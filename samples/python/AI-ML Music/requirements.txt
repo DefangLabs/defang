@@ -1,0 +1,5 @@
+uwsgi
+flask
+h5py
+implicit
+numpy

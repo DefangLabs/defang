@@ -1,0 +1,3 @@
+uwsgi
+flask
+boto3
