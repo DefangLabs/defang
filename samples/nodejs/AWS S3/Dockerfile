@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 3000
 
 # Run the app when the container launches
-CMD [ "node", "main.js" ]
+ENTRYPOINT [ "node", "main.js" ]
