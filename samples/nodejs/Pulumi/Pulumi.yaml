@@ -1,0 +1,6 @@
+name: defang-demo
+runtime: nodejs
+description: A minimal TypeScript Pulumi program to test DefangService resource
+config:
+  pulumi:disable-default-providers:
+    - 'aws'
