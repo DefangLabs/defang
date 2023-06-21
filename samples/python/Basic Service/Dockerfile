@@ -11,7 +11,7 @@ RUN apt-get update \
             python3-dev \
             ca-certificates \
       && rm -rf /var/lib/apt/lists/*
-	  
+
 # Install any needed packages specified in requirements.txt
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
@@ -23,5 +23,5 @@ COPY . /app
 EXPOSE 5000
 
 # Run main when the container launches
-CMD ["uwsgi", "--http", "0.0.0.0:5000", "--master", "-p", "2", "-w", "main:app"]
+ENTRYPOINT ["uwsgi", "--http", "0.0.0.0:5000", "--master", "-p", "2", "-w", "main:app"]
 USER nobody
