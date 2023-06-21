@@ -1,0 +1,12 @@
+{
+    "name": "defang-demo",
+    "private": true,
+    "main": "index.ts",
+    "devDependencies": {
+        "@types/node": ">=16"
+    },
+    "dependencies": {
+        "@defang-io/pulumi-defang": "^0.5.5",
+        "@pulumi/pulumi": "^3.0.0"
+    }
+}
