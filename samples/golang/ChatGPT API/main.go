@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-
-	"github.com/gorilla/mux"
+	"os/signal"
+	"syscall"
 )
 
 type Message struct {
@@ -20,6 +22,11 @@ func Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func Prompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
+
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	promptText := string(reqBody)
 
@@ -57,10 +64,22 @@ func Prompt(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	r := mux.NewRouter()
+	http.HandleFunc("/", Index)
+	http.HandleFunc("/prompt", Prompt)
 
-	r.HandleFunc("/", Index)
-	r.HandleFunc("/prompt", Prompt).Methods("POST")
+	// Register signal handler for graceful shutdown
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
 
-	http.ListenAndServe(":8080", r)
+	server := &http.Server{Addr: ":8080"}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server Serve: %v\n", err)
+		}
+	}()
+
+	sig := <-sigs
+	log.Printf("Received signal %v, shutting down...\n", sig)
+	log.Fatal(server.Shutdown(context.Background()))
 }
