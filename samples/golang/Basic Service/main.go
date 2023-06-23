@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type RequestInfo struct {
@@ -42,5 +47,19 @@ func main() {
 		w.Write(jsonResponse)
 	})
 
-	http.ListenAndServe(":8080", nil)
+	// Register signal handler for graceful shutdown
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
+
+	server := &http.Server{Addr: ":8080"}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server Serve: %v\n", err)
+		}
+	}()
+
+	sig := <-sigs
+	log.Printf("Received signal %v, shutting down...\n", sig)
+	log.Fatal(server.Shutdown(context.Background()))
 }

@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"html/template"
+	"log"
 	"net/http"
-
-	"github.com/gorilla/mux"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 var indexTmpl = template.Must(template.New("index").Parse(`
@@ -60,12 +63,24 @@ var submitTmpl = template.Must(template.New("submit").Parse(`
 `))
 
 func main() {
-	r := mux.NewRouter()
+	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/submit", submitHandler)
 
-	r.HandleFunc("/", indexHandler)
-	r.HandleFunc("/submit", submitHandler).Methods("POST")
+	// Register signal handler for graceful shutdown
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
 
-	http.ListenAndServe(":8080", r)
+	server := &http.Server{Addr: ":8080"}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server Serve: %v\n", err)
+		}
+	}()
+
+	sig := <-sigs
+	log.Printf("Received signal %v, shutting down...\n", sig)
+	log.Fatal(server.Shutdown(context.Background()))
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +89,11 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func submitHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html")
 	firstName := r.FormValue("first_name")
 	submitTmpl.Execute(w, struct{ FirstName string }{firstName})
