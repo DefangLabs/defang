@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type Response struct {
@@ -27,7 +30,7 @@ func main() {
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			w.WriteHeader(http.StatusBadGateway)
 			json.NewEncoder(w).Encode(Response{Status: "error"})
 			return
@@ -41,8 +44,19 @@ func main() {
 		json.NewEncoder(w).Encode(data)
 	})
 
-	fmt.Println("Starting server at port 8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatal(err)
-	}
+	// Register signal handler for graceful shutdown
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
+
+	server := &http.Server{Addr: ":8080"}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server Serve: %v\n", err)
+		}
+	}()
+
+	sig := <-sigs
+	log.Printf("Received signal %v, shutting down...\n", sig)
+	log.Fatal(server.Shutdown(context.Background()))
 }
