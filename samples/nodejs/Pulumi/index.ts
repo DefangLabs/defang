@@ -1,19 +1,22 @@
+// import * as aws from "@pulumi/aws";
 import { DefangService } from "@defang-io/pulumi-defang/lib";
 
 const service = new DefangService("nginx", {
-  image: "docker.io/nginx:latest",
+  // image: "docker.io/nginx:latest",
+  build: {
+    context: "../Basic Service",
+  },
   // platform: "linux",
-  ports: [{ target: 80, protocol: "http", mode: "ingress" }],
+  ports: [{ target: 3000, protocol: "http", mode: "ingress" }],
   // secrets: [
   //   {
   //     source: "secretx",
   //     value: "secretvalue", optional
   //   }
   // ],
-  // forceNewDeployment: true,
-  environment: {
-    RDS_HOST: "rds.endpoint",
-  },
+  // environment: {
+  //   RDS_HOST: "rds.endpoint",
+  // },
   deploy: {
     replicas: 1,
     resources: {
@@ -30,3 +33,14 @@ export const id = service.id;
 export const urn = service.urn;
 export const fqdn = service.fqdn;
 export const fabricDNS = service.fabricDNS;
+
+// const securityGroup = new aws.ec2.SecurityGroup("nginx", {});
+
+// const securityGroupRule = new aws.ec2.SecurityGroupRule("allow-nginx", {
+//   type: "ingress",
+//   fromPort: 80,
+//   toPort: 80,
+//   protocol: "tcp",
+//   cidrBlocks: service.natIPs,
+//   securityGroupId: service.securityGroup.id,
+// });
