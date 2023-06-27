@@ -7,6 +7,6 @@
     },
     "dependencies": {
         "@defang-io/pulumi-defang": "^0.6.8",
-        "@pulumi/pulumi": "^3.0.0"
+        "@pulumi/pulumi": "^3.73.0"
     }
 }
