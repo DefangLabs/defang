@@ -4,7 +4,7 @@ import { DefangService } from "@defang-io/pulumi-defang/lib";
 const service = new DefangService("nginx", {
   // image: "docker.io/nginx:latest",
   build: {
-    context: "../Basic Service",
+    context: "../nodejs/Basic Service",
   },
   // platform: "linux",
   ports: [{ target: 3000, protocol: "http", mode: "ingress" }],
@@ -31,8 +31,11 @@ const service = new DefangService("nginx", {
 
 export const id = service.id;
 export const urn = service.urn;
-export const fqdn = service.fqdn;
 export const fabricDNS = service.fabricDNS;
+export const fqdn = service.fqdn;
+export const name = service.name;
+export const natIPs = service.natIPs;
+export const etag = service.etag;
 
 // const securityGroup = new aws.ec2.SecurityGroup("nginx", {});
 
