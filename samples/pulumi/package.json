@@ -6,7 +6,7 @@
         "@types/node": ">=16"
     },
     "dependencies": {
-        "@defang-io/pulumi-defang": "^0.6.8",
+        "@defang-io/pulumi-defang": "^0.8.0",
         "@pulumi/pulumi": "^3.0.0"
     }
 }
