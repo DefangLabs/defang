@@ -1,4 +1,6 @@
 # defang
-The Defang Opinionated Platform (DOP) is a radically simpler way to build, deploy, and optimize production-ready cloud apps. The DOP is a serverless platform that lets you quickly build your application in the language of your choice and deploy to the cloud with a single command. The DOP CLI includes an AI-driven assistant that translates natural language prompts to a starting point for your project that you can then refine. Once you publish your code, the DOP automatically builds your project and deploys it to a pre-provisioned environment in the cloud, taking care of all the heavy lifting such as configuring networking, security, observability and all the other details that usually trip up the average cloud developer.
-
-This repo includes public releases of the Defang CLI and samples.
+The Defang Opinionated Platform (DOP) is a radically simpler way to build, deploy, and optimize production-ready cloud apps. 
+This repo includes:
+1. Public releases of the Defang CLI 
+2. Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
+3. Samples that show how to deploy an app using the Defang Pulumi Provider.
