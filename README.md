@@ -13,4 +13,4 @@ This repo includes:
 
 ## Support
 * Join our Slack channel using this [invite link](https://join.slack.com/share/enQtNTY2NzE1MTAzNDgzMi03M2YyZmZhYWE2YWNiMzFiYmI1MzJjMjUwNzVmZWIzOTYyZjhmOTlhYjU5ZTI1MGY4NjcwMGIzNzdkNWQ0ZWNi)
-* Mail us at info@defang.io
+* File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
