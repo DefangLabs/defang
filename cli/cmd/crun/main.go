@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/defang-io/defang/cli/pkg/cmd"
-	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
 	"github.com/spf13/pflag"
 )
 
@@ -25,14 +24,14 @@ func usage() {
 	fmt.Println(`
 Commands:
   run <image> [args]
-  logs <task ARN>
+  logs <task ID>
   destroy`)
 }
 
 func main() {
 	pflag.Parse()
 	color := cmd.ParseColor(*color)
-	region := aws.Region(*region)
+	region := cmd.Region(*region)
 
 	ctx := context.Background()
 

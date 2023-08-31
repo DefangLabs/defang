@@ -7,13 +7,13 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 )
 
-func (a *AwsEcs) Destroy(ctx context.Context, color Color) error {
+func (a *AwsEcs) Destroy(ctx context.Context) error {
 	s, err := a.createStack(ctx)
 	if err != nil {
 		return err
 	}
 
-	if _, err := s.Destroy(ctx, optdestroyColor(color), optdestroy.ProgressStreams(os.Stdout)); err != nil {
+	if _, err := s.Destroy(ctx, optdestroyColor(a.color), optdestroy.ProgressStreams(os.Stdout)); err != nil {
 		return err
 	}
 

@@ -3,11 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+
+	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
 )
 
-const (
-	stack = "dev"
-)
+type Region = aws.Region
 
 func Fatal(msg any) {
 	fmt.Println("Error:", msg) // TODO: color red

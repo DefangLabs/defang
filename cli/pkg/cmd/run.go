@@ -2,22 +2,19 @@ package cmd
 
 import (
 	"context"
-
-	"github.com/defang-io/defang/cli/pkg/aws/ecs/pulumi"
-	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
 )
 
-func Run(ctx context.Context, image string, color Color, region aws.Region, args []string, env map[string]string) error {
-	awsecs := pulumi.New(stack, region)
-	if err := awsecs.SetUp(ctx, image, pulumi.Color(color)); err != nil {
+func Run(ctx context.Context, image string, color Color, region Region, args []string, env map[string]string) error {
+	driver := createDriver(color, region)
+	if err := driver.SetUp(ctx, image); err != nil {
 		return err
 	}
 
-	arn, err := awsecs.Run(ctx, env, args...)
+	id, err := driver.Run(ctx, env, args...)
 	if err != nil {
 		return err
 	}
 
-	println("Task ARN:", *arn)
-	return awsecs.Tail(ctx, arn)
+	println("Task ID:", *id)
+	return driver.Tail(ctx, id)
 }
