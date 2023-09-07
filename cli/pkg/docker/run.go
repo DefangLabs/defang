@@ -13,7 +13,11 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		Image: d.image,
 		Env:   mapToSlice(env),
 		Cmd:   cmd,
-	}, nil, nil, nil, "")
+	}, &container.HostConfig{
+		Resources: container.Resources{
+			Memory: int64(d.memory),
+		},
+	}, nil, nil, "")
 	if err != nil {
 		return nil, err
 	}

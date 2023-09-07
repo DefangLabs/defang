@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/defang-io/defang/cli/pkg/aws/ecs/pulumi"
+	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn"
 	"github.com/defang-io/defang/cli/pkg/docker"
 	"github.com/defang-io/defang/cli/pkg/types"
 	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
@@ -47,7 +47,7 @@ func createDriver(color Color, region Region) types.Driver {
 		aws.RegionUSEast2,      // "us-east-2"
 		aws.RegionUSWest1,      // "us-west-1"
 		aws.RegionUSWest2:      // "us-west-2"
-		return pulumi.New(stack, region, pulumi.Color(color))
+		return cfn.New(stack, region)
 	default:
 		panic("unsupported region: " + region)
 	}

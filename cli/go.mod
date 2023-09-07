@@ -6,11 +6,13 @@ require (
 	github.com/aws/aws-cdk-go/awscdk/v2 v2.93.0
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.37
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.34.5
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.115.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.29.6
 	github.com/aws/constructs-go/constructs/v10 v10.2.69
 	github.com/aws/jsii-runtime-go v1.87.0
+	github.com/awslabs/goformation/v7 v7.12.1
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/pulumi/pulumi-aws/sdk/v5 v5.42.0
 	github.com/pulumi/pulumi/sdk/v3 v3.78.1

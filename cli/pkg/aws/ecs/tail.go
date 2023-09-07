@@ -1,4 +1,4 @@
-package pulumi
+package ecs
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -19,20 +18,19 @@ import (
 const spinner = `-\|/`
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
-	a.stackOutputs(ctx)
+	// a.Refresh(ctx)
 
 	parts := strings.Split(*taskArn, ":")
 
-	region := string(a.region)
 	if len(parts) == 6 {
-		region = parts[3]
+		a.Region = Region(parts[3])
 	}
 
 	taskId := path.Base(*taskArn)
-	logStreamName := path.Join(streamPrefix, containerName, taskId)
+	logStreamName := path.Join(StreamPrefix, ContainerName, taskId)
 
 	// Use CloudWatch API to tail the logs
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
@@ -43,7 +41,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	var nextToken *string
 	for {
 		events, err := cw.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
-			LogGroupName:  aws.String(a.logGroupName),
+			LogGroupName:  aws.String(a.LogGroupName),
 			LogStreamName: aws.String(logStreamName),
 			NextToken:     nextToken,
 			StartFromHead: aws.Bool(true),
@@ -66,7 +64,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 
 		// Use DescribeTasks API to check if the task is still running
 		tasks, _ := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-			Cluster: aws.String(a.clusterArn), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
+			Cluster: aws.String(a.ClusterArn), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
 			Tasks:   []string{taskId},
 		})
 		if tasks != nil && len(tasks.Tasks) > 0 {

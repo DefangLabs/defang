@@ -32,6 +32,7 @@ func ParseColor(color string) Color {
 	case "always", "never", "raw":
 		return Color(color)
 	default:
-		panic("invalid color option: " + color)
+		Fatal("invalid color option: " + color)
+		panic("unreachable")
 	}
 }

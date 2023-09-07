@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	awsecs "github.com/defang-io/defang/cli/pkg/aws/ecs"
 	"github.com/defang-io/defang/cli/pkg/types"
 	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v5/go/aws/cloudwatch"
@@ -17,47 +18,40 @@ import (
 )
 
 const (
-	containerName     = "pulumi"      // TODO: should depend on image name
-	ecrPublicPrefix   = "ecr-public2" // TODO: change; use project/stack name
-	ecrPublicRegistry = "public.ecr.aws"
-	projectName       = "projectNameX" // TODO: change
-	streamPrefix      = "pulumi"       // TODO: change
+	projectName = "projectNameX" // TODO: change
 )
 
 type TaskArn = types.TaskID
 
-type AwsEcs struct {
+type PulumiEcs struct {
+	awsecs.AwsEcs
+	image  string
 	stack  string
-	region aws.Region
 	color  Color
-
-	spot         bool
-	memoryMiB    uint32
-	vCpu         float32
-	image        string
-	taskDefArn   string
-	clusterArn   string
-	logGroupName string
+	memory uint64
 }
 
-var _ types.Driver = (*AwsEcs)(nil)
+var _ types.Driver = (*PulumiEcs)(nil)
 
-func New(stack string, region aws.Region, color Color) *AwsEcs {
-	return &AwsEcs{
-		stack:     stack,
-		region:    region,
-		color:     color,
-		spot:      true, // TODO: make configurable
-		vCpu:      1.0,  // TODO: make configurable
-		memoryMiB: 2048, // TODO: make configurable
+func New(stack string, region aws.Region, color Color) *PulumiEcs {
+	return &PulumiEcs{
+		stack: stack,
+		color: color,
+		AwsEcs: awsecs.AwsEcs{
+			Region: region,
+			Spot:   true,
+			VCpu:   1.0,
+		},
 	}
 }
 
-func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
-	const PREFIX = "my-" // TODO: change to "project-stack-"
+func (a PulumiEcs) deployFunc(ctx *pulumi.Context) error {
+	const PREFIX = "my-"                  // TODO: change to "project-stack-"
+	const ecrPublicPrefix = "ecr-public2" // TODO: change; use project/stack name
 
-	uswest2, err := aws.NewProvider(ctx, "uswest2", &aws.ProviderArgs{
-		Region: a.region,
+	// 0. AWS provider (we disabled the default providers)
+	uswest2, err := aws.NewProvider(ctx, "uswest2", &aws.ProviderArgs{ // TODO: misnomer
+		Region: a.Region,
 		// SkipMetadataApiCheck: pulumi.Bool(false), NO: this stack runs locally
 	})
 	if err != nil {
@@ -66,6 +60,7 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 
 	ctx.Export("region", uswest2.Region)
 
+	// 1. bucket (for state)
 	bucket, err := s3.NewBucket(ctx, PREFIX+"bucket-test", nil, pulumi.Provider(uswest2))
 	if err != nil {
 		return err
@@ -73,6 +68,7 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 
 	// ctx.Export("bucketName", bucket.ID())
 
+	// 2. ECS cluster
 	cluster, err := ecs.NewCluster(ctx, PREFIX+"cluster-test", nil, pulumi.Provider(uswest2))
 	if err != nil {
 		return err
@@ -80,21 +76,23 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 
 	ctx.Export("clusterArn", cluster.Arn)
 
+	// 3. ECR pull-through cache
 	ptcr, err := ecr.NewPullThroughCacheRule(ctx, PREFIX+"pull-through-cache-rule-test", &ecr.PullThroughCacheRuleArgs{
 		EcrRepositoryPrefix: pulumi.String(ecrPublicPrefix),
-		UpstreamRegistryUrl: pulumi.String(ecrPublicRegistry),
+		UpstreamRegistryUrl: pulumi.String(awsecs.EcrPublicRegistry),
 	}, pulumi.Provider(uswest2))
 	if err != nil {
 		return err
 	}
 
 	image := pulumi.StringOutput(pulumi.String(a.image).ToStringOutput())
-	if repo, ok := strings.CutPrefix(a.image, ecrPublicRegistry); ok {
-		image = pulumi.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s%s", ptcr.RegistryId, a.region, ecrPublicPrefix, repo)
+	if repo, ok := strings.CutPrefix(a.image, awsecs.EcrPublicRegistry); ok {
+		image = pulumi.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s%s", ptcr.RegistryId, a.Region, ecrPublicPrefix, repo)
 	}
 
+	// 4. ECS capacity provider
 	capacityProvider := "FARGATE"
-	if a.spot {
+	if a.Spot {
 		capacityProvider = "FARGATE_SPOT"
 	}
 	_, err = ecs.NewClusterCapacityProviders(ctx, PREFIX+"cluster-capacity-providers-test", &ecs.ClusterCapacityProvidersArgs{
@@ -113,7 +111,7 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 		return err
 	}
 
-	// Create CloudWatch log group
+	// 5. CloudWatch log group
 	logGroup, err := cloudwatch.NewLogGroup(ctx, PREFIX+"log-group-test", &cloudwatch.LogGroupArgs{
 		RetentionInDays: pulumi.Int(1),
 	}, pulumi.Provider(uswest2))
@@ -123,6 +121,7 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 
 	ctx.Export("logGroupName", logGroup.Name)
 
+	// 6. IAM role for task
 	powerUserRole, err := iam.NewRole(ctx, PREFIX+"task-role-test", &iam.RoleArgs{
 		AssumeRolePolicy: pulumi.String(`{
 			"Version": "2012-10-17",
@@ -142,23 +141,55 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 		return err
 	}
 
-	containers := []map[string]any{
+	containers := a.createContainerDefinition(image, logGroup.ID(), bucket.ID())
+	containerDefJson := pulumi.JSONMarshalWithContext(ctx.Context(), containers)
+
+	// 7. ECS task definition
+	cpu, mem := awsecs.FixupFargateConfig(a.VCpu, float64(a.memory)/1024/1024)
+	td, err := ecs.NewTaskDefinition(ctx, PREFIX+"task-def-test", &ecs.TaskDefinitionArgs{
+		// RuntimePlatform: ecs.TaskDefinitionRuntimePlatformArgs{
+		// 	OperatingSystemFamily: pulumi.String("LINUX"),
+		// 	CpuArchitecture: 	 pulumi.String("X86_64"),
+		// },
+		// Volumes: ecs.TaskDefinitionVolumeArray{
+		// 	ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("files")},
+		// },
+		TaskRoleArn:             powerUserRole.Arn, // ??? FIXME: too much?
+		ExecutionRoleArn:        powerUserRole.Arn, // needed for "awslogs"; FIXME: too much?
+		NetworkMode:             pulumi.String("awsvpc"),
+		RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
+		Memory:                  pulumi.String(strconv.FormatUint(uint64(mem), 10)),
+		Cpu:                     pulumi.String(strconv.FormatUint(uint64(cpu), 10)),
+		Family:                  pulumi.String(PREFIX + "task-def-test"),
+		ContainerDefinitions:    containerDefJson,
+	}, pulumi.Provider(uswest2))
+	if err != nil {
+		return err
+	}
+
+	ctx.Export("taskDefArn", td.Arn)
+	// ctx.Export("subNetIds", aws.(ctx, &aws.GetSubnetIdsArgs{}).Ids)
+	return nil
+}
+
+func (a PulumiEcs) createContainerDefinition(image, logGroupID, bucketID pulumi.Input) any {
+	return []map[string]any{
 		{
-			"name":  containerName,
+			"name":  awsecs.ContainerName,
 			"image": image,
 			"logConfiguration": map[string]any{
 				// "logDriver": "awsfirelens",
 				"logDriver": "awslogs",
 				"options": map[string]any{
-					"awslogs-group":         logGroup.ID(),
-					"awslogs-region":        a.region,
-					"awslogs-stream-prefix": streamPrefix,
+					"awslogs-group":         logGroupID,
+					"awslogs-region":        a.Region,
+					"awslogs-stream-prefix": awsecs.StreamPrefix,
 				},
 			},
 			"environment": []map[string]any{ // TODO: move elsewhere
 				{
 					"name":  "PULUMI_BACKEND_URL",
-					"value": pulumi.Sprintf("s3://%s?region=%s&awssdk=v2", bucket.ID(), a.region),
+					"value": pulumi.Sprintf("s3://%s?region=%s&awssdk=v2", bucketID, a.Region),
 				},
 				{
 					"name":  "PULUMI_SKIP_UPDATE_CHECK",
@@ -207,35 +238,9 @@ func (a AwsEcs) deployFunc(ctx *pulumi.Context) error {
 		// 	},
 		// },
 	}
-	containerDefJson := pulumi.JSONMarshalWithContext(ctx.Context(), containers)
-
-	td, err := ecs.NewTaskDefinition(ctx, PREFIX+"task-def-test", &ecs.TaskDefinitionArgs{
-		// RuntimePlatform: ecs.TaskDefinitionRuntimePlatformArgs{
-		// 	OperatingSystemFamily: pulumi.String("LINUX"),
-		// 	CpuArchitecture: 	 pulumi.String("X86_64"),
-		// },
-		// Volumes: ecs.TaskDefinitionVolumeArray{
-		// 	ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("files")},
-		// },
-		TaskRoleArn:             powerUserRole.Arn, // ??? FIXME: too much?
-		ExecutionRoleArn:        powerUserRole.Arn, // needed for "awslogs"; FIXME: too much?
-		NetworkMode:             pulumi.String("awsvpc"),
-		RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
-		Memory:                  pulumi.String(strconv.FormatUint(uint64(a.memoryMiB), 10)),
-		Cpu:                     pulumi.String(strconv.FormatUint(uint64(a.vCpu*1024), 10)),
-		Family:                  pulumi.String(PREFIX + "task-def-test"),
-		ContainerDefinitions:    containerDefJson,
-	}, pulumi.Provider(uswest2))
-	if err != nil {
-		return err
-	}
-
-	ctx.Export("taskDefArn", td.Arn)
-	// ctx.Export("subNetIds", aws.(ctx, &aws.GetSubnetIdsArgs{}).Ids)
-	return nil
 }
 
-func (a *AwsEcs) createStack(ctx context.Context) (*auto.Stack, error) {
+func (a *PulumiEcs) createStack(ctx context.Context) (*auto.Stack, error) {
 	s, err := auto.UpsertStackInlineSource(ctx, a.stack, projectName, a.deployFunc)
 	if err != nil {
 		return nil, err
@@ -253,7 +258,7 @@ func (a *AwsEcs) createStack(ctx context.Context) (*auto.Stack, error) {
 	return &s, nil
 }
 
-func (a *AwsEcs) stackOutputs(ctx context.Context) error {
+func (a *PulumiEcs) Refresh(ctx context.Context) error {
 	s, err := a.createStack(ctx)
 	if err != nil {
 		return err
@@ -268,10 +273,24 @@ func (a *AwsEcs) stackOutputs(ctx context.Context) error {
 	return nil
 }
 
-func (a *AwsEcs) fillOutputs(outputs auto.OutputMap) {
-	a.taskDefArn = outputs["taskDefArn"].Value.(string)
-	a.clusterArn = outputs["clusterArn"].Value.(string)
-	a.logGroupName = outputs["logGroupName"].Value.(string)
-	// a.bucketName = outputs["bucketName"].Value.(string)
-	// a.subNetIds = outputs["subNetIds"].Value.([]string)
+func (a *PulumiEcs) fillOutputs(outputs auto.OutputMap) {
+	a.TaskDefArn = outputs["taskDefArn"].Value.(string)
+	a.ClusterArn = outputs["clusterArn"].Value.(string)
+	a.LogGroupName = outputs["logGroupName"].Value.(string)
+	// a.BucketName = outputs["bucketName"].Value.(string)
+	// a.SubNetIds = outputs["subNetIds"].Value.([]string)
+}
+
+func (a *PulumiEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {
+	if err := a.Refresh(ctx); err != nil {
+		return nil, err
+	}
+	return a.AwsEcs.Run(ctx, env, cmd...)
+}
+
+func (a *PulumiEcs) Tail(ctx context.Context, task TaskArn) error {
+	if err := a.Refresh(ctx); err != nil {
+		return err
+	}
+	return a.AwsEcs.Tail(ctx, task)
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func Destroy(ctx context.Context, color Color, region Region) error {
+func Destroy(ctx context.Context, region Region, color Color) error {
 	driver := createDriver(color, region)
-	return driver.Destroy(ctx)
+	return driver.TearDown(ctx)
 }

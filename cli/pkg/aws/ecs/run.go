@@ -1,11 +1,10 @@
-package pulumi
+package ecs
 
 import (
 	"context"
 	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -14,9 +13,9 @@ import (
 const taskCount = 1
 
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {
-	a.stackOutputs(ctx)
+	// a.Refresh(ctx)
 
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(string(a.region)))
+	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -42,8 +41,8 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	rti := ecs.RunTaskInput{
 		Count:          aws.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
-		TaskDefinition: aws.String(a.taskDefArn),
-		Cluster:        aws.String(a.clusterArn),
+		TaskDefinition: aws.String(a.TaskDefArn),
+		Cluster:        aws.String(a.ClusterArn),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				Subnets: subnetIds, // required
@@ -54,7 +53,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name:        aws.String(containerName),
+					Name:        aws.String(ContainerName),
 					Command:     cmd,
 					Environment: pairs,
 					// EnvironmentFiles: ,

@@ -7,8 +7,10 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
 )
 
-func (a *AwsEcs) SetUp(ctx context.Context, image string) error {
+func (a *PulumiEcs) SetUp(ctx context.Context, image string, memory uint64) error {
 	a.image = image // TODO: set in stack config
+	a.memory = memory
+
 	s, err := a.createStack(ctx)
 	if err != nil {
 		return err

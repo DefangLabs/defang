@@ -4,11 +4,12 @@ import (
 	"context"
 	"os"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 )
 
-func (a *AwsEcs) Destroy(ctx context.Context) error {
-	s, err := a.createStack(ctx)
+func (a *PulumiEcs) TearDown(ctx context.Context) error {
+	s, err := auto.SelectStackInlineSource(ctx, a.stack, projectName, a.deployFunc)
 	if err != nil {
 		return err
 	}

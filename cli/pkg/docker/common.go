@@ -10,7 +10,8 @@ type ContainerID = types.TaskID
 type Docker struct {
 	*client.Client
 
-	image string
+	image  string
+	memory uint64
 }
 
 func New() *Docker {
