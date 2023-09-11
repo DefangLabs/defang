@@ -4,12 +4,13 @@ import (
 	"context"
 	"os"
 
+	"github.com/defang-io/defang/cli/pkg/types"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 )
 
 func (a *PulumiEcs) TearDown(ctx context.Context) error {
-	s, err := auto.SelectStackInlineSource(ctx, a.stack, projectName, a.deployFunc)
+	s, err := auto.SelectStackInlineSource(ctx, a.stack, types.ProjectName, a.deployFunc)
 	if err != nil {
 		return err
 	}

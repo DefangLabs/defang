@@ -24,6 +24,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	// 1. bucket (for state)
 	template.Resources["Bucket"] = &s3.Bucket{
 		// BucketName: aws.String(PREFIX + "bucket" + SUFFIX), // optional
+		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
 	}
 
 	// 2. ECS cluster
@@ -31,7 +32,12 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 		// ClusterName: aws.String(PREFIX + "cluster" + SUFFIX), // optional
 	}
 
-	// 3. ECR pull-through cache
+	// 3. ECR pull-through cache (only really needed for images from ECR Public registry)
+	// TODO: Creating pull through cache rules isn't supported in the following Regions:
+	// * China (Beijing) (cn-north-1)
+	// * China (Ningxia) (cn-northwest-1)
+	// * AWS GovCloud (US-East) (us-gov-east-1)
+	// * AWS GovCloud (US-West) (us-gov-west-1)
 	template.Resources["PullThroughCache"] = &ecr.PullThroughCacheRule{
 		EcrRepositoryPrefix: aws.String(ecrPublicPrefix), // TODO: optional
 		UpstreamRegistryUrl: aws.String(awsecs.EcrPublicRegistry),
@@ -125,7 +131,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 		NetworkMode:             aws.String("awsvpc"),
 		RequiresCompatibilities: []string{"FARGATE"},
 		TaskRoleArn:             cloudformation.RefPtr("TaskRole"),
-		// Family:                  aws.String(PREFIX + "task-def" + SUFFIX), // optional
+		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
 	}
 
 	template.Outputs["taskDefArn"] = cloudformation.Output{

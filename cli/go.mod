@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.115.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.29.6
+	github.com/aws/smithy-go v1.14.2
 	github.com/awslabs/goformation/v7 v7.12.1
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/pulumi/pulumi-aws/sdk/v5 v5.42.0
@@ -33,7 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.13.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.15.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.21.5 // indirect
-	github.com/aws/smithy-go v1.14.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cheggaaa/pb v1.0.29 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect

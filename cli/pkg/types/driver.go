@@ -2,6 +2,17 @@ package types
 
 import "context"
 
+const (
+	ProjectName = "crun"
+)
+
+func StackName(stack string) string {
+	if stack == "" {
+		return ProjectName
+	}
+	return ProjectName + "-" + stack
+}
+
 type TaskID *string
 
 type Driver interface {
