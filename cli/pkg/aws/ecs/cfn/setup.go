@@ -11,6 +11,7 @@ import (
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
 	"github.com/defang-io/defang/cli/pkg/aws/ecs"
+	"github.com/defang-io/defang/cli/pkg/aws/region"
 	"github.com/defang-io/defang/cli/pkg/types"
 )
 
@@ -23,9 +24,12 @@ var _ types.Driver = (*AwsEcs)(nil)
 
 const stackTimeout = time.Minute * 3
 
-func New(stack string, region ecs.Region) *AwsEcs {
+func New(stack string, region region.Region) *AwsEcs {
+	if stack == "" || region == "" {
+		panic("stack and region must be set")
+	}
 	return &AwsEcs{
-		stackName: types.StackName(stack),
+		stackName: stack,
 		AwsEcs: ecs.AwsEcs{
 			Region: region,
 			Spot:   true,
@@ -133,12 +137,14 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
+			case "subnetId":
+				a.SubnetID = *output.OutputValue
 			case "taskDefArn":
-				if a.TaskDefArn == "" {
-					a.TaskDefArn = *output.OutputValue
+				if a.TaskDefARN == "" {
+					a.TaskDefARN = *output.OutputValue
 				}
 			case "clusterArn":
-				a.ClusterArn = *output.OutputValue
+				a.ClusterARN = *output.OutputValue
 			case "logGroupName":
 				a.LogGroupName = *output.OutputValue
 			}

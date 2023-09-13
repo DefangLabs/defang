@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -20,14 +21,20 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		return nil, err
 	}
 
-	// Get the subnet IDs
-	subnet, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{})
-	if err != nil {
-		return nil, err
-	}
-	var subnetIds []string
-	for _, sn := range subnet.Subnets {
-		subnetIds = append(subnetIds, *sn.SubnetId)
+	if a.SubnetID == "" {
+		// Get a subnet ID
+		subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+			// Filters: []ec2Types.Filter{
+			// 	{
+			// 		Name:   aws.String("map-public-ip-on-launch"),
+			// 		Values: []string{"true"},
+			// 	},
+			// },
+		})
+		if err != nil {
+			return nil, err
+		}
+		a.SubnetID = *subnetsOutput.Subnets[0].SubnetId // TODO: make configurable/deterministic
 	}
 
 	var pairs []types.KeyValuePair
@@ -38,19 +45,27 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		})
 	}
 
+	// stsClient := sts.NewFromConfig(cfg)
+	// cred, err := stsClient.GetCallerIdentity(ctx, nil)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	rti := ecs.RunTaskInput{
 		Count:          aws.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
-		TaskDefinition: aws.String(a.TaskDefArn),
-		Cluster:        aws.String(a.ClusterArn),
+		TaskDefinition: aws.String(a.TaskDefARN),
+		PropagateTags:  types.PropagateTagsTaskDefinition,
+		Cluster:        aws.String(a.ClusterARN),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
-				Subnets: subnetIds, // required
-				// 		SecurityGroups: []string{},
-				AssignPublicIp: types.AssignPublicIpEnabled,
+				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
+				Subnets:        []string{a.SubnetID},
+				// SecurityGroups: []string{},
 			},
 		},
 		Overrides: &types.TaskOverride{
+			// TaskRoleArn: cred.Arn, TODO: default to caller identity; needs trust + iam:PassRole
 			ContainerOverrides: []types.ContainerOverride{
 				{
 					Name:        aws.String(ContainerName),
@@ -58,6 +73,12 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 					Environment: pairs,
 					// EnvironmentFiles: ,
 				},
+			},
+		},
+		Tags: []types.Tag{ //TODO: add tags to the task
+			{
+				Key:   aws.String("StartedAt"),
+				Value: aws.String(time.Now().String()),
 			},
 		},
 	}

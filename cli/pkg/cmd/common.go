@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/defang-io/defang/cli/pkg/aws/ecs"
+	"github.com/defang-io/defang/cli/pkg/aws"
 )
 
-type Region = ecs.Region
+type Region = aws.Region
 
 func Fatal(msg any) {
 	fmt.Println("Error:", msg) // TODO: color red

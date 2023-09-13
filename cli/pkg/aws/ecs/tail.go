@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/defang-io/defang/cli/pkg/aws/region"
 )
 
 const spinner = `-\|/`
@@ -23,11 +24,11 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	parts := strings.Split(*taskArn, ":")
 
 	if len(parts) == 6 {
-		a.Region = Region(parts[3])
+		a.Region = region.Region(parts[3])
 	}
 
 	taskId := path.Base(*taskArn)
-	logStreamName := path.Join(StreamPrefix, ContainerName, taskId)
+	logStreamName := path.Join(ProjectName, ContainerName, taskId)
 
 	// Use CloudWatch API to tail the logs
 	cfg, err := a.LoadConfig(ctx)
@@ -64,7 +65,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 
 		// Use DescribeTasks API to check if the task is still running
 		tasks, _ := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-			Cluster: aws.String(a.ClusterArn), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
+			Cluster: aws.String(a.ClusterARN), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
 			Tasks:   []string{taskId},
 		})
 		if tasks != nil && len(tasks.Tasks) > 0 {

@@ -5,27 +5,26 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/defang-io/defang/cli/pkg/aws/region"
 	"github.com/defang-io/defang/cli/pkg/types"
-	pulumiAws "github.com/pulumi/pulumi-aws/sdk/v5/go/aws"
 )
 
 const (
 	ContainerName     = "main"
 	EcrPublicRegistry = "public.ecr.aws"
-	StreamPrefix      = "crun"
+	ProjectName       = types.ProjectName
 )
-
-type Region = pulumiAws.Region // TODO: don't use Pulumi's Region type
 
 type TaskArn = types.TaskID
 
 type AwsEcs struct {
 	Spot         bool
 	VCpu         float64
-	ClusterArn   string
+	ClusterARN   string
 	LogGroupName string
-	Region       Region
-	TaskDefArn   string
+	Region       region.Region
+	TaskDefARN   string
+	SubnetID     string
 }
 
 func (a AwsEcs) LoadConfig(ctx context.Context) (aws.Config, error) {
