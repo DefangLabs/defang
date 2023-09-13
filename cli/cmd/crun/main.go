@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	color  = pflag.String("color", "auto", `Colorize output. Choices are: always, never, raw, auto`)
-	env    = pflag.StringToStringP("env", "e", nil, "Environment variables to pass to the run command")
-	region = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
-	memory = pflag.StringP("memory", "m", "2g", "Memory limit in bytes")
+	color    = pflag.String("color", "auto", `Colorize output. Choices are: always, never, raw, auto`)
+	envs     = pflag.StringArrayP("env", "e", nil, "Environment variables to pass to the run command")
+	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
+	memory   = pflag.StringP("memory", "m", "2g", "Memory limit in bytes")
+	envFiles = pflag.StringArray("env-file", nil, "Read in a file of environment variables")
 	// driver = pflag.StringP("driver", "d", "auto", "Container runner to use. Choices are: pulumi-ecs, docker")
 
 	version = "development" // overwritten by build script -ldflags "-X main.version=..."
@@ -35,6 +36,20 @@ func main() {
 	region := cmd.Region(*region)
 	memory := cmd.ParseMemory(*memory)
 
+	envMap := make(map[string]string)
+	// Apply env vars from files first, so they can be overridden by the command line
+	for _, envFile := range *envFiles {
+		if _, err := cmd.ParseEnvFile(envFile, envMap); err != nil {
+			cmd.Fatal(err)
+		}
+	}
+	// Apply env vars from the command line last, so they take precedence
+	for _, env := range *envs {
+		if key, value := cmd.ParseEnvLine(env); key != "" {
+			envMap[key] = value
+		}
+	}
+
 	ctx := context.Background()
 
 	var err error
@@ -45,7 +60,7 @@ func main() {
 		if pflag.NArg() < 2 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
-		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], *env)
+		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap)
 	case "logs", "tail":
 		if pflag.NArg() != 2 {
 			cmd.Fatal("logs requires a single task ID")
