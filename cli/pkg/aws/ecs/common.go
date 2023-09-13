@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	ContainerName     = "pulumi" // TODO: could depend on image name
+	ContainerName     = "main"
 	EcrPublicRegistry = "public.ecr.aws"
-	StreamPrefix      = "pulumi" // TODO: change
+	StreamPrefix      = "crun"
 )
 
-type Region = pulumiAws.Region // TODO: don't use Pulumi's
+type Region = pulumiAws.Region // TODO: don't use Pulumi's Region type
 
 type TaskArn = types.TaskID
 
