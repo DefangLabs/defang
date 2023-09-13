@@ -163,6 +163,13 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn ecs.TaskArn) error {
 	return a.AwsEcs.Tail(ctx, taskArn)
 }
 
+func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
+	if err := a.fillOutputs(ctx, a.stackName); err != nil {
+		return err
+	}
+	return a.AwsEcs.Stop(ctx, taskArn)
+}
+
 func (a *AwsEcs) TearDown(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {

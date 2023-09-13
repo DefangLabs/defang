@@ -20,4 +20,5 @@ type Driver interface {
 	TearDown(ctx context.Context) error
 	Run(ctx context.Context, env map[string]string, args ...string) (TaskID, error)
 	Tail(ctx context.Context, taskID TaskID) error
+	Stop(ctx context.Context, taskID TaskID) error
 }

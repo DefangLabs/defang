@@ -16,5 +16,6 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 	}
 
 	println("Task ID:", *id)
+	// FIXME: stop task on context cancelation/ctrl-c?
 	return driver.Tail(ctx, id)
 }

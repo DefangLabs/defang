@@ -14,6 +14,7 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		Env:   mapToSlice(env),
 		Cmd:   cmd,
 	}, &container.HostConfig{
+		AutoRemove: true,
 		Resources: container.Resources{
 			Memory: int64(d.memory),
 		},

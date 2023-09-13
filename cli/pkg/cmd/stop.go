@@ -6,7 +6,7 @@ import (
 	"github.com/defang-io/defang/cli/pkg/types"
 )
 
-func Logs(ctx context.Context, region Region, id types.TaskID) error {
+func Stop(ctx context.Context, region Region, id types.TaskID) error {
 	driver := createDriver(ColorAuto, region)
-	return driver.Tail(ctx, id)
+	return driver.Stop(ctx, id)
 }

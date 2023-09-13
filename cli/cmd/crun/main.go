@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 )
 
 var (
+	help     = pflag.BoolP("help", "h", false, "Show this help message")
 	color    = pflag.String("color", "auto", `Colorize output. Choices are: always, never, raw, auto`)
 	envs     = pflag.StringArrayP("env", "e", nil, "Environment variables to pass to the run command")
 	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
@@ -25,13 +27,19 @@ func usage() {
 	pflag.Usage()
 	fmt.Println(`
 Commands:
-  run <image> [args]
-  logs <task ID>
-  destroy`)
+  run <image> [arg...]   Create and run a new task from an image
+  logs <task ID>         Fetch the logs of a task
+  stop <task ID>         Stop a running task
+  destroy                Destroy all resources created by this tool`)
 }
 
 func main() {
 	pflag.Parse()
+	if *help {
+		usage()
+		return
+	}
+
 	color := cmd.ParseColor(*color)
 	region := cmd.Region(*region)
 	memory := cmd.ParseMemory(*memory)
@@ -55,12 +63,20 @@ func main() {
 	var err error
 	switch pflag.Arg(0) {
 	default:
+		err = errors.New("unknown command: " + pflag.Arg(0))
+	case "help", "":
 		usage()
 	case "run":
 		if pflag.NArg() < 2 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
 		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap)
+	case "stop":
+		if pflag.NArg() != 2 {
+			cmd.Fatal("stop requires a single task ID")
+		}
+		taskArn := pflag.Arg(1)
+		err = cmd.Stop(ctx, region, &taskArn)
 	case "logs", "tail":
 		if pflag.NArg() != 2 {
 			cmd.Fatal("logs requires a single task ID")
