@@ -1,0 +1,13 @@
+*
+!protos
+!cmd
+!pkg
+!go.mod
+!go.sum
+cmd/server/main
+cmd/server/server
+cmd/cli
+!cd
+cd/node_modules
+tests
+**/*_test.go
