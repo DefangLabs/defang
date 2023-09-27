@@ -1,0 +1,28 @@
+services:
+  dfnx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DNS: "${COMPOSE_PROJECT_NAME}-dfnx.prod1.defang.dev"
+    env_file:
+      - fileName.env
+    ports:
+      - target: 80
+        mode: host
+  # dfnx:
+  #   build:
+  #     context: .
+      # dockerfile: Dockerfile.dfn
+    # ports:
+      # - 80
+  echo:
+    image: ealen/echo-server
+    ports:
+      - target: 80
+        mode: ingress
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+    # domainname: echotest.gnafed.click
+    profiles:
+      - donotstart
