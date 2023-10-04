@@ -2,46 +2,10 @@ package auth
 
 import (
 	"context"
-	"errors"
-	"net/http"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
-	"google.golang.org/grpc/credentials"
 )
-
-func ParseAuthorizationHeader(header string) (id string, token string) {
-	tokens := strings.SplitN(header, " ", 2)
-	id = tokens[0]
-	if len(tokens) == 2 {
-		token = tokens[1]
-	}
-	return
-}
-
-func ParseBearerToken(header string) string {
-	id, token := ParseAuthorizationHeader(header)
-	if id != "Bearer" && id != "bearer" {
-		return ""
-	}
-	return token
-}
-
-type bearerTokenCreds map[string]string
-
-func NewBearerTokenCreds(token string) credentials.PerRPCCredentials {
-	return bearerTokenCreds{
-		"authorization": "Bearer " + strings.TrimSpace(token),
-	}
-}
-
-func (bt bearerTokenCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return bt, nil
-}
-
-func (bt bearerTokenCreds) RequireTransportSecurity() bool {
-	return true
-}
 
 type authInterceptor struct {
 	authorization string
@@ -70,18 +34,4 @@ func (a *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 
 func (authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return next
-}
-
-func GetBearerTokenFromHeader(header http.Header) (string, error) {
-	value := header.Get("authorization")
-	if value == "" {
-		return "", errors.New("missing authorization")
-	}
-
-	// Parse authorization header "Bearer <access_token>"
-	access_token := ParseBearerToken(value)
-	if access_token == "" {
-		return "", errors.New("missing bearer token")
-	}
-	return access_token, nil
 }
