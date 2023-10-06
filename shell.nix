@@ -2,6 +2,7 @@
 with pkgs;
 mkShell {
   buildInputs = [
+    buf
     git
     gnumake
     gnused # force Linux `sed` everywhere

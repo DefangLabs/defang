@@ -15,7 +15,8 @@ make
 go fmt
 ```
 
-## Update Dependencies (regen the go.mod file)
+## Update Dependencies
+To regenerate the `go.mod` file:
 ```
 go mod tidy
 ```
