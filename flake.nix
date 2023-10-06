@@ -13,7 +13,7 @@
       {
         devShells.default = import ./shell.nix { pkgs = pkgs; };
         packages.defang-cli = pkgs.callPackage ./nix/cli.nix { };
-        packages.defang-bin = pkgs.callPackage ./nix/bin.nix { };
+        packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
       }
     );
 }
