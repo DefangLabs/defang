@@ -2,3 +2,4 @@ node_modules/
 .envrc
 .direnv/
 .DS_Store
+/result
