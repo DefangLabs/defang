@@ -1,0 +1,269 @@
+// protos/v1/fabric.proto
+syntax = "proto3";
+
+option go_package = "github.com/defang-io/defang/src/protos/io/defang/v1";
+// option java_multiple_files = true;
+// option java_package = "io.defang.fabric";
+// option java_outer_classname = "FabricProto";
+
+package io.defang.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service FabricController {
+  rpc GetStatus(google.protobuf.Empty) returns (Status);   // public
+  rpc GetVersion(google.protobuf.Empty) returns (Version); // public
+  rpc Token(TokenRequest) returns (TokenResponse);         // public
+
+  rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  rpc Tail(TailRequest) returns (stream TailResponse);
+  rpc Update(Service) returns (ServiceInfo);
+  rpc Get(ServiceID) returns (ServiceInfo); // should be GetService
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+  // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse); // should be ListServices
+
+  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+
+  rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
+  rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
+  rpc CreateUploadURL(google.protobuf.Empty) returns (UploadURLResponse);
+  // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
+}
+
+message DeleteRequest { repeated string names = 1; }
+
+message DeleteResponse { string etag = 1; }
+
+message GenerateFilesRequest {
+  string prompt = 1;
+  string language = 2;
+}
+
+message File {
+  string name = 1;
+  string content = 2;
+}
+
+message GenerateFilesResponse { repeated File files = 1; }
+
+message UploadURLResponse { string url = 1; }
+
+message ServiceInfo {
+  Service service = 1;
+  repeated string endpoints = 2; // list of endpoints, one for each port
+  string tenant = 3;             // tenant ID (or project ID)
+  string etag = 4;
+  string status = 5;
+  repeated string nat_ips = 6; // comma-separated list of NAT IPs
+  repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
+  string private_fqdn = 8;     // fully qualified domain name (host)
+  string public_fqdn = 9;      // fully qualified domain name (ingress)
+
+  // bool is_function = 5; // true if service is a function
+  // string natsJwt = 5;
+}
+
+// message Project {
+//   repeated Service services = 1;
+//   repeated SecretValue secrets = 2;
+// }
+
+message Secrets { repeated string names = 1; }
+
+message SecretValue {
+  string name = 1;
+  string value = 2;
+}
+
+message TokenRequest {
+  string tenant = 1;
+  string auth_code = 2;      // from GitHub authorization code flow
+  repeated string scope = 3; // "tail", "read", etc.
+  string assertion = 4;      // jwt-bearer
+  // string refresh_token = 3;
+}
+
+message TokenResponse {
+  string access_token = 1; // our JWT
+  // string refresh_token = 2;
+  // string token_type = 3; // "Bearer"
+  // uint32 expires_in = 4; // 3600
+  // string id_token = 5; // "eyJhbGciOiJSUzI…"
+}
+
+message Status { string version = 1; }
+
+message Version {
+  string fabric = 1;
+  string nats = 2;
+}
+
+message TailRequest {
+  string service = 1; // was "name"
+  google.protobuf.Timestamp since = 2;
+  string etag = 3;
+  // string host = 4;
+}
+
+message LogEntry {
+  string message = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  bool stderr = 3;
+}
+
+message TailResponse {
+  reserved 1; // was "string raw"
+  repeated LogEntry entries = 2;
+  string service = 3;
+  string etag = 4;
+  string host = 5;
+}
+
+message ListServicesResponse { repeated ServiceInfo services = 1; }
+
+enum Platform {
+  LINUX_AMD64 = 0;
+  LINUX_ARM64 = 1;
+  LINUX_ANY = 2;
+}
+
+message ServiceID { string name = 1; }
+
+message Device {
+  repeated string capabilities = 1; // "gpu", "tpu", etc.
+  string driver = 2;                // "nvidia", "amd", etc.
+  uint32 count = 3;                 // number of devices to reserve
+  // repeated string device_ids = 4; // device IDs to reserve
+  // map<string, string> options = 5;
+}
+
+/* placement specifies constraints and preferences for platform to select a
+ * physical node to run service containers. */
+// message Placement {
+//   /* constraints defines a REQUIRED property the platform's node MUST fulfill
+//   to run service container. */ map<string, string> constraints = 1;
+//   /* preferences defines a property the platform's node SHOULD fulfill to run
+//   service container. */ map<string, string> preferences = 2;
+// }
+
+message Resource {
+  float memory = 1;            // in MiB
+  float cpus = 2;              // fractional vCPUs
+  repeated Device devices = 3; // devices & capabilities
+}
+
+message Resources {
+  Resource reservations = 1; // requested resources
+  // Resource limits = 2; // hard limits
+}
+
+message Deploy {
+  uint32 replicas = 1;     // number of initial replicas
+  Resources resources = 2; // reservations and limits
+  // Placement placement = 3;
+  // EndpointMode endpoint_mode
+  // Mode mode
+}
+
+// message Range {
+//   uint32 from = 1;
+//   uint32 to = 2;
+// }
+
+enum Protocol {
+  ANY = 0; // unspecified means any protocol
+  UDP = 1;
+  TCP = 2;
+  HTTP = 3;
+  HTTP2 = 4;
+  GRPC = 5; // HTTP/2 with gRPC health checks
+}
+
+enum Mode {
+  HOST = 0;    // no load-balancer; suitable for internal services and functions
+  INGRESS = 1; // with load-balancer; suitable for public services
+}
+
+message Port {
+  uint32 target = 1;
+  Protocol protocol = 2;
+  Mode mode = 3; // load-balanced (ingress) or not (host)
+  // string host_ip "127.0.0.1"
+  // Range published "8080"
+}
+
+message Secret {
+  string source = 1; // name of the secret
+  // string target = 2;
+}
+
+message Build {
+  string context = 1;           // path or URL to the build context
+  string dockerfile = 2;        // path to the Dockerfile
+  map<string, string> args = 3; // build-time variables
+
+  // string dockerfile_inline = 4; // inline Dockerfile
+  // repeated string ssh = 4;
+  // repeated string cache_from = 4;
+  // repeated string cache_to = 4;
+  // repeated string extra_hosts = 4;
+  // string isolation = 4;
+  // bool privileged = 4;
+  // map<string, string> labels = 4;
+  // bool no_cache = 4;
+  // bool pull = 4;
+  // float shm_size = 4;
+  // string target = 4;
+  // repeated Secret secrets = 4;
+  // repeated string tags = 4;
+  // repeated Platform platforms = 4;
+}
+
+message HealthCheck {
+  repeated string test = 1;
+  // float interval = 2;
+  // float timeout = 3;
+  // uint32 retries = 4;
+  // float start_period = 5;
+  // bool disable = 6;
+}
+
+message Service {
+  string name = 1;
+  string image = 2;
+  Platform platform = 3;
+  bool internal = 4; // true if service is internal TODO: not part of spec
+  Deploy deploy = 5;
+  repeated Port ports = 6;
+  map<string, string> environment = 7;
+  Build build = 8;
+  repeated Secret secrets = 9;
+  HealthCheck healthcheck = 10;
+  repeated string command = 11;
+  string domainname = 12;
+}
+
+message Event {
+  string specversion = 1; // required (but we don't care)
+  string type = 2;        // required
+  string source = 3;      // required
+  string id = 4;          // required
+  string datacontenttype = 5;
+  string dataschema = 6;
+  string subject = 7;
+  google.protobuf.Timestamp time = 8;
+  bytes data = 9;
+}
+
+message PublishRequest { Event event = 1; }
+
+message SubscribeRequest { string service = 1; }
+
+message SubscribeResponse {
+  repeated ServiceInfo services = 1;
+}

@@ -1,0 +1,44 @@
+# VERSION is the version we should download and use.
+VERSION:=$(shell git describe --match=NeVeRmAtCh --always --dirty)
+
+PROTOS := protos/io/defang/v1/fabric.pb.go protos/io/defang/v1/defangv1connect/fabric.connect.go
+
+BINARY_NAME:=defang
+GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
+
+$(BINARY_NAME): test
+	go build -o $@ $(GOFLAGS) ./cmd/cli
+
+$(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
+	buf generate protos
+
+.PHONY: install
+install: $(BINARY_NAME)
+	install $(BINARY_NAME) "$${GOPATH:-/usr/local}/bin/"
+
+.PHONY: test
+test:
+	go test -test.short ./...
+
+.PHONY: linux-amd64
+linux-amd64: test
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BINARY_NAME) $(GOFLAGS) ./cmd/cli
+
+defang_linux_amd64.zip: linux-amd64
+	zip $@ $(BINARY_NAME)
+
+defang-amd64: test
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o $@ $(GOFLAGS) ./cmd/cli
+	codesign -f -s "${MACOS_CERTIFICATE_NAME}" $@ --timestamp --options runtime
+
+defang-arm64: test
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o $@ $(GOFLAGS) ./cmd/cli
+	codesign -f -s "${MACOS_CERTIFICATE_NAME}" $@ --timestamp --options runtime
+
+defang_darwin.zip: defang-arm64 defang-amd64
+	lipo -create -output $(BINARY_NAME) defang-arm64 defang-amd64
+	codesign -f -s "${MACOS_CERTIFICATE_NAME}" $(BINARY_NAME) --timestamp --options runtime
+	zip $@ $(BINARY_NAME)
+
+.PHONY: zips
+zips: defang_linux_amd64.zip defang_darwin.zip

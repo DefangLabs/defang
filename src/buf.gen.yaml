@@ -1,0 +1,12 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/defang-io/defang/src/protos
+plugins:
+  - plugin: buf.build/protocolbuffers/go
+    out: protos
+    opt: paths=source_relative
+  - plugin: buf.build/bufbuild/connect-go
+    out: protos
+    opt: paths=source_relative
