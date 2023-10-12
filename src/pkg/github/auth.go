@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	MaxLoginLength = 39
-
 	authTemplateString = `<!DOCTYPE html>
 <html>
 	<head>
@@ -159,19 +157,4 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 	case code := <-ch:
 		return code, nil
 	}
-}
-
-func ExchangeCodeForToken(clientId, clientSecret, code string) (string, error) {
-	values := url.Values{
-		"client_id":     {clientId},
-		"client_secret": {clientSecret},
-		"code":          {code},
-	}
-	accessTokenUrl := "https://github.com/login/oauth/access_token?" + values.Encode()
-	q, err := pkg.PostForValues(accessTokenUrl, "application/json", nil)
-	if err != nil {
-		return "", err
-	}
-
-	return q.Get("access_token"), nil
 }
