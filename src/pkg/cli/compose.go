@@ -230,7 +230,7 @@ func createTarballReader(ctx context.Context, root, dockerfile string) (*bytes.B
 		"docker-compose.yml":  true,
 		"docker-compose.yaml": true,
 		"Dockerfile":          true, // overwritten below if specified
-		// "node_modules": true,
+		"node_modules":        true,
 	}
 	ignore[filepath.Base(dockerfile)] = false // always include the Dockerfile because Kaniko needs it
 	// dockerignore.ReadAll(root) TODO: use this from "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
