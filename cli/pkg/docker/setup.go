@@ -8,8 +8,8 @@ import (
 	"github.com/docker/docker/api/types"
 )
 
-func (d *Docker) SetUp(ctx context.Context, image string, memory uint64) error {
-	rc, err := d.ImagePull(ctx, image, types.ImagePullOptions{})
+func (d *Docker) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
+	rc, err := d.ImagePull(ctx, image, types.ImagePullOptions{Platform: platform})
 	if err != nil {
 		return err
 	}
@@ -17,6 +17,7 @@ func (d *Docker) SetUp(ctx context.Context, image string, memory uint64) error {
 	_, err = io.Copy(contextAwareWriter{ctx, os.Stderr}, rc)
 	d.image = image
 	d.memory = memory
+	d.platform = platform
 	return err
 }
 

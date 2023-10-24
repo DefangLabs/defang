@@ -12,6 +12,7 @@ require (
 	github.com/aws/smithy-go v1.14.2
 	github.com/awslabs/goformation/v7 v7.12.1
 	github.com/docker/docker v24.0.5+incompatible
+	github.com/opencontainers/image-spec v1.0.2
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/term v0.11.0
 )
@@ -36,7 +37,6 @@ require (
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/net v0.14.0 // indirect

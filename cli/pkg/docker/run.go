@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (ContainerID, error) {
@@ -18,7 +19,7 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		Resources: container.Resources{
 			Memory: int64(d.memory),
 		},
-	}, nil, nil, "")
+	}, nil, parsePlatform(d.platform), "")
 	if err != nil {
 		return nil, err
 	}
@@ -36,4 +37,22 @@ func mapToSlice(m map[string]string) []string {
 		s = append(s, k+"="+v)
 	}
 	return s
+}
+
+func parsePlatform(platform string) *v1.Platform {
+	parts := strings.Split(platform, "/")
+	var p = &v1.Platform{}
+	switch len(parts) {
+	case 3:
+		p.Variant = parts[2]
+		fallthrough
+	case 2:
+		p.OS = parts[0]
+		p.Architecture = parts[1]
+	case 1:
+		p.Architecture = parts[0]
+	default:
+		panic("invalid platform: " + platform)
+	}
+	return p
 }

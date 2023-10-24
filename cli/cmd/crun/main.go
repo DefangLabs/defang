@@ -17,6 +17,7 @@ var (
 	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
 	memory   = pflag.StringP("memory", "m", "2g", "Memory limit in bytes")
 	envFiles = pflag.StringArray("env-file", nil, "Read in a file of environment variables")
+	platform = pflag.String("platform", "", "Set platform if host is multi-platform capable")
 	// driver = pflag.StringP("driver", "d", "auto", "Container runner to use. Choices are: pulumi-ecs, docker")
 
 	version = "development" // overwritten by build script -ldflags "-X main.version=..."
@@ -70,7 +71,7 @@ func main() {
 		if pflag.NArg() < 2 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
-		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap)
+		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap, *platform)
 	case "stop":
 		if pflag.NArg() != 2 {
 			cmd.Fatal("stop requires a single task ID")

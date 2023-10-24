@@ -102,8 +102,9 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	}, stackTimeout)
 }
 
-func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64) error {
-	template, err := createTemplate(image, float64(memory)/1024/1024, a.VCpu, a.Spot).YAML()
+func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
+	arch := ecs.PlatformToArch(platform)
+	template, err := createTemplate(image, float64(memory)/1024/1024, a.VCpu, a.Spot, arch).YAML()
 	if err != nil {
 		return err
 	}

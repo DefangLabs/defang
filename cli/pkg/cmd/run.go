@@ -4,9 +4,9 @@ import (
 	"context"
 )
 
-func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string) error {
+func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string, platform string) error {
 	driver := createDriver(color, region)
-	if err := driver.SetUp(ctx, image, memory); err != nil {
+	if err := driver.SetUp(ctx, image, memory, platform); err != nil {
 		return err
 	}
 

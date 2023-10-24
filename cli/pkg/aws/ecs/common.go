@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -29,4 +30,20 @@ type AwsEcs struct {
 
 func (a AwsEcs) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return config.LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
+}
+
+func PlatformToArch(platform string) *string {
+	if platform == "" {
+		return nil
+	}
+	parts := strings.SplitN(platform, "/", 3)
+	arch := parts[0]
+	if len(parts) >= 2 {
+		arch = parts[1]
+	}
+	arch = strings.ToLower(arch)
+	if arch == "AMD64" {
+		arch = "X86_64"
+	}
+	return &arch
 }

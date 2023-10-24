@@ -19,7 +19,7 @@ import (
 
 const createVpcResources = true
 
-func createTemplate(image string, memory float64, vcpu float64, spot bool) *cloudformation.Template {
+func createTemplate(image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
 	const prefix = awsecs.ProjectName + "-" // TODO: include stack name
 	const ecrPublicPrefix = prefix + "ecr-public"
 
@@ -191,8 +191,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
 		Tags: defaultTags,
 		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
-			CpuArchitecture:       aws.String("ARM64"), // TODO: make this configurable
-			OperatingSystemFamily: aws.String("LINUX"),
+			CpuArchitecture:       arch,
+			OperatingSystemFamily: aws.String("LINUX"), // TODO: support other OSes?
 		},
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
