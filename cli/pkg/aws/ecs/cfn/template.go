@@ -14,7 +14,10 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 	awsecs "github.com/defang-io/defang/cli/pkg/aws/ecs"
+	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn/outputs"
 )
+
+const createVpcResources = true
 
 func createTemplate(image string, memory float64, vcpu float64, spot bool) *cloudformation.Template {
 	const prefix = awsecs.ProjectName + "-" // TODO: include stack name
@@ -30,14 +33,16 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	template := cloudformation.NewTemplate()
 
 	// 1. bucket (for state)
-	template.Resources["Bucket"] = &s3.Bucket{
+	const _bucket = "Bucket"
+	template.Resources[_bucket] = &s3.Bucket{
 		Tags: defaultTags,
 		// BucketName: aws.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
 		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
 	}
 
 	// 2. ECS cluster
-	template.Resources["Cluster"] = &ecs.Cluster{
+	const _cluster = "Cluster"
+	template.Resources[_cluster] = &ecs.Cluster{
 		Tags: defaultTags,
 		// ClusterName: aws.String(PREFIX + "cluster" + SUFFIX), // optional
 	}
@@ -48,7 +53,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	// * China (Ningxia) (cn-northwest-1)
 	// * AWS GovCloud (US-East) (us-gov-east-1)
 	// * AWS GovCloud (US-West) (us-gov-west-1)
-	template.Resources["PullThroughCache"] = &ecr.PullThroughCacheRule{
+	const _pullThroughCache = "PullThroughCache"
+	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
 		EcrRepositoryPrefix: aws.String(ecrPublicPrefix), // TODO: optional
 		UpstreamRegistryUrl: aws.String(awsecs.EcrPublicRegistry),
 	}
@@ -58,8 +64,9 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	if spot {
 		capacityProvider = "FARGATE_SPOT"
 	}
-	template.Resources["CapacityProvider"] = &ecs.ClusterCapacityProviderAssociations{
-		Cluster: cloudformation.Ref("Cluster"),
+	const _capacityProvider = "CapacityProvider"
+	template.Resources[_capacityProvider] = &ecs.ClusterCapacityProviderAssociations{
+		Cluster: cloudformation.Ref(_cluster),
 		CapacityProviders: []string{
 			capacityProvider,
 		},
@@ -72,7 +79,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	}
 
 	// 5. CloudWatch log group
-	template.Resources["LogGroup"] = &logs.LogGroup{
+	const _logGroup = "LogGroup"
+	template.Resources[_logGroup] = &logs.LogGroup{
 		Tags: defaultTags,
 		// LogGroupName:    aws.String(PREFIX + "log-group-test" + SUFFIX), // optional
 		RetentionInDays: aws.Int(1),
@@ -95,7 +103,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 			},
 		},
 	}
-	template.Resources["ExecutionRole"] = &iam.Role{
+	const _executionRole = "ExecutionRole"
+	template.Resources[_executionRole] = &iam.Role{
 		Tags: defaultTags,
 		// RoleName: aws.String(PREFIX + "execution-role" + SUFFIX), // optional
 		ManagedPolicyArns: []string{
@@ -142,13 +151,35 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 	}
 
 	// 6b. IAM role for task (optional)
-	template.Resources["TaskRole"] = &iam.Role{
+	const _taskRole = "TaskRole"
+	template.Resources[_taskRole] = &iam.Role{
 		Tags: defaultTags,
 		// RoleName: aws.String(PREFIX + "task-role" + SUFFIX), // optional
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/AdministratorAccess", // TODO: make this configurable
 		},
 		AssumeRolePolicyDocument: assumeRolePolicyDocumentECS,
+		Policies: []iam.Role_Policy{
+			{
+				// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#ecs-exec-required-iam-permissions
+				PolicyName: "AllowExecuteCommand",
+				PolicyDocument: map[string]any{
+					"Version": "2012-10-17",
+					"Statement": []map[string]any{
+						{
+							"Effect": "Allow",
+							"Action": []string{
+								"ssmmessages:CreateDataChannel",
+								"ssmmessages:OpenDataChannel",
+								"ssmmessages:OpenControlChannel",
+								"ssmmessages:CreateControlChannel",
+							},
+							"Resource": "*", // TODO: restrict
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// 7. ECS task definition
@@ -156,8 +187,13 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
 	}
 	cpu, mem := awsecs.FixupFargateConfig(vcpu, memory)
-	template.Resources["TaskDefinition"] = &ecs.TaskDefinition{
+	const _taskDefinition = "TaskDefinition"
+	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
 		Tags: defaultTags,
+		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
+			CpuArchitecture:       aws.String("ARM64"), // TODO: make this configurable
+			OperatingSystemFamily: aws.String("LINUX"),
+		},
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
 				Name:  awsecs.ContainerName,
@@ -165,92 +201,100 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool) *clou
 				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
 					LogDriver: "awslogs",
 					Options: map[string]string{
-						"awslogs-group":         cloudformation.Ref("LogGroup"),
+						"awslogs-group":         cloudformation.Ref(_logGroup),
 						"awslogs-region":        cloudformation.Ref("AWS::Region"),
 						"awslogs-stream-prefix": awsecs.ProjectName,
 					},
 				},
 				Environment: []ecs.TaskDefinition_KeyValuePair{
 					{
-						Name:  aws.String("PULUMI_BACKEND_URL"), // TODO: this should not be here
-						Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"),
+						Name:  aws.String("PULUMI_BACKEND_URL"),                                        // TODO: this should not be here
+						Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"), // TODO: use _bucket
 					},
 				},
 			},
 		},
 		Cpu:                     aws.String(strconv.FormatUint(uint64(cpu), 10)),
-		ExecutionRoleArn:        cloudformation.RefPtr("ExecutionRole"),
+		ExecutionRoleArn:        cloudformation.RefPtr(_executionRole),
 		Memory:                  aws.String(strconv.FormatUint(uint64(mem), 10)),
 		NetworkMode:             aws.String("awsvpc"),
 		RequiresCompatibilities: []string{"FARGATE"},
-		TaskRoleArn:             cloudformation.RefPtr("TaskRole"),
+		TaskRoleArn:             cloudformation.RefPtr(_taskRole),
 		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
 	}
 
-	// 8. a VPC
-	template.Resources["VPC"] = &ec2.VPC{
-		Tags:      defaultTags, // TODO: add Name tag
-		CidrBlock: aws.String("10.0.0.0/16"),
-	}
-	// 8b. an internet gateway
-	template.Resources["InternetGateway"] = &ec2.InternetGateway{
-		Tags: defaultTags,
-	}
-	template.Resources["InternetGatewayAttachment"] = &ec2.VPCGatewayAttachment{
-		VpcId:             cloudformation.Ref("VPC"),
-		InternetGatewayId: cloudformation.RefPtr("InternetGateway"),
-	}
-	// 8c. a route table
-	template.Resources["RouteTable"] = &ec2.RouteTable{
-		Tags:  defaultTags,
-		VpcId: cloudformation.Ref("VPC"),
-	}
-	// 8d. a route table association
-	// template.Resources["RouteTableAssociation"] = &ec2.GatewayRouteTableAssociation{
-	// 	RouteTableId: cloudformation.Ref("RouteTable"),
-	// 	GatewayId:    cloudformation.Ref("InternetGateway"),
-	// }
-	template.Resources["Route"] = &ec2.Route{
-		RouteTableId:         cloudformation.Ref("RouteTable"),
-		DestinationCidrBlock: aws.String("0.0.0.0/0"),
-		GatewayId:            cloudformation.RefPtr("InternetGateway"),
-	}
-	// 8d. a public subnet
-	template.Resources["Subnet"] = &ec2.Subnet{
-		Tags: defaultTags,
-		// AvailabilityZone: TODO: parse region suffix
-		CidrBlock:           aws.String("10.0.0.0/20"),
-		VpcId:               cloudformation.Ref("VPC"),
-		MapPublicIpOnLaunch: aws.Bool(true),
-	}
-	// 8e. a subnet route table association
-	template.Resources["SubnetRouteTableAssociation"] = &ec2.SubnetRouteTableAssociation{
-		SubnetId:     cloudformation.Ref("Subnet"),
-		RouteTableId: cloudformation.Ref("RouteTable"),
-	}
-	// 8f. S3 gateway endpoint
-	template.Resources["S3GatewayEndpoint"] = &ec2.VPCEndpoint{
-		VpcEndpointType: aws.String("Gateway"),
-		VpcId:           cloudformation.Ref("VPC"),
-		ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
+	if createVpcResources {
+		// 8a. a VPC
+		const _vpc = "VPC"
+		template.Resources[_vpc] = &ec2.VPC{
+			Tags:      append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
+			CidrBlock: aws.String("10.0.0.0/16"),
+		}
+		// 8b. an internet gateway
+		const _internetGateway = "InternetGateway"
+		template.Resources[_internetGateway] = &ec2.InternetGateway{
+			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "igw"}}, defaultTags...),
+		}
+		// 8c. an internet gateway attachment for the VPC
+		const _internetGatewayAttachment = "InternetGatewayAttachment"
+		template.Resources[_internetGatewayAttachment] = &ec2.VPCGatewayAttachment{
+			VpcId:             cloudformation.Ref(_vpc),
+			InternetGatewayId: cloudformation.RefPtr(_internetGateway),
+		}
+		// 8d. a route table
+		const _routeTable = "RouteTable"
+		template.Resources[_routeTable] = &ec2.RouteTable{
+			Tags:  append([]tags.Tag{{Key: "Name", Value: prefix + "routetable"}}, defaultTags...),
+			VpcId: cloudformation.Ref(_vpc),
+		}
+		// 8e. a route for the route table and internet gateway
+		const _route = "Route"
+		template.Resources[_route] = &ec2.Route{
+			RouteTableId:         cloudformation.Ref(_routeTable),
+			DestinationCidrBlock: aws.String("0.0.0.0/0"),
+			GatewayId:            cloudformation.RefPtr(_internetGateway),
+		}
+		// 8f. a public subnet
+		const _subnet = "Subnet"
+		template.Resources[_subnet] = &ec2.Subnet{
+			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
+			// AvailabilityZone: TODO: parse region suffix
+			CidrBlock:           aws.String("10.0.0.0/20"),
+			VpcId:               cloudformation.Ref(_vpc),
+			MapPublicIpOnLaunch: aws.Bool(true),
+		}
+		// 8g. a subnet / route table association
+		const _subnetRouteTableAssociation = "SubnetRouteTableAssociation"
+		template.Resources[_subnetRouteTableAssociation] = &ec2.SubnetRouteTableAssociation{
+			SubnetId:     cloudformation.Ref(_subnet),
+			RouteTableId: cloudformation.Ref(_routeTable),
+		}
+		// 8h. S3 gateway endpoint (to avoid S3 bandwidth charges)
+		const _s3GatewayEndpoint = "S3GatewayEndpoint"
+		template.Resources[_s3GatewayEndpoint] = &ec2.VPCEndpoint{
+			VpcEndpointType: aws.String("Gateway"),
+			VpcId:           cloudformation.Ref(_vpc),
+			ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
+		}
+
+		template.Outputs[outputs.SubnetId] = cloudformation.Output{
+			Value:       cloudformation.Ref(_subnet),
+			Description: aws.String("ID of the subnet"),
+		}
 	}
 
 	// Declare stack outputs
-	template.Outputs["taskDefArn"] = cloudformation.Output{
-		Value:       cloudformation.Ref("TaskDefinition"),
+	template.Outputs[outputs.TaskDefArn] = cloudformation.Output{
+		Value:       cloudformation.Ref(_taskDefinition),
 		Description: aws.String("ARN of the ECS task definition"),
 	}
-	template.Outputs["clusterArn"] = cloudformation.Output{
-		Value:       cloudformation.Ref("Cluster"),
+	template.Outputs[outputs.ClusterArn] = cloudformation.Output{
+		Value:       cloudformation.Ref(_cluster),
 		Description: aws.String("ARN of the ECS cluster"),
 	}
-	template.Outputs["logGroupName"] = cloudformation.Output{
-		Value:       cloudformation.Ref("LogGroup"),
+	template.Outputs[outputs.LogGroupName] = cloudformation.Output{
+		Value:       cloudformation.Ref(_logGroup),
 		Description: aws.String("Name of the CloudWatch log group"),
-	}
-	template.Outputs["subnetId"] = cloudformation.Output{
-		Value:       cloudformation.Ref("Subnet"),
-		Description: aws.String("ID of the subnet"),
 	}
 
 	return template

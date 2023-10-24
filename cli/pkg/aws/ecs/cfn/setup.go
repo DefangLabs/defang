@@ -11,6 +11,7 @@ import (
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
 	"github.com/defang-io/defang/cli/pkg/aws/ecs"
+	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/cli/pkg/aws/region"
 	"github.com/defang-io/defang/cli/pkg/types"
 )
@@ -69,7 +70,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 
 	defer a.fillOutputs(ctx, *uso.StackId)
 
-	println("Waiting for stack to be updated...") // TODO: verbose only
+	println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
 	return cloudformation.NewStackUpdateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -95,7 +96,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		}
 	}
 
-	println("Waiting for stack to be created...") // TODO: verbose only
+	println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
 	return cloudformation.NewStackCreateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(a.stackName),
 	}, stackTimeout)
@@ -137,15 +138,15 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
-			case "subnetId":
+			case outputs.SubnetId:
 				a.SubnetID = *output.OutputValue
-			case "taskDefArn":
+			case outputs.TaskDefArn:
 				if a.TaskDefARN == "" {
 					a.TaskDefARN = *output.OutputValue
 				}
-			case "clusterArn":
+			case outputs.ClusterArn:
 				a.ClusterARN = *output.OutputValue
-			case "logGroupName":
+			case outputs.LogGroupName:
 				a.LogGroupName = *output.OutputValue
 			}
 		}
@@ -190,7 +191,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	println("Waiting for stack to be deleted...") // TODO: verbose only
+	println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(a.stackName),
 	}, stackTimeout)
