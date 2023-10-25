@@ -31,6 +31,7 @@ Commands:
   run <image> [arg...]   Create and run a new task from an image
   logs <task ID>         Fetch the logs of a task
   stop <task ID>         Stop a running task
+  info <task ID>         Show information about a task
   destroy                Destroy all resources created by this tool`)
 }
 
@@ -67,28 +68,34 @@ func main() {
 		err = errors.New("unknown command: " + pflag.Arg(0))
 	case "help", "":
 		usage()
-	case "run":
+	case "run", "r":
 		if pflag.NArg() < 2 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
 		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap, *platform)
-	case "stop":
+	case "stop", "s":
 		if pflag.NArg() != 2 {
 			cmd.Fatal("stop requires a single task ID")
 		}
-		taskArn := pflag.Arg(1)
-		err = cmd.Stop(ctx, region, &taskArn)
-	case "logs", "tail":
+		taskID := pflag.Arg(1)
+		err = cmd.Stop(ctx, region, &taskID)
+	case "logs", "tail", "l":
 		if pflag.NArg() != 2 {
 			cmd.Fatal("logs requires a single task ID")
 		}
-		taskArn := pflag.Arg(1)
-		err = cmd.Logs(ctx, region, &taskArn)
-	case "destroy", "teardown":
+		taskID := pflag.Arg(1)
+		err = cmd.Logs(ctx, region, &taskID)
+	case "destroy", "teardown", "d":
 		if pflag.NArg() != 1 {
 			cmd.Fatal("destroy does not take any arguments")
 		}
 		err = cmd.Destroy(ctx, region, color)
+	case "info", "i":
+		if pflag.NArg() != 2 {
+			cmd.Fatal("info requires a single task ID")
+		}
+		taskID := pflag.Arg(1)
+		err = cmd.Info(ctx, region, &taskID)
 	}
 
 	if err != nil {

@@ -3,6 +3,7 @@ package cfn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 
 	defer a.fillOutputs(ctx, *uso.StackId)
 
-	println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
+	fmt.Println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
 	return cloudformation.NewStackUpdateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -96,7 +97,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		}
 	}
 
-	println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
+	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
 	return cloudformation.NewStackCreateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(a.stackName),
 	}, stackTimeout)
@@ -178,6 +179,13 @@ func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
+func (a *AwsEcs) Info(ctx context.Context, taskArn ecs.TaskArn) (string, error) {
+	if err := a.fillOutputs(ctx, a.stackName); err != nil {
+		return "", err
+	}
+	return a.AwsEcs.Info(ctx, taskArn)
+}
+
 func (a *AwsEcs) TearDown(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
@@ -192,7 +200,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
+	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(a.stackName),
 	}, stackTimeout)

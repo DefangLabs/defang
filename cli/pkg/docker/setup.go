@@ -14,7 +14,7 @@ func (d *Docker) SetUp(ctx context.Context, image string, memory uint64, platfor
 		return err
 	}
 	defer rc.Close()
-	_, err = io.Copy(contextAwareWriter{ctx, os.Stderr}, rc)
+	_, err = io.Copy(contextAwareWriter{ctx, os.Stderr}, rc) // FIXME: this outputs JSON to stderr
 	d.image = image
 	d.memory = memory
 	d.platform = platform
