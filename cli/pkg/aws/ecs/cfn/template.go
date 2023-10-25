@@ -223,6 +223,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
 	}
 
+	var vpcId *string
 	if createVpcResources {
 		// 8a. a VPC
 		const _vpc = "VPC"
@@ -230,6 +231,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 			Tags:      append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
 			CidrBlock: aws.String("10.0.0.0/16"),
 		}
+		vpcId = cloudformation.RefPtr(_vpc)
 		// 8b. an internet gateway
 		const _internetGateway = "InternetGateway"
 		template.Resources[_internetGateway] = &ec2.InternetGateway{
@@ -277,10 +279,33 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 			ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
 		}
 
-		template.Outputs[outputs.SubnetId] = cloudformation.Output{
+		template.Outputs[outputs.SubnetID] = cloudformation.Output{
 			Value:       cloudformation.Ref(_subnet),
 			Description: aws.String("ID of the subnet"),
 		}
+	}
+
+	const _securityGroup = "SecurityGroup"
+	template.Resources[_securityGroup] = &ec2.SecurityGroup{
+		Tags:             defaultTags, // Name tag is ignored
+		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
+		VpcId:            vpcId,
+		SecurityGroupIngress: []ec2.SecurityGroup_Ingress{
+			{
+				IpProtocol: "tcp",
+				FromPort:   aws.Int(1),
+				ToPort:     aws.Int(65535),
+				CidrIp:     aws.String("0.0.0.0/0"), // from anywhere FIXME: restrict to "my ip"
+			},
+		},
+		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{ FIXME: add ability to restrict outbound traffic
+		// 	{
+		// 		IpProtocol: "tcp",
+		// 		FromPort:   aws.Int(1),
+		// 		ToPort:     aws.Int(65535),
+		// 		// CidrIp:     aws.String("
+		// 	},
+		// },
 	}
 
 	// Declare stack outputs
@@ -295,6 +320,10 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	template.Outputs[outputs.LogGroupName] = cloudformation.Output{
 		Value:       cloudformation.Ref(_logGroup),
 		Description: aws.String("Name of the CloudWatch log group"),
+	}
+	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
+		Value:       cloudformation.Ref(_securityGroup),
+		Description: aws.String("ID of the security group"),
 	}
 
 	return template

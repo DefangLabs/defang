@@ -44,7 +44,6 @@ func main() {
 
 	color := cmd.ParseColor(*color)
 	region := cmd.Region(*region)
-	memory := cmd.ParseMemory(*memory)
 
 	envMap := make(map[string]string)
 	// Apply env vars from files first, so they can be overridden by the command line
@@ -72,25 +71,38 @@ func main() {
 		if pflag.NArg() < 2 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
+		memory := cmd.ParseMemory(*memory)
 		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap, *platform)
 	case "stop", "s":
+		if len(envMap) > 0 || *platform != "" {
+			cmd.Fatal("stop does not take --env, --env-file, or --platform")
+		}
 		if pflag.NArg() != 2 {
 			cmd.Fatal("stop requires a single task ID")
 		}
 		taskID := pflag.Arg(1)
 		err = cmd.Stop(ctx, region, &taskID)
 	case "logs", "tail", "l":
+		if len(envMap) > 0 || *platform != "" {
+			cmd.Fatal("logs does not take --env, --env-file, or --platform")
+		}
 		if pflag.NArg() != 2 {
 			cmd.Fatal("logs requires a single task ID")
 		}
 		taskID := pflag.Arg(1)
 		err = cmd.Logs(ctx, region, &taskID)
 	case "destroy", "teardown", "d":
+		if len(envMap) > 0 || *platform != "" {
+			cmd.Fatal("destroy does not take --env, --env-file, or --platform")
+		}
 		if pflag.NArg() != 1 {
 			cmd.Fatal("destroy does not take any arguments")
 		}
 		err = cmd.Destroy(ctx, region, color)
 	case "info", "i":
+		if len(envMap) > 0 || *platform != "" {
+			cmd.Fatal("info does not take --env, --env-file, or --platform")
+		}
 		if pflag.NArg() != 2 {
 			cmd.Fatal("info requires a single task ID")
 		}

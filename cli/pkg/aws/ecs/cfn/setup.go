@@ -140,7 +140,7 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
-			case outputs.SubnetId:
+			case outputs.SubnetID:
 				a.SubnetID = *output.OutputValue
 			case outputs.TaskDefArn:
 				if a.TaskDefARN == "" {
@@ -150,6 +150,8 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 				a.ClusterARN = *output.OutputValue
 			case outputs.LogGroupName:
 				a.LogGroupName = *output.OutputValue
+			case outputs.SecurityGroupID:
+				a.SecurityGroupID = *output.OutputValue
 			}
 		}
 	}

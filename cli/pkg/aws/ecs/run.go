@@ -60,17 +60,20 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
-				Subnets:        []string{a.SubnetID},
-				// SecurityGroups: []string{},
+				Subnets:        []string{a.SubnetID},        // TODO: make configurable; must this match the VPC of the SecGroup?
+				SecurityGroups: []string{a.SecurityGroupID}, // TODO: only include if needed
 			},
 		},
 		Overrides: &types.TaskOverride{
+			// Cpu:   aws.String("256"),
+			// Memory: aws.String("512"),
 			// TaskRoleArn: cred.Arn, TODO: default to caller identity; needs trust + iam:PassRole
 			ContainerOverrides: []types.ContainerOverride{
 				{
 					Name:        aws.String(ContainerName),
 					Command:     cmd,
 					Environment: pairs,
+					// ResourceRequirements: TODO: make configurable, support GPUs
 					// EnvironmentFiles: ,
 				},
 			},

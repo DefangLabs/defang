@@ -19,13 +19,14 @@ const (
 type TaskArn = types.TaskID
 
 type AwsEcs struct {
-	Spot         bool
-	VCpu         float64
-	ClusterARN   string
-	LogGroupName string
-	Region       region.Region
-	TaskDefARN   string
-	SubnetID     string
+	Spot            bool
+	VCpu            float64
+	ClusterARN      string
+	LogGroupName    string
+	Region          region.Region
+	TaskDefARN      string
+	SubnetID        string
+	SecurityGroupID string
 }
 
 func (a AwsEcs) LoadConfig(ctx context.Context) (aws.Config, error) {
