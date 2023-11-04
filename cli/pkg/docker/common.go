@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"errors"
+
 	"github.com/defang-io/defang/cli/pkg/types"
 	"github.com/docker/docker/client"
 )
@@ -27,3 +29,10 @@ func New() *Docker {
 }
 
 var _ types.Driver = (*Docker)(nil)
+
+func (Docker) SetVpcID(vpcId string) error {
+	if vpcId != "" {
+		return errors.New("docker does not support specifying VPC ID")
+	}
+	return nil
+}

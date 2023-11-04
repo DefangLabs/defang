@@ -141,7 +141,9 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
 			case outputs.SubnetID:
-				a.SubnetID = *output.OutputValue
+				if a.SubNetID == "" {
+					a.SubNetID = *output.OutputValue
+				}
 			case outputs.TaskDefArn:
 				if a.TaskDefARN == "" {
 					a.TaskDefARN = *output.OutputValue
@@ -181,7 +183,7 @@ func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
-func (a *AwsEcs) Info(ctx context.Context, taskArn ecs.TaskArn) (string, error) {
+func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (string, error) {
 	if err := a.fillOutputs(ctx, a.stackName); err != nil {
 		return "", err
 	}

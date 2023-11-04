@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
@@ -21,20 +22,22 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		return nil, err
 	}
 
-	if a.SubnetID == "" {
+	if a.SubNetID == "" {
 		// Get a subnet ID
 		subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
-			// Filters: []ec2Types.Filter{
-			// 	{
-			// 		Name:   aws.String("map-public-ip-on-launch"),
-			// 		Values: []string{"true"},
-			// 	},
-			// },
+			Filters: []ec2types.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []string{a.VpcID},
+					// 		Name:   aws.String("map-public-ip-on-launch"),
+					// 		Values: []string{"true"},
+				},
+			},
 		})
 		if err != nil {
 			return nil, err
 		}
-		a.SubnetID = *subnetsOutput.Subnets[0].SubnetId // TODO: make configurable/deterministic
+		a.SubNetID = *subnetsOutput.Subnets[0].SubnetId // TODO: make configurable/deterministic
 	}
 
 	var pairs []types.KeyValuePair
@@ -51,6 +54,10 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	// 	return nil, err
 	// }
 
+	var securityGroups []string
+	if a.SubNetID == "" {
+		securityGroups = []string{a.SecurityGroupID} // TODO: only if ports are mapped
+	}
 	rti := ecs.RunTaskInput{
 		Count:          aws.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
@@ -60,8 +67,8 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
-				Subnets:        []string{a.SubnetID},        // TODO: make configurable; must this match the VPC of the SecGroup?
-				SecurityGroups: []string{a.SecurityGroupID}, // TODO: only include if needed
+				Subnets:        []string{a.SubNetID},        // TODO: make configurable; must this match the VPC of the SecGroup?
+				SecurityGroups: securityGroups,
 			},
 		},
 		Overrides: &types.TaskOverride{

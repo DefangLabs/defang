@@ -6,8 +6,13 @@ import (
 	"time"
 )
 
-func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string, platform string) error {
+func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string, platform, vpcId string) error {
 	driver := createDriver(color, region)
+
+	if err := driver.SetVpcID(vpcId); err != nil { // VPC affects the cloudformation template
+		return err
+	}
+
 	if err := driver.SetUp(ctx, image, memory, platform); err != nil {
 		return err
 	}
@@ -21,7 +26,7 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 
 	// Try 10 times to get the public IP address
 	for i := 0; i < 10; i++ {
-		info, err := driver.Info(ctx, id)
+		info, err := driver.GetInfo(ctx, id)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue

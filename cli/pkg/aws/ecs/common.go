@@ -19,14 +19,15 @@ const (
 type TaskArn = types.TaskID
 
 type AwsEcs struct {
-	Spot            bool
-	VCpu            float64
 	ClusterARN      string
 	LogGroupName    string
 	Region          region.Region
-	TaskDefARN      string
-	SubnetID        string
 	SecurityGroupID string
+	Spot            bool
+	SubNetID        string
+	TaskDefARN      string
+	VCpu            float64
+	VpcID           string
 }
 
 func (a AwsEcs) LoadConfig(ctx context.Context) (aws.Config, error) {
@@ -47,4 +48,9 @@ func PlatformToArch(platform string) *string {
 		arch = "X86_64"
 	}
 	return &arch
+}
+
+func (a *AwsEcs) SetVpcID(vpcId string) error {
+	a.VpcID = vpcId
+	return nil
 }

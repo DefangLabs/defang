@@ -289,7 +289,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	template.Resources[_securityGroup] = &ec2.SecurityGroup{
 		Tags:             defaultTags, // Name tag is ignored
 		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
-		VpcId:            vpcId,
+		VpcId:            vpcId, // FIXME: should be the VpcId of the given subnet
 		SecurityGroupIngress: []ec2.SecurityGroup_Ingress{
 			{
 				IpProtocol: "tcp",

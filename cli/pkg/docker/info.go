@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func (d Docker) Info(ctx context.Context, id ContainerID) (string, error) {
+func (d Docker) GetInfo(ctx context.Context, id ContainerID) (string, error) {
 	info, err := d.ContainerInspect(ctx, *id)
 	if err != nil {
 		return "", err

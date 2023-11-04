@@ -9,7 +9,7 @@ import (
 
 func Info(ctx context.Context, region Region, id types.TaskID) error {
 	driver := createDriver(ColorAuto, region)
-	info, err := driver.Info(ctx, id)
+	info, err := driver.GetInfo(ctx, id)
 	if err != nil {
 		return err
 	}
