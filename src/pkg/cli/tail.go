@@ -130,6 +130,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 					continue
 				}
 				Debug(" - Reconnect failed:", err)
+				return err
 			}
 
 			return tailClient.Err() // returns nil on EOF
