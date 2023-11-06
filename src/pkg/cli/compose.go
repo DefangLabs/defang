@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
 	loader "github.com/compose-spec/compose-go/loader"
@@ -55,7 +56,7 @@ func resolveEnv(k string) *string {
 func convertPlatform(platform string) pb.Platform {
 	switch platform {
 	default:
-		logrus.Warnf("Unsupported platform: %s (assuming linux)", platform)
+		logrus.Warnf("Unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
 		return pb.Platform_LINUX_ANY
@@ -218,7 +219,6 @@ func createTarballReader(ctx context.Context, root, dockerfile string) (*bytes.B
 	ignore := map[string]bool{
 		".DS_Store":           true,
 		".direnv":             true,
-		".dockerignore":       true,
 		".envrc":              true,
 		".git":                true,
 		".github":             true,
@@ -231,18 +231,19 @@ func createTarballReader(ctx context.Context, root, dockerfile string) (*bytes.B
 		"docker-compose.yaml": true,
 		"Dockerfile":          true, // overwritten below if specified
 		"node_modules":        true,
+		// ".dockerignore":       true, we're not using this, but Kaniko does
 	}
 	ignore[filepath.Base(dockerfile)] = false // always include the Dockerfile because Kaniko needs it
 	// dockerignore.ReadAll(root) TODO: use this from "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		// Ignore files in the ignore map
-		if skip := ignore[info.Name()]; skip {
-			if info.IsDir() {
+		if skip := ignore[de.Name()]; skip {
+			if de.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
@@ -256,11 +257,20 @@ func createTarballReader(ctx context.Context, root, dockerfile string) (*bytes.B
 
 		Debug(" - Adding", relPath)
 
+		info, err := de.Info()
+		if err != nil {
+			return err
+		}
+
 		header, err := tar.FileInfoHeader(info, info.Name())
 		if err != nil {
 			return err
 		}
 
+		// Make reproducible; WalkDir walks files in lexical order.
+		header.ModTime = time.Unix(315532800, 0)
+		header.Gid = 0
+		header.Uid = 0
 		header.Name = filepath.ToSlash(relPath)
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
