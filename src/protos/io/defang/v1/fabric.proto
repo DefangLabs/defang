@@ -31,7 +31,7 @@ service FabricController {
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
-  rpc CreateUploadURL(google.protobuf.Empty) returns (UploadURLResponse);
+  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 }
 
@@ -50,6 +50,8 @@ message File {
 }
 
 message GenerateFilesResponse { repeated File files = 1; }
+
+message UploadURLRequest { string digest = 1; }
 
 message UploadURLResponse { string url = 1; }
 
