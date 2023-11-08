@@ -95,7 +95,7 @@ type FabricControllerClient interface {
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	CreateUploadURL(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UploadURLResponse], error)
+	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -178,7 +178,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerListSecretsProcedure,
 			opts...,
 		),
-		createUploadURL: connect_go.NewClient[emptypb.Empty, v1.UploadURLResponse](
+		createUploadURL: connect_go.NewClient[v1.UploadURLRequest, v1.UploadURLResponse](
 			httpClient,
 			baseURL+FabricControllerCreateUploadURLProcedure,
 			opts...,
@@ -202,7 +202,7 @@ type fabricControllerClient struct {
 	generateFiles   *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	putSecret       *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	listSecrets     *connect_go.Client[emptypb.Empty, v1.Secrets]
-	createUploadURL *connect_go.Client[emptypb.Empty, v1.UploadURLResponse]
+	createUploadURL *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -276,7 +276,7 @@ func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_g
 }
 
 // CreateUploadURL calls io.defang.v1.FabricController.CreateUploadURL.
-func (c *fabricControllerClient) CreateUploadURL(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UploadURLResponse], error) {
+func (c *fabricControllerClient) CreateUploadURL(ctx context.Context, req *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
 	return c.createUploadURL.CallUnary(ctx, req)
 }
 
@@ -297,7 +297,7 @@ type FabricControllerHandler interface {
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	CreateUploadURL(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UploadURLResponse], error)
+	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -478,6 +478,6 @@ func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connec
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListSecrets is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.UploadURLResponse], error) {
+func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CreateUploadURL is not implemented"))
 }

@@ -150,7 +150,7 @@ type mockClient struct {
 	url string
 }
 
-func (m mockClient) CreateUploadURL(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.UploadURLResponse], error) {
+func (m mockClient) CreateUploadURL(context.Context, *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
 	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url}), nil
 }
 func (mockClient) GetStatus(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Status], error) {

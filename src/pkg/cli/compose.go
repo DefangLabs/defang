@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -22,7 +24,6 @@ import (
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"gopkg.in/yaml.v3"
 )
 
@@ -156,9 +157,13 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body io.Reader) (string, error) {
-	// Upload the tarball to the fabric controller storage
-	res, err := client.CreateUploadURL(ctx, &connect.Request[emptypb.Empty]{})
+func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer) (string, error) {
+	// Upload the tarball to the fabric controller storage TODO: use a streaming API
+	digest := sha256.Sum256(body.Bytes())
+	req := &pb.UploadURLRequest{
+		Digest: "sha256-" + base64.StdEncoding.EncodeToString(digest[:]), // same as Nix
+	}
+	res, err := client.CreateUploadURL(ctx, connect.NewRequest(req))
 	if err != nil {
 		return "", err
 	}
