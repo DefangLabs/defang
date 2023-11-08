@@ -17,7 +17,7 @@ install: $(BINARY_NAME)
 	install $(BINARY_NAME) "$${GOPATH:-/usr/local}/bin/"
 
 .PHONY: test
-test:
+test: $(PROTOS)
 	go test -test.short ./...
 
 .PHONY: linux-amd64
