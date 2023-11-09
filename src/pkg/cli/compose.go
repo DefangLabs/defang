@@ -91,7 +91,7 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	return project, nil
 }
 
-func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig, force bool) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -103,22 +103,37 @@ func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricCon
 		return "", err
 	}
 
+	var digest string
+	if !force {
+		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
+		sha := sha256.Sum256(buffer.Bytes())
+		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
+		Debug(" - Digest:", digest)
+	}
+
+	if DoDryRun {
+		return root, nil
+	}
+
 	Info(" * Uploading build context for", name)
-	return uploadTarball(ctx, client, buffer)
+	return uploadTarball(ctx, client, buffer, digest)
 }
 
 func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	var pbports []*pb.Port
 	for _, port := range ports {
+		if port.Target < 1 || port.Target > 32767 {
+			return nil, errors.New("port target must be an integer between 1 and 32767")
+		}
+		if port.HostIP != "" {
+			logrus.Warn("Ignoring host_ip:", port.HostIP)
+		}
 		pbPort := &pb.Port{
 			// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 			// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
 			// Published string `yaml:",omitempty" json:"published,omitempty"`
 			// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
 			Target: port.Target,
-		}
-		if port.Target < 1 || port.Target > 32767 {
-			return nil, errors.New("port target must be an integer between 1 and 32767")
 		}
 		switch port.Protocol {
 		case "":
@@ -143,6 +158,9 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 		case "host":
 			pbPort.Mode = pb.Mode_HOST
 		case "ingress":
+			if port.Published != "" && port.Published != "443" {
+				return nil, errors.New("published port must be 443 for ingress mode")
+			}
 			pbPort.Mode = pb.Mode_INGRESS
 			if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
 				logrus.Warn("TCP ingress is not supported; assuming HTTP")
@@ -157,32 +175,31 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer) (string, error) {
+func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage TODO: use a streaming API
-	digest := sha256.Sum256(body.Bytes())
-	req := &pb.UploadURLRequest{
-		Digest: "sha256-" + base64.StdEncoding.EncodeToString(digest[:]), // same as Nix
-	}
-	res, err := client.CreateUploadURL(ctx, connect.NewRequest(req))
+	ureq := &pb.UploadURLRequest{Digest: digest}
+	res, err := client.CreateUploadURL(ctx, connect.NewRequest(ureq))
 	if err != nil {
 		return "", err
 	}
 
-	if !DoDryRun {
-		// Do an HTTP PUT to the generated URL
-		req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
-		if err != nil {
-			return "", err
-		}
-		req.Header.Set("Content-Type", "application/gzip")
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
-		}
+	if DoDryRun {
+		return "", errors.New("dry run")
+	}
+
+	// Do an HTTP PUT to the generated URL
+	req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/gzip")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
 	// Remove query params from URL

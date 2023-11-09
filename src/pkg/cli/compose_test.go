@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bufbuild/connect-go"
@@ -67,14 +68,14 @@ func TestLoadDockerCompose(t *testing.T) {
 
 func TestUploadTarball(t *testing.T) {
 	const path = "/upload/x/"
-	const expectedPath = "/upload/x/sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			t.Errorf("Expected PUT request, got %v", r.Method)
 		}
-		if r.URL.Path != expectedPath {
-			t.Errorf("Expected %v, got %v", expectedPath, r.URL.Path)
+		if !strings.HasPrefix(r.URL.Path, path) {
+			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
 		if r.Header.Get("Content-Type") != "application/gzip" {
 			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
@@ -83,13 +84,26 @@ func TestUploadTarball(t *testing.T) {
 	}))
 	defer server.Close()
 
-	url, err := uploadTarball(context.TODO(), mockClient{server.URL + path}, &bytes.Buffer{})
-	if err != nil {
-		t.Fatalf("uploadTarball() failed: %v", err)
-	}
-	if url != server.URL+expectedPath {
-		t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
-	}
+	t.Run("upload with digest", func(t *testing.T) {
+		url, err := uploadTarball(context.TODO(), mockGrpcClient{server.URL + path}, &bytes.Buffer{}, digest)
+		if err != nil {
+			t.Fatalf("uploadTarball() failed: %v", err)
+		}
+		const expectedPath = path + digest
+		if url != server.URL+expectedPath {
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
+		}
+	})
+
+	t.Run("force upload without digest", func(t *testing.T) {
+		url, err := uploadTarball(context.TODO(), mockGrpcClient{server.URL + path}, &bytes.Buffer{}, "")
+		if err != nil {
+			t.Fatalf("uploadTarball() failed: %v", err)
+		}
+		if url != server.URL+path {
+			t.Errorf("Expected %v, got %v", server.URL+path, url)
+		}
+	})
 }
 
 func TestCreateTarballReader(t *testing.T) {
@@ -146,52 +160,52 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 }
 
-type mockClient struct {
+type mockGrpcClient struct {
 	url string
 }
 
-func (m mockClient) CreateUploadURL(ctx context.Context, req *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
+func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
 	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
 }
-func (mockClient) GetStatus(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Status], error) {
+func (mockGrpcClient) GetStatus(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Status], error) {
 	panic("no impl")
 }
-func (mockClient) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Version], error) {
+func (mockGrpcClient) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Version], error) {
 	panic("no impl")
 }
-func (mockClient) Tail(context.Context, *connect.Request[pb.TailRequest]) (*connect.ServerStreamForClient[pb.TailResponse], error) {
+func (mockGrpcClient) Tail(context.Context, *connect.Request[pb.TailRequest]) (*connect.ServerStreamForClient[pb.TailResponse], error) {
 	panic("no impl")
 }
-func (mockClient) Update(context.Context, *connect.Request[pb.Service]) (*connect.Response[pb.ServiceInfo], error) {
+func (mockGrpcClient) Update(context.Context, *connect.Request[pb.Service]) (*connect.Response[pb.ServiceInfo], error) {
 	panic("no impl")
 }
-func (mockClient) Get(context.Context, *connect.Request[pb.ServiceID]) (*connect.Response[pb.ServiceInfo], error) {
+func (mockGrpcClient) Get(context.Context, *connect.Request[pb.ServiceID]) (*connect.Response[pb.ServiceInfo], error) {
 	panic("no impl")
 }
-func (mockClient) Delete(context.Context, *connect.Request[pb.DeleteRequest]) (*connect.Response[pb.DeleteResponse], error) {
+func (mockGrpcClient) Delete(context.Context, *connect.Request[pb.DeleteRequest]) (*connect.Response[pb.DeleteResponse], error) {
 	panic("no impl")
 }
-func (mockClient) Publish(context.Context, *connect.Request[pb.PublishRequest]) (*connect.Response[emptypb.Empty], error) {
+func (mockGrpcClient) Publish(context.Context, *connect.Request[pb.PublishRequest]) (*connect.Response[emptypb.Empty], error) {
 	panic("no impl")
 }
-func (mockClient) Subscribe(context.Context, *connect.Request[pb.SubscribeRequest]) (*connect.ServerStreamForClient[pb.SubscribeResponse], error) {
+func (mockGrpcClient) Subscribe(context.Context, *connect.Request[pb.SubscribeRequest]) (*connect.ServerStreamForClient[pb.SubscribeResponse], error) {
 	panic("no impl")
 }
-func (mockClient) GetServices(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.ListServicesResponse], error) {
+func (mockGrpcClient) GetServices(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.ListServicesResponse], error) {
 	panic("no impl")
 }
-func (mockClient) Token(context.Context, *connect.Request[pb.TokenRequest]) (*connect.Response[pb.TokenResponse], error) {
+func (mockGrpcClient) Token(context.Context, *connect.Request[pb.TokenRequest]) (*connect.Response[pb.TokenResponse], error) {
 	panic("no impl")
 }
-func (mockClient) PutSecret(context.Context, *connect.Request[pb.SecretValue]) (*connect.Response[emptypb.Empty], error) {
+func (mockGrpcClient) PutSecret(context.Context, *connect.Request[pb.SecretValue]) (*connect.Response[emptypb.Empty], error) {
 	panic("no impl")
 }
-func (mockClient) ListSecrets(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Secrets], error) {
+func (mockGrpcClient) ListSecrets(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Secrets], error) {
 	panic("no impl")
 }
-func (mockClient) GenerateFiles(context.Context, *connect.Request[pb.GenerateFilesRequest]) (*connect.Response[pb.GenerateFilesResponse], error) {
+func (mockGrpcClient) GenerateFiles(context.Context, *connect.Request[pb.GenerateFilesRequest]) (*connect.Response[pb.GenerateFilesResponse], error) {
 	panic("no impl")
 }
-func (mockClient) RevokeToken(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
+func (mockGrpcClient) RevokeToken(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
 	panic("no impl")
 }

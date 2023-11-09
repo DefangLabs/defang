@@ -14,6 +14,7 @@ $(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
 
 .PHONY: install
 install: $(BINARY_NAME)
+	#go install $(GOFLAGS) ./cmd/cli
 	install $(BINARY_NAME) "$${GOPATH:-/usr/local}/bin/"
 
 .PHONY: test
