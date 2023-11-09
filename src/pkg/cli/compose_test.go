@@ -66,14 +66,15 @@ func TestLoadDockerCompose(t *testing.T) {
 }
 
 func TestUploadTarball(t *testing.T) {
-	const path = "/upload/x"
+	const path = "/upload/x/"
+	const expectedPath = "/upload/x/sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			t.Errorf("Expected PUT request, got %v", r.Method)
 		}
-		if r.URL.Path != path {
-			t.Errorf("Expected %v, got %v", path, r.URL.Path)
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected %v, got %v", expectedPath, r.URL.Path)
 		}
 		if r.Header.Get("Content-Type") != "application/gzip" {
 			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
@@ -82,17 +83,16 @@ func TestUploadTarball(t *testing.T) {
 	}))
 	defer server.Close()
 
-	url, err := uploadTarball(context.TODO(), mockClient{server.URL + path}, bytes.NewReader([]byte{}))
+	url, err := uploadTarball(context.TODO(), mockClient{server.URL + path}, &bytes.Buffer{})
 	if err != nil {
-		t.Errorf("uploadTarball() failed: %v", err)
+		t.Fatalf("uploadTarball() failed: %v", err)
 	}
-	if url == "" {
-		t.Error("uploadTarball() returned empty URL")
+	if url != server.URL+expectedPath {
+		t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 	}
 }
 
 func TestCreateTarballReader(t *testing.T) {
-
 	t.Run("Default Dockerfile", func(t *testing.T) {
 		buffer, err := createTarballReader(context.TODO(), "../../tests", "")
 		if err != nil {
@@ -150,8 +150,8 @@ type mockClient struct {
 	url string
 }
 
-func (m mockClient) CreateUploadURL(context.Context, *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
-	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url}), nil
+func (m mockClient) CreateUploadURL(ctx context.Context, req *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
+	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
 }
 func (mockClient) GetStatus(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Status], error) {
 	panic("no impl")
