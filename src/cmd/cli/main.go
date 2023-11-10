@@ -359,8 +359,9 @@ var composeUpCmd = &cobra.Command{
 	Short: "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
+		var force, _ = cmd.Flags().GetBool("force")
 
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId))
+		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
 		if err != nil {
 			return err
 		}
@@ -385,8 +386,9 @@ var composeStartCmd = &cobra.Command{
 	Short: "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
+		var force, _ = cmd.Flags().GetBool("force")
 
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId))
+		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
 		if err != nil {
 			return err
 		}
@@ -441,8 +443,8 @@ var composeConfigCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		cli.DoDryRun = true // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId))
+		cli.DoDryRun = true                                                                  // config is like start in a dry run
+		_, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), false) // force=false to calculate the digest
 		return err
 	},
 }
@@ -574,10 +576,12 @@ func main() {
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory") TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name") TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
+	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
 	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
 	composeCmd.AddCommand(composeDownCmd)
+	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
 	rootCmd.AddCommand(composeCmd)
 

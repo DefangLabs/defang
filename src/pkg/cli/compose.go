@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,7 +92,7 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	return project, nil
 }
 
-func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig, force bool) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -103,86 +104,120 @@ func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricCon
 		return "", err
 	}
 
+	var digest string
+	if !force {
+		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
+		sha := sha256.Sum256(buffer.Bytes())
+		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
+		Debug(" - Digest:", digest)
+	}
+
+	if DoDryRun {
+		return root, nil
+	}
+
 	Info(" * Uploading build context for", name)
-	return uploadTarball(ctx, client, buffer)
+	return uploadTarball(ctx, client, buffer, digest)
+}
+
+func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
+	if port.Target < 1 || port.Target > 32767 {
+		return nil, fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
+	}
+	if port.HostIP != "" {
+		return nil, errors.New("port host_ip is not supported")
+	}
+	if port.Published != "" && port.Published != strconv.FormatUint(uint64(port.Target), 10) {
+		return nil, fmt.Errorf("port published must be empty or equal to target: %v", port.Published)
+	}
+
+	pbPort := &pb.Port{
+		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
+		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
+		// Published string `yaml:",omitempty" json:"published,omitempty"`
+		// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
+		Target: port.Target,
+	}
+
+	switch port.Protocol {
+	case "":
+		pbPort.Protocol = pb.Protocol_ANY // defaults to HTTP in CD
+	case "tcp":
+		pbPort.Protocol = pb.Protocol_TCP
+	case "udp":
+		pbPort.Protocol = pb.Protocol_UDP
+	case "http": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_HTTP
+	case "http2": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_HTTP2
+	case "grpc": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_GRPC
+	default:
+		return nil, fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+	}
+
+	logrus := logrus.WithField("target", port.Target)
+
+	switch port.Mode {
+	case "":
+		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
+		fallthrough
+	case "host":
+		pbPort.Mode = pb.Mode_HOST
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
+		if port.Published != "" {
+			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
+			break
+		}
+		pbPort.Mode = pb.Mode_INGRESS
+		if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
+			logrus.Warn("TCP ingress is not supported; assuming HTTP")
+			pbPort.Protocol = pb.Protocol_HTTP
+		}
+	default:
+		return nil, fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
+	}
+	return pbPort, nil
 }
 
 func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	var pbports []*pb.Port
 	for _, port := range ports {
-		pbPort := &pb.Port{
-			// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
-			// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
-			// Published string `yaml:",omitempty" json:"published,omitempty"`
-			// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
-			Target: port.Target,
+		pbPort, err := convertPort(port)
+		if err != nil {
+			return nil, err
 		}
-		if port.Target < 1 || port.Target > 32767 {
-			return nil, errors.New("port target must be an integer between 1 and 32767")
-		}
-		switch port.Protocol {
-		case "":
-			pbPort.Protocol = pb.Protocol_ANY // defaults to HTTP in CD
-		case "tcp":
-			pbPort.Protocol = pb.Protocol_TCP
-		case "udp":
-			pbPort.Protocol = pb.Protocol_UDP
-		case "http":
-			pbPort.Protocol = pb.Protocol_HTTP
-		case "http2":
-			pbPort.Protocol = pb.Protocol_HTTP2
-		case "grpc":
-			pbPort.Protocol = pb.Protocol_GRPC
-		default:
-			return nil, errors.New("port protocol not one of [tcp udp http http2 grpc]: " + port.Protocol)
-		}
-		switch port.Mode {
-		case "":
-			logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
-			fallthrough
-		case "host":
-			pbPort.Mode = pb.Mode_HOST
-		case "ingress":
-			pbPort.Mode = pb.Mode_INGRESS
-			if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
-				logrus.Warn("TCP ingress is not supported; assuming HTTP")
-				pbPort.Protocol = pb.Protocol_HTTP
-			}
-		default:
-			return nil, errors.New("port mode not one of [host ingress]: " + port.Mode)
-		}
-
 		pbports = append(pbports, pbPort)
 	}
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer) (string, error) {
+func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage TODO: use a streaming API
-	digest := sha256.Sum256(body.Bytes())
-	req := &pb.UploadURLRequest{
-		Digest: "sha256-" + base64.StdEncoding.EncodeToString(digest[:]), // same as Nix
-	}
-	res, err := client.CreateUploadURL(ctx, connect.NewRequest(req))
+	ureq := &pb.UploadURLRequest{Digest: digest}
+	res, err := client.CreateUploadURL(ctx, connect.NewRequest(ureq))
 	if err != nil {
 		return "", err
 	}
 
-	if !DoDryRun {
-		// Do an HTTP PUT to the generated URL
-		req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
-		if err != nil {
-			return "", err
-		}
-		req.Header.Set("Content-Type", "application/gzip")
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
-		}
+	if DoDryRun {
+		return "", errors.New("dry run")
+	}
+
+	// Do an HTTP PUT to the generated URL
+	req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/gzip")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
 	// Remove query params from URL

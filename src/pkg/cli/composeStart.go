@@ -16,7 +16,7 @@ import (
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) ([]*pb.ServiceInfo, error) {
+func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return nil, &ComposeError{err}
@@ -207,7 +207,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		var build *pb.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build)
+			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
 			if err != nil {
 				return nil, err
 			}
