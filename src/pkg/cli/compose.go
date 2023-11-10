@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -119,57 +120,74 @@ func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricCon
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
+func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
+	if port.Target < 1 || port.Target > 32767 {
+		return nil, fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
+	}
+	if port.HostIP != "" {
+		return nil, errors.New("port host_ip is not supported")
+	}
+	if port.Published != "" && port.Published != strconv.FormatUint(uint64(port.Target), 10) {
+		return nil, fmt.Errorf("port published must be empty or equal to target: %v", port.Published)
+	}
+
+	pbPort := &pb.Port{
+		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
+		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
+		// Published string `yaml:",omitempty" json:"published,omitempty"`
+		// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
+		Target: port.Target,
+	}
+
+	switch port.Protocol {
+	case "":
+		pbPort.Protocol = pb.Protocol_ANY // defaults to HTTP in CD
+	case "tcp":
+		pbPort.Protocol = pb.Protocol_TCP
+	case "udp":
+		pbPort.Protocol = pb.Protocol_UDP
+	case "http": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_HTTP
+	case "http2": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_HTTP2
+	case "grpc": // TODO: not per spec
+		pbPort.Protocol = pb.Protocol_GRPC
+	default:
+		return nil, fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+	}
+
+	logrus := logrus.WithField("target", port.Target)
+
+	switch port.Mode {
+	case "":
+		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
+		fallthrough
+	case "host":
+		pbPort.Mode = pb.Mode_HOST
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
+		if port.Published != "" {
+			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
+			break
+		}
+		pbPort.Mode = pb.Mode_INGRESS
+		if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
+			logrus.Warn("TCP ingress is not supported; assuming HTTP")
+			pbPort.Protocol = pb.Protocol_HTTP
+		}
+	default:
+		return nil, fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
+	}
+	return pbPort, nil
+}
+
 func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	var pbports []*pb.Port
 	for _, port := range ports {
-		if port.Target < 1 || port.Target > 32767 {
-			return nil, errors.New("port target must be an integer between 1 and 32767")
+		pbPort, err := convertPort(port)
+		if err != nil {
+			return nil, err
 		}
-		if port.HostIP != "" {
-			logrus.Warn("Ignoring host_ip:", port.HostIP)
-		}
-		pbPort := &pb.Port{
-			// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
-			// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
-			// Published string `yaml:",omitempty" json:"published,omitempty"`
-			// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
-			Target: port.Target,
-		}
-		switch port.Protocol {
-		case "":
-			pbPort.Protocol = pb.Protocol_ANY // defaults to HTTP in CD
-		case "tcp":
-			pbPort.Protocol = pb.Protocol_TCP
-		case "udp":
-			pbPort.Protocol = pb.Protocol_UDP
-		case "http":
-			pbPort.Protocol = pb.Protocol_HTTP
-		case "http2":
-			pbPort.Protocol = pb.Protocol_HTTP2
-		case "grpc":
-			pbPort.Protocol = pb.Protocol_GRPC
-		default:
-			return nil, errors.New("port protocol not one of [tcp udp http http2 grpc]: " + port.Protocol)
-		}
-		switch port.Mode {
-		case "":
-			logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
-			fallthrough
-		case "host":
-			pbPort.Mode = pb.Mode_HOST
-		case "ingress":
-			if port.Published != "" && port.Published != "443" {
-				return nil, errors.New("published port must be 443 for ingress mode")
-			}
-			pbPort.Mode = pb.Mode_INGRESS
-			if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
-				logrus.Warn("TCP ingress is not supported; assuming HTTP")
-				pbPort.Protocol = pb.Protocol_HTTP
-			}
-		default:
-			return nil, errors.New("port mode not one of [host ingress]: " + port.Mode)
-		}
-
 		pbports = append(pbports, pbPort)
 	}
 	return pbports, nil

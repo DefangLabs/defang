@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/compose-spec/compose-go/types"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -64,6 +65,72 @@ func TestLoadDockerCompose(t *testing.T) {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
 		}
 	})
+}
+
+func TestConvertPort(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    types.ServicePortConfig
+		expected *pb.Port
+		wantErr  string
+	}{
+		{
+			name:    "No target port xfail",
+			input:   types.ServicePortConfig{},
+			wantErr: "port target must be an integer between 1 and 32767",
+		},
+		{
+			name:     "Undefined mode and protocol, target only",
+			input:    types.ServicePortConfig{Target: 1234},
+			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST},
+		},
+		{
+			name:    "Published range xfail",
+			input:   types.ServicePortConfig{Target: 1234, Published: "1111-2222"},
+			wantErr: "port published must be empty or equal to target: 1111-2222",
+		},
+		{
+			name:     "Implied ingress mode, defined protocol, published equals target",
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Published: "1234", Target: 1234},
+			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_TCP},
+		},
+		{
+			name:     "Implied ingress mode, udp protocol, published equals target",
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Published: "1234", Target: 1234},
+			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_UDP},
+		},
+		{
+			name:    "Localhost IP, unsupported mode and protocol xfail",
+			input:   types.ServicePortConfig{Mode: "ingress", HostIP: "127.0.0.1", Protocol: "tcp", Published: "1234", Target: 1234},
+			wantErr: "host_ip is not supported",
+		},
+		{
+			name:     "Ingress mode without host IP, single target",
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
+			expected: &pb.Port{Target: 1234, Mode: pb.Mode_INGRESS, Protocol: pb.Protocol_HTTP},
+		},
+		{
+			name:    "Ingress mode without host IP, single target, published range xfail",
+			input:   types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1111-2223"},
+			wantErr: "port published must be empty or equal to target: 1111-2223",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertPort(tt.input)
+			if err != nil {
+				if tt.wantErr == "" {
+					t.Errorf("convertPort() unexpected error: %v", err)
+				} else if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("convertPort() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				return
+			}
+			if got.String() != tt.expected.String() {
+				t.Errorf("convertPort() got %v, want %v", got, tt.expected.String())
+			}
+		})
+	}
 }
 
 func TestUploadTarball(t *testing.T) {
