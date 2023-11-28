@@ -6,6 +6,7 @@ system ? builtins.currentSystem
 , lib
 , fetchurl
 , installShellFiles
+, unzip
 }:
 let
   shaMap = {
@@ -33,6 +34,7 @@ pkgs.stdenv.mkDerivation {
   sourceRoot = ".";
 
   nativeBuildInputs = [ installShellFiles ];
+  buildInputs = [ unzip ];
 
   installPhase = ''
     mkdir -p $out/bin
