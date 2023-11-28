@@ -175,7 +175,7 @@ func TestUploadTarball(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarballReader(context.TODO(), "../../tests", "")
+		buffer, err := createTarball(context.TODO(), "../../tests", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -213,14 +213,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarballReader(context.TODO(), "../../tests", "Dockerfile.missing")
+		_, err := createTarball(context.TODO(), "../../tests", "Dockerfile.missing")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarballReader(context.TODO(), "asdfqwer", "")
+		_, err := createTarball(context.TODO(), "asdfqwer", "")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

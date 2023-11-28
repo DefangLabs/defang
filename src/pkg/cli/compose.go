@@ -99,7 +99,7 @@ func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricCon
 	}
 
 	Info(" * Compressing build context for", name, "at", root)
-	buffer, err := createTarballReader(ctx, build.Context, build.Dockerfile)
+	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
 	}
@@ -243,7 +243,7 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
-func createTarballReader(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	foundDockerfile := false
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
