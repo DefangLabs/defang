@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # for release notes
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -46,6 +46,9 @@ jobs:
       - name: Download Go dependencies
         run: go mod download
         working-directory: src
+
+      - name: Install Nix (for nix-prefetch-url)
+        uses: cachix/install-nix-action@v23
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
