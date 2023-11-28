@@ -51,7 +51,7 @@ jobs:
         uses: cachix/install-nix-action@v23
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser # either 'goreleaser' (default) or 'goreleaser-pro'
           version: latest
