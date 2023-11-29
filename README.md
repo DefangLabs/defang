@@ -8,6 +8,7 @@ This repo includes:
 ## Getting started
 * Read our [Terms and Conditions](https://defang.io/terms-conditions.html)
 * Download the [latest version](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
+  * or use the [Nix package manager](https://nixos.org): `nix profile install github:defang-io/defang#defang-bin --refresh`
 * Take a look at our [Samples folder](https://github.com/defang-io/defang/tree/main/samples) for example projects in various programming languages.
 * Try the AI integration by running `defang generate`
 * Start your new service with `defang compose up`
