@@ -8,7 +8,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -23,7 +22,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 
 	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/auth"
 	"github.com/defang-io/defang/src/pkg/cli"
 	"github.com/defang-io/defang/src/pkg/scope"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
@@ -67,19 +65,8 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("invalid color option: %s", color)
 		}
 
-		accessToken := cli.GetExistingToken(server)
-		tenantId, _ = cli.TenantFromAccessToken(accessToken)
-		cli.Debug(" - Using tenant", tenantId, "for server", server)
-
-		baseUrl := "http://"
-		if strings.HasSuffix(server, ":443") {
-			baseUrl = "https://"
-		}
-		_, host := cli.SplitTenantHost(server)
-		baseUrl += host
-		cli.Debug(" - Connecting to", baseUrl)
-		client = defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-		cli.Info(" * Connected to", host)
+		// TODO: not all commands need a connection, so we should only connect when needed
+		client = cli.Connect(server)
 		return nil
 	},
 }
@@ -102,6 +89,21 @@ var loginCmd = &cobra.Command{
 		cli.Info(" * Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
 		printDefangHint("To generate a sample service, do:", "generate")
+		return nil
+	},
+}
+
+var whoamiCmd = &cobra.Command{
+	Use:   "whoami",
+	Args:  cobra.NoArgs,
+	Short: "Show the current user",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tenant, err := cli.Whoami(server)
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+		cli.Info(" * You are logged in as", tenant)
+		// TODO: access token might have expired, so we should check that here
 		return nil
 	},
 }
@@ -539,6 +541,9 @@ func main() {
 	// Login Command
 	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in") TODO: Implement this
 	rootCmd.AddCommand(loginCmd)
+
+	// Whoami Command
+	rootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
 	rootCmd.AddCommand(logout)
