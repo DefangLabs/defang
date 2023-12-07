@@ -87,7 +87,8 @@ message TokenRequest {
   string auth_code = 2;      // from GitHub authorization code flow
   repeated string scope = 3; // "tail", "read", etc.
   string assertion = 4;      // jwt-bearer
-  // string refresh_token = 3;
+  uint32 expires_in = 5;     // seconds
+  // string refresh_token = 6;
 }
 
 message TokenResponse {
