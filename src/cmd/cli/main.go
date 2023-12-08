@@ -506,16 +506,18 @@ var tokenCmd = &cobra.Command{
 	Short: "Manage personal access tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
+		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		// TODO: should default to use the current tenant
-		return cli.Token(cmd.Context(), client, clientId, pkg.DEFAULT_TENANT, scope.Scope(s))
+		// TODO: should default to use the current tenant, not the default tenant
+		return cli.Token(cmd.Context(), client, clientId, pkg.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 
 var logout = &cobra.Command{
-	Use:   "logout",
-	Args:  cobra.NoArgs,
-	Short: "Log out",
+	Use:     "logout",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"logoff", "revoke"},
+	Short:   "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
@@ -534,6 +536,7 @@ func main() {
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Token command
+	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("Scope of the token; one of %v (required)", scope.All()))
 	tokenCmd.MarkFlagRequired("scope")
 	rootCmd.AddCommand(tokenCmd)
