@@ -61,9 +61,6 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		if len(svccfg.GroupAdd) > 0 {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: group_add")}
 		}
-		if svccfg.Init != nil && *svccfg.Init {
-			logrus.Warn("unsupported compose directive: init") // TODO: expose the initProcessEnabled flag
-		}
 		if len(svccfg.Ipc) > 0 {
 			logrus.Warn("unsupported compose directive: ipc")
 		}
@@ -302,11 +299,17 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			return nil, &ComposeError{err}
 		}
 
+		init := false
+		if svccfg.Init != nil {
+			init = *svccfg.Init
+		}
+
 		services = append(services, &pb.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
 			Internal:    true, // TODO: support external services (w/o LB)
+			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
 			Deploy:      deploy,
