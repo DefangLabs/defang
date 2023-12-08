@@ -248,6 +248,7 @@ message Service {
   HealthCheck healthcheck = 10;
   repeated string command = 11;
   string domainname = 12;
+  bool init = 13;
 }
 
 message Event {
