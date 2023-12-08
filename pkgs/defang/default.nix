@@ -6,26 +6,25 @@ system ? builtins.currentSystem
 , lib
 , fetchurl
 , installShellFiles
-, unzip
 }:
 let
   shaMap = {
-    x86_64-linux = "10rhyhavgj7h1cndv9i7jhaaydwk5zmg7921rd8hb86gka7d51f6";
-    aarch64-linux = "10rxb0rawq1c8h51y6qjgpdy2qw9s5hiw1jf6n93c46lp1h1fp0i";
-    x86_64-darwin = "0rsg9lfd02axnaqaq57ckirz2pczwcb5zh1zcx4v60k9g6x93wq4";
-    aarch64-darwin = "0rsg9lfd02axnaqaq57ckirz2pczwcb5zh1zcx4v60k9g6x93wq4";
+    x86_64-linux = "0g84r3jmxywz4pdz4bzwfq3scydxzvdfmq5zhj5p2ww4d11mfnln";
+    aarch64-linux = "15lzvvlwszqfdgkrzjxmlallxla4gv5jwn5b6785s123m105r65v";
+    x86_64-darwin = "1c09dhin3h3pgmdfsbbkfhzdlza2xbapg58r3v4bfb6n6dy2z4kg";
+    aarch64-darwin = "1c09dhin3h3pgmdfsbbkfhzdlza2xbapg58r3v4bfb6n6dy2z4kg";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.39/defang_0.4.39_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.39/defang_0.4.39_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.39/defang_0.4.39_macOS.zip";
-    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.39/defang_0.4.39_macOS.zip";
+    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_macOS.zip";
+    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_macOS.zip";
   };
 in
 pkgs.stdenv.mkDerivation {
   pname = "defang";
-  version = "0.4.39";
+  version = "0.4.40";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -34,7 +33,6 @@ pkgs.stdenv.mkDerivation {
   sourceRoot = ".";
 
   nativeBuildInputs = [ installShellFiles ];
-  buildInputs = [ unzip ];
 
   installPhase = ''
     mkdir -p $out/bin
