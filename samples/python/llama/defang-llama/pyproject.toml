@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "defang-llama"
+version = "0.1.0"
+description = ""
+authors = ["Raphaël Titsworth-Morin <raphael@ephemerecreative.ca>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+llama-cpp-python = "^0.2.20"
+llama-index = "^0.9.13"
+flask = "^3.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
