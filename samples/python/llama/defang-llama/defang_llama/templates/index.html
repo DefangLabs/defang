@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ask Defang Llama</title>
+    <!-- Add Tailwind CSS from a CDN -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <!-- Add Google Font -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+    />
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+      #llama {
+        width: 200px;
+        height: 200px;
+        object-fit: contain;
+        position: relative;
+        margin-bottom: -14px;
+      }
+    </style>
+    <style>
+      .loader {
+        border: 16px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 16px solid #6366F1;
+        width: 60px;
+        height: 60px;
+        -webkit-animation: spin 2s linear infinite; /* Safari */
+        animation: spin 2s linear infinite;
+      }
+
+      /* Safari */
+      @-webkit-keyframes spin {
+        0% {
+          -webkit-transform: rotate(0deg);
+        }
+        100% {
+          -webkit-transform: rotate(360deg);
+        }
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-indigo-900 flex flex-col py-10 items-center justify-center min-h-screen"
+  >
+    <img
+      src="{{ url_for('static', filename='llama.png') }}"
+      alt="Llama Image"
+      id="llama"
+    />
+    <div class="bg-white p-8 rounded shadow-md max-w-lg w-full">
+      <form action="ask" class="flex flex-col gap-4 items-center">
+        <h1 class="text-2xl font-bold text-center">Ask Defang Llama</h1>
+        <textarea
+          name="question"
+          placeholder="Ask Defang Llama a question"
+          class="w-full px-3 py-2 placeholder-gray-300 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-indigo-100 focus:border-indigo-300"
+        ></textarea>
+
+        <input
+          type="submit"
+          id="submitter"
+          value="Ask"
+          class="cursor-pointer font-bold w-full px-3 py-2 text-white bg-indigo-500 rounded-md focus:bg-indigo-600 focus:outline-none"
+        />
+
+        <div id="spinner" class="hidden">
+          <div class="loader"></div>
+        </div>
+      </form>
+
+      <div
+        id="answer"
+        class="mt-4 p-4 bg-gray-100 rounded border border-gray-300 hidden"
+      ></div>
+    </div>
+
+    <script>
+      document
+        .querySelector("form")
+        .addEventListener("submit", function (event) {
+          event.preventDefault();
+
+          var question = event.target.elements.question.value;
+          var button = document.getElementById("submitter");
+          var spinner = document.getElementById("spinner");
+
+          function enableButton() {
+            button.disabled = false;
+            button.classList.remove("bg-gray-300");
+            button.classList.add("bg-indigo-500");
+            button.classList.add("cursor-pointer");
+            spinner.classList.add("hidden");
+          }
+
+          function disableButton() {
+            button.disabled = true;
+            button.classList.add("bg-gray-300");
+            button.classList.remove("bg-indigo-500");
+            button.classList.remove("cursor-pointer");
+            spinner.classList.remove("hidden");
+          }
+
+          disableButton();
+
+          fetch("{{ url_for('ask') }}?q=" + encodeURIComponent(question))
+            .then((response) => response.json())
+            .then((data) => {
+              // Handle the response data here
+              console.log(data);
+              document.getElementById("answer").textContent = data.answer;
+              // remove the hidden class
+              document.getElementById("answer").classList.remove("hidden");
+              enableButton();
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+              enableButton();
+            });
+        });
+    </script>
+  </body>
+</html>
