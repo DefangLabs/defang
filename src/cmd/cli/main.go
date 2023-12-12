@@ -597,7 +597,7 @@ func main() {
 	tailCmd.Flags().StringP("name", "n", "", "Name of the service")
 	tailCmd.Flags().String("etag", "", "ETag or deployment ID of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
-	tailCmd.Flags().String("since", "5s", "Show logs since duration/time; defaults to 5s ago")
+	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
 	rootCmd.AddCommand(tailCmd)
 
 	// Delete Command
