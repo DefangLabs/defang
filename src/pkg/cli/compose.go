@@ -247,6 +247,8 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	foundDockerfile := false
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
+	} else {
+		dockerfile = filepath.Clean(dockerfile)
 	}
 
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
@@ -271,6 +273,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		"docker-compose.yaml": true,
 		"Dockerfile":          true, // overwritten below if specified
 		"node_modules":        true,
+		"Thumbs.db":           true,
 		// ".dockerignore":       true, we're not using this, but Kaniko does
 	}
 	ignore[filepath.Base(dockerfile)] = false // always include the Dockerfile because Kaniko needs it
@@ -327,7 +330,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 		defer file.Close()
 
-		if !foundDockerfile && filepath.Clean(dockerfile) == relPath {
+		if !foundDockerfile && dockerfile == relPath {
 			foundDockerfile = true
 		}
 
