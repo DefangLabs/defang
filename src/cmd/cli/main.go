@@ -334,9 +334,10 @@ var secretsListCmd = &cobra.Command{
 }
 
 var composeCmd = &cobra.Command{
-	Use:   "compose",
-	Args:  cobra.NoArgs,
-	Short: "Work with local docker-compose.yml files",
+	Use:     "compose",
+	Aliases: []string{"stack"},
+	Args:    cobra.NoArgs,
+	Short:   "Work with local docker-compose.yml files",
 }
 
 func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
@@ -383,9 +384,10 @@ var composeUpCmd = &cobra.Command{
 }
 
 var composeStartCmd = &cobra.Command{
-	Use:   "start",
-	Args:  cobra.NoArgs,
-	Short: "Reads a docker-compose.yml file and deploys services to the cluster",
+	Use:     "start",
+	Aliases: []string{"deploy"},
+	Args:    cobra.NoArgs,
+	Short:   "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -408,7 +410,7 @@ var composeStartCmd = &cobra.Command{
 
 var composeDownCmd = &cobra.Command{
 	Use:     "down",
-	Aliases: []string{"stop"},
+	Aliases: []string{"stop", "rm"},
 	Args:    cobra.NoArgs,
 	Short:   "Reads a docker-compose.yml file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
