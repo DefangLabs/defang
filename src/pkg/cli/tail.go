@@ -117,6 +117,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		timestampZone = time.UTC
 	}
 
+	skipDuplicate := false
 	for {
 		if !tailClient.Receive() {
 			if errors.Is(tailClient.Err(), context.Canceled) {
@@ -132,6 +133,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
 				if err == nil {
+					skipDuplicate = true
 					continue
 				}
 				Debug(" - Reconnect failed:", err)
@@ -155,6 +157,10 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			}
 
 			ts := e.Timestamp.AsTime()
+			if skipDuplicate && ts.Equal(since) {
+				skipDuplicate = false
+				continue
+			}
 			if ts.After(since) {
 				since = ts
 			}
