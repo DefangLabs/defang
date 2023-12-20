@@ -20,13 +20,15 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	loader "github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/types"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
+
+const MiB = 1024 * 1024
 
 var (
 	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -340,7 +342,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 
 		_, err = io.Copy(tarWriter, file)
-		if buf.Len() > 1024*1024*10 {
+		if buf.Len() > 10*MiB {
 			return fmt.Errorf("build context is too large; this beta version is limited to 10MiB")
 		}
 		return err
