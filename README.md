@@ -1,3 +1,5 @@
+[![Go package](https://github.com/defang-io/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/defang-io/defang/actions/workflows/go.yml)
+
 # defang
 The Defang Opinionated Platform (DOP) is a radically simpler way to build, deploy, and optimize production-ready cloud apps.
 This repo includes:
