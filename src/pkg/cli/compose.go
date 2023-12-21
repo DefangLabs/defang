@@ -245,6 +245,30 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+func filter(file string, stat os.DirEntry) bool {
+	switch file {
+	// case Dockerfile": // overwritten below if specified
+	// case ".dockerignore": we're not using this, but Kaniko does
+	case ".DS_Store",
+		".direnv",
+		".envrc",
+		".git",
+		".github",
+		".idea",
+		".vscode",
+		"__pycache__",
+		"defang.exe", // our binary
+		"docker-compose.yml",
+		"docker-compose.yaml",
+		"node_modules",
+		"Thumbs.db":
+		return false // omit
+	case "defang": // our binary
+		return stat.IsDir() // omit only if it's a file
+	}
+	return true // keep
+}
+
 func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	foundDockerfile := false
 	if dockerfile == "" {
@@ -259,26 +283,6 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	// Declare a map of files to ignore
-	ignore := map[string]bool{
-		".DS_Store":           true,
-		".direnv":             true,
-		".envrc":              true,
-		".git":                true,
-		".github":             true,
-		".idea":               true,
-		".vscode":             true,
-		"__pycache__":         true,
-		"defang":              true, // our binary
-		"defang.exe":          true, // our binary
-		"docker-compose.yml":  true,
-		"docker-compose.yaml": true,
-		"Dockerfile":          true, // overwritten below if specified
-		"node_modules":        true,
-		"Thumbs.db":           true,
-		// ".dockerignore":       true, we're not using this, but Kaniko does
-	}
-	ignore[filepath.Base(dockerfile)] = false // always include the Dockerfile because Kaniko needs it
 	// dockerignore.ReadAll(root) TODO: use this from "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
 
 	err := filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
@@ -286,8 +290,8 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		// Ignore files in the ignore map
-		if skip := ignore[de.Name()]; skip {
+		// Ignore files using the filter function
+		if !filter(de.Name(), de) {
 			if de.IsDir() {
 				return filepath.SkipDir
 			}
