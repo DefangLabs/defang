@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      shm_size: 30gb
     deploy:
       resources:
         reservations:
@@ -14,4 +15,3 @@ services:
     ports:
       - mode: ingress
         target: 5000
-    
