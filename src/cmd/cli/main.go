@@ -33,13 +33,14 @@ import (
 //
 
 var (
-	client    defangv1connect.FabricControllerClient
-	server    string
-	clientId  = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
-	defFabric = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
-	tenantId  = pkg.DEFAULT_TENANT
-
-	version = "development" // overwritten by build script -ldflags "-X main.version=..."
+	client         defangv1connect.FabricControllerClient
+	clientId       = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
+	defFabric      = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
+	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
+	nonInteractive bool   // set by the --non-interactive flag
+	server         string // set by the --cluster flag
+	tenantId       = pkg.DEFAULT_TENANT
+	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
 var rootCmd = &cobra.Command{
@@ -67,6 +68,14 @@ var rootCmd = &cobra.Command{
 
 		// TODO: not all commands need a connection, so we should only connect when needed
 		client = cli.Connect(server)
+
+		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+			cli.Warn(" !", err)
+			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
+				return err
+			}
+			client = cli.Connect(server) // reconnect with the new token
+		}
 		return nil
 	},
 }
@@ -76,17 +85,10 @@ var loginCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		at, err := cli.Login(cmd.Context(), client, clientId, server)
+		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server)
 		if err != nil {
 			return err
 		}
-
-		if err := cli.SaveAccessToken(server, at); err != nil {
-			cli.Warn(" ! Failed to save access token:", err)
-		}
-
-		tenant, host := cli.SplitTenantHost(server)
-		cli.Info(" * Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
 		printDefangHint("To generate a sample service, do:", "generate")
 		return nil
@@ -102,8 +104,10 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
+		if err := cli.CheckLogin(cmd.Context(), client); err != nil {
+			return err
+		}
 		cli.Info(" * You are logged in as", tenant)
-		// TODO: access token might have expired, so we should check that here
 		return nil
 	},
 }
@@ -114,6 +118,10 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen", "new", "init"},
 	Short:   "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive {
+			return errors.New("cannot run in non-interactive mode")
+		}
+
 		// check if we are properly connected / authenticated before asking the questions
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil {
 			return err
@@ -266,7 +274,7 @@ var secretsSetCmd = &cobra.Command{
 		var name, _ = cmd.Flags().GetString("name")
 
 		var secret string
-		if term.IsTerminal(int(os.Stdin.Fd())) {
+		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
 			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
 				return err
@@ -334,9 +342,10 @@ var secretsListCmd = &cobra.Command{
 }
 
 var composeCmd = &cobra.Command{
-	Use:   "compose",
-	Args:  cobra.NoArgs,
-	Short: "Work with local docker-compose.yml files",
+	Use:     "compose",
+	Aliases: []string{"stack"},
+	Args:    cobra.NoArgs,
+	Short:   "Work with local docker-compose.yml files",
 }
 
 func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
@@ -383,9 +392,10 @@ var composeUpCmd = &cobra.Command{
 }
 
 var composeStartCmd = &cobra.Command{
-	Use:   "start",
-	Args:  cobra.NoArgs,
-	Short: "Reads a docker-compose.yml file and deploys services to the cluster",
+	Use:     "start",
+	Aliases: []string{"deploy"},
+	Args:    cobra.NoArgs,
+	Short:   "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -408,7 +418,7 @@ var composeStartCmd = &cobra.Command{
 
 var composeDownCmd = &cobra.Command{
 	Use:     "down",
-	Aliases: []string{"stop"},
+	Aliases: []string{"stop", "rm"},
 	Args:    cobra.NoArgs,
 	Short:   "Reads a docker-compose.yml file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -532,6 +542,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
+	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	// rootCmd.PersistentFlags().StringP("context", "C", "", "Change the context directory")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
@@ -597,7 +608,7 @@ func main() {
 	tailCmd.Flags().StringP("name", "n", "", "Name of the service")
 	tailCmd.Flags().String("etag", "", "ETag or deployment ID of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
-	tailCmd.Flags().String("since", "5s", "Show logs since duration/time; defaults to 5s ago")
+	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
 	rootCmd.AddCommand(tailCmd)
 
 	// Delete Command

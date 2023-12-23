@@ -76,3 +76,18 @@ func SaveAccessToken(fabric, at string) error {
 	Debug(" - Access token saved to", tokenFile)
 	return nil
 }
+
+func LoginAndSaveAccessToken(ctx context.Context, client defangv1connect.FabricControllerClient, clientId, fabric string) error {
+	at, err := Login(ctx, client, clientId, fabric)
+	if err != nil {
+		return err
+	}
+
+	tenant, host := SplitTenantHost(fabric)
+	Info(" * Successfully logged in to", host, "("+tenant.String()+" tenant)")
+
+	if err := SaveAccessToken(fabric, at); err != nil {
+		Warn(" ! Failed to save access token:", err)
+	}
+	return nil
+}

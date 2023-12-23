@@ -212,6 +212,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			build = &pb.Build{
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
+				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
 			}
 
 			if len(svccfg.Build.Args) > 0 {
@@ -267,7 +268,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				deploy.Resources = &pb.Resources{
 					Reservations: &pb.Resource{
 						Cpus:    float32(cpus),
-						Memory:  float32(reservations.MemoryBytes / 1024 / 1024),
+						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
 					},
 				}

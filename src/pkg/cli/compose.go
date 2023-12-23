@@ -20,13 +20,15 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	loader "github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/types"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
+
+const MiB = 1024 * 1024
 
 var (
 	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -243,10 +245,36 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+func filter(file string, stat os.DirEntry) bool {
+	switch file {
+	// case Dockerfile": // overwritten below if specified
+	// case ".dockerignore": we're not using this, but Kaniko does
+	case ".DS_Store",
+		".direnv",
+		".envrc",
+		".git",
+		".github",
+		".idea",
+		".vscode",
+		"__pycache__",
+		"defang.exe", // our binary
+		"docker-compose.yml",
+		"docker-compose.yaml",
+		"node_modules",
+		"Thumbs.db":
+		return false // omit
+	case "defang": // our binary
+		return stat.IsDir() // omit only if it's a file
+	}
+	return true // keep
+}
+
 func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	foundDockerfile := false
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
+	} else {
+		dockerfile = filepath.Clean(dockerfile)
 	}
 
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
@@ -255,25 +283,6 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	// Declare a map of files to ignore
-	ignore := map[string]bool{
-		".DS_Store":           true,
-		".direnv":             true,
-		".envrc":              true,
-		".git":                true,
-		".github":             true,
-		".idea":               true,
-		".vscode":             true,
-		"__pycache__":         true,
-		"defang":              true, // our binary
-		"defang.exe":          true, // our binary
-		"docker-compose.yml":  true,
-		"docker-compose.yaml": true,
-		"Dockerfile":          true, // overwritten below if specified
-		"node_modules":        true,
-		// ".dockerignore":       true, we're not using this, but Kaniko does
-	}
-	ignore[filepath.Base(dockerfile)] = false // always include the Dockerfile because Kaniko needs it
 	// dockerignore.ReadAll(root) TODO: use this from "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
 
 	err := filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
@@ -281,8 +290,8 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		// Ignore files in the ignore map
-		if skip := ignore[de.Name()]; skip {
+		// Ignore files using the filter function
+		if !filter(de.Name(), de) {
 			if de.IsDir() {
 				return filepath.SkipDir
 			}
@@ -327,7 +336,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 		defer file.Close()
 
-		if !foundDockerfile && filepath.Clean(dockerfile) == relPath {
+		if !foundDockerfile && dockerfile == relPath {
 			foundDockerfile = true
 		}
 
@@ -337,7 +346,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 
 		_, err = io.Copy(tarWriter, file)
-		if buf.Len() > 1024*1024*10 {
+		if buf.Len() > 10*MiB {
 			return fmt.Errorf("build context is too large; this beta version is limited to 10MiB")
 		}
 		return err
