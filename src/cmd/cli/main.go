@@ -50,6 +50,13 @@ var rootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		cd, _ := cmd.Flags().GetString("cd")
+		if cd != "" {
+			if err := os.Chdir(cd); err != nil {
+				return err
+			}
+		}
+
 		if _, _, err := net.SplitHostPort(server); err != nil {
 			server = server + ":443"
 		}
@@ -543,7 +550,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
-	// rootCmd.PersistentFlags().StringP("context", "C", "", "Change the context directory")
+	rootCmd.PersistentFlags().StringP("cd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Token command
