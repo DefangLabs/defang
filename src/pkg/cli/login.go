@@ -64,7 +64,7 @@ func Login(ctx context.Context, client defangv1connect.FabricControllerClient, c
 	}
 
 	tenant, _ := SplitTenantHost(fabric)
-	return GenerateToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
+	return generateToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
 }
 
 func SaveAccessToken(fabric, at string) error {

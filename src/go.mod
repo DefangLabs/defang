@@ -7,6 +7,7 @@ require (
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.0.0-beta.1.0.20231220211020-1aa0c8aa0529
 	github.com/google/uuid v1.5.0
+	github.com/moby/patternmatcher v0.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/term v0.15.0
