@@ -22,27 +22,25 @@ RUN pip install poetry
 # Set the working directory
 WORKDIR /app
 
+ARG MODEL_FILE=llama-2-7b-chat.Q4_0.gguf
+ARG MODEL_URL=https://huggingface.co/TheBloke/Llama-2-7B-chat-GGUF/resolve/main/${MODEL_FILE}
+ENV MODEL_PATH="/app/models/${MODEL_FILE}"
+RUN mkdir -p /app/models && curl -L ${MODEL_URL} -o ${MODEL_PATH}
+# ADD ${MODEL_URL} /app/models/ # should work but OOM
+
 # (Optional) Copy your Python project files and install dependencies
 COPY ./defang-llama/pyproject.toml ./defang-llama/README.md ./defang-llama/poetry.lock ./defang-llama/poetry.toml /app/
 
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on"
 
-RUN poetry install --no-dev
+RUN poetry install --only main --no-root
 
-ARG MODEL_FILE=llama-2-7b-chat.Q4_0.gguf
-ARG MODEL_URL=https://huggingface.co/TheBloke/Llama-2-7B-chat-GGUF/resolve/main/llama-2-7b-chat.Q4_0.gguf
-
-ENV MODEL_FILE=${MODEL_FILE}
-ENV MODEL_URL=${MODEL_URL}
-ENV MODEL_PATH="/app/models/${MODEL_FILE}"
 ENV FLASK_APP=defang_llama
 ENV FLASK_ENV=production
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
 
 COPY ./defang-llama/ /app/
-
-RUN curl -L $MODEL_URL -o "/app/models/${MODEL_FILE}"
 
 # TODO: nividia-smi
 

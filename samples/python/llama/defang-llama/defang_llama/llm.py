@@ -24,8 +24,8 @@ llm = LlamaCPP(
     # kwargs to pass to __call__()
     generate_kwargs={},
     # kwargs to pass to __init__()
-    # set to at least 1 to use GPU
-    model_kwargs={"n_gpu_layers": 1},
+    # set to at least 1 to use GPU; If -1, all layers are offloaded.
+    model_kwargs={"n_gpu_layers": -1},
     # transform inputs into Llama2 format
     messages_to_prompt=messages_to_prompt,
     completion_to_prompt=completion_to_prompt,

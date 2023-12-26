@@ -742,12 +742,12 @@ files = [
 
 [[package]]
 name = "llama-cpp-python"
-version = "0.2.20"
+version = "0.2.24"
 description = "Python bindings for the llama.cpp library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "llama_cpp_python-0.2.20.tar.gz", hash = "sha256:a0ada1cb800ba4da60ea6ac4f7264b687a35412374e5af2c92e5b22852cdbafb"},
+    {file = "llama_cpp_python-0.2.24.tar.gz", hash = "sha256:85f8fd110b4b90599d5ff427bd4a1a4db6e70817c60ba8aa609fa5c645761ec1"},
 ]
 
 [package.dependencies]
@@ -759,7 +759,7 @@ typing-extensions = ">=4.5.0"
 all = ["llama_cpp_python[dev,server,test]"]
 dev = ["black (>=23.3.0)", "httpx (>=0.24.1)", "mkdocs (>=1.4.3)", "mkdocs-material (>=9.1.18)", "mkdocstrings[python] (>=0.22.0)", "pytest (>=7.4.0)", "twine (>=4.0.2)"]
 server = ["fastapi (>=0.100.0)", "pydantic-settings (>=2.0.1)", "sse-starlette (>=1.6.1)", "starlette-context (>=0.3.6,<0.4)", "uvicorn (>=0.22.0)"]
-test = ["httpx (>=0.24.1)", "pytest (>=7.4.0)"]
+test = ["httpx (>=0.24.1)", "pytest (>=7.4.0)", "scipy (>=1.10)"]
 
 [[package]]
 name = "llama-index"
@@ -1919,4 +1919,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "4d942a4e68d8aafb798cb70440d33dd2bb436d3bf4fecccd42513b7b830aca14"
+content-hash = "2d57e0786b82ba7d0e8b9d304f859f4b4a8407f60f6c344ed34febf400dfcff5"
