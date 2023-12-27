@@ -11,10 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
+	common "github.com/defang-io/defang/src/pkg/aws"
 	"github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/aws/region"
-	"github.com/defang-io/defang/src/pkg/types"
 )
 
 type AwsEcs struct {
@@ -22,7 +22,7 @@ type AwsEcs struct {
 	stackName string
 }
 
-var _ types.Driver = (*AwsEcs)(nil)
+// var _ types.Driver = (*AwsEcs)(nil)
 
 const stackTimeout = time.Minute * 3
 
@@ -33,9 +33,9 @@ func New(stack string, region region.Region) *AwsEcs {
 	return &AwsEcs{
 		stackName: stack,
 		AwsEcs: ecs.AwsEcs{
-			Region: region,
-			Spot:   true,
-			VCpu:   1.0,
+			Aws:  common.Aws{Region: region},
+			Spot: true,
+			VCpu: 1.0,
 		},
 	}
 }

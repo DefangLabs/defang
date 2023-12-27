@@ -1,12 +1,9 @@
 package ecs
 
 import (
-	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/defang-io/defang/src/pkg/aws/region"
+	common "github.com/defang-io/defang/src/pkg/aws"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
@@ -19,19 +16,15 @@ const (
 type TaskArn = types.TaskID
 
 type AwsEcs struct {
+	common.Aws
 	ClusterARN      string
 	LogGroupName    string
-	Region          region.Region
 	SecurityGroupID string
 	Spot            bool
 	SubNetID        string
 	TaskDefARN      string
 	VCpu            float64
 	VpcID           string
-}
-
-func (a AwsEcs) LoadConfig(ctx context.Context) (aws.Config, error) {
-	return config.LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 }
 
 func PlatformToArch(platform string) *string {

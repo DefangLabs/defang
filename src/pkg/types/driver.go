@@ -19,4 +19,6 @@ type Driver interface {
 	// Exec(ctx context.Context, taskID TaskID, args ...string) error
 	GetInfo(ctx context.Context, taskID TaskID) (string, error) // TODO: make return value a struct
 	SetVpcID(vpcId string) error
+	PutSecret(ctx context.Context, name, value string) error
+	ListSecrets(ctx context.Context) ([]string, error) // no values
 }

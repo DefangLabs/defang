@@ -8,5 +8,9 @@
 		}
 	],
 	"settings": {
+		"go.testEnvVars": {
+			"AWS_PROFILE": "defang-sandbox"
+		},
+		"go.testTags": "integration"
 	}
 }

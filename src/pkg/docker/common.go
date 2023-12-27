@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"errors"
 
 	"github.com/defang-io/defang/src/pkg/types"
@@ -35,4 +36,12 @@ func (Docker) SetVpcID(vpcId string) error {
 		return errors.New("docker does not support specifying VPC ID")
 	}
 	return nil
+}
+
+func (Docker) PutSecret(ctx context.Context, name, value string) error {
+	return errors.New("docker does not support secrets")
+}
+
+func (Docker) ListSecrets(ctx context.Context) ([]string, error) {
+	return nil, errors.New("docker does not support secrets")
 }
