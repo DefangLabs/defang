@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/defang-io/defang/cli/pkg/aws/region"
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 const (

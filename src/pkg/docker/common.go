@@ -3,7 +3,7 @@ package docker
 import (
 	"errors"
 
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/types"
 	"github.com/docker/docker/client"
 )
 

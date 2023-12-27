@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/defang-io/defang/cli/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
 const spinner = `-\|/`

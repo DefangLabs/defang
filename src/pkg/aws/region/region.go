@@ -1,6 +1,6 @@
 package region
 
-import "github.com/defang-io/defang/cli/pkg/aws"
+import "github.com/defang-io/defang/src/pkg/aws"
 
 type Region = aws.Region
 

@@ -3,10 +3,10 @@ package cmd
 import (
 	"os"
 
-	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn"
-	"github.com/defang-io/defang/cli/pkg/aws/region"
-	"github.com/defang-io/defang/cli/pkg/docker"
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
+	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/docker"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 var currentUser = os.Getenv("USER")

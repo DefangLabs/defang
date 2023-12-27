@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func Logs(ctx context.Context, region Region, id types.TaskID) error {

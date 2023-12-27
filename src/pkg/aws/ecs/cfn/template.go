@@ -13,8 +13,8 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/logs"
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
-	awsecs "github.com/defang-io/defang/cli/pkg/aws/ecs"
-	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn/outputs"
+	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
+	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 )
 
 const createVpcResources = true

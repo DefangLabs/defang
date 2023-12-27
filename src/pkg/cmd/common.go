@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/defang-io/defang/cli/pkg/aws"
+	"github.com/defang-io/defang/src/pkg/aws"
 )
 
 type Region = aws.Region

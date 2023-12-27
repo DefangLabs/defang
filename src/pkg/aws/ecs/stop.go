@@ -5,7 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func (a AwsEcs) Stop(ctx context.Context, id types.TaskID) error {

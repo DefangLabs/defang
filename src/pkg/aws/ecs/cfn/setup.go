@@ -11,10 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
-	"github.com/defang-io/defang/cli/pkg/aws/ecs"
-	"github.com/defang-io/defang/cli/pkg/aws/ecs/cfn/outputs"
-	"github.com/defang-io/defang/cli/pkg/aws/region"
-	"github.com/defang-io/defang/cli/pkg/types"
+	"github.com/defang-io/defang/src/pkg/aws/ecs"
+	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
+	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 type AwsEcs struct {

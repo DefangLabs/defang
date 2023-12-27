@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/defang-io/defang/cli/pkg/cmd"
+	"github.com/defang-io/defang/src/pkg/cmd"
 	"github.com/spf13/pflag"
 )
 
