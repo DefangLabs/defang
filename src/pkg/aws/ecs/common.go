@@ -43,7 +43,8 @@ func PlatformToArch(platform string) *string {
 	if len(parts) >= 2 {
 		arch = parts[1]
 	}
-	arch = strings.ToLower(arch)
+	// From https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-runtimeplatform.html#cfn-ecs-taskdefinition-runtimeplatform-cpuarchitecture
+	arch = strings.ToUpper(arch)
 	if arch == "AMD64" {
 		arch = "X86_64"
 	}
