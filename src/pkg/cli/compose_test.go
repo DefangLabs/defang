@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

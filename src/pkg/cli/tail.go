@@ -86,8 +86,13 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet) TODO: could do fuzzy matching and suggest alternatives
 		if _, err := client.Get(ctx, connect.NewRequest(&pb.ServiceID{Name: service})); err != nil {
-			if connect.CodeOf(err) == connect.CodeNotFound {
+			switch connect.CodeOf(err) {
+			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
+			case connect.CodeUnknown:
+				// Ignore unknown (nil) errors
+			default:
+				Warn(" !", err)
 			}
 		}
 	}
@@ -112,6 +117,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		timestampZone = time.UTC
 	}
 
+	skipDuplicate := false
 	for {
 		if !tailClient.Receive() {
 			if errors.Is(tailClient.Err(), context.Canceled) {
@@ -127,6 +133,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
 				if err == nil {
+					skipDuplicate = true
 					continue
 				}
 				Debug(" - Reconnect failed:", err)
@@ -150,6 +157,10 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			}
 
 			ts := e.Timestamp.AsTime()
+			if skipDuplicate && ts.Equal(since) {
+				skipDuplicate = false
+				continue
+			}
 			if ts.After(since) {
 				since = ts
 			}

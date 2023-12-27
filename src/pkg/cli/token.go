@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
@@ -17,13 +18,17 @@ import (
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Token(ctx context.Context, client defangv1connect.FabricControllerClient, clientId string, tenant pkg.TenantID, scope scope.Scope) error {
+func Token(ctx context.Context, client defangv1connect.FabricControllerClient, clientId string, tenant pkg.TenantID, dur time.Duration, scope scope.Scope) error {
+	if DoDryRun {
+		return errors.New("dry-run")
+	}
+
 	code, err := github.StartAuthCodeFlow(ctx, clientId)
 	if err != nil {
 		return err
 	}
 
-	at, err := GenerateToken(ctx, client, code, tenant, scope)
+	at, err := generateToken(ctx, client, code, tenant, dur, scope)
 	if err != nil {
 		return err
 	}
@@ -33,7 +38,7 @@ func Token(ctx context.Context, client defangv1connect.FabricControllerClient, c
 	return nil
 }
 
-func GenerateToken(ctx context.Context, client defangv1connect.FabricControllerClient, code string, tenant pkg.TenantID, ss ...scope.Scope) (string, error) {
+func generateToken(ctx context.Context, client defangv1connect.FabricControllerClient, code string, tenant pkg.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
@@ -45,11 +50,7 @@ func GenerateToken(ctx context.Context, client defangv1connect.FabricControllerC
 
 	Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
 
-	if DoDryRun {
-		return "", errors.New("dry-run")
-	}
-
-	token, err := client.Token(ctx, connect.NewRequest(&pb.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes}))
+	token, err := client.Token(ctx, connect.NewRequest(&pb.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())}))
 	if err != nil {
 		return "", err
 	}
