@@ -2,8 +2,11 @@ name: Go package
 
 on:
   push:
+    branches:
+      - '**'
     paths:
       - '.github/workflows/go.yml'
+      - 'bin/codesign.sh'
       - 'src/**'
 
 jobs:
