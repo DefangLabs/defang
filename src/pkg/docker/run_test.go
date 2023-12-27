@@ -9,6 +9,10 @@ import (
 )
 
 func TestRun(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	d := New()
 
 	err := d.SetUp(context.TODO(), "alpine:latest", 6*1024*1024, d.platform)
