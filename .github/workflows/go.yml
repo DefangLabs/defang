@@ -2,6 +2,8 @@ name: Go package
 
 on:
   push:
+    tags:
+      - 'v*' # push events to tagged commits
     branches:
       - '**'
     paths:
