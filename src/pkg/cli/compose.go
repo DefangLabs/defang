@@ -95,7 +95,7 @@ func convertPlatform(platform string) pb.Platform {
 }
 
 func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
-	Debug(" - Loading compose file", filePath)
+	Debug(" - Loading compose file", filePath, "for project", projectName)
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
 	project, err := loader.Load(types.ConfigDetails{
