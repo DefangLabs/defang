@@ -53,16 +53,22 @@ func TestLoadDockerCompose(t *testing.T) {
 	})
 
 	t.Run("override project name", func(t *testing.T) {
-		_, err := loadDockerCompose("../../tests/docker-compose.yml", "blah")
+		p, err := loadDockerCompose("../../tests/docker-compose.yml", "blah")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
+		}
+		if p.Name != "blah" {
+			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		_, err := loadDockerCompose("../../tests/docker-compose.yml", "Valid-Username")
+		p, err := loadDockerCompose("../../tests/docker-compose.yml", "Valid-Username")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
+		}
+		if p.Name != "valid-username" {
+			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 }
