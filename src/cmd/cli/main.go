@@ -50,15 +50,11 @@ var rootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		cd, _ := cmd.Flags().GetString("cd")
+		cd, _ := cmd.Flags().GetString("cwd")
 		if cd != "" {
 			if err := os.Chdir(cd); err != nil {
 				return err
 			}
-		}
-
-		if _, _, err := net.SplitHostPort(server); err != nil {
-			server = server + ":443"
 		}
 
 		color, _ := cmd.Flags().GetString("color")
@@ -73,15 +69,19 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("invalid color option: %s", color)
 		}
 
+		if _, _, err := net.SplitHostPort(server); err != nil {
+			server = server + ":443"
+		}
+
 		// TODO: not all commands need a connection, so we should only connect when needed
-		client = cli.Connect(server)
+		client, tenantId = cli.Connect(server)
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			cli.Warn(" !", err)
 			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
 				return err
 			}
-			client = cli.Connect(server) // reconnect with the new token
+			client, tenantId = cli.Connect(server) // reconnect with the new token
 		}
 		return nil
 	},
@@ -550,7 +550,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
-	rootCmd.PersistentFlags().StringP("cd", "C", "", "Change directory before running the command")
+	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Token command
