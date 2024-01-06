@@ -49,6 +49,10 @@ func (a AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) {
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
+func update1s(o *cloudformation.StackUpdateCompleteWaiterOptions) {
+	o.MinDelay = 1
+}
+
 func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
@@ -64,17 +68,23 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		// Go SDK doesn't have --no-fail-on-empty-changeset; ignore ValidationError: No updates are to be performed.
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); ok && apiError.ErrorCode() == "ValidationError" && apiError.ErrorMessage() == "No updates are to be performed." {
-			return nil
+			return a.fillOutputs(ctx, a.stackName)
 		}
 		return err // might call createStackAndWait depending on the error
 	}
 
-	defer a.fillOutputs(ctx, *uso.StackId)
-
 	fmt.Println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
-	return cloudformation.NewStackUpdateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
+	o, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
+	if err != nil {
+		return err
+	}
+	return a.fillWithOutputs(ctx, o)
+}
+
+func create1s(o *cloudformation.StackCreateCompleteWaiterOptions) {
+	o.MinDelay = 1
 }
 
 func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) error {
@@ -98,9 +108,13 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
-	return cloudformation.NewStackCreateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
+	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(a.stackName),
 	}, stackTimeout)
+	if err != nil {
+		return err
+	}
+	return a.fillWithOutputs(ctx, dso)
 }
 
 func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
@@ -115,7 +129,7 @@ func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platfor
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); !ok || apiError.ErrorCode() != "ValidationError" || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
-			return err
+			// return err
 		}
 
 		return a.createStackAndWait(ctx, string(template))
@@ -137,6 +151,10 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 	if err != nil {
 		return err
 	}
+	return a.fillWithOutputs(ctx, dso)
+}
+
+func (a *AwsEcs) fillWithOutputs(ctx context.Context, dso *cloudformation.DescribeStacksOutput) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
@@ -154,6 +172,10 @@ func (a *AwsEcs) fillOutputs(ctx context.Context, stackId string) error {
 				a.LogGroupName = *output.OutputValue
 			case outputs.SecurityGroupID:
 				a.SecurityGroupID = *output.OutputValue
+			case outputs.BucketName:
+				a.BucketName = *output.OutputValue
+				// default: TODO: should do this but only for stack the driver created
+				// 	return fmt.Errorf("unknown output key %q", *output.OutputKey)
 			}
 		}
 	}

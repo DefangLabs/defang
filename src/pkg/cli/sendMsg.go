@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
 )
 
-func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient, subject, _type, id string, data []byte, contenttype string) error {
+func SendMsg(ctx context.Context, client client.Client, subject, _type, id string, data []byte, contenttype string) error {
 	if subject == "" {
 		return errors.New("subject is required")
 	}
@@ -27,7 +26,7 @@ func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient,
 		return nil
 	}
 
-	_, err := client.Publish(ctx, connect.NewRequest(&pb.PublishRequest{Event: &pb.Event{
+	err := client.Publish(ctx, &pb.PublishRequest{Event: &pb.Event{
 		Specversion:     "1.0",
 		Type:            _type,
 		Source:          "https://cli.defang.io",
@@ -35,6 +34,6 @@ func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient,
 		Id:              id,
 		Datacontenttype: contenttype,
 		Data:            data,
-	}}))
+	}})
 	return err
 }

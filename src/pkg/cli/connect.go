@@ -7,13 +7,23 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Connect(server string) (defangv1connect.FabricControllerClient, pkg.TenantID) {
+func Connect(server string) (client.Client, pkg.TenantID) {
+	tenantId, host := SplitTenantHost(server)
+
+	if host == "aws:443" {
+		Debug(" - Connecting to AWS")
+		byocClient := client.NewByocClient(string(tenantId))
+		return byocClient, pkg.TenantID(byocClient.ProjectID)
+	}
+
 	accessToken := GetExistingToken(server)
-	tenantId, _ := TenantFromAccessToken(accessToken)
-	_, host := SplitTenantHost(server) // TODO: use this returned tenantId when we have no access token
+	if accessToken != "" {
+		tenantId, _ = TenantFromAccessToken(accessToken)
+	}
 	Debug(" - Using tenant", tenantId, "for server", server)
 
 	baseUrl := "http://"
@@ -22,7 +32,7 @@ func Connect(server string) (defangv1connect.FabricControllerClient, pkg.TenantI
 	}
 	baseUrl += host
 	Debug(" - Connecting to", baseUrl)
-	client := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
+	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
 	Info(" * Connected to", host)
-	return client, tenantId
+	return client.NewGrpcClient(fabricClient), tenantId
 }

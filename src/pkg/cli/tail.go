@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -77,7 +77,7 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, service, etag string, since time.Time, raw bool) error {
+func Tail(ctx context.Context, client client.Client, service, etag string, since time.Time, raw bool) error {
 	if DoDryRun {
 		return nil
 	}
@@ -85,7 +85,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet) TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, connect.NewRequest(&pb.ServiceID{Name: service})); err != nil {
+		if _, err := client.Get(ctx, &pb.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
@@ -97,7 +97,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		}
 	}
 
-	tailClient, err := client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+	tailClient, err := client.Tail(ctx, &pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 				Debug(" - Disconnected:", tailClient.Err())
 				Warn(" ! Reconnecting...")
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+				tailClient, err = client.Tail(ctx, &pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err == nil {
 					skipDuplicate = true
 					continue

@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/http"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
@@ -117,7 +115,7 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	return project, nil
 }
 
-func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig, force bool) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force bool) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -218,10 +216,10 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer, digest string) (string, error) {
+func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage TODO: use a streaming API
 	ureq := &pb.UploadURLRequest{Digest: digest}
-	res, err := client.CreateUploadURL(ctx, connect.NewRequest(ureq))
+	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
 	}
@@ -231,12 +229,7 @@ func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerC
 	}
 
 	// Do an HTTP PUT to the generated URL
-	req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/gzip")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
 	if err != nil {
 		return "", err
 	}
@@ -245,13 +238,7 @@ func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerC
 		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
-	// Remove query params from URL
-	url, err := url.Parse(res.Msg.Url)
-	if err != nil {
-		return "", err
-	}
-	url.RawQuery = ""
-	return url.String(), nil
+	return http.RemoveQueryParam(res.Url), nil
 }
 
 type contextAwareWriter struct {

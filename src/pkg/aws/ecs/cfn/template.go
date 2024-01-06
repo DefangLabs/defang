@@ -21,7 +21,6 @@ const createVpcResources = true
 
 func createTemplate(image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
 	const prefix = awsecs.ProjectName + "-" // TODO: include stack name
-	const ecrPublicPrefix = prefix + "ecr-public"
 
 	defaultTags := []tags.Tag{
 		{
@@ -47,19 +46,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		// ClusterName: aws.String(PREFIX + "cluster" + SUFFIX), // optional
 	}
 
-	// 3. ECR pull-through cache (only really needed for images from ECR Public registry)
-	// TODO: Creating pull through cache rules isn't supported in the following Regions:
-	// * China (Beijing) (cn-north-1)
-	// * China (Ningxia) (cn-northwest-1)
-	// * AWS GovCloud (US-East) (us-gov-east-1)
-	// * AWS GovCloud (US-West) (us-gov-west-1)
-	const _pullThroughCache = "PullThroughCache"
-	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-		EcrRepositoryPrefix: aws.String(ecrPublicPrefix), // TODO: optional
-		UpstreamRegistryUrl: aws.String(awsecs.EcrPublicRegistry),
-	}
-
-	// 4. ECS capacity provider
+	// 3. ECS capacity provider
 	capacityProvider := "FARGATE"
 	if spot {
 		capacityProvider = "FARGATE_SPOT"
@@ -78,7 +65,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		},
 	}
 
-	// 5. CloudWatch log group
+	// 4. CloudWatch log group
 	const _logGroup = "LogGroup"
 	template.Resources[_logGroup] = &logs.LogGroup{
 		Tags: defaultTags,
@@ -86,7 +73,26 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		RetentionInDays: aws.Int(1),
 	}
 
-	// 6. IAM exec role for task
+	// TODO: support pull through cache for other registries like Docker Hub etc.
+	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
+		const _pullThroughCache = "PullThroughCache"
+		const ecrPublicPrefix = prefix + "ecr-public" // TODO: this will cause collisions between stacks
+
+		// 5. ECR pull-through cache (only really needed for images from ECR Public registry)
+		// TODO: Creating pull through cache rules isn't supported in the following Regions:
+		// * China (Beijing) (cn-north-1)
+		// * China (Ningxia) (cn-northwest-1)
+		// * AWS GovCloud (US-East) (us-gov-east-1)
+		// * AWS GovCloud (US-West) (us-gov-west-1)
+		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+			EcrRepositoryPrefix: aws.String(ecrPublicPrefix),
+			UpstreamRegistryUrl: aws.String(awsecs.EcrPublicRegistry),
+		}
+
+		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
+	}
+
+	// 6a. IAM exec role for task
 	assumeRolePolicyDocumentECS := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
@@ -142,7 +148,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 								"ecr:BatchImportUpstreamImage", // can bse repo permissions instead
 								"ecr:CreateRepository",         // can be registry permissions instead
 							},
-							"Resource": "*", // TODO: restrict
+							"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
 						},
 					},
 				},
@@ -179,13 +185,25 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 					},
 				},
 			},
+			{
+				PolicyName: "AllowPassRole",
+				PolicyDocument: map[string]any{
+					"Version": "2012-10-17",
+					"Statement": []map[string]any{
+						{
+							"Effect": "Allow",
+							"Action": []string{
+								"iam:PassRole",
+							},
+							"Resource": "*", // TODO: restrict to roles that are needed/created by the task
+						},
+					},
+				},
+			},
 		},
 	}
 
 	// 7. ECS task definition
-	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
-		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
-	}
 	cpu, mem := awsecs.FixupFargateConfig(vcpu, memory)
 	const _taskDefinition = "TaskDefinition"
 	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
@@ -203,15 +221,15 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 					Options: map[string]string{
 						"awslogs-group":         cloudformation.Ref(_logGroup),
 						"awslogs-region":        cloudformation.Ref("AWS::Region"),
-						"awslogs-stream-prefix": awsecs.ProjectName,
+						"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
 					},
 				},
-				Environment: []ecs.TaskDefinition_KeyValuePair{
-					{
-						Name:  aws.String("PULUMI_BACKEND_URL"),                                        // TODO: this should not be here
-						Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"), // TODO: use _bucket
-					},
-				},
+				// Environment: []ecs.TaskDefinition_KeyValuePair{
+				// 	{
+				// 		Name:  aws.String("PULUMI_BACKEND_URL"), // TODO: this should not be here
+				// 		Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"),
+				// 	},
+				// },
 			},
 		},
 		Cpu:                     aws.String(strconv.FormatUint(uint64(cpu), 10)),
@@ -324,6 +342,10 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
 		Value:       cloudformation.Ref(_securityGroup),
 		Description: aws.String("ID of the security group"),
+	}
+	template.Outputs[outputs.BucketName] = cloudformation.Output{
+		Value:       cloudformation.Ref(_bucket),
+		Description: aws.String("Name of the S3 bucket"),
 	}
 
 	return template

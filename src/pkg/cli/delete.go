@@ -3,12 +3,11 @@ package cli
 import (
 	"context"
 
-	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, name ...string) (string, error) {
+func Delete(ctx context.Context, client client.Client, name ...string) (string, error) {
 	Debug(" - Deleting service", name)
 
 	if DoDryRun {
@@ -18,9 +17,9 @@ func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, 
 	for i, n := range name {
 		name[i] = NormalizeServiceName(n)
 	}
-	resp, err := client.Delete(ctx, connect.NewRequest(&pb.DeleteRequest{Names: name}))
+	resp, err := client.Delete(ctx, &pb.DeleteRequest{Names: name})
 	if err != nil {
 		return "", err
 	}
-	return resp.Msg.Etag, nil
+	return resp.Etag, nil
 }

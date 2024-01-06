@@ -23,9 +23,9 @@ import (
 
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
+	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/scope"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
 //
@@ -33,7 +33,7 @@ import (
 //
 
 var (
-	client         defangv1connect.FabricControllerClient
+	client         cliClient.Client
 	clientId       = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
 	defFabric      = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
 	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
@@ -379,6 +379,7 @@ var composeUpCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
 
+		since := time.Now()
 		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
 		if err != nil {
 			return err
@@ -394,7 +395,7 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		cli.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, time.Now().Add(-time.Second), false)
+		return cli.Tail(cmd.Context(), client, "", etag, since, false)
 	},
 }
 
@@ -544,6 +545,15 @@ var logout = &cobra.Command{
 	},
 }
 
+var bootstrap = &cobra.Command{
+	Use:   "bootstrap",
+	Args:  cobra.NoArgs,
+	Short: "Bootstrap a new BYOC account",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cli.Bootstrap(cmd.Context())
+	},
+}
+
 func main() {
 	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
@@ -552,6 +562,9 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
+
+	// Bootstrap command
+	rootCmd.AddCommand(bootstrap)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -654,9 +667,9 @@ func main() {
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
-			composeFile := composeCmd.PersistentFlags().Lookup("file")
-			if composeFile.Changed {
-				compose += " -f " + composeFile.Value.String()
+			fileFlag := composeCmd.PersistentFlags().Lookup("file")
+			if fileFlag.Changed {
+				compose += " -f " + fileFlag.Value.String()
 			}
 			printDefangHint("Fix the error and try again. To validate the compose file, use:", compose+" config")
 		}

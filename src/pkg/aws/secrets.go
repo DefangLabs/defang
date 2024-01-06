@@ -90,12 +90,16 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 }
 
 func (a *Aws) ListSecrets(ctx context.Context) ([]string, error) {
+	return a.ListSecretsByPrefix(ctx, "")
+}
+
+func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	secretPrefix := getSecretID("")
+	secretPrefix := getSecretID(prefix)
 
 	svc := ssm.NewFromConfig(cfg)
 

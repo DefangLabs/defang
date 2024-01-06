@@ -11,12 +11,14 @@ services:
     ports:
       - target: 80
         mode: host
+
   # dfnx:
   #   build:
   #     context: .
       # dockerfile: Dockerfile.dfn
     # ports:
       # - 80
+
   echo:
     image: ealen/echo-server
     ports:

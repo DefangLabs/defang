@@ -21,4 +21,5 @@ type Driver interface {
 	SetVpcID(vpcId string) error
 	PutSecret(ctx context.Context, name, value string) error
 	ListSecrets(ctx context.Context) ([]string, error) // no values
+	CreateUploadURL(ctx context.Context, name string) (string, error)
 }

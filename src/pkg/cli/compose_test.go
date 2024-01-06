@@ -11,10 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestNormalizeServiceName(t *testing.T) {
@@ -158,7 +157,7 @@ func TestUploadTarball(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{server.URL + path}, &bytes.Buffer{}, digest)
+		url, err := uploadTarball(context.TODO(), client.MockClient{server.URL + path}, &bytes.Buffer{}, digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -169,7 +168,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{server.URL + path}, &bytes.Buffer{}, "")
+		url, err := uploadTarball(context.TODO(), client.MockClient{server.URL + path}, &bytes.Buffer{}, "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -231,54 +230,4 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
-}
-
-type mockGrpcClient struct {
-	url string
-}
-
-func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
-	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
-}
-func (mockGrpcClient) GetStatus(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Status], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Version], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Tail(context.Context, *connect.Request[pb.TailRequest]) (*connect.ServerStreamForClient[pb.TailResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Update(context.Context, *connect.Request[pb.Service]) (*connect.Response[pb.ServiceInfo], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Get(context.Context, *connect.Request[pb.ServiceID]) (*connect.Response[pb.ServiceInfo], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Delete(context.Context, *connect.Request[pb.DeleteRequest]) (*connect.Response[pb.DeleteResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Publish(context.Context, *connect.Request[pb.PublishRequest]) (*connect.Response[emptypb.Empty], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Subscribe(context.Context, *connect.Request[pb.SubscribeRequest]) (*connect.ServerStreamForClient[pb.SubscribeResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) GetServices(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.ListServicesResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) Token(context.Context, *connect.Request[pb.TokenRequest]) (*connect.Response[pb.TokenResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) PutSecret(context.Context, *connect.Request[pb.SecretValue]) (*connect.Response[emptypb.Empty], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) ListSecrets(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[pb.Secrets], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) GenerateFiles(context.Context, *connect.Request[pb.GenerateFilesRequest]) (*connect.Response[pb.GenerateFilesResponse], error) {
-	panic("no impl")
-}
-func (mockGrpcClient) RevokeToken(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
-	panic("no impl")
 }

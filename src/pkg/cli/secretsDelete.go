@@ -3,18 +3,17 @@ package cli
 import (
 	"context"
 
-	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func SecretsDelete(ctx context.Context, client defangv1connect.FabricControllerClient, name string) error {
+func SecretsDelete(ctx context.Context, client client.Client, name string) error {
 	Debug(" - Deleting secret", name)
 
 	if DoDryRun {
 		return nil
 	}
 
-	_, err := client.PutSecret(ctx, connect.NewRequest(&pb.SecretValue{Name: name}))
+	err := client.PutSecret(ctx, &pb.SecretValue{Name: name})
 	return err
 }

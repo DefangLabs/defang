@@ -17,6 +17,7 @@ type TaskArn = types.TaskID
 
 type AwsEcs struct {
 	common.Aws
+	BucketName      string
 	ClusterARN      string
 	LogGroupName    string
 	SecurityGroupID string

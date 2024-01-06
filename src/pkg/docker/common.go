@@ -45,3 +45,7 @@ func (Docker) PutSecret(ctx context.Context, name, value string) error {
 func (Docker) ListSecrets(ctx context.Context) ([]string, error) {
 	return nil, errors.New("docker does not support secrets")
 }
+
+func (Docker) CreateUploadURL(ctx context.Context, name string) (string, error) {
+	return "", errors.New("docker does not support uploads")
+}

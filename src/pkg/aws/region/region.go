@@ -1,6 +1,10 @@
 package region
 
-import "github.com/defang-io/defang/src/pkg/aws"
+import (
+	"strings"
+
+	"github.com/defang-io/defang/src/pkg/aws"
+)
 
 type Region = aws.Region
 
@@ -37,3 +41,11 @@ const (
 	USWest1      Region = "us-west-1"
 	USWest2      Region = "us-west-2"
 )
+
+func FromArn(arn string) Region {
+	parts := strings.Split(arn, ":")
+	if len(parts) < 6 {
+		panic("invalid ARN")
+	}
+	return Region(parts[3])
+}

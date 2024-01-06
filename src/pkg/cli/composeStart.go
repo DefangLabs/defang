@@ -8,15 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
+func ComposeStart(ctx context.Context, client client.Client, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return nil, &ComposeError{err}
@@ -204,7 +203,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		var build *pb.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
+			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force) // TODO: need BYOC support
 			if err != nil {
 				return nil, err
 			}
@@ -334,7 +333,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 
 		Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := client.Update(ctx, connect.NewRequest(service))
+		serviceInfo, err := client.Update(ctx, service)
 		if err != nil {
 			// Abort all? TODO: compose up should probably be atomic, all or nothing
 			if len(serviceInfos) == 0 {
@@ -345,9 +344,9 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 
 		if DoVerbose {
-			PrintObject(service.Name, serviceInfo.Msg)
+			PrintObject(service.Name, serviceInfo)
 		}
-		serviceInfos = append(serviceInfos, serviceInfo.Msg)
+		serviceInfos = append(serviceInfos, serviceInfo)
 	}
 
 	return serviceInfos, nil
