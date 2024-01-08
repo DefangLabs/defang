@@ -45,6 +45,25 @@ func (g GrpcClient) Update(ctx context.Context, req *v1.Service) (*v1.ServiceInf
 	return getMsg(g.client.Update(ctx, &connect_go.Request[v1.Service]{Msg: req}))
 }
 
+func (g GrpcClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
+	// return getMsg(g.client.Deploy(ctx, &connect_go.Request[v1.DeployRequest]{Msg: req})) TODO: implement this
+	var serviceInfos []*v1.ServiceInfo
+	for _, service := range req.Services {
+		// Info(" * Publishing service update for", service.Name)
+		serviceInfo, err := g.Update(ctx, service)
+		if err != nil {
+			if len(serviceInfos) == 0 {
+				return nil, err // abort if the first service update fails
+			}
+			// Warn(" ! Failed to update service", service.Name, err)
+			continue
+		}
+
+		serviceInfos = append(serviceInfos, serviceInfo)
+	}
+	return &v1.DeployResponse{Services: serviceInfos}, nil
+}
+
 func (g GrpcClient) Get(ctx context.Context, req *v1.ServiceID) (*v1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, &connect_go.Request[v1.ServiceID]{Msg: req}))
 }

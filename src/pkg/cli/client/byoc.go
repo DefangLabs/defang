@@ -37,6 +37,7 @@ const (
 	maxShmSizeMiB = 30720
 	cdVersion     = "latest"
 	projectName   = "bootstrap" // must match the projectName in index.ts
+	cdPrefix      = "cd-"       // renaming this practically deletes the Pulumi state
 )
 
 var (
@@ -47,10 +48,10 @@ var (
 type byoc struct {
 	driver         *cfn.AwsEcs
 	setupDone      bool
-	ProjectID      string // aka tenant
+	StackID        string // aka tenant
 	privateDomain  string
 	customerDomain string
-	taskArn        awsecs.TaskArn
+	cdTaskArn      awsecs.TaskArn
 }
 
 var _ Client = (*byoc)(nil)
@@ -61,10 +62,10 @@ func NewByocClient(projectId string) *byoc {
 		projectId = user
 	}
 	return &byoc{
-		driver:         cfn.New("crun-"+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
-		ProjectID:      projectId,
+		driver:         cfn.New(cdPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		StackID:        projectId,
 		privateDomain:  projectId + "." + projectName + ".internal",
-		customerDomain: "gnafed.click", // TODO: make configurable
+		customerDomain: "gnafed.click", // TODO: make configurable/optional
 	}
 }
 
@@ -80,33 +81,27 @@ func (b *byoc) setUp(ctx context.Context) error {
 	return nil
 }
 
-func (b *byoc) Update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
-	serviceInfo, err := b.update(ctx, service)
-	if err != nil {
-		return nil, err
+func (b *byoc) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
+	etag := pkg.RandomID()
+	serviceInfos := []*v1.ServiceInfo{}
+	for _, service := range req.Services {
+		serviceInfo, err := b.update(ctx, service)
+		if err != nil {
+			return nil, err
+		}
+		serviceInfo.Etag = etag
+		serviceInfos = append(serviceInfos, serviceInfo)
 	}
-	serviceInfos := []*v1.ServiceInfo{serviceInfo}
 	data, err := proto.Marshal(&v1.ListServicesResponse{
 		Services: serviceInfos,
 	})
 	if err != nil {
 		return nil, err
 	}
-	// payload, err := proto.Marshal(&v1.Event{
-	// 	Type:            "io.defang.fabric.cd",    // or utils.DEFANG_TYPE_REFRESH
-	// 	Source:          "https://cli.defang.io/", // unused
-	// 	Id:              b.Etag,
-	// 	Datacontenttype: "application/protobuf",
-	// 	Subject:         b.Tenant + ".service1",
-	// 	Time:            timestamppb.Now(),
-	// 	Data:            data,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	var payloadString string
 	if len(data) < 1000 {
+		// Small payloads can be sent as base64-encoded command-line argument
 		payloadString = base64.StdEncoding.EncodeToString(data)
 	} else {
 		url, err := b.driver.CreateUploadURL(ctx, "")
@@ -130,7 +125,10 @@ func (b *byoc) Update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo
 		return nil, err
 	}
 
-	return serviceInfo, b.runTask(ctx, "npm", "start", "up", payloadString)
+	return &v1.DeployResponse{
+		Services: serviceInfos,
+		Etag:     etag,
+	}, b.runTask(ctx, "npm", "start", "up", payloadString)
 }
 
 func (byoc) GetStatus(context.Context) (*v1.Status, error) {
@@ -164,18 +162,18 @@ func (b byoc) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error)
 
 func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",          // surpresses "npm notice" update messages
+		// "AWS_REGION":                 b.driver.Region.String(), this should be the destination region, not the CD region
 		"DOMAIN":                     b.customerDomain, // TODO: make optional
-		// "AWS_REGION":               cfnClient.Region,
-		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
-		"PULUMI_CONFIG_PASSPHRASE": "asdf", // TODO: make customizable
-		"STACK":                    b.ProjectID,
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",          // suppresses "npm notice" update messages TODO: move to Dockerfile.cd
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
+		"PULUMI_CONFIG_PASSPHRASE":   "asdf", // TODO: make customizable
+		"STACK":                      b.StackID,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	if err != nil {
 		return err
 	}
-	b.taskArn = taskArn
+	b.cdTaskArn = taskArn
 	return nil
 }
 
@@ -186,7 +184,7 @@ func (b *byoc) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteRes
 	if err := b.runTask(ctx, "npm", "start", "up", "TODO"); err != nil {
 		return nil, err
 	}
-	return &v1.DeleteResponse{Etag: *b.taskArn}, nil
+	return &v1.DeleteResponse{Etag: *b.cdTaskArn}, nil
 }
 
 func (byoc) Publish(context.Context, *v1.PublishRequest) error {
@@ -195,8 +193,8 @@ func (byoc) Publish(context.Context, *v1.PublishRequest) error {
 
 func (b byoc) getClusterNames() []string {
 	return []string{
-		projectName + "-" + b.ProjectID + "-cluster",
-		projectName + "-" + b.ProjectID + "-gpu-cluster",
+		projectName + "-" + b.StackID + "-cluster",
+		projectName + "-" + b.StackID + "-gpu-cluster",
 	}
 }
 
@@ -279,17 +277,17 @@ func (byoc) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.Genera
 }
 
 func (b byoc) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
-	return b.driver.PutSecret(ctx, secret.Name, b.ProjectID+"."+secret.Value)
+	return b.driver.PutSecret(ctx, secret.Name, b.StackID+"."+secret.Value)
 }
 
 func (b byoc) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
-	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.ProjectID)
+	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
 	if err != nil {
 		return nil, err
 	}
 	secrets := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
-		secrets[i] = strings.TrimPrefix(secret, b.ProjectID+".")
+		secrets[i] = strings.TrimPrefix(secret, b.StackID+".")
 	}
 	return &v1.Secrets{Names: secrets}, nil
 }
@@ -328,17 +326,31 @@ func (bs *byocStreamer) Msg() *v1.TailResponse {
 }
 
 func (bs *byocStreamer) Receive() bool {
-	entries, err := bs.LogStreamer.Receive(bs.ctx)
+	events, err := bs.LogStreamer.Receive(bs.ctx)
 	response := &v1.TailResponse{
-		Entries: make([]*v1.LogEntry, len(entries)),
-		// Etag: b.Etag,
-		Service: "cd",
-		Host:    "pulumi",
+		Entries: make([]*v1.LogEntry, len(events)),
 	}
-	for i, entry := range entries {
+	for i, event := range events {
+		if strings.HasPrefix(event.LogGroupID, cdPrefix) {
+			parts := strings.Split(event.LogStream, "/")
+			response.Etag = parts[2] // taskID TODO: grab from tag?
+			response.Service = "cd"
+			response.Host = "pulumi"
+		} else {
+			parts := strings.Split(event.LogStream, "/")
+			if len(parts) == 3 {
+				response.Host = parts[2] // taskID
+				parts = strings.SplitN(parts[1], "_", 2)
+				if len(parts) == 2 {
+					service, etag := parts[0], parts[1]
+					response.Service = service
+					response.Etag = etag
+				}
+			}
+		}
 		response.Entries[i] = &v1.LogEntry{
-			Message:   entry.Message,
-			Timestamp: timestamppb.New(entry.Timestamp),
+			Message:   event.Message,
+			Timestamp: timestamppb.New(event.Timestamp),
 			// Stderr:    false, TODO: detect
 		}
 	}
@@ -359,16 +371,26 @@ func (b *byoc) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.T
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	task := req.Etag
-	if task == "" {
-		task = *b.taskArn
+	// TODO: support --since
+	taskID := req.Etag
+	if taskID == "" && req.Service == "cd" {
+		taskID = *b.cdTaskArn
 	}
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
-	streamer, err := b.driver.TailTask(ctx, &task) // TODO: support --since
+	var err error
+	var streamer *awsecs.LogStreamer
+	if strings.HasPrefix(taskID, "arn:aws:ecs:") {
+		streamer, err = b.driver.TailTask(ctx, &taskID)
+	} else {
+		accountID := "532501343364"                               // FIXME: hard-coded
+		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match index.ts
+		logGroupID := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", b.driver.Region.String(), accountID, logGroupName)
+		streamer, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+	}
 	return &byocStreamer{
 		LogStreamer: streamer,
 		ctx:         ctx,
@@ -466,18 +488,18 @@ func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo,
 		}
 	}
 	// Check to make sure all required secrets are present in the secrets store
-	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.ProjectID); missing != nil {
+	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.StackID); missing != nil {
 		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
 	}
 	si := &v1.ServiceInfo{
 		Service: service,
-		Tenant:  b.ProjectID,
+		Tenant:  b.StackID,
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 	}
 
 	hasHost := false
 	hasIngress := false
-	fqn := newQualifiedName(b.ProjectID, service.Name)
+	fqn := newQualifiedName(b.StackID, service.Name)
 	for _, port := range service.Ports {
 		hasIngress = hasIngress || port.Mode == v1.Mode_INGRESS
 		hasHost = hasHost || port.Mode == v1.Mode_HOST
@@ -526,7 +548,7 @@ func (b byoc) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, 
 		}
 	} else if len(secrets) > 1 {
 		// Avoid multiple calls to AWS by sorting the list and then doing a binary search
-		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.ProjectID)
+		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
 		if err != nil {
 			log.Println("error listing secrets:", err)
 		}

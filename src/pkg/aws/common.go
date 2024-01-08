@@ -13,6 +13,10 @@ type Aws struct {
 	Region Region
 }
 
+func (r Region) String() string {
+	return string(r)
+}
+
 func (a Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return config.LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
 }

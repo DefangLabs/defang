@@ -32,7 +32,7 @@ func taskID(taskArn TaskArn) string {
 
 func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (*LogStreamer, error) {
 	logStreamName := getLogStreamForTask(taskArn)
-	return a.TailLogStream(ctx, logStreamName) // TODO: io.EOF on task stop
+	return a.TailLogStreans(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
 }
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
@@ -67,19 +67,30 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	}
 }
 
-func (a *AwsEcs) TailLogStream(ctx context.Context, logStreamNamePrefixes ...string) (*LogStreamer, error) {
+func getLogGroupID(logGroupARN string) string {
+	return strings.TrimSuffix(logGroupARN, ":*")
+}
+
+func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroupARNs ...string) (*LogStreamer, error) {
+	for i, lg := range logGroupARNs {
+		logGroupARNs[i] = getLogGroupID(lg)
+	}
+	return a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupARNs})
+}
+
+func (a *AwsEcs) TailLogStreans(ctx context.Context, logGroupArn string, logStreams ...string) (*LogStreamer, error) {
+	logGroupIDs := []string{getLogGroupID(logGroupArn)}
+	return a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupIDs, LogStreamNames: logStreams})
+}
+
+func (a *AwsEcs) startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (*LogStreamer, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	cw := cloudwatchlogs.NewFromConfig(cfg)
-	s, err := cw.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{
-		// LogEventFilterPattern: aws.String(""),
-		LogGroupIdentifiers: []string{strings.TrimSuffix(a.LogGroupARN, ":*")},
-		// LogStreamNamePrefixes: logStreamNamePrefixes,
-		// LogStreamNames: logStreamNamePrefixes,
-	})
+	s, err := cw.StartLiveTail(ctx, slti)
 	if err != nil {
 		return nil, err
 	}
@@ -129,10 +140,11 @@ func clusterArnFromTaskArn(taskArn string) string {
 	return fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", arnParts[3], arnParts[4], resourceParts[1])
 }
 
-type LogEntry struct {
-	Message   string
-	Timestamp time.Time
-	// Stderr    bool
+type LogEvent struct {
+	Message    string
+	Timestamp  time.Time
+	LogGroupID string
+	LogStream  string
 }
 
 type LogStreamer struct {
@@ -143,7 +155,7 @@ func (s LogStreamer) Close() error {
 	return s.StartLiveTailEventStream.Close()
 }
 
-func (s LogStreamer) Receive(ctx context.Context) ([]LogEntry, error) {
+func (s LogStreamer) Receive(ctx context.Context) ([]LogEvent, error) {
 	select {
 	case e := <-s.Events(): // blocking
 		switch ev := e.(type) {
@@ -152,12 +164,13 @@ func (s LogStreamer) Receive(ctx context.Context) ([]LogEntry, error) {
 			return nil, nil // ignore start message
 		case *types.StartLiveTailResponseStreamMemberSessionUpdate:
 			// fmt.Println("session update:", len(ev.Value.SessionResults))
-			entries := make([]LogEntry, len(ev.Value.SessionResults))
+			entries := make([]LogEvent, len(ev.Value.SessionResults))
 			for i, event := range ev.Value.SessionResults {
-				entries[i] = LogEntry{
-					Message:   *event.Message, // TODO: parse JSON if this is from awsfirelens
-					Timestamp: time.UnixMilli(*event.Timestamp),
-					// Server: LogStreamName,
+				entries[i] = LogEvent{
+					Message:    *event.Message, // TODO: parse JSON if this is from awsfirelens
+					Timestamp:  time.UnixMilli(*event.Timestamp),
+					LogGroupID: *event.LogGroupIdentifier,
+					LogStream:  *event.LogStreamName,
 				}
 			}
 			return entries, nil

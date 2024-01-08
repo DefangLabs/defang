@@ -12,6 +12,6 @@ func GetServices(ctx context.Context, client client.Client) error {
 		return err
 	}
 
-	PrintObject("services", serviceList)
+	PrintObject("", serviceList)
 	return nil
 }

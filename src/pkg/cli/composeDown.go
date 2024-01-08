@@ -7,6 +7,9 @@ import (
 )
 
 func ComposeDown(ctx context.Context, client client.Client, filePath, projectName string) (string, error) {
+	// resp, err := client.Deploy(ctx, &pb.DeployRequest{})
+	// return resp.Etag, err
+
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return "", err

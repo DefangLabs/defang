@@ -325,29 +325,28 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	var serviceInfos []*pb.ServiceInfo
-	for _, service := range services {
-		if DoDryRun {
+	if DoDryRun {
+		for _, service := range services {
 			PrintObject(service.Name, service)
-			continue
 		}
-
-		Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := client.Update(ctx, service)
-		if err != nil {
-			// Abort all? TODO: compose up should probably be atomic, all or nothing
-			if len(serviceInfos) == 0 {
-				return nil, err
-			}
-			Warn(" ! Failed to update service", service.Name, err)
-			continue
-		}
-
-		if DoVerbose {
-			PrintObject(service.Name, serviceInfo)
-		}
-		serviceInfos = append(serviceInfos, serviceInfo)
+		return nil, nil
 	}
 
-	return serviceInfos, nil
+	for _, service := range services {
+		Info(" * Deploying service", service.Name)
+	}
+
+	resp, err := client.Deploy(ctx, &pb.DeployRequest{
+		Services: services,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if DoVerbose {
+		for _, service := range resp.Services {
+			PrintObject(service.Service.Name, service)
+		}
+	}
+	return resp.Services, nil
 }

@@ -27,6 +27,9 @@ func (MockClient) Tail(context.Context, *pb.TailRequest) (ServerStream[pb.TailRe
 func (MockClient) Update(context.Context, *pb.Service) (*pb.ServiceInfo, error) {
 	panic("no impl: Update")
 }
+func (MockClient) Deploy(context.Context, *pb.DeployRequest) (*pb.DeployResponse, error) {
+	panic("no impl: Deploy")
+}
 func (MockClient) Get(context.Context, *pb.ServiceID) (*pb.ServiceInfo, error) {
 	panic("no impl: Get")
 }
