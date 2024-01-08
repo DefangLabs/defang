@@ -63,7 +63,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		LaunchType:     types.LaunchTypeFargate,
 		TaskDefinition: aws.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
-		Cluster:        aws.String(a.ClusterARN),
+		Cluster:        aws.String(a.ClusterName),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets

@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
@@ -31,7 +32,7 @@ func taskID(taskArn TaskArn) string {
 
 func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (*LogStreamer, error) {
 	logStreamName := getLogStreamForTask(taskArn)
-	return a.TailLogStream(ctx, logStreamName)
+	return a.TailLogStream(ctx, logStreamName) // TODO: io.EOF on task stop
 }
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
@@ -62,20 +63,29 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 
 		fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
 		spinMe++
-		time.Sleep(1 * time.Second)
+		pkg.SleepWithContext(ctx, time.Second)
 	}
 }
 
-func (a *AwsEcs) TailLogStream(ctx context.Context, logStreamName string) (*LogStreamer, error) {
+func (a *AwsEcs) TailLogStream(ctx context.Context, logStreamNamePrefixes ...string) (*LogStreamer, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	cw := cloudwatchlogs.NewFromConfig(cfg)
+	s, err := cw.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{
+		// LogEventFilterPattern: aws.String(""),
+		LogGroupIdentifiers: []string{strings.TrimSuffix(a.LogGroupARN, ":*")},
+		// LogStreamNamePrefixes: logStreamNamePrefixes,
+		// LogStreamNames: logStreamNamePrefixes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &LogStreamer{
-		logGroupName:  a.LogGroupName,
-		logStreamName: logStreamName,
-		cw:            cloudwatchlogs.NewFromConfig(cfg),
+		StartLiveTailEventStream: s.GetStream(),
 	}, nil
 }
 
@@ -85,7 +95,7 @@ func (a *AwsEcs) taskStatus(ctx context.Context, taskId string) error {
 
 	// Use DescribeTasks API to check if the task is still running (same as ecs.NewTasksStoppedWaiter)
 	ti, _ := ecsClient.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: aws.String(a.ClusterARN), // clusterArnFromTaskArn
+		Cluster: aws.String(a.ClusterName), // clusterArnFromTaskArn
 		Tasks:   []string{taskId},
 	})
 	if ti != nil && len(ti.Tasks) > 0 {
@@ -126,34 +136,37 @@ type LogEntry struct {
 }
 
 type LogStreamer struct {
-	logGroupName  string
-	logStreamName string
-	cw            *cloudwatchlogs.Client
-	nextToken     *string
+	*cloudwatchlogs.StartLiveTailEventStream
 }
 
-func (s *LogStreamer) Receive(ctx context.Context) ([]LogEntry, error) {
-	events, err := s.cw.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
-		LogGroupName:  &s.logGroupName,
-		LogStreamName: &s.logStreamName,
-		NextToken:     s.nextToken,
-		StartFromHead: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, err
-	}
-	entries := make([]LogEntry, len(events.Events))
-	for i, event := range events.Events {
-		entries[i] = LogEntry{
-			Message:   *event.Message, // TODO: parse JSON if this is from awsfirelens
-			Timestamp: time.UnixMilli(*event.Timestamp),
+func (s LogStreamer) Close() error {
+	return s.StartLiveTailEventStream.Close()
+}
+
+func (s LogStreamer) Receive(ctx context.Context) ([]LogEntry, error) {
+	select {
+	case e := <-s.Events(): // blocking
+		switch ev := e.(type) {
+		case *types.StartLiveTailResponseStreamMemberSessionStart:
+			// fmt.Println("session start:", ev.Value.SessionId)
+			return nil, nil // ignore start message
+		case *types.StartLiveTailResponseStreamMemberSessionUpdate:
+			// fmt.Println("session update:", len(ev.Value.SessionResults))
+			entries := make([]LogEntry, len(ev.Value.SessionResults))
+			for i, event := range ev.Value.SessionResults {
+				entries[i] = LogEntry{
+					Message:   *event.Message, // TODO: parse JSON if this is from awsfirelens
+					Timestamp: time.UnixMilli(*event.Timestamp),
+					// Server: LogStreamName,
+				}
+			}
+			return entries, nil
+		default:
+			return nil, fmt.Errorf("unexpected event: %T", ev)
 		}
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	if s.nextToken != nil && *s.nextToken == *events.NextForwardToken {
-		return entries, io.EOF // no new logs
-	}
-	s.nextToken = events.NextForwardToken
-	return entries, nil
 }
 
 func (s *LogStreamer) printLogEvents(ctx context.Context) error {

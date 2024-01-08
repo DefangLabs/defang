@@ -331,13 +331,13 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		Value:       cloudformation.Ref(_taskDefinition),
 		Description: aws.String("ARN of the ECS task definition"),
 	}
-	template.Outputs[outputs.ClusterArn] = cloudformation.Output{
+	template.Outputs[outputs.ClusterName] = cloudformation.Output{
 		Value:       cloudformation.Ref(_cluster),
-		Description: aws.String("ARN of the ECS cluster"),
+		Description: aws.String("Name of the ECS cluster"),
 	}
-	template.Outputs[outputs.LogGroupName] = cloudformation.Output{
-		Value:       cloudformation.Ref(_logGroup),
-		Description: aws.String("Name of the CloudWatch log group"),
+	template.Outputs[outputs.LogGroupARN] = cloudformation.Output{
+		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
+		Description: aws.String("ARN of the CloudWatch log group"),
 	}
 	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
 		Value:       cloudformation.Ref(_securityGroup),

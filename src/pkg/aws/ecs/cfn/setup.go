@@ -166,10 +166,10 @@ func (a *AwsEcs) fillWithOutputs(ctx context.Context, dso *cloudformation.Descri
 				if a.TaskDefARN == "" {
 					a.TaskDefARN = *output.OutputValue
 				}
-			case outputs.ClusterArn:
-				a.ClusterARN = *output.OutputValue
-			case outputs.LogGroupName:
-				a.LogGroupName = *output.OutputValue
+			case outputs.ClusterName:
+				a.ClusterName = *output.OutputValue
+			case outputs.LogGroupARN:
+				a.LogGroupARN = *output.OutputValue
 			case outputs.SecurityGroupID:
 				a.SecurityGroupID = *output.OutputValue
 			case outputs.BucketName:

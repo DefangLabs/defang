@@ -16,9 +16,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws"
-	"github.com/defang-io/defang/src/pkg/aws/ecs"
+	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/http"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
@@ -49,17 +50,18 @@ type byoc struct {
 	ProjectID      string // aka tenant
 	privateDomain  string
 	customerDomain string
-	taskArn        ecs.TaskArn
+	taskArn        awsecs.TaskArn
 }
 
 var _ Client = (*byoc)(nil)
 
 func NewByocClient(projectId string) *byoc {
+	user := os.Getenv("USER") // TODO: sanitize
 	if projectId == "" {
-		projectId = os.Getenv("USER") // TODO: sanitize
+		projectId = user
 	}
 	return &byoc{
-		driver:         cfn.New("crun-"+projectId, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		driver:         cfn.New("crun-"+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
 		ProjectID:      projectId,
 		privateDomain:  projectId + "." + projectName + ".internal",
 		customerDomain: "gnafed.click", // TODO: make configurable
@@ -70,9 +72,8 @@ func (b *byoc) setUp(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
-	// TODO: should probably be an explicit call to bootstrap the stack
-	// FIXME: which `cd` image should we use?
-	if err := b.driver.SetUp(ctx, "532501343364.dkr.ecr.us-west-2.amazonaws.com/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
+	// TODO: can we stick to the vanilla pulumi-nodejs image?
+	if err := b.driver.SetUp(ctx, "docker.io/defangio/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
 		return err
 	}
 	b.setupDone = true
@@ -148,13 +149,23 @@ func (byoc) RevokeToken(context.Context) error {
 	panic("not implemented: RevokeToken")
 }
 
-func (byoc) Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error) {
-	panic("not implemented: Get")
+func (b byoc) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error) {
+	all, err := b.GetServices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, service := range all.Services {
+		if service.Service.Name == s.Name {
+			return service, nil
+		}
+	}
+	return nil, errors.New("service not found") // CodeNotFound
 }
 
 func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
-		"DOMAIN": b.customerDomain, // TODO: make optional
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",          // surpresses "npm notice" update messages
+		"DOMAIN":                     b.customerDomain, // TODO: make optional
 		// "AWS_REGION":               cfnClient.Region,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
 		"PULUMI_CONFIG_PASSPHRASE": "asdf", // TODO: make customizable
@@ -169,7 +180,10 @@ func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
 }
 
 func (b *byoc) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
-	if err := b.runTask(ctx, "npm", "start", "down"); err != nil {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	if err := b.runTask(ctx, "npm", "start", "up", "TODO"); err != nil {
 		return nil, err
 	}
 	return &v1.DeleteResponse{Etag: *b.taskArn}, nil
@@ -179,10 +193,85 @@ func (byoc) Publish(context.Context, *v1.PublishRequest) error {
 	panic("not implemented: Publish")
 }
 
-func (byoc) GetServices(context.Context) (*v1.ListServicesResponse, error) {
-	return &v1.ListServicesResponse{
-		Services: []*v1.ServiceInfo{},
-	}, nil
+func (b byoc) getClusterNames() []string {
+	return []string{
+		projectName + "-" + b.ProjectID + "-cluster",
+		projectName + "-" + b.ProjectID + "-gpu-cluster",
+	}
+}
+
+func (b byoc) GetServices(ctx context.Context) (*v1.ListServicesResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	var maxResults int32 = 100 // the maximum allowed by AWS
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	clusters := make(map[string][]string)
+	ecsClient := ecs.NewFromConfig(cfg)
+	for _, clusterName := range b.getClusterNames() {
+		serviceArns, err := ecsClient.ListServices(ctx, &ecs.ListServicesInput{
+			Cluster:    &clusterName,
+			MaxResults: &maxResults, // TODO: handle pagination
+		})
+		if err != nil {
+			// return nil, err
+			// TODO: ignore ClusterNotFoundException
+			continue
+		}
+		clusters[clusterName] = serviceArns.ServiceArns
+	}
+	/* TODO: use this once namespaces are working
+	s, err := ecsClient.ListServicesByNamespace(ctx, &ecs.ListServicesByNamespaceInput{
+		MaxResults: &maxResults,
+		Namespace:  &b.privateDomain,
+	})
+	if err != nil {
+		// Ignore NamespaceNotFoundException
+		var namespaceNotFound *ecsTypes.NamespaceNotFoundException
+		if errors.As(err, &namespaceNotFound) {
+			println("ns not found")
+			return &v1.ListServicesResponse{}, nil
+		}
+		return nil, err
+	}
+	if len(s.ServiceArns) == 0 {
+		println("no services found")
+		return &v1.ListServicesResponse{}, nil
+	}
+	// Convert service ARNs to cluster name(s)
+	for _, arn := range s.ServiceArns {
+		// arn:aws:ecs:us-west-2:532501343364:service/ecs-edw-cluster/fabric-31fdcb4
+		resourcePath := strings.Split(arn, ":")[5]
+		parts := strings.Split(resourcePath, "/")
+		cluster, service := parts[1], parts[2]
+		clusters[cluster] = append(clusters[cluster], service)
+	}*/
+	// Query services for each cluster
+	serviceInfos := []*v1.ServiceInfo{}
+	for cluster, serviceNames := range clusters {
+		if len(serviceNames) == 0 {
+			continue
+		}
+		dso, err := ecsClient.DescribeServices(ctx, &ecs.DescribeServicesInput{
+			Services: serviceNames,
+			Cluster:  &cluster,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, service := range dso.Services {
+			// TODO: get the service definition from the task definition or tags
+			serviceInfos = append(serviceInfos, &v1.ServiceInfo{
+				Service: &v1.Service{
+					Name: *service.ServiceName,
+				},
+			})
+		}
+	}
+	return &v1.ListServicesResponse{Services: serviceInfos}, nil
 }
 
 func (byoc) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
@@ -220,7 +309,7 @@ func (b *byoc) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*
 }
 
 type byocStreamer struct {
-	*ecs.LogStreamer
+	*awsecs.LogStreamer
 	ctx      context.Context
 	err      error
 	response *v1.TailResponse
@@ -250,15 +339,14 @@ func (bs *byocStreamer) Receive() bool {
 		response.Entries[i] = &v1.LogEntry{
 			Message:   entry.Message,
 			Timestamp: timestamppb.New(entry.Timestamp),
+			// Stderr:    false, TODO: detect
 		}
 	}
 	bs.response = response
 	var resourceNotFound *types.ResourceNotFoundException
 	if errors.As(err, &resourceNotFound) || err == io.EOF {
-		err = nil                                               // TODO: return error if the task has stopped
-		ctx, cancel := context.WithTimeout(bs.ctx, time.Second) // SleepWithContext
-		defer cancel()
-		<-ctx.Done()
+		err = nil // TODO: return error if the task has stopped
+		pkg.SleepWithContext(bs.ctx, time.Second/10)
 	}
 	bs.err = err
 	return err == nil
@@ -275,6 +363,11 @@ func (b *byoc) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.T
 	if task == "" {
 		task = *b.taskArn
 	}
+	// How to tail multiple tasks/services at once?
+	//  * No Etag, no service:	tail all tasks/services
+	//  * Etag, no service: 	tail all tasks/services with that Etag
+	//  * No Etag, service:		tail all tasks/services with that service name
+	//  * Etag, service:		tail that task/service
 	streamer, err := b.driver.TailTask(ctx, &task) // TODO: support --since
 	return &byocStreamer{
 		LogStreamer: streamer,

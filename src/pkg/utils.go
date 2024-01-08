@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"math/rand"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -91,4 +93,10 @@ func IsDirEmpty(dir string) (bool, error) {
 		return true, nil
 	}
 	return false, err
+}
+
+func SleepWithContext(ctx context.Context, d time.Duration) {
+	ctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+	<-ctx.Done()
 }

@@ -2,8 +2,8 @@ package outputs
 
 const (
 	BucketName      = "bucketName"
-	ClusterArn      = "clusterArn"
-	LogGroupName    = "logGroupName"
+	ClusterName     = "clusterName"
+	LogGroupARN     = "logGroupArn"
 	SecurityGroupID = "securityGroupId"
 	SubnetID        = "subnetId"
 	TaskDefArn      = "taskDefArn"

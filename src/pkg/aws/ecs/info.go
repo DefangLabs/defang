@@ -16,7 +16,7 @@ func (a AwsEcs) Info(ctx context.Context, id TaskArn) (string, error) {
 	}
 
 	ti, err := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: aws.String(a.ClusterARN),
+		Cluster: aws.String(a.ClusterName),
 		Tasks:   []string{*id},
 		// Reason: aws.String("defang stop"),
 	})
