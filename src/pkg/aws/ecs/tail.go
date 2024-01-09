@@ -200,12 +200,7 @@ func clusterArnFromTaskArn(taskArn string) string {
 	return fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", arnParts[3], arnParts[4], resourceParts[1])
 }
 
-type LogEvent struct {
-	Message    string
-	Timestamp  time.Time
-	LogGroupID string
-	LogStream  string
-}
+type LogEvent = types.LiveTailSessionLogEvent
 
 type tailEventStream interface {
 	Close() error
@@ -228,16 +223,7 @@ func convertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 		return nil, nil // ignore start message
 	case *types.StartLiveTailResponseStreamMemberSessionUpdate:
 		// fmt.Println("session update:", len(ev.Value.SessionResults))
-		entries := make([]LogEvent, len(ev.Value.SessionResults))
-		for i, event := range ev.Value.SessionResults {
-			entries[i] = LogEvent{
-				Message:    *event.Message, // TODO: parse JSON if this is from awsfirelens
-				Timestamp:  time.UnixMilli(*event.Timestamp),
-				LogGroupID: *event.LogGroupIdentifier, // this is actually the account:name
-				LogStream:  *event.LogStreamName,
-			}
-		}
-		return entries, nil
+		return ev.Value.SessionResults, nil
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
@@ -256,7 +242,7 @@ func (s simpleStream) printLogEvents(ctx context.Context) error {
 	for {
 		events, err := s.Receive(ctx)
 		for _, event := range events {
-			fmt.Println(event.Message)
+			fmt.Println(*event.Message)
 		}
 		if err != nil {
 			return err

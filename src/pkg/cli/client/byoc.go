@@ -343,14 +343,14 @@ func (bs *byocStreamer) Receive() bool {
 		Entries: make([]*v1.LogEntry, len(events)),
 	}
 	for i, event := range events {
-		parts := strings.Split(event.LogGroupID, ":")
+		parts := strings.Split(*event.LogGroupIdentifier, ":")
 		if len(parts) > 1 && strings.HasPrefix(parts[1], cdPrefix) {
-			parts := strings.Split(event.LogStream, "/")
+			parts := strings.Split(*event.LogStreamName, "/")
 			response.Etag = parts[2] // taskID TODO: etag grab from tag?
 			response.Service = "cd"
 			response.Host = "pulumi"
 		} else {
-			parts := strings.Split(event.LogStream, "/")
+			parts := strings.Split(*event.LogStreamName, "/")
 			if len(parts) == 3 {
 				response.Host = parts[2] // taskID
 				parts = strings.SplitN(parts[1], "_", 2)
@@ -362,9 +362,9 @@ func (bs *byocStreamer) Receive() bool {
 			}
 		}
 		response.Entries[i] = &v1.LogEntry{
-			Message:   event.Message,
-			Timestamp: timestamppb.New(event.Timestamp),
-			// Stderr:    false, TODO: detect
+			Message:   *event.Message,
+			Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
+			// Stderr:    false, TODO: detect somehow from source
 		}
 	}
 	bs.response = response
