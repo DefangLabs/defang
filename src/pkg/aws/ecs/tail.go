@@ -30,9 +30,9 @@ func taskID(taskArn TaskArn) string {
 	return path.Base(*taskArn)
 }
 
-func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (*LogStreamer, error) {
+func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (*simpleStream, error) {
 	logStreamName := getLogStreamForTask(taskArn)
-	return a.TailLogStreans(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
+	return a.TailLogStreams(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
 }
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
@@ -67,37 +67,96 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	}
 }
 
-func getLogGroupID(logGroupARN string) string {
-	return strings.TrimSuffix(logGroupARN, ":*")
+func getLogGroupIdentifier(arnOrId string) string {
+	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroupARNs ...string) (*LogStreamer, error) {
-	for i, lg := range logGroupARNs {
-		logGroupARNs[i] = getLogGroupID(lg)
+// This is a workaround for the fact that the StartLiveTail API fails if any of the log groups don't exist yet.
+type pendingStream struct {
+	*simpleStream
+	pendingLogGroups []string
+	cw               *cloudwatchlogs.Client
+}
+
+var _ EventStream = (*pendingStream)(nil)
+
+func (ps *pendingStream) Receive(ctx context.Context) ([]LogEvent, error) {
+	if ps.pendingLogGroups == nil {
+		return ps.simpleStream.Receive(ctx) // blocking
 	}
-	return a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupARNs})
+	select {
+	case e := <-ps.Events(): // blocking
+		return convertEvents(e)
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		// Check if any of the log groups have been created
+		s, err := ps.cw.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: ps.pendingLogGroups})
+		if err != nil {
+			var resourceNotFound *types.ResourceNotFoundException
+			if errors.As(err, &resourceNotFound) {
+				return nil, nil // ignore (keep trying)
+			}
+			return nil, err
+		}
+		// Finally able to tail all log groups!
+		ps.pendingLogGroups = nil
+		ps.simpleStream = &simpleStream{s.GetStream()}
+		return nil, nil
+	}
 }
 
-func (a *AwsEcs) TailLogStreans(ctx context.Context, logGroupArn string, logStreams ...string) (*LogStreamer, error) {
-	logGroupIDs := []string{getLogGroupID(logGroupArn)}
-	return a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupIDs, LogStreamNames: logStreams})
+type EventStream interface {
+	Receive(ctx context.Context) ([]LogEvent, error)
+	Close() error
 }
 
-func (a *AwsEcs) startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (*LogStreamer, error) {
-	cfg, err := a.LoadConfig(ctx)
+func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error) {
+	for i, lg := range logGroups {
+		logGroups[i] = getLogGroupIdentifier(lg)
+	}
+	s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroups})
+	if err != nil {
+		var resourceNotFound *types.ResourceNotFoundException
+		if errors.As(err, &resourceNotFound) {
+			// Some log groups don't exist yet, so we'll wait for them to be created
+			s1, cw, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{logGroups[0]}})
+			if err != nil {
+				return nil, err
+			}
+			return &pendingStream{&simpleStream{s1}, logGroups, cw}, nil
+		}
+		return nil, err
+	}
+	return simpleStream{s}, nil
+}
+
+func (a *AwsEcs) TailLogStreams(ctx context.Context, logGroupArn string, logStreams ...string) (*simpleStream, error) {
+	logGroupIDs := []string{getLogGroupIdentifier(logGroupArn)}
+	s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupIDs, LogStreamNames: logStreams})
 	if err != nil {
 		return nil, err
+	}
+	return &simpleStream{s}, nil
+}
+
+func (a *AwsEcs) startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (tailEventStream, *cloudwatchlogs.Client, error) {
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	cw := cloudwatchlogs.NewFromConfig(cfg)
-	s, err := cw.StartLiveTail(ctx, slti)
+	slto, err := cw.StartLiveTail(ctx, slti)
 	if err != nil {
-		return nil, err
+		// var resourceNotFound *types.ResourceNotFoundException
+		// if errors.As(err, &resourceNotFound) {
+		// 	return nil, fmt.Errorf("log group not found: %w", err)
+		// }
+		return nil, nil, err
 	}
 
-	return &LogStreamer{
-		StartLiveTailEventStream: s.GetStream(),
-	}, nil
+	return slto.GetStream(), cw, nil
 }
 
 func (a *AwsEcs) taskStatus(ctx context.Context, taskId string) error {
@@ -147,42 +206,52 @@ type LogEvent struct {
 	LogStream  string
 }
 
-type LogStreamer struct {
-	*cloudwatchlogs.StartLiveTailEventStream
+type tailEventStream interface {
+	Close() error
+	Events() <-chan types.StartLiveTailResponseStream
 }
 
-func (s LogStreamer) Close() error {
-	return s.StartLiveTailEventStream.Close()
+type simpleStream struct {
+	tailEventStream
+	// taskId string
 }
 
-func (s LogStreamer) Receive(ctx context.Context) ([]LogEvent, error) {
+func (s simpleStream) Close() error {
+	return s.tailEventStream.Close()
+}
+
+func convertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
+	switch ev := e.(type) {
+	case *types.StartLiveTailResponseStreamMemberSessionStart:
+		// fmt.Println("session start:", ev.Value.SessionId)
+		return nil, nil // ignore start message
+	case *types.StartLiveTailResponseStreamMemberSessionUpdate:
+		// fmt.Println("session update:", len(ev.Value.SessionResults))
+		entries := make([]LogEvent, len(ev.Value.SessionResults))
+		for i, event := range ev.Value.SessionResults {
+			entries[i] = LogEvent{
+				Message:    *event.Message, // TODO: parse JSON if this is from awsfirelens
+				Timestamp:  time.UnixMilli(*event.Timestamp),
+				LogGroupID: *event.LogGroupIdentifier, // this is actually the account:name
+				LogStream:  *event.LogStreamName,
+			}
+		}
+		return entries, nil
+	default:
+		return nil, fmt.Errorf("unexpected event: %T", ev)
+	}
+}
+
+func (s simpleStream) Receive(ctx context.Context) ([]LogEvent, error) {
 	select {
 	case e := <-s.Events(): // blocking
-		switch ev := e.(type) {
-		case *types.StartLiveTailResponseStreamMemberSessionStart:
-			// fmt.Println("session start:", ev.Value.SessionId)
-			return nil, nil // ignore start message
-		case *types.StartLiveTailResponseStreamMemberSessionUpdate:
-			// fmt.Println("session update:", len(ev.Value.SessionResults))
-			entries := make([]LogEvent, len(ev.Value.SessionResults))
-			for i, event := range ev.Value.SessionResults {
-				entries[i] = LogEvent{
-					Message:    *event.Message, // TODO: parse JSON if this is from awsfirelens
-					Timestamp:  time.UnixMilli(*event.Timestamp),
-					LogGroupID: *event.LogGroupIdentifier,
-					LogStream:  *event.LogStreamName,
-				}
-			}
-			return entries, nil
-		default:
-			return nil, fmt.Errorf("unexpected event: %T", ev)
-		}
+		return convertEvents(e)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
-func (s *LogStreamer) printLogEvents(ctx context.Context) error {
+func (s simpleStream) printLogEvents(ctx context.Context) error {
 	for {
 		events, err := s.Receive(ctx)
 		for _, event := range events {

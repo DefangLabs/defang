@@ -11,7 +11,7 @@
 		"go.testEnvVars": {
 			"AWS_PROFILE": "defang-sandbox"
 		},
-		"go.testTags": "integration",
+		"go.buildTags": "integration",
 		"go.testTimeout": "300s"
 	}
 }

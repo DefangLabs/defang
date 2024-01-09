@@ -40,32 +40,33 @@ const (
 	cdPrefix      = "cd-"       // renaming this practically deletes the Pulumi state
 )
 
-var (
-	privateLbIps []string = nil
-	publicNatIps []string = nil
-)
-
 type byoc struct {
-	driver         *cfn.AwsEcs
-	setupDone      bool
-	StackID        string // aka tenant
-	privateDomain  string
-	customerDomain string
-	cdTaskArn      awsecs.TaskArn
+	driver        *cfn.AwsEcs
+	setupDone     bool
+	StackID       string // aka tenant
+	privateDomain string
+	customDomain  string
+	cdTaskArn     awsecs.TaskArn
+	privateLbIps  []string // TODO: grab these from the AWS API or outputs
+	publicNatIps  []string // TODO: grab these from the AWS API or outputs
+	albDnsName    string
 }
 
 var _ Client = (*byoc)(nil)
 
-func NewByocClient(projectId string) *byoc {
+func NewByocClient(stackId, domain string) *byoc {
 	user := os.Getenv("USER") // TODO: sanitize
-	if projectId == "" {
-		projectId = user
+	if stackId == "" {
+		stackId = user
 	}
 	return &byoc{
-		driver:         cfn.New(cdPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
-		StackID:        projectId,
-		privateDomain:  projectId + "." + projectName + ".internal",
-		customerDomain: "gnafed.click", // TODO: make configurable/optional
+		driver:        cfn.New(cdPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		StackID:       stackId,
+		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
+		customDomain:  domain,
+		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // TODO: grab these from the AWS API or outputs
+		// privateLbIps: nil,                                                 // TODO: grab these from the AWS API or outputs
+		// publicNatIps: nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
 }
 
@@ -92,6 +93,18 @@ func (b *byoc) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployRes
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
+
+	// Ensure all service endpoints are unique
+	endpoints := make(map[string]bool)
+	for _, serviceInfo := range serviceInfos {
+		for _, endpoint := range serviceInfo.Endpoints {
+			if endpoints[endpoint] {
+				return nil, fmt.Errorf("duplicate endpoint: %s", endpoint) // CodeInvalidArgument
+			}
+			endpoints[endpoint] = true
+		}
+	}
+
 	data, err := proto.Marshal(&v1.ListServicesResponse{
 		Services: serviceInfos,
 	})
@@ -162,12 +175,11 @@ func (b byoc) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error)
 
 func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
-		// "AWS_REGION":                 b.driver.Region.String(), this should be the destination region, not the CD region
-		"DOMAIN":                     b.customerDomain, // TODO: make optional
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",          // suppresses "npm notice" update messages TODO: move to Dockerfile.cd
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
-		"PULUMI_CONFIG_PASSPHRASE":   "asdf", // TODO: make customizable
-		"STACK":                      b.StackID,
+		// "AWS_REGION":               b.driver.Region.String(), TODO: this should be the destination region, not the CD region
+		"DOMAIN":                   b.customDomain,
+		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
+		"PULUMI_CONFIG_PASSPHRASE": "asdf", // TODO: make customizable
+		"STACK":                    b.StackID,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	if err != nil {
@@ -181,7 +193,7 @@ func (b *byoc) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteRes
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := b.runTask(ctx, "npm", "start", "up", "TODO"); err != nil {
+	if err := b.runTask(ctx, "npm", "start", "up", "TODO"); err != nil { // TODO: remove TODO payload (although it works fine!)
 		return nil, err
 	}
 	return &v1.DeleteResponse{Etag: *b.cdTaskArn}, nil
@@ -307,7 +319,7 @@ func (b *byoc) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*
 }
 
 type byocStreamer struct {
-	*awsecs.LogStreamer
+	awsecs.EventStream
 	ctx      context.Context
 	err      error
 	response *v1.TailResponse
@@ -326,14 +338,15 @@ func (bs *byocStreamer) Msg() *v1.TailResponse {
 }
 
 func (bs *byocStreamer) Receive() bool {
-	events, err := bs.LogStreamer.Receive(bs.ctx)
+	events, err := bs.EventStream.Receive(bs.ctx)
 	response := &v1.TailResponse{
 		Entries: make([]*v1.LogEntry, len(events)),
 	}
 	for i, event := range events {
-		if strings.HasPrefix(event.LogGroupID, cdPrefix) {
+		parts := strings.Split(event.LogGroupID, ":")
+		if len(parts) > 1 && strings.HasPrefix(parts[1], cdPrefix) {
 			parts := strings.Split(event.LogStream, "/")
-			response.Etag = parts[2] // taskID TODO: grab from tag?
+			response.Etag = parts[2] // taskID TODO: etag grab from tag?
 			response.Service = "cd"
 			response.Host = "pulumi"
 		} else {
@@ -382,21 +395,22 @@ func (b *byoc) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.T
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var streamer *awsecs.LogStreamer
+	var streamer awsecs.EventStream
 	if strings.HasPrefix(taskID, "arn:aws:ecs:") {
 		streamer, err = b.driver.TailTask(ctx, &taskID)
 	} else {
 		accountID := "532501343364"                               // FIXME: hard-coded
 		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match index.ts
 		logGroupID := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", b.driver.Region.String(), accountID, logGroupName)
-		streamer, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+		streamer, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID) // this fails if the log group doesn't exist yet
 	}
 	return &byocStreamer{
-		LogStreamer: streamer,
+		EventStream: streamer,
 		ctx:         ctx,
 	}, err
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
 	if service.Name == "" {
 		return nil, errors.New("service name is required") // CodeInvalidArgument
@@ -506,7 +520,7 @@ func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo,
 		si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
 	}
 	if hasIngress {
-		si.LbIps = privateLbIps // only set LB IPs if there are ingress ports
+		si.LbIps = b.privateLbIps // only set LB IPs if there are ingress ports
 		si.PublicFqdn = b.getFqdn(fqn, true)
 	}
 	if hasHost {
@@ -524,10 +538,10 @@ func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo,
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
 			log.Printf("CNAME %q does not point to %q\n", service.Domainname, si.PublicFqdn) // TODO: send to Loki tenant log
-			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)) FIXME: circular dependenc // CodeFailedPrecondition
+			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)) FIXME: circular dependency // CodeFailedPrecondition
 		}
 	}
-	si.NatIps = publicNatIps // TODO: even internal services use NAT now
+	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	return si, nil
 }
 
@@ -571,14 +585,20 @@ func (b byoc) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	if port.Mode == v1.Mode_HOST {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
-		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customerDomain)
+		if b.customDomain == "" {
+			return b.albDnsName
+		}
+		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
 	}
 }
 
 func (b byoc) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
-		return fmt.Sprintf("%s.%s", safeFqn, b.customerDomain)
+		if b.customDomain == "" {
+			return b.albDnsName
+		}
+		return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
 	} else {
 		return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
 	}

@@ -21,7 +21,7 @@ func isErrCodeNotFound(err error) bool {
 }
 
 func TestPutSecret(t *testing.T) {
-	a := Aws{Region: pkg.Getenv("AWS_REGION", "us-west-2")}
+	a := Aws{Region: Region(pkg.Getenv("AWS_REGION", "us-west-2"))}
 
 	ctx := context.TODO()
 	cfg, err := a.LoadConfig(ctx)
