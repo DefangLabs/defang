@@ -90,7 +90,7 @@ func (b *byoc) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployRes
 		if err != nil {
 			return nil, err
 		}
-		serviceInfo.Etag = etag
+		serviceInfo.Etag = etag // same etag for all services
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
 
@@ -542,6 +542,10 @@ func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo,
 		}
 	}
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
+	si.Status = "UPDATE_QUEUED"
+	if si.Service.Build != nil {
+		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+	}
 	return si, nil
 }
 
