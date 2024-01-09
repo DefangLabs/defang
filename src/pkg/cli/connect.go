@@ -16,7 +16,7 @@ func Connect(server string) (client.Client, pkg.TenantID) {
 
 	if host == "aws:443" {
 		Debug(" - Connecting to AWS")
-		byocClient := client.NewByocClient(string(tenantId))
+		byocClient := client.NewByocClient(string(tenantId), "") // TODO: custom domain
 		return byocClient, pkg.TenantID(byocClient.StackID)
 	}
 
