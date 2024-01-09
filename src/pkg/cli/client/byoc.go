@@ -40,7 +40,7 @@ const (
 	cdPrefix      = "cd-"       // renaming this practically deletes the Pulumi state
 )
 
-type byoc struct {
+type byocAws struct {
 	driver        *cfn.AwsEcs
 	setupDone     bool
 	StackID       string // aka tenant
@@ -52,14 +52,14 @@ type byoc struct {
 	albDnsName    string
 }
 
-var _ Client = (*byoc)(nil)
+var _ Client = (*byocAws)(nil)
 
-func NewByocClient(stackId, domain string) *byoc {
+func NewByocAWS(stackId, domain string) *byocAws {
 	user := os.Getenv("USER") // TODO: sanitize
 	if stackId == "" {
 		stackId = user
 	}
-	return &byoc{
+	return &byocAws{
 		driver:        cfn.New(cdPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
@@ -70,7 +70,7 @@ func NewByocClient(stackId, domain string) *byoc {
 	}
 }
 
-func (b *byoc) setUp(ctx context.Context) error {
+func (b *byocAws) setUp(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (b *byoc) setUp(ctx context.Context) error {
 	return nil
 }
 
-func (b *byoc) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
+func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
 	etag := pkg.RandomID()
 	serviceInfos := []*v1.ServiceInfo{}
 	for _, service := range req.Services {
@@ -144,23 +144,23 @@ func (b *byoc) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployRes
 	}, b.runTask(ctx, "npm", "start", "up", payloadString)
 }
 
-func (byoc) GetStatus(context.Context) (*v1.Status, error) {
+func (byocAws) GetStatus(context.Context) (*v1.Status, error) {
 	panic("not implemented: GetStatus")
 }
 
-func (byoc) GetVersion(context.Context) (*v1.Version, error) {
+func (byocAws) GetVersion(context.Context) (*v1.Version, error) {
 	return &v1.Version{Fabric: cdVersion}, nil
 }
 
-func (byoc) Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error) {
+func (byocAws) Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error) {
 	panic("not implemented: Token")
 }
 
-func (byoc) RevokeToken(context.Context) error {
+func (byocAws) RevokeToken(context.Context) error {
 	panic("not implemented: RevokeToken")
 }
 
-func (b byoc) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error) {
+func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (b byoc) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error)
 	return nil, errors.New("service not found") // CodeNotFound
 }
 
-func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
+func (b *byocAws) runTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
 		// "AWS_REGION":               b.driver.Region.String(), TODO: this should be the destination region, not the CD region
 		"DOMAIN":                   b.customDomain,
@@ -189,7 +189,7 @@ func (b *byoc) runTask(ctx context.Context, cmd ...string) error {
 	return nil
 }
 
-func (b *byoc) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
+func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -199,18 +199,18 @@ func (b *byoc) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteRes
 	return &v1.DeleteResponse{Etag: *b.cdTaskArn}, nil
 }
 
-func (byoc) Publish(context.Context, *v1.PublishRequest) error {
+func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
 	panic("not implemented: Publish")
 }
 
-func (b byoc) getClusterNames() []string {
+func (b byocAws) getClusterNames() []string {
 	return []string{
 		projectName + "-" + b.StackID + "-cluster",
 		projectName + "-" + b.StackID + "-gpu-cluster",
 	}
 }
 
-func (b byoc) GetServices(ctx context.Context) (*v1.ListServicesResponse, error) {
+func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -284,15 +284,15 @@ func (b byoc) GetServices(ctx context.Context) (*v1.ListServicesResponse, error)
 	return &v1.ListServicesResponse{Services: serviceInfos}, nil
 }
 
-func (byoc) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
+func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
 	panic("not implemented: GenerateFiles")
 }
 
-func (b byoc) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
+func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 	return b.driver.PutSecret(ctx, secret.Name, b.StackID+"."+secret.Value)
 }
 
-func (b byoc) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
+func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
 	if err != nil {
 		return nil, err
@@ -304,7 +304,7 @@ func (b byoc) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	return &v1.Secrets{Names: secrets}, nil
 }
 
-func (b *byoc) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
+func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (bs *byocStreamer) Receive() bool {
 	return err == nil
 }
 
-func (b *byoc) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
+func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
 	if req.Service != "" && req.Service != "cd" {
 		return nil, errors.New("service not found") // TODO: implement querying other services/tasks
 	}
@@ -411,7 +411,7 @@ func (b *byoc) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.T
 }
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
-func (b byoc) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
+func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
 	if service.Name == "" {
 		return nil, errors.New("service name is required") // CodeInvalidArgument
 	}
@@ -553,7 +553,7 @@ func newQualifiedName(tenant string, name string) qualifiedName {
 	return qualifiedName(fmt.Sprintf("%s.%s", tenant, name))
 }
 
-func (b byoc) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) *v1.Secret {
+func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) *v1.Secret {
 	if len(secrets) == 1 {
 		// Avoid fetching the list of secrets from AWS by only checking the one we need
 		fqn := newQualifiedName(tenantId, secrets[0].Source)
@@ -584,7 +584,7 @@ func (b byoc) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, 
 
 type qualifiedName = string // legacy
 
-func (b byoc) getEndpoint(fqn qualifiedName, port *v1.Port) string {
+func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
@@ -596,7 +596,7 @@ func (b byoc) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	}
 }
 
-func (b byoc) getFqdn(fqn qualifiedName, public bool) string {
+func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
 		if b.customDomain == "" {

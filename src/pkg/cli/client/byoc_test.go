@@ -11,7 +11,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocClient("ten ant", "")
+	b := NewByocAWS("ten ant", "")
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		_, err := b.Deploy(context.TODO(), &v1.DeployRequest{
@@ -34,7 +34,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocClient("tenant", "")
+	b := NewByocAWS("tenant", "")
 
 	s, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
