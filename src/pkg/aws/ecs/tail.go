@@ -85,19 +85,26 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 		ctx:   ctx,
 	}
 
+	var streams []tailEventStream
+	var waitingStreamIDs []string
+
 	for _, lg := range logGroups {
 		lgID := getLogGroupIdentifier(lg)
 		s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 		if err == nil {
-			cs.Add(s)
+			streams = append(streams, s)
 			continue
 		}
 
-		// Start a goroutine to wait for the log group to be created if the error is resource not found
 		var resourceNotFound *types.ResourceNotFoundException
 		if !errors.As(err, &resourceNotFound) {
 			return nil, err
 		}
+		waitingStreamIDs = append(waitingStreamIDs, lgID)
+	}
+
+	// Start goroutines to wait for the log group to be created for the resource not found log groups
+	for _, lgID := range waitingStreamIDs {
 		go func(ctx context.Context, lgID string) {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
@@ -109,7 +116,7 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 				case <-ticker.C:
 					s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 					if err == nil {
-						cs.Add(s)
+						cs.addAndStart(s)
 						return
 					}
 					var resourceNotFound *types.ResourceNotFoundException
@@ -121,6 +128,11 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 			}
 
 		}(ctx, lgID)
+	}
+
+	// Only add and start watching the streams if there were no errors, prevent lingering goroutines
+	for _, s := range streams {
+		cs.addAndStart(s)
 	}
 
 	return &cs, nil
@@ -209,12 +221,14 @@ type collectionStream struct {
 	lock    sync.Mutex
 }
 
-func (c *collectionStream) Add(s tailEventStream) {
+func (c *collectionStream) addAndStart(s tailEventStream) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.streams = append(c.streams, s)
 	go func() {
 		for {
+			// Double select to make sure context cancellation is not blocked by either the receive or send
+			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
 			select {
 			case e := <-s.Events():
 				select {
