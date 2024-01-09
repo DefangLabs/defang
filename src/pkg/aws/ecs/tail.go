@@ -7,6 +7,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -71,64 +72,45 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-// This is a workaround for the fact that the StartLiveTail API fails if any of the log groups don't exist yet.
-type pendingStream struct {
-	*simpleStream
-	pendingLogGroups []string
-	cw               *cloudwatchlogs.Client
-}
-
-var _ EventStream = (*pendingStream)(nil)
-
-func (ps *pendingStream) Receive(ctx context.Context) ([]LogEvent, error) {
-	if ps.pendingLogGroups == nil {
-		return ps.simpleStream.Receive(ctx) // blocking
-	}
-	select {
-	case e := <-ps.Events(): // blocking
-		return convertEvents(e)
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		// Check if any of the log groups have been created
-		s, err := ps.cw.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: ps.pendingLogGroups})
-		if err != nil {
-			var resourceNotFound *types.ResourceNotFoundException
-			if errors.As(err, &resourceNotFound) {
-				return nil, nil // ignore (keep trying)
-			}
-			return nil, err
-		}
-		// Finally able to tail all log groups!
-		ps.pendingLogGroups = nil
-		ps.simpleStream = &simpleStream{s.GetStream()}
-		return nil, nil
-	}
-}
-
 type EventStream interface {
 	Receive(ctx context.Context) ([]LogEvent, error)
 	Close() error
 }
 
 func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error) {
-	for i, lg := range logGroups {
-		logGroups[i] = getLogGroupIdentifier(lg)
+
+	var cs = collectionStream{
+		ch:  make(chan types.StartLiveTailResponseStream),
+		ctx: ctx,
 	}
-	s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroups})
-	if err != nil {
-		var resourceNotFound *types.ResourceNotFoundException
-		if errors.As(err, &resourceNotFound) {
-			// Some log groups don't exist yet, so we'll wait for them to be created
-			s1, cw, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{logGroups[0]}})
-			if err != nil {
-				return nil, err
+
+	for _, lg := range logGroups {
+		lgID := getLogGroupIdentifier(lg)
+		go func(ctx context.Context, lgID string) {
+			// Wait for the log group to be created
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					s1, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
+					if err == nil {
+						cs.Add(s1)
+					}
+					var resourceNotFound *types.ResourceNotFoundException
+					if !errors.As(err, &resourceNotFound) {
+						// Should we log the error somewhere?
+					}
+				}
 			}
-			return &pendingStream{&simpleStream{s1}, logGroups, cw}, nil
-		}
-		return nil, err
+
+		}(ctx, lgID)
 	}
-	return simpleStream{s}, nil
+
+	return simpleStream{&cs}, nil
 }
 
 func (a *AwsEcs) TailLogStreams(ctx context.Context, logGroupArn string, logStreams ...string) (*simpleStream, error) {
@@ -209,6 +191,53 @@ type LogEvent struct {
 type tailEventStream interface {
 	Close() error
 	Events() <-chan types.StartLiveTailResponseStream
+}
+
+type collectionStream struct {
+	streams []tailEventStream
+	ch      chan types.StartLiveTailResponseStream
+	ctx     context.Context
+	lock    sync.Mutex
+}
+
+func (c *collectionStream) Add(s tailEventStream) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.streams = append(c.streams, s)
+	go func() {
+		for {
+			select {
+			case e := <-s.Events():
+				select {
+				case <-c.ctx.Done():
+					return
+				case c.ch <- e:
+				}
+			case <-c.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (c *collectionStream) Close() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	var errs []error
+	for _, s := range c.streams {
+		err := s.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
+	return c.ch
 }
 
 type simpleStream struct {
