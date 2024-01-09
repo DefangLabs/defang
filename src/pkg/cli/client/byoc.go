@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/url"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws"
@@ -318,63 +316,82 @@ func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest)
 	}, nil
 }
 
-type byocStreamer struct {
-	awsecs.EventStream
+// byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
+type byocServerStream struct {
+	stream   awsecs.EventStream
 	ctx      context.Context
 	err      error
 	response *v1.TailResponse
+	etag     string
 }
 
-func (bs *byocStreamer) Close() error {
+var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
+
+func (bs *byocServerStream) Close() error {
 	return nil
 }
 
-func (bs *byocStreamer) Err() error {
+func (bs *byocServerStream) Err() error {
 	return bs.err
 }
 
-func (bs *byocStreamer) Msg() *v1.TailResponse {
+func (bs *byocServerStream) Msg() *v1.TailResponse {
 	return bs.response
 }
 
-func (bs *byocStreamer) Receive() bool {
-	events, err := bs.EventStream.Receive(bs.ctx)
-	response := &v1.TailResponse{
-		Entries: make([]*v1.LogEntry, len(events)),
+type hasErrCh interface {
+	Err() <-chan error
+}
+
+func (bs *byocServerStream) Receive() bool {
+	var errCh <-chan error
+	if errch, ok := bs.stream.(hasErrCh); ok {
+		errCh = errch.Err()
 	}
-	for i, event := range events {
-		parts := strings.Split(*event.LogGroupIdentifier, ":")
-		if len(parts) > 1 && strings.HasPrefix(parts[1], cdPrefix) {
-			parts := strings.Split(*event.LogStreamName, "/")
-			response.Etag = parts[2] // taskID TODO: etag grab from tag?
-			response.Service = "cd"
-			response.Host = "pulumi"
-		} else {
-			parts := strings.Split(*event.LogStreamName, "/")
-			if len(parts) == 3 {
-				response.Host = parts[2] // taskID
-				parts = strings.SplitN(parts[1], "_", 2)
-				if len(parts) == 2 {
-					service, etag := parts[0], parts[1]
-					response.Service = service
-					response.Etag = etag
+	select {
+	case <-bs.ctx.Done(): // blocking
+		bs.err = bs.ctx.Err()
+		return false
+	case err := <-errCh:
+		bs.err = err
+		return false
+	case e := <-bs.stream.Events(): // blocking
+		events, err := awsecs.ConvertEvents(e)
+		if err != nil {
+			bs.err = err
+			return false
+		}
+		response := &v1.TailResponse{
+			Entries: make([]*v1.LogEntry, len(events)),
+		}
+		for i, event := range events {
+			parts := strings.Split(*event.LogGroupIdentifier, ":")
+			if len(parts) > 1 && strings.HasPrefix(parts[1], cdPrefix) {
+				parts := strings.Split(*event.LogStreamName, "/")
+				response.Etag = parts[2] // taskID TODO: etag grab from tag?
+				response.Service = "cd"
+				response.Host = "pulumi"
+			} else {
+				parts := strings.Split(*event.LogStreamName, "/")
+				if len(parts) == 3 {
+					response.Host = parts[2] // taskID
+					parts = strings.SplitN(parts[1], "_", 2)
+					if len(parts) == 2 {
+						service, etag := parts[0], parts[1]
+						response.Service = service
+						response.Etag = etag
+					}
 				}
 			}
+			response.Entries[i] = &v1.LogEntry{
+				Message:   *event.Message,
+				Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
+				// Stderr:    false, TODO: detect somehow from source
+			}
 		}
-		response.Entries[i] = &v1.LogEntry{
-			Message:   *event.Message,
-			Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
-			// Stderr:    false, TODO: detect somehow from source
-		}
+		bs.response = response
+		return true
 	}
-	bs.response = response
-	var resourceNotFound *types.ResourceNotFoundException
-	if errors.As(err, &resourceNotFound) || err == io.EOF {
-		err = nil // TODO: return error if the task has stopped
-		pkg.SleepWithContext(bs.ctx, time.Second/10)
-	}
-	bs.err = err
-	return err == nil
 }
 
 func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
@@ -395,18 +412,19 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var streamer awsecs.EventStream
+	var eventStream awsecs.EventStream
 	if strings.HasPrefix(taskID, "arn:aws:ecs:") {
-		streamer, err = b.driver.TailTask(ctx, &taskID)
+		eventStream, err = b.driver.TailTask(ctx, &taskID)
 	} else {
-		accountID := "532501343364"                               // FIXME: hard-coded
+		accountID := b.driver.GetAccountID()
 		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match index.ts
 		logGroupID := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", b.driver.Region.String(), accountID, logGroupName)
-		streamer, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID) // this fails if the log group doesn't exist yet
+		eventStream, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
-	return &byocStreamer{
-		EventStream: streamer,
-		ctx:         ctx,
+	return &byocServerStream{
+		stream: eventStream,
+		ctx:    ctx,
+		etag:   req.Etag,
 	}, err
 }
 

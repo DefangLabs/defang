@@ -31,14 +31,14 @@ func taskID(taskArn TaskArn) string {
 	return path.Base(*taskArn)
 }
 
-func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (*simpleStream, error) {
+func (a *AwsEcs) TailTask(ctx context.Context, taskArn TaskArn) (EventStream, error) {
 	logStreamName := getLogStreamForTask(taskArn)
 	return a.TailLogStreams(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
 }
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	a.Region = region.FromArn(string(*taskArn))
-	s, err := a.TailTask(ctx, taskArn)
+	es, err := a.TailTask(ctx, taskArn)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskId := taskID(taskArn)
 	spinMe := 0
 	for {
-		err = s.printLogEvents(ctx)
+		err = printLogEvents(ctx, es)
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) && err != io.EOF {
@@ -58,7 +58,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 		err := a.taskStatus(ctx, taskId)
 		if err != nil {
 			// Before we exit, print any remaining logs
-			s.printLogEvents(ctx)
+			printLogEvents(ctx, es)
 			return err
 		}
 
@@ -72,27 +72,21 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-type EventStream interface {
-	Receive(ctx context.Context) ([]LogEvent, error)
-	Close() error
-}
-
 func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error) {
-
 	var cs = collectionStream{
 		ch:    make(chan types.StartLiveTailResponseStream),
-		errch: make(chan error),
+		errCh: make(chan error),
 		ctx:   ctx,
 	}
 
-	var streams []tailEventStream
+	var streams []EventStream
 	var waitingStreamIDs []string
 
 	for _, lg := range logGroups {
 		lgID := getLogGroupIdentifier(lg)
-		s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
+		es, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 		if err == nil {
-			streams = append(streams, s)
+			streams = append(streams, es)
 			continue
 		}
 
@@ -114,14 +108,14 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
+					es, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 					if err == nil {
-						cs.addAndStart(s)
+						cs.addAndStart(es)
 						return
 					}
 					var resourceNotFound *types.ResourceNotFoundException
 					if !errors.As(err, &resourceNotFound) {
-						cs.errch <- err
+						cs.errCh <- err
 						return
 					}
 				}
@@ -138,16 +132,16 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 	return &cs, nil
 }
 
-func (a *AwsEcs) TailLogStreams(ctx context.Context, logGroupArn string, logStreams ...string) (*simpleStream, error) {
+func (a *AwsEcs) TailLogStreams(ctx context.Context, logGroupArn string, logStreams ...string) (EventStream, error) {
 	logGroupIDs := []string{getLogGroupIdentifier(logGroupArn)}
-	s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupIDs, LogStreamNames: logStreams})
+	es, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: logGroupIDs, LogStreamNames: logStreams})
 	if err != nil {
 		return nil, err
 	}
-	return &simpleStream{s}, nil
+	return es, nil
 }
 
-func (a *AwsEcs) startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (tailEventStream, *cloudwatchlogs.Client, error) {
+func (a *AwsEcs) startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (EventStream, *cloudwatchlogs.Client, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -208,20 +202,21 @@ func clusterArnFromTaskArn(taskArn string) string {
 
 type LogEvent = types.LiveTailSessionLogEvent
 
-type tailEventStream interface {
+// EventStream is an interface that represents a stream of events from a call to StartLiveTail
+type EventStream interface {
 	Close() error
 	Events() <-chan types.StartLiveTailResponseStream
 }
 
 type collectionStream struct {
-	streams []tailEventStream
+	streams []EventStream
 	ch      chan types.StartLiveTailResponseStream
-	errch   chan error
+	errCh   chan error
 	ctx     context.Context
 	lock    sync.Mutex
 }
 
-func (c *collectionStream) addAndStart(s tailEventStream) {
+func (c *collectionStream) addAndStart(s EventStream) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.streams = append(c.streams, s)
@@ -259,27 +254,32 @@ func (c *collectionStream) Close() error {
 	return nil
 }
 
-func (c *collectionStream) Receive(ctx context.Context) ([]LogEvent, error) {
-	select {
-	case e := <-c.ch:
-		return convertEvents(e)
-	case err := <-c.errch:
-		return nil, err
-	case <-ctx.Done():
-		return nil, ctx.Err()
+func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
+	return c.ch
+}
+
+func (c *collectionStream) Err() <-chan error {
+	return c.errCh
+}
+
+func printLogEvents(ctx context.Context, es EventStream) error {
+	for {
+		select {
+		case e := <-es.Events(): // blocking
+			events, err := ConvertEvents(e)
+			if err != nil {
+				return err
+			}
+			for _, event := range events {
+				fmt.Println(*event.Message)
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
-type simpleStream struct {
-	tailEventStream
-	// taskId string
-}
-
-func (s simpleStream) Close() error {
-	return s.tailEventStream.Close()
-}
-
-func convertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
+func ConvertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	switch ev := e.(type) {
 	case *types.StartLiveTailResponseStreamMemberSessionStart:
 		// fmt.Println("session start:", ev.Value.SessionId)
@@ -289,26 +289,5 @@ func convertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 		return ev.Value.SessionResults, nil
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
-	}
-}
-
-func (s simpleStream) Receive(ctx context.Context) ([]LogEvent, error) {
-	select {
-	case e := <-s.Events(): // blocking
-		return convertEvents(e)
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (s simpleStream) printLogEvents(ctx context.Context) error {
-	for {
-		events, err := s.Receive(ctx)
-		for _, event := range events {
-			fmt.Println(*event.Message)
-		}
-		if err != nil {
-			return err
-		}
 	}
 }

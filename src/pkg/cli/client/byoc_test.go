@@ -36,10 +36,21 @@ func TestDeploy(t *testing.T) {
 func TestTail(t *testing.T) {
 	b := NewByocAWS("tenant", "")
 
-	s, err := b.Tail(context.TODO(), &v1.TailRequest{})
+	ss, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
-	s.Receive()
+	defer ss.Close()
+
+	// First we expect "true" (the "start" event)
+	if ss.Receive() != true {
+		t.Error("expected Receive() to return true")
+	}
+	if len(ss.Msg().Entries) != 0 {
+		t.Error("expected empty entries")
+	}
+	err = ss.Err()
+	if err != nil {
+		t.Error(err)
+	}
 }

@@ -49,3 +49,11 @@ func (a *AwsEcs) SetVpcID(vpcId string) error {
 	a.VpcID = vpcId
 	return nil
 }
+
+func (a *AwsEcs) GetVpcID() string {
+	return a.VpcID
+}
+
+func (a *AwsEcs) GetAccountID() string {
+	return common.GetAccountID(a.TaskDefARN)
+}

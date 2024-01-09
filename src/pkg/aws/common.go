@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -19,4 +20,9 @@ func (r Region) String() string {
 
 func (a Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	return config.LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
+}
+
+func GetAccountID(arn string) string {
+	parts := strings.Split(arn, ":")
+	return parts[4]
 }
