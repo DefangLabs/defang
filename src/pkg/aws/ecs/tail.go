@@ -90,6 +90,7 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 		s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 		if err == nil {
 			cs.Add(s)
+			continue
 		}
 
 		// Start a goroutine to wait for the log group to be created if the error is resource not found
@@ -109,13 +110,13 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 					s, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
 					if err == nil {
 						cs.Add(s)
+						return
 					}
 					var resourceNotFound *types.ResourceNotFoundException
-					if errors.As(err, &resourceNotFound) {
-						continue
+					if !errors.As(err, &resourceNotFound) {
+						cs.errch <- err
+						return
 					}
-					cs.errch <- err
-					return
 				}
 			}
 
@@ -217,9 +218,9 @@ func (c *collectionStream) Add(s tailEventStream) {
 			select {
 			case e := <-s.Events():
 				select {
+				case c.ch <- e:
 				case <-c.ctx.Done():
 					return
-				case c.ch <- e:
 				}
 			case <-c.ctx.Done():
 				return
