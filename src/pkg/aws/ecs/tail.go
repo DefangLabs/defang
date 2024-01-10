@@ -76,7 +76,7 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 	var cs = collectionStream{
 		ch:    make(chan types.StartLiveTailResponseStream),
 		errCh: make(chan error),
-		ctx:   ctx,
+		done:  make(chan struct{}),
 	}
 
 	var streams []EventStream
@@ -99,13 +99,15 @@ func (a *AwsEcs) TailLogGroups(ctx context.Context, logGroups ...string) (EventS
 
 	// Start goroutines to wait for the log group to be created for the resource not found log groups
 	for _, lgID := range waitingStreamIDs {
+		cs.wg.Add(1)
 		go func(ctx context.Context, lgID string) {
+			defer cs.wg.Done()
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 
 			for {
 				select {
-				case <-ctx.Done():
+				case <-cs.done:
 					return
 				case <-ticker.C:
 					es, _, err := a.startTail(ctx, &cloudwatchlogs.StartLiveTailInput{LogGroupIdentifiers: []string{lgID}})
@@ -212,15 +214,19 @@ type collectionStream struct {
 	streams []EventStream
 	ch      chan types.StartLiveTailResponseStream
 	errCh   chan error
-	ctx     context.Context
-	lock    sync.Mutex
+
+	done chan struct{}
+	lock sync.Mutex
+	wg   sync.WaitGroup
 }
 
 func (c *collectionStream) addAndStart(s EventStream) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.streams = append(c.streams, s)
+	c.wg.Add(1)
 	go func() {
+		defer c.wg.Done()
 		for {
 			// Double select to make sure context cancellation is not blocked by either the receive or send
 			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
@@ -228,10 +234,10 @@ func (c *collectionStream) addAndStart(s EventStream) {
 			case e := <-s.Events():
 				select {
 				case c.ch <- e:
-				case <-c.ctx.Done():
+				case <-c.done:
 					return
 				}
-			case <-c.ctx.Done():
+			case <-c.done:
 				return
 			}
 		}
@@ -239,8 +245,11 @@ func (c *collectionStream) addAndStart(s EventStream) {
 }
 
 func (c *collectionStream) Close() error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	close(c.done)
+	c.wg.Wait() // Only close the channels after all goroutines have exited
+	close(c.ch)
+	close(c.errCh)
+
 	var errs []error
 	for _, s := range c.streams {
 		err := s.Close()
