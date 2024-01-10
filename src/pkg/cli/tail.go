@@ -144,7 +144,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 		msg := tailClient.Msg()
 
-		if DoColor && !DoVerbose && !raw {
+		if !raw && DoColor && (!DoVerbose || len(msg.Entries) == 0) {
 			fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
 			spinMe++
 		}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -20,6 +21,7 @@ import (
 	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/defang-io/defang/src/pkg/logs"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 
 	"google.golang.org/protobuf/proto"
@@ -35,7 +37,7 @@ const (
 	maxShmSizeMiB = 30720
 	cdVersion     = "latest"
 	projectName   = "bootstrap" // must match the projectName in index.ts
-	cdPrefix      = "cd-"       // renaming this practically deletes the Pulumi state
+	cdTaskPrefix  = "cd-"       // renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
@@ -53,12 +55,12 @@ type byocAws struct {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(stackId, domain string) *byocAws {
-	user := os.Getenv("USER") // TODO: sanitize
+	user := os.Getenv("USER") // TODO: sanitize; also, this won't work for shared stacks
 	if stackId == "" {
 		stackId = user
 	}
 	return &byocAws{
-		driver:        cfn.New(cdPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		driver:        cfn.New(cdTaskPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
@@ -115,7 +117,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		// Small payloads can be sent as base64-encoded command-line argument
 		payloadString = base64.StdEncoding.EncodeToString(data)
 	} else {
-		url, err := b.driver.CreateUploadURL(ctx, "")
+		url, err := b.driver.CreateUploadURL(ctx, etag)
 		if err != nil {
 			return nil, err
 		}
@@ -127,9 +129,10 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("unexpected status code during upload: %d", resp.StatusCode)
+			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
 		payloadString = http.RemoveQueryParam(url)
+		// FIXME: this code path didn't work
 	}
 
 	if err := b.setUp(ctx); err != nil {
@@ -323,12 +326,13 @@ type byocServerStream struct {
 	err      error
 	response *v1.TailResponse
 	etag     string
+	service  string
 }
 
 var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
 
 func (bs *byocServerStream) Close() error {
-	return nil
+	return bs.stream.Close()
 }
 
 func (bs *byocServerStream) Err() error {
@@ -340,71 +344,112 @@ func (bs *byocServerStream) Msg() *v1.TailResponse {
 }
 
 type hasErrCh interface {
-	Err() <-chan error
+	Errs() <-chan error
 }
 
 func (bs *byocServerStream) Receive() bool {
 	var errCh <-chan error
 	if errch, ok := bs.stream.(hasErrCh); ok {
-		errCh = errch.Err()
+		errCh = errch.Errs()
 	}
+
 	select {
 	case <-bs.ctx.Done(): // blocking
 		bs.err = bs.ctx.Err()
 		return false
-	case err := <-errCh:
+	case err := <-errCh: // blocking
 		bs.err = err
 		return false
 	case e := <-bs.stream.Events(): // blocking
-		events, err := awsecs.ConvertEvents(e)
+		events, err := awsecs.GetLogEvents(e)
 		if err != nil {
 			bs.err = err
 			return false
 		}
-		response := &v1.TailResponse{
-			Entries: make([]*v1.LogEntry, len(events)),
+		bs.response = &v1.TailResponse{}
+		if len(events) == 0 {
+			// The original gRPC/connect server stream would never send an empty response.
+			// We could loop around the select, but returning an empty response updates the spinner.
+			return true
 		}
+		var record logs.FirelensMessage
+		parseFirelensRecords := false
+		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
+		event := events[0]
+		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
+			// These events are from the CD task
+			bs.response.Etag = bs.etag // FIXME: this would show all deployments, not just the one we're interested in
+			bs.response.Host = "pulumi"
+			bs.response.Service = "cd"
+		} else if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
+			// These events are from a service task: tenant/service_etag/taskID
+			bs.response.Host = parts[2] // TODO: figure out hostname/IP
+			parts = strings.Split(parts[1], "_")
+			if len(parts) != 2 {
+				// ignore sidecar logs (like route53-sidecar)
+				return true
+			}
+			service, etag := parts[0], parts[1]
+			bs.response.Etag = etag
+			bs.response.Service = service
+		} else if strings.Contains(*event.LogStreamName, "-firelens-") {
+			// These events are from the Firelens sidecar; try to parse the JSON
+			if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
+				bs.response.Etag = record.Etag
+				bs.response.Host = record.Host
+				bs.response.Service = record.ContainerName // TODO: could be service_etag
+				parseFirelensRecords = true
+			}
+		}
+		if bs.etag != "" && bs.etag != bs.response.Etag {
+			return true // TODO: filter these out using the AWS StartLiveTail API
+		}
+		if bs.service != "" && bs.service != bs.response.Service {
+			return true // TODO: filter these out using the AWS StartLiveTail API
+		}
+		entries := make([]*v1.LogEntry, len(events))
 		for i, event := range events {
-			parts := strings.Split(*event.LogGroupIdentifier, ":")
-			if len(parts) > 1 && strings.HasPrefix(parts[1], cdPrefix) {
-				parts := strings.Split(*event.LogStreamName, "/")
-				response.Etag = parts[2] // taskID TODO: etag grab from tag?
-				response.Service = "cd"
-				response.Host = "pulumi"
-			} else {
-				parts := strings.Split(*event.LogStreamName, "/")
-				if len(parts) == 3 {
-					response.Host = parts[2] // taskID
-					parts = strings.SplitN(parts[1], "_", 2)
-					if len(parts) == 2 {
-						service, etag := parts[0], parts[1]
-						response.Service = service
-						response.Etag = etag
+			stderr := false //  TODO: detect somehow from source
+			message := *event.Message
+			if parseFirelensRecords {
+				if err := json.Unmarshal([]byte(message), &record); err == nil {
+					message = record.Log
+					if record.ContainerName == "kaniko" {
+						stderr = isKanikoError(message)
+					} else {
+						stderr = record.Source == logs.SourceStderr
 					}
 				}
 			}
-			response.Entries[i] = &v1.LogEntry{
-				Message:   *event.Message,
+			entries[i] = &v1.LogEntry{
+				Message:   message,
+				Stderr:    stderr,
 				Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
-				// Stderr:    false, TODO: detect somehow from source
 			}
 		}
-		bs.response = response
+		bs.response.Entries = entries
 		return true
 	}
 }
 
-func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
-	if req.Service != "" && req.Service != "cd" {
-		return nil, errors.New("service not found") // TODO: implement querying other services/tasks
+// Copied from server/fabric.go
+func isKanikoError(message string) bool {
+	switch message[:pkg.Min(len(message), 4)] {
+	case "WARN", "ERRO", "DEBU", "FATA", "PANI":
+		return true // always show
+	default:
+		return false // only shown with --verbose
 	}
+}
+
+func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	// TODO: support --since
-	taskID := req.Etag
-	if taskID == "" && req.Service == "cd" {
-		taskID = *b.cdTaskArn
+	// TODO: support req.Since
+	etag := req.Etag
+	if etag == "" && req.Service == "cd" {
+		etag = *b.cdTaskArn
 	}
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
@@ -413,18 +458,20 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * Etag, service:		tail that task/service
 	var err error
 	var eventStream awsecs.EventStream
-	if strings.HasPrefix(taskID, "arn:aws:ecs:") {
-		eventStream, err = b.driver.TailTask(ctx, &taskID)
+	if strings.HasPrefix(etag, "arn:aws:ecs:") {
+		eventStream, err = b.driver.TailTask(ctx, &etag)
+		etag = "" // no need to filter by etag
 	} else {
 		accountID := b.driver.GetAccountID()
-		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match index.ts
+		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match pulumi/index.ts
 		logGroupID := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", b.driver.Region.String(), accountID, logGroupName)
 		eventStream, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
 	return &byocServerStream{
-		stream: eventStream,
-		ctx:    ctx,
-		etag:   req.Etag,
+		stream:  eventStream,
+		ctx:     ctx,
+		etag:    etag,
+		service: req.Service,
 	}, err
 }
 
@@ -551,11 +598,11 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
 		cname, err := net.LookupCNAME(service.Domainname)
 		if err != nil {
-			log.Printf("error looking up CNAME %q: %v\n", service.Domainname, err)
+			log.Printf("error looking up CNAME %q: %v\n", service.Domainname, err) // TODO: avoid `log` in CLI
 			// Do not expose the error to the client, but fail the request with FailedPrecondition
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			log.Printf("CNAME %q does not point to %q\n", service.Domainname, si.PublicFqdn) // TODO: send to Loki tenant log
+			log.Printf("CNAME %q does not point to %q\n", service.Domainname, si.PublicFqdn) // TODO: avoid `log` in CLI
 			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)) FIXME: circular dependency // CodeFailedPrecondition
 		}
 	}
@@ -577,7 +624,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 		fqn := newQualifiedName(tenantId, secrets[0].Source)
 		found, err := b.driver.IsValidSecret(ctx, fqn)
 		if err != nil {
-			log.Printf("error checking secret: %v\n", err)
+			log.Printf("error checking secret: %v\n", err) // TODO: avoid `log` in CLI
 		}
 		if !found {
 			return secrets[0]
@@ -586,7 +633,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 		// Avoid multiple calls to AWS by sorting the list and then doing a binary search
 		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
 		if err != nil {
-			log.Println("error listing secrets:", err)
+			log.Println("error listing secrets:", err) // TODO: avoid `log` in CLI
 		}
 		for _, secret := range secrets {
 			fqn := newQualifiedName(tenantId, secret.Source)

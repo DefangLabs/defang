@@ -267,7 +267,7 @@ func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
 	return c.ch
 }
 
-func (c *collectionStream) Err() <-chan error {
+func (c *collectionStream) Errs() <-chan error {
 	return c.errCh
 }
 
@@ -275,7 +275,7 @@ func printLogEvents(ctx context.Context, es EventStream) error {
 	for {
 		select {
 		case e := <-es.Events(): // blocking
-			events, err := ConvertEvents(e)
+			events, err := GetLogEvents(e)
 			if err != nil {
 				return err
 			}
@@ -288,7 +288,7 @@ func printLogEvents(ctx context.Context, es EventStream) error {
 	}
 }
 
-func ConvertEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
+func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	switch ev := e.(type) {
 	case *types.StartLiveTailResponseStreamMemberSessionStart:
 		// fmt.Println("session start:", ev.Value.SessionId)
