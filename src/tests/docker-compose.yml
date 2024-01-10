@@ -11,6 +11,8 @@ services:
     ports:
       - target: 80
         mode: host
+    secrets:
+      - dummy
 
   # dfnx:
   #   build:
@@ -29,3 +31,8 @@ services:
     # domainname: echotest.gnafed.click
     profiles:
       - donotstart
+
+secrets:
+  dummy:
+    external:
+      name: dummy

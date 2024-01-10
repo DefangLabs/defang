@@ -290,7 +290,7 @@ func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.Gen
 }
 
 func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
-	return b.driver.PutSecret(ctx, secret.Name, b.StackID+"."+secret.Value)
+	return b.driver.PutSecret(ctx, b.StackID+"."+secret.Name, secret.Value)
 }
 
 func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
