@@ -10,6 +10,10 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	aws := New("crun-test", region.Region("us-west-2")) // TODO: customize name
 	if aws == nil {
 		t.Fatal("aws is nil")
