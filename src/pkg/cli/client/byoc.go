@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws"
 	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
@@ -35,7 +36,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "latest"
+	cdVersion     = "v0.4.50-77-gd49343d"
 	projectName   = "bootstrap" // must match the projectName in index.ts
 	cdTaskPrefix  = "cd-"       // renaming this practically deletes the Pulumi state
 )
@@ -47,8 +48,8 @@ type byocAws struct {
 	privateDomain string
 	customDomain  string
 	cdTaskArn     awsecs.TaskArn
-	privateLbIps  []string // TODO: grab these from the AWS API or outputs
-	publicNatIps  []string // TODO: grab these from the AWS API or outputs
+	privateLbIps  []string
+	publicNatIps  []string
 	albDnsName    string
 }
 
@@ -64,9 +65,9 @@ func NewByocAWS(stackId, domain string) *byocAws {
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
-		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // TODO: grab these from the AWS API or outputs
-		// privateLbIps: nil,                                                 // TODO: grab these from the AWS API or outputs
-		// publicNatIps: nil,                                                 // TODO: grab these from the AWS API or outputs
+		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
+		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
+		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
 }
 
@@ -145,8 +146,19 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	}, b.runTask(ctx, "npm", "start", "up", payloadString)
 }
 
-func (byocAws) GetStatus(context.Context) (*v1.Status, error) {
-	panic("not implemented: GetStatus")
+func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
+	// Use STS to get the account ID
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	_, err = sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.Status{
+		Version: cdVersion,
+	}, nil
 }
 
 func (byocAws) GetVersion(context.Context) (*v1.Version, error) {
@@ -180,6 +192,7 @@ func (b *byocAws) runTask(ctx context.Context, cmd ...string) error {
 		"DOMAIN":                   b.customDomain,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
 		"PULUMI_CONFIG_PASSPHRASE": "asdf", // TODO: make customizable
+		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"STACK":                    b.StackID,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
