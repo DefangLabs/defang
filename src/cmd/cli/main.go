@@ -43,6 +43,9 @@ var (
 	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
+const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
+var autoConnectAnnotation = map[string]string{autoConnect: ""}
+
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -73,10 +76,15 @@ var rootCmd = &cobra.Command{
 			server = server + ":443"
 		}
 
-		// TODO: not all commands need a connection, so we should only connect when needed
+		// Not all commands need a connection, so we should only connect when needed
+		if _, ok := cmd.Annotations[autoConnect]; !ok {
+			return nil
+		}
+
 		client, tenantId = cli.Connect(server)
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+			// TODO: only do this for authorization-related errors
 			cli.Warn(" !", err)
 			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
 				return err
@@ -88,9 +96,10 @@ var rootCmd = &cobra.Command{
 }
 
 var loginCmd = &cobra.Command{
-	Use:   "login",
-	Args:  cobra.NoArgs,
-	Short: "Authenticate to the Defang cluster",
+	Use:         "login",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server)
 		if err != nil {
@@ -103,9 +112,10 @@ var loginCmd = &cobra.Command{
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Args:  cobra.NoArgs,
-	Short: "Show the current user",
+	Use:         "whoami",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tenant, err := cli.Whoami(server)
 		if err != nil {
@@ -120,10 +130,11 @@ var whoamiCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:     "generate",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"gen", "new", "init"},
-	Short:   "Generate a sample Defang project in the current folder",
+	Use:         "generate",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"gen", "new", "init"},
+	Short:       "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
@@ -215,10 +226,11 @@ Generate will write files in the current folder. You can edit them and then depl
 }
 
 var getServicesCmd = &cobra.Command{
-	Use:     "services",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"getServices", "ls", "list"},
-	Short:   "Get list of services on the cluster",
+	Use:         "services",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"getServices", "ls", "list"},
+	Short:       "Get list of services on the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.GetServices(cmd.Context(), client)
 		if err != nil {
@@ -230,10 +242,11 @@ var getServicesCmd = &cobra.Command{
 }
 
 var getVersionCmd = &cobra.Command{
-	Use:     "version",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
-	Short:   "Get version information for the CLI and Fabric service",
+	Use:         "version",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"ver", "stat", "status"}, // for backwards compatibility
+	Short:       "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
 		fmt.Println(version)
@@ -245,9 +258,10 @@ var getVersionCmd = &cobra.Command{
 }
 
 var tailCmd = &cobra.Command{
-	Use:   "tail",
-	Args:  cobra.NoArgs,
-	Short: "Tail logs from one or more services",
+	Use:         "tail",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 		var etag, _ = cmd.Flags().GetString("etag")
@@ -273,10 +287,11 @@ var secretsCmd = &cobra.Command{
 }
 
 var secretsSetCmd = &cobra.Command{
-	Use:     "set",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"add", "put"},
-	Short:   "Adds or updates a secret",
+	Use:         "set",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"add", "put"},
+	Short:       "Adds or updates a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 
@@ -316,10 +331,11 @@ var secretsSetCmd = &cobra.Command{
 }
 
 var secretsDeleteCmd = &cobra.Command{
-	Use:     "delete",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"del", "rm", "remove"},
-	Short:   "Deletes a secret",
+	Use:         "delete",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"del", "rm", "remove"},
+	Short:       "Deletes a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 
@@ -339,10 +355,11 @@ var secretsDeleteCmd = &cobra.Command{
 }
 
 var secretsListCmd = &cobra.Command{
-	Use:     "ls",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"list"},
-	Short:   "List secrets",
+	Use:         "ls",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"list"},
+	Short:       "List secrets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.SecretsList(cmd.Context(), client)
 	},
@@ -372,9 +389,10 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 }
 
 var composeUpCmd = &cobra.Command{
-	Use:   "up",
-	Args:  cobra.NoArgs,
-	Short: "Like 'start' but immediately tracks the progress of the deployment",
+	Use:         "up",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -399,10 +417,11 @@ var composeUpCmd = &cobra.Command{
 }
 
 var composeStartCmd = &cobra.Command{
-	Use:     "start",
-	Aliases: []string{"deploy"},
-	Args:    cobra.NoArgs,
-	Short:   "Reads a docker-compose.yml file and deploys services to the cluster",
+	Use:         "start",
+	Aliases:     []string{"deploy"},
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -424,10 +443,11 @@ var composeStartCmd = &cobra.Command{
 }
 
 var composeDownCmd = &cobra.Command{
-	Use:     "down",
-	Aliases: []string{"stop", "rm"},
-	Args:    cobra.NoArgs,
-	Short:   "Reads a docker-compose.yml file and deletes services from the cluster",
+	Use:         "down",
+	Aliases:     []string{"stop", "rm"},
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Reads a docker-compose.yml file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var tail, _ = cmd.Flags().GetBool("tail")
@@ -469,10 +489,11 @@ var composeConfigCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:     "delete",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"del", "rm", "remove"},
-	Short:   "Delete a service from the cluster",
+	Use:         "delete",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"del", "rm", "remove"},
+	Short:       "Delete a service from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 		var tail, _ = cmd.Flags().GetBool("tail")
@@ -501,11 +522,12 @@ var deleteCmd = &cobra.Command{
 }
 
 var sendCmd = &cobra.Command{
-	Use:     "send",
-	Hidden:  true, // not available in private beta
-	Args:    cobra.NoArgs,
-	Aliases: []string{"msg", "message", "publish", "pub"},
-	Short:   "Send a message to a service",
+	Use:         "send",
+	Hidden:      true, // not available in private beta
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"msg", "message", "publish", "pub"},
+	Short:       "Send a message to a service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var id, _ = cmd.Flags().GetString("id")
 		var _type, _ = cmd.Flags().GetString("type")
@@ -518,9 +540,10 @@ var sendCmd = &cobra.Command{
 }
 
 var tokenCmd = &cobra.Command{
-	Use:   "token",
-	Args:  cobra.NoArgs,
-	Short: "Manage personal access tokens",
+	Use:         "token",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Manage personal access tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
@@ -530,11 +553,12 @@ var tokenCmd = &cobra.Command{
 	},
 }
 
-var logout = &cobra.Command{
-	Use:     "logout",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"logoff", "revoke"},
-	Short:   "Log out",
+var logoutCmd = &cobra.Command{
+	Use:         "logout",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"logoff", "revoke"},
+	Short:       "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
@@ -567,7 +591,7 @@ func main() {
 	rootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
-	rootCmd.AddCommand(logout)
+	rootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
 	//generateCmd.Flags().StringP("name", "n", "service1", "Name of the service")
