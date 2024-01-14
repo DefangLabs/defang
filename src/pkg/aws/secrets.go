@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/defang-io/defang/src/pkg"
 )
 
@@ -19,7 +19,7 @@ var (
 )
 
 func getSecretID(name string) *string {
-	return aws.String(stackPrefix + name)
+	return ptr.String(stackPrefix + name)
 }
 
 func (a *Aws) DeleteSecret(ctx context.Context, name string) error {
@@ -49,11 +49,11 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 	svc := ssm.NewFromConfig(cfg)
 
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		MaxResults: aws.Int32(1),
+		MaxResults: ptr.Int32(1),
 		ParameterFilters: []types.ParameterStringFilter{
 			{
-				Key:    aws.String("Name"),
-				Option: aws.String("Equals"),
+				Key:    ptr.String("Name"),
+				Option: ptr.String("Equals"),
 				Values: []string{*secretId},
 			},
 		},
@@ -71,13 +71,13 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 	}
 
 	secretId := getSecretID(name)
-	secretString := aws.String(value)
+	secretString := ptr.String(value)
 
 	svc := ssm.NewFromConfig(cfg)
 
 	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
-		Overwrite: aws.Bool(true),
+		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
 		Name:      secretId,
 		Value:     secretString,
@@ -104,11 +104,11 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 	svc := ssm.NewFromConfig(cfg)
 
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		// MaxResults: aws.Int64(10), TODO: limit the output depending on quotas
+		// MaxResults: ptr.Int64(10), TODO: limit the output depending on quotas
 		ParameterFilters: []types.ParameterStringFilter{
 			{
-				Key:    aws.String("Name"),
-				Option: aws.String("BeginsWith"),
+				Key:    ptr.String("Name"),
+				Option: ptr.String("BeginsWith"),
 				Values: []string{*secretPrefix},
 			},
 		},

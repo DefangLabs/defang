@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/ptr"
 	common "github.com/defang-io/defang/src/pkg/aws"
 	"github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
@@ -60,8 +60,8 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
-		StackName:    aws.String(a.stackName),
-		TemplateBody: aws.String(templateBody),
+		StackName:    ptr.String(a.stackName),
+		TemplateBody: ptr.String(templateBody),
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 	})
 	if err != nil {
@@ -94,8 +94,8 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	_, err = cfn.CreateStack(ctx, &cloudformation.CreateStackInput{
-		StackName:    aws.String(a.stackName),
-		TemplateBody: aws.String(templateBody),
+		StackName:    ptr.String(a.stackName),
+		TemplateBody: ptr.String(templateBody),
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		OnFailure:    cfnTypes.OnFailureDelete,
 	})
@@ -109,7 +109,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 
 	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 
 func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
 	arch := ecs.PlatformToArch(platform)
-	template, err := createTemplate(image, float64(memory)/1024/1024, a.VCpu, a.Spot, arch).YAML()
+	template, err := createTemplate(a.stackName, image, float64(memory)/1024/1024, a.VCpu, a.Spot, arch).YAML()
 	if err != nil {
 		return err
 	}
@@ -128,8 +128,8 @@ func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platfor
 	if err := a.updateStackAndWait(ctx, string(template)); err != nil {
 		// Check if the stack doesn't exist; if so, create it, otherwise return the error
 		var apiError smithy.APIError
-		if ok := errors.As(err, &apiError); !ok || apiError.ErrorCode() != "ValidationError" || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
-			// return err
+		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
+			return err
 		}
 
 		return a.createStackAndWait(ctx, string(template))
@@ -219,7 +219,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 	}
 
 	_, err = cfn.DeleteStack(ctx, &cloudformation.DeleteStackInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 		// RetainResources: []string{"Bucket"}, only when the stack is in the DELETE_FAILED state
 	})
 	if err != nil {
@@ -228,6 +228,6 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 
 	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/smithy-go/ptr"
 )
 
 func (a AwsEcs) Info(ctx context.Context, id TaskArn) (string, error) {
@@ -16,9 +16,9 @@ func (a AwsEcs) Info(ctx context.Context, id TaskArn) (string, error) {
 	}
 
 	ti, err := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: aws.String(a.ClusterName),
+		Cluster: ptr.String(a.ClusterName),
 		Tasks:   []string{*id},
-		// Reason: aws.String("defang stop"),
+		// Reason: ptr.String("defang stop"),
 	})
 	if err != nil {
 		return "", err

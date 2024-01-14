@@ -21,6 +21,8 @@ type Client interface {
 	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
 	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
 	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
+	Destroy(context.Context) error
+	Refresh(context.Context) error
 	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
 	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
 	Publish(context.Context, *v1.PublishRequest) error

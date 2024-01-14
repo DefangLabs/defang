@@ -3,12 +3,13 @@ package ecs
 import (
 	"strings"
 
-	common "github.com/defang-io/defang/src/pkg/aws"
+	"github.com/defang-io/defang/src/pkg/aws"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
 const (
 	ContainerName     = "main"
+	DockerRegistry    = "docker.io"
 	EcrPublicRegistry = "public.ecr.aws"
 	ProjectName       = types.ProjectName
 )
@@ -16,7 +17,7 @@ const (
 type TaskArn = types.TaskID
 
 type AwsEcs struct {
-	common.Aws
+	aws.Aws
 	BucketName      string
 	ClusterName     string
 	LogGroupARN     string
@@ -54,6 +55,17 @@ func (a *AwsEcs) GetVpcID() string {
 	return a.VpcID
 }
 
-func (a *AwsEcs) GetAccountID() string {
-	return common.GetAccountID(a.TaskDefARN)
+func (a *AwsEcs) getAccountID() string {
+	return aws.GetAccountID(a.TaskDefARN)
+}
+
+func (a *AwsEcs) MakeARN(service, resource string) string {
+	return strings.Join([]string{
+		"arn",
+		"aws",
+		service,
+		string(a.Region),
+		a.getAccountID(),
+		resource,
+	}, ":")
 }

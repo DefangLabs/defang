@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/smithy-go/ptr"
 )
 
 const taskCount = 1
@@ -27,9 +27,9 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 			Filters: []ec2types.Filter{
 				{
-					Name:   aws.String("vpc-id"),
+					Name:   ptr.String("vpc-id"),
 					Values: []string{a.VpcID},
-					// 		Name:   aws.String("map-public-ip-on-launch"),
+					// 		Name:   ptr.String("map-public-ip-on-launch"),
 					// 		Values: []string{"true"},
 				},
 			},
@@ -43,8 +43,8 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	var pairs []types.KeyValuePair
 	for k, v := range env {
 		pairs = append(pairs, types.KeyValuePair{
-			Name:  aws.String(k),
-			Value: aws.String(v),
+			Name:  ptr.String(k),
+			Value: ptr.String(v),
 		})
 	}
 
@@ -59,11 +59,11 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		securityGroups = []string{a.SecurityGroupID} // TODO: only if ports are mapped
 	}
 	rti := ecs.RunTaskInput{
-		Count:          aws.Int32(taskCount),
+		Count:          ptr.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
-		TaskDefinition: aws.String(a.TaskDefARN),
+		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
-		Cluster:        aws.String(a.ClusterName),
+		Cluster:        ptr.String(a.ClusterName),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
@@ -72,12 +72,12 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 			},
 		},
 		Overrides: &types.TaskOverride{
-			// Cpu:   aws.String("256"),
-			// Memory: aws.String("512"),
+			// Cpu:   ptr.String("256"),
+			// Memory: ptr.String("512"),
 			// TaskRoleArn: cred.Arn, TODO: default to caller identity; needs trust + iam:PassRole
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name:        aws.String(ContainerName),
+					Name:        ptr.String(ContainerName),
 					Command:     cmd,
 					Environment: pairs,
 					// ResourceRequirements: TODO: make configurable, support GPUs
@@ -87,8 +87,8 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		},
 		Tags: []types.Tag{ //TODO: add tags to the task
 			{
-				Key:   aws.String("StartedAt"),
-				Value: aws.String(time.Now().String()),
+				Key:   ptr.String("StartedAt"),
+				Value: ptr.String(time.Now().String()),
 			},
 		},
 	}

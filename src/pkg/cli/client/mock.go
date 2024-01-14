@@ -60,3 +60,9 @@ func (MockClient) GenerateFiles(context.Context, *pb.GenerateFilesRequest) (*pb.
 func (MockClient) RevokeToken(context.Context) error {
 	panic("no impl: RevokeToken")
 }
+func (MockClient) Destroy(context.Context) error {
+	panic("no impl: Destroy")
+}
+func (MockClient) Refresh(context.Context) error {
+	panic("no impl: Refresh")
+}

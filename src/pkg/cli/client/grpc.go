@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 
 	connect_go "github.com/bufbuild/connect-go"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
@@ -100,4 +101,12 @@ func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLReques
 
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
 	return g.client.Tail(ctx, &connect_go.Request[v1.TailRequest]{Msg: req})
+}
+
+func (g *GrpcClient) Destroy(ctx context.Context) error {
+	return errors.New("not a BYOC cluster")
+}
+
+func (g *GrpcClient) Refresh(ctx context.Context) error {
+	return errors.New("not a BYOC cluster")
 }

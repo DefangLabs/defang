@@ -7,6 +7,17 @@ import (
 	"net/url"
 )
 
+// Put issues a PUT to the specified URL.
+//
+// Caller should close resp.Body when done reading from it.
+//
+// If the provided body is an io.Closer, it is closed after the
+// request.
+//
+// To set custom headers, use NewRequest and DefaultClient.Do.
+//
+// See the Client.Do method documentation for details on how redirects
+// are handled.
 func Put(ctx context.Context, url string, contentType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, "PUT", url, body)
 	if err != nil {

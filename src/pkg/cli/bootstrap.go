@@ -2,20 +2,23 @@ package cli
 
 import (
 	"context"
+	"errors"
 
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/aws"
-	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 )
 
-func Bootstrap(ctx context.Context) error {
-	clientCfn := cfn.New("crun-llunesu", aws.Region(pkg.Getenv("AWS_REGION", "us-west-2")))
-	if err := clientCfn.SetUp(ctx, "532501343364.dkr.ecr.us-west-2.amazonaws.com/cd:latest", 512_000_000, "linux/amd64"); err != nil {
-		return err
+func BootstrapDestroy(ctx context.Context, client client.Client) error {
+	if DoDryRun {
+		return errors.New("dry run")
 	}
-	task, err := clientCfn.Run(ctx, nil, "--bootstrap")
-	if err != nil {
-		return err
+	Warn(" ! Destroying all resources")
+	return client.Destroy(ctx)
+}
+
+func BootstrapRefresh(ctx context.Context, client client.Client) error {
+	if DoDryRun {
+		return errors.New("dry run")
 	}
-	return clientCfn.Tail(ctx, task)
+	Info(" * Refreshing all resources")
+	return client.Refresh(ctx)
 }

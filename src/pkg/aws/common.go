@@ -19,7 +19,11 @@ func (r Region) String() string {
 }
 
 func (a Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
-	return config.LoadDefaultConfig(ctx, config.WithRegion(string(a.Region)))
+	return LoadDefaultConfig(ctx, a.Region)
+}
+
+func LoadDefaultConfig(ctx context.Context, region Region) (aws.Config, error) {
+	return config.LoadDefaultConfig(ctx, config.WithRegion(string(region)))
 }
 
 func GetAccountID(arn string) string {

@@ -44,7 +44,7 @@ const (
 
 func FromArn(arn string) Region {
 	parts := strings.Split(arn, ":")
-	if len(parts) < 6 {
+	if len(parts) < 6 || parts[0] != "arn" {
 		panic("invalid ARN")
 	}
 	return Region(parts[3])

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
 )
 
@@ -36,7 +36,7 @@ func (a *AwsEcs) CreateUploadURL(ctx context.Context, name string) (string, erro
 	// Use S3 SDK to create a presigned URL for uploading a file.
 	req, err := s3.NewPresignClient(s3Client).PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: &a.BucketName,
-		Key:    aws.String(prefix + name),
+		Key:    ptr.String(prefix + name),
 	})
 	if err != nil {
 		return "", err

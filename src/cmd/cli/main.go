@@ -570,12 +570,28 @@ var logoutCmd = &cobra.Command{
 }
 
 var bootstrapCmd = &cobra.Command{
-	Use:         "bootstrap",
+	Use:   "bootstrap",
+	Args:  cobra.NoArgs,
+	Short: "Manage a BYOC account",
+}
+
+var bootstrapDestroyCmd = &cobra.Command{
+	Use:         "destroy",
 	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Bootstrap a new BYOC account",
+	Short:       "Destroy the bootstrapped resources",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.Bootstrap(cmd.Context())
+		return cli.BootstrapDestroy(cmd.Context(), client)
+	},
+}
+
+var bootstrapRrefreshCmd = &cobra.Command{
+	Use:         "refresh",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Refresh the bootstrapped resources",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cli.BootstrapRefresh(cmd.Context(), client)
 	},
 }
 
@@ -590,6 +606,8 @@ func main() {
 
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
+	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
+	bootstrapCmd.AddCommand(bootstrapRrefreshCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")

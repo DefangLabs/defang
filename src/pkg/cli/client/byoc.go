@@ -36,7 +36,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-77-gd49343d"
+	cdVersion     = "v0.4.50-79-g1086708"
 	projectName   = "bootstrap" // must match the projectName in index.ts
 	cdTaskPrefix  = "cd-"       // renaming this practically deletes the Pulumi state
 )
@@ -117,6 +117,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	if len(data) < 1000 {
 		// Small payloads can be sent as base64-encoded command-line argument
 		payloadString = base64.StdEncoding.EncodeToString(data)
+		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
 		url, err := b.driver.CreateUploadURL(ctx, etag)
 		if err != nil {
@@ -143,7 +144,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runTask(ctx, "npm", "start", "up", payloadString)
+	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
@@ -186,31 +187,29 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 	return nil, errors.New("service not found") // CodeNotFound
 }
 
-func (b *byocAws) runTask(ctx context.Context, cmd ...string) error {
+func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
 		// "AWS_REGION":               b.driver.Region.String(), TODO: this should be the destination region, not the CD region
 		"DOMAIN":                   b.customDomain,
-		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region),
-		"PULUMI_CONFIG_PASSPHRASE": "asdf", // TODO: make customizable
+		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
+		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"STACK":                    b.StackID,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
-	if err != nil {
-		return err
-	}
 	b.cdTaskArn = taskArn
-	return nil
+	return err
 }
 
 func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := b.runTask(ctx, "npm", "start", "up", "TODO"); err != nil { // TODO: remove TODO payload (although it works fine!)
+	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil { // TODO: remove TODO payload (although it works fine!)
 		return nil, err
 	}
-	return &v1.DeleteResponse{Etag: *b.cdTaskArn}, nil
+	etag := awsecs.GetTaskID(b.cdTaskArn) // TODO: this is the CD task ID, not the etag
+	return &v1.DeleteResponse{Etag: etag}, nil
 }
 
 func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
@@ -427,6 +426,7 @@ func (bs *byocServerStream) Receive() bool {
 			if parseFirelensRecords {
 				if err := json.Unmarshal([]byte(message), &record); err == nil {
 					message = record.Log
+					println("container name:", record.ContainerName, "source:", record.Source)
 					if record.ContainerName == "kaniko" {
 						stderr = isKanikoError(message)
 					} else {
@@ -462,7 +462,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	// TODO: support req.Since
 	etag := req.Etag
 	if etag == "" && req.Service == "cd" {
-		etag = *b.cdTaskArn
+		etag = awsecs.GetTaskID(b.cdTaskArn)
 	}
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
@@ -471,14 +471,13 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * Etag, service:		tail that task/service
 	var err error
 	var eventStream awsecs.EventStream
-	if strings.HasPrefix(etag, "arn:aws:ecs:") {
-		eventStream, err = b.driver.TailTask(ctx, &etag)
+	if !pkg.IsValidRandomID(etag) {
+		eventStream, err = b.driver.TailTask(ctx, etag)
 		etag = "" // no need to filter by etag
 	} else {
-		accountID := b.driver.GetAccountID()
 		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match pulumi/index.ts
-		logGroupID := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", b.driver.Region.String(), accountID, logGroupName)
-		eventStream, err = b.driver.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
+		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
 	return &byocServerStream{
 		stream:  eventStream,
@@ -688,4 +687,21 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 
 func dnsSafe(fqn qualifiedName) string {
 	return strings.ReplaceAll(string(fqn), ".", "-")
+}
+
+func (b *byocAws) Destroy(ctx context.Context) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	return b.driver.TearDown(ctx)
+}
+
+func (b *byocAws) Refresh(ctx context.Context) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	if err := b.runCdTask(ctx, "npm", "start", "refresh"); err != nil {
+		return err
+	}
+	return nil
 }
