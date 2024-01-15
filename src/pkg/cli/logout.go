@@ -11,7 +11,7 @@ func Logout(ctx context.Context, client client.Client) error {
 	Debug(" - Logging out")
 	err := client.RevokeToken(ctx)
 	// Ignore unauthenticated errors, since we're logging out anyway
-	if e, ok := err.(*connect.Error); !ok || e.Code() != connect.CodeUnauthenticated {
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return err
 	}
 	// TODO: remove the cached token file
