@@ -203,7 +203,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		var build *pb.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force) // TODO: need BYOC support
+			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
 			if err != nil {
 				return nil, err
 			}
