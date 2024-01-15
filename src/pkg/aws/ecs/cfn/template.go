@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/ec2"
 	"github.com/awslabs/goformation/v7/cloudformation/ecr"
@@ -36,7 +36,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	const _bucket = "Bucket"
 	template.Resources[_bucket] = &s3.Bucket{
 		Tags: defaultTags,
-		// BucketName: aws.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
+		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
 		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
 	}
 
@@ -44,7 +44,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	const _cluster = "Cluster"
 	template.Resources[_cluster] = &ecs.Cluster{
 		Tags: defaultTags,
-		// ClusterName: aws.String(PREFIX + "cluster" + SUFFIX), // optional
+		// ClusterName: ptr.String(PREFIX + "cluster" + SUFFIX), // optional
 	}
 
 	// 3. ECR pull-through cache (only really needed for images from ECR Public registry)
@@ -55,8 +55,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	// * AWS GovCloud (US-West) (us-gov-west-1)
 	const _pullThroughCache = "PullThroughCache"
 	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-		EcrRepositoryPrefix: aws.String(ecrPublicPrefix), // TODO: optional
-		UpstreamRegistryUrl: aws.String(awsecs.EcrPublicRegistry),
+		EcrRepositoryPrefix: ptr.String(ecrPublicPrefix), // TODO: optional
+		UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
 	}
 
 	// 4. ECS capacity provider
@@ -73,7 +73,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		DefaultCapacityProviderStrategy: []ecs.ClusterCapacityProviderAssociations_CapacityProviderStrategy{
 			{
 				CapacityProvider: capacityProvider,
-				Weight:           aws.Int(1),
+				Weight:           ptr.Int(1),
 			},
 		},
 	}
@@ -82,8 +82,8 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	const _logGroup = "LogGroup"
 	template.Resources[_logGroup] = &logs.LogGroup{
 		Tags: defaultTags,
-		// LogGroupName:    aws.String(PREFIX + "log-group-test" + SUFFIX), // optional
-		RetentionInDays: aws.Int(1),
+		// LogGroupName:    ptr.String(PREFIX + "log-group-test" + SUFFIX), // optional
+		RetentionInDays: ptr.Int(1),
 	}
 
 	// 6. IAM exec role for task
@@ -106,7 +106,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	const _executionRole = "ExecutionRole"
 	template.Resources[_executionRole] = &iam.Role{
 		Tags: defaultTags,
-		// RoleName: aws.String(PREFIX + "execution-role" + SUFFIX), // optional
+		// RoleName: ptr.String(PREFIX + "execution-role" + SUFFIX), // optional
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
 		},
@@ -154,7 +154,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	const _taskRole = "TaskRole"
 	template.Resources[_taskRole] = &iam.Role{
 		Tags: defaultTags,
-		// RoleName: aws.String(PREFIX + "task-role" + SUFFIX), // optional
+		// RoleName: ptr.String(PREFIX + "task-role" + SUFFIX), // optional
 		ManagedPolicyArns: []string{
 			"arn:aws:iam::aws:policy/AdministratorAccess", // TODO: make this configurable
 		},
@@ -192,7 +192,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		Tags: defaultTags,
 		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
 			CpuArchitecture:       arch,
-			OperatingSystemFamily: aws.String("LINUX"), // TODO: support other OSes?
+			OperatingSystemFamily: ptr.String("LINUX"), // TODO: support other OSes?
 		},
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
@@ -208,16 +208,16 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 				},
 				Environment: []ecs.TaskDefinition_KeyValuePair{
 					{
-						Name:  aws.String("PULUMI_BACKEND_URL"),                                        // TODO: this should not be here
+						Name:  ptr.String("PULUMI_BACKEND_URL"),                                        // TODO: this should not be here
 						Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"), // TODO: use _bucket
 					},
 				},
 			},
 		},
-		Cpu:                     aws.String(strconv.FormatUint(uint64(cpu), 10)),
+		Cpu:                     ptr.String(strconv.FormatUint(uint64(cpu), 10)),
 		ExecutionRoleArn:        cloudformation.RefPtr(_executionRole),
-		Memory:                  aws.String(strconv.FormatUint(uint64(mem), 10)),
-		NetworkMode:             aws.String("awsvpc"),
+		Memory:                  ptr.String(strconv.FormatUint(uint64(mem), 10)),
+		NetworkMode:             ptr.String("awsvpc"),
 		RequiresCompatibilities: []string{"FARGATE"},
 		TaskRoleArn:             cloudformation.RefPtr(_taskRole),
 		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
@@ -229,7 +229,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		const _vpc = "VPC"
 		template.Resources[_vpc] = &ec2.VPC{
 			Tags:      append([]tags.Tag{{Key: "Name", Value: prefix + "vpc"}}, defaultTags...),
-			CidrBlock: aws.String("10.0.0.0/16"),
+			CidrBlock: ptr.String("10.0.0.0/16"),
 		}
 		vpcId = cloudformation.RefPtr(_vpc)
 		// 8b. an internet gateway
@@ -253,7 +253,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		const _route = "Route"
 		template.Resources[_route] = &ec2.Route{
 			RouteTableId:         cloudformation.Ref(_routeTable),
-			DestinationCidrBlock: aws.String("0.0.0.0/0"),
+			DestinationCidrBlock: ptr.String("0.0.0.0/0"),
 			GatewayId:            cloudformation.RefPtr(_internetGateway),
 		}
 		// 8f. a public subnet
@@ -261,9 +261,9 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		template.Resources[_subnet] = &ec2.Subnet{
 			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
 			// AvailabilityZone: TODO: parse region suffix
-			CidrBlock:           aws.String("10.0.0.0/20"),
+			CidrBlock:           ptr.String("10.0.0.0/20"),
 			VpcId:               cloudformation.Ref(_vpc),
-			MapPublicIpOnLaunch: aws.Bool(true),
+			MapPublicIpOnLaunch: ptr.Bool(true),
 		}
 		// 8g. a subnet / route table association
 		const _subnetRouteTableAssociation = "SubnetRouteTableAssociation"
@@ -274,14 +274,14 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		// 8h. S3 gateway endpoint (to avoid S3 bandwidth charges)
 		const _s3GatewayEndpoint = "S3GatewayEndpoint"
 		template.Resources[_s3GatewayEndpoint] = &ec2.VPCEndpoint{
-			VpcEndpointType: aws.String("Gateway"),
+			VpcEndpointType: ptr.String("Gateway"),
 			VpcId:           cloudformation.Ref(_vpc),
 			ServiceName:     cloudformation.Sub("com.amazonaws.${AWS::Region}.s3"),
 		}
 
 		template.Outputs[outputs.SubnetID] = cloudformation.Output{
 			Value:       cloudformation.Ref(_subnet),
-			Description: aws.String("ID of the subnet"),
+			Description: ptr.String("ID of the subnet"),
 		}
 	}
 
@@ -293,17 +293,17 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		SecurityGroupIngress: []ec2.SecurityGroup_Ingress{
 			{
 				IpProtocol: "tcp",
-				FromPort:   aws.Int(1),
-				ToPort:     aws.Int(65535),
-				CidrIp:     aws.String("0.0.0.0/0"), // from anywhere FIXME: restrict to "my ip"
+				FromPort:   ptr.Int(1),
+				ToPort:     ptr.Int(65535),
+				CidrIp:     ptr.String("0.0.0.0/0"), // from anywhere FIXME: restrict to "my ip"
 			},
 		},
 		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{ FIXME: add ability to restrict outbound traffic
 		// 	{
 		// 		IpProtocol: "tcp",
-		// 		FromPort:   aws.Int(1),
-		// 		ToPort:     aws.Int(65535),
-		// 		// CidrIp:     aws.String("
+		// 		FromPort:   ptr.Int(1),
+		// 		ToPort:     ptr.Int(65535),
+		// 		// CidrIp:     ptr.String("
 		// 	},
 		// },
 	}
@@ -311,19 +311,19 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 	// Declare stack outputs
 	template.Outputs[outputs.TaskDefArn] = cloudformation.Output{
 		Value:       cloudformation.Ref(_taskDefinition),
-		Description: aws.String("ARN of the ECS task definition"),
+		Description: ptr.String("ARN of the ECS task definition"),
 	}
 	template.Outputs[outputs.ClusterArn] = cloudformation.Output{
 		Value:       cloudformation.Ref(_cluster),
-		Description: aws.String("ARN of the ECS cluster"),
+		Description: ptr.String("ARN of the ECS cluster"),
 	}
 	template.Outputs[outputs.LogGroupName] = cloudformation.Output{
 		Value:       cloudformation.Ref(_logGroup),
-		Description: aws.String("Name of the CloudWatch log group"),
+		Description: ptr.String("Name of the CloudWatch log group"),
 	}
 	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
 		Value:       cloudformation.Ref(_securityGroup),
-		Description: aws.String("ID of the security group"),
+		Description: ptr.String("ID of the security group"),
 	}
 
 	return template

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
@@ -47,7 +47,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 
 		// Use DescribeTasks API to check if the task is still running
 		ti, _ := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-			Cluster: aws.String(a.ClusterARN), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
+			Cluster: ptr.String(a.ClusterARN), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
 			Tasks:   []string{taskId},
 		})
 		if ti != nil && len(ti.Tasks) > 0 {
@@ -90,10 +90,10 @@ func clusterArnFromTaskArn(taskArn string) string {
 func (a AwsEcs) printLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, logStreamName string, nextToken *string) (*string, error) {
 	for {
 		events, err := cw.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
-			LogGroupName:  aws.String(a.LogGroupName),
-			LogStreamName: aws.String(logStreamName),
+			LogGroupName:  ptr.String(a.LogGroupName),
+			LogStreamName: ptr.String(logStreamName),
 			NextToken:     nextToken,
-			StartFromHead: aws.Bool(true),
+			StartFromHead: ptr.Bool(true),
 		})
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
