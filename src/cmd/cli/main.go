@@ -84,7 +84,10 @@ var rootCmd = &cobra.Command{
 		client, tenantId = cli.Connect(server)
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
-			// TODO: only do this for authorization-related errors
+			// Login now; only do this for authorization-related errors
+			if e, ok := err.(*connect.Error); !ok || e.Code() != connect.CodeUnauthenticated {
+				return err
+			}
 			cli.Warn(" !", err)
 			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
 				return err
