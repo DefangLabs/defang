@@ -34,5 +34,5 @@ services:
 
 secrets:
   dummy:
-    external:
-      name: dummy
+    external: true
+    name: dummy
