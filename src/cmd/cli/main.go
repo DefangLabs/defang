@@ -85,7 +85,7 @@ var rootCmd = &cobra.Command{
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
-			if e, ok := err.(*connect.Error); !ok || e.Code() != connect.CodeUnauthenticated {
+			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
 			cli.Warn(" !", err)
