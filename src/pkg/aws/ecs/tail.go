@@ -47,6 +47,9 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 }
 
 func (a *AwsEcs) TailTask(ctx context.Context, taskID string) (EventStream, error) {
+	if taskID == "" {
+		return nil, errors.New("taskID is empty")
+	}
 	logStreamName := getLogStreamForTaskID(taskID)
 	return TailLogGroup(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
 }

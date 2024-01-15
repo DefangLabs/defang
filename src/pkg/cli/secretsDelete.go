@@ -14,6 +14,7 @@ func SecretsDelete(ctx context.Context, client client.Client, name string) error
 		return nil
 	}
 
+	// FIXME: create dedicated DeleteSecret method in client proto
 	err := client.PutSecret(ctx, &pb.SecretValue{Name: name})
 	return err
 }

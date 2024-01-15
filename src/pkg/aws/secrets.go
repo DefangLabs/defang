@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -20,6 +21,11 @@ var (
 
 func getSecretID(name string) *string {
 	return ptr.String(stackPrefix + name)
+}
+
+func IsParameterNotFoundError(err error) bool {
+	var e *types.ParameterNotFound
+	return errors.As(err, &e)
 }
 
 func (a *Aws) DeleteSecret(ctx context.Context, name string) error {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bufbuild/connect-go"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -34,11 +35,15 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocAWS("tenant", "")
+	b := NewByocAWS("TestTail", "")
 
 	ss, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
-		t.Fatal(err)
+		// the only acceptable error is "unauthorized"
+		if connect.CodeOf(err) != connect.CodeUnauthenticated {
+			t.Fatal(err)
+		}
+		t.Skip("skipping test; not authorized")
 	}
 	defer ss.Close()
 
@@ -53,4 +58,83 @@ func TestTail(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestGetServices(t *testing.T) {
+	b := NewByocAWS("TestGetServices", "")
+
+	services, err := b.GetServices(context.TODO())
+	if err != nil {
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			t.Skip("skipping test; not authorized")
+		}
+		// the only acceptable error is "unauthorized"
+		t.Fatal(err)
+	}
+
+	if len(services.Services) != 0 {
+		t.Error("expected empty services")
+	}
+}
+
+func TestPutSecret(t *testing.T) {
+	const secretName = "hello"
+	b := NewByocAWS("TestPutSecret", "")
+
+	t.Run("delete non-existent", func(t *testing.T) {
+		err := b.PutSecret(context.TODO(), &v1.SecretValue{Name: secretName})
+		if err != nil {
+			// the only acceptable error is "unauthorized"
+			if connect.CodeOf(err) == connect.CodeUnauthenticated {
+				t.Skip("skipping test; not authorized")
+			}
+			if connect.CodeOf(err) != connect.CodeNotFound {
+				t.Error("expected NotFound")
+			}
+		}
+	})
+
+	t.Run("invalid name", func(t *testing.T) {
+		err := b.PutSecret(context.TODO(), &v1.SecretValue{})
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Error("expected invalid argument")
+		}
+	})
+
+	t.Run("put", func(t *testing.T) {
+		err := b.PutSecret(context.TODO(), &v1.SecretValue{Name: secretName, Value: "world"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Check that the secret is in the list
+		secrets, err := b.driver.ListSecretsByPrefix(context.TODO(), b.StackID+".")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(secrets) != 1 {
+			t.Fatalf("expected 1 secret, got %v", secrets)
+		}
+		expected := b.StackID + "." + secretName
+		if secrets[0] != expected {
+			t.Fatalf("expected %q, got %q", expected, secrets[0])
+		}
+	})
+}
+
+func TestListSecrets(t *testing.T) {
+	b := NewByocAWS("TestListSecrets", "")
+
+	t.Run("list", func(t *testing.T) {
+		secrets, err := b.ListSecrets(context.TODO())
+		if err != nil {
+			// the only acceptable error is "unauthorized"
+			if connect.CodeOf(err) == connect.CodeUnauthenticated {
+				t.Skip("skipping test; not authorized")
+			}
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(secrets.Names) != 0 {
+			t.Fatalf("expected empty list, got %v", secrets.Names)
+		}
+	})
 }

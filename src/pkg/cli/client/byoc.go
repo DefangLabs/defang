@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws"
 	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
@@ -36,9 +38,9 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-79-g1086708"
-	projectName   = "bootstrap" // must match the projectName in index.ts
-	cdTaskPrefix  = "cd-"       // renaming this practically deletes the Pulumi state
+	cdVersion     = "v0.4.50-79-g1086708" // will cause issues if two clients with different versions are connected to the same stack
+	projectName   = "bootstrap"           // must match the projectName in index.ts
+	cdTaskPrefix  = "cd-"                 // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
@@ -77,7 +79,7 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	}
 	// TODO: can we stick to the vanilla pulumi-nodejs image?
 	if err := b.driver.SetUp(ctx, "docker.io/defangio/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
-		return err
+		return annotateAwsError(err)
 	}
 	b.setupDone = true
 	return nil
@@ -184,7 +186,7 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 			return service, nil
 		}
 	}
-	return nil, errors.New("service not found") // CodeNotFound
+	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
 func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
@@ -198,7 +200,7 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	b.cdTaskArn = taskArn
-	return err
+	return annotateAwsError(err)
 }
 
 func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
@@ -217,6 +219,7 @@ func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
 }
 
 func (b byocAws) getClusterNames() []string {
+	// This should match the naming in pulumi/ecs/common.ts
 	return []string{
 		projectName + "-" + b.StackID + "-cluster",
 		projectName + "-" + b.StackID + "-gpu-cluster",
@@ -224,13 +227,10 @@ func (b byocAws) getClusterNames() []string {
 }
 
 func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
 	var maxResults int32 = 100 // the maximum allowed by AWS
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, annotateAwsError(err)
 	}
 	clusters := make(map[string][]string)
 	ecsClient := ecs.NewFromConfig(cfg)
@@ -240,38 +240,14 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 			MaxResults: &maxResults, // TODO: handle pagination
 		})
 		if err != nil {
-			// return nil, err
-			// TODO: ignore ClusterNotFoundException
-			continue
+			var notFound *ecsTypes.ClusterNotFoundException
+			if errors.As(err, &notFound) {
+				continue
+			}
+			return nil, annotateAwsError(err)
 		}
 		clusters[clusterName] = serviceArns.ServiceArns
 	}
-	/* TODO: use this once namespaces are working
-	s, err := ecsClient.ListServicesByNamespace(ctx, &ecs.ListServicesByNamespaceInput{
-		MaxResults: &maxResults,
-		Namespace:  &b.privateDomain,
-	})
-	if err != nil {
-		// Ignore NamespaceNotFoundException
-		var namespaceNotFound *ecsTypes.NamespaceNotFoundException
-		if errors.As(err, &namespaceNotFound) {
-			println("ns not found")
-			return &v1.ListServicesResponse{}, nil
-		}
-		return nil, err
-	}
-	if len(s.ServiceArns) == 0 {
-		println("no services found")
-		return &v1.ListServicesResponse{}, nil
-	}
-	// Convert service ARNs to cluster name(s)
-	for _, arn := range s.ServiceArns {
-		// arn:aws:ecs:us-west-2:532501343364:service/ecs-edw-cluster/fabric-31fdcb4
-		resourcePath := strings.Split(arn, ":")[5]
-		parts := strings.Split(resourcePath, "/")
-		cluster, service := parts[1], parts[2]
-		clusters[cluster] = append(clusters[cluster], service)
-	}*/
 	// Query services for each cluster
 	serviceInfos := []*v1.ServiceInfo{}
 	for cluster, serviceNames := range clusters {
@@ -283,7 +259,7 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 			Cluster:  &cluster,
 		})
 		if err != nil {
-			return nil, err
+			return nil, annotateAwsError(err)
 		}
 		for _, service := range dso.Services {
 			// TODO: get the service definition from the task definition or tags
@@ -301,8 +277,33 @@ func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.Gen
 	panic("not implemented: GenerateFiles")
 }
 
+// annotateAwsError translates the AWS error to an error code the CLI client understands
+func annotateAwsError(err error) error {
+	if err == nil {
+		return err
+	}
+	if strings.Contains(err.Error(), "get credentials:") {
+		return connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if aws.IsParameterNotFoundError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	return err
+}
+
 func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
-	return b.driver.PutSecret(ctx, b.StackID+"."+secret.Name, secret.Value)
+	if !pkg.IsValidSecretName(secret.Name) {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
+	}
+	var err error
+	prefix := b.StackID + "."
+	fqn := prefix + secret.Name
+	if secret.Value == "" {
+		err = b.driver.DeleteSecret(ctx, fqn)
+	} else {
+		err = b.driver.PutSecret(ctx, fqn, secret.Value)
+	}
+	return annotateAwsError(err)
 }
 
 func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
@@ -310,9 +311,10 @@ func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	if err != nil {
 		return nil, err
 	}
+	prefix := b.StackID + "."
 	secrets := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
-		secrets[i] = strings.TrimPrefix(secret, b.StackID+".")
+		secrets[i] = strings.TrimPrefix(secret, prefix)
 	}
 	return &v1.Secrets{Names: secrets}, nil
 }
@@ -348,7 +350,7 @@ func (bs *byocServerStream) Close() error {
 }
 
 func (bs *byocServerStream) Err() error {
-	return bs.err
+	return annotateAwsError(bs.err)
 }
 
 func (bs *byocServerStream) Msg() *v1.TailResponse {
@@ -471,7 +473,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * Etag, service:		tail that task/service
 	var err error
 	var eventStream awsecs.EventStream
-	if !pkg.IsValidRandomID(etag) {
+	if etag != "" && !pkg.IsValidRandomID(etag) {
 		eventStream, err = b.driver.TailTask(ctx, etag)
 		etag = "" // no need to filter by etag
 	} else {
