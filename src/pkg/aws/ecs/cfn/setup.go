@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/aws/region"
@@ -56,8 +56,8 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
-		StackName:    aws.String(a.stackName),
-		TemplateBody: aws.String(templateBody),
+		StackName:    ptr.String(a.stackName),
+		TemplateBody: ptr.String(templateBody),
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 	})
 	if err != nil {
@@ -84,8 +84,8 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	_, err = cfn.CreateStack(ctx, &cloudformation.CreateStackInput{
-		StackName:    aws.String(a.stackName),
-		TemplateBody: aws.String(templateBody),
+		StackName:    ptr.String(a.stackName),
+		TemplateBody: ptr.String(templateBody),
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		OnFailure:    cfnTypes.OnFailureDelete,
 	})
@@ -99,7 +99,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 
 	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
 	return cloudformation.NewStackCreateCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 }
 
@@ -197,7 +197,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 	}
 
 	_, err = cfn.DeleteStack(ctx, &cloudformation.DeleteStackInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 		// RetainResources: []string{"Bucket"}, only when the stack is in the DELETE_FAILED state
 	})
 	if err != nil {
@@ -206,6 +206,6 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 
 	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
-		StackName: aws.String(a.stackName),
+		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
 }
