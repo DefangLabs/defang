@@ -46,6 +46,9 @@ var (
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
 var autoConnectAnnotation = map[string]string{autoConnect: ""}
 
+const authNeeded = "auth-needed"                                              // annotation to indicate that a command needs authorization
+var authNeededAnnotation = map[string]string{authNeeded: "", autoConnect: ""} // auth implies auto-connect
+
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -82,6 +85,11 @@ var rootCmd = &cobra.Command{
 		}
 
 		client, tenantId = cli.Connect(server)
+
+		// Check if we are correctly logged in, but only if the command needs authorization
+		if _, ok := cmd.Annotations[authNeeded]; !ok {
+			return nil
+		}
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
@@ -134,18 +142,13 @@ var whoamiCmd = &cobra.Command{
 
 var generateCmd = &cobra.Command{
 	Use:         "generate",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"gen", "new", "init"},
 	Short:       "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
-		}
-
-		// check if we are properly connected / authenticated before asking the questions
-		if err := cli.CheckLogin(cmd.Context(), client); err != nil {
-			return err
 		}
 
 		var qs = []*survey.Question{
@@ -230,7 +233,7 @@ Generate will write files in the current folder. You can edit them and then depl
 
 var getServicesCmd = &cobra.Command{
 	Use:         "services",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"getServices", "ls", "list"},
 	Short:       "Get list of services on the cluster",
@@ -262,7 +265,7 @@ var getVersionCmd = &cobra.Command{
 
 var tailCmd = &cobra.Command{
 	Use:         "tail",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -291,7 +294,7 @@ var secretsCmd = &cobra.Command{
 
 var secretsSetCmd = &cobra.Command{
 	Use:         "set",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"add", "put"},
 	Short:       "Adds or updates a secret",
@@ -335,7 +338,7 @@ var secretsSetCmd = &cobra.Command{
 
 var secretsDeleteCmd = &cobra.Command{
 	Use:         "delete",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Deletes a secret",
@@ -359,7 +362,7 @@ var secretsDeleteCmd = &cobra.Command{
 
 var secretsListCmd = &cobra.Command{
 	Use:         "ls",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
 	Short:       "List secrets",
@@ -393,7 +396,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -422,7 +425,7 @@ var composeUpCmd = &cobra.Command{
 var composeStartCmd = &cobra.Command{
 	Use:         "start",
 	Aliases:     []string{"deploy"},
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -448,7 +451,7 @@ var composeStartCmd = &cobra.Command{
 var composeDownCmd = &cobra.Command{
 	Use:         "down",
 	Aliases:     []string{"stop", "rm"},
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Reads a docker-compose.yml file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -493,7 +496,7 @@ var composeConfigCmd = &cobra.Command{
 
 var deleteCmd = &cobra.Command{
 	Use:         "delete",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
@@ -527,7 +530,7 @@ var deleteCmd = &cobra.Command{
 var sendCmd = &cobra.Command{
 	Use:         "send",
 	Hidden:      true, // not available in private beta
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"msg", "message", "publish", "pub"},
 	Short:       "Send a message to a service",
@@ -544,7 +547,7 @@ var sendCmd = &cobra.Command{
 
 var tokenCmd = &cobra.Command{
 	Use:         "token",
-	Annotations: autoConnectAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Manage personal access tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
