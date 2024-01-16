@@ -11,16 +11,21 @@ import (
 )
 
 type GrpcClient struct {
-	client defangv1connect.FabricControllerClient
-	fabric string
+	client      defangv1connect.FabricControllerClient
+	fabric      string
+	accessToken string
 }
 
-func NewGrpcClient(client defangv1connect.FabricControllerClient, fabric string) *GrpcClient {
-	return &GrpcClient{client: client, fabric: fabric}
+func NewGrpcClient(client defangv1connect.FabricControllerClient, fabric, accessToken string) *GrpcClient {
+	return &GrpcClient{client: client, fabric: fabric, accessToken: accessToken}
 }
 
 func (g GrpcClient) GetFabric() string {
 	return g.fabric
+}
+
+func (g GrpcClient) GetAccessToken() string {
+	return g.accessToken
 }
 
 func getMsg[T any](resp *connect_go.Response[T], err error) (*T, error) {

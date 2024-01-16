@@ -28,11 +28,11 @@ func Connect(server string, provider client.Provider) (client.Client, pkg.Tenant
 	Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
 	Info(" * Connected to", host)
-	defangClient := client.NewGrpcClient(fabricClient, server)
+	defangClient := client.NewGrpcClient(fabricClient, server, accessToken)
 
 	if provider == client.ProviderAWS {
 		Debug(" - Using AWS provider")
-		byocClient := client.NewByocAWS(string(tenantId), "", defangClient, GetExistingToken) // TODO: custom domain
+		byocClient := client.NewByocAWS(string(tenantId), "", defangClient) // TODO: custom domain
 		return byocClient, pkg.TenantID(byocClient.StackID)
 	}
 

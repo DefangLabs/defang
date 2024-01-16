@@ -55,13 +55,11 @@ type byocAws struct {
 	privateLbIps  []string
 	publicNatIps  []string
 	albDnsName    string
-
-	getToken func() string
 }
 
 var _ Client = (*byocAws)(nil)
 
-func NewByocAWS(stackId, domain string, defClient *GrpcClient, getTokenFn func(string) string) *byocAws {
+func NewByocAWS(stackId, domain string, defClient *GrpcClient) *byocAws {
 	user := os.Getenv("USER") // TODO: sanitize; also, this won't work for shared stacks
 	if stackId == "" {
 		stackId = user
@@ -75,7 +73,6 @@ func NewByocAWS(stackId, domain string, defClient *GrpcClient, getTokenFn func(s
 		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
-		getToken: func() string { return getTokenFn(defClient.GetFabric()) },
 	}
 }
 
@@ -152,7 +149,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runCdTask(ctx, "npm", "start", "up", payloadString, b.GetFabric(), b.getToken())
+	}, b.runCdTask(ctx, "npm", "start", "up", payloadString, b.GetFabric(), b.GetAccessToken())
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
