@@ -38,9 +38,9 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-79-g1086708" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "bootstrap"           // must match the projectName in index.ts
-	cdTaskPrefix  = "cd-"                 // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion     = "v0.4.50-112-gf4733a6" // will cause issues if two clients with different versions are connected to the same stack
+	projectName   = "bootstrap"            // must match the projectName in index.ts
+	cdTaskPrefix  = "cd-"                  // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {

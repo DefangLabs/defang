@@ -1,6 +1,8 @@
 package cfn
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"strconv"
@@ -20,7 +22,25 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 )
 
-const createVpcResources = true
+const (
+	createVpcResources = true
+	maxCacheRepoLength = 20 // ECR pull-through cache rule prefix must be 1-20 characters long
+)
+
+var (
+	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
+	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
+)
+
+func getCacheRepoPrefix(prefix, suffix string) string {
+	repo := prefix + suffix
+	if len(repo) > maxCacheRepoLength {
+		// Cache repo name is too long; hash it and use the first 6 chars
+		hash := sha256.Sum256([]byte(prefix))
+		return hex.EncodeToString(hash[:])[:6] + "-" + suffix
+	}
+	return repo
+}
 
 func createTemplate(stack, image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
 	prefix := stack + "-"
@@ -78,35 +98,37 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 
 	const _pullThroughCache = "PullThroughCache"
 	const _privateRepoSecret = "PrivateRepoSecret"
+	// 5. ECR pull-through cache rules
+	// TODO: Creating pull through cache rules isn't supported in the following Regions:
+	// * China (Beijing) (cn-north-1)
+	// * China (Ningxia) (cn-northwest-1)
+	// * AWS GovCloud (US-East) (us-gov-east-1)
+	// * AWS GovCloud (US-West) (us-gov-west-1)
 	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
 		const _pullThroughCache = "PullThroughCache"
-		ecrPublicPrefix := prefix + "ecr-public"
+		ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
 
-		// 5. ECR pull-through cache (only really needed for images from ECR Public registry)
-		// TODO: Creating pull through cache rules isn't supported in the following Regions:
-		// * China (Beijing) (cn-north-1)
-		// * China (Ningxia) (cn-northwest-1)
-		// * AWS GovCloud (US-East) (us-gov-east-1)
-		// * AWS GovCloud (US-West) (us-gov-west-1)
+		// 5. The pull-through cache rule
 		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
 			EcrRepositoryPrefix: ptr.String(ecrPublicPrefix),
 			UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
 		}
 
 		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
-	} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok {
-		dockerPublicPrefix := prefix + "docker-public"
+	} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok && dockerHubUsername != "" && dockerHubAccessToken != "" {
+		dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
 
+		// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
+		// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
 		bytes, err := json.Marshal(struct {
 			Username    string `json:"username"`
 			AccessToken string `json:"accessToken"`
-		}{"defangio", os.Getenv("DOCKER_HUB_PASSWORD")}) // TODO: make this configurable
+		}{dockerHubUsername, dockerHubAccessToken})
 		if err != nil {
 			panic(err) // there's no reason this should ever fail
 		}
 
-		// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
-		// TODO: this is $0.40 per secret per month, so make it opt-in
+		// This is $0.40 per secret per month, so make it opt-in (only done when DOCKERHUB_* env vars are set)
 		template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
 			Tags:         defaultTags,
 			Description:  ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
@@ -114,12 +136,7 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 			SecretString: ptr.String(string(bytes)),
 		}
 
-		// 5b. ECR pull-through cache (only really needed for images from ECR Public registry)
-		// TODO: Creating pull through cache rules isn't supported in the following Regions:
-		// * China (Beijing) (cn-north-1)
-		// * China (Ningxia) (cn-northwest-1)
-		// * AWS GovCloud (US-East) (us-gov-east-1)
-		// * AWS GovCloud (US-West) (us-gov-west-1)
+		// 5b. The pull-through cache rule
 		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
 			EcrRepositoryPrefix: ptr.String(dockerPublicPrefix),
 			UpstreamRegistryUrl: ptr.String("registry-1.docker.io"),
@@ -129,9 +146,10 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + dockerPublicPrefix + repo)
 	} else {
 		// TODO: support pull through cache for other registries
+		// TODO: support private repos (with or without pull-through cache)
 	}
 
-	// 6a. IAM exec role for task
+	// 6. IAM roles for ECS task
 	assumeRolePolicyDocumentECS := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
@@ -148,6 +166,45 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 			},
 		},
 	}
+
+	// 6a. IAM exec role for task
+	execPolicies := []iam.Role_Policy{{
+		// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
+		PolicyName: "AllowECRPassThrough",
+		PolicyDocument: map[string]any{
+			"Version": "2012-10-17",
+			"Statement": []map[string]any{
+				{
+					"Effect": "Allow",
+					"Action": []string{
+						"ecr:CreatePullThroughCacheRule",
+						"ecr:BatchImportUpstreamImage", // should be registry permission instead
+						"ecr:CreateRepository",         // can be registry permission instead
+					},
+					"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
+				},
+			},
+		},
+	}}
+	if _, ok := template.Resources[_privateRepoSecret]; ok {
+		execPolicies = append(execPolicies, iam.Role_Policy{
+			PolicyName: "AllowGetRepoSecret",
+			PolicyDocument: map[string]any{
+				"Version": "2012-10-17",
+				"Statement": []map[string]any{
+					{
+						"Effect": "Allow",
+						"Action": []string{
+							"secretsmanager:GetSecretValue",
+							"ssm:GetParameters",
+							// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
+						},
+						"Resource": cloudformation.Ref(_privateRepoSecret),
+					},
+				},
+			},
+		})
+	}
 	const _executionRole = "ExecutionRole"
 	template.Resources[_executionRole] = &iam.Role{
 		Tags: defaultTags,
@@ -156,43 +213,7 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 			"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
 		},
 		AssumeRolePolicyDocument: assumeRolePolicyDocumentECS,
-		Policies: []iam.Role_Policy{
-			{
-				PolicyName: "AllowGetRepoSecret",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"secretsmanager:GetSecretValue",
-								"ssm:GetParameters",
-								// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
-							},
-							"Resource": cloudformation.Ref(_privateRepoSecret),
-						},
-					},
-				},
-			},
-			{
-				// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
-				PolicyName: "AllowECRPassThrough",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"ecr:CreatePullThroughCacheRule",
-								"ecr:BatchImportUpstreamImage", // should be registry permission instead
-								"ecr:CreateRepository",         // can be registry permission instead
-							},
-							"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
-						},
-					},
-				},
-			},
-		},
+		Policies:                 execPolicies,
 	}
 
 	// 6b. IAM role for task (optional)
