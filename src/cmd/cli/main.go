@@ -40,7 +40,6 @@ var (
 	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
 	nonInteractive bool   // set by the --non-interactive flag
 	server         string // set by the --cluster flag
-	provider       string // set by the --provider flag
 	tenantId       = pkg.DEFAULT_TENANT
 	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
@@ -86,7 +85,8 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		client, tenantId = cli.Connect(server, provider)
+		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
+		client, tenantId = cli.Connect(server, *provider)
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -102,7 +102,7 @@ var rootCmd = &cobra.Command{
 			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
 				return err
 			}
-			client, tenantId = cli.Connect(server, provider) // reconnect with the new token
+			client, tenantId = cli.Connect(server, *provider) // reconnect with the new token
 		}
 		return nil
 	},
@@ -604,9 +604,10 @@ var bootstrapRrefreshCmd = &cobra.Command{
 }
 
 func main() {
+	p := cliClient.ProviderDefang
 	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
-	rootCmd.PersistentFlags().StringVarP(&provider, "provider", "s", defProvider, "Service provider to connect to, use 'aws' for bring your own cloud")
+	rootCmd.PersistentFlags().VarP(&p, "provider", "p", "Service provider to connect to, use 'aws' for bring your own cloud")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
