@@ -292,5 +292,5 @@ message SubscribeResponse {
 }
 
 message DelegateSubdomainZoneRequest {
-  repeated string NameServerRecords = 1;
+  repeated string name_server_records = 1;
 }

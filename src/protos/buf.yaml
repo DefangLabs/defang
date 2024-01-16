@@ -1,0 +1,9 @@
+version: v1
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - BASIC # TODO: Should use `DEFAULT` rules, see: https://buf.build/docs/lint/rules#default
+      #rpc_allow_google_protobuf_empty_requests: true
+      #rpc_allow_google_protobuf_empty_responses: true
