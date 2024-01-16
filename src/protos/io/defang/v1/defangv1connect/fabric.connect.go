@@ -44,9 +44,6 @@ const (
 	FabricControllerGetVersionProcedure = "/io.defang.v1.FabricController/GetVersion"
 	// FabricControllerTokenProcedure is the fully-qualified name of the FabricController's Token RPC.
 	FabricControllerTokenProcedure = "/io.defang.v1.FabricController/Token"
-	// FabricControllerRefreshTokenProcedure is the fully-qualified name of the FabricController's
-	// RefreshToken RPC.
-	FabricControllerRefreshTokenProcedure = "/io.defang.v1.FabricController/RefreshToken"
 	// FabricControllerRevokeTokenProcedure is the fully-qualified name of the FabricController's
 	// RevokeToken RPC.
 	FabricControllerRevokeTokenProcedure = "/io.defang.v1.FabricController/RevokeToken"
@@ -87,6 +84,8 @@ const (
 	// FabricControllerDeleteSubdomainZoneProcedure is the fully-qualified name of the
 	// FabricController's DeleteSubdomainZone RPC.
 	FabricControllerDeleteSubdomainZoneProcedure = "/io.defang.v1.FabricController/DeleteSubdomainZone"
+	// FabricControllerWhoAmIProcedure is the fully-qualified name of the FabricController's WhoAmI RPC.
+	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -94,7 +93,6 @@ type FabricControllerClient interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
 	GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Version], error)
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
-	RefreshToken(context.Context, *connect_go.Request[v1.RefreshTokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error)
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
@@ -111,6 +109,7 @@ type FabricControllerClient interface {
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -136,11 +135,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		token: connect_go.NewClient[v1.TokenRequest, v1.TokenResponse](
 			httpClient,
 			baseURL+FabricControllerTokenProcedure,
-			opts...,
-		),
-		refreshToken: connect_go.NewClient[v1.RefreshTokenRequest, v1.TokenResponse](
-			httpClient,
-			baseURL+FabricControllerRefreshTokenProcedure,
 			opts...,
 		),
 		revokeToken: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
@@ -218,6 +212,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDeleteSubdomainZoneProcedure,
 			opts...,
 		),
+		whoAmI: connect_go.NewClient[emptypb.Empty, v1.WhoAmIResponse](
+			httpClient,
+			baseURL+FabricControllerWhoAmIProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -226,7 +225,6 @@ type fabricControllerClient struct {
 	getStatus             *connect_go.Client[emptypb.Empty, v1.Status]
 	getVersion            *connect_go.Client[emptypb.Empty, v1.Version]
 	token                 *connect_go.Client[v1.TokenRequest, v1.TokenResponse]
-	refreshToken          *connect_go.Client[v1.RefreshTokenRequest, v1.TokenResponse]
 	revokeToken           *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	tail                  *connect_go.Client[v1.TailRequest, v1.TailResponse]
 	update                *connect_go.Client[v1.Service, v1.ServiceInfo]
@@ -242,6 +240,7 @@ type fabricControllerClient struct {
 	createUploadURL       *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone *connect_go.Client[v1.DelegateSubdomainZoneRequest, emptypb.Empty]
 	deleteSubdomainZone   *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	whoAmI                *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -257,11 +256,6 @@ func (c *fabricControllerClient) GetVersion(ctx context.Context, req *connect_go
 // Token calls io.defang.v1.FabricController.Token.
 func (c *fabricControllerClient) Token(ctx context.Context, req *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error) {
 	return c.token.CallUnary(ctx, req)
-}
-
-// RefreshToken calls io.defang.v1.FabricController.RefreshToken.
-func (c *fabricControllerClient) RefreshToken(ctx context.Context, req *connect_go.Request[v1.RefreshTokenRequest]) (*connect_go.Response[v1.TokenResponse], error) {
-	return c.refreshToken.CallUnary(ctx, req)
 }
 
 // RevokeToken calls io.defang.v1.FabricController.RevokeToken.
@@ -339,12 +333,16 @@ func (c *fabricControllerClient) DeleteSubdomainZone(ctx context.Context, req *c
 	return c.deleteSubdomainZone.CallUnary(ctx, req)
 }
 
+// WhoAmI calls io.defang.v1.FabricController.WhoAmI.
+func (c *fabricControllerClient) WhoAmI(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
+	return c.whoAmI.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
 	GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Version], error)
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
-	RefreshToken(context.Context, *connect_go.Request[v1.RefreshTokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
@@ -361,6 +359,7 @@ type FabricControllerHandler interface {
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -382,11 +381,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerTokenHandler := connect_go.NewUnaryHandler(
 		FabricControllerTokenProcedure,
 		svc.Token,
-		opts...,
-	)
-	fabricControllerRefreshTokenHandler := connect_go.NewUnaryHandler(
-		FabricControllerRefreshTokenProcedure,
-		svc.RefreshToken,
 		opts...,
 	)
 	fabricControllerRevokeTokenHandler := connect_go.NewUnaryHandler(
@@ -464,6 +458,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.DeleteSubdomainZone,
 		opts...,
 	)
+	fabricControllerWhoAmIHandler := connect_go.NewUnaryHandler(
+		FabricControllerWhoAmIProcedure,
+		svc.WhoAmI,
+		opts...,
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -472,8 +471,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetVersionHandler.ServeHTTP(w, r)
 		case FabricControllerTokenProcedure:
 			fabricControllerTokenHandler.ServeHTTP(w, r)
-		case FabricControllerRefreshTokenProcedure:
-			fabricControllerRefreshTokenHandler.ServeHTTP(w, r)
 		case FabricControllerRevokeTokenProcedure:
 			fabricControllerRevokeTokenHandler.ServeHTTP(w, r)
 		case FabricControllerTailProcedure:
@@ -504,6 +501,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDelegateSubdomainZoneHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteSubdomainZoneProcedure:
 			fabricControllerDeleteSubdomainZoneHandler.ServeHTTP(w, r)
+		case FabricControllerWhoAmIProcedure:
+			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -523,10 +522,6 @@ func (UnimplementedFabricControllerHandler) GetVersion(context.Context, *connect
 
 func (UnimplementedFabricControllerHandler) Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Token is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) RefreshToken(context.Context, *connect_go.Request[v1.RefreshTokenRequest]) (*connect_go.Response[v1.TokenResponse], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.RefreshToken is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
@@ -587,4 +582,8 @@ func (UnimplementedFabricControllerHandler) DelegateSubdomainZone(context.Contex
 
 func (UnimplementedFabricControllerHandler) DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteSubdomainZone is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.WhoAmI is not implemented"))
 }

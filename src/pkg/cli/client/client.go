@@ -17,7 +17,6 @@ type Client interface {
 	GetStatus(context.Context) (*v1.Status, error)
 	GetVersion(context.Context) (*v1.Version, error)
 	Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error)
-	RefreshToken(context.Context, *v1.RefreshTokenRequest) (*v1.TokenResponse, error)
 	RevokeToken(context.Context) error
 	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
 	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
@@ -34,6 +33,8 @@ type Client interface {
 	PutSecret(context.Context, *v1.SecretValue) error
 	ListSecrets(context.Context) (*v1.Secrets, error)
 	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
+	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
 
 	GetFabric() string
+	GetAccessToken() string
 }

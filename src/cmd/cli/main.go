@@ -90,7 +90,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
-		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+		if _, err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -136,11 +136,8 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tenant, err := cli.Whoami(getServer(cmd))
+		tenant, err := cli.CheckLogin(cmd.Context(), client)
 		if err != nil {
-			return fmt.Errorf("failed to get current user: %w", err)
-		}
-		if err := cli.CheckLogin(cmd.Context(), client); err != nil {
 			return err
 		}
 		cli.Info(" * You are logged in as", tenant)
@@ -314,7 +311,7 @@ var secretsSetCmd = &cobra.Command{
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
-			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
+			if _, err := cli.CheckLogin(cmd.Context(), client); err != nil {
 				return err
 			}
 

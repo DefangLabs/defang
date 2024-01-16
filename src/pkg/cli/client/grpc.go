@@ -47,10 +47,6 @@ func (g GrpcClient) Token(ctx context.Context, req *v1.TokenRequest) (*v1.TokenR
 	return getMsg(g.client.Token(ctx, &connect_go.Request[v1.TokenRequest]{Msg: req}))
 }
 
-func (g GrpcClient) RefreshToken(ctx context.Context, req *v1.RefreshTokenRequest) (*v1.TokenResponse, error) {
-	return getMsg(g.client.RefreshToken(ctx, &connect_go.Request[v1.RefreshTokenRequest]{Msg: req}))
-}
-
 func (g GrpcClient) RevokeToken(ctx context.Context) error {
 	_, err := g.client.RevokeToken(ctx, &connect_go.Request[emptypb.Empty]{})
 	return err
@@ -111,6 +107,10 @@ func (g GrpcClient) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 
 func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, &connect_go.Request[v1.UploadURLRequest]{Msg: req}))
+}
+
+func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
+	return getMsg(g.client.WhoAmI(ctx, &connect_go.Request[emptypb.Empty]{}))
 }
 
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {

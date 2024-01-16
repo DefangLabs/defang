@@ -15,7 +15,6 @@ service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status);   // public
   rpc GetVersion(google.protobuf.Empty) returns (Version); // public
   rpc Token(TokenRequest) returns (TokenResponse);         // public
-  rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
@@ -38,6 +37,7 @@ service FabricController {
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (google.protobuf.Empty);
   rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
 }
 
 message DeployRequest {
@@ -103,11 +103,6 @@ message TokenRequest {
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
   // string refresh_token = 6;
-}
-
-message RefreshTokenRequest {
-  string tenant = 1;
-  string current_access_token = 2;
 }
 
 message TokenResponse {
@@ -293,4 +288,8 @@ message SubscribeResponse {
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
+}
+
+message WhoAmIResponse {
+  string tenant = 1;
 }
