@@ -33,15 +33,13 @@ import (
 //
 
 var (
-	client         cliClient.Client
-	clientId       = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
-	defFabric      = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
-	defProvider    = pkg.Getenv("DEFANG_PROVIDER", "defang")
-	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
-	nonInteractive bool   // set by the --non-interactive flag
-	server         string // set by the --cluster flag
-	tenantId       = pkg.DEFAULT_TENANT
-	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
+	client      cliClient.Client
+	clientId    = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
+	defFabric   = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
+	defProvider = pkg.Getenv("DEFANG_PROVIDER", "defang")
+	hasTty      = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
+	tenantId    = pkg.DEFAULT_TENANT
+	version     = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
@@ -76,14 +74,12 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("invalid color option: %s", color)
 		}
 
-		if _, _, err := net.SplitHostPort(server); err != nil {
-			server = server + ":443"
-		}
-
 		// Not all commands need a connection, so we should only connect when needed
 		if _, ok := cmd.Annotations[autoConnect]; !ok {
 			return nil
 		}
+
+		server := getServer(cmd)
 
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
 		client, tenantId = cli.Connect(server, *provider)
@@ -93,6 +89,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -108,13 +105,22 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func getServer(cmd *cobra.Command) string {
+	server, _ := cmd.Flags().GetString("cluster")
+	if _, _, err := net.SplitHostPort(server); err != nil {
+		server = server + ":443"
+	}
+	return server
+}
+
 var loginCmd = &cobra.Command{
 	Use:         "login",
 	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server)
+
+		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, getServer(cmd))
 		if err != nil {
 			return err
 		}
@@ -130,7 +136,7 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tenant, err := cli.Whoami(server)
+		tenant, err := cli.Whoami(getServer(cmd))
 		if err != nil {
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
@@ -149,6 +155,7 @@ var generateCmd = &cobra.Command{
 	Aliases:     []string{"gen", "new", "init"},
 	Short:       "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
 		}
@@ -304,6 +311,7 @@ var secretsSetCmd = &cobra.Command{
 		var name, _ = cmd.Flags().GetString("name")
 
 		var secret string
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
 			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
@@ -606,11 +614,11 @@ var bootstrapRrefreshCmd = &cobra.Command{
 func main() {
 	p := cliClient.ProviderDefang
 	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
-	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
+	rootCmd.PersistentFlags().StringP("cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().VarP(&p, "provider", "p", "Service provider to connect to, use 'aws' for bring your own cloud")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
-	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
+	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
@@ -775,9 +783,9 @@ func printDefangHint(hint, args string) {
 	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n", hint)
-	if rootCmd.PersistentFlags().Lookup("cluster").Changed {
-		cluster := strings.TrimSuffix(server, ":443")
-		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, cluster, args)
+	clusterFlag := rootCmd.PersistentFlags().Lookup("cluster")
+	if clusterFlag.Changed {
+		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, clusterFlag.Value.String(), args)
 	} else {
 		fmt.Printf("\n  %s %s\n\n", executable, args)
 	}
