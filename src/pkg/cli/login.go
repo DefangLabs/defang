@@ -10,6 +10,7 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 var (
@@ -49,7 +50,12 @@ func SplitTenantHost(fabric string) (pkg.TenantID, string) {
 
 func CheckLogin(ctx context.Context, client client.Client) error {
 	// TODO: create a proper rpc for this; or we can use a refresh token and use that to check
-	_, err := client.GetServices(ctx)
+	fabric := client.GetFabric()
+	tenant, _ := SplitTenantHost(fabric)
+	_, err := client.RefreshToken(ctx, &v1.RefreshTokenRequest{
+		Tenant:             tenant.String(),
+		CurrentAccessToken: GetExistingToken(fabric),
+	})
 	return err
 }
 

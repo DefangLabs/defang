@@ -44,6 +44,8 @@ const (
 )
 
 type byocAws struct {
+	*GrpcClient
+
 	driver        *cfn.AwsEcs
 	setupDone     bool
 	StackID       string // aka tenant
@@ -53,16 +55,19 @@ type byocAws struct {
 	privateLbIps  []string
 	publicNatIps  []string
 	albDnsName    string
+
+	getToken func() string
 }
 
 var _ Client = (*byocAws)(nil)
 
-func NewByocAWS(stackId, domain string) *byocAws {
+func NewByocAWS(stackId, domain string, defClient *GrpcClient, getTokenFn func(string) string) *byocAws {
 	user := os.Getenv("USER") // TODO: sanitize; also, this won't work for shared stacks
 	if stackId == "" {
 		stackId = user
 	}
 	return &byocAws{
+		GrpcClient:    defClient,
 		driver:        cfn.New(cdTaskPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
@@ -70,6 +75,7 @@ func NewByocAWS(stackId, domain string) *byocAws {
 		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
+		getToken: func() string { return getTokenFn(defClient.GetFabric()) },
 	}
 }
 
@@ -146,7 +152,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	}, b.runCdTask(ctx, "npm", "start", "up", payloadString, b.GetFabric(), b.getToken())
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
@@ -166,14 +172,6 @@ func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
 
 func (byocAws) GetVersion(context.Context) (*v1.Version, error) {
 	return &v1.Version{Fabric: cdVersion}, nil
-}
-
-func (byocAws) Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error) {
-	panic("not implemented: Token")
-}
-
-func (byocAws) RevokeToken(context.Context) error {
-	panic("not implemented: RevokeToken")
 }
 
 func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, error) {

@@ -12,10 +12,15 @@ import (
 
 type GrpcClient struct {
 	client defangv1connect.FabricControllerClient
+	fabric string
 }
 
-func NewGrpcClient(client defangv1connect.FabricControllerClient) *GrpcClient {
-	return &GrpcClient{client: client}
+func NewGrpcClient(client defangv1connect.FabricControllerClient, fabric string) *GrpcClient {
+	return &GrpcClient{client: client, fabric: fabric}
+}
+
+func (g GrpcClient) GetFabric() string {
+	return g.fabric
 }
 
 func getMsg[T any](resp *connect_go.Response[T], err error) (*T, error) {
@@ -35,6 +40,10 @@ func (g GrpcClient) GetVersion(ctx context.Context) (*v1.Version, error) {
 
 func (g GrpcClient) Token(ctx context.Context, req *v1.TokenRequest) (*v1.TokenResponse, error) {
 	return getMsg(g.client.Token(ctx, &connect_go.Request[v1.TokenRequest]{Msg: req}))
+}
+
+func (g GrpcClient) RefreshToken(ctx context.Context, req *v1.RefreshTokenRequest) (*v1.TokenResponse, error) {
+	return getMsg(g.client.RefreshToken(ctx, &connect_go.Request[v1.RefreshTokenRequest]{Msg: req}))
 }
 
 func (g GrpcClient) RevokeToken(ctx context.Context) error {

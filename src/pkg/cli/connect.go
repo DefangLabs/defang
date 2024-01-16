@@ -11,14 +11,8 @@ import (
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Connect(server string) (client.Client, pkg.TenantID) {
+func Connect(server, provider string) (client.Client, pkg.TenantID) {
 	tenantId, host := SplitTenantHost(server)
-
-	if host == "aws:443" {
-		Debug(" - Connecting to AWS")
-		byocClient := client.NewByocAWS(string(tenantId), "") // TODO: custom domain
-		return byocClient, pkg.TenantID(byocClient.StackID)
-	}
 
 	accessToken := GetExistingToken(server)
 	if accessToken != "" {
@@ -34,5 +28,13 @@ func Connect(server string) (client.Client, pkg.TenantID) {
 	Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
 	Info(" * Connected to", host)
-	return client.NewGrpcClient(fabricClient), tenantId
+	defClient := client.NewGrpcClient(fabricClient, server)
+
+	if provider == "aws" {
+		Debug(" - Using AWS provider")
+		byocClient := client.NewByocAWS(string(tenantId), "", defClient, GetExistingToken) // TODO: custom domain
+		return byocClient, pkg.TenantID(byocClient.StackID)
+	}
+
+	return defClient, tenantId
 }
