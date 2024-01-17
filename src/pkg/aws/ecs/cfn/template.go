@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	createVpcResources = true
-	maxCacheRepoLength = 20 // ECR pull-through cache rule prefix must be 1-20 characters long
+	createVpcResources   = true
+	maxCachePrefixLength = 20 // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 
 func getCacheRepoPrefix(prefix, suffix string) string {
 	repo := prefix + suffix
-	if len(repo) > maxCacheRepoLength {
+	if len(repo) > maxCachePrefixLength {
 		// Cache repo name is too long; hash it and use the first 6 chars
 		hash := sha256.Sum256([]byte(prefix))
 		return hex.EncodeToString(hash[:])[:6] + "-" + suffix

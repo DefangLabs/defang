@@ -29,8 +29,8 @@ func TestGetCacheRepoPrefix(t *testing.T) {
 		t.Run(tt.want, func(t *testing.T) {
 			if got := getCacheRepoPrefix(tt.prefix, tt.suffix); got != tt.want {
 				t.Errorf("getCacheRepoPrefix() = %q, want %q", got, tt.want)
-			} else if len(got) > maxCacheRepoLength {
-				t.Errorf("getCacheRepoPrefix() = %q, want length <= %v", got, maxCacheRepoLength)
+			} else if len(got) > maxCachePrefixLength {
+				t.Errorf("getCacheRepoPrefix() = %q, want length <= %v", got, maxCachePrefixLength)
 			}
 		})
 	}
