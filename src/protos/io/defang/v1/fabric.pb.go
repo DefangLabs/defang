@@ -1718,7 +1718,7 @@ type Service struct {
 	Name        string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Image       string            `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
 	Platform    Platform          `protobuf:"varint,3,opt,name=platform,proto3,enum=io.defang.v1.Platform" json:"platform,omitempty"`
-	Internal    bool              `protobuf:"varint,4,opt,name=internal,proto3" json:"internal,omitempty"` // true if service is internal TODO: not part of spec
+	Internal    bool              `protobuf:"varint,4,opt,name=internal,proto3" json:"internal,omitempty"` // true if service is internal; TODO: not part of spec
 	Deploy      *Deploy           `protobuf:"bytes,5,opt,name=deploy,proto3" json:"deploy,omitempty"`
 	Ports       []*Port           `protobuf:"bytes,6,rep,name=ports,proto3" json:"ports,omitempty"`
 	Environment map[string]string `protobuf:"bytes,7,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
