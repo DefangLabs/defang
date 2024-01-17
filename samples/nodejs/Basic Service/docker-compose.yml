@@ -3,7 +3,6 @@ services:
   service1:
     build:
       context: .
-      dockerfile: Dockerfile
     ports:
       - mode: ingress
         target: 3000
