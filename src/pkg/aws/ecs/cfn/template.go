@@ -150,7 +150,6 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 	}
 
 	// 6. IAM roles for ECS task
-	assumeRolePolicyDocumentECS := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
 			{
@@ -304,7 +303,7 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 			CidrBlock: ptr.String("10.0.0.0/16"),
 		}
 		vpcId = cloudformation.RefPtr(_vpc)
-		// 8b. an internet gateway
+		// 8b. an internet gateway; FIXME: make internet access optional
 		const _internetGateway = "InternetGateway"
 		template.Resources[_internetGateway] = &ec2.InternetGateway{
 			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "igw"}}, defaultTags...),
@@ -332,7 +331,7 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		const _subnet = "Subnet"
 		template.Resources[_subnet] = &ec2.Subnet{
 			Tags: append([]tags.Tag{{Key: "Name", Value: prefix + "subnet"}}, defaultTags...),
-			// AvailabilityZone: TODO: parse region suffix
+			// AvailabilityZone:; TODO: parse region suffix
 			CidrBlock:           ptr.String("10.0.0.0/20"),
 			VpcId:               cloudformation.Ref(_vpc),
 			MapPublicIpOnLaunch: ptr.Bool(true),
@@ -367,10 +366,10 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 				IpProtocol: "tcp",
 				FromPort:   ptr.Int(1),
 				ToPort:     ptr.Int(65535),
-				CidrIp:     ptr.String("0.0.0.0/0"), // from anywhere FIXME: make optional and/or restrict to "my ip"
+				CidrIp:     ptr.String("0.0.0.0/0"), // from anywhere; FIXME: make optional and/or restrict to "my ip"
 			},
 		},
-		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{ FIXME: add ability to restrict outbound traffic
+		// SecurityGroupEgress: []ec2.SecurityGroup_Egress{; FIXME: add ability to restrict outbound traffic
 		// 	{
 		// 		IpProtocol: "tcp",
 		// 		FromPort:   ptr.Int(1),

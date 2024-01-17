@@ -216,8 +216,8 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
-	// Upload the tarball to the fabric controller storage TODO: use a streaming API
+func uploadTarball(ctx context.Context, client client.Client, body io.Readerer, digest string) (string, error) {
+	// Upload the tarball to the fabric controller storage; TODO: use a streaming API
 	ureq := &pb.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {

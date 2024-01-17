@@ -74,13 +74,13 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		Overrides: &types.TaskOverride{
 			// Cpu:   ptr.String("256"),
 			// Memory: ptr.String("512"),
-			// TaskRoleArn: cred.Arn, TODO: default to caller identity; needs trust + iam:PassRole
+			// TaskRoleArn: cred.Arn; TODO: default to caller identity; needs trust + iam:PassRole
 			ContainerOverrides: []types.ContainerOverride{
 				{
 					Name:        ptr.String(ContainerName),
 					Command:     cmd,
 					Environment: pairs,
-					// ResourceRequirements: TODO: make configurable, support GPUs
+					// ResourceRequirements:; TODO: make configurable, support GPUs
 					// EnvironmentFiles: ,
 				},
 			},

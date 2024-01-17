@@ -199,7 +199,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 	//
 	var services []*pb.Service
 	for _, svccfg := range project.Services {
-		// Upload the build context, if any. TODO: parallelize
+		// Upload the build context, if any; TODO: parallelize
 		var build *pb.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
@@ -230,7 +230,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		var healthcheck *pb.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
 			// if svccfg.HealthCheck.Test[0] == "CMD-SHELL" && len(svccfg.HealthCheck.Test) == 2 {
-			// 	// Convert CMD_SHELL to CMD TODO: handle shell quotes and escapes
+			// 	// Convert CMD_SHELL to CMD; TODO: handle shell quotes and escapes
 			// 	svccfg.HealthCheck.Test = append([]string{"CMD"}, strings.Split(svccfg.HealthCheck.Test[1], " ")...)
 			// }
 			healthcheck = &pb.HealthCheck{

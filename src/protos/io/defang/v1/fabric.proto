@@ -254,7 +254,7 @@ message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal TODO: not part of spec
+  bool internal = 4; // true if service is internal; TODO: not part of spec
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;

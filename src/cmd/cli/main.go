@@ -631,7 +631,7 @@ func main() {
 	rootCmd.AddCommand(tokenCmd)
 
 	// Login Command
-	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in") TODO: Implement this
+	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in"); TODO: Implement this
 	rootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
@@ -666,12 +666,12 @@ func main() {
 	// Compose Command
 	composeCmd.PersistentFlags().StringP("file", "f", "docker-compose.yml", "Compose file path")
 	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
-	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode") TODO: Implement compose option
-	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file.") TODO: Implement compose option
-	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)") TODO: Implement compose option
-	// composeCmd.Flags().String("profile", "", "Specify a profile to enable") TODO: Implement compose option
-	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory") TODO: Implement compose option
-	// composeCmd.Flags().StringP("project", "p", "", "Compose project name") TODO: Implement compose option
+	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
+	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
+	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
+	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
+	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
+	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeUpCmd)
