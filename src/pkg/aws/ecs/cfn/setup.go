@@ -174,7 +174,7 @@ func (a *AwsEcs) fillWithOutputs(ctx context.Context, dso *cloudformation.Descri
 				a.SecurityGroupID = *output.OutputValue
 			case outputs.BucketName:
 				a.BucketName = *output.OutputValue
-				// default: TODO: should do this but only for stack the driver created
+				// default:; TODO: should do this but only for stack the driver created
 				// 	return fmt.Errorf("unknown output key %q", *output.OutputKey)
 			}
 		}

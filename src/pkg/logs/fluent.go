@@ -16,6 +16,6 @@ type FirelensMessage struct {
 	Tag               string `json:"tag,omitempty"`                 // added by NATS output filter
 	Etag              string `json:"etag,omitempty"`                // added by us
 	Host              string `json:"host,omitempty"`                // added by us
-	Service           string `json:"service,omitempty"`             // added by us (for label) TODO: deprecated
+	Service           string `json:"service,omitempty"`             // added by us (for label); TODO: deprecated
 	Tenant            string `json:"tenant,omitempty"`              // added by us; TODO: deprecated
 }

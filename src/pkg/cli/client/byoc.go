@@ -38,7 +38,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-112-gf4733a6" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion     = "v0.4.50-116-g7a8e090" // will cause issues if two clients with different versions are connected to the same stack
 	projectName   = "bootstrap"            // must match the projectName in index.ts
 	cdTaskPrefix  = "cd-"                  // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -186,7 +186,7 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 
 func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
-		// "AWS_REGION":               b.driver.Region.String(), TODO: this should be the destination region, not the CD region
+		// "AWS_REGION":               b.driver.Region.String(); TODO: this should be the destination region, not the CD region
 		"DOMAIN":                   b.customDomain,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
 		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
@@ -612,7 +612,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
 			log.Printf("CNAME %q does not point to %q\n", service.Domainname, si.PublicFqdn) // TODO: avoid `log` in CLI
-			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)) FIXME: circular dependency // CodeFailedPrecondition
+			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)); FIXME: circular dependency // CodeFailedPrecondition
 		}
 	}
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now

@@ -29,7 +29,7 @@ func (a *AwsEcs) CreateUploadURL(ctx context.Context, name string) (string, erro
 		}
 		// Sanitize the digest so it's safe to use as a file name
 		name = s3InvalidCharsRegexp.ReplaceAllString(name, "_")
-		// name = path.Join(buildsPath, tenantId.String(), digest) TODO: avoid collisions between tenants
+		// name = path.Join(buildsPath, tenantId.String(), digest); TODO: avoid collisions between tenants
 	}
 
 	s3Client := s3.NewFromConfig(cfg)

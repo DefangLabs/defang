@@ -57,7 +57,7 @@ func (g GrpcClient) Update(ctx context.Context, req *v1.Service) (*v1.ServiceInf
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
-	// return getMsg(g.client.Deploy(ctx, &connect_go.Request[v1.DeployRequest]{Msg: req})) TODO: implement this
+	// return getMsg(g.client.Deploy(ctx, &connect_go.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
 	var serviceInfos []*v1.ServiceInfo
 	for _, service := range req.Services {
 		// Info(" * Publishing service update for", service.Name)

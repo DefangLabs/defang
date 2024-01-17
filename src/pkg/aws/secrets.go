@@ -110,7 +110,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 	svc := ssm.NewFromConfig(cfg)
 
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		// MaxResults: ptr.Int64(10), TODO: limit the output depending on quotas
+		// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
 		ParameterFilters: []types.ParameterStringFilter{
 			{
 				Key:    ptr.String("Name"),
