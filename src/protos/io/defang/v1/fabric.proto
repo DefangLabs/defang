@@ -65,6 +65,8 @@ message ServiceInfo {
   repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;
