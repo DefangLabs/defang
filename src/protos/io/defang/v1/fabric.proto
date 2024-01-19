@@ -229,10 +229,11 @@ message Build {
 
 message HealthCheck {
   repeated string test = 1;
-  // float interval = 2;
-  // float timeout = 3;
-  // uint32 retries = 4;
-  // float start_period = 5;
+  uint32 interval = 2; // in seconds
+  uint32 timeout = 3; // in seconds; must be less than interval
+  uint32 retries = 4;
+  // uint32 start_period = 5;
+  // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;
 }
 
