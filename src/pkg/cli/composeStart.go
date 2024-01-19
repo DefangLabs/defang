@@ -171,7 +171,8 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				}
 				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
-			if interval <= timeout || timeout <= 0 {
+			// Technically this should test for <= but both interval and timeout have 30s as the default value
+			if interval < timeout || timeout <= 0 {
 				return nil, &ComposeError{fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)}
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
