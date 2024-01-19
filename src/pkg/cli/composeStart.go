@@ -156,18 +156,29 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
 			}
 		}
-		if svccfg.HealthCheck != nil {
+		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {
+			timeout := 30 // default per compose spec
 			if svccfg.HealthCheck.Timeout != nil {
-				logrus.Warn("unsupported compose directive: healthcheck timeout")
+				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
+					logrus.Warn("healthcheck timeout must be a multiple of 1s")
+				}
+				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
+			interval := 30 // default per compose spec
 			if svccfg.HealthCheck.Interval != nil {
-				logrus.Warn("unsupported compose directive: healthcheck interval")
+				if *svccfg.HealthCheck.Interval%1e9 != 0 {
+					logrus.Warn("healthcheck interval must be a multiple of 1s")
+				}
+				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
-			if svccfg.HealthCheck.Retries != nil {
-				logrus.Warn("unsupported compose directive: healthcheck retries")
+			if interval <= timeout || timeout <= 0 {
+				return nil, &ComposeError{fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)}
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_period")
+			}
+			if svccfg.HealthCheck.StartInterval != nil {
+				logrus.Warn("unsupported compose directive: healthcheck start_interval")
 			}
 		}
 		if svccfg.Deploy != nil {
@@ -204,7 +215,15 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
 			healthcheck = &pb.HealthCheck{
 				Test: svccfg.HealthCheck.Test,
-				// TODO: add the other healthcheck parameters
+			}
+			if nil != svccfg.HealthCheck.Interval {
+				healthcheck.Interval = uint32(*svccfg.HealthCheck.Interval / 1e9)
+			}
+			if nil != svccfg.HealthCheck.Timeout {
+				healthcheck.Timeout = uint32(*svccfg.HealthCheck.Timeout / 1e9)
+			}
+			if nil != svccfg.HealthCheck.Retries {
+				healthcheck.Retries = uint32(*svccfg.HealthCheck.Retries)
 			}
 		}
 
