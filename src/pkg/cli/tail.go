@@ -84,7 +84,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 	if service != "" {
 		service = NormalizeServiceName(service)
-		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
 		if _, err := client.Get(ctx, &pb.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:

@@ -10,9 +10,12 @@ services:
       - fileName.env
     ports:
       - target: 80
-        mode: host
+        mode: ingress
     secrets:
       - dummy
+    healthcheck:
+      test: ["NONE"]
+      disable: true
 
   # dfnx:
   #   build:

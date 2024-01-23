@@ -150,6 +150,7 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 	}
 
 	// 6. IAM roles for ECS task
+	assumeRolePolicyDocumentECS := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
 			{
