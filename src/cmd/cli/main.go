@@ -63,16 +63,16 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		color, _ := cmd.Flags().GetString("color")
-		switch color {
-		case "auto":
+		color := cmd.Flag("color").Value.(*ColorMode)
+		switch *color {
+		case ColorAuto:
 			cli.DoColor = cli.CanColor
-		case "always":
+		case ColorAlways:
 			cli.DoColor = true
-		case "never":
+		case ColorNone:
 			cli.DoColor = false
 		default:
-			return fmt.Errorf("invalid color option: %s", color)
+			panic("invalid color mode")
 		}
 
 		if _, _, err := net.SplitHostPort(server); err != nil {
@@ -575,7 +575,8 @@ var logoutCmd = &cobra.Command{
 }
 
 func main() {
-	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
+	colorMode := ColorAuto
+	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
@@ -623,7 +624,7 @@ func main() {
 	rootCmd.AddCommand(secretsCmd)
 
 	// Compose Command
-	composeCmd.PersistentFlags().StringP("file", "f", "docker-compose.yml", "Compose file path")
+	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
 	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
@@ -684,7 +685,7 @@ func main() {
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
-			composeFile := composeCmd.PersistentFlags().Lookup("file")
+			composeFile := composeCmd.Flag("file")
 			if composeFile.Changed {
 				compose += " -f " + composeFile.Value.String()
 			}
