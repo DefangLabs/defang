@@ -33,4 +33,8 @@ type Client interface {
 	PutSecret(context.Context, *v1.SecretValue) error
 	ListSecrets(context.Context) (*v1.Secrets, error)
 	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
+	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
+
+	GetFabric() string
+	GetAccessToken() string
 }

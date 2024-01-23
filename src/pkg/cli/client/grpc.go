@@ -11,11 +11,21 @@ import (
 )
 
 type GrpcClient struct {
-	client defangv1connect.FabricControllerClient
+	client      defangv1connect.FabricControllerClient
+	fabric      string
+	accessToken string
 }
 
-func NewGrpcClient(client defangv1connect.FabricControllerClient) *GrpcClient {
-	return &GrpcClient{client: client}
+func NewGrpcClient(client defangv1connect.FabricControllerClient, fabric, accessToken string) *GrpcClient {
+	return &GrpcClient{client: client, fabric: fabric, accessToken: accessToken}
+}
+
+func (g GrpcClient) GetFabric() string {
+	return g.fabric
+}
+
+func (g GrpcClient) GetAccessToken() string {
+	return g.accessToken
 }
 
 func getMsg[T any](resp *connect_go.Response[T], err error) (*T, error) {
@@ -97,6 +107,10 @@ func (g GrpcClient) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 
 func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, &connect_go.Request[v1.UploadURLRequest]{Msg: req}))
+}
+
+func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
+	return getMsg(g.client.WhoAmI(ctx, &connect_go.Request[emptypb.Empty]{}))
 }
 
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {

@@ -47,10 +47,9 @@ func SplitTenantHost(fabric string) (pkg.TenantID, string) {
 	return pkg.DEFAULT_TENANT, fabric
 }
 
-func CheckLogin(ctx context.Context, client client.Client) error {
-	// TODO: create a proper rpc for this; or we can use a refresh token and use that to check
-	_, err := client.GetServices(ctx)
-	return err
+func CheckLogin(ctx context.Context, client client.Client) (string, error) {
+	resp, err := client.WhoAmI(ctx)
+	return resp.Tenant, err
 }
 
 func Login(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
