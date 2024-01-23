@@ -59,13 +59,13 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		color, _ := cmd.Flags().GetString("color")
-		switch color {
-		case "auto":
+		color := cmd.Flag("color").Value.(*ColorMode)
+		switch *color {
+		case ColorAuto:
 			cli.DoColor = cli.CanColor
-		case "always":
+		case ColorAlways:
 			cli.DoColor = true
-		case "never":
+		case ColorNone:
 			cli.DoColor = false
 		default:
 			return fmt.Errorf("invalid color option: %s", color)
@@ -611,7 +611,8 @@ func main() {
 	hasTty := term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "defang"))
 
-	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
+	colorMode := ColorAuto
+	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", "Service provider to connect to, use 'aws' for bring-your-own-cloud")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
@@ -665,7 +666,7 @@ func main() {
 	rootCmd.AddCommand(secretsCmd)
 
 	// Compose Command
-	composeCmd.PersistentFlags().StringP("file", "f", "docker-compose.yml", "Compose file path")
+	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
 	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
@@ -726,7 +727,7 @@ func main() {
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
-			fileFlag := composeCmd.PersistentFlags().Lookup("file")
+			fileFlag := composeCmd.Flag("file")
 			if fileFlag.Changed {
 				compose += " -f " + fileFlag.Value.String()
 			}

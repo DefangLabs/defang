@@ -93,6 +93,13 @@ func convertPlatform(platform string) pb.Platform {
 }
 
 func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
+	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
+	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
+	if files, _ := filepath.Glob(filePath); len(files) > 1 {
+		return nil, fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+	} else if len(files) == 1 {
+		filePath = files[0]
+	}
 	Debug(" - Loading compose file", filePath, "for project", projectName)
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
