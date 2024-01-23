@@ -27,7 +27,7 @@ func (p Provider) String() string {
 
 func (p *Provider) Set(str string) error {
 	if provider, ok := providerMap[str]; ok {
-		p = &provider
+		*p = provider
 		return nil
 	}
 
