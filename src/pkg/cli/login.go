@@ -47,9 +47,15 @@ func SplitTenantHost(fabric string) (pkg.TenantID, string) {
 	return pkg.DEFAULT_TENANT, fabric
 }
 
-func CheckLogin(ctx context.Context, client client.Client) (string, error) {
-	resp, err := client.WhoAmI(ctx)
-	return resp.Tenant, err
+func CheckLogin(ctx context.Context, client client.Client) error {
+	// TODO: use WhoAmI instead of GetServices
+	// resp, err := client.WhoAmI(ctx)
+	// if err != nil {
+	// 	return "", err
+	// }
+	// return resp.Tenant, nil
+	_, err := client.GetServices(ctx)
+	return err
 }
 
 func Login(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {

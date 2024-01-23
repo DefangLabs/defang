@@ -18,7 +18,7 @@ func Connect(server string, provider client.Provider) (client.Client, pkg.Tenant
 	if accessToken != "" {
 		tenantId, _ = TenantFromAccessToken(accessToken)
 	}
-	Debug(" - Using tenant", tenantId, "for server", server)
+	Debug(" - Using tenant", tenantId, "for server", server, "and provider", provider)
 
 	baseUrl := "http://"
 	if strings.HasSuffix(server, ":443") {

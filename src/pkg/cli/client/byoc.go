@@ -38,7 +38,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-116-g7a8e090" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion     = "v0.4.50-146-g8b57e51" // will cause issues if two clients with different versions are connected to the same stack
 	projectName   = "bootstrap"            // must match the projectName in index.ts
 	cdTaskPrefix  = "cd-"                  // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -153,17 +153,24 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
+	return &v1.Status{
+		Version: cdVersion,
+	}, nil
+}
+
+func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 	// Use STS to get the account ID
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, annotateAwsError(err)
 	}
-	_, err = sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		return nil, err
+		return nil, annotateAwsError(err)
 	}
-	return &v1.Status{
-		Version: cdVersion,
+	_ = identity // TODO: use this to get the account ID
+	return &v1.WhoAmIResponse{
+		Tenant: b.StackID,
 	}, nil
 }
 

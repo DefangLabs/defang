@@ -33,13 +33,10 @@ import (
 //
 
 var (
-	client      cliClient.Client
-	clientId    = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
-	defFabric   = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
-	defProvider = pkg.Getenv("DEFANG_PROVIDER", "defang")
-	hasTty      = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
-	tenantId    = pkg.DEFAULT_TENANT
-	version     = "development" // overwritten by build script -ldflags "-X main.version=..."
+	client   cliClient.Client
+	clientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
+	tenantId = pkg.DEFAULT_TENANT
+	version  = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
@@ -90,7 +87,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
-		if _, err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -136,7 +133,8 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tenant, err := cli.CheckLogin(cmd.Context(), client)
+		server := getServer(cmd)
+		tenant, err := cli.Whoami(server)
 		if err != nil {
 			return err
 		}
@@ -311,7 +309,7 @@ var secretsSetCmd = &cobra.Command{
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
-			if _, err := cli.CheckLogin(cmd.Context(), client); err != nil {
+			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
 				return err
 			}
 
@@ -609,10 +607,13 @@ var bootstrapRrefreshCmd = &cobra.Command{
 }
 
 func main() {
-	p := cliClient.ProviderDefang
+	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
+	hasTty := term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
+	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "defang"))
+
 	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
-	rootCmd.PersistentFlags().StringP("cluster", "s", defFabric, "Cluster to connect to")
-	rootCmd.PersistentFlags().VarP(&p, "provider", "p", "Service provider to connect to, use 'aws' for bring your own cloud")
+	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Cluster to connect to")
+	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", "Service provider to connect to, use 'aws' for bring-your-own-cloud")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")

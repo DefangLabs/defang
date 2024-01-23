@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocAWS("ten ant", "")
+	b := NewByocAWS("ten ant", "", nil)
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		_, err := b.Deploy(context.TODO(), &v1.DeployRequest{
@@ -35,7 +35,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocAWS("TestTail", "")
+	b := NewByocAWS("TestTail", "", nil)
 
 	ss, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
@@ -61,7 +61,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocAWS("TestGetServices", "")
+	b := NewByocAWS("TestGetServices", "", nil)
 
 	services, err := b.GetServices(context.TODO())
 	if err != nil {
@@ -79,7 +79,7 @@ func TestGetServices(t *testing.T) {
 
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
-	b := NewByocAWS("TestPutSecret", "")
+	b := NewByocAWS("TestPutSecret", "", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
 		err := b.PutSecret(context.TODO(), &v1.SecretValue{Name: secretName})
@@ -122,7 +122,7 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByocAWS("TestListSecrets", "")
+	b := NewByocAWS("TestListSecrets", "", nil)
 
 	t.Run("list", func(t *testing.T) {
 		secrets, err := b.ListSecrets(context.TODO())
