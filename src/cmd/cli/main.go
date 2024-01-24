@@ -17,6 +17,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 	"golang.org/x/term"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -43,6 +44,12 @@ var (
 	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
+const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
+var autoConnectAnnotation = map[string]string{autoConnect: ""}
+
+const authNeeded = "auth-needed"                                              // annotation to indicate that a command needs authorization
+var authNeededAnnotation = map[string]string{authNeeded: "", autoConnect: ""} // auth implies auto-connect
+
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -50,40 +57,57 @@ var rootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		cd, _ := cmd.Flags().GetString("cwd")
+		if cd != "" {
+			if err := os.Chdir(cd); err != nil {
+				return err
+			}
+		}
+
+		color := cmd.Flag("color").Value.(*ColorMode)
+		switch *color {
+		case ColorAlways:
+			cli.DoColor = true
+		case ColorNone:
+			cli.DoColor = false
+		}
+
 		if _, _, err := net.SplitHostPort(server); err != nil {
 			server = server + ":443"
 		}
 
-		color, _ := cmd.Flags().GetString("color")
-		switch color {
-		case "auto":
-			cli.DoColor = cli.CanColor
-		case "always":
-			cli.DoColor = true
-		case "never":
-			cli.DoColor = false
-		default:
-			return fmt.Errorf("invalid color option: %s", color)
+		// Not all commands need a connection, so we should only connect when needed
+		if _, ok := cmd.Annotations[autoConnect]; !ok {
+			return nil
 		}
 
-		// TODO: not all commands need a connection, so we should only connect when needed
-		client = cli.Connect(server)
+		client, tenantId = cli.Connect(server)
+
+		// Check if we are correctly logged in, but only if the command needs authorization
+		if _, ok := cmd.Annotations[authNeeded]; !ok {
+			return nil
+		}
 
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+			// Login now; only do this for authorization-related errors
+			if connect.CodeOf(err) != connect.CodeUnauthenticated {
+				return err
+			}
 			cli.Warn(" !", err)
 			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
 				return err
 			}
-			client = cli.Connect(server) // reconnect with the new token
+			client, tenantId = cli.Connect(server) // reconnect with the new token
 		}
 		return nil
 	},
 }
 
 var loginCmd = &cobra.Command{
-	Use:   "login",
-	Args:  cobra.NoArgs,
-	Short: "Authenticate to the Defang cluster",
+	Use:         "login",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server)
 		if err != nil {
@@ -96,9 +120,10 @@ var loginCmd = &cobra.Command{
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Args:  cobra.NoArgs,
-	Short: "Show the current user",
+	Use:         "whoami",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tenant, err := cli.Whoami(server)
 		if err != nil {
@@ -113,18 +138,14 @@ var whoamiCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:     "generate",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"gen", "new", "init"},
-	Short:   "Generate a sample Defang project in the current folder",
+	Use:         "generate",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"gen", "new", "init"},
+	Short:       "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
-		}
-
-		// check if we are properly connected / authenticated before asking the questions
-		if err := cli.CheckLogin(cmd.Context(), client); err != nil {
-			return err
 		}
 
 		var qs = []*survey.Question{
@@ -208,10 +229,11 @@ Generate will write files in the current folder. You can edit them and then depl
 }
 
 var getServicesCmd = &cobra.Command{
-	Use:     "services",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"getServices", "ls", "list"},
-	Short:   "Get list of services on the cluster",
+	Use:         "services",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"getServices", "ls", "list"},
+	Short:       "Get list of services on the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.GetServices(cmd.Context(), client)
 		if err != nil {
@@ -223,24 +245,31 @@ var getServicesCmd = &cobra.Command{
 }
 
 var getVersionCmd = &cobra.Command{
-	Use:     "version",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
-	Short:   "Get version information for the CLI and Fabric service",
+	Use:         "version",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"ver", "stat", "status"}, // for backwards compatibility
+	Short:       "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
 		fmt.Println(version)
-		cli.Print(cli.BrightCyan, "Defang Fabric: ")
-		ver, err := cli.GetVersion(cmd.Context(), client)
+
+		cli.Print(cli.BrightCyan, "Latest CLI:    ")
+		ver, err := GetLatestVersion(cmd.Context())
 		fmt.Println(ver)
-		return err
+
+		cli.Print(cli.BrightCyan, "Defang Fabric: ")
+		ver, err2 := cli.GetVersion(cmd.Context(), client)
+		fmt.Println(ver)
+		return errors.Join(err, err2)
 	},
 }
 
 var tailCmd = &cobra.Command{
-	Use:   "tail",
-	Args:  cobra.NoArgs,
-	Short: "Tail logs from one or more services",
+	Use:         "tail",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 		var etag, _ = cmd.Flags().GetString("etag")
@@ -266,10 +295,11 @@ var secretsCmd = &cobra.Command{
 }
 
 var secretsSetCmd = &cobra.Command{
-	Use:     "set",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"add", "put"},
-	Short:   "Adds or updates a secret",
+	Use:         "set",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"add", "put"},
+	Short:       "Adds or updates a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 
@@ -309,10 +339,11 @@ var secretsSetCmd = &cobra.Command{
 }
 
 var secretsDeleteCmd = &cobra.Command{
-	Use:     "delete",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"del", "rm", "remove"},
-	Short:   "Deletes a secret",
+	Use:         "delete",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"del", "rm", "remove"},
+	Short:       "Deletes a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 
@@ -332,10 +363,11 @@ var secretsDeleteCmd = &cobra.Command{
 }
 
 var secretsListCmd = &cobra.Command{
-	Use:     "ls",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"list"},
-	Short:   "List secrets",
+	Use:         "ls",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"list"},
+	Short:       "List secrets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.SecretsList(cmd.Context(), client)
 	},
@@ -365,9 +397,10 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 }
 
 var composeUpCmd = &cobra.Command{
-	Use:   "up",
-	Args:  cobra.NoArgs,
-	Short: "Like 'start' but immediately tracks the progress of the deployment",
+	Use:         "up",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -392,10 +425,11 @@ var composeUpCmd = &cobra.Command{
 }
 
 var composeStartCmd = &cobra.Command{
-	Use:     "start",
-	Aliases: []string{"deploy"},
-	Args:    cobra.NoArgs,
-	Short:   "Reads a docker-compose.yml file and deploys services to the cluster",
+	Use:         "start",
+	Aliases:     []string{"deploy"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Reads a docker-compose.yml file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -417,10 +451,11 @@ var composeStartCmd = &cobra.Command{
 }
 
 var composeDownCmd = &cobra.Command{
-	Use:     "down",
-	Aliases: []string{"stop", "rm"},
-	Args:    cobra.NoArgs,
-	Short:   "Reads a docker-compose.yml file and deletes services from the cluster",
+	Use:         "down",
+	Aliases:     []string{"stop", "rm"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Reads a docker-compose.yml file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var tail, _ = cmd.Flags().GetBool("tail")
@@ -462,10 +497,11 @@ var composeConfigCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:     "delete",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"del", "rm", "remove"},
-	Short:   "Delete a service from the cluster",
+	Use:         "delete",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"del", "rm", "remove"},
+	Short:       "Delete a service from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 		var tail, _ = cmd.Flags().GetBool("tail")
@@ -494,11 +530,12 @@ var deleteCmd = &cobra.Command{
 }
 
 var sendCmd = &cobra.Command{
-	Use:     "send",
-	Hidden:  true, // not available in private beta
-	Args:    cobra.NoArgs,
-	Aliases: []string{"msg", "message", "publish", "pub"},
-	Short:   "Send a message to a service",
+	Use:         "send",
+	Hidden:      true, // not available in private beta
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"msg", "message", "publish", "pub"},
+	Short:       "Send a message to a service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var id, _ = cmd.Flags().GetString("id")
 		var _type, _ = cmd.Flags().GetString("type")
@@ -511,9 +548,10 @@ var sendCmd = &cobra.Command{
 }
 
 var tokenCmd = &cobra.Command{
-	Use:   "token",
-	Args:  cobra.NoArgs,
-	Short: "Manage personal access tokens",
+	Use:         "token",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Manage personal access tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
@@ -523,11 +561,12 @@ var tokenCmd = &cobra.Command{
 	},
 }
 
-var logout = &cobra.Command{
-	Use:     "logout",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"logoff", "revoke"},
-	Short:   "Log out",
+var logoutCmd = &cobra.Command{
+	Use:         "logout",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"logoff", "revoke"},
+	Short:       "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
@@ -538,12 +577,13 @@ var logout = &cobra.Command{
 }
 
 func main() {
-	rootCmd.PersistentFlags().String("color", "auto", `Colorize output; "auto", "always" or "never"`)
+	colorMode := ColorAuto
+	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
-	// rootCmd.PersistentFlags().StringP("context", "C", "", "Change the context directory")
+	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Token command
@@ -553,14 +593,14 @@ func main() {
 	rootCmd.AddCommand(tokenCmd)
 
 	// Login Command
-	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in") TODO: Implement this
+	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in"); TODO: Implement this
 	rootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
 	rootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
-	rootCmd.AddCommand(logout)
+	rootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
 	//generateCmd.Flags().StringP("name", "n", "service1", "Name of the service")
@@ -586,14 +626,14 @@ func main() {
 	rootCmd.AddCommand(secretsCmd)
 
 	// Compose Command
-	composeCmd.PersistentFlags().StringP("file", "f", "docker-compose.yml", "Compose file path")
+	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
-	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode") TODO: Implement compose option
-	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file.") TODO: Implement compose option
-	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)") TODO: Implement compose option
-	// composeCmd.Flags().String("profile", "", "Specify a profile to enable") TODO: Implement compose option
-	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory") TODO: Implement compose option
-	// composeCmd.Flags().StringP("project", "p", "", "Compose project name") TODO: Implement compose option
+	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
+	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
+	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
+	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
+	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
+	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeUpCmd)
@@ -647,7 +687,7 @@ func main() {
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
-			composeFile := composeCmd.PersistentFlags().Lookup("file")
+			composeFile := composeCmd.Flag("file")
 			if composeFile.Changed {
 				compose += " -f " + composeFile.Value.String()
 			}
@@ -667,7 +707,14 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
+
 		os.Exit(int(code))
+	}
+
+	if !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
+		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(version, ver) < 0 {
+			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+		}
 	}
 }
 
@@ -695,7 +742,7 @@ func prettyExecutable(def string) string {
 }
 
 func printDefangHint(hint, args string) {
-	if pkg.GetenvBool("DEFANG_HIDE_HINTS") {
+	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !hasTty {
 		return
 	}
 

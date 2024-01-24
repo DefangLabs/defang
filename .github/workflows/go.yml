@@ -2,8 +2,13 @@ name: Go package
 
 on:
   push:
+    tags:
+      - 'v*' # push events to tagged commits
+    branches:
+      - '**'
     paths:
       - '.github/workflows/go.yml'
+      - 'bin/codesign.sh'
       - 'src/**'
 
 jobs:

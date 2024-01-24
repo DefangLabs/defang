@@ -19,10 +19,33 @@ This repo includes:
 * Join our Slack channel using this [invite link](https://join.slack.com/share/enQtNTY2NzE1MTAzNDgzMi03M2YyZmZhYWE2YWNiMzFiYmI1MzJjMjUwNzVmZWIzOTYyZjhmOTlhYjU5ZTI1MGY4NjcwMGIzNzdkNWQ0ZWNi)
 * File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
 
+## Command completion
+The Defang CLI supports command completion for Bash, Zsh, and Fish. To get the shell script for command completion, run the following command:
+```
+defang completion [bash|zsh|fish|powershell]
+```
+
+If you're using Bash, you can add the following to your `~/.bashrc` file:
+```
+source <(defang completion bash)
+```
+
+If you're using Zsh, you can add the following to your `~/.zshrc` file:
+```
+source <(defang completion zsh)
+```
+or pipe the output to a file called `_defang` in the directory with the completions.
+
+If you're using Fish, you can add the following to your `~/.config/fish/config.fish` file:
+```
+defang completion fish | source
+```
+
 ## Environment Variables
 The Defang CLI recognizes the following environment variables:
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 * `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 * `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
+* `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 * `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 * `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`

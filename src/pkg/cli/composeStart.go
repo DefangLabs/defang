@@ -156,18 +156,30 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
 			}
 		}
-		if svccfg.HealthCheck != nil {
+		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {
+			timeout := 30 // default per compose spec
 			if svccfg.HealthCheck.Timeout != nil {
-				logrus.Warn("unsupported compose directive: healthcheck timeout")
+				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
+					logrus.Warn("healthcheck timeout must be a multiple of 1s")
+				}
+				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
+			interval := 30 // default per compose spec
 			if svccfg.HealthCheck.Interval != nil {
-				logrus.Warn("unsupported compose directive: healthcheck interval")
+				if *svccfg.HealthCheck.Interval%1e9 != 0 {
+					logrus.Warn("healthcheck interval must be a multiple of 1s")
+				}
+				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
-			if svccfg.HealthCheck.Retries != nil {
-				logrus.Warn("unsupported compose directive: healthcheck retries")
+			// Technically this should test for <= but both interval and timeout have 30s as the default value
+			if interval < timeout || timeout <= 0 {
+				return nil, &ComposeError{fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)}
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_period")
+			}
+			if svccfg.HealthCheck.StartInterval != nil {
+				logrus.Warn("unsupported compose directive: healthcheck start_interval")
 			}
 		}
 		if svccfg.Deploy != nil {
@@ -200,43 +212,31 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 	//
 	var services []*pb.Service
 	for _, svccfg := range project.Services {
-		// Upload the build context, if any. TODO: parallelize
-		var build *pb.Build
-		if svccfg.Build != nil {
-			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
-			if err != nil {
-				return nil, err
+		var healthcheck *pb.HealthCheck
+		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
+			healthcheck = &pb.HealthCheck{
+				Test: svccfg.HealthCheck.Test,
 			}
-
-			build = &pb.Build{
-				Context:    url,
-				Dockerfile: svccfg.Build.Dockerfile,
-				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
+			if nil != svccfg.HealthCheck.Interval {
+				healthcheck.Interval = uint32(*svccfg.HealthCheck.Interval / 1e9)
 			}
-
-			if len(svccfg.Build.Args) > 0 {
-				build.Args = make(map[string]string)
-				for key, value := range svccfg.Build.Args {
-					if value == nil {
-						value = resolveEnv(key)
-					}
-					if value != nil {
-						build.Args[key] = *value
-					}
-				}
+			if nil != svccfg.HealthCheck.Timeout {
+				healthcheck.Timeout = uint32(*svccfg.HealthCheck.Timeout / 1e9)
+			}
+			if nil != svccfg.HealthCheck.Retries {
+				healthcheck.Retries = uint32(*svccfg.HealthCheck.Retries)
 			}
 		}
 
-		var healthcheck *pb.HealthCheck
-		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
-			// if svccfg.HealthCheck.Test[0] == "CMD-SHELL" && len(svccfg.HealthCheck.Test) == 2 {
-			// 	// Convert CMD_SHELL to CMD TODO: handle shell quotes and escapes
-			// 	svccfg.HealthCheck.Test = append([]string{"CMD"}, strings.Split(svccfg.HealthCheck.Test[1], " ")...)
-			// }
-			healthcheck = &pb.HealthCheck{
-				Test: svccfg.HealthCheck.Test,
-				// TODO: add the other parameters
+		ports, err := convertPorts(svccfg.Ports)
+		if err != nil {
+			return nil, &ComposeError{err}
+		}
+		// Show a warning when we have ingress ports but no explicit healthcheck
+		for _, port := range ports {
+			if port.Mode == pb.Mode_INGRESS && healthcheck == nil {
+				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
+				break
 			}
 		}
 
@@ -275,6 +275,34 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 		}
 
+		// Upload the build context, if any; TODO: parallelize
+		var build *pb.Build
+		if svccfg.Build != nil {
+			// Pack the build context into a tarball and upload
+			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
+			if err != nil {
+				return nil, err
+			}
+
+			build = &pb.Build{
+				Context:    url,
+				Dockerfile: svccfg.Build.Dockerfile,
+				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
+			}
+
+			if len(svccfg.Build.Args) > 0 {
+				build.Args = make(map[string]string)
+				for key, value := range svccfg.Build.Args {
+					if value == nil {
+						value = resolveEnv(key)
+					}
+					if value != nil {
+						build.Args[key] = *value
+					}
+				}
+			}
+		}
+
 		// Extract environment variables
 		envs := make(map[string]string)
 		for key, value := range svccfg.Environment {
@@ -292,12 +320,6 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			secrets = append(secrets, &pb.Secret{
 				Source: secret.Source,
 			})
-		}
-
-		// TODO: move this validation up so we don't upload the build context if it's invalid
-		ports, err := convertPorts(svccfg.Ports)
-		if err != nil {
-			return nil, &ComposeError{err}
 		}
 
 		init := false

@@ -24,11 +24,34 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/moby/patternmatcher"
+	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-const MiB = 1024 * 1024
+const (
+	MiB                 = 1024 * 1024
+	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
+	defaultDockerIgnore = `# Default .dockerignore file for Defang
+**/.DS_Store
+**/.direnv
+**/.envrc
+**/.git
+**/.github
+**/.idea
+**/.vscode
+**/__pycache__
+**/compose.yaml
+**/compose.yml
+**/defang.exe
+**/docker-compose.yml
+**/docker-compose.yaml
+**/node_modules
+**/Thumbs.db
+# Ignore our own binary, but only in the root to avoid ignoring subfolders
+defang`
+)
 
 var (
 	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -72,7 +95,14 @@ func convertPlatform(platform string) pb.Platform {
 }
 
 func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
-	Debug(" - Loading compose file", filePath)
+	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
+	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
+	if files, _ := filepath.Glob(filePath); len(files) > 1 {
+		return nil, fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+	} else if len(files) == 1 {
+		filePath = files[0]
+	}
+	Debug(" - Loading compose file", filePath, "for project", projectName)
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
 	project, err := loader.Load(types.ConfigDetails{
@@ -196,7 +226,7 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 }
 
 func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer, digest string) (string, error) {
-	// Upload the tarball to the fabric controller storage TODO: use a streaming API
+	// Upload the tarball to the fabric controller storage; TODO: use a streaming API
 	ureq := &pb.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, connect.NewRequest(ureq))
 	if err != nil {
@@ -245,30 +275,6 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
-func filter(file string, stat os.DirEntry) bool {
-	switch file {
-	// case Dockerfile": // overwritten below if specified
-	// case ".dockerignore": we're not using this, but Kaniko does
-	case ".DS_Store",
-		".direnv",
-		".envrc",
-		".git",
-		".github",
-		".idea",
-		".vscode",
-		"__pycache__",
-		"defang.exe", // our binary
-		"docker-compose.yml",
-		"docker-compose.yaml",
-		"node_modules",
-		"Thumbs.db":
-		return false // omit
-	case "defang": // our binary
-		return stat.IsDir() // omit only if it's a file
-	}
-	return true // keep
-}
-
 func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	foundDockerfile := false
 	if dockerfile == "" {
@@ -277,24 +283,46 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		dockerfile = filepath.Clean(dockerfile)
 	}
 
+	// A Dockerfile-specific ignore-file takes precedence over the .dockerignore file at the root of the build context if both exist.
+	var reader io.ReadCloser
+	var err error
+	reader, err = os.Open(filepath.Join(root, dockerfile+".dockerignore"))
+	if err != nil {
+		reader, err = os.Open(filepath.Join(root, ".dockerignore"))
+		if err != nil {
+			Debug(" - No .dockerignore file found; using defaults")
+			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
+		} else {
+			Debug(" - Reading .dockerignore file")
+		}
+	} else {
+		Debug(" - Reading", dockerfile+".dockerignore file")
+	}
+	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
+	if reader != nil {
+		reader.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	pm, err := patternmatcher.New(patterns)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	fileCount := 0
 	var buf bytes.Buffer
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	// dockerignore.ReadAll(root) TODO: use this from "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
-
-	err := filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Ignore files using the filter function
-		if !filter(de.Name(), de) {
-			if de.IsDir() {
-				return filepath.SkipDir
-			}
+		// Don't include the root directory itself in the tarball
+		if path == root {
 			return nil
 		}
 
@@ -304,7 +332,21 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		Debug(" - Adding", relPath)
+		// Ignore files using the dockerignore patternmatcher
+		baseName := filepath.ToSlash(relPath)
+		ignore, err := pm.MatchesOrParentMatches(baseName)
+		if err != nil {
+			return err
+		}
+		if ignore {
+			Debug(" - Ignoring", relPath)
+			if de.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		Debug(" - Adding", baseName)
 
 		info, err := de.Info()
 		if err != nil {
@@ -317,10 +359,10 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 
 		// Make reproducible; WalkDir walks files in lexical order.
-		header.ModTime = time.Unix(315532800, 0)
+		header.ModTime = time.Unix(sourceDateEpoch, 0)
 		header.Gid = 0
 		header.Uid = 0
-		header.Name = filepath.ToSlash(relPath)
+		header.Name = baseName
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
 			return err

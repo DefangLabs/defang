@@ -6,26 +6,28 @@ system ? builtins.currentSystem
 , lib
 , fetchurl
 , installShellFiles
+, makeWrapper
+, stdenv
 , unzip
 }:
 let
   shaMap = {
-    x86_64-linux = "0h3vzwclg9phdzi4wdrw9gy4amlc2b1ij4m1l04kpkavm1cnb0hl";
-    aarch64-linux = "1y3pqpydpvam8g62gjgsn1vk5jqbwffvp0i4n3ccv0zj9zmc5979";
-    x86_64-darwin = "0lxr76qbnvycznl6qzsb20yxfiavdf6pypikzjd4pj6h299qd59x";
-    aarch64-darwin = "0lxr76qbnvycznl6qzsb20yxfiavdf6pypikzjd4pj6h299qd59x";
+    x86_64-linux = "0yfmy5hf65is50gpyz8r6k8dg8ivqjgh12dmwd2h5hic20l1yz3b";
+    aarch64-linux = "1x5d4v1khxrn84r21wfmb0l5ql8pmlbdw4v36b3rslm5h85pg3n1";
+    x86_64-darwin = "1iv4vfhb81b822np6cdmpchjph95fwakm8f6q3hqqbca028hnpiy";
+    aarch64-darwin = "1iv4vfhb81b822np6cdmpchjph95fwakm8f6q3hqqbca028hnpiy";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.43/defang_0.4.43_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.43/defang_0.4.43_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.43/defang_0.4.43_macOS.zip";
-    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.43/defang_0.4.43_macOS.zip";
+    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.55/defang_0.4.55_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.55/defang_0.4.55_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.55/defang_0.4.55_macOS.zip";
+    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.55/defang_0.4.55_macOS.zip";
   };
 in
 pkgs.stdenv.mkDerivation {
   pname = "defang";
-  version = "0.4.43";
+  version = "0.4.55";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -33,8 +35,7 @@ pkgs.stdenv.mkDerivation {
 
   sourceRoot = ".";
 
-  nativeBuildInputs = [ installShellFiles ];
-  buildInputs = [ unzip ];
+  nativeBuildInputs = [ installShellFiles unzip ];
 
   installPhase = ''
     mkdir -p $out/bin

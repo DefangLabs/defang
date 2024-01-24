@@ -23,7 +23,6 @@ const (
 
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
-	ansiRegex     = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]*[@-~]|].*?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
 )
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -84,7 +83,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 
 	if service != "" {
 		service = NormalizeServiceName(service)
-		// Show a warning if the service doesn't exist (yet) TODO: could do fuzzy matching and suggest alternatives
+		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
 		if _, err := client.Get(ctx, connect.NewRequest(&pb.ServiceID{Name: service})); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
@@ -129,27 +128,38 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
 				Debug(" - Disconnected:", tailClient.Err())
-				Warn(" ! Reconnecting...")
+				if !raw {
+					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+				}
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
-				if err == nil {
-					skipDuplicate = true
-					continue
+				if err != nil {
+					Debug(" - Reconnect failed:", err)
+					return err
 				}
-				Debug(" - Reconnect failed:", err)
-				return err
+				if !raw {
+					Fprintln(os.Stderr, WarnColor, " ! Reconnected!   ")
+				}
+				skipDuplicate = true
+				continue
 			}
 
 			return tailClient.Err() // returns nil on EOF
 		}
 		msg := tailClient.Msg()
 
-		if DoColor && !DoVerbose && !raw {
+		// Show a spinner if we're not in raw mode and have a TTY
+		if !raw && DoColor {
 			fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
 			spinMe++
+			// Replace service progress messages with our own spinner
+			if isProgressMsg(msg.Entries) {
+				println("asf")
+				continue
+			}
 		}
 
-		isInternal := !strings.HasPrefix(msg.Host, "ip-")
+		isInternal := !strings.HasPrefix(msg.Host, "ip-") // FIXME: not true for BYOC
 		for _, e := range msg.Entries {
 			if !DoVerbose && !e.Stderr && isInternal {
 				// HACK: skip noisy CI/CD logs (except errors)
@@ -201,13 +211,21 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 				}
 				if DoColor {
 					if !strings.Contains(line, "\033[") {
-						line = colorKeyRegex.ReplaceAllString(line, replaceString)
+						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
 				} else {
-					line = ansiRegex.ReplaceAllLiteralString(line, "")
+					line = StripAnsi(line)
 				}
 				Println(Reset, line)
 			}
 		}
 	}
+}
+
+func isProgressDot(line string) bool {
+	return len(line) <= 1 || len(StripAnsi(line)) <= 1
+}
+
+func isProgressMsg(entries []*pb.LogEntry) bool {
+	return len(entries) == 0 || (len(entries) == 1 && isProgressDot(entries[0].Message))
 }

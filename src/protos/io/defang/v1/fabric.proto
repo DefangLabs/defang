@@ -65,6 +65,8 @@ message ServiceInfo {
   repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;
@@ -229,10 +231,11 @@ message Build {
 
 message HealthCheck {
   repeated string test = 1;
-  // float interval = 2;
-  // float timeout = 3;
-  // uint32 retries = 4;
-  // float start_period = 5;
+  uint32 interval = 2; // in seconds
+  uint32 timeout = 3; // in seconds; must be less than interval
+  uint32 retries = 4;
+  // uint32 start_period = 5;
+  // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;
 }
 
@@ -240,7 +243,7 @@ message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal TODO: not part of spec
+  bool internal = 4; // true if service is internal; TODO: not part of spec
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
