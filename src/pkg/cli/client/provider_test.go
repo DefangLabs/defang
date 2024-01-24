@@ -37,6 +37,12 @@ func TestProvider(t *testing.T) {
 			want:     ProviderAWS,
 			wantErr:  false,
 		},
+		{
+			name:     "valid provider auto",
+			provider: "auto",
+			want:     ProviderAuto,
+			wantErr:  false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

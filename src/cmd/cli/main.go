@@ -609,12 +609,12 @@ var bootstrapRrefreshCmd = &cobra.Command{
 func main() {
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
 	hasTty := term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
-	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "defang"))
+	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
 	colorMode := ColorAuto
 	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
-	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Cluster to connect to")
-	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", "Service provider to connect to, use 'aws' for bring-your-own-cloud")
+	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Defang cluster to connect to")
+	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")

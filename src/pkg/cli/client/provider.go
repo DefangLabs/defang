@@ -2,23 +2,24 @@ package client
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Provider string
 
 const (
+	ProviderAuto   Provider = "auto"
 	ProviderDefang Provider = "defang"
 	ProviderAWS    Provider = "aws"
 	// ProviderAzure  Provider = "azure"
 	// ProviderGCP    Provider = "gcp"
 )
 
-var providerMap = map[string]Provider{
-	"defang": ProviderDefang,
-	"aws":    ProviderAWS,
-	// "azure":  ProviderAzure,
-	// "gcp":    ProviderGCP,
+var allProviders = []Provider{
+	ProviderAuto,
+	ProviderDefang,
+	ProviderAWS,
+	// ProviderAzure,
+	// ProviderGCP,
 }
 
 func (p Provider) String() string {
@@ -26,18 +27,16 @@ func (p Provider) String() string {
 }
 
 func (p *Provider) Set(str string) error {
-	if provider, ok := providerMap[str]; ok {
-		*p = provider
-		return nil
+	for _, provider := range allProviders {
+		if provider.String() == str {
+			*p = provider
+			return nil
+		}
 	}
 
-	availableProviders := make([]string, 0, len(providerMap))
-	for provider := range providerMap {
-		availableProviders = append(availableProviders, provider)
-	}
-	return fmt.Errorf("invalid provider '%v', available providers are: %s", str, strings.Join(availableProviders, ", "))
+	return fmt.Errorf("available providers are: %v", allProviders)
 }
 
 func (p Provider) Type() string {
-	return "Provider"
+	return "provider"
 }

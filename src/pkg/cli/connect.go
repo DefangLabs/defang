@@ -2,6 +2,7 @@ package cli
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
@@ -30,11 +31,17 @@ func Connect(server string, provider client.Provider) (client.Client, pkg.Tenant
 	Info(" * Connected to", host)
 	defangClient := client.NewGrpcClient(fabricClient, server, accessToken)
 
-	if provider == client.ProviderAWS {
-		Debug(" - Using AWS provider")
+	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
+		if !awsInEnv {
+			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
+		}
 		byocClient := client.NewByocAWS(string(tenantId), "", defangClient) // TODO: custom domain
 		return byocClient, pkg.TenantID(byocClient.StackID)
 	}
 
+	if awsInEnv {
+		Warn(" ! Using Defang provider, but AWS environment variables are detected; use '-P aws'")
+	}
 	return defangClient, tenantId
 }
