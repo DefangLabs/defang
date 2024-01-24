@@ -36,6 +36,7 @@ import (
 var (
 	client   cliClient.Client
 	clientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
+	hasTty   = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
 	tenantId = pkg.DEFAULT_TENANT
 	version  = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
@@ -622,7 +623,6 @@ var bootstrapRefreshCmd = &cobra.Command{
 
 func main() {
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
-	hasTty := term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
 	colorMode := ColorAuto
