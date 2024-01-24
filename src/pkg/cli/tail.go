@@ -23,7 +23,6 @@ const (
 
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
-	ansiRegex     = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]*[@-~]|].*?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
 )
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -204,7 +203,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						line = colorKeyRegex.ReplaceAllString(line, replaceString)
 					}
 				} else {
-					line = ansiRegex.ReplaceAllLiteralString(line, "")
+					line = StripAnsi(line)
 				}
 				Println(Reset, line)
 			}

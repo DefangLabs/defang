@@ -33,6 +33,7 @@ func Connect(server string, provider client.Provider) (client.Client, pkg.Tenant
 
 	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
 	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
+		Info(" * Using AWS provider")
 		if !awsInEnv {
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}

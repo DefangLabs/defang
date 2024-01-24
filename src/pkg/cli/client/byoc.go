@@ -38,9 +38,9 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-146-g8b57e51" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "bootstrap"            // must match the projectName in index.ts
-	cdTaskPrefix  = "cd-"                  // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion     = "v0.4.50-169-g7c144dc2" // will cause issues if two clients with different versions are connected to the same stack
+	projectName   = "bootstrap"             // must match the projectName in index.ts
+	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
@@ -66,11 +66,11 @@ func NewByocAWS(stackId, domain string, defClient *GrpcClient) *byocAws {
 	}
 	return &byocAws{
 		GrpcClient:    defClient,
-		driver:        cfn.New(cdTaskPrefix+user, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		driver:        cfn.New(cdTaskPrefix, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
-		albDnsName:    "ecs-dev-alb-672419834.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
+		albDnsName:    "TODO.cloudfront.net", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
@@ -209,7 +209,7 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil { // TODO: remove TODO payload (although it works fine!)
+	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil {
 		return nil, err
 	}
 	etag := awsecs.GetTaskID(b.cdTaskArn) // TODO: this is the CD task ID, not the etag
@@ -393,7 +393,11 @@ func (bs *byocServerStream) Receive() bool {
 		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 		event := events[0]
 		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
-			// These events are from the CD task
+			// These events are from the CD task; detect the progress dots
+			if len(events) == 1 && *event.Message == "." || *event.Message == "\033[38;5;3m.\033[0m" {
+				// This is a progress dot; return an empty response
+				return true
+			}
 			bs.response.Etag = bs.etag // FIXME: this would show all deployments, not just the one we're interested in
 			bs.response.Host = "pulumi"
 			bs.response.Service = "cd"
@@ -671,7 +675,7 @@ func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
 		if b.customDomain == "" {
-			return b.albDnsName
+			return "" //b.albDnsName
 		}
 		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
 	}
@@ -700,11 +704,11 @@ func (b *byocAws) Destroy(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *byocAws) Refresh(ctx context.Context) error {
+func (b *byocAws) BootstrapCommand(ctx context.Context, command string) error {
 	if err := b.setUp(ctx); err != nil {
 		return err
 	}
-	if err := b.runCdTask(ctx, "npm", "start", "refresh"); err != nil {
+	if err := b.runCdTask(ctx, "npm", "start", command); err != nil {
 		return err
 	}
 	return nil

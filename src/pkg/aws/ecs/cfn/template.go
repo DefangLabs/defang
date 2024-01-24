@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	createVpcResources   = true
-	maxCachePrefixLength = 20 // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
+	createVpcResources   = true // TODO: make this configurable, add an option to use the default VPC
+	maxCachePrefixLength = 20   // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
 )
 
 var (
@@ -94,6 +94,10 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		Tags: defaultTags,
 		// LogGroupName:    ptr.String(PREFIX + "log-group-test" + SUFFIX), // optional
 		RetentionInDays: ptr.Int(1),
+		// Make sure the log group cannot be deleted while the cluster is up
+		AWSCloudFormationDependsOn: []string{
+			_cluster,
+		},
 	}
 
 	const _pullThroughCache = "PullThroughCache"

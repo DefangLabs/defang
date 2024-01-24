@@ -590,19 +590,31 @@ var bootstrapDestroyCmd = &cobra.Command{
 	Use:         "destroy",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Destroy the bootstrapped resources",
+	Short:       "Destroy the bootstrapped CD resources",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapDestroy(cmd.Context(), client)
+		cli.Warn(` ! This will fail unless you "down" the stacks first!`)
+		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
 }
 
-var bootstrapRrefreshCmd = &cobra.Command{
+var bootstrapDownCmd = &cobra.Command{
+	Use:         "down",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Destroy the service stack",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cli.Warn(` ! Destroying the cluster`)
+		return cli.BootstrapCommand(cmd.Context(), client, "down")
+	},
+}
+
+var bootstrapRefreshCmd = &cobra.Command{
 	Use:         "refresh",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Refresh the bootstrapped resources",
+	Short:       "Refresh the service resources",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapRefresh(cmd.Context(), client)
+		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
 	},
 }
 
@@ -624,7 +636,8 @@ func main() {
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
-	bootstrapCmd.AddCommand(bootstrapRrefreshCmd)
+	bootstrapCmd.AddCommand(bootstrapDownCmd)
+	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -782,8 +795,11 @@ func printDefangHint(hint, args string) {
 	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n", hint)
-	clusterFlag := rootCmd.PersistentFlags().Lookup("cluster")
-	if clusterFlag.Changed {
+	providerFlag := rootCmd.Flag("provider")
+	clusterFlag := rootCmd.Flag("cluster")
+	if providerFlag.Changed {
+		fmt.Printf("\n  %s --provider %s %s\n\n", executable, providerFlag.Value.String(), args)
+	} else if clusterFlag.Changed {
 		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, clusterFlag.Value.String(), args)
 	} else {
 		fmt.Printf("\n  %s %s\n\n", executable, args)
