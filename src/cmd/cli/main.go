@@ -768,7 +768,7 @@ func main() {
 
 	if !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(version, ver) < 0 {
-			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases")
+			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 		}
 	}
 }
