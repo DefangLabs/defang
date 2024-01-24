@@ -16,6 +16,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
@@ -26,6 +27,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/logs"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -142,10 +144,62 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		return nil, err
 	}
 
+	// Create the subdomain delegation and pass the subdomain to the CD task
+	if b.customDomain == "" {
+		log.Printf("no custom domain name provided, obtain and delegate a subdomain zone.\n")
+		domain, err := b.delegateSubdomain(ctx)
+		if err != nil {
+			return nil, err
+		}
+		b.customDomain = domain
+	}
+
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
 	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
+}
+
+func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
+	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: []string{"dummy.record"}}
+	resp, err := b.DelegateSubdomainZone(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	domain := resp.Zone
+	log.Printf("delegated subdomain name obtained: %q\n", domain)
+
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return "", annotateAwsError(err)
+	}
+	r53Client := route53.NewFromConfig(cfg)
+
+	zoneId, err := aws.GetZoneIdFromDomain(ctx, domain, r53Client)
+	if errors.Is(err, aws.ErrNoZoneFound) {
+		zoneId, err = aws.CreateZone(ctx, domain, r53Client)
+		if err != nil {
+			return "", annotateAwsError(err)
+		}
+	} else if err != nil {
+		return "", annotateAwsError(err)
+	}
+
+	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
+	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, types.RRTypeNs, r53Client)
+	if err != nil {
+		return "", annotateAwsError(err)
+	}
+	if len(nsServers) == 0 {
+		return "", errors.New("no NS records found for the subdomain zone")
+	}
+
+	req = &v1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+	resp, err = b.DelegateSubdomainZone(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	return domain, nil
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
