@@ -139,7 +139,7 @@ func Error(v ...any) (int, error) {
 // 	return c.color[id]
 // }
 
-var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]*[@-~]|].*?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
+var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
 
 func StripAnsi(s string) string {
 	return ansiRegex.ReplaceAllLiteralString(s, "")

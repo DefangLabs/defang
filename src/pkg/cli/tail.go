@@ -128,27 +128,38 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
 				Debug(" - Disconnected:", tailClient.Err())
-				Warn(" ! Reconnecting...")
+				if !raw {
+					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+				}
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, &pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
-				if err == nil {
-					skipDuplicate = true
-					continue
+				if err != nil {
+					Debug(" - Reconnect failed:", err)
+					return err
 				}
-				Debug(" - Reconnect failed:", err)
-				return err
+				if !raw {
+					Fprintln(os.Stderr, WarnColor, " ! Reconnected!   ")
+				}
+				skipDuplicate = true
+				continue
 			}
 
 			return tailClient.Err() // returns nil on EOF
 		}
 		msg := tailClient.Msg()
 
-		if !raw && DoColor && (!DoVerbose || len(msg.Entries) == 0) {
+		// Show a spinner if we're not in raw mode and have a TTY
+		if !raw && DoColor {
 			fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
 			spinMe++
+			// Replace service progress messages with our own spinner
+			if isProgressMsg(msg.Entries) {
+				println("asf")
+				continue
+			}
 		}
 
-		isInternal := !strings.HasPrefix(msg.Host, "ip-")
+		isInternal := !strings.HasPrefix(msg.Host, "ip-") // FIXME: not true for BYOC
 		for _, e := range msg.Entries {
 			if !DoVerbose && !e.Stderr && isInternal {
 				// HACK: skip noisy CI/CD logs (except errors)
@@ -200,7 +211,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				}
 				if DoColor {
 					if !strings.Contains(line, "\033[") {
-						line = colorKeyRegex.ReplaceAllString(line, replaceString)
+						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
 				} else {
 					line = StripAnsi(line)
@@ -209,4 +220,12 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 		}
 	}
+}
+
+func isProgressDot(line string) bool {
+	return len(line) <= 1 || len(StripAnsi(line)) <= 1
+}
+
+func isProgressMsg(entries []*pb.LogEntry) bool {
+	return len(entries) == 0 || (len(entries) == 1 && isProgressDot(entries[0].Message))
 }
