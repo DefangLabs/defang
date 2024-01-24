@@ -38,9 +38,9 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-169-g7c144dc2" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "bootstrap"             // must match the projectName in index.ts
-	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion     = "v0.4.50-172-gb863c352" // will cause issues if two clients with different versions are connected to the same stack
+	projectName   = "defang"
+	cdTaskPrefix  = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
@@ -195,6 +195,7 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 	env := map[string]string{
 		// "AWS_REGION":               b.driver.Region.String(); TODO: this should be the destination region, not the CD region
 		"DOMAIN":                   b.customDomain,
+		"PROJECT":                  projectName,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
 		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
