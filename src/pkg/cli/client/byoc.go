@@ -435,7 +435,7 @@ func (bs *byocServerStream) Receive() bool {
 			if parseFirelensRecords {
 				if err := json.Unmarshal([]byte(message), &record); err == nil {
 					message = record.Log
-					println("container name:", record.ContainerName, "source:", record.Source)
+					// println("container name:", record.ContainerName, "source:", record.Source)
 					if record.ContainerName == "kaniko" {
 						stderr = isKanikoError(message)
 					} else {
