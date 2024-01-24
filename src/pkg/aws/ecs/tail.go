@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"path"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
@@ -27,11 +28,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	for {
 		err = printLogEvents(ctx, es) // blocking
 		if err != nil {
-			var resourceNotFound *types.ResourceNotFoundException
-			if !errors.As(err, &resourceNotFound) && err != io.EOF {
-				return err
-			}
-			// continue loop, waiting for the log stream to be created
+			return err
 		}
 
 		err := getTaskStatus(ctx, a.Region, a.ClusterName, taskId)
@@ -51,7 +48,25 @@ func (a *AwsEcs) TailTask(ctx context.Context, taskID string) (EventStream, erro
 		return nil, errors.New("taskID is empty")
 	}
 	logStreamName := getLogStreamForTaskID(taskID)
-	return TailLogGroup(ctx, a.LogGroupARN, logStreamName) // TODO: io.EOF on task stop
+	for {
+		stream, err := TailLogGroup(ctx, a.LogGroupARN, logStreamName)
+		if err != nil {
+			var resourceNotFound *types.ResourceNotFoundException
+			if !errors.As(err, &resourceNotFound) {
+				return nil, err
+			}
+			// The log stream doesn't exist yet, so wait for it to be created, but bail out if the task is stopped
+			err := getTaskStatus(ctx, a.Region, a.ClusterName, taskID)
+			if err != nil {
+				return nil, err
+			}
+			// continue loop, waiting for the log stream to be created; sleep to avoid throttling
+			pkg.SleepWithContext(ctx, time.Second)
+			continue
+		}
+		// TODO: should wrap this stream so we can return io.EOF on task stop
+		return stream, nil
+	}
 }
 
 func getLogStreamForTaskID(taskID string) string {
