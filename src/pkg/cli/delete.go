@@ -7,17 +7,14 @@ import (
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func Delete(ctx context.Context, client client.Client, name ...string) (string, error) {
-	Debug(" - Deleting service", name)
+func Delete(ctx context.Context, client client.Client, names ...string) (string, error) {
+	Debug(" - Deleting service", names)
 
 	if DoDryRun {
 		return "", nil
 	}
 
-	for i, n := range name {
-		name[i] = NormalizeServiceName(n)
-	}
-	resp, err := client.Delete(ctx, &pb.DeleteRequest{Names: name})
+	resp, err := client.Delete(ctx, &pb.DeleteRequest{Names: names})
 	if err != nil {
 		return "", err
 	}

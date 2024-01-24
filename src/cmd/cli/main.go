@@ -383,7 +383,7 @@ var composeCmd = &cobra.Command{
 	Use:     "compose",
 	Aliases: []string{"stack"},
 	Args:    cobra.NoArgs,
-	Short:   "Work with local docker-compose.yml files",
+	Short:   "Work with local Compose files",
 }
 
 func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
@@ -405,7 +405,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
@@ -435,8 +435,8 @@ var composeStartCmd = &cobra.Command{
 	Use:         "start",
 	Aliases:     []string{"deploy"},
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "Reads a docker-compose.yml file and deploys services to the cluster",
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
@@ -457,12 +457,28 @@ var composeStartCmd = &cobra.Command{
 	},
 }
 
+var composeRestartCmd = &cobra.Command{
+	Use:         "restart",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and restarts its services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var filePath, _ = cmd.InheritedFlags().GetString("file")
+
+		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, string(tenantId))
+		if err != nil {
+			return err
+		}
+		return nil
+	},
+}
+
 var composeDownCmd = &cobra.Command{
 	Use:         "down",
 	Aliases:     []string{"stop", "rm"},
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "Reads a docker-compose.yml file and deletes services from the cluster",
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var tail, _ = cmd.Flags().GetBool("tail")
@@ -492,8 +508,8 @@ var composeDownCmd = &cobra.Command{
 
 var composeConfigCmd = &cobra.Command{
 	Use:   "config",
-	Args:  cobra.NoArgs,
-	Short: "Reads a docker-compose.yml file and shows the generated config",
+	Args:  cobra.NoArgs, // TODO: takes optional list of service names
+	Short: "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
@@ -532,6 +548,20 @@ var deleteCmd = &cobra.Command{
 		}
 
 		printDefangHint("To track the deployment status, do:", "tail --etag "+etag)
+		return nil
+	},
+}
+
+var restartCmd = &cobra.Command{
+	Use:         "restart",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.MinimumNArgs(1),
+	Short:       "Restart one or more services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_, err := cli.Restart(cmd.Context(), client, args...)
+		if err != nil {
+			return err
+		}
 		return nil
 	},
 }
@@ -679,6 +709,7 @@ func main() {
 	secretsCmd.AddCommand(secretsListCmd)
 
 	rootCmd.AddCommand(secretsCmd)
+	rootCmd.AddCommand(restartCmd)
 
 	// Compose Command
 	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
@@ -698,6 +729,7 @@ func main() {
 	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
 	rootCmd.AddCommand(composeCmd)
+	composeCmd.AddCommand(composeRestartCmd)
 
 	// Tail Command
 	tailCmd.Flags().StringP("name", "n", "", "Name of the service")

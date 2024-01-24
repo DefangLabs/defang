@@ -17,7 +17,7 @@ func ComposeDown(ctx context.Context, client client.Client, filePath, projectNam
 
 	names := make([]string, 0, len(project.Services))
 	for _, service := range project.Services {
-		names = append(names, service.Name)
+		names = append(names, NormalizeServiceName(service.Name))
 	}
 
 	return Delete(ctx, client, names...)
