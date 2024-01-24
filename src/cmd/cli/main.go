@@ -17,6 +17,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 	"golang.org/x/term"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -61,14 +62,10 @@ var rootCmd = &cobra.Command{
 
 		color := cmd.Flag("color").Value.(*ColorMode)
 		switch *color {
-		case ColorAuto:
-			cli.DoColor = cli.CanColor
 		case ColorAlways:
 			cli.DoColor = true
 		case ColorNone:
 			cli.DoColor = false
-		default:
-			return fmt.Errorf("invalid color option: %s", color)
 		}
 
 		// Not all commands need a connection, so we should only connect when needed
@@ -260,10 +257,15 @@ var getVersionCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
 		fmt.Println(version)
-		cli.Print(cli.BrightCyan, "Defang Fabric: ")
-		ver, err := cli.GetVersion(cmd.Context(), client)
+
+		cli.Print(cli.BrightCyan, "Latest CLI:    ")
+		ver, err := GetLatestVersion(cmd.Context())
 		fmt.Println(ver)
-		return err
+
+		cli.Print(cli.BrightCyan, "Defang Fabric: ")
+		ver, err2 := cli.GetVersion(cmd.Context(), client)
+		fmt.Println(ver)
+		return errors.Join(err, err2)
 	},
 }
 
@@ -760,7 +762,14 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
+
 		os.Exit(int(code))
+	}
+
+	if !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
+		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(version, ver) < 0 {
+			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases")
+		}
 	}
 }
 
@@ -788,7 +797,7 @@ func prettyExecutable(def string) string {
 }
 
 func printDefangHint(hint, args string) {
-	if pkg.GetenvBool("DEFANG_HIDE_HINTS") {
+	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !hasTty {
 		return
 	}
 

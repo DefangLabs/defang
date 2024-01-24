@@ -46,5 +46,6 @@ The Defang CLI recognizes the following environment variables:
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 * `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 * `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
+* `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 * `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 * `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`

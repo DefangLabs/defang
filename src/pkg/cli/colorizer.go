@@ -14,7 +14,7 @@ var (
 	isTerminal = term.IsTerminal(int(os.Stdout.Fd())) && termEnv != ""
 	_, noColor = os.LookupEnv("NO_COLOR") // per spec, the value doesn't matter
 	CanColor   = isTerminal && !noColor && termEnv != "dumb"
-	DoColor    = false
+	DoColor    = CanColor
 )
 
 type Color string
