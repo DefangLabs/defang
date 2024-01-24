@@ -8,17 +8,14 @@ import (
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, name ...string) (string, error) {
-	Debug(" - Deleting service", name)
+func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, names ...string) (string, error) {
+	Debug(" - Deleting service", names)
 
 	if DoDryRun {
 		return "", nil
 	}
 
-	for i, n := range name {
-		name[i] = NormalizeServiceName(n)
-	}
-	resp, err := client.Delete(ctx, connect.NewRequest(&pb.DeleteRequest{Names: name}))
+	resp, err := client.Delete(ctx, connect.NewRequest(&pb.DeleteRequest{Names: names}))
 	if err != nil {
 		return "", err
 	}
