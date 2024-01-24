@@ -243,6 +243,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		var deploy *pb.Deploy
 		if svccfg.Deploy != nil {
 			deploy = &pb.Deploy{}
+			deploy.Replicas = 1 // default to one replica per service
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
 			}

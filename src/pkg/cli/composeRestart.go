@@ -3,13 +3,14 @@ package cli
 import (
 	"context"
 
+	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func ComposeDown(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) (string, error) {
+func ComposeRestart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) ([]*pb.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	names := make([]string, 0, len(project.Services))
@@ -17,5 +18,5 @@ func ComposeDown(ctx context.Context, client defangv1connect.FabricControllerCli
 		names = append(names, NormalizeServiceName(service.Name))
 	}
 
-	return Delete(ctx, client, names...)
+	return Restart(ctx, client, names...)
 }
