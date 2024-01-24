@@ -14,6 +14,6 @@ func GetServices(ctx context.Context, client defangv1connect.FabricControllerCli
 		return err
 	}
 
-	PrintObject("services", serviceList.Msg)
+	PrintObject("", serviceList.Msg)
 	return nil
 }
