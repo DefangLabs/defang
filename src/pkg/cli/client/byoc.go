@@ -38,7 +38,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-172-gb863c352" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion     = "v0.4.50-173-gf3f94a6a" // will cause issues if two clients with different versions are connected to the same stack
 	projectName   = "defang"
 	cdTaskPrefix  = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -54,7 +54,7 @@ type byocAws struct {
 	cdTaskArn     awsecs.TaskArn
 	privateLbIps  []string
 	publicNatIps  []string
-	albDnsName    string
+	// albDnsName    string
 }
 
 var _ Client = (*byocAws)(nil)
@@ -70,7 +70,7 @@ func NewByocAWS(stackId, domain string, defClient *GrpcClient) *byocAws {
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
-		albDnsName:    "TODO.cloudfront.net", // FIXME: grab these from the AWS API or outputs
+		// albDnsName:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
@@ -210,6 +210,7 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
+	// FIXME: this should only delete the services that are specified in the request, not all
 	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil {
 		return nil, err
 	}
@@ -676,7 +677,7 @@ func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
 		if b.customDomain == "" {
-			return "" //b.albDnsName
+			return fmt.Sprintf(":%d", port.Target)
 		}
 		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
 	}
@@ -686,7 +687,7 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
 		if b.customDomain == "" {
-			return b.albDnsName
+			return "" //b.albDnsName
 		}
 		return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
 	} else {
