@@ -4,14 +4,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      shm_size: 30G
+    environment:
+      - MODEL=phi
+    # ports:
+    #   - 5000:5000
+    # volumes:
+    #   - ./defang-llama/defang_llama/__init__.py/:/app/defang_llama/__init__.py
+    #   - ./defang-llama/defang_llama/llm.py/:/app/defang_llama/llm.py
+    #   - ./.data/ollama:/root/.ollama
     deploy:
       resources:
         reservations:
           cpus: '2.0'
-          memory: 4096M
+          memory: 8192M
           devices:
             - capabilities: ["gpu"]
+    healthcheck: 
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 20
     ports:
       - mode: ingress
         target: 5000
-    
