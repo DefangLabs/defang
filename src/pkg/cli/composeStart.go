@@ -230,6 +230,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 
 		ports, err := convertPorts(svccfg.Ports)
 		if err != nil {
+			// TODO: move this validation up so we don't upload the build context if it's invalid
 			return nil, &ComposeError{err}
 		}
 		// Show a warning when we have ingress ports but no explicit healthcheck
@@ -243,7 +244,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		var deploy *pb.Deploy
 		if svccfg.Deploy != nil {
 			deploy = &pb.Deploy{}
-			deploy.Replicas = 1 // default to one replica per service
+			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
 			}
@@ -253,9 +254,9 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				reservations = svccfg.Deploy.Resources.Limits
 			}
 			if reservations != nil {
-				// TODO: move this validation up so we don't upload the build context if it's invalid
 				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
 				if err != nil {
+					// TODO: move this validation up so we don't upload the build context if it's invalid
 					return nil, &ComposeError{fmt.Errorf("invalid reservations cpus: %v", err)}
 				}
 				var devices []*pb.Device
@@ -274,6 +275,10 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 					},
 				}
 			}
+		}
+
+		if deploy == nil || deploy.Resources == nil || deploy.Resources.Reservations == nil || deploy.Resources.Reservations.Memory == 0 {
+			logrus.Warn("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
 		}
 
 		// Upload the build context, if any; TODO: parallelize
