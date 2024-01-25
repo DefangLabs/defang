@@ -29,6 +29,7 @@ service FabricController {
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
 
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
