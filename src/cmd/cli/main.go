@@ -120,11 +120,35 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.Whoami(cmd.Context(), client)
+		_, err := cli.Whoami(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
 		return nil
+	},
+}
+
+var delegateDomainCmd = &cobra.Command{
+	Use:         "delegate",
+	Annotations: authNeededAnnotation,
+	Short:       "Delegate a subdomain to the given name servers",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: args}
+		resp, err := client.DelegateSubdomainZone(cmd.Context(), req)
+		if err != nil {
+			return err
+		}
+		cli.Info(" * Delegated subdomain ", resp.Zone, " NS servers to", strings.Join(args, ", "))
+		return nil
+	},
+}
+
+var unDelegateDomainCmd = &cobra.Command{
+	Use:         "undelegate",
+	Annotations: authNeededAnnotation,
+	Short:       "Remove a subdomain delegation to the given name servers",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return client.DeleteSubdomainZone(cmd.Context())
 	},
 }
 
@@ -670,6 +694,10 @@ func main() {
 
 	// Whoami Command
 	rootCmd.AddCommand(whoamiCmd)
+
+	// Delegate subdomain Commands
+	rootCmd.AddCommand(delegateDomainCmd)
+	rootCmd.AddCommand(unDelegateDomainCmd)
 
 	// Logout Command
 	rootCmd.AddCommand(logoutCmd)
