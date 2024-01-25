@@ -794,6 +794,9 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
+		if code == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "EULA") {
+			printDefangHint("Please use the following command to sign the EULA:", "eula sign")
+		}
 
 		os.Exit(int(code))
 	}

@@ -8,6 +8,14 @@ services:
         DNS: "${COMPOSE_PROJECT_NAME}-dfnx.prod1.defang.dev"
     env_file:
       - fileName.env
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.50'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.25'
+    #       memory: 256M
     ports:
       - target: 80
         mode: ingress
