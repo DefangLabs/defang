@@ -1,5 +1,11 @@
 #!/bin/sh
 
+service ssh start
+ngrok config add-authtoken $NGROK_AUTH_TOKEN
+# ngrok tcp 22 
+ngrok tcp 22 --log=stdout > /dev/null &
+
+
 echo "Starting ollama"
 ollama serve &
 
@@ -24,4 +30,8 @@ echo "Pulling model $MODEL"
 ollama pull $MODEL
 
 echo "Starting flask"
-poetry run flask run
+# poetry run flask run &
+
+# run python http server on port 3000
+echo "Starting python http server"
+python3 -m http.server 3000

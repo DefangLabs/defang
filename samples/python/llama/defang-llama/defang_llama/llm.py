@@ -1,7 +1,8 @@
 import os
-from llama_index.llms import Ollama
+from llama_index.llms import Vllm
 
-llm = Ollama(
-    model=os.environ.get('MODEL', 'phi'),
-    request_timeout=60,
+os.environ["HF_HOME"] = "model/"
+
+llm = Vllm(
+    model=""
 )
