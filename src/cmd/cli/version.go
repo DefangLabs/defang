@@ -9,6 +9,15 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+var version = "development" // overwritten by build script -ldflags "-X main.version=..." and GoReleaser
+
+func GetCurrentVersion() string {
+	if v := semver.Canonical("v" + version); v != "" {
+		return v
+	}
+	return version
+}
+
 func GetLatestVersion(ctx context.Context) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/defang-io/defang/tags", nil)
 	if err != nil {
@@ -29,5 +38,5 @@ func GetLatestVersion(ctx context.Context) (string, error) {
 	sort.Slice(tags, func(i, j int) bool {
 		return semver.Compare(tags[i].Name, tags[j].Name) > 0
 	})
-	return tags[0].Name, nil
+	return semver.Canonical(tags[0].Name), nil
 }
