@@ -129,9 +129,8 @@ func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 	// return getMsg(g.client.WhoAmI(ctx, &connect_go.Request[emptypb.Empty]{})); TODO: implement this rpc
 }
 
-func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *v1.DelegateSubdomainZoneRequest) error {
-	_, err := getMsg(g.client.DelegateSubdomainZone(ctx, &connect_go.Request[v1.DelegateSubdomainZoneRequest]{Msg: req}))
-	return err
+func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect_go.Request[v1.DelegateSubdomainZoneRequest]{Msg: req}))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
