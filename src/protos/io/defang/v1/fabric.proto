@@ -296,4 +296,6 @@ message DelegateSubdomainZoneRequest {
 
 message WhoAmIResponse {
   string tenant = 1;
+  string account = 2;
+  string region = 3;
 }

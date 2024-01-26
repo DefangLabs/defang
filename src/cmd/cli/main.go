@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -74,10 +73,9 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		server := getServer(cmd)
-
+		cluster, _ := cmd.Flags().GetString("cluster")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
-		client, tenantId = cli.Connect(server, *provider)
+		client, tenantId = cli.Connect(cluster, *provider)
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -91,21 +89,13 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			cli.Warn(" !", err)
-			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
+			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster); err != nil {
 				return err
 			}
-			client, tenantId = cli.Connect(server, *provider) // reconnect with the new token
+			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
 		}
 		return nil
 	},
-}
-
-func getServer(cmd *cobra.Command) string {
-	server, _ := cmd.Flags().GetString("cluster")
-	if _, _, err := net.SplitHostPort(server); err != nil {
-		server = server + ":443"
-	}
-	return server
 }
 
 var loginCmd = &cobra.Command{
@@ -114,8 +104,8 @@ var loginCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, getServer(cmd))
+		cluster, _ := cmd.Flags().GetString("cluster")
+		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster)
 		if err != nil {
 			return err
 		}
@@ -131,12 +121,10 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		server := getServer(cmd)
-		tenant, err := cli.Whoami(server)
+		err := cli.Whoami(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
-		cli.Info(" * You are logged in as", tenant)
 		return nil
 	},
 }

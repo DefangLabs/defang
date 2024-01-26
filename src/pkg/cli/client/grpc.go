@@ -3,8 +3,12 @@ package client
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strings"
 
+	"github.com/bufbuild/connect-go"
 	connect_go "github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/auth"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,8 +20,15 @@ type GrpcClient struct {
 	accessToken string
 }
 
-func NewGrpcClient(client defangv1connect.FabricControllerClient, fabric, accessToken string) *GrpcClient {
-	return &GrpcClient{client: client, fabric: fabric, accessToken: accessToken}
+func NewGrpcClient(host, accessToken string) *GrpcClient {
+	baseUrl := "http://"
+	if strings.HasSuffix(host, ":443") {
+		baseUrl = "https://"
+	}
+	baseUrl += host
+	// Debug(" - Connecting to", baseUrl)
+	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
+	return &GrpcClient{client: fabricClient, fabric: host, accessToken: accessToken}
 }
 
 func (g GrpcClient) GetFabric() string {
@@ -110,7 +121,12 @@ func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLReques
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
-	return getMsg(g.client.WhoAmI(ctx, &connect_go.Request[emptypb.Empty]{}))
+	tenant, err := TenantFromAccessToken(g.accessToken)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.WhoAmIResponse{Tenant: string(tenant), Account: "defang", Region: "us-west-2"}, nil
+	// return getMsg(g.client.WhoAmI(ctx, &connect_go.Request[emptypb.Empty]{})); TODO: implement this rpc
 }
 
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {

@@ -27,8 +27,8 @@ type AwsEcs struct {
 const stackTimeout = time.Minute * 3
 
 func New(stack string, region region.Region) *AwsEcs {
-	if stack == "" || region == "" {
-		panic("stack and region must be set")
+	if stack == "" {
+		panic("stack must be set")
 	}
 	return &AwsEcs{
 		stackName: stack,

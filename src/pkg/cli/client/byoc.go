@@ -66,7 +66,7 @@ func NewByocAWS(stackId, domain string, defClient *GrpcClient) *byocAws {
 	}
 	return &byocAws{
 		GrpcClient:    defClient,
-		driver:        cfn.New(cdTaskPrefix, aws.Region(pkg.Getenv("AWS_REGION", "us-west-2"))), // TODO: figure out how to get region
+		driver:        cfn.New(cdTaskPrefix, aws.Region(os.Getenv("AWS_REGION"))),
 		StackID:       stackId,
 		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
@@ -168,9 +168,10 @@ func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	_ = identity // TODO: use this to get the account ID
 	return &v1.WhoAmIResponse{
-		Tenant: b.StackID,
+		Tenant:  b.StackID,
+		Region:  cfg.Region,
+		Account: *identity.Account,
 	}, nil
 }
 

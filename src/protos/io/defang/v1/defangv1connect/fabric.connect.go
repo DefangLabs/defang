@@ -69,6 +69,9 @@ const (
 	// FabricControllerGenerateFilesProcedure is the fully-qualified name of the FabricController's
 	// GenerateFiles RPC.
 	FabricControllerGenerateFilesProcedure = "/io.defang.v1.FabricController/GenerateFiles"
+	// FabricControllerSignEULAProcedure is the fully-qualified name of the FabricController's SignEULA
+	// RPC.
+	FabricControllerSignEULAProcedure = "/io.defang.v1.FabricController/SignEULA"
 	// FabricControllerPutSecretProcedure is the fully-qualified name of the FabricController's
 	// PutSecret RPC.
 	FabricControllerPutSecretProcedure = "/io.defang.v1.FabricController/PutSecret"
@@ -104,6 +107,7 @@ type FabricControllerClient interface {
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -187,6 +191,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerGenerateFilesProcedure,
 			opts...,
 		),
+		signEULA: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerSignEULAProcedure,
+			opts...,
+		),
 		putSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
@@ -235,6 +244,7 @@ type fabricControllerClient struct {
 	subscribe             *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices           *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
 	generateFiles         *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
+	signEULA              *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	putSecret             *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	listSecrets           *connect_go.Client[emptypb.Empty, v1.Secrets]
 	createUploadURL       *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
@@ -308,6 +318,11 @@ func (c *fabricControllerClient) GenerateFiles(ctx context.Context, req *connect
 	return c.generateFiles.CallUnary(ctx, req)
 }
 
+// SignEULA calls io.defang.v1.FabricController.SignEULA.
+func (c *fabricControllerClient) SignEULA(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.signEULA.CallUnary(ctx, req)
+}
+
 // PutSecret calls io.defang.v1.FabricController.PutSecret.
 func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.putSecret.CallUnary(ctx, req)
@@ -354,6 +369,7 @@ type FabricControllerHandler interface {
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -433,6 +449,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.GenerateFiles,
 		opts...,
 	)
+	fabricControllerSignEULAHandler := connect_go.NewUnaryHandler(
+		FabricControllerSignEULAProcedure,
+		svc.SignEULA,
+		opts...,
+	)
 	fabricControllerPutSecretHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutSecretProcedure,
 		svc.PutSecret,
@@ -491,6 +512,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetServicesHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateFilesProcedure:
 			fabricControllerGenerateFilesHandler.ServeHTTP(w, r)
+		case FabricControllerSignEULAProcedure:
+			fabricControllerSignEULAHandler.ServeHTTP(w, r)
 		case FabricControllerPutSecretProcedure:
 			fabricControllerPutSecretHandler.ServeHTTP(w, r)
 		case FabricControllerListSecretsProcedure:
@@ -562,6 +585,10 @@ func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connec
 
 func (UnimplementedFabricControllerHandler) GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateFiles is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SignEULA is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {

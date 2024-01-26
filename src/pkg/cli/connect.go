@@ -1,35 +1,37 @@
 package cli
 
 import (
-	"net/http"
+	"net"
 	"os"
 	"strings"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/auth"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Connect(server string, provider client.Provider) (client.Client, pkg.TenantID) {
-	tenantId, host := SplitTenantHost(server)
+func SplitTenantHost(cluster string) (pkg.TenantID, string) {
+	tenant := pkg.DEFAULT_TENANT
+	parts := strings.SplitN(cluster, "@", 2)
+	if len(parts) == 2 {
+		tenant, cluster = pkg.TenantID(parts[0]), parts[1]
+	}
+	if _, _, err := net.SplitHostPort(cluster); err != nil {
+		cluster = cluster + ":443" // default to https
+	}
+	return tenant, cluster
+}
 
-	accessToken := GetExistingToken(server)
+func Connect(cluster string, provider client.Provider) (client.Client, pkg.TenantID) {
+	tenantId, host := SplitTenantHost(cluster)
+
+	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
-		tenantId, _ = TenantFromAccessToken(accessToken)
+		tenantId, _ = client.TenantFromAccessToken(accessToken)
 	}
-	Debug(" - Using tenant", tenantId, "for server", server, "and provider", provider)
+	Debug(" - Using tenant", tenantId, "for cluster", cluster, "and provider", provider)
 
-	baseUrl := "http://"
-	if strings.HasSuffix(server, ":443") {
-		baseUrl = "https://"
-	}
-	baseUrl += host
-	Debug(" - Connecting to", baseUrl)
-	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-	Info(" * Connected to", host)
-	defangClient := client.NewGrpcClient(fabricClient, server, accessToken)
+	Info(" * Connecting to", host)
+	defangClient := client.NewGrpcClient(host, accessToken)
 
 	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
 	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
@@ -42,7 +44,7 @@ func Connect(server string, provider client.Provider) (client.Client, pkg.Tenant
 	}
 
 	if awsInEnv {
-		Warn(" ! Using Defang provider, but AWS environment variables are detected; use '-P aws'")
+		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
 	}
 	return defangClient, tenantId
 }

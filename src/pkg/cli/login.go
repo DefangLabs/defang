@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -39,22 +38,8 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func SplitTenantHost(fabric string) (pkg.TenantID, string) {
-	parts := strings.SplitN(fabric, "@", 2)
-	if len(parts) == 2 {
-		return pkg.TenantID(parts[0]), parts[1]
-	}
-	return pkg.DEFAULT_TENANT, fabric
-}
-
 func CheckLogin(ctx context.Context, client client.Client) error {
-	// TODO: use WhoAmI instead of GetServices
-	// resp, err := client.WhoAmI(ctx)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// return resp.Tenant, nil
-	_, err := client.GetServices(ctx)
+	_, err := client.WhoAmI(ctx)
 	return err
 }
 
