@@ -6,9 +6,10 @@ authors = ["Raphaël Titsworth-Morin <raphael@ephemerecreative.ca>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "3.10.12"
 llama-index = "^0.9.13"
 flask = "^3.0.0"
+torch = "^2.1.2"
 
 
 [build-system]

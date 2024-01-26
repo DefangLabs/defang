@@ -1,13 +1,12 @@
 version: '3.9'
 services:
-  llama:
+  gpu-dev:
     build:
-      context: .
+      context: ./app
       dockerfile: Dockerfile
       shm_size: 30G
-    environment:
-      - MODEL=phi
     deploy:
+      replicas: 1
       resources:
         reservations:
           cpus: '2.0'
@@ -15,12 +14,10 @@ services:
           devices:
             - capabilities: ["gpu"]
     healthcheck: 
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "curl", "-f", "http://example.com"]
       interval: 1m30s
       timeout: 30s
       retries: 20
-    ports:
-      - mode: ingress
-        target: 5000
     secrets:
       - NGROK_AUTH_TOKEN
+  
