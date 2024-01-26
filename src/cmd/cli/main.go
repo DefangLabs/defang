@@ -41,7 +41,6 @@ var (
 	nonInteractive bool   // set by the --non-interactive flag
 	server         string // set by the --cluster flag
 	tenantId       = pkg.DEFAULT_TENANT
-	version        = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
@@ -252,7 +251,7 @@ var getVersionCmd = &cobra.Command{
 	Short:       "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
-		fmt.Println(version)
+		fmt.Println(GetCurrentVersion())
 
 		cli.Print(cli.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())
@@ -743,8 +742,8 @@ func main() {
 		os.Exit(int(code))
 	}
 
-	if !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
-		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(version, ver) < 0 {
+	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
+		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
 			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 		}
 	}
