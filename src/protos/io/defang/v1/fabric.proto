@@ -80,11 +80,15 @@ message ServiceInfo {
 //   repeated SecretValue secrets = 2;
 // }
 
-message Secrets { repeated string names = 1; }
+message Secrets {
+  repeated string names = 1;
+  string project = 2; // defaults to tenant ID
+}
 
 message SecretValue {
   string name = 1;
   string value = 2;
+  string project = 3; // defaults to tenant ID
 }
 
 message TokenRequest {
