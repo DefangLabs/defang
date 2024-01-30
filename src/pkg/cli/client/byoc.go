@@ -200,7 +200,7 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
 		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
 		"PULUMI_SKIP_UPDATE_CHECK": "true",
-		"STACK":                    b.StackID,
+		"STACK":                    tenant + "-" + b.StackID,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	b.cdTaskArn = taskArn
@@ -595,7 +595,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	}
 	si := &v1.ServiceInfo{
 		Service: service,
-		Tenant:  b.StackID,
+		Project: b.StackID,      // was: tenant
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 	}
 

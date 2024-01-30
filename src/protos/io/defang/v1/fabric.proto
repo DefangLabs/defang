@@ -50,7 +50,10 @@ message DeployResponse {
   string etag = 2;
 }
 
-message DeleteRequest { repeated string names = 1; }
+message DeleteRequest {
+  repeated string names = 1;
+  // string project = 2; // defaults to tenant ID
+}
 
 message DeleteResponse { string etag = 1; }
 
@@ -73,7 +76,7 @@ message UploadURLResponse { string url = 1; }
 message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
-  string tenant = 3;             // tenant ID (or project ID)
+  string project = 3;            // was: tenant; defaults to tenant ID
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
@@ -92,11 +95,15 @@ message ServiceInfo {
 //   repeated SecretValue secrets = 2;
 // }
 
-message Secrets { repeated string names = 1; }
+message Secrets {
+  repeated string names = 1;
+  string project = 2; // defaults to tenant ID
+}
 
 message SecretValue {
   string name = 1;
   string value = 2;
+  string project = 3; // defaults to tenant ID
 }
 
 message TokenRequest {
