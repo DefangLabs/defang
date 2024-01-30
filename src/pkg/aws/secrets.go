@@ -3,24 +3,20 @@ package aws
 import (
 	"context"
 	"errors"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
-	"github.com/defang-io/defang/src/pkg"
 )
 
 var (
-	currentUser = os.Getenv("USER") // TODO: sanitize
-	stack       = pkg.Getenv("STACK", currentUser)
-	stackPrefix = "/" + stack + "/"
+	secretPrefix = "/defang/"
 )
 
 func getSecretID(name string) *string {
-	return ptr.String(stackPrefix + name)
+	return ptr.String(secretPrefix + name)
 }
 
 func IsParameterNotFoundError(err error) bool {
@@ -105,8 +101,6 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 		return nil, err
 	}
 
-	secretPrefix := getSecretID(prefix)
-
 	svc := ssm.NewFromConfig(cfg)
 
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
@@ -115,7 +109,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 			{
 				Key:    ptr.String("Name"),
 				Option: ptr.String("BeginsWith"),
-				Values: []string{*secretPrefix},
+				Values: []string{*getSecretID(prefix)},
 			},
 		},
 	})
@@ -125,7 +119,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	names := make([]string, 0, len(res.Parameters))
 	for _, p := range res.Parameters {
-		if name, found := strings.CutPrefix(*p.Name, stackPrefix); found {
+		if name, found := strings.CutPrefix(*p.Name, secretPrefix); found {
 			names = append(names, name)
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -38,39 +37,36 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-173-gf3f94a6a" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "defang"
-	cdTaskPrefix  = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion     = "v0.4.50-195-gc871623b" // will cause issues if two clients with different versions are connected to the same stack
+	projectName   = "defang"                // TODO: support multiple projects
+	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
 	*GrpcClient
 
-	driver        *cfn.AwsEcs
-	setupDone     bool
-	StackID       string // aka tenant
-	privateDomain string
-	customDomain  string
 	cdTaskArn     awsecs.TaskArn
+	customDomain  string
+	driver        *cfn.AwsEcs
+	privateDomain string
 	privateLbIps  []string
 	publicNatIps  []string
-	// albDnsName    string
+	setupDone     bool
+	stage         string
+	tenantID      string
 }
 
 var _ Client = (*byocAws)(nil)
 
-func NewByocAWS(stackId, domain string, defClient *GrpcClient) *byocAws {
-	user := os.Getenv("USER") // TODO: sanitize; also, this won't work for shared stacks
-	if stackId == "" {
-		stackId = user
-	}
+func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
 	return &byocAws{
-		GrpcClient:    defClient,
-		driver:        cfn.New(cdTaskPrefix, aws.Region(os.Getenv("AWS_REGION"))),
-		StackID:       stackId,
-		privateDomain: stackId + "." + projectName + ".internal", // must match the logic in ecs/common.ts
 		customDomain:  domain,
-		// albDnsName:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
+		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
+		GrpcClient:    defClient,
+		privateDomain: projectName + "." + tenantId + ".internal", // must match the logic in ecs/common.ts
+		stage:         "defang",                                   // must match prefix in secrets.go
+		tenantID:      tenantId,
+		// fqdn:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
@@ -149,7 +145,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runCdTask(ctx, "npm", "start", "up", payloadString, b.GetFabric(), b.GetAccessToken())
+	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
@@ -169,7 +165,7 @@ func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 		return nil, annotateAwsError(err)
 	}
 	return &v1.WhoAmIResponse{
-		Tenant:  b.StackID,
+		Tenant:  b.tenantID,
 		Region:  cfg.Region,
 		Account: *identity.Account,
 	}, nil
@@ -199,8 +195,7 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 		"PROJECT":                  projectName,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
 		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
-		"PULUMI_SKIP_UPDATE_CHECK": "true",
-		"STACK":                    tenant + "-" + b.StackID,
+		"STACK":                    b.tenantID + "-" + b.stage,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	b.cdTaskArn = taskArn
@@ -226,8 +221,8 @@ func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
 func (b byocAws) getClusterNames() []string {
 	// This should match the naming in pulumi/ecs/common.ts
 	return []string{
-		projectName + "-" + b.StackID + "-cluster",
-		projectName + "-" + b.StackID + "-gpu-cluster",
+		projectName + "-" + b.tenantID + "-cluster",
+		projectName + "-" + b.tenantID + "-gpu-cluster",
 	}
 }
 
@@ -301,7 +296,7 @@ func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	var err error
-	prefix := b.StackID + "."
+	prefix := b.tenantID + "."
 	fqn := prefix + secret.Name
 	if secret.Value == "" {
 		err = b.driver.DeleteSecret(ctx, fqn)
@@ -312,11 +307,11 @@ func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 }
 
 func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
-	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
+	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
 	if err != nil {
 		return nil, err
 	}
-	prefix := b.StackID + "."
+	prefix := b.tenantID + "."
 	secrets := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
 		secrets[i] = strings.TrimPrefix(secret, prefix)
@@ -486,7 +481,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		eventStream, err = b.driver.TailTask(ctx, etag)
 		etag = "" // no need to filter by etag
 	} else {
-		logGroupName := projectName + "-" + b.StackID + "-kaniko" // TODO: must match pulumi/index.ts
+		logGroupName := projectName + "-" + b.tenantID + "-kaniko" // TODO: must match pulumi/index.ts
 		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
@@ -590,18 +585,18 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		}
 	}
 	// Check to make sure all required secrets are present in the secrets store
-	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.StackID); missing != nil {
+	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID); missing != nil {
 		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
 	}
 	si := &v1.ServiceInfo{
 		Service: service,
-		Project: b.StackID,      // was: tenant
+		Project: b.tenantID,     // was: tenant
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 	}
 
 	hasHost := false
 	hasIngress := false
-	fqn := newQualifiedName(b.StackID, service.Name)
+	fqn := newQualifiedName(b.tenantID, service.Name)
 	for _, port := range service.Ports {
 		hasIngress = hasIngress || port.Mode == v1.Mode_INGRESS
 		hasHost = hasHost || port.Mode == v1.Mode_HOST
@@ -654,7 +649,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 		}
 	} else if len(secrets) > 1 {
 		// Avoid multiple calls to AWS by sorting the list and then doing a binary search
-		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.StackID)
+		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
 		if err != nil {
 			log.Println("error listing secrets:", err) // TODO: avoid `log` in CLI
 		}
@@ -688,7 +683,7 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
 		if b.customDomain == "" {
-			return "" //b.albDnsName
+			return "" //b.fqdn
 		}
 		return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
 	} else {

@@ -107,14 +107,14 @@ func TestPutSecret(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Check that the secret is in the list
-		secrets, err := b.driver.ListSecretsByPrefix(context.TODO(), b.StackID+".")
+		secrets, err := b.driver.ListSecretsByPrefix(context.TODO(), b.tenantID+".")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(secrets) != 1 {
 			t.Fatalf("expected 1 secret, got %v", secrets)
 		}
-		expected := b.StackID + "." + secretName
+		expected := b.tenantID + "." + secretName
 		if secrets[0] != expected {
 			t.Fatalf("expected %q, got %q", expected, secrets[0])
 		}

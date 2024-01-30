@@ -32,10 +32,10 @@ func TestPutSecret(t *testing.T) {
 	// Create an instance of AWS SSM
 	svc := ssm.NewFromConfig(cfg)
 
-	// Create random secretId, value
+	// Create random secret name and value
 	name := uuid.NewString()
 	value := uuid.NewString()
-	secretId := getSecretID(name)
+	secretId := "/defang/" + name
 
 	exist, err := a.IsValidSecret(ctx, name)
 	if err != nil {
@@ -51,11 +51,11 @@ func TestPutSecret(t *testing.T) {
 	}
 	// Cleanup after test
 	defer svc.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-		Name: secretId,
+		Name: &secretId,
 	})
 
 	gsv, err := svc.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           secretId,
+		Name:           &secretId,
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestPutSecret(t *testing.T) {
 
 	// Check that the secret is deleted
 	_, err = svc.GetParameter(ctx, &ssm.GetParameterInput{
-		Name: secretId,
+		Name: &secretId,
 	})
 	if !isErrCodeNotFound(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)

@@ -40,7 +40,7 @@ func Connect(cluster string, provider client.Provider) (client.Client, pkg.Tenan
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}
 		byocClient := client.NewByocAWS(string(tenantId), "", defangClient) // TODO: custom domain
-		return byocClient, pkg.TenantID(byocClient.StackID)
+		return byocClient, tenantId
 	}
 
 	if awsInEnv {

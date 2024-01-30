@@ -40,7 +40,7 @@ func New(stack string, region region.Region) *AwsEcs {
 	}
 }
 
-func (a AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) {
+func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
