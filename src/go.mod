@@ -31,6 +31,7 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go-v2/service/route53 v1.37.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 )
