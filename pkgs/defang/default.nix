@@ -6,25 +6,28 @@ system ? builtins.currentSystem
 , lib
 , fetchurl
 , installShellFiles
+, makeWrapper
+, stdenv
+, unzip
 }:
 let
   shaMap = {
-    x86_64-linux = "0g84r3jmxywz4pdz4bzwfq3scydxzvdfmq5zhj5p2ww4d11mfnln";
-    aarch64-linux = "15lzvvlwszqfdgkrzjxmlallxla4gv5jwn5b6785s123m105r65v";
-    x86_64-darwin = "1c09dhin3h3pgmdfsbbkfhzdlza2xbapg58r3v4bfb6n6dy2z4kg";
-    aarch64-darwin = "1c09dhin3h3pgmdfsbbkfhzdlza2xbapg58r3v4bfb6n6dy2z4kg";
+    x86_64-linux = "1h3cprak54g65bf2v4yjgih2x4jwri80h224czi1yv5054lp66hb";
+    aarch64-linux = "0y11sx9kn45gi5lv2s2ff9sncsracyx2f8vqabyv9l9ld05d414b";
+    x86_64-darwin = "1lbkha3m4nr7nrq2hliiza494a3acp0a21qxz2c1hagr5b419yxl";
+    aarch64-darwin = "1lbkha3m4nr7nrq2hliiza494a3acp0a21qxz2c1hagr5b419yxl";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_macOS.zip";
-    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.40/defang_0.4.40_macOS.zip";
+    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.56/defang_0.4.56_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.56/defang_0.4.56_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.56/defang_0.4.56_macOS.zip";
+    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.56/defang_0.4.56_macOS.zip";
   };
 in
 pkgs.stdenv.mkDerivation {
   pname = "defang";
-  version = "0.4.40";
+  version = "0.4.56";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -32,7 +35,7 @@ pkgs.stdenv.mkDerivation {
 
   sourceRoot = ".";
 
-  nativeBuildInputs = [ installShellFiles ];
+  nativeBuildInputs = [ installShellFiles unzip ];
 
   installPhase = ''
     mkdir -p $out/bin

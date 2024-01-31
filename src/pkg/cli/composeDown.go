@@ -12,9 +12,9 @@ func ComposeDown(ctx context.Context, client defangv1connect.FabricControllerCli
 		return "", err
 	}
 
-	names := make([]string, len(project.Services))
-	for i, service := range project.Services {
-		names[i] = service.Name
+	names := make([]string, 0, len(project.Services))
+	for _, service := range project.Services {
+		names = append(names, NormalizeServiceName(service.Name))
 	}
 
 	return Delete(ctx, client, names...)
