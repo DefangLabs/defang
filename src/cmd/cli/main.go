@@ -610,6 +610,7 @@ func main() {
 	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
+	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")

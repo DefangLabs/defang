@@ -24,7 +24,7 @@ func Generate(ctx context.Context, client defangv1connect.FabricControllerClient
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		// Print the files that were generated
 		for _, file := range response.Msg.Files {
 			Debug(file.Name + "\n```")

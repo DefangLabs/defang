@@ -382,7 +382,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			continue
 		}
 
-		if DoVerbose {
+		if DoDebug {
 			PrintObject(service.Name, serviceInfo.Msg)
 		}
 		serviceInfos = append(serviceInfos, serviceInfo.Msg)
