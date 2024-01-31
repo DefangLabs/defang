@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
@@ -204,6 +205,16 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			if svccfg.Deploy.EndpointMode != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy endpoint_mode")}
 			}
+			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
+				logrus.Warn("no reservations specified; using limits as reservations")
+			}
+			reservations := getResourceReservations(svccfg.Deploy.Resources)
+			if reservations != nil && reservations.NanoCPUs != "" {
+				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
+				if err != nil || cpus < 0 { // "0" just means "as small as possible"
+					return nil, &ComposeError{fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)}
+				}
+			}
 		}
 	}
 
@@ -249,15 +260,14 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
 			}
 
-			reservations := svccfg.Deploy.Resources.Reservations
-			if reservations == nil {
-				reservations = svccfg.Deploy.Resources.Limits
-			}
+			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil {
-				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
-				if err != nil {
-					// TODO: move this validation up so we don't upload the build context if it's invalid
-					return nil, &ComposeError{fmt.Errorf("invalid reservations cpus: %v", err)}
+				cpus := 0.0
+				if reservations.NanoCPUs != "" {
+					cpus, err = strconv.ParseFloat(reservations.NanoCPUs, 32)
+					if err != nil {
+						panic(err) // was already validated above
+					}
 				}
 				var devices []*pb.Device
 				for _, d := range reservations.Devices {
@@ -379,4 +389,12 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 	}
 
 	return serviceInfos, nil
+}
+
+func getResourceReservations(r types.Resources) *types.Resource {
+	if r.Reservations == nil {
+		// TODO: we might not want to default to all the limits, maybe only memory?
+		return r.Limits
+	}
+	return r.Reservations
 }
