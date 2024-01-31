@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 	"sort"
@@ -58,6 +57,23 @@ type byocAws struct {
 	tenantID      string
 }
 
+type Warning string
+
+func (w Warning) Error() string {
+	return string(w)
+}
+
+type Warnings []Warning
+
+func (w Warnings) Error() string {
+	var buf strings.Builder
+	for _, warning := range w {
+		buf.WriteString(warning.Error())
+		buf.WriteByte('\n')
+	}
+	return buf.String()
+}
+
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
@@ -87,11 +103,27 @@ func (b *byocAws) setUp(ctx context.Context) error {
 }
 
 func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+	// Create the subdomain delegation and pass the subdomain to the CD task
+	if b.customDomain == "" {
+		domain, err := b.delegateSubdomain(ctx)
+		if err != nil {
+			return nil, err
+		}
+		b.customDomain = domain
+	}
+
 	etag := pkg.RandomID()
 	serviceInfos := []*v1.ServiceInfo{}
+	var warnings Warnings
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
-		if err != nil {
+		var warning Warning
+		if errors.As(err, &warning) {
+			warnings = append(warnings, warning)
+		} else if err != nil {
 			return nil, err
 		}
 		serviceInfo.Etag = etag // same etag for all services
@@ -140,34 +172,24 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		// FIXME: this code path didn't work
 	}
 
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
-	// Create the subdomain delegation and pass the subdomain to the CD task
-	if b.customDomain == "" {
-		log.Printf("no custom domain name provided, obtain and delegate a subdomain zone.\n")
-		domain, err := b.delegateSubdomain(ctx)
-		if err != nil {
-			return nil, err
-		}
-		b.customDomain = domain
-	}
-
-	return &v1.DeployResponse{
+	resp := &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	}
+	if err := b.runCdTask(ctx, "npm", "start", "up", payloadString); err != nil {
+		return resp, err
+	}
+	return resp, warnings
 }
 
 func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
+	// Hack: call DelegateSubdomainZone with a dummy record to get the subdomain zone
 	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: []string{"dummy.record"}}
 	resp, err := b.DelegateSubdomainZone(ctx, req)
 	if err != nil {
 		return "", err
 	}
 	domain := resp.Zone
-	log.Printf("delegated subdomain name obtained: %q\n", domain)
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -639,9 +661,14 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		}
 	}
 	// Check to make sure all required secrets are present in the secrets store
-	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID); missing != nil {
+	missing, err := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if missing != nil {
 		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
 	}
+
 	si := &v1.ServiceInfo{
 		Service: service,
 		Project: b.tenantID,     // was: tenant
@@ -663,6 +690,8 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	if hasHost {
 		si.PrivateFqdn = b.getFqdn(fqn, false)
 	}
+
+	var warning Warning
 	if service.Domainname != "" {
 		if !hasIngress {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -670,12 +699,10 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
 		cname, err := net.LookupCNAME(service.Domainname)
 		if err != nil {
-			log.Printf("error looking up CNAME %q: %v\n", service.Domainname, err) // TODO: avoid `log` in CLI
-			// Do not expose the error to the client, but fail the request with FailedPrecondition
+			warning = Warning(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			log.Printf("CNAME %q does not point to %q\n", service.Domainname, si.PublicFqdn) // TODO: avoid `log` in CLI
-			// return nil, fmt.Errorf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn)); FIXME: circular dependency // CodeFailedPrecondition
+			warning = Warning(fmt.Sprintf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn))
 		}
 	}
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
@@ -683,40 +710,28 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 	}
-	return si, nil
+	return si, warning
 }
 
 func newQualifiedName(tenant string, name string) qualifiedName {
 	return qualifiedName(fmt.Sprintf("%s.%s", tenant, name))
 }
 
-func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) *v1.Secret {
-	if len(secrets) == 1 {
-		// Avoid fetching the list of secrets from AWS by only checking the one we need
-		fqn := newQualifiedName(tenantId, secrets[0].Source)
-		found, err := b.driver.IsValidSecret(ctx, fqn)
-		if err != nil {
-			log.Printf("error checking secret: %v\n", err) // TODO: avoid `log` in CLI
-		}
-		if !found {
-			return secrets[0]
-		}
-	} else if len(secrets) > 1 {
-		// Avoid multiple calls to AWS by sorting the list and then doing a binary search
-		sorted, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
-		if err != nil {
-			log.Println("error listing secrets:", err) // TODO: avoid `log` in CLI
-		}
-		for _, secret := range secrets {
-			fqn := newQualifiedName(tenantId, secret.Source)
-			if i := sort.Search(len(sorted), func(i int) bool {
-				return sorted[i] >= fqn
-			}); i >= len(sorted) || sorted[i] != fqn {
-				return secret // secret not found
-			}
+func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) (*v1.Secret, error) {
+	sorted, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
+	if err != nil {
+		return nil, err
+	}
+	for _, secret := range secrets {
+		fqn := newQualifiedName(tenantId, secret.Source)
+		i := sort.Search(len(sorted), func(i int) bool {
+			return sorted[i] >= fqn
+		})
+		if i >= len(sorted) || sorted[i] != fqn {
+			return secret, nil // secret not found
 		}
 	}
-	return nil // all secrets found (or none specified)
+	return nil, nil // all secrets found (or none specified)
 }
 
 type qualifiedName = string // legacy

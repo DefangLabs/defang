@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client client.Client, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
+func ComposeStart(ctx context.Context, c client.Client, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return nil, &ComposeError{err}
@@ -294,7 +295,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		var build *pb.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
+			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
 			if err != nil {
 				return nil, err
 			}
@@ -374,10 +375,13 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		Info(" * Deploying service", service.Name)
 	}
 
-	resp, err := client.Deploy(ctx, &pb.DeployRequest{
+	resp, err := c.Deploy(ctx, &pb.DeployRequest{
 		Services: services,
 	})
-	if err != nil {
+	var warnings client.Warnings
+	if errors.As(err, &warnings) {
+		Warn(warnings)
+	} else if err != nil {
 		return nil, err
 	}
 
