@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 	"golang.org/x/term"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/AlecAivazis/survey/v2"
 
@@ -605,6 +606,22 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
+var eulaCmd = &cobra.Command{
+	Use:         "eula",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Read and/or agree the Defang terms of service",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		agreeToS, _ := cmd.Flags().GetBool("agree-tos")
+		cli.Println("Read our latest terms of service at https://defang.io/terms-conditions.html")
+		if agreeToS {
+			_, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{})
+			return err
+		}
+		return nil
+	},
+}
+
 func main() {
 	colorMode := ColorAuto
 	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
@@ -615,6 +632,10 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
+
+	// Eula command
+	eulaCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
+	rootCmd.AddCommand(eulaCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -740,13 +761,16 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
+		if code == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "EULA") {
+			printDefangHint("Please use the following command to agree to the terms of service:", "eula --agree-tos")
+		}
 
 		os.Exit(int(code))
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
-			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			cli.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 		}
 	}
 }
