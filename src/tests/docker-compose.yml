@@ -7,15 +7,30 @@ services:
         DNS: "${COMPOSE_PROJECT_NAME}-dfnx.prod1.defang.dev"
     env_file:
       - fileName.env
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.50'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.25'
+    #       memory: 256M
     ports:
       - target: 80
-        mode: host
+        mode: ingress
+    secrets:
+      - dummy
+    healthcheck:
+      test: ["NONE"]
+      disable: true
+
   # dfnx:
   #   build:
   #     context: .
       # dockerfile: Dockerfile.dfn
     # ports:
       # - 80
+
   echo:
     image: ealen/echo-server
     ports:
@@ -26,3 +41,8 @@ services:
     # domainname: echotest.gnafed.click
     profiles:
       - donotstart
+
+secrets:
+  dummy:
+    external: true
+    name: dummy

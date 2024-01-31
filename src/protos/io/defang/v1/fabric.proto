@@ -35,7 +35,10 @@ service FabricController {
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 }
 
-message DeleteRequest { repeated string names = 1; }
+message DeleteRequest {
+  repeated string names = 1;
+  // string project = 2; // defaults to tenant ID
+}
 
 message DeleteResponse { string etag = 1; }
 
@@ -58,13 +61,15 @@ message UploadURLResponse { string url = 1; }
 message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
-  string tenant = 3;             // tenant ID (or project ID)
+  string project = 3;            // was: tenant; defaults to tenant ID
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
   repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;
@@ -75,11 +80,15 @@ message ServiceInfo {
 //   repeated SecretValue secrets = 2;
 // }
 
-message Secrets { repeated string names = 1; }
+message Secrets {
+  repeated string names = 1;
+  string project = 2; // defaults to tenant ID
+}
 
 message SecretValue {
   string name = 1;
   string value = 2;
+  string project = 3; // defaults to tenant ID
 }
 
 message TokenRequest {
@@ -209,6 +218,7 @@ message Build {
   string context = 1;           // path or URL to the build context
   string dockerfile = 2;        // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
+  float shm_size = 4;           // in MiB
 
   // string dockerfile_inline = 4; // inline Dockerfile
   // repeated string ssh = 4;
@@ -220,7 +230,6 @@ message Build {
   // map<string, string> labels = 4;
   // bool no_cache = 4;
   // bool pull = 4;
-  // float shm_size = 4;
   // string target = 4;
   // repeated Secret secrets = 4;
   // repeated string tags = 4;
@@ -229,10 +238,11 @@ message Build {
 
 message HealthCheck {
   repeated string test = 1;
-  // float interval = 2;
-  // float timeout = 3;
-  // uint32 retries = 4;
-  // float start_period = 5;
+  uint32 interval = 2; // in seconds
+  uint32 timeout = 3; // in seconds; must be less than interval
+  uint32 retries = 4;
+  // uint32 start_period = 5;
+  // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;
 }
 
@@ -240,7 +250,7 @@ message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal TODO: not part of spec
+  bool internal = 4; // true if service is internal; TODO: not part of spec
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;

@@ -22,6 +22,10 @@ func IsValidServiceName(name string) bool {
 	return len(name) < 20 && validServiceRegex.MatchString(name) // HACK to avoid long target group names
 }
 
+func IsValidTailName(name string) bool {
+	return len(name) < 64 && validServiceRegex.MatchString(name)
+}
+
 func IsValidSecretName(name string) bool {
 	return validSecretRegex.MatchString(name)
 }

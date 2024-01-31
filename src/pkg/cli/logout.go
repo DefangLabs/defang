@@ -12,7 +12,7 @@ func Logout(ctx context.Context, client defangv1connect.FabricControllerClient) 
 	Debug(" - Logging out")
 	_, err := client.RevokeToken(ctx, connect.NewRequest(&emptypb.Empty{}))
 	// Ignore unauthenticated errors, since we're logging out anyway
-	if e, ok := err.(*connect.Error); !ok || e.Code() != connect.CodeUnauthenticated {
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return err
 	}
 	// TODO: remove the cached token file
