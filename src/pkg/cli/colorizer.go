@@ -94,7 +94,7 @@ func Println(c Color, v ...any) (int, error) {
 }
 
 func Debug(v ...any) (int, error) {
-	if !DoVerbose {
+	if !DoDebug {
 		return 0, nil
 	}
 	return Fprintln(os.Stderr, DebugColor, v...)
