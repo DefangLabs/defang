@@ -707,6 +707,7 @@ func main() {
 
 	go func() {
 		<-sigs
+		cli.Debug("Received interrupt signal; cancelling...")
 		cancel()
 	}()
 
