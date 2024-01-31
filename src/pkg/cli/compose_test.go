@@ -45,14 +45,14 @@ func TestLoadDockerCompose(t *testing.T) {
 	DoVerbose = true
 
 	t.Run("no project name", func(t *testing.T) {
-		_, err := loadDockerCompose("../../tests/docker-compose.yml", "")
+		_, err := loadDockerCompose("../../tests/compose.yaml", "")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
 		}
 	})
 
 	t.Run("override project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/docker-compose.yml", "blah")
+		p, err := loadDockerCompose("../../tests/compose.yaml", "blah")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
 		}
@@ -62,7 +62,7 @@ func TestLoadDockerCompose(t *testing.T) {
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/docker-compose.yml", "Valid-Username")
+		p, err := loadDockerCompose("../../tests/compose.yaml", "Valid-Username")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
 		}
