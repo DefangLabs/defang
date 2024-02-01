@@ -98,6 +98,15 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	if err := b.driver.SetUp(ctx, "docker.io/defangio/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
 		return annotateAwsError(err)
 	}
+
+	if b.customDomain == "" {
+		domain, err := b.GetDelegateSubdomainZone(ctx)
+		if err != nil {
+			return err
+		}
+		b.customDomain = domain.Zone
+	}
+
 	b.setupDone = true
 	return nil
 }
@@ -105,14 +114,6 @@ func (b *byocAws) setUp(ctx context.Context) error {
 func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
-	}
-	// Create the subdomain delegation and pass the subdomain to the CD task
-	if b.customDomain == "" {
-		domain, err := b.delegateSubdomain(ctx)
-		if err != nil {
-			return nil, err
-		}
-		b.customDomain = domain
 	}
 
 	etag := pkg.RandomID()
@@ -170,6 +171,10 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		}
 		payloadString = http.RemoveQueryParam(url)
 		// FIXME: this code path didn't work
+	}
+
+	if _, err := b.delegateSubdomain(ctx); err != nil {
+		return nil, err
 	}
 
 	resp := &v1.DeployResponse{

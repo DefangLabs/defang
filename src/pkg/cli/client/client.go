@@ -34,6 +34,7 @@ type Client interface {
 	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
 	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context) error
+	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
 
 	BootstrapCommand(context.Context, string) error
 	GetFabric() string

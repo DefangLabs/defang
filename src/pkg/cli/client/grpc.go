@@ -138,6 +138,10 @@ func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
 	return err
 }
 
+func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*v1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect_go.Request[emptypb.Empty]{}))
+}
+
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
 	return g.client.Tail(ctx, &connect_go.Request[v1.TailRequest]{Msg: req})
 }
