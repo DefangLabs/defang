@@ -46,15 +46,16 @@ const (
 type byocAws struct {
 	*GrpcClient
 
-	cdTaskArn     awsecs.TaskArn
-	customDomain  string
-	driver        *cfn.AwsEcs
-	privateDomain string
-	privateLbIps  []string
-	publicNatIps  []string
-	setupDone     bool
-	stage         string
-	tenantID      string
+	cdTaskArn               awsecs.TaskArn
+	customDomain            string
+	shoudlDelegateSubdomain bool
+	driver                  *cfn.AwsEcs
+	privateDomain           string
+	privateLbIps            []string
+	publicNatIps            []string
+	setupDone               bool
+	stage                   string
+	tenantID                string
 }
 
 type Warning string
@@ -105,6 +106,7 @@ func (b *byocAws) setUp(ctx context.Context) error {
 			return err
 		}
 		b.customDomain = domain.Zone
+		b.shoudlDelegateSubdomain = true
 	}
 
 	b.setupDone = true
@@ -173,8 +175,10 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		// FIXME: this code path didn't work
 	}
 
-	if _, err := b.delegateSubdomain(ctx); err != nil {
-		return nil, err
+	if b.shoudlDelegateSubdomain {
+		if _, err := b.delegateSubdomain(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := &v1.DeployResponse{
