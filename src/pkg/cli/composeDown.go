@@ -3,14 +3,15 @@ package cli
 import (
 	"context"
 
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 )
 
-func ComposeDown(ctx context.Context, client client.Client, filePath, projectName string) (string, error) {
+func ComposeDown(ctx context.Context, client client.Client, filePath string, tenantId pkg.TenantID) (string, error) {
 	// resp, err := client.Deploy(ctx, &pb.DeployRequest{})
 	// return resp.Etag, err
 
-	project, err := loadDockerCompose(filePath, projectName)
+	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return "", err
 	}

@@ -19,6 +19,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
 	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
@@ -92,7 +93,7 @@ func convertPlatform(platform string) pb.Platform {
 	}
 }
 
-func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
+func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, error) {
 	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
 	if files, _ := filepath.Glob(filePath); len(files) > 1 {
@@ -100,16 +101,25 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	} else if len(files) == 1 {
 		filePath = files[0]
 	}
-	Debug(" - Loading compose file", filePath, "for project", projectName)
+	Debug(" - Loading compose file", filePath, "for project", tenantId)
+
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
+
+	projectName := "default"
+	if tenantId == "" {
+		logrus.Warnf("not logged in; using project name %q", projectName)
+	} else {
+		projectName = strings.ToLower(string(tenantId)) // normalize to lowercase
+	}
+
 	project, err := loader.Load(types.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}, loader.WithDiscardEnvFiles, func(o *loader.Options) {
-		o.SetProjectName(strings.ToLower(projectName), projectName != "") // normalize to lowercase
-		o.SkipConsistencyCheck = true                                     // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		o.SetProjectName(projectName, true) // TODO: don't overwrite the declared project name in the compose file
+		o.SkipConsistencyCheck = true       // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	})
 	if err != nil {
 		return nil, err

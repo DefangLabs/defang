@@ -400,7 +400,7 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
+		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
@@ -433,7 +433,7 @@ var composeStartCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
 
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
+		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
@@ -457,7 +457,7 @@ var composeRestartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, string(tenantId))
+		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, tenantId)
 		if err != nil {
 			return err
 		}
@@ -476,7 +476,7 @@ var composeDownCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, string(tenantId))
+		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, tenantId)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -499,14 +499,15 @@ var composeDownCmd = &cobra.Command{
 }
 
 var composeConfigCmd = &cobra.Command{
-	Use:   "config",
-	Args:  cobra.NoArgs, // TODO: takes optional list of service names
-	Short: "Reads a Compose file and shows the generated config",
+	Use:         "config",
+	Annotations: autoConnectAnnotation, // try to get the tenantId from the cached token
+	Args:        cobra.NoArgs,          // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		cli.DoDryRun = true                                                                  // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), false) // force=false to calculate the digest
+		cli.DoDryRun = true                                                          // config is like start in a dry run
+		_, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, false) // force=false to calculate the digest
 		return err
 	},
 }
