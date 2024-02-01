@@ -397,6 +397,7 @@ var composeUpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
+		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
 		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
@@ -405,6 +406,10 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		printEndpoints(serviceInfos)
+
+		if detach {
+			return nil
+		}
 
 		var etag string
 		services := "all services"
@@ -729,6 +734,7 @@ func main() {
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
+	composeUpCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
 	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
