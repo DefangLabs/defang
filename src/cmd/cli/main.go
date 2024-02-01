@@ -612,19 +612,19 @@ var logoutCmd = &cobra.Command{
 }
 
 var tosCmd = &cobra.Command{
-	Use:         "terms",
-	Aliases:     []string{"tos", "eula"},
+	Use:         "tos",
+	Aliases:     []string{"terms", "eula", "tos", "tou"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Read and/or agree the Defang terms and conditions",
+	Short:       "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		agree, _ := cmd.Flags().GetBool("agree")
-		cli.Println("Read our latest terms and conditions at https://defang.io/terms-conditions.html")
+		agree, _ := cmd.Flags().GetBool("agree-tos")
+		cli.Println("Read our latest terms of service at https://defang.io/terms-conditions.html")
 		if agree {
 			if _, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{}); err != nil {
 				return err
 			}
-			cli.Info(" * You have agreed to the Defang terms and conditions")
+			cli.Info(" * You have agreed to the Defang terms of service")
 		}
 		return nil
 	},
@@ -642,7 +642,7 @@ func main() {
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Eula command
-	tosCmd.Flags().Bool("agree", false, "Agree to the Defang terms and conditions")
+	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
 	rootCmd.AddCommand(tosCmd)
 
 	// Token command
@@ -771,7 +771,7 @@ func main() {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
-			printDefangHint("Please use the following command to agree to the Defang terms and conditions:", "terms --agree")
+			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree")
 		}
 
 		os.Exit(int(code))
