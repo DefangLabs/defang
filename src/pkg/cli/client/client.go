@@ -33,6 +33,7 @@ type Client interface {
 	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
 	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
 
+	SignEULA(context.Context) error
 	BootstrapCommand(context.Context, string) error
 	GetFabric() string
 	GetAccessToken() string

@@ -11,6 +11,7 @@ import (
 
 var (
 	DoVerbose = false
+	DoDebug   = false
 	DoDryRun  = false
 )
 

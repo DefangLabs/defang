@@ -115,7 +115,7 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
 	}

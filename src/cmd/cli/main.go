@@ -638,6 +638,21 @@ var bootstrapRefreshCmd = &cobra.Command{
 	},
 }
 
+var eulaCmd = &cobra.Command{
+	Use:         "eula",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Read and/or agree the Defang terms of service",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		agreeToS, _ := cmd.Flags().GetBool("agree-tos")
+		cli.Println("Read our latest terms of service at https://defang.io/terms-conditions.html")
+		if agreeToS {
+			return client.SignEULA(cmd.Context())
+		}
+		return nil
+	},
+}
+
 func main() {
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
@@ -647,6 +662,7 @@ func main() {
 	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Defang cluster to connect to")
 	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
+	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
@@ -657,6 +673,10 @@ func main() {
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
+
+	// Eula command
+	eulaCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
+	rootCmd.AddCommand(eulaCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -750,6 +770,7 @@ func main() {
 
 	go func() {
 		<-sigs
+		cli.Debug("Received interrupt signal; cancelling...")
 		cancel()
 	}()
 
@@ -782,7 +803,7 @@ func main() {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
 		if code == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "EULA") {
-			printDefangHint("Please use the following command to sign the EULA:", "eula sign")
+			printDefangHint("Please use the following command to agree to the terms of service:", "eula --agree-tos")
 		}
 
 		os.Exit(int(code))
@@ -790,7 +811,7 @@ func main() {
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
-			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			cli.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 		}
 	}
 }

@@ -43,6 +43,7 @@ func TestNormalizeServiceName(t *testing.T) {
 
 func TestLoadDockerCompose(t *testing.T) {
 	DoVerbose = true
+	DoDebug = true
 
 	t.Run("no project name", func(t *testing.T) {
 		_, err := loadDockerCompose("../../tests/compose.yaml", "")

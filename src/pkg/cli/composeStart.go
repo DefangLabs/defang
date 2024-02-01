@@ -381,7 +381,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath, projectNa
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}

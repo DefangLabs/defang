@@ -23,7 +23,7 @@ func Generate(ctx context.Context, client client.Client, language string, descri
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		// Print the files that were generated
 		for _, file := range response.Files {
 			Debug(file.Name + "\n```")
