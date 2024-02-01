@@ -444,7 +444,7 @@ var composeStartCmd = &cobra.Command{
 		if len(serviceInfos) == 1 {
 			command += " --etag " + serviceInfos[0].Etag
 		}
-		printDefangHint("To track the deployment status, do:", command)
+		printDefangHint("To track the update, do:", command)
 		return nil
 	},
 }
@@ -473,7 +473,7 @@ var composeDownCmd = &cobra.Command{
 	Short:       "Reads a Compose file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
-		var tail, _ = cmd.Flags().GetBool("tail")
+		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
 		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, string(tenantId))
@@ -488,12 +488,12 @@ var composeDownCmd = &cobra.Command{
 
 		cli.Info(" * Deleted services, deployment ID", etag)
 
-		if tail {
+		if !detach {
 			cli.Info(" * Tailing logs for deployment; press Ctrl+C to detach:")
 			return cli.Tail(cmd.Context(), client, "", etag, since, false)
 		}
 
-		printDefangHint("To track the deployment status, do:", "tail --etag "+etag)
+		printDefangHint("To track the update, do:", "tail --etag "+etag)
 		return nil
 	},
 }
@@ -539,7 +539,7 @@ var deleteCmd = &cobra.Command{
 			return cli.Tail(cmd.Context(), client, "", etag, since, false)
 		}
 
-		printDefangHint("To track the deployment status, do:", "tail --etag "+etag)
+		printDefangHint("To track the update, do:", "tail --etag "+etag)
 		return nil
 	},
 }
@@ -733,11 +733,14 @@ func main() {
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
+	composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
-	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
+	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting") // obsolete, but keep for backwards compatibility
+	composeDownCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
+	composeDownCmd.Flags().MarkHidden("tail")
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
