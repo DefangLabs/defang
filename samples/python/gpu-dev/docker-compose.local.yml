@@ -1,8 +1,0 @@
-version: '3.9'
-services:
-  gpu-dev:
-    build:
-      context: ./app
-      dockerfile: Dockerfile
-      shm_size: 30G
-  
