@@ -31,15 +31,9 @@ import (
 )
 
 const (
-	maxCpus       = 2
-	maxGpus       = 1
-	maxMemoryMiB  = 8192
-	maxReplicas   = 2
-	maxServices   = 6
-	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-217-g742c02f5" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "defang"                // TODO: support multiple projects
-	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion    = "v0.4.50-222-gd6934e90" // will cause issues if two clients with different versions are connected to the same stack
+	projectName  = "defang"                // TODO: support multiple projects
+	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
