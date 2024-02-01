@@ -52,19 +52,20 @@ type byocAws struct {
 	privateLbIps  []string
 	publicNatIps  []string
 	setupDone     bool
-	stage         string
+	pulumiStack   string
 	tenantID      string
 }
 
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
+	const stage = "defang" // must match prefix in secrets.go
 	return &byocAws{
 		customDomain:  domain,
 		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
 		GrpcClient:    defClient,
 		privateDomain: projectName + "." + tenantId + ".internal", // must match the logic in ecs/common.ts
-		stage:         "defang",                                   // must match prefix in secrets.go
+		pulumiStack:   tenantId + "-" + stage,
 		tenantID:      tenantId,
 		// fqdn:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
@@ -195,7 +196,7 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
 		"PROJECT":                  projectName,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
 		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
-		"STACK":                    b.tenantID + "-" + b.stage,
+		"STACK":                    b.pulumiStack,
 	}
 	taskArn, err := b.driver.Run(ctx, env, cmd...)
 	b.cdTaskArn = taskArn
@@ -214,16 +215,16 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 	return &v1.DeleteResponse{Etag: etag}, nil
 }
 
-func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
-	panic("not implemented: Publish")
+// stack returns a stack-qualified name, like the Pulumi TS function `stack`
+func (b *byocAws) stack(name string) string {
+	return projectName + "-" + b.pulumiStack + "-" + name
 }
 
-func (b byocAws) getClusterNames() []string {
+func (b *byocAws) getClusterNames() []string {
 	// This should match the naming in pulumi/ecs/common.ts
-	prefix := projectName + "-" + b.tenantID + "-" + b.stage
 	return []string{
-		prefix + "-cluster",
-		prefix + "-gpu-cluster",
+		b.stack("cluster"),
+		b.stack("gpu-cluster"),
 	}
 }
 
@@ -288,10 +289,6 @@ func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
 
 	// Replace the first underscore to get the FQN.
 	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
-}
-
-func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
-	panic("not implemented: GenerateFiles")
 }
 
 // annotateAwsError translates the AWS error to an error code the CLI client understands
@@ -498,7 +495,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		eventStream, err = b.driver.TailTask(ctx, etag)
 		etag = "" // no need to filter by etag
 	} else {
-		logGroupName := projectName + "-" + b.tenantID + "-kaniko" // TODO: must match pulumi/index.ts
+		logGroupName := b.stack("kaniko") // TODO: rename this, but must match pulumi/index.ts
 		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
