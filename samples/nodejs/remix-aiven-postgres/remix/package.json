@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
+    "@defang-io/pulumi-defang": "^0.15.1",
     "@prisma/client": "^5.5.2",
     "@remix-run/express": "^2.2.0",
     "@remix-run/node": "^2.2.0",
