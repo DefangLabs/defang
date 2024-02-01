@@ -611,17 +611,20 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
-var eulaCmd = &cobra.Command{
-	Use:         "eula",
+var tosCmd = &cobra.Command{
+	Use:         "terms",
+	Aliases:     []string{"tos", "eula"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Read and/or agree the Defang terms of service",
+	Short:       "Read and/or agree the Defang terms and conditions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		agreeToS, _ := cmd.Flags().GetBool("agree-tos")
-		cli.Println("Read our latest terms of service at https://defang.io/terms-conditions.html")
+		agreeToS, _ := cmd.Flags().GetBool("agree")
+		cli.Println("Read our latest terms and conditions at https://defang.io/terms-conditions.html")
 		if agreeToS {
-			_, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{})
-			return err
+			if _, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{}); err != nil {
+				return err
+			}
+			cli.Info(" * You have agreed to the Defang terms and conditions")
 		}
 		return nil
 	},
@@ -639,8 +642,8 @@ func main() {
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Eula command
-	eulaCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
-	rootCmd.AddCommand(eulaCmd)
+	tosCmd.Flags().Bool("agree", false, "Agree to the Defang terms of service")
+	rootCmd.AddCommand(tosCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -767,8 +770,8 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
-		if code == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "EULA") {
-			printDefangHint("Please use the following command to agree to the terms of service:", "eula --agree-tos")
+		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
+			printDefangHint("Please use the following command to agree to the Defang terms and conditions:", "terms --agree")
 		}
 
 		os.Exit(int(code))
