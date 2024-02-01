@@ -220,9 +220,10 @@ func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
 
 func (b byocAws) getClusterNames() []string {
 	// This should match the naming in pulumi/ecs/common.ts
+	prefix := projectName + "-" + b.tenantID + "-" + b.stage
 	return []string{
-		projectName + "-" + b.tenantID + "-cluster",
-		projectName + "-" + b.tenantID + "-gpu-cluster",
+		prefix + "-cluster",
+		prefix + "-gpu-cluster",
 	}
 }
 
@@ -262,15 +263,31 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 			return nil, annotateAwsError(err)
 		}
 		for _, service := range dso.Services {
+			// Check whether this is indeed a service we want to manage
+			fqn := strings.SplitN(getQualifiedNameFromEcsName(*service.ServiceName), ".", 2)
+			if len(fqn) != 2 {
+				continue
+			}
 			// TODO: get the service definition from the task definition or tags
 			serviceInfos = append(serviceInfos, &v1.ServiceInfo{
 				Service: &v1.Service{
-					Name: *service.ServiceName,
+					Name: fqn[1],
 				},
 			})
 		}
 	}
 	return &v1.ListServicesResponse{Services: serviceInfos}, nil
+}
+
+func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
+	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
+	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
+		return ""
+	}
+	serviceName := ecsService[:len(ecsService)-8]
+
+	// Replace the first underscore to get the FQN.
+	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
 }
 
 func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
