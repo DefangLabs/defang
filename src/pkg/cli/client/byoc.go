@@ -473,7 +473,6 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	// TODO: support req.Since
 	etag := req.Etag
 	if etag == "" && req.Service == "cd" {
 		etag = awsecs.GetTaskID(b.cdTaskArn)
@@ -486,6 +485,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	var err error
 	var eventStream awsecs.EventStream
 	if etag != "" && !pkg.IsValidRandomID(etag) {
+		// Assume "etag" is the CD task ID
 		eventStream, err = b.driver.TailTask(ctx, etag)
 		etag = "" // no need to filter by etag
 	} else {
@@ -493,12 +493,20 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
 	}
+	if err != nil {
+		return nil, annotateAwsError(err)
+	}
+	// if es, err := awsecs.Query(ctx, b.driver.LogGroupARN, req.Since.AsTime(), time.Now()); err == nil {
+	// 	for _, e := range es {
+	// 		println(*e.Message)
+	// 	}
+	// }
 	return &byocServerStream{
 		stream:  eventStream,
 		ctx:     ctx,
 		etag:    etag,
 		service: req.Service,
-	}, err
+	}, nil
 }
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC

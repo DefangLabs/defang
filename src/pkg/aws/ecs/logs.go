@@ -18,11 +18,12 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
-// taskArn = arn:aws:ecs:us-west-2:123456789012:task/ecs-edw-cluster/2cba912d5eb14ffd926f6992b054f3bf
-// clusterArn = arn:aws:ecs:us-west-2:123456789012:cluster/ecs-edw-cluster
-// logGroup = arn:aws:logs:us-west-2:123456789012:log-group:/log/group/name:*
-// logstream = prefix/container/2cba912d5eb14ffd926f6992b054f3bf (per "awslogs" driver)
-// logstream = prefix/container-firelens-2cba912d5eb14ffd926f6992b054f3bf (per "awsfirelens" driver)
+// Task ARN						arn:aws:ecs:us-west-2:123456789012:task/CLUSTER_NAME/2cba912d5eb14ffd926f6992b054f3bf
+// Cluster ARN					arn:aws:ecs:us-west-2:123456789012:cluster/CLUSTER_NAME
+// LogGroup ARN					arn:aws:logs:us-west-2:123456789012:log-group:/LOG/GROUP/NAME:*
+// LogGroup ID					arn:aws:logs:us-west-2:123456789012:log-group:/LOG/GROUP/NAME
+// LogStream ("awslogs")		PREFIX/CONTAINER/2cba912d5eb14ffd926f6992b054f3bf
+// LogStream ("awsfirelens")	PREFIX/CONTAINER-firelens-2cba912d5eb14ffd926f6992b054f3bf
 
 func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
@@ -53,6 +54,7 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 	}
 
 	// Start goroutines to wait for the log group to be created for the resource not found log groups
+	since := time.Now()
 	for _, lg := range pendingGroups {
 		cs.wg.Add(1)
 		go func(ctx context.Context, lgID string) {
@@ -67,6 +69,17 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 				case <-ticker.C:
 					es, err := TailLogGroup(ctx, lgID)
 					if err == nil {
+						// Query the logs between the start time and now
+						if events, err := Query(ctx, lgID, since, time.Now()); err == nil {
+							println("found logs:", len(events))
+							cs.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+								Value: types.LiveTailSessionUpdate{
+									SessionResults: events,
+								},
+							}
+						} else {
+							println("error querying logs:", err)
+						}
 						cs.addAndStart(es)
 						return
 					}
@@ -95,6 +108,39 @@ func TailLogGroup(ctx context.Context, logGroupArn string, logStreams ...string)
 	})
 }
 
+func Query(ctx context.Context, logGroupArn string, start time.Time, end time.Time) ([]LogEvent, error) {
+	region := region.FromArn(logGroupArn)
+	cfg, err := aws.LoadDefaultConfig(ctx, region)
+	if err != nil {
+		return nil, err
+	}
+
+	logGroupIdentifier := getLogGroupIdentifier(logGroupArn)
+	cw := cloudwatchlogs.NewFromConfig(cfg)
+	fleo, err := cw.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
+		StartTime:          ptr.Int64(start.UnixMilli()),
+		EndTime:            ptr.Int64(end.UnixMilli()),
+		LogGroupIdentifier: &logGroupIdentifier,
+		// LogStreamNamePrefix:,
+		// LogStreamNames: ,
+	})
+	if err != nil {
+		return nil, err
+	}
+	events := make([]LogEvent, len(fleo.Events))
+	for i, e := range fleo.Events {
+		events[i] = LogEvent{
+			IngestionTime:      e.IngestionTime,
+			LogGroupIdentifier: &logGroupIdentifier,
+			Message:            e.Message,
+			Timestamp:          e.Timestamp,
+			LogStreamName:      e.LogStreamName,
+		}
+	}
+	// TODO: handle pagination using NextToken
+	return events, nil
+}
+
 func startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (EventStream, error) {
 	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
@@ -107,6 +153,16 @@ func startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (Ev
 	if err != nil {
 		return nil, err
 	}
+
+	// if !since.IsZero() {
+	// 	if events, err := Query(ctx, slti.LogGroupIdentifiers[0], since, time.Now()); err == nil {
+	// 		slto.Events <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+	// 			Value: types.LiveTailSessionUpdate{
+	// 				SessionResults: events,
+	// 			},
+	// 		}
+	// 	}
+	// }
 
 	return slto.GetStream(), nil
 }
