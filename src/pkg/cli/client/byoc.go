@@ -37,7 +37,7 @@ const (
 	maxReplicas   = 2
 	maxServices   = 6
 	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-201-g4f3167e8" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion     = "v0.4.50-217-g742c02f5" // will cause issues if two clients with different versions are connected to the same stack
 	projectName   = "defang"                // TODO: support multiple projects
 	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
