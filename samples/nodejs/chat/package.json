@@ -1,0 +1,15 @@
+{
+  "name": "service1",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^4.0.1",
+    "body-parser": "^1.19.0",
+    "http": "0.0.1-security"
+  }
+}
