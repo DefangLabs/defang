@@ -137,7 +137,7 @@ func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) error
 	return errors.New("not a BYOC cluster")
 }
 
-func (g *GrpcClient) SignEULA(ctx context.Context) error {
+func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 	_, err := g.client.SignEULA(ctx, &connect_go.Request[emptypb.Empty]{})
 	return err
 }
