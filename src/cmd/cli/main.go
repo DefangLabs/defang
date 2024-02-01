@@ -618,9 +618,9 @@ var tosCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Read and/or agree the Defang terms and conditions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		agreeToS, _ := cmd.Flags().GetBool("agree")
+		agree, _ := cmd.Flags().GetBool("agree")
 		cli.Println("Read our latest terms and conditions at https://defang.io/terms-conditions.html")
-		if agreeToS {
+		if agree {
 			if _, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{}); err != nil {
 				return err
 			}
@@ -642,7 +642,7 @@ func main() {
 	//rootCmd.PersistentFlags().StringVarP(&userLicense, "license", "l", "", "name of license for the project")
 
 	// Eula command
-	tosCmd.Flags().Bool("agree", false, "Agree to the Defang terms of service")
+	tosCmd.Flags().Bool("agree", false, "Agree to the Defang terms and conditions")
 	rootCmd.AddCommand(tosCmd)
 
 	// Token command
