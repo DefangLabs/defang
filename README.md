@@ -5,7 +5,7 @@ The Defang Opinionated Platform (DOP) is a radically simpler way to build, deplo
 This repo includes:
 * Public releases of the Defang CLI; [click here](https://github.com/defang-io/defang/releases/latest/) for the latest version
 * Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
-* Samples that show how to deploy an app using the Defang Pulumi Provider.
+* Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/defang-io/pulumi-defang).
 
 ## Getting started
 * Read our [Terms and Conditions](https://defang.io/terms-service.html)
