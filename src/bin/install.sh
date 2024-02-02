@@ -5,7 +5,7 @@
 # This script installs the latest release of defang from GitHub. It is designed                #
 # to be run like this:                                                                         #
 #                                                                                              #
-# source <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh) #
+# . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)      #
 #                                                                                              #
 # This allows us to do some interactive stuff where we can prompt the user for input.          #
 #                                                                                              #
