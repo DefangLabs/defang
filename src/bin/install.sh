@@ -1,5 +1,25 @@
 #!/bin/bash
 
+################################################################################################
+#                                                                                              #
+# This script installs the latest release of defang from GitHub. It is designed                #
+# to be run like this:                                                                         #
+#                                                                                              #
+# source <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh) #
+#                                                                                              #
+# This allows us to do some interactive stuff where we can prompt the user for input.          #
+#                                                                                              #
+################################################################################################
+
+echo "
+       __     ____                 
+  ____/ /__  / __/___ _____  ____ _
+ / __  / _ \/ /_/ __ \`/ __ \/ __ \`/
+/ /_/ /  __/ __/ /_/ / / / / /_/ / 
+\__,_/\___/_/  \__,_/_/ /_/\__, /  
+                          /____/
+"
+
 # Define the GitHub API URL for the latest release
 RELEASE_API_URL="https://api.github.com/repos/defang-io/defang/releases/latest"
 
@@ -114,30 +134,41 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to your PATH for this session."
     export PATH="$PATH:$INSTALL_DIR"
 
-    # Detect the shell and choose the appropriate profile file
-    case $SHELL in
-    */bash)
-        PROFILE_FILE="$HOME/.bashrc"
-        ;;
-    */zsh)
-        PROFILE_FILE="$HOME/.zshrc"
-        ;;
-    */ksh)
-        PROFILE_FILE="$HOME/.kshrc"
-        ;;
-    # Add more cases here for other shells
-    *)
-        echo "Unsupported shell. Please add the following line to your shell's profile file:"
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\""
-        PROFILE_FILE=""
-        ;;
-    esac
+    # Define the possible shell profile files
+    PROFILE_FILES=(".bashrc" ".zshrc" ".kshrc")
+    FOUND_PROFILE_FILE=false
 
-    # Append the line to the profile file, if one was found
-    if [[ -n "$PROFILE_FILE" ]]; then
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$PROFILE_FILE"
-        echo "Added $INSTALL_DIR to your PATH in $PROFILE_FILE. The change will take effect in new shell sessions."
+    # Loop over the possible profile files
+    for profile_file in "${PROFILE_FILES[@]}"; do
+        # If the profile file exists in the user's home directory
+        if [[ -f "$HOME/$profile_file" ]]; then
+            FOUND_PROFILE_FILE=true
+            # Prompt the user for confirmation
+            read -p "Can we append the necessary line to $HOME/$profile_file? (y/n) " -n 1 -r
+            echo    # move to a new line
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # Append the line to the profile file
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/$profile_file"
+            fi
+        fi
+    done
+
+    # If no profile file was found
+    if [[ $FOUND_PROFILE_FILE == false ]]; then
+        # Get the name of the current shell
+        CURRENT_SHELL=$(basename "$SHELL")
+        # Prompt the user to create a new profile file
+        read -p "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) " -n 1 -r
+        echo    # move to a new line
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Create the new profile file and append the line
+            echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/.$CURRENT_SHELL"rc""
+        fi
     fi
 fi
+
+# Cleanup: Remove the originally downloaded file
+echo "Cleaning up..."
+rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
