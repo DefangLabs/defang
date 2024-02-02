@@ -83,7 +83,7 @@ EXTRACT_DIR=$(mktemp -d)
 # Extract the downloaded file to the temporary directory
 echo "Extracting the downloaded file to $EXTRACT_DIR..."
 if [ "$OS" = "Darwin" ]; then
-    if ! unzip "$FILENAME" -d "$EXTRACT_DIR"; then
+    if ! unzip -q "$FILENAME" -d "$EXTRACT_DIR"; then
         echo "Failed to extract the downloaded file. The file might be corrupted."
         exit 1
     fi
@@ -113,15 +113,15 @@ fi
 BINARY_NAME='defang' # Adjust this based on actual content
 
 # Move the binary or application to the installation directory from the temporary directory
-echo "Moving the binary/application to $INSTALL_DIR"
+echo "Moving defang to $INSTALL_DIR"
 if ! mv "$EXTRACT_DIR/$BINARY_NAME" "$INSTALL_DIR"; then
-    echo "Failed to move the binary/application. Please check your permissions and try again."
+    echo "Failed to move defang. Please check your permissions and try again."
     exit 1
 fi
 
 # Make the binary executable
 if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
-    echo "Failed to make the binary/application executable. Please check your permissions and try again."
+    echo "Failed to make defang executable. Please check your permissions and try again."
     exit 1
 fi
 
@@ -149,7 +149,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
             echo    # move to a new line
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # Append the line to the profile file
-                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/$profile_file"
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang Installer" >> "$HOME/$profile_file"
             fi
         fi
     done
@@ -164,7 +164,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         echo    # move to a new line
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create the new profile file and append the line
-            echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/.$CURRENT_SHELL"rc""
+            echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/.$CURRENT_SHELL"rc" # Added by Defang Installer"
         fi
     fi
 fi
