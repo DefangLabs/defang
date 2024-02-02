@@ -8,15 +8,16 @@ This repo includes:
 * Samples that show how to deploy an app using the Defang Pulumi Provider.
 
 ## Getting started
-* Read our [Terms and Conditions](https://defang.io/terms-conditions.html)
+* Read our [Terms and Conditions](https://defang.io/terms-service.html)
 * Download the [latest version](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
-  * or use the [Nix package manager](https://nixos.org): `nix profile install github:defang-io/defang#defang-bin --refresh`
+  * or use the [Nix package manager](https://nixos.org):
+    * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/master.tar.gz`
+    * with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
 * Take a look at our [Samples folder](https://github.com/defang-io/defang/tree/main/samples) for example projects in various programming languages.
 * Try the AI integration by running `defang generate`
 * Start your new service with `defang compose up`
 
 ## Support
-* Join our Slack channel using this [invite link](https://join.slack.com/share/enQtNTY2NzE1MTAzNDgzMi03M2YyZmZhYWE2YWNiMzFiYmI1MzJjMjUwNzVmZWIzOTYyZjhmOTlhYjU5ZTI1MGY4NjcwMGIzNzdkNWQ0ZWNi)
 * File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
 
 ## Command completion
