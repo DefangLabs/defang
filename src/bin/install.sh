@@ -113,8 +113,31 @@ rm -rf "$EXTRACT_DIR"
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to your PATH for this session."
     export PATH="$PATH:$INSTALL_DIR"
-    echo "To make this change permanent, add the following line to your shell profile:"
-    echo "export PATH=\"\$PATH:$INSTALL_DIR\""
+
+    # Detect the shell and choose the appropriate profile file
+    case $SHELL in
+    */bash)
+        PROFILE_FILE="$HOME/.bashrc"
+        ;;
+    */zsh)
+        PROFILE_FILE="$HOME/.zshrc"
+        ;;
+    */ksh)
+        PROFILE_FILE="$HOME/.kshrc"
+        ;;
+    # Add more cases here for other shells
+    *)
+        echo "Unsupported shell. Please add the following line to your shell's profile file:"
+        echo "export PATH=\"\$PATH:$INSTALL_DIR\""
+        PROFILE_FILE=""
+        ;;
+    esac
+
+    # Append the line to the profile file, if one was found
+    if [[ -n "$PROFILE_FILE" ]]; then
+        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$PROFILE_FILE"
+        echo "Added $INSTALL_DIR to your PATH in $PROFILE_FILE. The change will take effect in new shell sessions."
+    fi
 fi
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
