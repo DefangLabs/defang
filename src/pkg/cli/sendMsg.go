@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/bufbuild/connect-go"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient,
 		return nil
 	}
 
-	_, err := client.Publish(ctx, connect.NewRequest(&pb.PublishRequest{Event: &pb.Event{
+	_, err := client.Publish(ctx, connect.NewRequest(&v1.PublishRequest{Event: &v1.Event{
 		Specversion:     "1.0",
 		Type:            _type,
 		Source:          "https://cli.defang.io",

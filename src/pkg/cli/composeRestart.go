@@ -3,11 +3,11 @@ package cli
 import (
 	"context"
 
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func ComposeRestart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) ([]*pb.ServiceInfo, error) {
+func ComposeRestart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) ([]*v1.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return nil, err

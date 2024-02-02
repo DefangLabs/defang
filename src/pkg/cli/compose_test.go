@@ -14,7 +14,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/types"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
@@ -79,7 +79,7 @@ func TestConvertPort(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    types.ServicePortConfig
-		expected *pb.Port
+		expected *v1.Port
 		wantErr  string
 	}{
 		{
@@ -90,7 +90,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Undefined mode and protocol, target only",
 			input:    types.ServicePortConfig{Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
 		},
 		{
 			name:    "Published range xfail",
@@ -100,12 +100,12 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Implied ingress mode, defined protocol, published equals target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Published: "1234", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_TCP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_TCP},
 		},
 		{
 			name:     "Implied ingress mode, udp protocol, published equals target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Published: "1234", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_UDP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP},
 		},
 		{
 			name:    "Localhost IP, unsupported mode and protocol xfail",
@@ -115,7 +115,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Ingress mode without host IP, single target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_INGRESS, Protocol: pb.Protocol_HTTP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
 		},
 		{
 			name:    "Ingress mode without host IP, single target, published range xfail",
@@ -240,14 +240,14 @@ type mockGrpcClient struct {
 	url string
 }
 
-func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[pb.UploadURLRequest]) (*connect.Response[pb.UploadURLResponse], error) {
-	return connect.NewResponse(&pb.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
+func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error) {
+	return connect.NewResponse(&v1.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
 }
 
-func (mockGrpcClient) Subscribe(context.Context, *connect.Request[pb.SubscribeRequest]) (*connect.ServerStreamForClient[pb.SubscribeResponse], error) {
+func (mockGrpcClient) Subscribe(context.Context, *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Subscribe is not implemented"))
 }
 
-func (mockGrpcClient) Tail(context.Context, *connect.Request[pb.TailRequest]) (*connect.ServerStreamForClient[pb.TailResponse], error) {
+func (mockGrpcClient) Tail(context.Context, *connect.Request[v1.TailRequest]) (*connect.ServerStreamForClient[v1.TailResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Tail is not implemented"))
 }

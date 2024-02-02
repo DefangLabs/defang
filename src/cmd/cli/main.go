@@ -26,7 +26,8 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
 	"github.com/defang-io/defang/src/pkg/scope"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
@@ -41,7 +42,7 @@ var (
 	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
 	nonInteractive bool   // set by the --non-interactive flag
 	server         string // set by the --cluster flag
-	tenantId       = pkg.DEFAULT_TENANT
+	tenantId       = types.DEFAULT_TENANT
 )
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
@@ -380,7 +381,7 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
+func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
 		if len(serviceInfo.Endpoints) > 0 {
@@ -388,7 +389,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 		}
 		cli.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
 		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+			if serviceInfo.Service.Ports[i].Mode == v1.Mode_INGRESS {
 				endpoint = "https://" + endpoint
 			}
 			fmt.Println("   -", endpoint)
@@ -592,7 +593,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, clientId, pkg.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, clientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 

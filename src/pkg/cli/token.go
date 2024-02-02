@@ -10,15 +10,14 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg"
-	fab "github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/github"
 	"github.com/defang-io/defang/src/pkg/scope"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Token(ctx context.Context, client defangv1connect.FabricControllerClient, clientId string, tenant pkg.TenantID, dur time.Duration, scope scope.Scope) error {
+func Token(ctx context.Context, client defangv1connect.FabricControllerClient, clientId string, tenant types.TenantID, dur time.Duration, scope scope.Scope) error {
 	if DoDryRun {
 		return errors.New("dry-run")
 	}
@@ -38,7 +37,7 @@ func Token(ctx context.Context, client defangv1connect.FabricControllerClient, c
 	return nil
 }
 
-func generateToken(ctx context.Context, client defangv1connect.FabricControllerClient, code string, tenant pkg.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
+func generateToken(ctx context.Context, client defangv1connect.FabricControllerClient, code string, tenant types.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
@@ -50,14 +49,14 @@ func generateToken(ctx context.Context, client defangv1connect.FabricControllerC
 
 	Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
 
-	token, err := client.Token(ctx, connect.NewRequest(&pb.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())}))
+	token, err := client.Token(ctx, connect.NewRequest(&v1.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())}))
 	if err != nil {
 		return "", err
 	}
 	return token.Msg.AccessToken, nil
 }
 
-func TenantFromAccessToken(at string) (fab.TenantID, error) {
+func TenantFromAccessToken(at string) (types.TenantID, error) {
 	parts := strings.Split(at, ".")
 	if len(parts) != 3 {
 		return "", errors.New("not a JWT")
@@ -70,5 +69,5 @@ func TenantFromAccessToken(at string) (fab.TenantID, error) {
 		return "", err
 	}
 	err = json.Unmarshal(bytes, &claims)
-	return fab.TenantID(claims.Sub), err
+	return types.TenantID(claims.Sub), err
 }

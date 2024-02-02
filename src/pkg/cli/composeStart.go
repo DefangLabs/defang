@@ -11,13 +11,13 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
+func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*v1.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, projectName)
 	if err != nil {
 		return nil, &ComposeError{err}
@@ -221,11 +221,11 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 	//
 	// Publish updates
 	//
-	var services []*pb.Service
+	var services []*v1.Service
 	for _, svccfg := range project.Services {
-		var healthcheck *pb.HealthCheck
+		var healthcheck *v1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
-			healthcheck = &pb.HealthCheck{
+			healthcheck = &v1.HealthCheck{
 				Test: svccfg.HealthCheck.Test,
 			}
 			if nil != svccfg.HealthCheck.Interval {
@@ -246,15 +246,15 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 		// Show a warning when we have ingress ports but no explicit healthcheck
 		for _, port := range ports {
-			if port.Mode == pb.Mode_INGRESS && healthcheck == nil {
+			if port.Mode == v1.Mode_INGRESS && healthcheck == nil {
 				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
 				break
 			}
 		}
 
-		var deploy *pb.Deploy
+		var deploy *v1.Deploy
 		if svccfg.Deploy != nil {
-			deploy = &pb.Deploy{}
+			deploy = &v1.Deploy{}
 			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
@@ -269,16 +269,16 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 						panic(err) // was already validated above
 					}
 				}
-				var devices []*pb.Device
+				var devices []*v1.Device
 				for _, d := range reservations.Devices {
-					devices = append(devices, &pb.Device{
+					devices = append(devices, &v1.Device{
 						Capabilities: d.Capabilities,
 						Count:        uint32(d.Count),
 						Driver:       d.Driver,
 					})
 				}
-				deploy.Resources = &pb.Resources{
-					Reservations: &pb.Resource{
+				deploy.Resources = &v1.Resources{
+					Reservations: &v1.Resource{
 						Cpus:    float32(cpus),
 						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
@@ -292,7 +292,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 
 		// Upload the build context, if any; TODO: parallelize
-		var build *pb.Build
+		var build *v1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
 			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
@@ -300,7 +300,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 				return nil, err
 			}
 
-			build = &pb.Build{
+			build = &v1.Build{
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
@@ -331,9 +331,9 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 
 		// Extract secret references
-		var secrets []*pb.Secret
+		var secrets []*v1.Secret
 		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &pb.Secret{
+			secrets = append(secrets, &v1.Secret{
 				Source: secret.Source,
 			})
 		}
@@ -343,7 +343,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			init = *svccfg.Init
 		}
 
-		services = append(services, &pb.Service{
+		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
@@ -364,7 +364,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	var serviceInfos []*pb.ServiceInfo
+	var serviceInfos []*v1.ServiceInfo
 	for _, service := range services {
 		if DoDryRun {
 			PrintObject(service.Name, service)

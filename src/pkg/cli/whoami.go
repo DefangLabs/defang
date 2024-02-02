@@ -1,8 +1,8 @@
 package cli
 
-import fab "github.com/defang-io/defang/src/pkg"
+import "github.com/defang-io/defang/src/pkg/types"
 
-func Whoami(server string) (fab.TenantID, error) {
+func Whoami(server string) (types.TenantID, error) {
 	accessToken := GetExistingToken(server)
 	return TenantFromAccessToken(accessToken)
 }

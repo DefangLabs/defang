@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -84,7 +84,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, connect.NewRequest(&pb.ServiceID{Name: service})); err != nil {
+		if _, err := client.Get(ctx, connect.NewRequest(&v1.ServiceID{Name: service})); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
@@ -96,7 +96,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		}
 	}
 
-	tailClient, err := client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+	tailClient, err := client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, connect.NewRequest(&pb.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+				tailClient, err = client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
 				if err != nil {
 					Debug(" - Reconnect failed:", err)
 					return err
@@ -226,6 +226,6 @@ func isProgressDot(line string) bool {
 	return len(line) <= 1 || len(StripAnsi(line)) <= 1
 }
 
-func isProgressMsg(entries []*pb.LogEntry) bool {
+func isProgressMsg(entries []*v1.LogEntry) bool {
 	return len(entries) == 0 || (len(entries) == 1 && isProgressDot(entries[0].Message))
 }
