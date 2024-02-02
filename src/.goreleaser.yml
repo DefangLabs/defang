@@ -11,7 +11,7 @@ builds:
       - arm64
     hooks:
       post:
-        - ../bin/codesign.sh "{{ .Path }}"
+        - ./bin/codesign.sh "{{ .Path }}"
 
   - id: defang-cli
     main: ./cmd/cli
@@ -33,7 +33,7 @@ universal_binaries:
     replace: true
     hooks:
       post:
-        - ../bin/codesign.sh "{{ .Path }}"
+        - ./bin/codesign.sh "{{ .Path }}"
 
 archives:
   - format_overrides:

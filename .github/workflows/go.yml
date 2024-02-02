@@ -8,7 +8,6 @@ on:
       - '**'
     paths:
       - '.github/workflows/go.yml'
-      - 'bin/codesign.sh'
       - 'src/**'
 
 jobs:
