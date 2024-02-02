@@ -8,11 +8,14 @@ This repo includes:
 * Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/defang-io/pulumi-defang).
 
 ## Getting started
-* Read our [Terms and Conditions](https://defang.io/terms-service.html)
-* Download the [latest version](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
-  * or use the [Nix package manager](https://nixos.org):
+* Read our [Terms of Service](https://defang.io/terms-service.html)
+* Install the Defang CLI from one of the following sources:
+  * Download the [latest version](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
+  * Using the [Homebrew package manager](https://brew.sh): `brew install defang-io/defang/defang-cli`
+  * Using [Go](https://go.dev): `go install github.com/defang-io/defang/src/cmd/cli@latest`
+  * Using the [Nix package manager](https://nixos.org):
     * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz`
-    * with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
+    * or with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
 * Take a look at our [Samples folder](https://github.com/defang-io/defang/tree/main/samples) for example projects in various programming languages.
 * Try the AI integration by running `defang generate`
 * Start your new service with `defang compose up`
@@ -21,7 +24,7 @@ This repo includes:
 * File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
 
 ## Command completion
-The Defang CLI supports command completion for Bash, Zsh, and Fish. To get the shell script for command completion, run the following command:
+The Defang CLI supports command completion for Bash, Zsh, Fish, and Powershell. To get the shell script for command completion, run the following command:
 ```
 defang completion [bash|zsh|fish|powershell]
 ```
@@ -40,6 +43,11 @@ or pipe the output to a file called `_defang` in the directory with the completi
 If you're using Fish, you can add the following to your `~/.config/fish/config.fish` file:
 ```
 defang completion fish | source
+```
+
+If you're using Powershell, you can add the following to your `$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1` file:
+```
+Invoke-Expression -Command (defang completion powershell | Out-String)
 ```
 
 ## Environment Variables
