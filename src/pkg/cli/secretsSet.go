@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/bufbuild/connect-go"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
@@ -15,6 +15,6 @@ func SecretsSet(ctx context.Context, client defangv1connect.FabricControllerClie
 		return nil
 	}
 
-	_, err := client.PutSecret(ctx, connect.NewRequest(&pb.SecretValue{Name: name, Value: value}))
+	_, err := client.PutSecret(ctx, connect.NewRequest(&v1.SecretValue{Name: name, Value: value}))
 	return err
 }

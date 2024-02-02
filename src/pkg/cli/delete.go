@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/bufbuild/connect-go"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
@@ -15,7 +15,7 @@ func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, 
 		return "", nil
 	}
 
-	resp, err := client.Delete(ctx, connect.NewRequest(&pb.DeleteRequest{Names: names}))
+	resp, err := client.Delete(ctx, connect.NewRequest(&v1.DeleteRequest{Names: names}))
 	if err != nil {
 		return "", err
 	}

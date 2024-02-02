@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/types"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Connect(server string) (defangv1connect.FabricControllerClient, pkg.TenantID) {
+func Connect(server string) (defangv1connect.FabricControllerClient, types.TenantID) {
 	accessToken := GetExistingToken(server)
 	tenantId, _ := TenantFromAccessToken(accessToken)
 	_, host := SplitTenantHost(server) // TODO: use this returned tenantId when we have no access token

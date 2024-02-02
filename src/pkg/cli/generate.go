@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/bufbuild/connect-go"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
@@ -16,7 +16,7 @@ func Generate(ctx context.Context, client defangv1connect.FabricControllerClient
 		return nil, nil
 	}
 
-	response, err := client.GenerateFiles(ctx, connect.NewRequest(&pb.GenerateFilesRequest{
+	response, err := client.GenerateFiles(ctx, connect.NewRequest(&v1.GenerateFilesRequest{
 		Language: language,
 		Prompt:   description,
 	}))
