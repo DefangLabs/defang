@@ -1,0 +1,12 @@
+{
+    "name": "defang-pulumi-remix-postgres",
+    "main": "index.ts",
+    "devDependencies": {
+        "@types/node": "^16"
+    },
+    "dependencies": {
+        "@defang-io/pulumi-defang": "^0.11.8",
+        "@pulumi/aiven": "^6.7.2",
+        "@pulumi/pulumi": "^3.0.0"
+    }
+}

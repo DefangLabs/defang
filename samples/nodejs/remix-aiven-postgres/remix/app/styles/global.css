@@ -1,0 +1,11 @@
+body {
+  font-family: "Roboto", sans-serif;
+  /* nice, subtle light coloured gradient with a blue hue */
+  background-image: linear-gradient(
+    135deg,
+    #f5f7fa 0%,
+    #c3cfe2 100%
+  );
+  padding: 20px;
+  min-height: 100vh;
+}
