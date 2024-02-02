@@ -771,7 +771,7 @@ func main() {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
-			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree")
+			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree-tos")
 		}
 
 		os.Exit(int(code))
