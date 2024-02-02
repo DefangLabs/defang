@@ -619,7 +619,7 @@ var tosCmd = &cobra.Command{
 	Short:       "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agree, _ := cmd.Flags().GetBool("agree-tos")
-		cli.Println("Read our latest terms of service at https://defang.io/terms-conditions.html")
+		cli.Println("Read our latest terms of service at https://defang.io/terms-service.html")
 		if agree {
 			if _, err := client.SignEULA(cmd.Context(), &connect.Request[emptypb.Empty]{}); err != nil {
 				return err
