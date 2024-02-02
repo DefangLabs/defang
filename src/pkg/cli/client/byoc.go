@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/logs"
+	"github.com/defang-io/defang/src/pkg/quota"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 
 	"google.golang.org/protobuf/proto"
@@ -511,94 +511,8 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
-	if service.Name == "" {
-		return nil, errors.New("service name is required") // CodeInvalidArgument
-	}
-	if service.Build != nil {
-		if service.Build.Context == "" {
-			return nil, errors.New("build.context is required") // CodeInvalidArgument
-		}
-		if service.Build.ShmSize > maxShmSizeMiB || service.Build.ShmSize < 0 {
-			return nil, fmt.Errorf("build.shm_size exceeds quota (max %d MiB)", maxShmSizeMiB) // CodeInvalidArgument
-		}
-		// TODO: consider stripping the pre-signed query params from the URL, but only if it's an S3 URL. (Not ideal because it would cause a diff in Pulumi.)
-	} else {
-		if service.Image == "" {
-			return nil, errors.New("missing image") // CodeInvalidArgument
-		}
-	}
-
-	uniquePorts := make(map[uint32]bool)
-	for _, port := range service.Ports {
-		if port.Target < 1 || port.Target > 32767 {
-			return nil, fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
-		}
-		if port.Mode == v1.Mode_INGRESS {
-			if port.Protocol == v1.Protocol_TCP || port.Protocol == v1.Protocol_UDP {
-				return nil, fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
-			}
-		}
-		if uniquePorts[port.Target] {
-			return nil, fmt.Errorf("duplicate port %d", port.Target) // CodeInvalidArgument
-		}
-		uniquePorts[port.Target] = true
-	}
-	if service.Healthcheck != nil && len(service.Healthcheck.Test) > 0 {
-		switch service.Healthcheck.Test[0] {
-		case "CMD":
-			if len(service.Healthcheck.Test) < 3 {
-				return nil, errors.New("invalid CMD healthcheck; expected a command and URL") // CodeInvalidArgument
-			}
-			if !strings.HasSuffix(service.Healthcheck.Test[1], "curl") && !strings.HasSuffix(service.Healthcheck.Test[1], "wget") {
-				return nil, errors.New("invalid CMD healthcheck; expected curl or wget") // CodeInvalidArgument
-			}
-			hasHttpUrl := false
-			for _, arg := range service.Healthcheck.Test[2:] {
-				if u, err := url.Parse(arg); err == nil && u.Scheme == "http" {
-					hasHttpUrl = true
-					break
-				}
-			}
-			if !hasHttpUrl {
-				return nil, errors.New("invalid CMD healthcheck; missing HTTP URL") // CodeInvalidArgument
-			}
-		case "HTTP": // TODO: deprecate
-			if len(service.Healthcheck.Test) != 2 || !strings.HasPrefix(service.Healthcheck.Test[1], "/") {
-				return nil, errors.New("invalid HTTP healthcheck; expected an absolute path") // CodeInvalidArgument
-			}
-		case "NONE": // OK
-			if len(service.Healthcheck.Test) != 1 {
-				return nil, errors.New("invalid NONE healthcheck; expected no arguments") // CodeInvalidArgument
-			}
-		default:
-			return nil, fmt.Errorf("unsupported healthcheck: %v", service.Healthcheck.Test) // CodeInvalidArgument
-		}
-	}
-
-	if service.Deploy != nil {
-		// TODO: create proper per-tenant per-stage quotas for these
-		if service.Deploy.Replicas > maxReplicas {
-			return nil, fmt.Errorf("replicas exceeds quota (max %d)", maxReplicas) // CodeInvalidArgument
-		}
-		if service.Deploy.Resources != nil && service.Deploy.Resources.Reservations != nil {
-			if service.Deploy.Resources.Reservations.Cpus > maxCpus || service.Deploy.Resources.Reservations.Cpus < 0 {
-				return nil, fmt.Errorf("cpus exceeds quota (max %d vCPU)", maxCpus) // CodeInvalidArgument
-			}
-			if service.Deploy.Resources.Reservations.Memory > maxMemoryMiB || service.Deploy.Resources.Reservations.Memory < 0 {
-				return nil, fmt.Errorf("memory exceeds quota (max %d MiB)", maxMemoryMiB) // CodeInvalidArgument
-			}
-			for _, device := range service.Deploy.Resources.Reservations.Devices {
-				if len(device.Capabilities) != 1 || device.Capabilities[0] != "gpu" {
-					return nil, errors.New("only GPU devices are supported") // CodeInvalidArgument
-				}
-				if device.Driver != "" && device.Driver != "nvidia" {
-					return nil, errors.New("only nvidia GPU devices are supported") // CodeInvalidArgument
-				}
-				if device.Count > maxGpus {
-					return nil, fmt.Errorf("gpu count exceeds quota (max %d)", maxGpus) // CodeInvalidArgument
-				}
-			}
-		}
+	if err := quota.Byoc.Validate(service); err != nil {
+		return nil, err
 	}
 	// Check to make sure all required secrets are present in the secrets store
 	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID); missing != nil {
