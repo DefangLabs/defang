@@ -145,7 +145,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
             FOUND_PROFILE_FILE=true
             # Prompt the user for confirmation
             echo -n "Can we append the necessary line to $HOME/$profile_file? (y/n) "
-            read -n 1 -r
+            read REPLY 
             echo    # move to a new line
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # Append the line to the profile file
@@ -160,7 +160,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         CURRENT_SHELL=$(basename "$SHELL")
         # Prompt the user to create a new profile file
         echo -n "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) "
-        read -n 1 -r
+        read REPLY
         echo    # move to a new line
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create the new profile file and append the line
