@@ -72,7 +72,7 @@ elif [ "$OS" = "Linux" ]; then
 fi
 
 # Download the file
-if ! curl -L "$DOWNLOAD_URL" -o "$FILENAME"; then
+if ! curl -s -L "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
     exit 1
 fi
@@ -144,7 +144,6 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         if [[ -f "$HOME/$profile_file" ]]; then
             FOUND_PROFILE_FILE=true
             # Prompt the user for confirmation
-            read -p "Can we append the necessary line to $HOME/$profile_file? (y/n) " -n 1 -r
             echo    # move to a new line
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # Append the line to the profile file
@@ -158,7 +157,6 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         # Get the name of the current shell
         CURRENT_SHELL=$(basename "$SHELL")
         # Prompt the user to create a new profile file
-        read -p "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) " -n 1 -r
         echo    # move to a new line
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create the new profile file and append the line
@@ -168,7 +166,6 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
 fi
 
 # Cleanup: Remove the originally downloaded file
-echo "Cleaning up..."
 rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
