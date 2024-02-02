@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
 	"github.com/defang-io/defang/src/pkg/scope"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func Token(ctx context.Context, client client.Client, clientId string, tenant pkg.TenantID, dur time.Duration, scope scope.Scope) error {
+func Token(ctx context.Context, client client.Client, clientId string, tenant types.TenantID, dur time.Duration, scope scope.Scope) error {
 	if DoDryRun {
 		return errors.New("dry-run")
 	}
@@ -33,7 +33,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant pk
 	return nil
 }
 
-func generateToken(ctx context.Context, client client.Client, code string, tenant pkg.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
+func generateToken(ctx context.Context, client client.Client, code string, tenant types.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
@@ -45,7 +45,7 @@ func generateToken(ctx context.Context, client client.Client, code string, tenan
 
 	Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
 
-	token, err := client.Token(ctx, &pb.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())})
+	token, err := client.Token(ctx, &v1.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())})
 	if err != nil {
 		return "", err
 	}

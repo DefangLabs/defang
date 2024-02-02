@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 type MockClient struct {
@@ -13,6 +13,6 @@ type MockClient struct {
 
 var _ Client = (*MockClient)(nil)
 
-func (m MockClient) CreateUploadURL(ctx context.Context, req *pb.UploadURLRequest) (*pb.UploadURLResponse, error) {
-	return &pb.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
+func (m MockClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
+	return &v1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }

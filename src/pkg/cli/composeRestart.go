@@ -3,12 +3,12 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func ComposeRestart(ctx context.Context, client client.Client, filePath string, tenantId pkg.TenantID) ([]*pb.ServiceInfo, error) {
+func ComposeRestart(ctx context.Context, client client.Client, filePath string, tenantId types.TenantID) ([]*v1.ServiceInfo, error) {
 	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return nil, err

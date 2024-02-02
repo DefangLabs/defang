@@ -19,10 +19,10 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	pkg "github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
@@ -79,17 +79,17 @@ func resolveEnv(k string) *string {
 	return &v
 }
 
-func convertPlatform(platform string) pb.Platform {
+func convertPlatform(platform string) v1.Platform {
 	switch platform {
 	default:
 		logrus.Warnf("Unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
-		return pb.Platform_LINUX_ANY
+		return v1.Platform_LINUX_ANY
 	case "linux/amd64":
-		return pb.Platform_LINUX_AMD64
+		return v1.Platform_LINUX_AMD64
 	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
-		return pb.Platform_LINUX_ARM64
+		return v1.Platform_LINUX_ARM64
 	}
 }
 
@@ -160,7 +160,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
-func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
+func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 	if port.Target < 1 || port.Target > 32767 {
 		return nil, fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
 	}
@@ -171,7 +171,7 @@ func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
 		return nil, fmt.Errorf("port published must be empty or equal to target: %v", port.Published)
 	}
 
-	pbPort := &pb.Port{
+	pbPort := &v1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
 		// Published string `yaml:",omitempty" json:"published,omitempty"`
@@ -181,17 +181,17 @@ func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
 
 	switch port.Protocol {
 	case "":
-		pbPort.Protocol = pb.Protocol_ANY // defaults to HTTP in CD
+		pbPort.Protocol = v1.Protocol_ANY // defaults to HTTP in CD
 	case "tcp":
-		pbPort.Protocol = pb.Protocol_TCP
+		pbPort.Protocol = v1.Protocol_TCP
 	case "udp":
-		pbPort.Protocol = pb.Protocol_UDP
+		pbPort.Protocol = v1.Protocol_UDP
 	case "http": // TODO: not per spec
-		pbPort.Protocol = pb.Protocol_HTTP
+		pbPort.Protocol = v1.Protocol_HTTP
 	case "http2": // TODO: not per spec
-		pbPort.Protocol = pb.Protocol_HTTP2
+		pbPort.Protocol = v1.Protocol_HTTP2
 	case "grpc": // TODO: not per spec
-		pbPort.Protocol = pb.Protocol_GRPC
+		pbPort.Protocol = v1.Protocol_GRPC
 	default:
 		return nil, fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
 	}
@@ -203,17 +203,17 @@ func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
 		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
 		fallthrough
 	case "host":
-		pbPort.Mode = pb.Mode_HOST
+		pbPort.Mode = v1.Mode_HOST
 	case "ingress":
 		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
 		if port.Published != "" {
 			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
 			break
 		}
-		pbPort.Mode = pb.Mode_INGRESS
-		if pbPort.Protocol == pb.Protocol_TCP || pbPort.Protocol == pb.Protocol_UDP {
+		pbPort.Mode = v1.Mode_INGRESS
+		if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
 			logrus.Warn("TCP ingress is not supported; assuming HTTP")
-			pbPort.Protocol = pb.Protocol_HTTP
+			pbPort.Protocol = v1.Protocol_HTTP
 		}
 	default:
 		return nil, fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
@@ -221,8 +221,8 @@ func convertPort(port types.ServicePortConfig) (*pb.Port, error) {
 	return pbPort, nil
 }
 
-func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
-	var pbports []*pb.Port
+func convertPorts(ports []types.ServicePortConfig) ([]*v1.Port, error) {
+	var pbports []*v1.Port
 	for _, port := range ports {
 		pbPort, err := convertPort(port)
 		if err != nil {
@@ -235,7 +235,7 @@ func convertPorts(ports []types.ServicePortConfig) ([]*pb.Port, error) {
 
 func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
-	ureq := &pb.UploadURLRequest{Digest: digest}
+	ureq := &v1.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
