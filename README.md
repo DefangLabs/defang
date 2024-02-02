@@ -5,22 +5,26 @@ The Defang Opinionated Platform (DOP) is a radically simpler way to build, deplo
 This repo includes:
 * Public releases of the Defang CLI; [click here](https://github.com/defang-io/defang/releases/latest/) for the latest version
 * Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
-* Samples that show how to deploy an app using the Defang Pulumi Provider.
+* Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/defang-io/pulumi-defang).
 
 ## Getting started
-* Read our [Terms and Conditions](https://defang.io/terms-conditions.html)
-* Download the [latest version](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
-  * or use the [Nix package manager](https://nixos.org): `nix profile install github:defang-io/defang#defang-bin --refresh`
+* Read our [Terms of Service](https://defang.io/terms-service.html)
+* Install the Defang CLI from one of the following sources:
+  * Using the [Homebrew package manager](https://brew.sh): `brew install defang-io/defang/defang`
+  * Using [Go](https://go.dev): `go install github.com/defang-io/defang/src/cmd/cli@latest`
+  * Using the [Nix package manager](https://nixos.org):
+    * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz`
+    * or with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
+  * Download the [latest binary](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
 * Take a look at our [Samples folder](https://github.com/defang-io/defang/tree/main/samples) for example projects in various programming languages.
 * Try the AI integration by running `defang generate`
 * Start your new service with `defang compose up`
 
 ## Support
-* Join our Slack channel using this [invite link](https://join.slack.com/share/enQtNTY2NzE1MTAzNDgzMi03M2YyZmZhYWE2YWNiMzFiYmI1MzJjMjUwNzVmZWIzOTYyZjhmOTlhYjU5ZTI1MGY4NjcwMGIzNzdkNWQ0ZWNi)
 * File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
 
 ## Command completion
-The Defang CLI supports command completion for Bash, Zsh, and Fish. To get the shell script for command completion, run the following command:
+The Defang CLI supports command completion for Bash, Zsh, Fish, and Powershell. To get the shell script for command completion, run the following command:
 ```
 defang completion [bash|zsh|fish|powershell]
 ```
@@ -39,6 +43,11 @@ or pipe the output to a file called `_defang` in the directory with the completi
 If you're using Fish, you can add the following to your `~/.config/fish/config.fish` file:
 ```
 defang completion fish | source
+```
+
+If you're using Powershell, you can add the following to your `$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1` file:
+```
+Invoke-Expression -Command (defang completion powershell | Out-String)
 ```
 
 ## Environment Variables

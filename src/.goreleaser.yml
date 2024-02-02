@@ -11,7 +11,7 @@ builds:
       - arm64
     hooks:
       post:
-        - ../bin/codesign.sh "{{ .Path }}"
+        - ./bin/codesign.sh "{{ .Path }}"
 
   - id: defang-cli
     main: ./cmd/cli
@@ -33,7 +33,7 @@ universal_binaries:
     replace: true
     hooks:
       post:
-        - ../bin/codesign.sh "{{ .Path }}"
+        - ./bin/codesign.sh "{{ .Path }}"
 
 archives:
   - format_overrides:
@@ -51,8 +51,8 @@ release:
   header: |
     # Defang CLI
     This is the Command Line Interface (CLI) for [Defang](https://defang.io). This is a beta version and is provided as-is, intended primarily for testing purposes.
-    Please note, we do not currently have any automated installers. This means you'll need to manually extract the archive and place the binary in your system's PATH.
-    ## Installation Instructions
+    For alternative installation methods, please check the [README](https://github.com/defang-io/defang/blob/main/README.md).
+    ## Manual installation Instructions
     1. Download the archive file for your Operating System.
     2. Extract the archive. This should reveal the binary file for Defang.
     3. Manually place the binary file in a directory that's included in your system's `PATH` environment variable.

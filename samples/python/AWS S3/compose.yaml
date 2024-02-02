@@ -10,4 +10,9 @@ services:
     secrets:
       - AWS_ACCESS_KEY
       - AWS_SECRET_KEY
+secrets:
+  AWS_ACCESS_KEY:
+    external: true
+  AWS_SECRET_KEY:
+    external: true
 
