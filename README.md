@@ -10,7 +10,7 @@ This repo includes:
 ## Getting started
 * Read our [Terms of Service](https://defang.io/terms-service.html)
 * Install the Defang CLI from one of the following sources:
-  * Using the [Homebrew package manager](https://brew.sh): `brew install defang-io/defang/defang-cli`
+  * Using the [Homebrew package manager](https://brew.sh): `brew install defang-io/defang/defang`
   * Using [Go](https://go.dev): `go install github.com/defang-io/defang/src/cmd/cli@latest`
   * Using the [Nix package manager](https://nixos.org):
     * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz`
