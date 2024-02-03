@@ -45,8 +45,9 @@ type byocAws struct {
 	privateDomain string
 	privateLbIps  []string
 	publicNatIps  []string
-	setupDone     bool
 	pulumiStack   string
+	quota         quota.Quotas
+	setupDone     bool
 	tenantID      string
 }
 
@@ -60,7 +61,17 @@ func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
 		GrpcClient:    defClient,
 		privateDomain: projectName + "." + tenantId + ".internal", // must match the logic in ecs/common.ts
 		pulumiStack:   tenantId + "-" + stage,
-		tenantID:      tenantId,
+		quota: quota.Quotas{
+			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+			Cpus:       16,
+			Gpus:       8,
+			MemoryMiB:  65536,
+			Replicas:   16,
+			Services:   40,
+			ShmSizeMiB: 30720,
+		},
+
+		tenantID: tenantId,
 		// fqdn:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
@@ -81,6 +92,9 @@ func (b *byocAws) setUp(ctx context.Context) error {
 
 func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
 	etag := pkg.RandomID()
+	if len(req.Services) > b.quota.Services {
+		return nil, errors.New("maximum number of services reached")
+	}
 	serviceInfos := []*v1.ServiceInfo{}
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
@@ -511,7 +525,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
-	if err := quota.Byoc.Validate(service); err != nil {
+	if err := b.quota.Validate(service); err != nil {
 		return nil, err
 	}
 	// Check to make sure all required secrets are present in the secrets store
@@ -566,6 +580,7 @@ func newQualifiedName(tenant string, name string) qualifiedName {
 	return qualifiedName(fmt.Sprintf("%s.%s", tenant, name))
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) *v1.Secret {
 	if len(secrets) == 1 {
 		// Avoid fetching the list of secrets from AWS by only checking the one we need
@@ -597,6 +612,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 
 type qualifiedName = string // legacy
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
@@ -609,6 +625,7 @@ func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	}
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
@@ -621,6 +638,7 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	}
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafe(fqn qualifiedName) string {
 	return strings.ReplaceAll(string(fqn), ".", "-")
 }

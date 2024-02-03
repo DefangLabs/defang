@@ -297,9 +297,18 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
+	byoc := Quotas{
+		Cpus:       16,
+		Gpus:       8,
+		MemoryMiB:  65536,
+		Replicas:   16,
+		Services:   40,
+		ShmSizeMiB: 30720,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Byoc.Validate(tt.service); err != nil && err.Error() != tt.wantErr {
+			if err := byoc.Validate(tt.service); err != nil && err.Error() != tt.wantErr {
 				t.Errorf("Byoc.Validate() = %v, want %v", err, tt.wantErr)
 			} else if err == nil && tt.wantErr != "" {
 				t.Errorf("Byoc.Validate() = nil, want %v", tt.wantErr)

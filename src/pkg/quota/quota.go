@@ -14,18 +14,8 @@ type Quotas struct {
 	Gpus       uint32
 	MemoryMiB  float32
 	Replicas   uint32
-	Services   uint
+	Services   int
 	ShmSizeMiB float32
-}
-
-// These serve mostly to pevent fat-finger errors in the CLI or Compose files
-var Byoc = Quotas{
-	Cpus:       16,
-	Gpus:       8,
-	MemoryMiB:  65536,
-	Replicas:   16,
-	Services:   40,
-	ShmSizeMiB: 30720,
 }
 
 func (q Quotas) Validate(service *v1.Service) error {
