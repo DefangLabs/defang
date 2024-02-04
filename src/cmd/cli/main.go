@@ -401,21 +401,20 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(serviceInfos)
+		printEndpoints(project.Services)
 
 		if detach {
 			return nil
 		}
 
-		var etag string
+		etag := project.Etag
 		services := "all services"
-		if len(serviceInfos) == 1 {
-			etag = serviceInfos[0].Etag
+		if etag != "" {
 			services = "deployment ID " + etag
 		}
 
@@ -434,16 +433,16 @@ var composeStartCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
 
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(serviceInfos)
+		printEndpoints(project.Services)
 
 		command := "tail"
-		if len(serviceInfos) == 1 {
-			command += " --etag " + serviceInfos[0].Etag
+		if project.Etag != "" {
+			command += " --etag " + project.Etag
 		}
 		printDefangHint("To track the update, do:", command)
 		return nil

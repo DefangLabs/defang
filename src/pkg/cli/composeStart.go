@@ -17,7 +17,7 @@ import (
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client client.Client, filePath string, tenantId types.TenantID, force bool) ([]*v1.ServiceInfo, error) {
+func ComposeStart(ctx context.Context, client client.Client, filePath string, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
 	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return nil, &ComposeError{err}
@@ -387,7 +387,7 @@ func ComposeStart(ctx context.Context, client client.Client, filePath string, te
 			PrintObject(service.Service.Name, service)
 		}
 	}
-	return resp.Services, nil
+	return resp, nil
 }
 
 func getResourceReservations(r compose.Resources) *compose.Resource {
