@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -39,7 +41,7 @@ const (
 type byocAws struct {
 	*GrpcClient
 
-	cdTaskArn     awsecs.TaskArn
+	cdTasks       map[string]awsecs.TaskArn
 	customDomain  string
 	driver        *cfn.AwsEcs
 	privateDomain string
@@ -56,6 +58,7 @@ var _ Client = (*byocAws)(nil)
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
 	const stage = "defang" // must match prefix in secrets.go
 	return &byocAws{
+		cdTasks:       make(map[string]awsecs.TaskArn),
 		customDomain:  domain,
 		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
 		GrpcClient:    defClient,
@@ -150,11 +153,16 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
+	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	if err != nil {
+		return nil, err
+	}
 
+	b.cdTasks[etag] = taskArn
 	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	}, nil
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
@@ -197,18 +205,19 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
-func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
+func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
+	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	env := map[string]string{
-		// "AWS_REGION":               b.driver.Region.String(); TODO: this should be the destination region, not the CD region
+		// "AWS_REGION":               region.String();
+		"DEBUG":                    os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DOMAIN":                   b.customDomain,
+		"PRIVATE_DOMAIN":           b.privateDomain,
 		"PROJECT":                  projectName,
-		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
-		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
+		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
+		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
 		"STACK":                    b.pulumiStack,
 	}
-	taskArn, err := b.driver.Run(ctx, env, cmd...)
-	b.cdTaskArn = taskArn
-	return annotateAwsError(err)
+	return b.driver.Run(ctx, env, cmd...)
 }
 
 func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
@@ -216,10 +225,12 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil {
-		return nil, err
+	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", "")
+	if err != nil {
+		return nil, annotateAwsError(err)
 	}
-	etag := awsecs.GetTaskID(b.cdTaskArn) // TODO: this is the CD task ID, not the etag
+	etag := awsecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
+	b.cdTasks[etag] = taskArn
 	return &v1.DeleteResponse{Etag: etag}, nil
 }
 
@@ -302,7 +313,7 @@ func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
 // annotateAwsError translates the AWS error to an error code the CLI client understands
 func annotateAwsError(err error) error {
 	if err == nil {
-		return err
+		return nil
 	}
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, err)
@@ -357,12 +368,13 @@ func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest)
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
-	stream   awsecs.EventStream
+	cdTask   awsecs.TaskArn
 	ctx      context.Context
 	err      error
-	response *v1.TailResponse
 	etag     string
+	response *v1.TailResponse
 	service  string
+	stream   awsecs.EventStream
 }
 
 var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
@@ -372,6 +384,9 @@ func (bs *byocServerStream) Close() error {
 }
 
 func (bs *byocServerStream) Err() error {
+	if bs.err == io.EOF {
+		return nil // same as the original gRPC/connect server stream
+	}
 	return annotateAwsError(bs.err)
 }
 
@@ -403,6 +418,13 @@ func (bs *byocServerStream) Receive() bool {
 			return false
 		}
 		bs.response = &v1.TailResponse{}
+		// Before we return the response, we need to check the status of the CD task
+		if bs.cdTask != nil {
+			if err := awsecs.GetTaskStatus(bs.ctx, bs.cdTask); err != nil {
+				bs.err = err
+				return false
+			}
+		}
 		if len(events) == 0 {
 			// The original gRPC/connect server stream would never send an empty response.
 			// We could loop around the select, but returning an empty response updates the spinner.
@@ -412,6 +434,9 @@ func (bs *byocServerStream) Receive() bool {
 		parseFirelensRecords := false
 		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 		event := events[0]
+		// if info := awsecs.GetLogStreamInfo(*event.LogStreamName); info != nil {
+		// 	awsecs.GetTaskStatus(bs.ctx, bs.) // TODO: we'd need cluster-name to create the ARN
+		// }
 		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
 			// These events are from the CD task; detect the progress dots
 			if len(events) == 1 && *event.Message == "." || *event.Message == "\033[38;5;3m.\033[0m" {
@@ -422,7 +447,7 @@ func (bs *byocServerStream) Receive() bool {
 			bs.response.Host = "pulumi"
 			bs.response.Service = "cd"
 		} else if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-			// These events are from a service task: tenant/service_etag/taskID
+			// These events are from a awslogs service task: tenant/service_etag/taskID
 			bs.response.Host = parts[2] // TODO: figure out hostname/IP
 			parts = strings.Split(parts[1], "_")
 			if len(parts) != 2 {
@@ -476,10 +501,12 @@ func (bs *byocServerStream) Receive() bool {
 // Copied from server/fabric.go
 func isKanikoError(message string) bool {
 	switch message[:pkg.Min(len(message), 4)] {
-	case "WARN", "ERRO", "DEBU", "FATA", "PANI":
+	case "WARN", "ERRO", "FATA", "PANI":
 		return true // always show
-	default:
+	case "INFO", "TRAC", "DEBU":
 		return false // only shown with --verbose
+	default:
+		return true // show by default (likely Dockerfile errors)
 	}
 }
 
@@ -488,9 +515,9 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		return nil, err
 	}
 	etag := req.Etag
-	if etag == "" && req.Service == "cd" {
-		etag = awsecs.GetTaskID(b.cdTaskArn)
-	}
+	// if etag == "" && req.Service == "cd" {
+	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
+	// }
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
 	//  * Etag, no service: 	tail all tasks/services with that Etag
@@ -516,10 +543,11 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	// 	}
 	// }
 	return &byocServerStream{
-		stream:  eventStream,
 		ctx:     ctx,
+		cdTask:  b.cdTasks[etag],
 		etag:    etag,
 		service: req.Service,
+		stream:  eventStream,
 	}, nil
 }
 
@@ -654,7 +682,7 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) error {
 	if err := b.setUp(ctx); err != nil {
 		return err
 	}
-	if err := b.runCdTask(ctx, "npm", "start", command); err != nil {
+	if _, err := b.runCdTask(ctx, "npm", "start", command); err != nil {
 		return err
 	}
 	return nil
