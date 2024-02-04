@@ -158,10 +158,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 		}
 
-		isInternal := !strings.HasPrefix(msg.Host, "ip-") // FIXME: not true for BYOC
+		// HACK: skip noisy CI/CD logs (except errors)
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko"
+		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
-			if !DoVerbose && !e.Stderr && isInternal {
-				// HACK: skip noisy CI/CD logs (except errors)
+			if onlyErrors && !e.Stderr {
 				continue
 			}
 
