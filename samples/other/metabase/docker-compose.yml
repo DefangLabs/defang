@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+  metabase:
+    image: "metabase/metabase:latest"
+    ports:
+      - mode: ingress
+        target: 3000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 1024M
+    # secrets:
+    #   - MB_DB_CONNECTION_URI
