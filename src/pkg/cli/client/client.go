@@ -32,6 +32,9 @@ type Client interface {
 	ListSecrets(context.Context) (*v1.Secrets, error)
 	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
 	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
+	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
+	DeleteSubdomainZone(context.Context) error
+	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
 
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) error

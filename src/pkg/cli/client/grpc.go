@@ -128,6 +128,19 @@ func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 	// return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{})); TODO: implement this rpc
 }
 
+func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect.Request[v1.DelegateSubdomainZoneRequest]{Msg: req}))
+}
+
+func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
+	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+	return err
+}
+
+func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*v1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+}
+
 func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
 	return g.client.Tail(ctx, &connect.Request[v1.TailRequest]{Msg: req})
 }
