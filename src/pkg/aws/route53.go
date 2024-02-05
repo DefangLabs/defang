@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -40,7 +41,10 @@ func GetZoneIdFromDomain(ctx context.Context, domain string, r53 *route53.Client
 func CreateZone(ctx context.Context, domain string, r53 *route53.Client) (string, error) {
 	params := &route53.CreateHostedZoneInput{
 		Name:            aws.String(domain),
-		CallerReference: aws.String(domain),
+		CallerReference: aws.String(domain + time.Now().String()),
+		HostedZoneConfig: &types.HostedZoneConfig{
+			Comment: aws.String("Created by defang cli"),
+		},
 	}
 	resp, err := r53.CreateHostedZone(ctx, params)
 	if err != nil {
