@@ -7,8 +7,8 @@
       "start": "node main.js"
     },
     "dependencies": {
-      "express": "^4.17.1",
-      "node-fetch": "^2.6.6"
+      "express": "4.18.2",
+      "node-fetch": "2.6.7"
     }
   }
   

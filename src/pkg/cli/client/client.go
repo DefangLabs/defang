@@ -36,6 +36,7 @@ type Client interface {
 	DeleteSubdomainZone(context.Context) error
 	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
 
+	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) error
 	GetFabric() string
 	GetAccessToken() string

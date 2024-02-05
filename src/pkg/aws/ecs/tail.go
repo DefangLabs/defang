@@ -43,6 +43,14 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	}
 }
 
+func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
+	if taskID == "" {
+		return nil, errors.New("taskID is empty")
+	}
+	taskArn := a.MakeARN("ecs", "task/"+a.ClusterName+"/"+taskID)
+	return &taskArn, nil
+}
+
 func (a *AwsEcs) TailTask(ctx context.Context, taskID string) (EventStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")

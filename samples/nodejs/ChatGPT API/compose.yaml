@@ -9,3 +9,6 @@ services:
         target: 3000
     secrets:
       - OPENAI_KEY
+secrets:
+  OPENAI_KEY:
+    external: true

@@ -13,7 +13,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 func TestNormalizeServiceName(t *testing.T) {
@@ -43,6 +43,7 @@ func TestNormalizeServiceName(t *testing.T) {
 
 func TestLoadDockerCompose(t *testing.T) {
 	DoVerbose = true
+	DoDebug = true
 
 	t.Run("no project name", func(t *testing.T) {
 		_, err := loadDockerCompose("../../tests/compose.yaml", "")
@@ -76,7 +77,7 @@ func TestConvertPort(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    types.ServicePortConfig
-		expected *pb.Port
+		expected *v1.Port
 		wantErr  string
 	}{
 		{
@@ -87,7 +88,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Undefined mode and protocol, target only",
 			input:    types.ServicePortConfig{Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
 		},
 		{
 			name:    "Published range xfail",
@@ -97,12 +98,12 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Implied ingress mode, defined protocol, published equals target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Published: "1234", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_TCP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_TCP},
 		},
 		{
 			name:     "Implied ingress mode, udp protocol, published equals target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Published: "1234", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_HOST, Protocol: pb.Protocol_UDP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP},
 		},
 		{
 			name:    "Localhost IP, unsupported mode and protocol xfail",
@@ -112,7 +113,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Ingress mode without host IP, single target",
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
-			expected: &pb.Port{Target: 1234, Mode: pb.Mode_INGRESS, Protocol: pb.Protocol_HTTP},
+			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
 		},
 		{
 			name:    "Ingress mode without host IP, single target, published range xfail",

@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func TenantFromAccessToken(at string) (pkg.TenantID, error) {
+func TenantFromAccessToken(at string) (types.TenantID, error) {
 	parts := strings.Split(at, ".")
 	if len(parts) != 3 {
 		return "", errors.New("not a JWT")
@@ -22,5 +22,5 @@ func TenantFromAccessToken(at string) (pkg.TenantID, error) {
 		return "", err
 	}
 	err = json.Unmarshal(bytes, &claims)
-	return pkg.TenantID(claims.Sub), err
+	return types.TenantID(claims.Sub), err
 }

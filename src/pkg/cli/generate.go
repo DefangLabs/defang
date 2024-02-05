@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
@@ -15,7 +15,7 @@ func Generate(ctx context.Context, client client.Client, language string, descri
 		return nil, nil
 	}
 
-	response, err := client.GenerateFiles(ctx, &pb.GenerateFilesRequest{
+	response, err := client.GenerateFiles(ctx, &v1.GenerateFilesRequest{
 		Language: language,
 		Prompt:   description,
 	})
@@ -23,7 +23,7 @@ func Generate(ctx context.Context, client client.Client, language string, descri
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		// Print the files that were generated
 		for _, file := range response.Files {
 			Debug(file.Name + "\n```")

@@ -5,15 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func SplitTenantHost(cluster string) (pkg.TenantID, string) {
-	tenant := pkg.DEFAULT_TENANT
+func SplitTenantHost(cluster string) (types.TenantID, string) {
+	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
 	if len(parts) == 2 {
-		tenant, cluster = pkg.TenantID(parts[0]), parts[1]
+		tenant, cluster = types.TenantID(parts[0]), parts[1]
 	}
 	if _, _, err := net.SplitHostPort(cluster); err != nil {
 		cluster = cluster + ":443" // default to https
@@ -21,7 +21,7 @@ func SplitTenantHost(cluster string) (pkg.TenantID, string) {
 	return tenant, cluster
 }
 
-func Connect(cluster string, provider client.Provider) (client.Client, pkg.TenantID) {
+func Connect(cluster string, provider client.Provider) (client.Client, types.TenantID) {
 	tenantId, host := SplitTenantHost(cluster)
 
 	accessToken := GetExistingToken(cluster)

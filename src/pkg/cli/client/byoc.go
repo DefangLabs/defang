@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
-	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/logs"
+	"github.com/defang-io/defang/src/pkg/quota"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
@@ -32,30 +34,25 @@ import (
 )
 
 const (
-	maxCpus       = 2
-	maxGpus       = 1
-	maxMemoryMiB  = 8192
-	maxReplicas   = 2
-	maxServices   = 6
-	maxShmSizeMiB = 30720
-	cdVersion     = "v0.4.50-195-gc871623b" // will cause issues if two clients with different versions are connected to the same stack
-	projectName   = "defang"                // TODO: support multiple projects
-	cdTaskPrefix  = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion    = "v0.4.50-242-g85fed92a" // will cause issues if two clients with different versions are connected to the same stack
+	projectName  = "defang"                // TODO: support multiple projects
+	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
 	*GrpcClient
 
-	cdTaskArn               awsecs.TaskArn
+	cdTasks                 map[string]awsecs.TaskArn
 	customDomain            string
-	shoudlDelegateSubdomain bool
 	driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string
 	publicNatIps            []string
+	pulumiStack             string
+	quota                   quota.Quotas
 	setupDone               bool
-	stage                   string
 	tenantID                string
+	shoudlDelegateSubdomain bool
 }
 
 type Warning string
@@ -78,13 +75,25 @@ func (w Warnings) Error() string {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
+	const stage = "defang" // must match prefix in secrets.go
 	return &byocAws{
+		cdTasks:       make(map[string]awsecs.TaskArn),
 		customDomain:  domain,
 		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
 		GrpcClient:    defClient,
 		privateDomain: projectName + "." + tenantId + ".internal", // must match the logic in ecs/common.ts
-		stage:         "defang",                                   // must match prefix in secrets.go
-		tenantID:      tenantId,
+		pulumiStack:   tenantId + "-" + stage,
+		quota: quota.Quotas{
+			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+			Cpus:       16,
+			Gpus:       8,
+			MemoryMiB:  65536,
+			Replicas:   16,
+			Services:   40,
+			ShmSizeMiB: 30720,
+		},
+
+		tenantID: tenantId,
 		// fqdn:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
@@ -119,6 +128,9 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	}
 
 	etag := pkg.RandomID()
+	if len(req.Services) > b.quota.Services {
+		return nil, errors.New("maximum number of services reached")
+	}
 	serviceInfos := []*v1.ServiceInfo{}
 	var warnings Warnings
 	for _, service := range req.Services {
@@ -180,26 +192,23 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 			return nil, err
 		}
 	}
+	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	if err != nil {
+		return nil, err
+	}
+	b.cdTasks[etag] = taskArn
 
-	resp := &v1.DeployResponse{
+	return &v1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}
-	if err := b.runCdTask(ctx, "npm", "start", "up", payloadString); err != nil {
-		return resp, err
-	}
-	return resp, warnings
+	}, warnings
 }
 
 func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
-	// Hack: call DelegateSubdomainZone with a dummy record to get the subdomain zone
-	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: []string{"dummy.record"}}
-	resp, err := b.DelegateSubdomainZone(ctx, req)
-	if err != nil {
-		return "", err
+	if b.customDomain == "" {
+		return "", errors.New("custom domain not set")
 	}
-	domain := resp.Zone
-
+	domain := b.customDomain
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -225,12 +234,12 @@ func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
 		return "", errors.New("no NS records found for the subdomain zone")
 	}
 
-	req = &v1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
-	resp, err = b.DelegateSubdomainZone(ctx, req)
+	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+	resp, err := b.DelegateSubdomainZone(ctx, req)
 	if err != nil {
 		return "", err
 	}
-	return domain, nil
+	return resp.Zone, nil
 }
 
 func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
@@ -273,18 +282,20 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
-func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) error {
+func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
+	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	env := map[string]string{
-		// "AWS_REGION":               b.driver.Region.String(); TODO: this should be the destination region, not the CD region
+		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_ORG":               b.tenantID,
 		"DOMAIN":                   b.customDomain,
+		"PRIVATE_DOMAIN":           b.privateDomain,
 		"PROJECT":                  projectName,
-		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, b.driver.Region), // TODO: add a way to override bucket/region
-		"PULUMI_CONFIG_PASSPHRASE": "asdf",                                                                           // TODO: make customizable
-		"STACK":                    b.tenantID + "-" + b.stage,
+		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
+		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
+		"STACK":                    b.pulumiStack,
 	}
-	taskArn, err := b.driver.Run(ctx, env, cmd...)
-	b.cdTaskArn = taskArn
-	return annotateAwsError(err)
+	return b.driver.Run(ctx, env, cmd...)
 }
 
 func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
@@ -292,22 +303,25 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	if err := b.runCdTask(ctx, "npm", "start", "up", ""); err != nil {
-		return nil, err
+	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", "")
+	if err != nil {
+		return nil, annotateAwsError(err)
 	}
-	etag := awsecs.GetTaskID(b.cdTaskArn) // TODO: this is the CD task ID, not the etag
+	etag := awsecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
+	b.cdTasks[etag] = taskArn
 	return &v1.DeleteResponse{Etag: etag}, nil
 }
 
-func (byocAws) Publish(context.Context, *v1.PublishRequest) error {
-	panic("not implemented: Publish")
+// stack returns a stack-qualified name, like the Pulumi TS function `stack`
+func (b *byocAws) stack(name string) string {
+	return projectName + "-" + b.pulumiStack + "-" + name
 }
 
-func (b byocAws) getClusterNames() []string {
+func (b *byocAws) getClusterNames() []string {
 	// This should match the naming in pulumi/ecs/common.ts
 	return []string{
-		projectName + "-" + b.tenantID + "-cluster",
-		projectName + "-" + b.tenantID + "-gpu-cluster",
+		b.stack("cluster"),
+		b.stack("gpu-cluster"),
 	}
 }
 
@@ -347,10 +361,15 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 			return nil, annotateAwsError(err)
 		}
 		for _, service := range dso.Services {
+			// Check whether this is indeed a service we want to manage
+			fqn := strings.SplitN(getQualifiedNameFromEcsName(*service.ServiceName), ".", 2)
+			if len(fqn) != 2 {
+				continue
+			}
 			// TODO: get the service definition from the task definition or tags
 			serviceInfos = append(serviceInfos, &v1.ServiceInfo{
 				Service: &v1.Service{
-					Name: *service.ServiceName,
+					Name: fqn[1],
 				},
 			})
 		}
@@ -358,14 +377,21 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 	return &v1.ListServicesResponse{Services: serviceInfos}, nil
 }
 
-func (byocAws) GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
-	panic("not implemented: GenerateFiles")
+func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
+	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
+	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
+		return ""
+	}
+	serviceName := ecsService[:len(ecsService)-8]
+
+	// Replace the first underscore to get the FQN.
+	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
 }
 
 // annotateAwsError translates the AWS error to an error code the CLI client understands
 func annotateAwsError(err error) error {
 	if err == nil {
-		return err
+		return nil
 	}
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, err)
@@ -420,21 +446,29 @@ func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest)
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
-	stream   awsecs.EventStream
-	ctx      context.Context
-	err      error
-	response *v1.TailResponse
-	etag     string
-	service  string
+	cancelTaskCh func()
+	err          error
+	errCh        <-chan error
+	etag         string
+	response     *v1.TailResponse
+	service      string
+	stream       awsecs.EventStream
+	taskCh       <-chan error
 }
 
 var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
 
 func (bs *byocServerStream) Close() error {
+	if bs.cancelTaskCh != nil {
+		bs.cancelTaskCh()
+	}
 	return bs.stream.Close()
 }
 
 func (bs *byocServerStream) Err() error {
+	if bs.err == io.EOF {
+		return nil // same as the original gRPC/connect server stream
+	}
 	return annotateAwsError(bs.err)
 }
 
@@ -447,18 +481,7 @@ type hasErrCh interface {
 }
 
 func (bs *byocServerStream) Receive() bool {
-	var errCh <-chan error
-	if errch, ok := bs.stream.(hasErrCh); ok {
-		errCh = errch.Errs()
-	}
-
 	select {
-	case <-bs.ctx.Done(): // blocking
-		bs.err = bs.ctx.Err()
-		return false
-	case err := <-errCh: // blocking
-		bs.err = err
-		return false
 	case e := <-bs.stream.Events(): // blocking
 		events, err := awsecs.GetLogEvents(e)
 		if err != nil {
@@ -485,7 +508,7 @@ func (bs *byocServerStream) Receive() bool {
 			bs.response.Host = "pulumi"
 			bs.response.Service = "cd"
 		} else if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-			// These events are from a service task: tenant/service_etag/taskID
+			// These events are from a awslogs service task: tenant/service_etag/taskID
 			bs.response.Host = parts[2] // TODO: figure out hostname/IP
 			parts = strings.Split(parts[1], "_")
 			if len(parts) != 2 {
@@ -517,9 +540,8 @@ func (bs *byocServerStream) Receive() bool {
 			if parseFirelensRecords {
 				if err := json.Unmarshal([]byte(message), &record); err == nil {
 					message = record.Log
-					// println("container name:", record.ContainerName, "source:", record.Source)
 					if record.ContainerName == "kaniko" {
-						stderr = isKanikoError(message)
+						stderr = isLogrusError(message)
 					} else {
 						stderr = record.Source == logs.SourceStderr
 					}
@@ -533,16 +555,27 @@ func (bs *byocServerStream) Receive() bool {
 		}
 		bs.response.Entries = entries
 		return true
+
+	case err := <-bs.errCh: // blocking (if not nil)
+		bs.err = err
+		return false
+
+	case err := <-bs.taskCh: // blocking (if not nil)
+		bs.err = err
+		return false
 	}
 }
 
 // Copied from server/fabric.go
-func isKanikoError(message string) bool {
+func isLogrusError(message string) bool {
+	message = pkg.StripAnsi(message)
 	switch message[:pkg.Min(len(message), 4)] {
-	case "WARN", "ERRO", "DEBU", "FATA", "PANI":
+	case "WARN", "ERRO", "FATA", "PANI":
 		return true // always show
-	default:
+	case "", ".", "INFO", "TRAC", "DEBU":
 		return false // only shown with --verbose
+	default:
+		return true // show by default (likely Dockerfile errors)
 	}
 }
 
@@ -550,125 +583,62 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	// TODO: support req.Since
 	etag := req.Etag
-	if etag == "" && req.Service == "cd" {
-		etag = awsecs.GetTaskID(b.cdTaskArn)
-	}
+	// if etag == "" && req.Service == "cd" {
+	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
+	// }
 	// How to tail multiple tasks/services at once?
 	//  * No Etag, no service:	tail all tasks/services
 	//  * Etag, no service: 	tail all tasks/services with that Etag
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
+	var cdTaskArn awsecs.TaskArn
 	var eventStream awsecs.EventStream
 	if etag != "" && !pkg.IsValidRandomID(etag) {
+		// Assume "etag" is the CD task ID
 		eventStream, err = b.driver.TailTask(ctx, etag)
+		cdTaskArn, _ = b.driver.GetTaskArn(etag)
 		etag = "" // no need to filter by etag
 	} else {
-		logGroupName := projectName + "-" + b.tenantID + "-kaniko" // TODO: must match pulumi/index.ts
+		logGroupName := b.stack("kaniko") // TODO: rename this, but must match pulumi/index.ts
 		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+		cdTaskArn = b.cdTasks[etag]
+	}
+	if err != nil {
+		return nil, annotateAwsError(err)
+	}
+	// if es, err := awsecs.Query(ctx, b.driver.LogGroupARN, req.Since.AsTime(), time.Now()); err == nil {
+	// 	for _, e := range es {
+	// 		println(*e.Message)
+	// 	}
+	// }
+	var errCh <-chan error
+	if errch, ok := eventStream.(hasErrCh); ok {
+		errCh = errch.Errs()
+	}
+	var taskch <-chan error
+	var cancel func()
+	if cdTaskArn != nil {
+		taskch, cancel = awsecs.TaskStatusCh(cdTaskArn, 3*time.Second) // check every 3 seconds
 	}
 	return &byocServerStream{
-		stream:  eventStream,
-		ctx:     ctx,
-		etag:    etag,
-		service: req.Service,
-	}, err
+		cancelTaskCh: cancel,
+		errCh:        errCh,
+		etag:         etag,
+		service:      req.Service,
+		stream:       eventStream,
+		taskCh:       taskch,
+	}, nil
 }
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
-	if service.Name == "" {
-		return nil, errors.New("service name is required") // CodeInvalidArgument
-	}
-	if service.Build != nil {
-		if service.Build.Context == "" {
-			return nil, errors.New("build.context is required") // CodeInvalidArgument
-		}
-		if service.Build.ShmSize > maxShmSizeMiB || service.Build.ShmSize < 0 {
-			return nil, fmt.Errorf("build.shm_size exceeds quota (max %d MiB)", maxShmSizeMiB) // CodeInvalidArgument
-		}
-		// TODO: consider stripping the pre-signed query params from the URL, but only if it's an S3 URL. (Not ideal because it would cause a diff in Pulumi.)
-	} else {
-		if service.Image == "" {
-			return nil, errors.New("missing image") // CodeInvalidArgument
-		}
+	if err := b.quota.Validate(service); err != nil {
+		return nil, err
 	}
 
-	uniquePorts := make(map[uint32]bool)
-	for _, port := range service.Ports {
-		if port.Target < 1 || port.Target > 32767 {
-			return nil, fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
-		}
-		if port.Mode == v1.Mode_INGRESS {
-			if port.Protocol == v1.Protocol_TCP || port.Protocol == v1.Protocol_UDP {
-				return nil, fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
-			}
-		}
-		if uniquePorts[port.Target] {
-			return nil, fmt.Errorf("duplicate port %d", port.Target) // CodeInvalidArgument
-		}
-		uniquePorts[port.Target] = true
-	}
-	if service.Healthcheck != nil && len(service.Healthcheck.Test) > 0 {
-		switch service.Healthcheck.Test[0] {
-		case "CMD":
-			if len(service.Healthcheck.Test) < 3 {
-				return nil, errors.New("invalid CMD healthcheck; expected a command and URL") // CodeInvalidArgument
-			}
-			if !strings.HasSuffix(service.Healthcheck.Test[1], "curl") && !strings.HasSuffix(service.Healthcheck.Test[1], "wget") {
-				return nil, errors.New("invalid CMD healthcheck; expected curl or wget") // CodeInvalidArgument
-			}
-			hasHttpUrl := false
-			for _, arg := range service.Healthcheck.Test[2:] {
-				if u, err := url.Parse(arg); err == nil && u.Scheme == "http" {
-					hasHttpUrl = true
-					break
-				}
-			}
-			if !hasHttpUrl {
-				return nil, errors.New("invalid CMD healthcheck; missing HTTP URL") // CodeInvalidArgument
-			}
-		case "HTTP": // TODO: deprecate
-			if len(service.Healthcheck.Test) != 2 || !strings.HasPrefix(service.Healthcheck.Test[1], "/") {
-				return nil, errors.New("invalid HTTP healthcheck; expected an absolute path") // CodeInvalidArgument
-			}
-		case "NONE": // OK
-			if len(service.Healthcheck.Test) != 1 {
-				return nil, errors.New("invalid NONE healthcheck; expected no arguments") // CodeInvalidArgument
-			}
-		default:
-			return nil, fmt.Errorf("unsupported healthcheck: %v", service.Healthcheck.Test) // CodeInvalidArgument
-		}
-	}
-
-	if service.Deploy != nil {
-		// TODO: create proper per-tenant per-stage quotas for these
-		if service.Deploy.Replicas > maxReplicas {
-			return nil, fmt.Errorf("replicas exceeds quota (max %d)", maxReplicas) // CodeInvalidArgument
-		}
-		if service.Deploy.Resources != nil && service.Deploy.Resources.Reservations != nil {
-			if service.Deploy.Resources.Reservations.Cpus > maxCpus || service.Deploy.Resources.Reservations.Cpus < 0 {
-				return nil, fmt.Errorf("cpus exceeds quota (max %d vCPU)", maxCpus) // CodeInvalidArgument
-			}
-			if service.Deploy.Resources.Reservations.Memory > maxMemoryMiB || service.Deploy.Resources.Reservations.Memory < 0 {
-				return nil, fmt.Errorf("memory exceeds quota (max %d MiB)", maxMemoryMiB) // CodeInvalidArgument
-			}
-			for _, device := range service.Deploy.Resources.Reservations.Devices {
-				if len(device.Capabilities) != 1 || device.Capabilities[0] != "gpu" {
-					return nil, errors.New("only GPU devices are supported") // CodeInvalidArgument
-				}
-				if device.Driver != "" && device.Driver != "nvidia" {
-					return nil, errors.New("only nvidia GPU devices are supported") // CodeInvalidArgument
-				}
-				if device.Count > maxGpus {
-					return nil, fmt.Errorf("gpu count exceeds quota (max %d)", maxGpus) // CodeInvalidArgument
-				}
-			}
-		}
-	}
 	// Check to make sure all required secrets are present in the secrets store
 	missing, err := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID)
 	if err != nil {
@@ -726,6 +696,7 @@ func newQualifiedName(tenant string, name string) qualifiedName {
 	return qualifiedName(fmt.Sprintf("%s.%s", tenant, name))
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) (*v1.Secret, error) {
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
 	if err != nil {
@@ -745,18 +716,20 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 
 type qualifiedName = string // legacy
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
 		if b.customDomain == "" {
-			return fmt.Sprintf(":%d", port.Target)
+			return ":443" // placeholder for the public ALB/distribution
 		}
 		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
 	}
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	safeFqn := dnsSafe(fqn)
 	if public {
@@ -769,6 +742,7 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 	}
 }
 
+// This functions was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafe(fqn qualifiedName) string {
 	return strings.ReplaceAll(string(fqn), ".", "-")
 }
@@ -784,7 +758,7 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) error {
 	if err := b.setUp(ctx); err != nil {
 		return err
 	}
-	if err := b.runCdTask(ctx, "npm", "start", command); err != nil {
+	if _, err := b.runCdTask(ctx, "npm", "start", command); err != nil {
 		return err
 	}
 	return nil

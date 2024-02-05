@@ -25,7 +25,8 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli"
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/scope"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 //
@@ -36,7 +37,7 @@ var (
 	client   cliClient.Client
 	clientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
 	hasTty   = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
-	tenantId = pkg.DEFAULT_TENANT
+	tenantId = types.DEFAULT_TENANT
 )
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
@@ -373,7 +374,7 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
+func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
 		if len(serviceInfo.Endpoints) > 0 {
@@ -381,7 +382,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 		}
 		cli.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
 		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+			if serviceInfo.Service.Ports[i].Mode == v1.Mode_INGRESS {
 				endpoint = "https://" + endpoint
 			}
 			fmt.Println("   -", endpoint)
@@ -397,24 +398,33 @@ var composeUpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
+		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
+		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(serviceInfos)
+		printEndpoints(project.Services)
 
-		var etag string
+		if detach {
+			return nil
+		}
+
+		etag := project.Etag
 		services := "all services"
-		if len(serviceInfos) == 1 {
-			etag = serviceInfos[0].Etag
+		if etag != "" {
 			services = "deployment ID " + etag
 		}
 
 		cli.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if err != nil {
+			return err
+		}
+		cli.Info(" * Done.")
+		return nil
 	},
 }
 
@@ -428,18 +438,18 @@ var composeStartCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
 
-		serviceInfos, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), force)
+		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(serviceInfos)
+		printEndpoints(project.Services)
 
 		command := "tail"
-		if len(serviceInfos) == 1 {
-			command += " --etag " + serviceInfos[0].Etag
+		if project.Etag != "" {
+			command += " --etag " + project.Etag
 		}
-		printDefangHint("To track the deployment status, do:", command)
+		printDefangHint("To track the update, do:", command)
 		return nil
 	},
 }
@@ -452,7 +462,7 @@ var composeRestartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, string(tenantId))
+		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, tenantId)
 		if err != nil {
 			return err
 		}
@@ -468,10 +478,10 @@ var composeDownCmd = &cobra.Command{
 	Short:       "Reads a Compose file and deletes services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
-		var tail, _ = cmd.Flags().GetBool("tail")
+		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, string(tenantId))
+		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, tenantId)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -483,25 +493,31 @@ var composeDownCmd = &cobra.Command{
 
 		cli.Info(" * Deleted services, deployment ID", etag)
 
-		if tail {
-			cli.Info(" * Tailing logs for deployment; press Ctrl+C to detach:")
-			return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if detach {
+			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			return nil
 		}
 
-		printDefangHint("To track the deployment status, do:", "tail --etag "+etag)
+		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if err != nil {
+			return err
+		}
+		cli.Info(" * Done.")
 		return nil
+
 	},
 }
 
 var composeConfigCmd = &cobra.Command{
-	Use:   "config",
-	Args:  cobra.NoArgs, // TODO: takes optional list of service names
-	Short: "Reads a Compose file and shows the generated config",
+	Use:         "config",
+	Annotations: autoConnectAnnotation, // try to get the tenantId from the cached token
+	Args:        cobra.NoArgs,          // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		cli.DoDryRun = true                                                                  // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, filePath, string(tenantId), false) // force=false to calculate the digest
+		cli.DoDryRun = true                                                          // config is like start in a dry run
+		_, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, false) // force=false to calculate the digest
 		return err
 	},
 }
@@ -529,13 +545,13 @@ var deleteCmd = &cobra.Command{
 
 		cli.Info(" * Deleted service", name, "with deployment ID", etag)
 
-		if tail {
-			cli.Info(" * Tailing logs for deployment; press Ctrl+C to detach:")
-			return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if !tail {
+			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			return nil
 		}
 
-		printDefangHint("To track the deployment status, do:", "tail --etag "+etag)
-		return nil
+		cli.Info(" * Tailing logs for update; press Ctrl+C to detach:")
+		return cli.Tail(cmd.Context(), client, "", etag, since, false)
 	},
 }
 
@@ -581,7 +597,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, clientId, pkg.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, clientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 
@@ -638,6 +654,25 @@ var bootstrapRefreshCmd = &cobra.Command{
 	},
 }
 
+var tosCmd = &cobra.Command{
+	Use:         "tos",
+	Aliases:     []string{"terms", "eula", "tac", "tou"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Read and/or agree the Defang terms of service",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		agree, _ := cmd.Flags().GetBool("agree-tos")
+		cli.Println("Read our latest terms of service at https://defang.io/terms-service.html")
+		if agree {
+			if err := client.AgreeToS(cmd.Context()); err != nil {
+				return err
+			}
+			cli.Info(" * You have agreed to the Defang terms of service")
+		}
+		return nil
+	},
+}
+
 func main() {
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
@@ -647,6 +682,7 @@ func main() {
 	rootCmd.PersistentFlags().StringP("cluster", "s", defangFabric, "Defang cluster to connect to")
 	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
+	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
@@ -657,6 +693,10 @@ func main() {
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
+
+	// Eula command
+	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
+	rootCmd.AddCommand(tosCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
@@ -708,10 +748,14 @@ func main() {
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
+	composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
+	composeUpCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
-	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
+	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting") // obsolete, but keep for backwards compatibility
+	composeDownCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
+	composeDownCmd.Flags().MarkHidden("tail")
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
@@ -750,6 +794,7 @@ func main() {
 
 	go func() {
 		<-sigs
+		cli.Debug("Received interrupt signal; cancelling...")
 		cancel()
 	}()
 
@@ -781,8 +826,8 @@ func main() {
 		if code == connect.CodeUnauthenticated {
 			printDefangHint("Please use the following command to log in:", "login")
 		}
-		if code == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "EULA") {
-			printDefangHint("Please use the following command to sign the EULA:", "eula sign")
+		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
+			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree-tos")
 		}
 
 		os.Exit(int(code))
@@ -790,7 +835,7 @@ func main() {
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
-			cli.Warn(" ! A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			cli.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 		}
 	}
 }

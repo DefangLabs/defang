@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/google/uuid"
 )
 
@@ -26,7 +26,7 @@ func SendMsg(ctx context.Context, client client.Client, subject, _type, id strin
 		return nil
 	}
 
-	err := client.Publish(ctx, &pb.PublishRequest{Event: &pb.Event{
+	err := client.Publish(ctx, &v1.PublishRequest{Event: &v1.Event{
 		Specversion:     "1.0",
 		Type:            _type,
 		Source:          "https://cli.defang.io",

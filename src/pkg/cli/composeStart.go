@@ -9,16 +9,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	pb "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/types"
+	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/sirupsen/logrus"
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, c client.Client, filePath, projectName string, force bool) ([]*pb.ServiceInfo, error) {
-	project, err := loadDockerCompose(filePath, projectName)
+func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
+	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return nil, &ComposeError{err}
 	}
@@ -221,11 +222,11 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 	//
 	// Publish updates
 	//
-	var services []*pb.Service
+	var services []*v1.Service
 	for _, svccfg := range project.Services {
-		var healthcheck *pb.HealthCheck
+		var healthcheck *v1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
-			healthcheck = &pb.HealthCheck{
+			healthcheck = &v1.HealthCheck{
 				Test: svccfg.HealthCheck.Test,
 			}
 			if nil != svccfg.HealthCheck.Interval {
@@ -246,15 +247,15 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 		}
 		// Show a warning when we have ingress ports but no explicit healthcheck
 		for _, port := range ports {
-			if port.Mode == pb.Mode_INGRESS && healthcheck == nil {
+			if port.Mode == v1.Mode_INGRESS && healthcheck == nil {
 				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
 				break
 			}
 		}
 
-		var deploy *pb.Deploy
+		var deploy *v1.Deploy
 		if svccfg.Deploy != nil {
-			deploy = &pb.Deploy{}
+			deploy = &v1.Deploy{}
 			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
@@ -269,16 +270,16 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 						panic(err) // was already validated above
 					}
 				}
-				var devices []*pb.Device
+				var devices []*v1.Device
 				for _, d := range reservations.Devices {
-					devices = append(devices, &pb.Device{
+					devices = append(devices, &v1.Device{
 						Capabilities: d.Capabilities,
 						Count:        uint32(d.Count),
 						Driver:       d.Driver,
 					})
 				}
-				deploy.Resources = &pb.Resources{
-					Reservations: &pb.Resource{
+				deploy.Resources = &v1.Resources{
+					Reservations: &v1.Resource{
 						Cpus:    float32(cpus),
 						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
@@ -292,7 +293,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 		}
 
 		// Upload the build context, if any; TODO: parallelize
-		var build *pb.Build
+		var build *v1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
 			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
@@ -300,7 +301,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 				return nil, err
 			}
 
-			build = &pb.Build{
+			build = &v1.Build{
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
@@ -331,9 +332,9 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 		}
 
 		// Extract secret references
-		var secrets []*pb.Secret
+		var secrets []*v1.Secret
 		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &pb.Secret{
+			secrets = append(secrets, &v1.Secret{
 				Source: secret.Source,
 			})
 		}
@@ -343,7 +344,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 			init = *svccfg.Init
 		}
 
-		services = append(services, &pb.Service{
+		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
@@ -375,7 +376,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 		Info(" * Deploying service", service.Name)
 	}
 
-	resp, err := c.Deploy(ctx, &pb.DeployRequest{
+	resp, err := c.Deploy(ctx, &v1.DeployRequest{
 		Services: services,
 	})
 	var warnings client.Warnings
@@ -385,15 +386,15 @@ func ComposeStart(ctx context.Context, c client.Client, filePath, projectName st
 		return nil, err
 	}
 
-	if DoVerbose {
+	if DoDebug {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}
 	}
-	return resp.Services, nil
+	return resp, nil
 }
 
-func getResourceReservations(r types.Resources) *types.Resource {
+func getResourceReservations(r compose.Resources) *compose.Resource {
 	if r.Reservations == nil {
 		// TODO: we might not want to default to all the limits, maybe only memory?
 		return r.Limits
