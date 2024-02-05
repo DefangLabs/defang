@@ -208,8 +208,9 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	env := map[string]string{
-		// "AWS_REGION":               region.String();
-		"DEBUG":                    os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_ORG":               b.tenantID,
 		"DOMAIN":                   b.customDomain,
 		"PRIVATE_DOMAIN":           b.privateDomain,
 		"PROJECT":                  projectName,
