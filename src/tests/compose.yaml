@@ -22,8 +22,8 @@ services:
     secrets:
       - dummy
     healthcheck:
-      test: ["NONE"]
-      disable: true
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      # disable: true
 
   # dfnx:
   #   build:

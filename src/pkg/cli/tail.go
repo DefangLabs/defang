@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -214,7 +215,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
 				} else {
-					line = StripAnsi(line)
+					line = pkg.StripAnsi(line)
 				}
 				Println(Reset, line)
 			}
@@ -223,7 +224,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 }
 
 func isProgressDot(line string) bool {
-	return len(line) <= 1 || len(StripAnsi(line)) <= 1
+	return len(line) <= 1 || len(pkg.StripAnsi(line)) <= 1
 }
 
 func isProgressMsg(entries []*v1.LogEntry) bool {

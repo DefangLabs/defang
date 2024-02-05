@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocAWS("ten ant", "", nil)
+	b := NewByocAWS("ten ant", "", nil) // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		_, err := b.Deploy(context.TODO(), &v1.DeployRequest{
@@ -137,4 +137,31 @@ func TestListSecrets(t *testing.T) {
 			t.Fatalf("expected empty list, got %v", secrets.Names)
 		}
 	})
+}
+
+func TestIsKanikoError(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{"empty", "", false},
+		{"not kaniko", "error building image: error building stage: failed to execute command: waiting for process to exit: exit status 1", true},
+		{"info", "INFO[0001] Retrieving image manifest alpine:latest", false},
+		{"trace", "TRAC[0001] blah", false},
+		{"debug", "DEBU[0001] blah", false},
+		{"warn", "WARN[0001] Failed to retrieve image library/alpine:latest", true},
+		{"error", "ERRO[0001] some err", true},
+		{"fatal", "FATA[0001] some err", true},
+		{"panic", "PANI[0001] some err", true},
+		{"trace long", "TRACE long trace message", false},
+		{"ansi info", "\033[1;35mINFO\033[0m[0001] colored", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isLogrusError(tt.msg); got != tt.want {
+				t.Errorf("isKanikoError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

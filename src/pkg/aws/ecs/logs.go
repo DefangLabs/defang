@@ -25,6 +25,39 @@ import (
 // LogStream ("awslogs")		PREFIX/CONTAINER/2cba912d5eb14ffd926f6992b054f3bf
 // LogStream ("awsfirelens")	PREFIX/CONTAINER-firelens-2cba912d5eb14ffd926f6992b054f3bf
 
+type LogStreamInfo struct {
+	Prefix    string
+	Container string
+	Firelens  bool
+	TaskID    string
+}
+
+func GetLogStreamInfo(logStream string) *LogStreamInfo {
+	parts := strings.Split(logStream, "/")
+	switch len(parts) {
+	case 3:
+		return &LogStreamInfo{
+			Prefix:    parts[0],
+			Container: parts[1],
+			Firelens:  false,
+			TaskID:    parts[2],
+		}
+	case 2:
+		firelensParts := strings.Split(parts[1], "-")
+		if len(firelensParts) != 3 || firelensParts[1] != "firelens" {
+			return nil
+		}
+		return &LogStreamInfo{
+			Prefix:    parts[0],
+			Container: firelensParts[0],
+			Firelens:  true,
+			TaskID:    firelensParts[2],
+		}
+	default:
+		return nil
+	}
+}
+
 func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
@@ -71,14 +104,12 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 					if err == nil {
 						// Query the logs between the start time and now
 						if events, err := Query(ctx, lgID, since, time.Now()); err == nil {
-							println("found logs:", len(events))
+							// println("found logs:", len(events))
 							cs.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-								Value: types.LiveTailSessionUpdate{
-									SessionResults: events,
-								},
+								Value: types.LiveTailSessionUpdate{SessionResults: events},
 							}
 						} else {
-							println("error querying logs:", err)
+							// println("error querying logs:", err)
 						}
 						cs.addAndStart(es)
 						return
@@ -242,13 +273,13 @@ func (c *collectionStream) addAndStart(s EventStream) {
 			// Double select to make sure context cancellation is not blocked by either the receive or send
 			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
 			select {
-			case e := <-s.Events():
+			case e := <-s.Events(): // blocking
 				select {
 				case c.ch <- e:
 				case <-c.done:
 					return
 				}
-			case <-c.done:
+			case <-c.done: // blocking
 				return
 			}
 		}
@@ -295,4 +326,34 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	default:
 		return nil, fmt.Errorf("unexpected event: %T", ev)
 	}
+}
+
+func TaskStatusCh(taskArn TaskArn, poll time.Duration) (<-chan error, func()) {
+	if taskArn == nil {
+		panic("taskArn is nil")
+	}
+	ch := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		defer close(ch)
+		ticker := time.NewTicker(poll)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				// Handle cancellation
+				ch <- ctx.Err()
+				return
+			case <-ticker.C:
+				if err := GetTaskStatus(ctx, taskArn); err != nil {
+					ch <- err
+					return
+				}
+			}
+		}
+	}()
+
+	return ch, cancel
 }

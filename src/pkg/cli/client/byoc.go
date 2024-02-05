@@ -368,18 +368,22 @@ func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest)
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
-	cdTask   awsecs.TaskArn
-	ctx      context.Context
-	err      error
-	etag     string
-	response *v1.TailResponse
-	service  string
-	stream   awsecs.EventStream
+	cancelTaskCh func()
+	err          error
+	errCh        <-chan error
+	etag         string
+	response     *v1.TailResponse
+	service      string
+	stream       awsecs.EventStream
+	taskCh       <-chan error
 }
 
 var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
 
 func (bs *byocServerStream) Close() error {
+	if bs.cancelTaskCh != nil {
+		bs.cancelTaskCh()
+	}
 	return bs.stream.Close()
 }
 
@@ -399,18 +403,7 @@ type hasErrCh interface {
 }
 
 func (bs *byocServerStream) Receive() bool {
-	var errCh <-chan error
-	if errch, ok := bs.stream.(hasErrCh); ok {
-		errCh = errch.Errs()
-	}
-
 	select {
-	case <-bs.ctx.Done(): // blocking
-		bs.err = bs.ctx.Err()
-		return false
-	case err := <-errCh: // blocking
-		bs.err = err
-		return false
 	case e := <-bs.stream.Events(): // blocking
 		events, err := awsecs.GetLogEvents(e)
 		if err != nil {
@@ -418,13 +411,6 @@ func (bs *byocServerStream) Receive() bool {
 			return false
 		}
 		bs.response = &v1.TailResponse{}
-		// Before we return the response, we need to check the status of the CD task
-		if bs.cdTask != nil {
-			if err := awsecs.GetTaskStatus(bs.ctx, bs.cdTask); err != nil {
-				bs.err = err
-				return false
-			}
-		}
 		if len(events) == 0 {
 			// The original gRPC/connect server stream would never send an empty response.
 			// We could loop around the select, but returning an empty response updates the spinner.
@@ -434,9 +420,6 @@ func (bs *byocServerStream) Receive() bool {
 		parseFirelensRecords := false
 		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 		event := events[0]
-		// if info := awsecs.GetLogStreamInfo(*event.LogStreamName); info != nil {
-		// 	awsecs.GetTaskStatus(bs.ctx, bs.) // TODO: we'd need cluster-name to create the ARN
-		// }
 		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
 			// These events are from the CD task; detect the progress dots
 			if len(events) == 1 && *event.Message == "." || *event.Message == "\033[38;5;3m.\033[0m" {
@@ -479,9 +462,8 @@ func (bs *byocServerStream) Receive() bool {
 			if parseFirelensRecords {
 				if err := json.Unmarshal([]byte(message), &record); err == nil {
 					message = record.Log
-					// println("container name:", record.ContainerName, "source:", record.Source)
 					if record.ContainerName == "kaniko" {
-						stderr = isKanikoError(message)
+						stderr = isLogrusError(message)
 					} else {
 						stderr = record.Source == logs.SourceStderr
 					}
@@ -495,15 +477,24 @@ func (bs *byocServerStream) Receive() bool {
 		}
 		bs.response.Entries = entries
 		return true
+
+	case err := <-bs.errCh: // blocking (if not nil)
+		bs.err = err
+		return false
+
+	case err := <-bs.taskCh: // blocking (if not nil)
+		bs.err = err
+		return false
 	}
 }
 
 // Copied from server/fabric.go
-func isKanikoError(message string) bool {
+func isLogrusError(message string) bool {
+	message = pkg.StripAnsi(message)
 	switch message[:pkg.Min(len(message), 4)] {
 	case "WARN", "ERRO", "FATA", "PANI":
 		return true // always show
-	case "INFO", "TRAC", "DEBU":
+	case "", ".", "INFO", "TRAC", "DEBU":
 		return false // only shown with --verbose
 	default:
 		return true // show by default (likely Dockerfile errors)
@@ -542,12 +533,22 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	// 		println(*e.Message)
 	// 	}
 	// }
+	var errCh <-chan error
+	if errch, ok := eventStream.(hasErrCh); ok {
+		errCh = errch.Errs()
+	}
+	var taskch <-chan error
+	var cancel func()
+	if cdTask := b.cdTasks[etag]; cdTask != nil {
+		taskch, cancel = awsecs.TaskStatusCh(cdTask, 3*time.Second) // Check every 3 seconds
+	}
 	return &byocServerStream{
-		ctx:     ctx,
-		cdTask:  b.cdTasks[etag],
-		etag:    etag,
-		service: req.Service,
-		stream:  eventStream,
+		cancelTaskCh: cancel,
+		errCh:        errCh,
+		etag:         etag,
+		service:      req.Service,
+		stream:       eventStream,
+		taskCh:       taskch,
 	}, nil
 }
 
@@ -556,6 +557,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	if err := b.quota.Validate(service); err != nil {
 		return nil, err
 	}
+
 	// Check to make sure all required secrets are present in the secrets store
 	if missing := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID); missing != nil {
 		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
@@ -647,7 +649,7 @@ func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
 		if b.customDomain == "" {
-			return fmt.Sprintf(":%d", port.Target)
+			return ":443" // placeholder for the public ALB/distribution
 		}
 		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
 	}
