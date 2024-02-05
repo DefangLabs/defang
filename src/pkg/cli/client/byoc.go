@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-241-gb0e7e8cc" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-242-g85fed92a" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
