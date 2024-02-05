@@ -11,9 +11,9 @@ import (
 
 var (
 	termEnv    = os.Getenv("TERM")
-	isTerminal = term.IsTerminal(int(os.Stdout.Fd())) && termEnv != ""
+	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && termEnv != ""
 	_, noColor = os.LookupEnv("NO_COLOR") // per spec, the value doesn't matter
-	CanColor   = isTerminal && !noColor && termEnv != "dumb"
+	CanColor   = IsTerminal && !noColor && termEnv != "dumb"
 	DoColor    = CanColor
 )
 
