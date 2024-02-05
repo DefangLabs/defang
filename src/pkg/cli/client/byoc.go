@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-222-gd6934e90" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-241-gb0e7e8cc" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -515,15 +515,18 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
+	var cdTaskArn awsecs.TaskArn
 	var eventStream awsecs.EventStream
 	if etag != "" && !pkg.IsValidRandomID(etag) {
 		// Assume "etag" is the CD task ID
 		eventStream, err = b.driver.TailTask(ctx, etag)
+		cdTaskArn, _ = b.driver.GetTaskArn(etag)
 		etag = "" // no need to filter by etag
 	} else {
 		logGroupName := b.stack("kaniko") // TODO: rename this, but must match pulumi/index.ts
 		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+		cdTaskArn = b.cdTasks[etag]
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
@@ -539,8 +542,8 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	}
 	var taskch <-chan error
 	var cancel func()
-	if cdTask := b.cdTasks[etag]; cdTask != nil {
-		taskch, cancel = awsecs.TaskStatusCh(cdTask, 3*time.Second) // Check every 3 seconds
+	if cdTaskArn != nil {
+		taskch, cancel = awsecs.TaskStatusCh(cdTaskArn, 3*time.Second) // check every 3 seconds
 	}
 	return &byocServerStream{
 		cancelTaskCh: cancel,

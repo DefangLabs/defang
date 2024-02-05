@@ -419,7 +419,12 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		cli.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if err != nil {
+			return err
+		}
+		cli.Info(" * Done.")
+		return nil
 	},
 }
 
@@ -488,13 +493,18 @@ var composeDownCmd = &cobra.Command{
 
 		cli.Info(" * Deleted services, deployment ID", etag)
 
-		if !detach {
-			cli.Info(" * Tailing logs for deployment; press Ctrl+C to detach:")
-			return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if detach {
+			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			return nil
 		}
 
-		printDefangHint("To track the update, do:", "tail --etag "+etag)
+		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if err != nil {
+			return err
+		}
+		cli.Info(" * Done.")
 		return nil
+
 	},
 }
 
@@ -535,13 +545,13 @@ var deleteCmd = &cobra.Command{
 
 		cli.Info(" * Deleted service", name, "with deployment ID", etag)
 
-		if tail {
-			cli.Info(" * Tailing logs for deployment; press Ctrl+C to detach:")
-			return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		if !tail {
+			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			return nil
 		}
 
-		printDefangHint("To track the update, do:", "tail --etag "+etag)
-		return nil
+		cli.Info(" * Tailing logs for update; press Ctrl+C to detach:")
+		return cli.Tail(cmd.Context(), client, "", etag, since, false)
 	},
 }
 
