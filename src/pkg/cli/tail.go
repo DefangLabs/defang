@@ -12,6 +12,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -103,9 +104,39 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	}
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
-	if CanColor && DoColor && !raw {
-		fmt.Print(HideCursor)
-		defer fmt.Print(Reset + ShowCursor)
+	if IsTerminal && !raw {
+		if CanColor && DoColor {
+			fmt.Print(HideCursor)
+			defer fmt.Print(Reset + ShowCursor)
+		}
+
+		if !DoVerbose {
+			Info(" * Press V to toggle verbose mode")
+			oldState, err := term.MakeUnbuf(int(os.Stdin.Fd()))
+			if err != nil {
+				return err
+			}
+			defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+			defer os.Stdin.Close() // abort the read
+			go func() {
+				var b [1]byte
+				for {
+					if _, err := os.Stdin.Read(b[:]); err != nil {
+						return
+					}
+					if b[0] == 'V' || b[0] == 'v' {
+						verbose := !DoVerbose
+						DoVerbose = verbose
+						state := "off"
+						if verbose {
+							state = "on"
+						}
+						Info(" * Verbose mode", state)
+					}
+				}
+			}()
+		}
 	}
 
 	// colorizer := colorizer{}
