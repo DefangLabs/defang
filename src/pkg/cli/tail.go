@@ -154,7 +154,6 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			spinMe++
 			// Replace service progress messages with our own spinner
 			if isProgressMsg(msg.Entries) {
-				println("asf")
 				continue
 			}
 		}
