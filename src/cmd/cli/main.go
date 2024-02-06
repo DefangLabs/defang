@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -38,10 +37,9 @@ import (
 var (
 	client         defangv1connect.FabricControllerClient
 	clientId       = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125")
-	defFabric      = pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
+	defFabric      = pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
 	hasTty         = term.IsTerminal(int(os.Stdin.Fd())) && !pkg.GetenvBool("CI")
-	nonInteractive bool   // set by the --non-interactive flag
-	server         string // set by the --cluster flag
+	nonInteractive bool // set by the --non-interactive flag
 	tenantId       = types.DEFAULT_TENANT
 )
 
@@ -73,16 +71,13 @@ var rootCmd = &cobra.Command{
 			cli.DoColor = false
 		}
 
-		if _, _, err := net.SplitHostPort(server); err != nil {
-			server = server + ":443"
-		}
-
 		// Not all commands need a connection, so we should only connect when needed
 		if _, ok := cmd.Annotations[autoConnect]; !ok {
 			return nil
 		}
 
-		client, tenantId = cli.Connect(server)
+		cluster, _ := cmd.Flags().GetString("cluster")
+		client, tenantId = cli.Connect(cluster)
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -95,10 +90,10 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			cli.Warn(" !", err)
-			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server); err != nil {
+			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster); err != nil {
 				return err
 			}
-			client, tenantId = cli.Connect(server) // reconnect with the new token
+			client, tenantId = cli.Connect(cluster) // reconnect with the new token
 		}
 		return nil
 	},
@@ -110,7 +105,8 @@ var loginCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, server)
+		cluster, _ := cmd.Flags().GetString("cluster")
+		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster)
 		if err != nil {
 			return err
 		}
@@ -126,7 +122,8 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tenant, err := cli.Whoami(server)
+		cluster, _ := cmd.Flags().GetString("cluster")
+		tenant, err := cli.Whoami(cluster)
 		if err != nil {
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
@@ -634,7 +631,7 @@ var tosCmd = &cobra.Command{
 func main() {
 	colorMode := ColorAuto
 	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
-	rootCmd.PersistentFlags().StringVarP(&server, "cluster", "s", defFabric, "Cluster to connect to")
+	rootCmd.PersistentFlags().StringP("cluster", "s", defFabric, "Cluster to connect to")
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
@@ -816,9 +813,9 @@ func printDefangHint(hint, args string) {
 	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n", hint)
-	if rootCmd.PersistentFlags().Lookup("cluster").Changed {
-		cluster := strings.TrimSuffix(server, ":443")
-		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, cluster, args)
+	clusterFlag := rootCmd.Flag("cluster")
+	if clusterFlag.Changed {
+		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, clusterFlag.Value.String(), args)
 	} else {
 		fmt.Printf("\n  %s %s\n\n", executable, args)
 	}
