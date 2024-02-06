@@ -40,6 +40,12 @@ service FabricController {
   rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse);
   rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message TrackRequest {
+  string anon_id = 1;
+  string event = 2;
 }
 
 message DeployRequest {

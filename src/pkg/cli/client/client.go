@@ -14,30 +14,30 @@ type ServerStream[Res any] interface {
 }
 
 type Client interface {
-	GetStatus(context.Context) (*v1.Status, error)
-	GetVersion(context.Context) (*v1.Version, error)
-	Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error)
-	RevokeToken(context.Context) error
-	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
-	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
-	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
-	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
-	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
-	Publish(context.Context, *v1.PublishRequest) error
+	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
-	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	GetServices(context.Context) (*v1.ListServicesResponse, error)
-	GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error)
-	PutSecret(context.Context, *v1.SecretValue) error
-	ListSecrets(context.Context) (*v1.Secrets, error)
-	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
-	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
-	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
-	DeleteSubdomainZone(context.Context) error
-	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
-
+	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (string, error)
-	GetFabric() string
+	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
+	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
+	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
+	DeleteSubdomainZone(context.Context) error
+	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
+	GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error)
+	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
 	GetAccessToken() string
+	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
+	GetFabric() string
+	GetServices(context.Context) (*v1.ListServicesResponse, error)
+	GetStatus(context.Context) (*v1.Status, error)
+	GetVersion(context.Context) (*v1.Version, error)
+	ListSecrets(context.Context) (*v1.Secrets, error)
+	Publish(context.Context, *v1.PublishRequest) error
+	PutSecret(context.Context, *v1.SecretValue) error
+	RevokeToken(context.Context) error
+	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
+	Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error)
+	Track(context.Context, string) error
+	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
 }

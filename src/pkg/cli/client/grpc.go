@@ -10,13 +10,15 @@ import (
 	"github.com/defang-io/defang/src/pkg/auth"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type GrpcClient struct {
+	accessToken string
+	anonID      string
 	client      defangv1connect.FabricControllerClient
 	fabric      string
-	accessToken string
 }
 
 func NewGrpcClient(host, accessToken string) *GrpcClient {
@@ -27,7 +29,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-	return &GrpcClient{client: fabricClient, fabric: host, accessToken: accessToken}
+	return &GrpcClient{client: fabricClient, fabric: host, accessToken: accessToken, anonID: uuid.NewString()}
 }
 
 func (g GrpcClient) GetFabric() string {
@@ -146,10 +148,15 @@ func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStrea
 }
 
 func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	return "", errors.New("not a BYOC cluster")
+	return "", errors.New("the bootstrap command is not valid for the Defang provider")
 }
 
 func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 	_, err := g.client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
+	return err
+}
+
+func (g *GrpcClient) Track(ctx context.Context, event string) error {
+	_, err := g.client.Track(ctx, &connect.Request[v1.TrackRequest]{Msg: &v1.TrackRequest{AnonId: g.anonID, Event: event}})
 	return err
 }

@@ -92,6 +92,8 @@ const (
 	FabricControllerGetDelegateSubdomainZoneProcedure = "/io.defang.v1.FabricController/GetDelegateSubdomainZone"
 	// FabricControllerWhoAmIProcedure is the fully-qualified name of the FabricController's WhoAmI RPC.
 	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
+	// FabricControllerTrackProcedure is the fully-qualified name of the FabricController's Track RPC.
+	FabricControllerTrackProcedure = "/io.defang.v1.FabricController/Track"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -118,6 +120,7 @@ type FabricControllerClient interface {
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
+	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -235,6 +238,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerWhoAmIProcedure,
 			opts...,
 		),
+		track: connect_go.NewClient[v1.TrackRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerTrackProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -261,6 +269,7 @@ type fabricControllerClient struct {
 	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
+	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -368,6 +377,11 @@ func (c *fabricControllerClient) WhoAmI(ctx context.Context, req *connect_go.Req
 	return c.whoAmI.CallUnary(ctx, req)
 }
 
+// Track calls io.defang.v1.FabricController.Track.
+func (c *fabricControllerClient) Track(ctx context.Context, req *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.track.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -392,6 +406,7 @@ type FabricControllerHandler interface {
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
+	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -505,6 +520,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.WhoAmI,
 		opts...,
 	)
+	fabricControllerTrackHandler := connect_go.NewUnaryHandler(
+		FabricControllerTrackProcedure,
+		svc.Track,
+		opts...,
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -549,6 +569,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetDelegateSubdomainZoneHandler.ServeHTTP(w, r)
 		case FabricControllerWhoAmIProcedure:
 			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
+		case FabricControllerTrackProcedure:
+			fabricControllerTrackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -640,4 +662,8 @@ func (UnimplementedFabricControllerHandler) GetDelegateSubdomainZone(context.Con
 
 func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.WhoAmI is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Track is not implemented"))
 }
