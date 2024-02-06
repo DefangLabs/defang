@@ -110,6 +110,8 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 	// colorizer := colorizer{}
 	spinMe := 0
+	doSpinner := !raw && DoColor
+
 	timestampZone := time.Local
 	timestampFormat := TimestampFormat
 	if time.Since(since) >= 24*time.Hour {
@@ -150,13 +152,9 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		msg := tailClient.Msg()
 
 		// Show a spinner if we're not in raw mode and have a TTY
-		if !raw && DoColor {
-			fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
+		if doSpinner {
+			fmt.Printf("\r%c\r", spinner[spinMe%len(spinner)])
 			spinMe++
-			// Replace service progress messages with our own spinner
-			if isProgressMsg(msg.Entries) {
-				continue
-			}
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
@@ -182,6 +180,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					out = os.Stderr
 				}
 				Fprintln(out, Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
+				continue
+			}
+
+			// Replace service progress messages with our own spinner
+			if doSpinner && isProgressDot(e.Message) {
 				continue
 			}
 
@@ -225,8 +228,4 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 func isProgressDot(line string) bool {
 	return len(line) <= 1 || len(pkg.StripAnsi(line)) <= 1
-}
-
-func isProgressMsg(entries []*v1.LogEntry) bool {
-	return len(entries) == 0 || (len(entries) == 1 && isProgressDot(entries[0].Message))
 }
