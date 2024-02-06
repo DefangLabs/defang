@@ -753,12 +753,13 @@ func (b *byocAws) Destroy(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *byocAws) BootstrapCommand(ctx context.Context, command string) error {
+func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
 	if err := b.setUp(ctx); err != nil {
-		return err
+		return "", err
 	}
-	if _, err := b.runCdTask(ctx, "npm", "start", command); err != nil {
-		return err
+	cdTaskArn, err := b.runCdTask(ctx, "npm", "start", command)
+	if err != nil || cdTaskArn == nil {
+		return "", annotateAwsError(err)
 	}
-	return nil
+	return awsecs.GetTaskID(cdTaskArn), nil
 }

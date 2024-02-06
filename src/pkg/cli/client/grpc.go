@@ -145,8 +145,8 @@ func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStrea
 	return g.client.Tail(ctx, &connect.Request[v1.TailRequest]{Msg: req})
 }
 
-func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) error {
-	return errors.New("not a BYOC cluster")
+func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (string, error) {
+	return "", errors.New("not a BYOC cluster")
 }
 
 func (g *GrpcClient) AgreeToS(ctx context.Context) error {

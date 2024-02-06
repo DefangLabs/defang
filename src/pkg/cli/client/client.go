@@ -37,7 +37,7 @@ type Client interface {
 	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
 
 	AgreeToS(context.Context) error
-	BootstrapCommand(context.Context, string) error
+	BootstrapCommand(context.Context, string) (string, error)
 	GetFabric() string
 	GetAccessToken() string
 }
