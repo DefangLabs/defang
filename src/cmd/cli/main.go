@@ -674,7 +674,7 @@ var tosCmd = &cobra.Command{
 }
 
 func main() {
-	defangFabric := pkg.Getenv("DEFANG_FABRIC", "fabric-prod1.defang.dev")
+	defangFabric := pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
 	colorMode := ColorAuto
