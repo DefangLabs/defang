@@ -5,12 +5,10 @@ import (
 	"net"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/bufbuild/connect-go"
 	fab "github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/github"
-	"github.com/defang-io/defang/src/pkg/types"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -40,14 +38,6 @@ func GetExistingToken(fabric string) string {
 	}
 
 	return accessToken
-}
-
-func SplitTenantHost(fabric string) (types.TenantID, string) {
-	parts := strings.SplitN(fabric, "@", 2)
-	if len(parts) == 2 {
-		return types.TenantID(parts[0]), parts[1]
-	}
-	return "", fabric
 }
 
 func CheckLogin(ctx context.Context, client defangv1connect.FabricControllerClient) error {
