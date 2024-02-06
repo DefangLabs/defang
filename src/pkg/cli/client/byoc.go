@@ -92,9 +92,7 @@ func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
 			Services:   40,
 			ShmSizeMiB: 30720,
 		},
-
 		tenantID: tenantId,
-		// fqdn:    "defang-lionello-alb-770995209.us-west-2.elb.amazonaws.com", // FIXME: grab these from the AWS API or outputs
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
