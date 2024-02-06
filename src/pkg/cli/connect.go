@@ -9,11 +9,16 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
+const DefaultCluster = "fabric-prod1.defang.dev"
+
 func SplitTenantHost(cluster string) (types.TenantID, string) {
 	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
 	if len(parts) == 2 {
 		tenant, cluster = types.TenantID(parts[0]), parts[1]
+	}
+	if cluster == "" {
+		cluster = DefaultCluster
 	}
 	if _, _, err := net.SplitHostPort(cluster); err != nil {
 		cluster = cluster + ":443" // default to https
