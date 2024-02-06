@@ -280,6 +280,9 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 			{
 				Name:  awsecs.ContainerName,
 				Image: image,
+				// LinuxParameters: &ecs.TaskDefinition_LinuxParameters{
+				// 	InitProcessEnabled: ptr.Bool(true),
+				// },
 				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
 					LogDriver: "awslogs",
 					Options: map[string]string{

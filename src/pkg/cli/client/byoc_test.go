@@ -155,7 +155,9 @@ func TestIsKanikoError(t *testing.T) {
 		{"fatal", "FATA[0001] some err", true},
 		{"panic", "PANI[0001] some err", true},
 		{"trace long", "TRACE long trace message", false},
-		{"ansi info", "\033[1;35mINFO\033[0m[0001] colored", false},
+		{"ansi info", "\033[36mINFO\033[0m[0001] colored blue", false},
+		{"ansi warn", "\033[33mWARN\033[0m[0001] colored yellow", true},
+		{"ansi err", "\033[31mERRO\033[0m[0001] colored red", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

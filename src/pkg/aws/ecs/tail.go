@@ -19,7 +19,7 @@ const AwsLogsStreamPrefix = ProjectName
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskId := GetTaskID(taskArn)
 	a.Region = region.FromArn(*taskArn)
-	es, err := a.TailTask(ctx, taskId)
+	es, err := a.TailTaskID(ctx, taskId)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) TailTask(ctx context.Context, taskID string) (EventStream, error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}

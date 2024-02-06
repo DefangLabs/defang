@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-242-g85fed92a" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-262-g46e8b6c5" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -499,11 +499,7 @@ func (bs *byocServerStream) Receive() bool {
 		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 		event := events[0]
 		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
-			// These events are from the CD task; detect the progress dots
-			if len(events) == 1 && *event.Message == "." || *event.Message == "\033[38;5;3m.\033[0m" {
-				// This is a progress dot; return an empty response
-				return true
-			}
+			// These events are from the CD task; detect stdout/stderr
 			bs.response.Etag = bs.etag // FIXME: this would show all deployments, not just the one we're interested in
 			bs.response.Host = "pulumi"
 			bs.response.Service = "cd"
@@ -546,6 +542,8 @@ func (bs *byocServerStream) Receive() bool {
 						stderr = record.Source == logs.SourceStderr
 					}
 				}
+			} else if bs.response.Service == "cd" && strings.HasPrefix(message, " ** ") {
+				stderr = true
 			}
 			entries[i] = &v1.LogEntry{
 				Message:   message,
@@ -568,11 +566,11 @@ func (bs *byocServerStream) Receive() bool {
 
 // Copied from server/fabric.go
 func isLogrusError(message string) bool {
-	message = pkg.StripAnsi(message)
+	// Logrus's TextFormatter prefixes messages with the uppercase log level, optionally truncated and/or in color
 	switch message[:pkg.Min(len(message), 4)] {
-	case "WARN", "ERRO", "FATA", "PANI":
+	case "WARN", "ERRO", "FATA", "PANI", "\x1b[31", "\x1b[33": // red or yellow
 		return true // always show
-	case "", ".", "INFO", "TRAC", "DEBU":
+	case "", "INFO", "TRAC", "DEBU", "\x1b[36", "\x1b[37": // blue or gray
 		return false // only shown with --verbose
 	default:
 		return true // show by default (likely Dockerfile errors)
@@ -597,13 +595,14 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	var eventStream awsecs.EventStream
 	if etag != "" && !pkg.IsValidRandomID(etag) {
 		// Assume "etag" is the CD task ID
-		eventStream, err = b.driver.TailTask(ctx, etag)
+		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		cdTaskArn, _ = b.driver.GetTaskArn(etag)
 		etag = "" // no need to filter by etag
 	} else {
-		logGroupName := b.stack("kaniko") // TODO: rename this, but must match pulumi/index.ts
-		logGroupID := b.driver.MakeARN("logs", "log-group:"+logGroupName)
-		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, logGroupID)
+		// Tail CD, kaniko, and all services
+		kanikoLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stack("kaniko"))     // must match logic in ecs/common.ts
+		servicesLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stack("logGroup")) // must match logic in ecs/common.ts
+		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, kanikoLogGroup, servicesLogGroup)
 		cdTaskArn = b.cdTasks[etag]
 	}
 	if err != nil {
