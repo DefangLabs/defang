@@ -133,6 +133,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 							state = "on"
 						}
 						Info(" * Verbose mode", state)
+						go client.Track("Verbose Toggled")
 					}
 				}
 			}()

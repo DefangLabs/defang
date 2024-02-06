@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -156,7 +157,23 @@ func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 	return err
 }
 
-func (g *GrpcClient) Track(ctx context.Context, event string) error {
-	_, err := g.client.Track(ctx, &connect.Request[v1.TrackRequest]{Msg: &v1.TrackRequest{AnonId: g.anonID, Event: event}})
+func (g *GrpcClient) Track(event string, properties ...Property) error {
+	if g == nil || g.client == nil {
+		return errors.New("not connected")
+	}
+
+	// Convert map[string]any to map[string]string
+	var props map[string]string
+	if len(properties) > 0 {
+		props = make(map[string]string, len(properties))
+		for _, p := range properties {
+			props[p.Name] = fmt.Sprint(p.Value)
+		}
+	}
+	_, err := g.client.Track(context.Background(), &connect.Request[v1.TrackRequest]{Msg: &v1.TrackRequest{
+		AnonId:     g.anonID,
+		Event:      event,
+		Properties: props,
+	}})
 	return err
 }

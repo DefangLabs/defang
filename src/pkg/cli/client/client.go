@@ -38,6 +38,11 @@ type Client interface {
 	RevokeToken(context.Context) error
 	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
 	Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error)
-	Track(context.Context, string) error
+	Track(string, ...Property) error
 	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
+}
+
+type Property struct {
+	Name  string
+	Value any
 }
