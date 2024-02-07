@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-278-g1d7705ee" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-279-ge4a200e7" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -190,7 +190,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	taskArn, err := b.runCdTask(ctx, "node", "lib/index.js", "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
