@@ -278,8 +278,9 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		},
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
-				Name:  awsecs.ContainerName,
-				Image: image,
+				Name:        awsecs.ContainerName,
+				Image:       image,
+				StopTimeout: ptr.Int(120),
 				// LinuxParameters: &ecs.TaskDefinition_LinuxParameters{
 				// 	InitProcessEnabled: ptr.Bool(true),
 				// },
