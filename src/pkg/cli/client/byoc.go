@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-278-g1d7705ee" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-281-gb3d11b5c" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -654,7 +654,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		si.PrivateFqdn = b.getFqdn(fqn, false)
 	}
 
-	var warning Warning
+	var warning Warning // TODO: should be nil by default
 	if service.Domainname != "" {
 		if !hasIngress {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
