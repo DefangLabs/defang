@@ -93,7 +93,7 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 		"client_id":    {clientId},
 		"state":        {state},
 		"redirect_uri": {server.URL + "/auth"},
-		"scope":        {"read:org"}, // required for membership check
+		"scope":        {"read:org,user:email"}, // required for membership check
 		// "login":     {";TODO: from state file"},
 	}
 	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
