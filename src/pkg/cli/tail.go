@@ -125,7 +125,10 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					if _, err := os.Stdin.Read(b[:]); err != nil {
 						return
 					}
-					if b[0] == 'V' || b[0] == 'v' {
+					switch b[0] {
+					case 10, 13: // Enter or Return
+						Info(" ") // empty line, but overwrite spinner
+					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
 						state := "off"
