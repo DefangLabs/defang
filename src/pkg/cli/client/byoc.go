@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-283-gbb6df731" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.50-289-g86c9c0b9" // will cause issues if two clients with different versions are connected to the same stack
 	projectName  = "defang"                // TODO: support multiple projects
 	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
 )
@@ -55,9 +55,18 @@ type byocAws struct {
 	shoudlDelegateSubdomain bool
 }
 
-type Warning string
+type Warning interface {
+	Error() string
+	Warning() string
+}
 
-func (w Warning) Error() string {
+type WarningError string
+
+func (w WarningError) Error() string {
+	return string(w)
+}
+
+func (w WarningError) Warning() string {
 	return string(w)
 }
 
@@ -66,7 +75,7 @@ type Warnings []Warning
 func (w Warnings) Error() string {
 	var buf strings.Builder
 	for _, warning := range w {
-		buf.WriteString(warning.Error())
+		buf.WriteString(warning.Warning())
 		buf.WriteByte('\n')
 	}
 	return buf.String()
@@ -134,7 +143,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
 		var warning Warning
-		if errors.As(err, &warning) {
+		if errors.As(err, &warning) && warning != nil {
 			warnings = append(warnings, warning)
 		} else if err != nil {
 			return nil, err
@@ -190,7 +199,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", payloadString)
+	taskArn, err := b.runCdTask(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -662,10 +671,10 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
 		cname, err := net.LookupCNAME(service.Domainname)
 		if err != nil {
-			warning = Warning(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
+			warning = WarningError(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			warning = Warning(fmt.Sprintf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn))
+			warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn))
 		}
 	}
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now

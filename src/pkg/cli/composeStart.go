@@ -381,7 +381,9 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 	})
 	var warnings client.Warnings
 	if errors.As(err, &warnings) {
-		Warn(warnings)
+		if len(warnings) > 0 {
+			Warn(warnings)
+		}
 	} else if err != nil {
 		return nil, err
 	}
