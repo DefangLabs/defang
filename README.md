@@ -17,11 +17,27 @@ This repo includes:
 
 ## Installing
 Install the Defang CLI from one of the following sources:
-* Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/defang-io/homebrew-defang): `brew install defang-io/defang/defang`
-* Using [Go](https://go.dev): `go install github.com/defang-io/defang/src/cmd/cli@latest`
+* Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/defang-io/homebrew-defang): 
+  ```
+  brew install defang-io/defang/defang
+  ```
+* Using a shell script:
+  ```
+  . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)
+  ```
+* Using [Go](https://go.dev): 
+  ```
+  go install github.com/defang-io/defang/src/cmd/cli@latest
+  ```
 * Using the [Nix package manager](https://nixos.org):
-  * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz`
-  * or with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
+  * with Nix-Env: 
+    ```
+    nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz
+    ```
+  * or with Flakes: 
+    ```
+    nix profile install github:defang-io/defang#defang-bin --refresh
+    ```
 * Download the [latest binary](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
 
 ## Support
