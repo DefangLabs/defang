@@ -317,4 +317,5 @@ message WhoAmIResponse {
   string tenant = 1;
   string account = 2;
   string region = 3;
+  string user_id = 4;
 }
