@@ -204,6 +204,16 @@ func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
 	return getTaskStatus(ctx, region, cluster, taskID)
 }
 
+func isTaskTerminalState(status string) bool {
+	// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/scheduling_tasks.html#task-lifecycle
+	switch status {
+	case "DELETED", "STOPPED", "DEPROVISIONING":
+		return true
+	default:
+		return false // we might still get logs
+	}
+}
+
 func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) error {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
@@ -213,24 +223,31 @@ func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId strin
 
 	// Use DescribeTasks API to check if the task is still running (same as ecs.NewTasksStoppedWaiter)
 	ti, _ := ecsClient.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: ptr.String(cluster),
+		Cluster: &cluster,
 		Tasks:   []string{taskId},
 	})
-	if ti != nil && len(ti.Tasks) > 0 {
-		task := ti.Tasks[0]
-		switch task.StopCode {
-		default:
-			return taskFailure{string(task.StopCode), *task.StoppedReason}
-		case ecsTypes.TaskStopCodeEssentialContainerExited:
-			if *task.Containers[0].ExitCode == 0 {
-				return io.EOF // Success
-			}
-			reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *task.Containers[0].ExitCode)
-			return taskFailure{string(task.StopCode), reason}
-		case "": // Task is still running
-		}
+	if ti == nil || len(ti.Tasks) == 0 {
+		return nil // task doesn't exist yet; TODO: check the actual error from DescribeTasks
 	}
-	return nil // still running or doesn't exist yet
+	task := ti.Tasks[0]
+	if task.LastStatus == nil || !isTaskTerminalState(*task.LastStatus) {
+		return nil // still running
+	}
+
+	switch task.StopCode {
+	default:
+		return taskFailure{string(task.StopCode), *task.StoppedReason}
+	case ecsTypes.TaskStopCodeEssentialContainerExited:
+		for _, c := range task.Containers {
+			if c.ExitCode != nil && *c.ExitCode != 0 {
+				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
+				return taskFailure{string(task.StopCode), reason}
+			}
+		}
+		fallthrough
+	case "": // TODO: shouldn't happen
+		return io.EOF // Success
+	}
 }
 
 func SplitClusterTask(taskArn TaskArn) (string, string) {

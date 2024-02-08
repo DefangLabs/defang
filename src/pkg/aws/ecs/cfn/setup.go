@@ -70,6 +70,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		if ok := errors.As(err, &apiError); ok && apiError.ErrorCode() == "ValidationError" && apiError.ErrorMessage() == "No updates are to be performed." {
 			return a.fillOutputs(ctx)
 		}
+		// TODO: handle UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
 		return err // might call createStackAndWait depending on the error
 	}
 

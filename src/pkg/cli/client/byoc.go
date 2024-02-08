@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.50-289-g86c9c0b9" // will cause issues if two clients with different versions are connected to the same stack
-	projectName  = "defang"                // TODO: support multiple projects
-	cdTaskPrefix = "defang-cd"             // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion    = "v0.4.51-1-gde332378" // will cause issues if two clients with different versions are connected to the same stack
+	projectName  = "defang"              // TODO: support multiple projects
+	cdTaskPrefix = "defang-cd"           // WARNING: renaming this practically deletes the Pulumi state
 )
 
 type byocAws struct {
@@ -52,7 +52,7 @@ type byocAws struct {
 	quota                   quota.Quotas
 	setupDone               bool
 	tenantID                string
-	shoudlDelegateSubdomain bool
+	shouldDelegateSubdomain bool
 }
 
 type Warning interface {
@@ -84,14 +84,16 @@ func (w Warnings) Error() string {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
+	lowerTenant := strings.ToLower(tenantId)
+	domain = strings.ToLower(domain)
 	const stage = "defang" // must match prefix in secrets.go
 	return &byocAws{
 		cdTasks:       make(map[string]awsecs.TaskArn),
 		customDomain:  domain,
 		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
 		GrpcClient:    defClient,
-		privateDomain: projectName + "." + tenantId + ".internal", // must match the logic in ecs/common.ts
-		pulumiStack:   tenantId + "-" + stage,
+		privateDomain: projectName + "." + lowerTenant + ".internal", // must match the logic in ecs/common.ts
+		pulumiStack:   lowerTenant + "-" + stage,
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -121,8 +123,8 @@ func (b *byocAws) setUp(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		b.customDomain = domain.Zone
-		b.shoudlDelegateSubdomain = true
+		b.customDomain = strings.ToLower(domain.Zone) // HACK: this should be DnsSafe
+		b.shouldDelegateSubdomain = true
 	}
 
 	b.setupDone = true
@@ -194,12 +196,12 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 		// FIXME: this code path didn't work
 	}
 
-	if b.shoudlDelegateSubdomain {
+	if b.shouldDelegateSubdomain {
 		if _, err := b.delegateSubdomain(ctx); err != nil {
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdTask(ctx, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +291,7 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
-func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
+func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
@@ -302,6 +304,10 @@ func (b *byocAws) runCdTask(ctx context.Context, cmd ...string) (awsecs.TaskArn,
 		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
 		"STACK":                    b.pulumiStack,
 	}
+	// for k, v := range env {
+	// 	fmt.Printf("%s=%q ", k, v)
+	// }
+	// fmt.Println()
 	return b.driver.Run(ctx, env, cmd...)
 }
 
@@ -310,7 +316,7 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdTask(ctx, "npm", "start", "up", "")
+	taskArn, err := b.runCdCommand(ctx, "up", "")
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
@@ -567,7 +573,7 @@ func (bs *byocServerStream) Receive() bool {
 
 	case err := <-bs.taskCh: // blocking (if not nil)
 		bs.err = err
-		return false
+		return false // TODO: make sure we got all the logs from the task
 	}
 }
 
@@ -737,7 +743,7 @@ func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafe(fqn qualifiedName) string {
-	return strings.ReplaceAll(string(fqn), ".", "-")
+	return strings.ReplaceAll(strings.ToLower(string(fqn)), ".", "-")
 }
 
 func (b *byocAws) Destroy(ctx context.Context) error {
@@ -751,7 +757,7 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string,
 	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdTask(ctx, "npm", "start", command)
+	cdTaskArn, err := b.runCdCommand(ctx, command)
 	if err != nil || cdTaskArn == nil {
 		return "", annotateAwsError(err)
 	}
