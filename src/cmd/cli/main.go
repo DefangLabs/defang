@@ -842,14 +842,15 @@ func main() {
 	// Handle Ctrl+C so we can exit gracefully
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
-	defer close(sigs)
+	// defer close(sigs)
 	signal.Notify(sigs, os.Interrupt)
-	defer signal.Stop(sigs)
+	// defer signal.Stop(sigs)
 
 	go func() {
 		<-sigs
-		client.Track("User Interrupted")
+		signal.Stop(sigs)
 		cli.Debug("Received interrupt signal; cancelling...")
+		client.Track("User Interrupted")
 		cancel()
 	}()
 
@@ -896,6 +897,8 @@ func main() {
 			}
 		}
 	}
+
+	// time.Sleep(time.Minute)
 }
 
 func prettyExecutable(def string) string {
