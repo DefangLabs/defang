@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chat App</title>
+</head>
+<body>
+
+<input type="text" id="name" placeholder="Enter your name" required>
+<input type="text" id="message" placeholder="Enter a message" required>
+<button onclick="sendMessage()">Send</button>
+
+<ul id="messages"></ul>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    var socket = io();
+
+    socket.on('message', function(msg){
+        var ul = document.getElementById('messages');
+        var li = document.createElement('li');
+        li.appendChild(document.createTextNode(msg.name + ': ' + msg.message));
+        ul.appendChild(li);
+    });
+
+    function sendMessage(){
+        var name = document.getElementById('name').value;
+        var message = document.getElementById('message').value;
+        socket.emit('message', { name: name, message: message });
+    }
+</script>
+
+</body>
+</html>
