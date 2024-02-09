@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.51-1-gde332378" // will cause issues if two clients with different versions are connected to the same stack
-	projectName  = "defang"              // TODO: support multiple projects
-	cdTaskPrefix = "defang-cd"           // WARNING: renaming this practically deletes the Pulumi state
+	cdVersion    = "v0.4.51-40-g0dfbafef" // will cause issues if two clients with different versions are connected to the same stack
+	cdTaskPrefix = "defang-cd"            // WARNING: renaming this practically deletes the Pulumi state
+	defangPrefix = "Defang"               // prefix for all resources created by Defang
 )
 
 type byocAws struct {
@@ -48,6 +48,7 @@ type byocAws struct {
 	privateDomain           string
 	privateLbIps            []string
 	publicNatIps            []string
+	pulumiProject           string
 	pulumiStack             string
 	quota                   quota.Quotas
 	setupDone               bool
@@ -84,16 +85,17 @@ func (w Warnings) Error() string {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
-	lowerTenant := strings.ToLower(tenantId)
-	domain = strings.ToLower(domain)
-	const stage = "defang" // must match prefix in secrets.go
+	if domain != strings.ToLower(domain) {
+		panic("custom domain must be lowercase")
+	}
 	return &byocAws{
+		GrpcClient:    defClient,
 		cdTasks:       make(map[string]awsecs.TaskArn),
 		customDomain:  domain,
-		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
-		GrpcClient:    defClient,
-		privateDomain: projectName + "." + lowerTenant + ".internal", // must match the logic in ecs/common.ts
-		pulumiStack:   lowerTenant + "-" + stage,
+		driver:        cfn.New(cdTaskPrefix, aws.Region("")),   // default region
+		privateDomain: strings.ToLower(tenantId + ".internal"), // must match the logic in ecs/common.ts
+		pulumiProject: tenantId,                                // TODO: multi-project support
+		pulumiStack:   "beta",                                  // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -295,11 +297,12 @@ func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskA
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
+		"DEFANG_PREFIX":            defangPrefix,
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":               b.tenantID,
 		"DOMAIN":                   b.customDomain,
 		"PRIVATE_DOMAIN":           b.privateDomain,
-		"PROJECT":                  projectName,
+		"PROJECT":                  b.pulumiProject,
 		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
 		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
 		"STACK":                    b.pulumiStack,
@@ -327,7 +330,7 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 
 // stack returns a stack-qualified name, like the Pulumi TS function `stack`
 func (b *byocAws) stack(name string) string {
-	return projectName + "-" + b.pulumiStack + "-" + name
+	return fmt.Sprintf("%s-%s-%s-%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as
 }
 
 func (b *byocAws) getClusterNames() []string {
@@ -415,13 +418,16 @@ func annotateAwsError(err error) error {
 	return err
 }
 
+func (b byocAws) getSecretID(name string) string {
+	return fmt.Sprintf("/%s/%s/%s/%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
+}
+
 func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
+	fqn := b.getSecretID(secret.Name)
 	var err error
-	prefix := b.tenantID + "."
-	fqn := prefix + secret.Name
 	if secret.Value == "" {
 		err = b.driver.DeleteSecret(ctx, fqn)
 	} else {
@@ -435,7 +441,7 @@ func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	if err != nil {
 		return nil, err
 	}
-	prefix := b.tenantID + "."
+	prefix := b.getSecretID("")
 	secrets := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
 		secrets[i] = strings.TrimPrefix(secret, prefix)
@@ -531,7 +537,7 @@ func (bs *byocServerStream) Receive() bool {
 			// These events are from the Firelens sidecar; try to parse the JSON
 			if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
 				bs.response.Etag = record.Etag
-				bs.response.Host = record.Host
+				bs.response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
 				bs.response.Service = record.ContainerName // TODO: could be service_etag
 				parseFirelensRecords = true
 			}

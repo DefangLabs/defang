@@ -31,7 +31,7 @@ func Connect(cluster string, provider client.Provider) (client.Client, types.Ten
 
 	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
-		tenantId, _ = client.TenantFromAccessToken(accessToken)
+		tenantId, _, _ = client.TenantFromAccessToken(accessToken)
 	}
 	Debug(" - Using tenant", tenantId, "for cluster", cluster, "and provider", provider)
 

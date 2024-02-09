@@ -4,19 +4,15 @@ import (
 	"context"
 	"errors"
 	"sort"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
-var (
-	secretPrefix = "/defang/"
-)
-
+// TODO: this function is pretty useless, but it's here for consistency
 func getSecretID(name string) *string {
-	return ptr.String(secretPrefix + name)
+	return ptr.String(name)
 }
 
 func IsParameterNotFoundError(err error) bool {
@@ -119,9 +115,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	names := make([]string, 0, len(res.Parameters))
 	for _, p := range res.Parameters {
-		if name, found := strings.CutPrefix(*p.Name, secretPrefix); found {
-			names = append(names, name)
-		}
+		names = append(names, *p.Name)
 	}
 	sort.Strings(names) // make sure the output is deterministic
 	return names, nil

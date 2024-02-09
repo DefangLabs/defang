@@ -123,7 +123,7 @@ func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLReques
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
-	tenant, err := TenantFromAccessToken(g.accessToken)
+	tenant, _, err := TenantFromAccessToken(g.accessToken)
 	if err != nil {
 		return nil, err
 	}
