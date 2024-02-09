@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.51-40-g0dfbafef" // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "v0.4.51-43-g869d79e0" // will cause issues if two clients with different versions are connected to the same stack
 	cdTaskPrefix = "defang-cd"            // WARNING: renaming this practically deletes the Pulumi state
 	defangPrefix = "Defang"               // prefix for all resources created by Defang
 )
@@ -712,7 +712,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 		return nil, err
 	}
 	for _, secret := range secrets {
-		fqn := newQualifiedName(tenantId, secret.Source)
+		fqn := b.getSecretID(secret.Source)
 		i := sort.Search(len(sorted), func(i int) bool {
 			return sorted[i] >= fqn
 		})
