@@ -3,11 +3,15 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func ComposeDown(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) (string, error) {
-	project, err := loadDockerCompose(filePath, projectName)
+func ComposeDown(ctx context.Context, client client.Client, filePath string, tenantId types.TenantID) (string, error) {
+	// resp, err := client.Deploy(ctx, &pb.DeployRequest{})
+	// return resp.Etag, err
+
+	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return "", err
 	}

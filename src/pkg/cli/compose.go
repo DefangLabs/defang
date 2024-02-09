@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,11 +17,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/http"
+	pkg "github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
@@ -74,6 +73,7 @@ func resolveEnv(k string) *string {
 	v, ok := os.LookupEnv(k)
 	if !ok {
 		logrus.Warnf("environment variable not found: %q", k)
+		HadWarnings = true
 		// If the value could not be resolved, it should be removed
 		return nil
 	}
@@ -84,6 +84,7 @@ func convertPlatform(platform string) v1.Platform {
 	switch platform {
 	default:
 		logrus.Warnf("Unsupported platform: %q (assuming linux)", platform)
+		HadWarnings = true
 		fallthrough
 	case "", "linux":
 		return v1.Platform_LINUX_ANY
@@ -94,7 +95,7 @@ func convertPlatform(platform string) v1.Platform {
 	}
 }
 
-func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
+func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, error) {
 	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
 	if files, _ := filepath.Glob(filePath); len(files) > 1 {
@@ -102,16 +103,26 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	} else if len(files) == 1 {
 		filePath = files[0]
 	}
-	Debug(" - Loading compose file", filePath, "for project", projectName)
+	Debug(" - Loading compose file", filePath, "for project", tenantId)
+
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
+
+	projectName := "default"
+	if tenantId == "" {
+		logrus.Warnf("not logged in; using project name %q", projectName)
+		HadWarnings = true
+	} else {
+		projectName = strings.ToLower(string(tenantId)) // normalize to lowercase
+	}
+
 	project, err := loader.Load(types.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}, loader.WithDiscardEnvFiles, func(o *loader.Options) {
-		o.SetProjectName(strings.ToLower(projectName), projectName != "") // normalize to lowercase
-		o.SkipConsistencyCheck = true                                     // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		o.SetProjectName(projectName, true) // TODO: don't overwrite the declared project name in the compose file
+		o.SkipConsistencyCheck = true       // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	})
 	if err != nil {
 		return nil, err
@@ -124,7 +135,7 @@ func loadDockerCompose(filePath, projectName string) (*types.Project, error) {
 	return project, nil
 }
 
-func getRemoteBuildContext(ctx context.Context, client defangv1connect.FabricControllerClient, name string, build *types.BuildConfig, force bool) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force bool) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -193,6 +204,7 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 	switch port.Mode {
 	case "":
 		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
+		HadWarnings = true
 		fallthrough
 	case "host":
 		pbPort.Mode = v1.Mode_HOST
@@ -200,11 +212,13 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
 		if port.Published != "" {
 			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
+			HadWarnings = true
 			break
 		}
 		pbPort.Mode = v1.Mode_INGRESS
 		if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
 			logrus.Warn("TCP ingress is not supported; assuming HTTP")
+			HadWarnings = true
 			pbPort.Protocol = v1.Protocol_HTTP
 		}
 	default:
@@ -225,10 +239,10 @@ func convertPorts(ports []types.ServicePortConfig) ([]*v1.Port, error) {
 	return pbports, nil
 }
 
-func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerClient, body *bytes.Buffer, digest string) (string, error) {
-	// Upload the tarball to the fabric controller storage; TODO: use a streaming API
+func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
+	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
 	ureq := &v1.UploadURLRequest{Digest: digest}
-	res, err := client.CreateUploadURL(ctx, connect.NewRequest(ureq))
+	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
 	}
@@ -238,12 +252,7 @@ func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerC
 	}
 
 	// Do an HTTP PUT to the generated URL
-	req, err := http.NewRequestWithContext(ctx, "PUT", res.Msg.Url, body)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/gzip")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
 	if err != nil {
 		return "", err
 	}
@@ -252,13 +261,7 @@ func uploadTarball(ctx context.Context, client defangv1connect.FabricControllerC
 		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
-	// Remove query params from URL
-	url, err := url.Parse(res.Msg.Url)
-	if err != nil {
-		return "", err
-	}
-	url.RawQuery = ""
-	return url.String(), nil
+	return http.RemoveQueryParam(res.Url), nil
 }
 
 type contextAwareWriter struct {

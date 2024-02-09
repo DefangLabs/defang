@@ -3,16 +3,14 @@ package cli
 import (
 	"context"
 
-	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 )
 
-func SecretsList(ctx context.Context, client defangv1connect.FabricControllerClient) error {
-	secrets, err := client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{})
+func SecretsList(ctx context.Context, client client.Client) error {
+	secrets, err := client.ListSecrets(ctx)
 	if err != nil {
 		return err
 	}
 
-	return PrintObject("", secrets.Msg)
+	return PrintObject("", secrets)
 }

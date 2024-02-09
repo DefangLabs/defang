@@ -15,7 +15,7 @@ func (a AwsEcs) Stop(ctx context.Context, id types.TaskID) error {
 	}
 
 	_, err = ecs.NewFromConfig(cfg).StopTask(ctx, &ecs.StopTaskInput{
-		Cluster: ptr.String(a.ClusterARN),
+		Cluster: ptr.String(a.ClusterName),
 		Task:    id,
 		// Reason: ptr.String("defang stop"),
 	})

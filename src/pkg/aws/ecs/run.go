@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -63,7 +64,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		LaunchType:     types.LaunchTypeFargate,
 		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
-		Cluster:        ptr.String(a.ClusterARN),
+		Cluster:        ptr.String(a.ClusterName),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
@@ -89,6 +90,10 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 			{
 				Key:   ptr.String("StartedAt"),
 				Value: ptr.String(time.Now().String()),
+			},
+			{
+				Key:   ptr.String("StartedBy"),
+				Value: ptr.String(os.Getenv("USER")),
 			},
 		},
 	}

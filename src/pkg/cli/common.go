@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	DoVerbose = false
-	DoDebug   = false
-	DoDryRun  = false
+	DoVerbose   = false
+	DoDebug     = false
+	DoDryRun    = false
+	HadWarnings = false
 )
 
 func MarshalPretty(root string, data proto.Message) ([]byte, error) {

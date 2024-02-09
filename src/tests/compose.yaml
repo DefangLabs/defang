@@ -1,3 +1,4 @@
+name: tests
 services:
   dfnx:
     build:
@@ -18,11 +19,13 @@ services:
     ports:
       - target: 80
         mode: ingress
+      - target: 1234
+        # mode: host
     secrets:
       - dummy
     healthcheck:
-      test: ["NONE"]
-      disable: true
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      # disable: true
 
   # dfnx:
   #   build:

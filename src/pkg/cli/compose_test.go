@@ -5,17 +5,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
 func TestNormalizeServiceName(t *testing.T) {
@@ -160,7 +158,7 @@ func TestUploadTarball(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{url: server.URL + path}, &bytes.Buffer{}, digest)
+		url, err := uploadTarball(context.TODO(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -171,7 +169,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{url: server.URL + path}, &bytes.Buffer{}, "")
+		url, err := uploadTarball(context.TODO(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -233,21 +231,4 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
-}
-
-type mockGrpcClient struct {
-	defangv1connect.UnimplementedFabricControllerHandler
-	url string
-}
-
-func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error) {
-	return connect.NewResponse(&v1.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
-}
-
-func (mockGrpcClient) Subscribe(context.Context, *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Subscribe is not implemented"))
-}
-
-func (mockGrpcClient) Tail(context.Context, *connect.Request[v1.TailRequest]) (*connect.ServerStreamForClient[v1.TailResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Tail is not implemented"))
 }

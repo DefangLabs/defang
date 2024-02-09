@@ -6,15 +6,13 @@ import (
 	"os"
 	"path"
 
-	"github.com/bufbuild/connect-go"
-	fab "github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
-	tokenDir = path.Join(fab.Getenv("XDG_STATE_HOME", path.Join(os.Getenv("HOME"), ".local/state")), "defang")
+	tokenDir = path.Join(pkg.Getenv("XDG_STATE_HOME", path.Join(os.Getenv("HOME"), ".local/state")), "defang")
 )
 
 func getTokenFile(fabric string) string {
@@ -40,13 +38,12 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func CheckLogin(ctx context.Context, client defangv1connect.FabricControllerClient) error {
-	// TODO: create a proper rpc for this; or we can use a refresh token and use that to check
-	_, err := client.GetServices(ctx, &connect.Request[emptypb.Empty]{})
+func CheckLogin(ctx context.Context, client client.Client) error {
+	_, err := client.WhoAmI(ctx)
 	return err
 }
 
-func Login(ctx context.Context, client defangv1connect.FabricControllerClient, clientId, fabric string) (string, error) {
+func Login(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
 	Debug(" - Logging in to", fabric)
 
 	code, err := github.StartAuthCodeFlow(ctx, clientId)
@@ -68,7 +65,7 @@ func SaveAccessToken(fabric, at string) error {
 	return nil
 }
 
-func LoginAndSaveAccessToken(ctx context.Context, client defangv1connect.FabricControllerClient, clientId, fabric string) error {
+func LoginAndSaveAccessToken(ctx context.Context, client client.Client, clientId, fabric string) error {
 	at, err := Login(ctx, client, clientId, fabric)
 	if err != nil {
 		return err
