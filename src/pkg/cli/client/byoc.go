@@ -260,6 +260,10 @@ func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
 }
 
 func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
+	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
+		return nil, err
+	}
+
 	// Use STS to get the account ID
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
