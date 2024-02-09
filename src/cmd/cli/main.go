@@ -125,7 +125,7 @@ var loginCmd = &cobra.Command{
 
 var whoamiCmd = &cobra.Command{
 	Use:         "whoami",
-	Annotations: autoConnectAnnotation,
+	Annotations: autoConnectAnnotation, // show login status, don't prompt for login
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
