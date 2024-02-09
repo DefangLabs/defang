@@ -16,10 +16,9 @@ import (
 )
 
 type GrpcClient struct {
-	accessToken string
+	accessToken string // for WhoAmI
 	anonID      string
 	client      defangv1connect.FabricControllerClient
-	fabric      string
 }
 
 func NewGrpcClient(host, accessToken string) *GrpcClient {
@@ -30,15 +29,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-	return &GrpcClient{client: fabricClient, fabric: host, accessToken: accessToken, anonID: uuid.NewString()}
-}
-
-func (g GrpcClient) GetFabric() string {
-	return g.fabric
-}
-
-func (g GrpcClient) GetAccessToken() string {
-	return g.accessToken
+	return &GrpcClient{client: fabricClient, accessToken: accessToken, anonID: uuid.NewString()}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -123,12 +114,7 @@ func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLReques
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
-	tenant, _, err := TenantFromAccessToken(g.accessToken)
-	if err != nil {
-		return nil, err
-	}
-	return &v1.WhoAmIResponse{Tenant: string(tenant), Account: "defang", Region: "us-west-2"}, nil
-	// return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{})); TODO: implement this rpc
+	return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error) {

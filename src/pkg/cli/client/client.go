@@ -26,9 +26,7 @@ type Client interface {
 	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
 	GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error)
 	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
-	GetAccessToken() string
 	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
-	GetFabric() string
 	GetServices(context.Context) (*v1.ListServicesResponse, error)
 	GetStatus(context.Context) (*v1.Status, error)
 	GetVersion(context.Context) (*v1.Version, error)
