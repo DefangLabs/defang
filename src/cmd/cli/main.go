@@ -77,16 +77,16 @@ var rootCmd = &cobra.Command{
 		}
 
 		cluster, _ := cmd.Flags().GetString("cluster")
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
 		client, tenantId = cli.Connect(cluster, *provider)
-		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider})
+		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
 		}
 
-		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -97,7 +97,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
-			go client.Track("User Reconnected")
+			go client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil
 	},
