@@ -32,9 +32,11 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 		}
 		if normalized != svccfg.Name {
 			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
+			HadWarnings = true
 		}
 		if svccfg.ContainerName != "" {
 			logrus.Warn("unsupported compose directive: container_name")
+			HadWarnings = true
 		}
 		if svccfg.Hostname != "" {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")}
@@ -44,6 +46,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 		}
 		if len(svccfg.DNSOpts) != 0 {
 			logrus.Warn("unsupported compose directive: dns_opt")
+			HadWarnings = true
 		}
 		if len(svccfg.DNS) != 0 {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: dns")}
@@ -53,6 +56,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 		}
 		if len(svccfg.DependsOn) != 0 {
 			logrus.Warn("unsupported compose directive: depends_on")
+			HadWarnings = true
 		}
 		if len(svccfg.DeviceCgroupRules) != 0 {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: device_cgroup_rules")}
@@ -65,33 +69,43 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 		}
 		if len(svccfg.Ipc) > 0 {
 			logrus.Warn("unsupported compose directive: ipc")
+			HadWarnings = true
 		}
 		if len(svccfg.Uts) > 0 {
 			logrus.Warn("unsupported compose directive: uts")
+			HadWarnings = true
 		}
 		if svccfg.Isolation != "" {
 			logrus.Warn("unsupported compose directive: isolation")
+			HadWarnings = true
 		}
 		if svccfg.MacAddress != "" {
 			logrus.Warn("unsupported compose directive: mac_address")
+			HadWarnings = true
 		}
 		if len(svccfg.Labels) > 0 {
 			logrus.Warn("unsupported compose directive: labels") // TODO: add support for labels
+			HadWarnings = true
 		}
 		if len(svccfg.Links) > 0 {
 			logrus.Warn("unsupported compose directive: links")
+			HadWarnings = true
 		}
 		if svccfg.Logging != nil {
 			logrus.Warn("unsupported compose directive: logging")
+			HadWarnings = true
 		}
 		if _, ok := svccfg.Networks["default"]; !ok || len(svccfg.Networks) > 1 {
 			logrus.Warn("unsupported compose directive: networks")
+			HadWarnings = true
 		}
 		if len(svccfg.Volumes) > 0 {
 			logrus.Warn("unsupported compose directive: volumes") // TODO: add support for volumes
+			HadWarnings = true
 		}
 		if len(svccfg.VolumesFrom) > 0 {
 			logrus.Warn("unsupported compose directive: volumes_from") // TODO: add support for volumes_from
+			HadWarnings = true
 		}
 		if svccfg.Build != nil {
 			if svccfg.Build.Dockerfile != "" {
@@ -112,21 +126,26 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			}
 			if len(svccfg.Build.Labels) != 0 {
 				logrus.Warn("unsupported compose directive: build labels") // TODO: add support for Kaniko --label
+				HadWarnings = true
 			}
 			if len(svccfg.Build.CacheFrom) != 0 {
 				logrus.Warn("unsupported compose directive: build cache_from")
+				HadWarnings = true
 			}
 			if len(svccfg.Build.CacheTo) != 0 {
 				logrus.Warn("unsupported compose directive: build cache_to")
+				HadWarnings = true
 			}
 			if svccfg.Build.NoCache {
 				logrus.Warn("unsupported compose directive: build no_cache")
+				HadWarnings = true
 			}
 			if len(svccfg.Build.ExtraHosts) != 0 {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build extra_hosts")}
 			}
 			if svccfg.Build.Isolation != "" {
 				logrus.Warn("unsupported compose directive: build isolation")
+				HadWarnings = true
 			}
 			if svccfg.Build.Network != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build network")}
@@ -163,6 +182,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			if svccfg.HealthCheck.Timeout != nil {
 				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
 					logrus.Warn("healthcheck timeout must be a multiple of 1s")
+					HadWarnings = true
 				}
 				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
@@ -170,6 +190,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			if svccfg.HealthCheck.Interval != nil {
 				if *svccfg.HealthCheck.Interval%1e9 != 0 {
 					logrus.Warn("healthcheck interval must be a multiple of 1s")
+					HadWarnings = true
 				}
 				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
@@ -179,9 +200,11 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_period")
+				HadWarnings = true
 			}
 			if svccfg.HealthCheck.StartInterval != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_interval")
+				HadWarnings = true
 			}
 		}
 		if svccfg.Deploy != nil {
@@ -190,6 +213,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			}
 			if len(svccfg.Deploy.Labels) > 0 {
 				logrus.Warn("unsupported compose directive: deploy labels")
+				HadWarnings = true
 			}
 			if svccfg.Deploy.UpdateConfig != nil {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy update_config")}
@@ -202,12 +226,14 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			}
 			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
 				logrus.Warn("unsupported compose directive: deploy placement")
+				HadWarnings = true
 			}
 			if svccfg.Deploy.EndpointMode != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy endpoint_mode")}
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
 				logrus.Warn("no reservations specified; using limits as reservations")
+				HadWarnings = true
 			}
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil && reservations.NanoCPUs != "" {
@@ -249,6 +275,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 		for _, port := range ports {
 			if port.Mode == v1.Mode_INGRESS && healthcheck == nil {
 				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
+				HadWarnings = true
 				break
 			}
 		}
@@ -290,6 +317,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 
 		if deploy == nil || deploy.Resources == nil || deploy.Resources.Reservations == nil || deploy.Resources.Reservations.Memory == 0 {
 			logrus.Warn("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
+			HadWarnings = true
 		}
 
 		// Upload the build context, if any; TODO: parallelize

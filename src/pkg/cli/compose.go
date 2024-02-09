@@ -73,6 +73,7 @@ func resolveEnv(k string) *string {
 	v, ok := os.LookupEnv(k)
 	if !ok {
 		logrus.Warnf("environment variable not found: %q", k)
+		HadWarnings = true
 		// If the value could not be resolved, it should be removed
 		return nil
 	}
@@ -83,6 +84,7 @@ func convertPlatform(platform string) v1.Platform {
 	switch platform {
 	default:
 		logrus.Warnf("Unsupported platform: %q (assuming linux)", platform)
+		HadWarnings = true
 		fallthrough
 	case "", "linux":
 		return v1.Platform_LINUX_ANY
@@ -109,6 +111,7 @@ func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, 
 	projectName := "default"
 	if tenantId == "" {
 		logrus.Warnf("not logged in; using project name %q", projectName)
+		HadWarnings = true
 	} else {
 		projectName = strings.ToLower(string(tenantId)) // normalize to lowercase
 	}
@@ -201,6 +204,7 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 	switch port.Mode {
 	case "":
 		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
+		HadWarnings = true
 		fallthrough
 	case "host":
 		pbPort.Mode = v1.Mode_HOST
@@ -208,11 +212,13 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
 		if port.Published != "" {
 			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
+			HadWarnings = true
 			break
 		}
 		pbPort.Mode = v1.Mode_INGRESS
 		if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
 			logrus.Warn("TCP ingress is not supported; assuming HTTP")
+			HadWarnings = true
 			pbPort.Protocol = v1.Protocol_HTTP
 		}
 	default:

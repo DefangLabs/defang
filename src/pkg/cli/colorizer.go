@@ -104,6 +104,7 @@ func Info(v ...any) (int, error) {
 }
 
 func Warn(v ...any) (int, error) {
+	HadWarnings = true
 	return Fprintln(os.Stderr, WarnColor, v...)
 }
 

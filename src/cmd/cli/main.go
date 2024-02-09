@@ -889,6 +889,13 @@ func main() {
 		os.Exit(int(code))
 	}
 
+	if hasTty && cli.HadWarnings {
+		cli.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
+			fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
+		}
+	}
+
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
 			cli.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
@@ -897,8 +904,6 @@ func main() {
 			}
 		}
 	}
-
-	// time.Sleep(time.Minute)
 }
 
 func prettyExecutable(def string) string {
