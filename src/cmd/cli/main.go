@@ -315,11 +315,11 @@ var secretsSetCmd = &cobra.Command{
 	Short:       "Adds or updates a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		go client.Track("Secret-Set Invoked", P{"name", name})
+		go client.Track("Secret-Set Invoked", P{"name", name}, P{"non-interactive", nonInteractive})
 
 		var secret string
-		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
 			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
