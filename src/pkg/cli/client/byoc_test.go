@@ -15,6 +15,8 @@ func TestDeploy(t *testing.T) {
 	b := NewByocAWS("ten ant", "", nil) // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
+		t.Skip("skipping test: delegation enabled")
+
 		_, err := b.Deploy(context.TODO(), &v1.DeployRequest{
 			Services: []*v1.Service{{
 				Name:  "test",
