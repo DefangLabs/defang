@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
@@ -880,7 +881,13 @@ func main() {
 
 		code := connect.CodeOf(err)
 		if code == connect.CodeUnauthenticated {
-			printDefangHint("Please use the following command to log in:", "login")
+			// All AWS errors are wrapped in OperationError
+			var oe *smithy.OperationError
+			if errors.As(err, &oe) {
+				fmt.Println("Could not authenticate to the AWS service. Please check your aws credentials and try again.")
+			} else {
+				printDefangHint("Please use the following command to log in:", "login")
+			}
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree-tos")

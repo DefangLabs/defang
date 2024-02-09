@@ -38,7 +38,7 @@ func Connect(cluster string, provider client.Provider) (client.Client, types.Ten
 	Info(" * Connecting to", host)
 	defangClient := client.NewGrpcClient(host, accessToken)
 
-	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
 	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
 		Info(" * Using AWS provider")
 		if !awsInEnv {
