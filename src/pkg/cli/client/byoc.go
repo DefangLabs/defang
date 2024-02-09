@@ -441,11 +441,11 @@ func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 }
 
 func (b byocAws) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
-	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
+	prefix := b.getSecretID("")
+	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
-	prefix := b.getSecretID("")
 	secrets := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
 		secrets[i] = strings.TrimPrefix(secret, prefix)
@@ -665,7 +665,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 
 	hasHost := false
 	hasIngress := false
-	fqn := newQualifiedName(b.tenantID, service.Name)
+	fqn := service.Name //newQualifiedName(b.tenantID, service.Name)
 	for _, port := range service.Ports {
 		hasIngress = hasIngress || port.Mode == v1.Mode_INGRESS
 		hasHost = hasHost || port.Mode == v1.Mode_HOST
@@ -707,7 +707,8 @@ func newQualifiedName(tenant string, name string) qualifiedName {
 
 // This functions was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) (*v1.Secret, error) {
-	sorted, err := b.driver.ListSecretsByPrefix(ctx, b.tenantID)
+	prefix := b.getSecretID("")
+	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
