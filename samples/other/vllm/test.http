@@ -1,0 +1,9 @@
+POST https://defang-beta-mistral--8000.prod1.defang.dev/v1/completions
+Content-Type: application/json
+
+{
+    "model": "TheBloke/Mistral-7B-Instruct-v0.2-AWQ",
+    "prompt": "I have a cli named `defang`. It's supposed to make it easier and safer to deploy services to AWS ECS. Tell me what you would expect from it.",
+    "max_tokens": 4000,
+    "temperature": 0.2
+}
