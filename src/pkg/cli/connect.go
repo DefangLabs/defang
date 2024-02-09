@@ -2,13 +2,11 @@ package cli
 
 import (
 	"net"
-	"net/http"
+	"os"
 	"strings"
 
-	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/types"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
@@ -28,22 +26,30 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 	return tenant, cluster
 }
 
-func Connect(cluster string) (defangv1connect.FabricControllerClient, types.TenantID) {
-	tenantId, host := SplitTenantHost(cluster) // TODO: use this returned tenantId when we have no access token
+func Connect(cluster string, provider client.Provider) (client.Client, types.TenantID) {
+	tenantId, host := SplitTenantHost(cluster)
 
 	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
-		tenantId, _ = TenantFromAccessToken(accessToken)
+		tenantId, _, _ = client.TenantFromAccessToken(accessToken)
 	}
-	Debug(" - Using tenant", tenantId, "for cluster", cluster)
+	Debug(" - Using tenant", tenantId, "for cluster", cluster, "and provider", provider)
 
-	baseUrl := "http://"
-	if strings.HasSuffix(host, ":443") {
-		baseUrl = "https://"
+	Info(" * Connecting to", host)
+	defangClient := client.NewGrpcClient(host, accessToken)
+
+	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
+		Info(" * Using AWS provider")
+		if !awsInEnv {
+			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
+		}
+		byocClient := client.NewByocAWS(string(tenantId), "", defangClient) // TODO: custom domain
+		return byocClient, tenantId
 	}
-	baseUrl += host
-	Debug(" - Connecting to", baseUrl)
-	client := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-	Info(" * Connected to", host)
-	return client, tenantId
+
+	if awsInEnv {
+		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
+	}
+	return defangClient, tenantId
 }

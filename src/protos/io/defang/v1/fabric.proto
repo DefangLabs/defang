@@ -19,9 +19,10 @@ service FabricController {
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
-  rpc Update(Service) returns (ServiceInfo);
+  rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
+  rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(ServiceID) returns (ServiceInfo); // should be GetService
-  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -34,6 +35,27 @@ service FabricController {
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
+
+  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
+  rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse);
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message TrackRequest {
+  string anon_id = 1;
+  string event = 2;
+  map<string, string> properties = 3;
+}
+
+message DeployRequest {
+  repeated Service services = 1;
+}
+
+message DeployResponse {
+  repeated ServiceInfo services = 1;
+  string etag = 2;
 }
 
 message DeleteRequest {
@@ -281,4 +303,19 @@ message SubscribeRequest { string service = 1; }
 
 message SubscribeResponse {
   repeated ServiceInfo services = 1;
+}
+
+message DelegateSubdomainZoneRequest {
+  repeated string name_server_records = 1;
+}
+
+message DelegateSubdomainZoneResponse {
+  string zone = 1;
+}
+
+message WhoAmIResponse {
+  string tenant = 1;
+  string account = 2;
+  string region = 3;
+  string user_id = 4;
 }

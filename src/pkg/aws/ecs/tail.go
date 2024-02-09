@@ -5,110 +5,100 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
-	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/smithy-go/ptr"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
 const spinner = `-\|/`
 
+const AwsLogsStreamPrefix = ProjectName
+
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
-	// a.Refresh(ctx)
-
-	parts := strings.Split(*taskArn, ":")
-	if len(parts) == 6 {
-		a.Region = region.Region(parts[3])
-	}
-
-	taskId := path.Base(*taskArn)
-	logStreamName := path.Join(ProjectName, ContainerName, taskId)
-
-	cfg, err := a.LoadConfig(ctx)
+	taskId := GetTaskID(taskArn)
+	a.Region = region.FromArn(*taskArn)
+	es, err := a.TailTaskID(ctx, taskId)
 	if err != nil {
 		return err
 	}
 
-	// Use CloudWatch API to tail the logs
-	cw := cloudwatchlogs.NewFromConfig(cfg)
-
 	spinMe := 0
-	var nextToken *string
 	for {
-		nextToken, err = a.printLogEvents(ctx, cw, logStreamName, nextToken)
+		err = printLogEvents(ctx, es) // blocking
 		if err != nil {
 			return err
 		}
 
-		// Use DescribeTasks API to check if the task is still running
-		ti, _ := ecs.NewFromConfig(cfg).DescribeTasks(ctx, &ecs.DescribeTasksInput{
-			Cluster: ptr.String(a.ClusterARN), // arn:aws:ecs:us-west-2:532501343364:cluster/ecs-dev-cluster
-			Tasks:   []string{taskId},
-		})
-		if ti != nil && len(ti.Tasks) > 0 {
-			task := ti.Tasks[0]
-			switch task.StopCode {
-			default:
-				// Before we exit, grab any remaining logs
-				a.printLogEvents(ctx, cw, logStreamName, nextToken)
-				return taskFailure{string(task.StopCode), *task.StoppedReason}
-			case ecsTypes.TaskStopCodeEssentialContainerExited:
-				// Before we exit, grab any remaining logs
-				a.printLogEvents(ctx, cw, logStreamName, nextToken)
-				if *task.Containers[0].ExitCode == 0 {
-					return nil // Success
-				}
-				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *task.Containers[0].ExitCode)
-				return taskFailure{string(task.StopCode), reason}
-			case "": // Task is still running
-			}
+		err := getTaskStatus(ctx, a.Region, a.ClusterName, taskId)
+		if err != nil {
+			// Before we exit, print any remaining logs (ignore errors)
+			printLogEvents(ctx, es)
+			return err
 		}
 
 		fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
 		spinMe++
-		time.Sleep(1 * time.Second)
 	}
 }
 
-func clusterArnFromTaskArn(taskArn string) string {
-	arnParts := strings.Split(taskArn, ":")
-	if len(arnParts) != 6 {
-		panic("invalid task ARN")
+func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
+	if taskID == "" {
+		return nil, errors.New("taskID is empty")
 	}
-	resourceParts := strings.Split(arnParts[5], "/")
-	if len(resourceParts) != 3 || resourceParts[0] != "task" {
-		panic("invalid task ARN")
-	}
-	return fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", arnParts[3], arnParts[4], resourceParts[1])
+	taskArn := a.MakeARN("ecs", "task/"+a.ClusterName+"/"+taskID)
+	return &taskArn, nil
 }
 
-func (a AwsEcs) printLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, logStreamName string, nextToken *string) (*string, error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, error) {
+	if taskID == "" {
+		return nil, errors.New("taskID is empty")
+	}
+	logStreamName := getLogStreamForTaskID(taskID)
 	for {
-		events, err := cw.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
-			LogGroupName:  ptr.String(a.LogGroupName),
-			LogStreamName: ptr.String(logStreamName),
-			NextToken:     nextToken,
-			StartFromHead: ptr.Bool(true),
-		})
+		stream, err := TailLogGroup(ctx, a.LogGroupARN, logStreamName)
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {
 				return nil, err
 			}
-			break // continue outer loop, waiting for the log stream to be created
+			// The log stream doesn't exist yet, so wait for it to be created, but bail out if the task is stopped
+			err := getTaskStatus(ctx, a.Region, a.ClusterName, taskID)
+			if err != nil {
+				return nil, err
+			}
+			// continue loop, waiting for the log stream to be created; sleep to avoid throttling
+			pkg.SleepWithContext(ctx, time.Second)
+			continue
 		}
-		for _, event := range events.Events {
-			fmt.Println(*event.Message)
-		}
-		if nextToken != nil && *nextToken == *events.NextForwardToken {
-			break // no new logs
-		}
-		nextToken = events.NextForwardToken
+		// TODO: should wrap this stream so we can return io.EOF on task stop
+		return stream, nil
 	}
-	return nextToken, nil
+}
+
+func getLogStreamForTaskID(taskID string) string {
+	return path.Join(AwsLogsStreamPrefix, ContainerName, taskID) // per "awslogs" driver
+}
+
+func GetTaskID(taskArn TaskArn) string {
+	return path.Base(*taskArn)
+}
+
+func printLogEvents(ctx context.Context, es EventStream) error {
+	for {
+		select {
+		case e := <-es.Events(): // blocking
+			events, err := GetLogEvents(e)
+			// Print before checking for errors, so we don't lose any logs in case of EOF
+			for _, event := range events {
+				fmt.Println(*event.Message)
+			}
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

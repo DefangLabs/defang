@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -77,15 +78,15 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, service, etag string, since time.Time, raw bool) error {
+func Tail(ctx context.Context, client client.Client, service, etag string, since time.Time, raw bool) error {
 	if DoDryRun {
 		return nil
 	}
 
 	if service != "" {
 		service = NormalizeServiceName(service)
-		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, connect.NewRequest(&v1.ServiceID{Name: service})); err != nil {
+		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
+		if _, err := client.Get(ctx, &v1.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
@@ -97,7 +98,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		}
 	}
 
-	tailClient, err := client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
@@ -124,7 +125,10 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 					if _, err := os.Stdin.Read(b[:]); err != nil {
 						return
 					}
-					if b[0] == 'V' || b[0] == 'v' {
+					switch b[0] {
+					case 10, 13: // Enter or Return
+						Info(" ") // empty line, but overwrite spinner
+					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
 						state := "off"
@@ -132,6 +136,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 							state = "on"
 						}
 						Info(" * Verbose mode", state)
+						go client.Track("Verbose Toggled")
 					}
 				}
 			}()
@@ -165,7 +170,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
 					Debug(" - Reconnect failed:", err)
 					return err
@@ -187,10 +192,11 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			spinMe++
 		}
 
-		isInternal := !strings.HasPrefix(msg.Host, "ip-") // FIXME: not true for BYOC
+		// HACK: skip noisy CI/CD logs (except errors)
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko"
+		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
-			if !DoVerbose && !e.Stderr && isInternal {
-				// HACK: skip noisy CI/CD logs (except errors)
+			if onlyErrors && !e.Stderr {
 				continue
 			}
 
@@ -247,7 +253,7 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
 				} else {
-					line = StripAnsi(line)
+					line = pkg.StripAnsi(line)
 				}
 				Println(Reset, line)
 			}
@@ -256,5 +262,5 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 }
 
 func isProgressDot(line string) bool {
-	return len(line) <= 1 || len(StripAnsi(line)) <= 1
+	return len(line) <= 1 || len(pkg.StripAnsi(line)) <= 1
 }
