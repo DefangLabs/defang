@@ -57,11 +57,7 @@ release:
     2. Extract the archive. This should reveal the binary file for Defang.
     3. Manually place the binary file in a directory that's included in your system's `PATH` environment variable.
     ### Additional Step for MacOS Users
-    MacOS users will need to allow the binary to run due to security settings:
-    1. Attempt to run the binary. You'll see a security prompt preventing you from running it.
-    2. Go to System Preferences > Privacy & Security > General.
-    3. In the 'Allow applications downloaded from:' section, you should see a message about Defang being blocked. Click 'Open Anyway'.
-    4. Alternatively, select the option "App Store and identified developers" to allow all applications from the App Store and identified developers to run.
+    If you're having trouble running the binary on MacOS, please check our [FAQs](http://localhost:3000/docs/faq#im-having-trouble-running-the-binary-on-my-mac-what-should-i-do).
 
     Please remember this software is in beta, so please report any issues or feedback through our GitHub page. Your help in improving Defang is greatly appreciated!
   # mode: keep-existing
