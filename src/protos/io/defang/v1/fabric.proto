@@ -15,8 +15,10 @@ service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status);   // public
   rpc GetVersion(google.protobuf.Empty) returns (Version); // public
   rpc Token(TokenRequest) returns (TokenResponse);         // public
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
@@ -27,20 +29,22 @@ service FabricController {
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse); // should be ListServices
-
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // deprecated
+  rpc AgreeToS(AgreeToSRequest) returns (google.protobuf.Empty);
+  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
-  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
   rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse);
-  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
-  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message AgreeToSRequest {
+  string email = 1;
 }
 
 message TrackRequest {
