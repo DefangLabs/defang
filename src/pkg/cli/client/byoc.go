@@ -334,7 +334,11 @@ func (b *byocAws) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.Delete
 
 // stack returns a stack-qualified name, like the Pulumi TS function `stack`
 func (b *byocAws) stack(name string) string {
-	return fmt.Sprintf("%s-%s-%s-%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as
+	return fmt.Sprintf("%s-%s-%s-%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
+}
+
+func (b *byocAws) stackDir(name string) string {
+	return fmt.Sprintf("/%s/%s/%s/%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *byocAws) getClusterNames() []string {
@@ -610,8 +614,8 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		etag = "" // no need to filter by etag
 	} else {
 		// Tail CD, kaniko, and all services
-		kanikoLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stack("kaniko"))     // must match logic in ecs/common.ts
-		servicesLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stack("logGroup")) // must match logic in ecs/common.ts
+		kanikoLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stackDir("kaniko"))     // must match logic in ecs/common.ts
+		servicesLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stackDir("logGroup")) // must match logic in ecs/common.ts
 		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, kanikoLogGroup, servicesLogGroup)
 		cdTaskArn = b.cdTasks[etag]
 	}
