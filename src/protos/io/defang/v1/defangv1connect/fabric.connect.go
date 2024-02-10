@@ -44,9 +44,13 @@ const (
 	FabricControllerGetVersionProcedure = "/io.defang.v1.FabricController/GetVersion"
 	// FabricControllerTokenProcedure is the fully-qualified name of the FabricController's Token RPC.
 	FabricControllerTokenProcedure = "/io.defang.v1.FabricController/Token"
+	// FabricControllerTrackProcedure is the fully-qualified name of the FabricController's Track RPC.
+	FabricControllerTrackProcedure = "/io.defang.v1.FabricController/Track"
 	// FabricControllerRevokeTokenProcedure is the fully-qualified name of the FabricController's
 	// RevokeToken RPC.
 	FabricControllerRevokeTokenProcedure = "/io.defang.v1.FabricController/RevokeToken"
+	// FabricControllerWhoAmIProcedure is the fully-qualified name of the FabricController's WhoAmI RPC.
+	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
 	// FabricControllerTailProcedure is the fully-qualified name of the FabricController's Tail RPC.
 	FabricControllerTailProcedure = "/io.defang.v1.FabricController/Tail"
 	// FabricControllerUpdateProcedure is the fully-qualified name of the FabricController's Update RPC.
@@ -72,15 +76,21 @@ const (
 	// FabricControllerSignEULAProcedure is the fully-qualified name of the FabricController's SignEULA
 	// RPC.
 	FabricControllerSignEULAProcedure = "/io.defang.v1.FabricController/SignEULA"
+	// FabricControllerAgreeToSProcedure is the fully-qualified name of the FabricController's AgreeToS
+	// RPC.
+	FabricControllerAgreeToSProcedure = "/io.defang.v1.FabricController/AgreeToS"
+	// FabricControllerCreateUploadURLProcedure is the fully-qualified name of the FabricController's
+	// CreateUploadURL RPC.
+	FabricControllerCreateUploadURLProcedure = "/io.defang.v1.FabricController/CreateUploadURL"
 	// FabricControllerPutSecretProcedure is the fully-qualified name of the FabricController's
 	// PutSecret RPC.
 	FabricControllerPutSecretProcedure = "/io.defang.v1.FabricController/PutSecret"
 	// FabricControllerListSecretsProcedure is the fully-qualified name of the FabricController's
 	// ListSecrets RPC.
 	FabricControllerListSecretsProcedure = "/io.defang.v1.FabricController/ListSecrets"
-	// FabricControllerCreateUploadURLProcedure is the fully-qualified name of the FabricController's
-	// CreateUploadURL RPC.
-	FabricControllerCreateUploadURLProcedure = "/io.defang.v1.FabricController/CreateUploadURL"
+	// FabricControllerDeleteSecretProcedure is the fully-qualified name of the FabricController's
+	// DeleteSecret RPC.
+	FabricControllerDeleteSecretProcedure = "/io.defang.v1.FabricController/DeleteSecret"
 	// FabricControllerDelegateSubdomainZoneProcedure is the fully-qualified name of the
 	// FabricController's DelegateSubdomainZone RPC.
 	FabricControllerDelegateSubdomainZoneProcedure = "/io.defang.v1.FabricController/DelegateSubdomainZone"
@@ -90,10 +100,6 @@ const (
 	// FabricControllerGetDelegateSubdomainZoneProcedure is the fully-qualified name of the
 	// FabricController's GetDelegateSubdomainZone RPC.
 	FabricControllerGetDelegateSubdomainZoneProcedure = "/io.defang.v1.FabricController/GetDelegateSubdomainZone"
-	// FabricControllerWhoAmIProcedure is the fully-qualified name of the FabricController's WhoAmI RPC.
-	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
-	// FabricControllerTrackProcedure is the fully-qualified name of the FabricController's Track RPC.
-	FabricControllerTrackProcedure = "/io.defang.v1.FabricController/Track"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -101,7 +107,9 @@ type FabricControllerClient interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
 	GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Version], error)
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
+	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error)
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
@@ -112,15 +120,16 @@ type FabricControllerClient interface {
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	// Deprecated: do not use.
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	AgreeToS(context.Context, *connect_go.Request[v1.AgreeToSRequest]) (*connect_go.Response[emptypb.Empty], error)
+	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
+	DeleteSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
-	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
-	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -150,10 +159,21 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerTokenProcedure,
 			opts...,
 		),
+		track: connect_go.NewClient[v1.TrackRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerTrackProcedure,
+			opts...,
+		),
 		revokeToken: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerRevokeTokenProcedure,
 			opts...,
+		),
+		whoAmI: connect_go.NewClient[emptypb.Empty, v1.WhoAmIResponse](
+			httpClient,
+			baseURL+FabricControllerWhoAmIProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		tail: connect_go.NewClient[v1.TailRequest, v1.TailResponse](
 			httpClient,
@@ -207,6 +227,16 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerSignEULAProcedure,
 			opts...,
 		),
+		agreeToS: connect_go.NewClient[v1.AgreeToSRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerAgreeToSProcedure,
+			opts...,
+		),
+		createUploadURL: connect_go.NewClient[v1.UploadURLRequest, v1.UploadURLResponse](
+			httpClient,
+			baseURL+FabricControllerCreateUploadURLProcedure,
+			opts...,
+		),
 		putSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
@@ -218,9 +248,9 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		createUploadURL: connect_go.NewClient[v1.UploadURLRequest, v1.UploadURLResponse](
+		deleteSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
 			httpClient,
-			baseURL+FabricControllerCreateUploadURLProcedure,
+			baseURL+FabricControllerDeleteSecretProcedure,
 			opts...,
 		),
 		delegateSubdomainZone: connect_go.NewClient[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse](
@@ -239,17 +269,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		whoAmI: connect_go.NewClient[emptypb.Empty, v1.WhoAmIResponse](
-			httpClient,
-			baseURL+FabricControllerWhoAmIProcedure,
-			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
-			connect_go.WithClientOptions(opts...),
-		),
-		track: connect_go.NewClient[v1.TrackRequest, emptypb.Empty](
-			httpClient,
-			baseURL+FabricControllerTrackProcedure,
-			opts...,
-		),
 	}
 }
 
@@ -258,7 +277,9 @@ type fabricControllerClient struct {
 	getStatus                *connect_go.Client[emptypb.Empty, v1.Status]
 	getVersion               *connect_go.Client[emptypb.Empty, v1.Version]
 	token                    *connect_go.Client[v1.TokenRequest, v1.TokenResponse]
+	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 	revokeToken              *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	tail                     *connect_go.Client[v1.TailRequest, v1.TailResponse]
 	update                   *connect_go.Client[v1.Service, v1.ServiceInfo]
 	deploy                   *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
@@ -269,14 +290,14 @@ type fabricControllerClient struct {
 	getServices              *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
+	agreeToS                 *connect_go.Client[v1.AgreeToSRequest, emptypb.Empty]
+	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
-	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
+	deleteSecret             *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
-	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
-	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -294,9 +315,19 @@ func (c *fabricControllerClient) Token(ctx context.Context, req *connect_go.Requ
 	return c.token.CallUnary(ctx, req)
 }
 
+// Track calls io.defang.v1.FabricController.Track.
+func (c *fabricControllerClient) Track(ctx context.Context, req *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.track.CallUnary(ctx, req)
+}
+
 // RevokeToken calls io.defang.v1.FabricController.RevokeToken.
 func (c *fabricControllerClient) RevokeToken(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.revokeToken.CallUnary(ctx, req)
+}
+
+// WhoAmI calls io.defang.v1.FabricController.WhoAmI.
+func (c *fabricControllerClient) WhoAmI(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
+	return c.whoAmI.CallUnary(ctx, req)
 }
 
 // Tail calls io.defang.v1.FabricController.Tail.
@@ -345,8 +376,20 @@ func (c *fabricControllerClient) GenerateFiles(ctx context.Context, req *connect
 }
 
 // SignEULA calls io.defang.v1.FabricController.SignEULA.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) SignEULA(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.signEULA.CallUnary(ctx, req)
+}
+
+// AgreeToS calls io.defang.v1.FabricController.AgreeToS.
+func (c *fabricControllerClient) AgreeToS(ctx context.Context, req *connect_go.Request[v1.AgreeToSRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.agreeToS.CallUnary(ctx, req)
+}
+
+// CreateUploadURL calls io.defang.v1.FabricController.CreateUploadURL.
+func (c *fabricControllerClient) CreateUploadURL(ctx context.Context, req *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
+	return c.createUploadURL.CallUnary(ctx, req)
 }
 
 // PutSecret calls io.defang.v1.FabricController.PutSecret.
@@ -359,9 +402,9 @@ func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_g
 	return c.listSecrets.CallUnary(ctx, req)
 }
 
-// CreateUploadURL calls io.defang.v1.FabricController.CreateUploadURL.
-func (c *fabricControllerClient) CreateUploadURL(ctx context.Context, req *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
-	return c.createUploadURL.CallUnary(ctx, req)
+// DeleteSecret calls io.defang.v1.FabricController.DeleteSecret.
+func (c *fabricControllerClient) DeleteSecret(ctx context.Context, req *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.deleteSecret.CallUnary(ctx, req)
 }
 
 // DelegateSubdomainZone calls io.defang.v1.FabricController.DelegateSubdomainZone.
@@ -379,22 +422,14 @@ func (c *fabricControllerClient) GetDelegateSubdomainZone(ctx context.Context, r
 	return c.getDelegateSubdomainZone.CallUnary(ctx, req)
 }
 
-// WhoAmI calls io.defang.v1.FabricController.WhoAmI.
-func (c *fabricControllerClient) WhoAmI(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
-	return c.whoAmI.CallUnary(ctx, req)
-}
-
-// Track calls io.defang.v1.FabricController.Track.
-func (c *fabricControllerClient) Track(ctx context.Context, req *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return c.track.CallUnary(ctx, req)
-}
-
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
 	GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Version], error)
 	Token(context.Context, *connect_go.Request[v1.TokenRequest]) (*connect_go.Response[v1.TokenResponse], error)
+	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Tail(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
@@ -405,15 +440,16 @@ type FabricControllerHandler interface {
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	// Deprecated: do not use.
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
+	AgreeToS(context.Context, *connect_go.Request[v1.AgreeToSRequest]) (*connect_go.Response[emptypb.Empty], error)
+	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
+	DeleteSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
-	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
-	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -439,10 +475,21 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.Token,
 		opts...,
 	)
+	fabricControllerTrackHandler := connect_go.NewUnaryHandler(
+		FabricControllerTrackProcedure,
+		svc.Track,
+		opts...,
+	)
 	fabricControllerRevokeTokenHandler := connect_go.NewUnaryHandler(
 		FabricControllerRevokeTokenProcedure,
 		svc.RevokeToken,
 		opts...,
+	)
+	fabricControllerWhoAmIHandler := connect_go.NewUnaryHandler(
+		FabricControllerWhoAmIProcedure,
+		svc.WhoAmI,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerTailHandler := connect_go.NewServerStreamHandler(
 		FabricControllerTailProcedure,
@@ -496,6 +543,16 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.SignEULA,
 		opts...,
 	)
+	fabricControllerAgreeToSHandler := connect_go.NewUnaryHandler(
+		FabricControllerAgreeToSProcedure,
+		svc.AgreeToS,
+		opts...,
+	)
+	fabricControllerCreateUploadURLHandler := connect_go.NewUnaryHandler(
+		FabricControllerCreateUploadURLProcedure,
+		svc.CreateUploadURL,
+		opts...,
+	)
 	fabricControllerPutSecretHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutSecretProcedure,
 		svc.PutSecret,
@@ -507,9 +564,9 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
-	fabricControllerCreateUploadURLHandler := connect_go.NewUnaryHandler(
-		FabricControllerCreateUploadURLProcedure,
-		svc.CreateUploadURL,
+	fabricControllerDeleteSecretHandler := connect_go.NewUnaryHandler(
+		FabricControllerDeleteSecretProcedure,
+		svc.DeleteSecret,
 		opts...,
 	)
 	fabricControllerDelegateSubdomainZoneHandler := connect_go.NewUnaryHandler(
@@ -528,17 +585,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
-	fabricControllerWhoAmIHandler := connect_go.NewUnaryHandler(
-		FabricControllerWhoAmIProcedure,
-		svc.WhoAmI,
-		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
-		connect_go.WithHandlerOptions(opts...),
-	)
-	fabricControllerTrackHandler := connect_go.NewUnaryHandler(
-		FabricControllerTrackProcedure,
-		svc.Track,
-		opts...,
-	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -547,8 +593,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetVersionHandler.ServeHTTP(w, r)
 		case FabricControllerTokenProcedure:
 			fabricControllerTokenHandler.ServeHTTP(w, r)
+		case FabricControllerTrackProcedure:
+			fabricControllerTrackHandler.ServeHTTP(w, r)
 		case FabricControllerRevokeTokenProcedure:
 			fabricControllerRevokeTokenHandler.ServeHTTP(w, r)
+		case FabricControllerWhoAmIProcedure:
+			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
 		case FabricControllerTailProcedure:
 			fabricControllerTailHandler.ServeHTTP(w, r)
 		case FabricControllerUpdateProcedure:
@@ -569,22 +619,22 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGenerateFilesHandler.ServeHTTP(w, r)
 		case FabricControllerSignEULAProcedure:
 			fabricControllerSignEULAHandler.ServeHTTP(w, r)
+		case FabricControllerAgreeToSProcedure:
+			fabricControllerAgreeToSHandler.ServeHTTP(w, r)
+		case FabricControllerCreateUploadURLProcedure:
+			fabricControllerCreateUploadURLHandler.ServeHTTP(w, r)
 		case FabricControllerPutSecretProcedure:
 			fabricControllerPutSecretHandler.ServeHTTP(w, r)
 		case FabricControllerListSecretsProcedure:
 			fabricControllerListSecretsHandler.ServeHTTP(w, r)
-		case FabricControllerCreateUploadURLProcedure:
-			fabricControllerCreateUploadURLHandler.ServeHTTP(w, r)
+		case FabricControllerDeleteSecretProcedure:
+			fabricControllerDeleteSecretHandler.ServeHTTP(w, r)
 		case FabricControllerDelegateSubdomainZoneProcedure:
 			fabricControllerDelegateSubdomainZoneHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteSubdomainZoneProcedure:
 			fabricControllerDeleteSubdomainZoneHandler.ServeHTTP(w, r)
 		case FabricControllerGetDelegateSubdomainZoneProcedure:
 			fabricControllerGetDelegateSubdomainZoneHandler.ServeHTTP(w, r)
-		case FabricControllerWhoAmIProcedure:
-			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
-		case FabricControllerTrackProcedure:
-			fabricControllerTrackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -606,8 +656,16 @@ func (UnimplementedFabricControllerHandler) Token(context.Context, *connect_go.R
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Token is not implemented"))
 }
 
+func (UnimplementedFabricControllerHandler) Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Track is not implemented"))
+}
+
 func (UnimplementedFabricControllerHandler) RevokeToken(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.RevokeToken is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.WhoAmI is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Tail(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error {
@@ -650,6 +708,14 @@ func (UnimplementedFabricControllerHandler) SignEULA(context.Context, *connect_g
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SignEULA is not implemented"))
 }
 
+func (UnimplementedFabricControllerHandler) AgreeToS(context.Context, *connect_go.Request[v1.AgreeToSRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.AgreeToS is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CreateUploadURL is not implemented"))
+}
+
 func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutSecret is not implemented"))
 }
@@ -658,8 +724,8 @@ func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connec
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListSecrets is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CreateUploadURL is not implemented"))
+func (UnimplementedFabricControllerHandler) DeleteSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteSecret is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
@@ -672,12 +738,4 @@ func (UnimplementedFabricControllerHandler) DeleteSubdomainZone(context.Context,
 
 func (UnimplementedFabricControllerHandler) GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetDelegateSubdomainZone is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.WhoAmI is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Track is not implemented"))
 }

@@ -19,8 +19,12 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };                                               // public
   rpc Token(TokenRequest) returns (TokenResponse); // public
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
 
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
@@ -35,16 +39,18 @@ service FabricController {
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
-
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option deprecated = true;
+  };
+  rpc AgreeToS(AgreeToSRequest) returns (google.protobuf.Empty);
+  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-  rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
-  // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
+  rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
       returns (DelegateSubdomainZoneResponse);
@@ -54,10 +60,10 @@ service FabricController {
       returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
-  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  };
-  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message AgreeToSRequest {
+  bool agree = 1;
 }
 
 message TrackRequest {
