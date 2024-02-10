@@ -35,10 +35,10 @@ import (
 //
 
 var (
-	client   cliClient.Client
-	clientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
-	hasTty   = cli.IsTerminal && !pkg.GetenvBool("CI")
-	tenantId = types.DEFAULT_TENANT
+	client         cliClient.Client
+	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
+	hasTty         = cli.IsTerminal && !pkg.GetenvBool("CI")
+	tenantId       = types.DEFAULT_TENANT
 )
 
 type P = cliClient.Property // shorthand for tracking properties
@@ -100,7 +100,7 @@ var rootCmd = &cobra.Command{
 					return err
 				}
 			} else {
-				if err := cli.InteractiveLogin(cmd.Context(), client, clientId, cluster); err != nil {
+				if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
 				}
 			}
@@ -121,7 +121,7 @@ var loginCmd = &cobra.Command{
 
 		go client.Track("Login Invoked", P{"cluster", cluster})
 
-		err := cli.InteractiveLogin(cmd.Context(), client, clientId, cluster)
+		err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster)
 		if err != nil {
 			return err
 		}
@@ -649,7 +649,7 @@ var tokenCmd = &cobra.Command{
 		go client.Track("Token Invoked", P{"scope", s}, P{"expires", expires})
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, clientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 
