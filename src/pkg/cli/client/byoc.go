@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	cdVersion    = "v0.4.51-43-g869d79e0" // will cause issues if two clients with different versions are connected to the same stack
-	cdTaskPrefix = "defang-cd"            // WARNING: renaming this practically deletes the Pulumi state
-	defangPrefix = "Defang"               // prefix for all resources created by Defang
+	cdVersion    = "v0.5.0"    // will cause issues if two clients with different versions are connected to the same stack
+	cdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	defangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
 type byocAws struct {
