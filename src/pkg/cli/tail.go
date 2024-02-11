@@ -27,6 +27,8 @@ var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
 )
 
+type P = client.Property // shorthand for tracking properties
+
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
 // At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
 func ParseTimeOrDuration(str string) (time.Time, error) {
@@ -118,25 +120,26 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 			defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-			defer os.Stdin.Close() // abort the read
+			input := term.NewNonBlockingStdin()
+			defer input.Close() // abort the read
 			go func() {
 				var b [1]byte
 				for {
-					if _, err := os.Stdin.Read(b[:]); err != nil {
-						return
+					if _, err := input.Read(b[:]); err != nil {
+						return // exit goroutine
 					}
 					switch b[0] {
 					case 10, 13: // Enter or Return
-						Info(" ") // empty line, but overwrite spinner
+						Println(" ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
-						state := "off"
+						modeStr := "off"
 						if verbose {
-							state = "on"
+							modeStr = "on"
 						}
-						Info(" * Verbose mode", state)
-						go client.Track("Verbose Toggled")
+						Info(" * Verbose mode", modeStr)
+						go client.Track("Verbose Toggled", P{"verbose", verbose})
 					}
 				}
 			}()
