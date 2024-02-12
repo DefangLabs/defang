@@ -631,10 +631,14 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	if errch, ok := eventStream.(hasErrCh); ok {
 		errCh = errch.Errs()
 	}
-	var taskch <-chan error
+
+	taskch := make(chan error)
 	var cancel func()
 	if cdTaskArn != nil {
-		taskch, cancel = awsecs.TaskStatusCh(cdTaskArn, 3*time.Second) // check every 3 seconds
+		ctx, cancel = context.WithCancel(ctx)
+		go func() {
+			taskch <- awsecs.WaitForTask(ctx, cdTaskArn, 3*time.Second)
+		}()
 	}
 	return &byocServerStream{
 		cancelTaskCh: cancel,

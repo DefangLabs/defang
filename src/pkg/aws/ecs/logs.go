@@ -346,32 +346,21 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	}
 }
 
-func TaskStatusCh(taskArn TaskArn, poll time.Duration) (<-chan error, func()) {
+func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error {
 	if taskArn == nil {
 		panic("taskArn is nil")
 	}
-	ch := make(chan error)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		defer close(ch)
-		ticker := time.NewTicker(poll)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// Handle cancellation
-				ch <- ctx.Err()
-				return
-			case <-ticker.C:
-				if err := GetTaskStatus(ctx, taskArn); err != nil {
-					ch <- err
-					return
-				}
+	ticker := time.NewTicker(poll)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			// Handle cancellation
+			return ctx.Err()
+		case <-ticker.C:
+			if err := GetTaskStatus(ctx, taskArn); err != nil {
+				return err
 			}
 		}
-	}()
-
-	return ch, cancel
+	}
 }
