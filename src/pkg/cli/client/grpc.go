@@ -163,3 +163,8 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	}})
 	return err
 }
+
+func (g *GrpcClient) CheckLogin(ctx context.Context) error {
+	_, err := g.WhoAmI(ctx)
+	return err
+}
