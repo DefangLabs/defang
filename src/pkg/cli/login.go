@@ -38,11 +38,6 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func CheckLogin(ctx context.Context, client client.Client) error {
-	_, err := client.WhoAmI(ctx)
-	return err
-}
-
 func Login(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
 	Debug(" - Logging in to", fabric)
 

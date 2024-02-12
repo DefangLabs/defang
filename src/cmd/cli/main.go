@@ -88,7 +88,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := cli.CheckLogin(cmd.Context(), client); err != nil && !nonInteractive {
+		if err := client.CheckLogin(cmd.Context()); err != nil && !nonInteractive {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
@@ -323,7 +323,7 @@ var secretsSetCmd = &cobra.Command{
 		var secret string
 		if !nonInteractive {
 			// check if we are properly connected / authenticated before asking the questions
-			if err := cli.CheckLogin(cmd.Context(), client); err != nil {
+			if err := client.CheckLogin(cmd.Context()); err != nil {
 				return err
 			}
 
@@ -708,8 +708,8 @@ var bootstrapRefreshCmd = &cobra.Command{
 }
 
 var tosCmd = &cobra.Command{
-	Use:         "tos",
-	Aliases:     []string{"terms", "eula", "tac", "tou"},
+	Use:         "terms",
+	Aliases:     []string{"tos", "eula", "tac", "tou"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Read and/or agree the Defang terms of service",
@@ -718,7 +718,7 @@ var tosCmd = &cobra.Command{
 
 		go client.Track("Tos Invoked", P{"agree", agree})
 
-		cli.Println("Read our latest terms of service at https://defang.io/terms-service.html")
+		cli.Println("Our latest terms of service can be found at https://defang.io/terms-service.html")
 		if agree {
 			if err := client.AgreeToS(cmd.Context()); err != nil {
 				return err
