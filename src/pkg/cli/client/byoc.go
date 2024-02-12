@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	cdVersion    = "v0.5.0"    // will cause issues if two clients with different versions are connected to the same stack
+	cdVersion    = "beta"      // will cause issues if two clients with different versions are connected to the same stack
 	cdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
 	defangPrefix = "Defang"    // prefix for all resources created by Defang
 )
