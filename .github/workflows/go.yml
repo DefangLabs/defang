@@ -12,6 +12,9 @@ on:
 
 jobs:
   go-test:
+    permissions:
+      contents: read
+      id-token: write # for id_token_test.go id-token verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

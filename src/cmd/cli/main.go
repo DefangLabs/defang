@@ -88,14 +88,21 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.CheckLogin(cmd.Context()); err != nil && !nonInteractive {
+		if err := client.CheckLogin(cmd.Context()); err != nil {
 			// Login now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
 			cli.Warn(" !", err)
-			if err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster); err != nil {
-				return err
+
+			if nonInteractive {
+				if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
+					return err
+				}
+			} else {
+				if err := cli.InteractiveLogin(cmd.Context(), client, clientId, cluster); err != nil {
+					return err
+				}
 			}
 			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
 			go client.Track("User Reconnected", P{"err", err.Error()})
@@ -114,7 +121,7 @@ var loginCmd = &cobra.Command{
 
 		go client.Track("Login Invoked", P{"cluster", cluster})
 
-		err := cli.LoginAndSaveAccessToken(cmd.Context(), client, clientId, cluster)
+		err := cli.InteractiveLogin(cmd.Context(), client, clientId, cluster)
 		if err != nil {
 			return err
 		}

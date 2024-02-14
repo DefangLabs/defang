@@ -23,7 +23,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant ty
 		return err
 	}
 
-	at, err := generateToken(ctx, client, code, tenant, dur, scope)
+	at, err := exchangeCodeForToken(ctx, client, code, tenant, dur, scope)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant ty
 	return nil
 }
 
-func generateToken(ctx context.Context, client client.Client, code string, tenant types.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
+func exchangeCodeForToken(ctx context.Context, client client.Client, code string, tenant types.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
