@@ -9,6 +9,7 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 var (
@@ -38,7 +39,7 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func Login(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
+func LoginWithGitHub(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
 	Debug(" - Logging in to", fabric)
 
 	code, err := github.StartAuthCodeFlow(ctx, clientId)
@@ -47,10 +48,10 @@ func Login(ctx context.Context, client client.Client, clientId, fabric string) (
 	}
 
 	tenant, _ := SplitTenantHost(fabric)
-	return generateToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
+	return exchangeCodeForToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
 }
 
-func SaveAccessToken(fabric, at string) error {
+func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
 	os.MkdirAll(tokenDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
@@ -60,8 +61,8 @@ func SaveAccessToken(fabric, at string) error {
 	return nil
 }
 
-func LoginAndSaveAccessToken(ctx context.Context, client client.Client, clientId, fabric string) error {
-	at, err := Login(ctx, client, clientId, fabric)
+func InteractiveLogin(ctx context.Context, client client.Client, clientId, fabric string) error {
+	at, err := LoginWithGitHub(ctx, client, clientId, fabric)
 	if err != nil {
 		return err
 	}
@@ -69,8 +70,24 @@ func LoginAndSaveAccessToken(ctx context.Context, client client.Client, clientId
 	tenant, host := SplitTenantHost(fabric)
 	Info(" * Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := SaveAccessToken(fabric, at); err != nil {
+	if err := saveAccessToken(fabric, at); err != nil {
 		Warn(" ! Failed to save access token:", err)
 	}
 	return nil
+}
+
+func NonInteractiveLogin(ctx context.Context, client client.Client, fabric string) error {
+	idToken, err := github.GetIdToken(ctx)
+	if err != nil {
+		return err
+	}
+	Debug(" - Using GitHub Actions id-token")
+	resp, err := client.Token(ctx, &defangv1.TokenRequest{
+		Assertion: idToken,
+		Scope:     []string{"admin"},
+	})
+	if err != nil {
+		return err
+	}
+	return saveAccessToken(fabric, resp.AccessToken)
 }
