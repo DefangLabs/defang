@@ -176,6 +176,11 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			if secret.Target != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
 			}
+			if s, ok := project.Secrets[secret.Source]; !ok {
+				logrus.Warnf("secret %q is not defined in the top-level secrets section", secret.Source)
+			} else if !s.External {
+				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source)
+			}
 		}
 		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {
 			timeout := 30 // default per compose spec
