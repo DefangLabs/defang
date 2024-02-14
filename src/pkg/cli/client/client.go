@@ -29,7 +29,6 @@ type Client interface {
 	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
 	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
 	GetServices(context.Context) (*v1.ListServicesResponse, error)
-	GetStatus(context.Context) (*v1.Status, error)
 	GetVersion(context.Context) (*v1.Version, error)
 	ListSecrets(context.Context) (*v1.Secrets, error)
 	Publish(context.Context, *v1.PublishRequest) error
