@@ -34,13 +34,13 @@ import (
 )
 
 const (
-	cdVersion    = "beta"      // will cause issues if two clients with different versions are connected to the same stack
 	cdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
 	defangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
 var (
-	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/k4e3g1l1/cd:"+cdVersion) // TODO: change to defang-io/cd
+	// Changing this will cause issues if two clients with different versions are using the same account
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/k4e3g1l1/cd:beta") // TODO: change to defang-io/cd
 )
 
 type byocAws struct {
@@ -257,12 +257,6 @@ func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	return resp.Zone, nil
 }
 
-func (b byocAws) GetStatus(ctx context.Context) (*v1.Status, error) {
-	return &v1.Status{
-		Version: cdVersion,
-	}, nil
-}
-
 func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
 		return nil, err
@@ -285,6 +279,7 @@ func (b byocAws) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
 }
 
 func (byocAws) GetVersion(context.Context) (*v1.Version, error) {
+	cdVersion := cdImage[strings.LastIndex(cdImage, ":")+1:]
 	return &v1.Version{Fabric: cdVersion}, nil
 }
 

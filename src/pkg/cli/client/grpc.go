@@ -39,10 +39,6 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
-func (g GrpcClient) GetStatus(ctx context.Context) (*v1.Status, error) {
-	return getMsg(g.client.GetStatus(ctx, &connect.Request[emptypb.Empty]{}))
-}
-
 func (g GrpcClient) GetVersion(ctx context.Context) (*v1.Version, error) {
 	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
