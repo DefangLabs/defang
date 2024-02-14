@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DNS: "${COMPOSE_PROJECT_NAME}-dfnx.prod1.defang.dev"
+        DNS: dfnx
     env_file:
       - fileName.env
     deploy:

@@ -534,8 +534,8 @@ func (bs *byocServerStream) Receive() bool {
 			// These events are from a awslogs service task: tenant/service_etag/taskID
 			bs.response.Host = parts[2] // TODO: figure out hostname/IP
 			parts = strings.Split(parts[1], "_")
-			if len(parts) != 2 {
-				// ignore sidecar logs (like route53-sidecar)
+			if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
+				// ignore sidecar logs (like route53-sidecar or fluentbit)
 				return true
 			}
 			service, etag := parts[0], parts[1]
