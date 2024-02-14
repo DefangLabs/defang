@@ -39,6 +39,10 @@ const (
 	defangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
+var (
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/k4e3g1l1/cd:"+cdVersion) // TODO: change to defang-io/cd
+)
+
 type byocAws struct {
 	*GrpcClient
 
@@ -116,7 +120,7 @@ func (b *byocAws) setUp(ctx context.Context) error {
 		return nil
 	}
 	// TODO: can we stick to the vanilla pulumi-nodejs image?
-	if err := b.driver.SetUp(ctx, "public.ecr.aws/k4e3g1l1/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
+	if err := b.driver.SetUp(ctx, cdImage, 512_000_000, "linux/amd64"); err != nil {
 		return annotateAwsError(err)
 	}
 
