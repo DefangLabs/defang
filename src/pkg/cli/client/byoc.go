@@ -116,7 +116,7 @@ func (b *byocAws) setUp(ctx context.Context) error {
 		return nil
 	}
 	// TODO: can we stick to the vanilla pulumi-nodejs image?
-	if err := b.driver.SetUp(ctx, "docker.io/defangio/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
+	if err := b.driver.SetUp(ctx, "public.ecr.aws/k4e3g1l1/cd:"+cdVersion, 512_000_000, "linux/amd64"); err != nil {
 		return annotateAwsError(err)
 	}
 
