@@ -89,7 +89,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		Tags: []types.Tag{ //TODO: add tags to the task
 			{
 				Key:   ptr.String("StartedAt"),
-				Value: ptr.String(time.Now().String()),
+				Value: ptr.String(time.Now().Format(time.RFC3339)),
 			},
 			{
 				Key:   ptr.String("StartedBy"),
