@@ -77,10 +77,11 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
+		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		cluster, _ := cmd.Flags().GetString("cluster")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
-		client, tenantId = cli.Connect(cluster, *provider)
+		client, tenantId = cli.Connect(cluster, filePath, *provider)
 		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -98,8 +99,7 @@ var rootCmd = &cobra.Command{
 			if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 				return err
 			}
-
-			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
+			client, tenantId = cli.Connect(cluster, filePath, *provider) // reconnect with the new token
 			go client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil

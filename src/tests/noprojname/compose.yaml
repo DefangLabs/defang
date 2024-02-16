@@ -1,0 +1,15 @@
+services:
+  echo:
+    image: ealen/echo-server
+    ports:
+      - target: 80
+        mode: ingress
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+    profiles:
+      - donotstart
+
+secrets:
+  dummy:
+    external: true
+    name: dummy
