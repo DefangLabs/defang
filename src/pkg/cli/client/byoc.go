@@ -88,18 +88,15 @@ func (w Warnings) Error() string {
 
 var _ Client = (*byocAws)(nil)
 
-func NewByocAWS(tenantId, domain string, defClient *GrpcClient) *byocAws {
-	if domain != strings.ToLower(domain) {
-		panic("custom domain must be lowercase")
-	}
+func NewByocAWS(tenantId, project string, defClient *GrpcClient) *byocAws {
 	return &byocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]awsecs.TaskArn),
-		customDomain:  domain,
-		driver:        cfn.New(cdTaskPrefix, aws.Region("")),   // default region
-		privateDomain: strings.ToLower(tenantId + ".internal"), // must match the logic in ecs/common.ts
-		pulumiProject: tenantId,                                // TODO: multi-project support
-		pulumiStack:   "beta",                                  // TODO: make customizable
+		customDomain:  "",
+		driver:        cfn.New(cdTaskPrefix, aws.Region("")),  // default region
+		privateDomain: strings.ToLower(project + ".internal"), // must match the logic in ecs/common.ts
+		pulumiProject: project,                                // TODO: multi-project support
+		pulumiStack:   "beta",                                 // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -666,8 +663,8 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 
 	si := &v1.ServiceInfo{
 		Service: service,
-		Project: b.tenantID,     // was: tenant
-		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project: b.pulumiProject, // was: tenant
+		Etag:    pkg.RandomID(),  // TODO: could be hash for dedup/idempotency
 	}
 
 	hasHost := false
