@@ -84,7 +84,7 @@ func NonInteractiveLogin(ctx context.Context, client client.Client, fabric strin
 	Debug(" - Using GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
-		Scope:     []string{"admin"},
+		// Scope:     []string{"admin"},
 	})
 	if err != nil {
 		return err
