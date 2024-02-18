@@ -14,11 +14,14 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	replaceString   = string(Cyan + "$0" + Reset)
+	ansiCyan        = "\033[36m"
+	ansiReset       = "\033[0m"
+	replaceString   = ansiCyan + "$0" + ansiReset
 	spinner         = `-\|/`
 	TimestampFormat = "15:04:05.000000 "
 )
@@ -106,10 +109,13 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	}
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
+	spinMe := 0
+	doSpinner := !raw && canColor && IsTerminal
+
 	if IsTerminal && !raw {
-		if CanColor && DoColor {
-			fmt.Print(HideCursor)
-			defer fmt.Print(Reset + ShowCursor)
+		if doSpinner {
+			stdout.HideCursor()
+			defer stdout.ShowCursor()
 		}
 
 		if !DoVerbose {
@@ -130,7 +136,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					}
 					switch b[0] {
 					case 10, 13: // Enter or Return
-						Println(" ") // empty line, but overwrite the spinner
+						Println(Nop, " ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
@@ -145,10 +151,6 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}()
 		}
 	}
-
-	// colorizer := colorizer{}
-	spinMe := 0
-	doSpinner := !raw && DoColor
 
 	timestampZone := time.Local
 	timestampFormat := TimestampFormat
@@ -170,7 +172,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
 				Debug(" - Disconnected:", tailClient.Err())
 				if !raw {
-					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
@@ -179,7 +181,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					return err
 				}
 				if !raw {
-					Fprintln(os.Stderr, WarnColor, " ! Reconnected!   ")
+					Fprintln(stderr, WarnColor, " ! Reconnected!   ")
 				}
 				skipDuplicate = true
 				continue
@@ -213,9 +215,9 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 
 			if raw {
-				out := os.Stdout
+				out := stdout
 				if e.Stderr {
-					out = os.Stderr
+					out = stderr
 				}
 				Fprintln(out, Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
@@ -227,9 +229,9 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 
 			tsString := ts.In(timestampZone).Format(timestampFormat)
-			tsColor := Bright
+			tsColor := termenv.ANSIWhite
 			if e.Stderr {
-				tsColor = BrightRed
+				tsColor = termenv.ANSIBrightRed
 			}
 			var prefixLen int
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
@@ -237,28 +239,29 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				if i == 0 {
 					prefixLen, _ = Print(tsColor, tsString)
 					if etag == "" {
-						l, _ := Print(Yellow, msg.Etag, " ")
+						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
 					}
 					if service == "" {
-						l, _ := Print(Green, msg.Service, " ")
+						l, _ := Print(termenv.ANSIGreen, msg.Service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := Print(Purple, msg.Host, " ")
+						l, _ := Print(termenv.ANSIMagenta, msg.Host, " ")
 						prefixLen += l
 					}
 				} else {
 					Print(Nop, strings.Repeat(" ", prefixLen))
 				}
-				if DoColor {
+				if doColor(stdout) {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
+					stdout.Reset()
 				} else {
 					line = pkg.StripAnsi(line)
 				}
-				Println(Reset, line)
+				Println(Nop, line)
 			}
 		}
 	}

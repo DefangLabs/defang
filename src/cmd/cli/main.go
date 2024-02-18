@@ -67,9 +67,9 @@ var rootCmd = &cobra.Command{
 		color := cmd.Flag("color").Value.(*ColorMode)
 		switch *color {
 		case ColorAlways:
-			cli.DoColor = true
-		case ColorNone:
-			cli.DoColor = false
+			cli.ForceColor(true)
+		case ColorNever:
+			cli.ForceColor(false)
 		}
 
 		// Not all commands need a connection, so we should only connect when needed
@@ -725,7 +725,7 @@ var tosCmd = &cobra.Command{
 
 		go client.Track("Tos Invoked", P{"agree", agree})
 
-		cli.Println("Our latest terms of service can be found at https://defang.io/terms-service.html")
+		cli.Println(cli.Nop, "Our latest terms of service can be found at https://defang.io/terms-service.html")
 		if agree {
 			if err := client.AgreeToS(cmd.Context()); err != nil {
 				return err
@@ -904,7 +904,7 @@ func main() {
 	}
 
 	if hasTty && cli.HadWarnings {
-		cli.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		cli.Println(cli.Nop, "For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 		if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 			fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 		}
@@ -913,7 +913,7 @@ func main() {
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") {
 		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
 			cli.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion())
-			cli.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			cli.Println(cli.Nop, "A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
