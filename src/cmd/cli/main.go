@@ -90,20 +90,15 @@ var rootCmd = &cobra.Command{
 
 		if err := client.CheckLogin(cmd.Context()); err != nil {
 			// Login now; only do this for authorization-related errors
-			if connect.CodeOf(err) != connect.CodeUnauthenticated {
+			if connect.CodeOf(err) != connect.CodeUnauthenticated || nonInteractive {
 				return err
 			}
 			cli.Warn(" !", err)
 
-			if nonInteractive {
-				if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
-					return err
-				}
-			} else {
-				if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
-					return err
-				}
+			if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
+				return err
 			}
+
 			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
 			go client.Track("User Reconnected", P{"err", err.Error()})
 		}
@@ -118,15 +113,22 @@ var loginCmd = &cobra.Command{
 	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cluster, _ := cmd.Flags().GetString("cluster")
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		go client.Track("Login Invoked", P{"cluster", cluster})
+		go client.Track("Login Invoked", P{"cluster", cluster}, P{"non-interactive", nonInteractive})
 
-		err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster)
-		if err != nil {
-			return err
+		if nonInteractive {
+			if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
+				return err
+			}
+		} else {
+			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster)
+			if err != nil {
+				return err
+			}
+
+			printDefangHint("To generate a sample service, do:", "generate")
 		}
-
-		printDefangHint("To generate a sample service, do:", "generate")
 		return nil
 	},
 }
@@ -154,9 +156,10 @@ var generateCmd = &cobra.Command{
 	Aliases:     []string{"gen", "new", "init"},
 	Short:       "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Generate Invoked")
-
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+
+		go client.Track("Generate Invoked", P{"non-interactive", nonInteractive})
+
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
 		}

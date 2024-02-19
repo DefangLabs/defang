@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"path"
@@ -28,8 +29,8 @@ func GetExistingToken(fabric string) string {
 
 	if accessToken == "" {
 		tokenFile := getTokenFile(fabric)
-		Debug(" - Reading access token from file", tokenFile)
 
+		Debug(" - Reading access token from file", tokenFile)
 		all, _ := os.ReadFile(tokenFile)
 		accessToken = string(all)
 	} else {
@@ -53,11 +54,11 @@ func LoginWithGitHub(ctx context.Context, client client.Client, gitHubClientId, 
 
 func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
+	Debug(" - Saving access token to", tokenFile)
 	os.MkdirAll(tokenDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
 		return err
 	}
-	Debug(" - Access token saved to", tokenFile)
 	return nil
 }
 
@@ -77,14 +78,15 @@ func InteractiveLogin(ctx context.Context, client client.Client, gitHubClientId,
 }
 
 func NonInteractiveLogin(ctx context.Context, client client.Client, fabric string) error {
+	Debug(" - Non-interactive login using GitHub Actions id-token")
 	idToken, err := github.GetIdToken(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
-	Debug(" - Using GitHub Actions id-token")
+	Debug(" - Got GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
-		// Scope:     []string{"admin"},
+		Scope:     []string{"admin", "read"},
 	})
 	if err != nil {
 		return err
