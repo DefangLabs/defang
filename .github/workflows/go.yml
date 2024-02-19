@@ -71,17 +71,21 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
-      - name: Add secret
-        run: echo blah | go run ./cmd/cli secret set -n dummy
+      - name: Login using GitHub token
+        run: go run ./cmd/cli login --debug
+        working-directory: src
+
+      - name: Add dummy secret
+        run: echo blah | go run ./cmd/cli secret set -n dummy --debug
         working-directory: src
 
       - name: Run sanity tests
-        run: go run ./cmd/cli compose start -f tests/compose.yaml
+        run: go run ./cmd/cli compose start -f tests/compose.yaml --debug
         working-directory: src
 
   go-release:
     if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
-    # needs: go-test
+    needs: go-test
     runs-on: macos-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
