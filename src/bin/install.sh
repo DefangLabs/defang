@@ -160,7 +160,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
             fi
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # Append the line to the profile file
-                echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang Installer" >> "$HOME/$profile_file"
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang install.sh" >> "$HOME/$profile_file"
             else
                 # Print the command for the user to run manually
                 echo "To add $INSTALL_DIR to your PATH, run the following command:"
@@ -187,17 +187,17 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         fi
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create the new profile file and append the line
-            echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang Installer" >> "$HOME/.${CURRENT_SHELL}rc"
+            echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang install.sh" >> "$HOME/.${CURRENT_SHELL}rc"
         else
             # Print the command for the user to run manually
             echo "To add $INSTALL_DIR to your PATH, run the following command:"
             echo
-            echo "\techo \"export PATH=\\\"\\\$PATH:$INSTALL_DIR\\\"\" >> \"\$HOME/.${CURRENT_SHELL}rc\""
+            echo "  echo \"export PATH=\\\"\\\$PATH:$INSTALL_DIR\\\"\" >> \"\$HOME/.${CURRENT_SHELL}rc\""
             echo
             # alternatively just print the export path command and tell them to add it to their profile file
             echo "Alternatively, you can add the following line to your profile file:"
             echo
-            echo "\texport PATH=\"\$PATH:$INSTALL_DIR\""
+            echo "  export PATH=\"\$PATH:$INSTALL_DIR\""
             echo
         fi
     fi
