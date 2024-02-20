@@ -106,7 +106,7 @@ func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, 
 	Debug(" - Loading compose file", filePath, "for project", tenantId)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
-	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !DoColor, DisableLevelTruncation: true})
+	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
 
 	projectName := "default"
 	if tenantId == "" {
