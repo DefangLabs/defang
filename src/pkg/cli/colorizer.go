@@ -2,101 +2,75 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"os"
 
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
 
 var (
-	termEnv    = os.Getenv("TERM")
-	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && termEnv != ""
-	_, noColor = os.LookupEnv("NO_COLOR") // per spec, the value doesn't matter
-	CanColor   = IsTerminal && !noColor && termEnv != "dumb"
-	DoColor    = CanColor
+	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != ""
+	stdout     = termenv.NewOutput(os.Stdout)
+	stderr     = termenv.NewOutput(os.Stderr)
+	canColor   = doColor(stdout)
 )
 
-type Color string
+type Color = termenv.ANSIColor
 
 const (
-	Nop           Color = ""
-	HideCursor    Color = "\033[?25l"
-	ShowCursor    Color = "\033[?25h"
-	Reset         Color = "\033[0m"
-	Bright        Color = "\033[1m"
-	Dim           Color = "\033[2m"
-	Underscore    Color = "\033[4m"
-	Blink         Color = "\033[5m"
-	Reverse       Color = "\033[7m"
-	Hidden        Color = "\033[8m"
-	Black         Color = "\033[30m"
-	Red           Color = "\033[31m"
-	Green         Color = "\033[32m"
-	Yellow        Color = "\033[33m"
-	Blue          Color = "\033[34m"
-	Purple        Color = "\033[35m"
-	Cyan          Color = "\033[36m"
-	White         Color = "\033[37m"
-	Gray          Color = "\033[1;30m"
-	BrightRed     Color = "\033[1;31m"
-	BrightGreen   Color = "\033[1;32m"
-	BrightYellow  Color = "\033[1;33m"
-	BrightBlue    Color = "\033[1;34m"
-	BrightPurple  Color = "\033[1;35m"
-	BrightCyan    Color = "\033[1;36m"
-	BrightWhite   Color = "\033[1;37m"
-	Transparent   Color = "\033[39m"
-	BgBlack       Color = "\033[40m"
-	BgYellow      Color = "\033[43m"
-	BgBlue        Color = "\033[44m"
-	BgMagenta     Color = "\033[45m"
-	BgCyan        Color = "\033[46m"
-	BgGreen       Color = "\033[42m"
-	BgWhite       Color = "\033[47m"
-	BgTransparent Color = "\033[49m"
-
-	InfoColor  = BrightPurple
-	ErrorColor = BrightRed
-	WarnColor  = BrightYellow
-	DebugColor = Gray
+	Nop        Color = -1
+	Bright           = termenv.ANSIBrightWhite
+	BrightCyan       = termenv.ANSIBrightCyan
+	InfoColor        = termenv.ANSIBrightMagenta
+	ErrorColor       = termenv.ANSIBrightRed
+	WarnColor        = termenv.ANSIBrightYellow
+	DebugColor       = termenv.ANSIBrightBlack // Gray
 )
 
-func (c Color) String() string {
-	if DoColor {
-		return string(c)
-	}
-	return ""
+// doColor returns true if the provided output's profile is not Ascii.
+func doColor(o *termenv.Output) bool {
+	return o.Profile != termenv.Ascii
 }
 
-func Fprint(w io.Writer, c Color, v ...any) (int, error) {
-	if DoColor && c != Nop {
-		fmt.Fprint(w, string(c))
-		defer fmt.Fprint(w, Reset) // or append to v?
+func ForceColor(color bool) {
+	if color {
+		stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.ANSI))
+		stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.ANSI))
+	} else {
+		stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.Ascii))
+		stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.Ascii))
+	}
+}
+
+func Fprint(w *termenv.Output, c Color, v ...any) (int, error) {
+	if doColor(w) && c != Nop {
+		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
+		defer w.Reset()
 	}
 	return fmt.Fprint(w, v...)
 }
 
-func Fprintln(w io.Writer, c Color, v ...any) (int, error) {
-	if DoColor && c != Nop {
-		fmt.Fprint(w, string(c))
-		defer fmt.Fprint(w, Reset) // or append to v?
+func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
+	if doColor(w) && c != Nop {
+		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
+		defer w.Reset()
 	}
 	return fmt.Fprintln(w, v...)
 }
 
 func Print(c Color, v ...any) (int, error) {
-	return Fprint(os.Stdout, c, v...)
+	return Fprint(stdout, c, v...)
 }
 
 func Println(c Color, v ...any) (int, error) {
-	return Fprintln(os.Stdout, c, v...)
+	return Fprintln(stdout, c, v...)
 }
 
 func Debug(v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Fprintln(os.Stderr, DebugColor, v...)
+	return Fprintln(stderr, DebugColor, v...)
 }
 
 func Info(v ...any) (int, error) {
@@ -105,36 +79,9 @@ func Info(v ...any) (int, error) {
 
 func Warn(v ...any) (int, error) {
 	HadWarnings = true
-	return Fprintln(os.Stderr, WarnColor, v...)
+	return Fprintln(stderr, WarnColor, v...)
 }
 
 func Error(v ...any) (int, error) {
-	return Fprintln(os.Stderr, ErrorColor, v...)
+	return Fprintln(stderr, ErrorColor, v...)
 }
-
-// var backgroundColors = []Color{
-// 	// BgTransparent,
-// 	BgBlack,
-// 	BgYellow,
-// 	BgBlue,
-// 	BgMagenta,
-// 	BgCyan,
-// 	BgGreen,
-// 	BgWhite,
-// }
-
-// type colorizer struct {
-// 	next  int
-// 	color map[string]string
-// }
-
-// func (c *colorizer) backgroundColor(id string) string {
-// 	if c.color == nil {
-// 		c.color = make(map[string]string)
-// 	}
-// 	if c.color[id] == "" {
-// 		c.color[id] = backgroundColors[c.next]
-// 		c.next = (c.next + 1) % len(backgroundColors)
-// 	}
-// 	return c.color[id]
-// }
