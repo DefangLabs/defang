@@ -73,3 +73,9 @@ nix:
     repository:
       owner: defang-io
       name: defang
+
+changelog:
+  filters:
+    exclude:
+      # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
+      - "^defang: v[0-9]+\\.[0-9]+\\.[0-9]+ -> v[0-9]+\\.[0-9]+\\.[0-9]+$"
