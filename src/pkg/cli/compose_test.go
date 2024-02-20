@@ -56,7 +56,7 @@ func TestLoadDockerCompose(t *testing.T) {
 	})
 
 	t.Run("use project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/compose.yaml", "tests")
+		p, err := loadDockerCompose("../../tests/testproj/compose.yaml", "tests")
 		if err != nil {
 			t.Fatalf("loadDockerCompose() failed: %v", err)
 		}
@@ -184,7 +184,7 @@ func TestUploadTarball(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.TODO(), "../../tests", "")
+		buffer, err := createTarball(context.TODO(), "../../tests/testproj", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}

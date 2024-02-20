@@ -121,7 +121,7 @@ func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, 
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}, loader.WithDiscardEnvFiles, func(o *loader.Options) {
-		o.SetProjectName(projectName, false) // TODO: don't overwrite the declared project name in the compose file
+		o.SetProjectName(projectName, false) // don't overwrite the declared project name in the compose file
 		o.SkipConsistencyCheck = true        // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	})
 	if err != nil {
