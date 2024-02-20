@@ -12,8 +12,12 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 service FabricController {
-  rpc GetStatus(google.protobuf.Empty) returns (Status);   // public
-  rpc GetVersion(google.protobuf.Empty) returns (Version); // public
+  rpc GetStatus(google.protobuf.Empty) returns (Status) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };   // public
+  rpc GetVersion(google.protobuf.Empty) returns (Version){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // public
   rpc Token(TokenRequest) returns (TokenResponse);         // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -21,25 +25,35 @@ service FabricController {
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
-  rpc Get(ServiceID) returns (ServiceInfo); // should be GetService
+  rpc Get(ServiceID) returns (ServiceInfo){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse); // should be ListServices
+  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // should be ListServices
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
 
   rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
+  rpc ListSecrets(google.protobuf.Empty) returns (Secrets){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
   rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse);
-  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse);
+  rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse){
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 }
 
