@@ -10,11 +10,12 @@ on:
       - '.github/workflows/go.yml'
       - 'src/**'
 
+permissions:
+  contents: read
+  id-token: write # for GitHub id-token auth
+
 jobs:
   go-test:
-    permissions:
-      contents: read
-      id-token: write # for id_token_test.go id-token verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,17 +26,66 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
-      - name: Download Go dependencies
-        run: go mod download
-        working-directory: src
-
       - name: Run Go unit tests
         run: go test -test.short -v ./...
         working-directory: src
 
+  # go-byoc-test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Configure AWS Credentials for CI
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: us-west-2
+  #         output-credentials: true
+  #         role-to-assume: arn:aws:iam::488659951590:role/ci-role-d4fe904 # ciRoleArn from defang-io/infrastructure stack
+
+  #     - name: Configure AWS Credentials for Staging
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: us-west-2
+  #         role-duration-seconds: 1200
+  #         role-chaining: true
+  #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
+
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Go
+  #       uses: actions/setup-go@v5
+  #       with:
+  #         go-version-file: src/go.mod
+  #         cache-dependency-path: src/go.sum
+
+  #     - name: Run sanity tests
+  #       run: go run ./cmd/cli compose up -f tests/compose.yaml
+  #       working-directory: src
+
+  go-playground-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Login using GitHub token
+        run: go run ./cmd/cli login --debug
+        working-directory: src
+
+      - name: Add dummy secret
+        run: echo blah | go run ./cmd/cli secret set -n dummy --debug
+        working-directory: src
+
+      - name: Run sanity tests
+        run: go run ./cmd/cli compose start -f tests/compose.yaml --debug
+        working-directory: src
+
   go-release:
     if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
-    # needs: go-test
+    needs: go-test
     runs-on: macos-latest
     permissions:
       contents: write # to upload archives as GitHub Releases

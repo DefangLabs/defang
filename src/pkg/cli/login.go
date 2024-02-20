@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"path"
@@ -28,8 +29,8 @@ func GetExistingToken(fabric string) string {
 
 	if accessToken == "" {
 		tokenFile := getTokenFile(fabric)
-		Debug(" - Reading access token from file", tokenFile)
 
+		Debug(" - Reading access token from file", tokenFile)
 		all, _ := os.ReadFile(tokenFile)
 		accessToken = string(all)
 	} else {
@@ -39,10 +40,10 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func LoginWithGitHub(ctx context.Context, client client.Client, clientId, fabric string) (string, error) {
+func LoginWithGitHub(ctx context.Context, client client.Client, gitHubClientId, fabric string) (string, error) {
 	Debug(" - Logging in to", fabric)
 
-	code, err := github.StartAuthCodeFlow(ctx, clientId)
+	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId)
 	if err != nil {
 		return "", err
 	}
@@ -53,16 +54,16 @@ func LoginWithGitHub(ctx context.Context, client client.Client, clientId, fabric
 
 func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
+	Debug(" - Saving access token to", tokenFile)
 	os.MkdirAll(tokenDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
 		return err
 	}
-	Debug(" - Access token saved to", tokenFile)
 	return nil
 }
 
-func InteractiveLogin(ctx context.Context, client client.Client, clientId, fabric string) error {
-	at, err := LoginWithGitHub(ctx, client, clientId, fabric)
+func InteractiveLogin(ctx context.Context, client client.Client, gitHubClientId, fabric string) error {
+	at, err := LoginWithGitHub(ctx, client, gitHubClientId, fabric)
 	if err != nil {
 		return err
 	}
@@ -77,14 +78,15 @@ func InteractiveLogin(ctx context.Context, client client.Client, clientId, fabri
 }
 
 func NonInteractiveLogin(ctx context.Context, client client.Client, fabric string) error {
+	Debug(" - Non-interactive login using GitHub Actions id-token")
 	idToken, err := github.GetIdToken(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
-	Debug(" - Using GitHub Actions id-token")
+	Debug(" - Got GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
-		// Scope:     []string{"admin"},
+		Scope:     []string{"admin", "read"},
 	})
 	if err != nil {
 		return err

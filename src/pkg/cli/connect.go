@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"strings"
@@ -31,7 +34,7 @@ func Connect(cluster string, provider client.Provider) (client.Client, types.Ten
 
 	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
-		tenantId, _, _ = client.TenantFromAccessToken(accessToken)
+		tenantId, _, _ = tenantFromAccessToken(accessToken)
 	}
 	Debug(" - Using tenant", tenantId, "for cluster", cluster, "and provider", provider)
 
@@ -52,4 +55,22 @@ func Connect(cluster string, provider client.Provider) (client.Client, types.Ten
 		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
 	}
 	return defangClient, tenantId
+}
+
+// Deprecated: don't rely on info in token
+func tenantFromAccessToken(at string) (types.TenantID, string, error) {
+	parts := strings.Split(at, ".")
+	if len(parts) != 3 {
+		return "", "", errors.New("not a JWT")
+	}
+	var claims struct {
+		Iss string `json:"iss"`
+		Sub string `json:"sub"`
+	}
+	bytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", "", err
+	}
+	err = json.Unmarshal(bytes, &claims)
+	return types.TenantID(claims.Sub), claims.Iss, err
 }
