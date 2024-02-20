@@ -21,7 +21,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect_go.IsAtLeastVersion0_1_0
+const _ = connect_go.IsAtLeastVersion1_7_0
 
 const (
 	// FabricControllerName is the fully-qualified name of the FabricController service.
@@ -136,12 +136,14 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		getStatus: connect_go.NewClient[emptypb.Empty, v1.Status](
 			httpClient,
 			baseURL+FabricControllerGetStatusProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		getVersion: connect_go.NewClient[emptypb.Empty, v1.Version](
 			httpClient,
 			baseURL+FabricControllerGetVersionProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		token: connect_go.NewClient[v1.TokenRequest, v1.TokenResponse](
 			httpClient,
@@ -171,7 +173,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		get: connect_go.NewClient[v1.ServiceID, v1.ServiceInfo](
 			httpClient,
 			baseURL+FabricControllerGetProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		delete: connect_go.NewClient[v1.DeleteRequest, v1.DeleteResponse](
 			httpClient,
@@ -191,7 +194,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		getServices: connect_go.NewClient[emptypb.Empty, v1.ListServicesResponse](
 			httpClient,
 			baseURL+FabricControllerGetServicesProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		generateFiles: connect_go.NewClient[v1.GenerateFilesRequest, v1.GenerateFilesResponse](
 			httpClient,
@@ -211,7 +215,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		listSecrets: connect_go.NewClient[emptypb.Empty, v1.Secrets](
 			httpClient,
 			baseURL+FabricControllerListSecretsProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		createUploadURL: connect_go.NewClient[v1.UploadURLRequest, v1.UploadURLResponse](
 			httpClient,
@@ -231,12 +236,14 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		getDelegateSubdomainZone: connect_go.NewClient[emptypb.Empty, v1.DelegateSubdomainZoneResponse](
 			httpClient,
 			baseURL+FabricControllerGetDelegateSubdomainZoneProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		whoAmI: connect_go.NewClient[emptypb.Empty, v1.WhoAmIResponse](
 			httpClient,
 			baseURL+FabricControllerWhoAmIProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		track: connect_go.NewClient[v1.TrackRequest, emptypb.Empty](
 			httpClient,
@@ -418,12 +425,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerGetStatusHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetStatusProcedure,
 		svc.GetStatus,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerGetVersionHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetVersionProcedure,
 		svc.GetVersion,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerTokenHandler := connect_go.NewUnaryHandler(
 		FabricControllerTokenProcedure,
@@ -453,7 +462,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerGetHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetProcedure,
 		svc.Get,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerDeleteHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteProcedure,
@@ -473,7 +483,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerGetServicesHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetServicesProcedure,
 		svc.GetServices,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerGenerateFilesHandler := connect_go.NewUnaryHandler(
 		FabricControllerGenerateFilesProcedure,
@@ -493,7 +504,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerListSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListSecretsProcedure,
 		svc.ListSecrets,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerCreateUploadURLHandler := connect_go.NewUnaryHandler(
 		FabricControllerCreateUploadURLProcedure,
@@ -513,12 +525,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerGetDelegateSubdomainZoneHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetDelegateSubdomainZoneProcedure,
 		svc.GetDelegateSubdomainZone,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerWhoAmIHandler := connect_go.NewUnaryHandler(
 		FabricControllerWhoAmIProcedure,
 		svc.WhoAmI,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerTrackHandler := connect_go.NewUnaryHandler(
 		FabricControllerTrackProcedure,
