@@ -46,7 +46,7 @@ func Connect(cluster string, composeFilePath string, provider client.Provider) (
 		projectName := string(tenantId)
 		project, err := loadDockerCompose(composeFilePath, tenantId)
 		if err != nil {
-			Info(" * No Docker Compose file found; assuming default project: ", tenantId)
+			Info(" * Failed to load Compose file: ", err, "; assuming default project: ", tenantId)
 		} else {
 			projectName = project.Name
 		}
