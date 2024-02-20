@@ -12,13 +12,19 @@
 ################################################################################################
 
 echo "
-       __     ____                 
+       __     ____
   ____/ /__  / __/___ _____  ____ _
  / __  / _ \/ /_/ __ \`/ __ \/ __ \`/
-/ /_/ /  __/ __/ /_/ / / / / /_/ / 
-\__,_/\___/_/  \__,_/_/ /_/\__, /  
+/ /_/ /  __/ __/ /_/ / / / / /_/ /
+\__,_/\___/_/  \__,_/_/ /_/\__, /
                           /____/
 "
+
+# Check for -y flag or CI var and set the REPLY variable to "y" if it is present
+if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
+    REPLY="y"
+    CI="1"
+fi
 
 # Define the GitHub API URL for the latest release
 RELEASE_API_URL="https://api.github.com/repos/defang-io/defang/releases/latest"
@@ -146,10 +152,12 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         # If the profile file exists in the user's home directory
         if [[ -f "$HOME/$profile_file" ]]; then
             FOUND_PROFILE_FILE=true
-            # Prompt the user for confirmation
-            echo -n "Can we append the necessary line to $HOME/$profile_file? (y/n) "
-            read REPLY 
-            echo    # move to a new line
+            if [[ "$CI" != "1" ]]; then
+                # Prompt the user for confirmation
+                echo -n "Can we append the necessary line to $HOME/$profile_file? (y/n) "
+                read REPLY
+                echo    # move to a new line
+            fi
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # Append the line to the profile file
                 echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang Installer" >> "$HOME/$profile_file"
@@ -171,10 +179,12 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     if [[ $FOUND_PROFILE_FILE == false ]]; then
         # Get the name of the current shell
         CURRENT_SHELL=$(basename "$SHELL")
-        # Prompt the user to create a new profile file
-        echo -n "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) "
-        read REPLY
-        echo    # move to a new line
+        if [[ "$CI" != "1" ]]; then
+            # Prompt the user to create a new profile file
+            echo -n "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) "
+            read REPLY
+            echo    # move to a new line
+        fi
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create the new profile file and append the line
             echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang Installer" >> "$HOME/.${CURRENT_SHELL}rc"
