@@ -107,6 +107,7 @@ message ServiceInfo {
   string public_fqdn = 9;      // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
+  string zone_id = 12; // zone ID for byod domain
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;
