@@ -752,6 +752,8 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
+	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
+	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
@@ -804,8 +806,6 @@ func main() {
 	rootCmd.AddCommand(restartCmd)
 
 	// Compose Command
-	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
-	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
 	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
