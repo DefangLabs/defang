@@ -216,6 +216,30 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	}, warnings
 }
 
+func (b byocAws) FindZone(ctx context.Context, domain string) (string, error) {
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return "", annotateAwsError(err)
+	}
+	r53Client := route53.NewFromConfig(cfg)
+
+	domain = strings.TrimSuffix(domain, ".")
+	domain = strings.ToLower(domain)
+	for {
+		zoneId, err := aws.GetZoneIdFromDomain(ctx, domain, r53Client)
+		if errors.Is(err, aws.ErrNoZoneFound) {
+			if strings.Count(domain, ".") <= 1 {
+				return "", nil
+			}
+			domain = domain[strings.Index(domain, ".")+1:]
+			continue
+		} else if err != nil {
+			return "", err
+		}
+		return zoneId, nil
+	}
+}
+
 func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	if b.customDomain == "" {
 		return "", errors.New("custom domain not set")
@@ -683,7 +707,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 		si.PrivateFqdn = b.getFqdn(fqn, false)
 	}
 
-	var warning Warning // TODO: should be nil by default
+	var warning Warning
 	if service.Domainname != "" {
 		if !hasIngress {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -694,9 +718,18 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 			warning = WarningError(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q", service.Domainname, si.PublicFqdn))
+			zoneId, err := b.FindZone(ctx, service.Domainname)
+			if err != nil {
+				return nil, err
+			}
+			if zoneId != "" {
+				si.ZoneId = zoneId
+			} else {
+				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found", service.Domainname, si.PublicFqdn))
+			}
 		}
 	}
+
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	si.Status = "UPDATE_QUEUED"
 	if si.Service.Build != nil {
