@@ -1,10 +1,11 @@
+name: tests
 services:
   dfnx:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        DNS: "${COMPOSE_PROJECT_NAME}-dfnx.prod1.defang.dev"
+        DNS: dfnx
     env_file:
       - fileName.env
     deploy:
@@ -18,11 +19,13 @@ services:
     ports:
       - target: 80
         mode: ingress
+      - target: 1234
+        # mode: host
     secrets:
       - dummy
     healthcheck:
-      test: ["NONE"]
-      disable: true
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      # disable: true
 
   # dfnx:
   #   build:

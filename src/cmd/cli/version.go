@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"sort"
 
 	"golang.org/x/mod/semver"
 )
@@ -19,7 +19,7 @@ func GetCurrentVersion() string {
 }
 
 func GetLatestVersion(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/defang-io/defang/tags", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/defang-io/defang/releases/latest", nil)
 	if err != nil {
 		return "", err
 	}
@@ -28,15 +28,15 @@ func GetLatestVersion(ctx context.Context) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	var tags []struct {
-		Name string `json:"name"`
+	if resp.StatusCode != http.StatusOK {
+		// The primary rate limit for unauthenticated requests is 60 requests per hour, per IP.
+		return "", errors.New(resp.Status)
 	}
-	err = json.NewDecoder(resp.Body).Decode(&tags)
-	if err != nil || len(tags) == 0 {
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return "", err
 	}
-	sort.Slice(tags, func(i, j int) bool {
-		return semver.Compare(tags[i].Name, tags[j].Name) > 0
-	})
-	return semver.Canonical(tags[0].Name), nil
+	return semver.Canonical(release.TagName), nil
 }

@@ -10,14 +10,18 @@ import (
 	"time"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	replaceString   = string(Cyan + "$0" + Reset)
+	ansiCyan        = "\033[36m"
+	ansiReset       = "\033[0m"
+	replaceString   = ansiCyan + "$0" + ansiReset
 	spinner         = `-\|/`
 	TimestampFormat = "15:04:05.000000 "
 )
@@ -25,6 +29,8 @@ const (
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
 )
+
+type P = client.Property // shorthand for tracking properties
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
 // At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
@@ -77,15 +83,15 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, service, etag string, since time.Time, raw bool) error {
+func Tail(ctx context.Context, client client.Client, service, etag string, since time.Time, raw bool) error {
 	if DoDryRun {
 		return nil
 	}
 
 	if service != "" {
 		service = NormalizeServiceName(service)
-		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, connect.NewRequest(&v1.ServiceID{Name: service})); err != nil {
+		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
+		if _, err := client.Get(ctx, &v1.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
@@ -97,16 +103,19 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 		}
 	}
 
-	tailClient, err := client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
+	spinMe := 0
+	doSpinner := !raw && canColor && IsTerminal
+
 	if IsTerminal && !raw {
-		if CanColor && DoColor {
-			fmt.Print(HideCursor)
-			defer fmt.Print(Reset + ShowCursor)
+		if doSpinner {
+			stdout.HideCursor()
+			defer stdout.ShowCursor()
 		}
 
 		if !DoVerbose {
@@ -117,30 +126,31 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			}
 			defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-			defer os.Stdin.Close() // abort the read
+			input := term.NewNonBlockingStdin()
+			defer input.Close() // abort the read
 			go func() {
 				var b [1]byte
 				for {
-					if _, err := os.Stdin.Read(b[:]); err != nil {
-						return
+					if _, err := input.Read(b[:]); err != nil {
+						return // exit goroutine
 					}
-					if b[0] == 'V' || b[0] == 'v' {
+					switch b[0] {
+					case 10, 13: // Enter or Return
+						Println(Nop, " ") // empty line, but overwrite the spinner
+					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
-						state := "off"
+						modeStr := "off"
 						if verbose {
-							state = "on"
+							modeStr = "on"
 						}
-						Info(" * Verbose mode", state)
+						Info(" * Verbose mode", modeStr)
+						go client.Track("Verbose Toggled", P{"verbose", verbose})
 					}
 				}
 			}()
 		}
 	}
-
-	// colorizer := colorizer{}
-	spinMe := 0
-	doSpinner := !raw && DoColor
 
 	timestampZone := time.Local
 	timestampFormat := TimestampFormat
@@ -162,16 +172,16 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
 				Debug(" - Disconnected:", tailClient.Err())
 				if !raw {
-					Fprint(os.Stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, connect.NewRequest(&v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)}))
+				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
 					Debug(" - Reconnect failed:", err)
 					return err
 				}
 				if !raw {
-					Fprintln(os.Stderr, WarnColor, " ! Reconnected!   ")
+					Fprintln(stderr, WarnColor, " ! Reconnected!   ")
 				}
 				skipDuplicate = true
 				continue
@@ -187,10 +197,11 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			spinMe++
 		}
 
-		isInternal := !strings.HasPrefix(msg.Host, "ip-") // FIXME: not true for BYOC
+		// HACK: skip noisy CI/CD logs (except errors)
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko"
+		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
-			if !DoVerbose && !e.Stderr && isInternal {
-				// HACK: skip noisy CI/CD logs (except errors)
+			if onlyErrors && !e.Stderr {
 				continue
 			}
 
@@ -204,9 +215,9 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			}
 
 			if raw {
-				out := os.Stdout
+				out := stdout
 				if e.Stderr {
-					out = os.Stderr
+					out = stderr
 				}
 				Fprintln(out, Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
@@ -218,9 +229,9 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 			}
 
 			tsString := ts.In(timestampZone).Format(timestampFormat)
-			tsColor := Bright
+			tsColor := termenv.ANSIWhite
 			if e.Stderr {
-				tsColor = BrightRed
+				tsColor = termenv.ANSIBrightRed
 			}
 			var prefixLen int
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
@@ -228,33 +239,34 @@ func Tail(ctx context.Context, client defangv1connect.FabricControllerClient, se
 				if i == 0 {
 					prefixLen, _ = Print(tsColor, tsString)
 					if etag == "" {
-						l, _ := Print(Yellow, msg.Etag, " ")
+						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
 					}
 					if service == "" {
-						l, _ := Print(Green, msg.Service, " ")
+						l, _ := Print(termenv.ANSIGreen, msg.Service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := Print(Purple, msg.Host, " ")
+						l, _ := Print(termenv.ANSIMagenta, msg.Host, " ")
 						prefixLen += l
 					}
 				} else {
 					Print(Nop, strings.Repeat(" ", prefixLen))
 				}
-				if DoColor {
+				if doColor(stdout) {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
+					stdout.Reset()
 				} else {
-					line = StripAnsi(line)
+					line = pkg.StripAnsi(line)
 				}
-				Println(Reset, line)
+				Println(Nop, line)
 			}
 		}
 	}
 }
 
 func isProgressDot(line string) bool {
-	return len(line) <= 1 || len(StripAnsi(line)) <= 1
+	return len(line) <= 1 || len(pkg.StripAnsi(line)) <= 1
 }

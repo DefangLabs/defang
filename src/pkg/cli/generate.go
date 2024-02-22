@@ -5,28 +5,27 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-func Generate(ctx context.Context, client defangv1connect.FabricControllerClient, language string, description string) ([]string, error) {
+func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
 		Warn(" ! Dry run, not generating files")
 		return nil, nil
 	}
 
-	response, err := client.GenerateFiles(ctx, connect.NewRequest(&v1.GenerateFilesRequest{
+	response, err := client.GenerateFiles(ctx, &v1.GenerateFilesRequest{
 		Language: language,
 		Prompt:   description,
-	}))
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	if DoDebug {
 		// Print the files that were generated
-		for _, file := range response.Msg.Files {
+		for _, file := range response.Files {
 			Debug(file.Name + "\n```")
 			Debug(file.Content)
 			Debug("```")
@@ -37,7 +36,7 @@ func Generate(ctx context.Context, client defangv1connect.FabricControllerClient
 
 	// Write each file to disk
 	Info(" * Writing files to disk...")
-	for _, file := range response.Msg.Files {
+	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
@@ -48,7 +47,7 @@ func Generate(ctx context.Context, client defangv1connect.FabricControllerClient
 
 	// put the file names in an array
 	var fileNames []string
-	for _, file := range response.Msg.Files {
+	for _, file := range response.Files {
 		fileNames = append(fileNames, file.Name)
 	}
 

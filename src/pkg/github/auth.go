@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 
-	pkg "github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/google/uuid"
+	"github.com/pkg/browser"
 )
 
 const (
@@ -58,53 +57,6 @@ var (
 	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
 )
 
-func StartDeviceFlow(ctx context.Context, clientId string) (url.Values, error) {
-	codeUrl := "https://github.com/login/device/code?client_id=" + clientId
-	q, err := pkg.PostForValues(codeUrl, "application/json", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	interval, err := strconv.Atoi(q.Get("interval"))
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("Please visit %s and enter the code %s\n", q.Get("verification_uri"), q.Get("user_code"))
-
-	values := url.Values{
-		"client_id":   {clientId},
-		"device_code": q["device_code"],
-		"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
-	}
-	accessTokenUrl := "https://github.com/login/oauth/access_token?" + values.Encode()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		time.Sleep(time.Duration(interval) * time.Second)
-
-		q, err := pkg.PostForValues(accessTokenUrl, "application/json", nil)
-		if err != nil || q.Get("error") != "" {
-			switch q.Get("error") {
-			case "authorization_pending":
-				continue
-			case "slow_down":
-				if interval, err = strconv.Atoi(q.Get("interval")); err == nil {
-					continue
-				}
-			}
-			return nil, fmt.Errorf("%w: %v", err, q.Get("error_description"))
-		}
-
-		return q, nil
-	}
-}
-
 func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 	// Generate random state
 	state := uuid.NewString()
@@ -143,13 +95,28 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 		"client_id":    {clientId},
 		"state":        {state},
 		"redirect_uri": {server.URL + "/auth"},
-		"scope":        {"read:org"}, // required for membership check
+		"scope":        {"read:org user:email"}, // required for membership check; space-delimited
 		// "login":     {";TODO: from state file"},
 	}
 	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
 
-	n, _ := fmt.Printf("Please visit %s and log in. (Right click to open)\r", server.URL)
+	n, _ := fmt.Printf("Please visit %s and log in. (Right click the URL or press Enter to open browser)\r", server.URL)
 	defer fmt.Print(strings.Repeat(" ", n), "\r")
+
+	input := term.NewNonBlockingStdin()
+	defer input.Close() // abort the read
+	go func() {
+		var b [1]byte
+		for {
+			if _, err := input.Read(b[:]); err != nil {
+				return // exit goroutine
+			}
+			switch b[0] {
+			case 10, 13: // Enter or Return
+				browser.OpenURL(server.URL)
+			}
+		}
+	}()
 
 	select {
 	case <-ctx.Done():
