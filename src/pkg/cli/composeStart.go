@@ -377,6 +377,12 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			init = *svccfg.Init
 		}
 
+		var dnsRole string
+		dnsRoleVal := svccfg.Extensions["x-dns-role"]
+		if dnsRoleVal != nil {
+			dnsRole = fmt.Sprint(dnsRoleVal)
+		}
+
 		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
@@ -391,6 +397,7 @@ func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantI
 			Command:     svccfg.Command,
 			Domainname:  svccfg.DomainName,
 			Platform:    convertPlatform(svccfg.Platform),
+			DnsRole:     dnsRole,
 		})
 	}
 

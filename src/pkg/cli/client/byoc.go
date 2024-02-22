@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -216,11 +218,18 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	}, warnings
 }
 
-func (b byocAws) FindZone(ctx context.Context, domain string) (string, error) {
+func (b byocAws) FindZone(ctx context.Context, domain, role string) (string, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
 	}
+
+	if role != "" {
+		stsClient := sts.NewFromConfig(cfg)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, role)
+		cfg.Credentials = awssdk.NewCredentialsCache(creds)
+	}
+
 	r53Client := route53.NewFromConfig(cfg)
 
 	domain = strings.TrimSuffix(domain, ".")
@@ -718,7 +727,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 			warning = WarningError(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			zoneId, err := b.FindZone(ctx, service.Domainname)
+			zoneId, err := b.FindZone(ctx, service.Domainname, service.DnsRole)
 			if err != nil {
 				return nil, err
 			}

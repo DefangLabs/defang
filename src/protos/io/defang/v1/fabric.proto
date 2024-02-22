@@ -298,6 +298,7 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
+  string dns_role = 14; // role arn used to access route53 to create dns records
 }
 
 message Event {
