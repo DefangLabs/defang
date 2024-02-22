@@ -8,5 +8,11 @@
 		}
 	],
 	"settings": {
+		"go.testEnvVars": {
+			"AWS_PROFILE": "defang-sandbox"
+		},
+		"go.buildTags": "integration",
+		"go.testFlags": ["-short"],
+		"go.testTimeout": "300s"
 	}
 }

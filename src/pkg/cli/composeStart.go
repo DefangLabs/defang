@@ -2,23 +2,24 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/bufbuild/connect-go"
-	"github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/sirupsen/logrus"
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*v1.ServiceInfo, error) {
-	project, err := loadDockerCompose(filePath, projectName)
+func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
+	project, err := loadDockerCompose(filePath, tenantId)
 	if err != nil {
 		return nil, &ComposeError{err}
 	}
@@ -31,9 +32,11 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 		if normalized != svccfg.Name {
 			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
+			HadWarnings = true
 		}
 		if svccfg.ContainerName != "" {
 			logrus.Warn("unsupported compose directive: container_name")
+			HadWarnings = true
 		}
 		if svccfg.Hostname != "" {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")}
@@ -43,6 +46,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 		if len(svccfg.DNSOpts) != 0 {
 			logrus.Warn("unsupported compose directive: dns_opt")
+			HadWarnings = true
 		}
 		if len(svccfg.DNS) != 0 {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: dns")}
@@ -52,6 +56,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 		if len(svccfg.DependsOn) != 0 {
 			logrus.Warn("unsupported compose directive: depends_on")
+			HadWarnings = true
 		}
 		if len(svccfg.DeviceCgroupRules) != 0 {
 			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: device_cgroup_rules")}
@@ -64,33 +69,43 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 		if len(svccfg.Ipc) > 0 {
 			logrus.Warn("unsupported compose directive: ipc")
+			HadWarnings = true
 		}
 		if len(svccfg.Uts) > 0 {
 			logrus.Warn("unsupported compose directive: uts")
+			HadWarnings = true
 		}
 		if svccfg.Isolation != "" {
 			logrus.Warn("unsupported compose directive: isolation")
+			HadWarnings = true
 		}
 		if svccfg.MacAddress != "" {
 			logrus.Warn("unsupported compose directive: mac_address")
+			HadWarnings = true
 		}
 		if len(svccfg.Labels) > 0 {
 			logrus.Warn("unsupported compose directive: labels") // TODO: add support for labels
+			HadWarnings = true
 		}
 		if len(svccfg.Links) > 0 {
 			logrus.Warn("unsupported compose directive: links")
+			HadWarnings = true
 		}
 		if svccfg.Logging != nil {
 			logrus.Warn("unsupported compose directive: logging")
+			HadWarnings = true
 		}
 		if _, ok := svccfg.Networks["default"]; !ok || len(svccfg.Networks) > 1 {
 			logrus.Warn("unsupported compose directive: networks")
+			HadWarnings = true
 		}
 		if len(svccfg.Volumes) > 0 {
 			logrus.Warn("unsupported compose directive: volumes") // TODO: add support for volumes
+			HadWarnings = true
 		}
 		if len(svccfg.VolumesFrom) > 0 {
 			logrus.Warn("unsupported compose directive: volumes_from") // TODO: add support for volumes_from
+			HadWarnings = true
 		}
 		if svccfg.Build != nil {
 			if svccfg.Build.Dockerfile != "" {
@@ -111,21 +126,26 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 			if len(svccfg.Build.Labels) != 0 {
 				logrus.Warn("unsupported compose directive: build labels") // TODO: add support for Kaniko --label
+				HadWarnings = true
 			}
 			if len(svccfg.Build.CacheFrom) != 0 {
 				logrus.Warn("unsupported compose directive: build cache_from")
+				HadWarnings = true
 			}
 			if len(svccfg.Build.CacheTo) != 0 {
 				logrus.Warn("unsupported compose directive: build cache_to")
+				HadWarnings = true
 			}
 			if svccfg.Build.NoCache {
 				logrus.Warn("unsupported compose directive: build no_cache")
+				HadWarnings = true
 			}
 			if len(svccfg.Build.ExtraHosts) != 0 {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build extra_hosts")}
 			}
 			if svccfg.Build.Isolation != "" {
 				logrus.Warn("unsupported compose directive: build isolation")
+				HadWarnings = true
 			}
 			if svccfg.Build.Network != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build network")}
@@ -156,12 +176,18 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			if secret.Target != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
 			}
+			if s, ok := project.Secrets[secret.Source]; !ok {
+				logrus.Warnf("secret %q is not defined in the top-level secrets section", secret.Source)
+			} else if !s.External {
+				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source)
+			}
 		}
 		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {
 			timeout := 30 // default per compose spec
 			if svccfg.HealthCheck.Timeout != nil {
 				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
 					logrus.Warn("healthcheck timeout must be a multiple of 1s")
+					HadWarnings = true
 				}
 				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
@@ -169,6 +195,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			if svccfg.HealthCheck.Interval != nil {
 				if *svccfg.HealthCheck.Interval%1e9 != 0 {
 					logrus.Warn("healthcheck interval must be a multiple of 1s")
+					HadWarnings = true
 				}
 				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
@@ -178,9 +205,11 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_period")
+				HadWarnings = true
 			}
 			if svccfg.HealthCheck.StartInterval != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_interval")
+				HadWarnings = true
 			}
 		}
 		if svccfg.Deploy != nil {
@@ -189,6 +218,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 			if len(svccfg.Deploy.Labels) > 0 {
 				logrus.Warn("unsupported compose directive: deploy labels")
+				HadWarnings = true
 			}
 			if svccfg.Deploy.UpdateConfig != nil {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy update_config")}
@@ -201,12 +231,14 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
 				logrus.Warn("unsupported compose directive: deploy placement")
+				HadWarnings = true
 			}
 			if svccfg.Deploy.EndpointMode != "" {
 				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy endpoint_mode")}
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
 				logrus.Warn("no reservations specified; using limits as reservations")
+				HadWarnings = true
 			}
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil && reservations.NanoCPUs != "" {
@@ -248,6 +280,7 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		for _, port := range ports {
 			if port.Mode == v1.Mode_INGRESS && healthcheck == nil {
 				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
+				HadWarnings = true
 				break
 			}
 		}
@@ -289,13 +322,14 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 
 		if deploy == nil || deploy.Resources == nil || deploy.Resources.Reservations == nil || deploy.Resources.Reservations.Memory == 0 {
 			logrus.Warn("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
+			HadWarnings = true
 		}
 
 		// Upload the build context, if any; TODO: parallelize
 		var build *v1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
+			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
 			if err != nil {
 				return nil, err
 			}
@@ -364,34 +398,38 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	var serviceInfos []*v1.ServiceInfo
-	for _, service := range services {
-		if DoDryRun {
+	if DoDryRun {
+		for _, service := range services {
 			PrintObject(service.Name, service)
-			continue
 		}
-
-		Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := client.Update(ctx, connect.NewRequest(service))
-		if err != nil {
-			// Abort all? TODO: compose up should probably be atomic, all or nothing
-			if len(serviceInfos) == 0 {
-				return nil, err
-			}
-			Warn(" ! Failed to update service", service.Name, err)
-			continue
-		}
-
-		if DoDebug {
-			PrintObject(service.Name, serviceInfo.Msg)
-		}
-		serviceInfos = append(serviceInfos, serviceInfo.Msg)
+		return nil, nil
 	}
 
-	return serviceInfos, nil
+	for _, service := range services {
+		Info(" * Deploying service", service.Name)
+	}
+
+	resp, err := c.Deploy(ctx, &v1.DeployRequest{
+		Services: services,
+	})
+	var warnings client.Warnings
+	if errors.As(err, &warnings) {
+		if len(warnings) > 0 {
+			Warn(warnings)
+		}
+	} else if err != nil {
+		return nil, err
+	}
+
+	if DoDebug {
+		for _, service := range resp.Services {
+			PrintObject(service.Service.Name, service)
+		}
+	}
+	return resp, nil
 }
 
-func getResourceReservations(r types.Resources) *types.Resource {
+func getResourceReservations(r compose.Resources) *compose.Resource {
 	if r.Reservations == nil {
 		// TODO: we might not want to default to all the limits, maybe only memory?
 		return r.Limits

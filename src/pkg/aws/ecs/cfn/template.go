@@ -1,6 +1,10 @@
 package cfn
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"os"
 	"strconv"
 	"strings"
 
@@ -12,16 +16,34 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/iam"
 	"github.com/awslabs/goformation/v7/cloudformation/logs"
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
+	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 )
 
-const createVpcResources = true
+const (
+	createVpcResources   = true // TODO: make this configurable, add an option to use the default VPC
+	maxCachePrefixLength = 20   // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
+)
 
-func createTemplate(image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
-	const prefix = awsecs.ProjectName + "-" // TODO: include stack name
-	const ecrPublicPrefix = prefix + "ecr-public"
+var (
+	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
+	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
+)
+
+func getCacheRepoPrefix(prefix, suffix string) string {
+	repo := prefix + suffix
+	if len(repo) > maxCachePrefixLength {
+		// Cache repo name is too long; hash it and use the first 6 chars
+		hash := sha256.Sum256([]byte(prefix))
+		return hex.EncodeToString(hash[:])[:6] + "-" + suffix
+	}
+	return repo
+}
+
+func createTemplate(stack, image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
+	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
 		{
@@ -47,19 +69,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		// ClusterName: ptr.String(PREFIX + "cluster" + SUFFIX), // optional
 	}
 
-	// 3. ECR pull-through cache (only really needed for images from ECR Public registry)
-	// TODO: Creating pull through cache rules isn't supported in the following Regions:
-	// * China (Beijing) (cn-north-1)
-	// * China (Ningxia) (cn-northwest-1)
-	// * AWS GovCloud (US-East) (us-gov-east-1)
-	// * AWS GovCloud (US-West) (us-gov-west-1)
-	const _pullThroughCache = "PullThroughCache"
-	template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-		EcrRepositoryPrefix: ptr.String(ecrPublicPrefix), // TODO: optional
-		UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
-	}
-
-	// 4. ECS capacity provider
+	// 3. ECS capacity provider
 	capacityProvider := "FARGATE"
 	if spot {
 		capacityProvider = "FARGATE_SPOT"
@@ -78,15 +88,72 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		},
 	}
 
-	// 5. CloudWatch log group
+	// 4. CloudWatch log group
 	const _logGroup = "LogGroup"
 	template.Resources[_logGroup] = &logs.LogGroup{
 		Tags: defaultTags,
 		// LogGroupName:    ptr.String(PREFIX + "log-group-test" + SUFFIX), // optional
 		RetentionInDays: ptr.Int(1),
+		// Make sure the log group cannot be deleted while the cluster is up
+		AWSCloudFormationDependsOn: []string{
+			_cluster,
+		},
 	}
 
-	// 6. IAM exec role for task
+	const _pullThroughCache = "PullThroughCache"
+	const _privateRepoSecret = "PrivateRepoSecret"
+	// 5. ECR pull-through cache rules
+	// TODO: Creating pull through cache rules isn't supported in the following Regions:
+	// * China (Beijing) (cn-north-1)
+	// * China (Ningxia) (cn-northwest-1)
+	// * AWS GovCloud (US-East) (us-gov-east-1)
+	// * AWS GovCloud (US-West) (us-gov-west-1)
+	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
+		const _pullThroughCache = "PullThroughCache"
+		ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
+
+		// 5. The pull-through cache rule
+		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+			EcrRepositoryPrefix: ptr.String(ecrPublicPrefix),
+			UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
+		}
+
+		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
+	} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok && dockerHubUsername != "" && dockerHubAccessToken != "" {
+		dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
+
+		// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
+		// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
+		bytes, err := json.Marshal(struct {
+			Username    string `json:"username"`
+			AccessToken string `json:"accessToken"`
+		}{dockerHubUsername, dockerHubAccessToken})
+		if err != nil {
+			panic(err) // there's no reason this should ever fail
+		}
+
+		// This is $0.40 per secret per month, so make it opt-in (only done when DOCKERHUB_* env vars are set)
+		template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
+			Tags:         defaultTags,
+			Description:  ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
+			Name:         ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
+			SecretString: ptr.String(string(bytes)),
+		}
+
+		// 5b. The pull-through cache rule
+		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+			EcrRepositoryPrefix: ptr.String(dockerPublicPrefix),
+			UpstreamRegistryUrl: ptr.String("registry-1.docker.io"),
+			CredentialArn:       cloudformation.RefPtr(_privateRepoSecret),
+		}
+
+		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + dockerPublicPrefix + repo)
+	} else {
+		// TODO: support pull through cache for other registries
+		// TODO: support private repos (with or without pull-through cache)
+	}
+
+	// 6. IAM roles for ECS task
 	assumeRolePolicyDocumentECS := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
@@ -103,6 +170,45 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 			},
 		},
 	}
+
+	// 6a. IAM exec role for task
+	execPolicies := []iam.Role_Policy{{
+		// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
+		PolicyName: "AllowECRPassThrough",
+		PolicyDocument: map[string]any{
+			"Version": "2012-10-17",
+			"Statement": []map[string]any{
+				{
+					"Effect": "Allow",
+					"Action": []string{
+						"ecr:CreatePullThroughCacheRule",
+						"ecr:BatchImportUpstreamImage", // should be registry permission instead
+						"ecr:CreateRepository",         // can be registry permission instead
+					},
+					"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
+				},
+			},
+		},
+	}}
+	if _, ok := template.Resources[_privateRepoSecret]; ok {
+		execPolicies = append(execPolicies, iam.Role_Policy{
+			PolicyName: "AllowGetRepoSecret",
+			PolicyDocument: map[string]any{
+				"Version": "2012-10-17",
+				"Statement": []map[string]any{
+					{
+						"Effect": "Allow",
+						"Action": []string{
+							"secretsmanager:GetSecretValue",
+							"ssm:GetParameters",
+							// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
+						},
+						"Resource": cloudformation.Ref(_privateRepoSecret),
+					},
+				},
+			},
+		})
+	}
 	const _executionRole = "ExecutionRole"
 	template.Resources[_executionRole] = &iam.Role{
 		Tags: defaultTags,
@@ -111,43 +217,7 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 			"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
 		},
 		AssumeRolePolicyDocument: assumeRolePolicyDocumentECS,
-		Policies: []iam.Role_Policy{
-			// {
-			// 	PolicyName: "AllowGetSecrets",
-			// 	PolicyDocument: map[string]any{
-			// 		"Version": "2012-10-17",
-			// 		"Statement": []map[string]any{
-			// 			{
-			// 				"Effect": "Allow",
-			// 				"Action": []string{
-			// 					"secretsmanager:GetSecretValue",
-			// 					"ssm:GetParameters",
-			// 					// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
-			// 				},
-			// 				"Resource": "*", // TODO: restrict to ECR or other repo secrets
-			// 			},
-			// 		},
-			// 	},
-			// },
-			{
-				// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
-				PolicyName: "AllowECRPassThrough",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"ecr:CreatePullThroughCacheRule",
-								"ecr:BatchImportUpstreamImage", // can bse repo permissions instead
-								"ecr:CreateRepository",         // can be registry permissions instead
-							},
-							"Resource": "*", // TODO: restrict
-						},
-					},
-				},
-			},
-		},
+		Policies:                 execPolicies,
 	}
 
 	// 6b. IAM role for task (optional)
@@ -179,13 +249,25 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 					},
 				},
 			},
+			{
+				PolicyName: "AllowPassRole",
+				PolicyDocument: map[string]any{
+					"Version": "2012-10-17",
+					"Statement": []map[string]any{
+						{
+							"Effect": "Allow",
+							"Action": []string{
+								"iam:PassRole",
+							},
+							"Resource": "*", // TODO: restrict to roles that are needed/created by the task
+						},
+					},
+				},
+			},
 		},
 	}
 
 	// 7. ECS task definition
-	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
-		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
-	}
 	cpu, mem := awsecs.FixupFargateConfig(vcpu, memory)
 	const _taskDefinition = "TaskDefinition"
 	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
@@ -196,20 +278,18 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		},
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
-				Name:  awsecs.ContainerName,
-				Image: image,
+				Name:        awsecs.ContainerName,
+				Image:       image,
+				StopTimeout: ptr.Int(120),
+				// LinuxParameters: &ecs.TaskDefinition_LinuxParameters{
+				// 	InitProcessEnabled: ptr.Bool(true),
+				// },
 				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
 					LogDriver: "awslogs",
 					Options: map[string]string{
 						"awslogs-group":         cloudformation.Ref(_logGroup),
 						"awslogs-region":        cloudformation.Ref("AWS::Region"),
-						"awslogs-stream-prefix": awsecs.ProjectName,
-					},
-				},
-				Environment: []ecs.TaskDefinition_KeyValuePair{
-					{
-						Name:  ptr.String("PULUMI_BACKEND_URL"),                                        // TODO: this should not be here
-						Value: cloudformation.SubPtr("s3://${Bucket}?region=${AWS::Region}&awssdk=v2"), // TODO: use _bucket
+						"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
 					},
 				},
 			},
@@ -313,17 +393,21 @@ func createTemplate(image string, memory float64, vcpu float64, spot bool, arch 
 		Value:       cloudformation.Ref(_taskDefinition),
 		Description: ptr.String("ARN of the ECS task definition"),
 	}
-	template.Outputs[outputs.ClusterArn] = cloudformation.Output{
+	template.Outputs[outputs.ClusterName] = cloudformation.Output{
 		Value:       cloudformation.Ref(_cluster),
-		Description: ptr.String("ARN of the ECS cluster"),
+		Description: ptr.String("Name of the ECS cluster"),
 	}
-	template.Outputs[outputs.LogGroupName] = cloudformation.Output{
-		Value:       cloudformation.Ref(_logGroup),
-		Description: ptr.String("Name of the CloudWatch log group"),
+	template.Outputs[outputs.LogGroupARN] = cloudformation.Output{
+		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
+		Description: ptr.String("ARN of the CloudWatch log group"),
 	}
 	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
 		Value:       cloudformation.Ref(_securityGroup),
 		Description: ptr.String("ID of the security group"),
+	}
+	template.Outputs[outputs.BucketName] = cloudformation.Output{
+		Value:       cloudformation.Ref(_bucket),
+		Description: ptr.String("Name of the S3 bucket"),
 	}
 
 	return template

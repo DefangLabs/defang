@@ -5,8 +5,8 @@ import "fmt"
 type ColorMode string
 
 const (
-	// ColorNone disables color output.
-	ColorNone ColorMode = "none"
+	// ColorNever disables color output.
+	ColorNever ColorMode = "never"
 	// ColorAuto enables color output only if the output is connected to a terminal.
 	ColorAuto ColorMode = "auto"
 	// ColorAlways enables color output.
@@ -14,7 +14,7 @@ const (
 )
 
 var allColorModes = []ColorMode{
-	ColorNone,
+	ColorNever,
 	ColorAuto,
 	ColorAlways,
 }

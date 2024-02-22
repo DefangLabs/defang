@@ -17,7 +17,7 @@ This repo includes:
 
 ## Installing
 Install the Defang CLI from one of the following sources:
-* Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/defang-io/homebrew-defang): 
+* Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/defang-io/homebrew-defang):
   ```
   brew install defang-io/defang/defang
   ```
@@ -25,16 +25,16 @@ Install the Defang CLI from one of the following sources:
   ```
   . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)
   ```
-* Using [Go](https://go.dev): 
+* Using [Go](https://go.dev):
   ```
   go install github.com/defang-io/defang/src/cmd/cli@latest
   ```
 * Using the [Nix package manager](https://nixos.org):
-  * with Nix-Env: 
+  * with Nix-Env:
     ```
     nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz
     ```
-  * or with Flakes: 
+  * or with Flakes:
     ```
     nix profile install github:defang-io/defang#defang-bin --refresh
     ```
@@ -73,8 +73,11 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 ## Environment Variables
 The Defang CLI recognizes the following environment variables:
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
+* `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/k4e3g1l1/cd:beta`
+* `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
 * `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 * `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 * `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
+* `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, or `defang`
 * `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 * `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`

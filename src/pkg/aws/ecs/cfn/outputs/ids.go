@@ -1,9 +1,10 @@
 package outputs
 
 const (
-	TaskDefArn      = "taskDefArn"
-	ClusterArn      = "clusterArn"
-	LogGroupName    = "logGroupName"
-	SubnetID        = "subnetId"
+	BucketName      = "bucketName"
+	ClusterName     = "clusterName"
+	LogGroupARN     = "logGroupArn"
 	SecurityGroupID = "securityGroupId"
+	SubnetID        = "subnetId"
+	TaskDefArn      = "taskDefArn"
 )
