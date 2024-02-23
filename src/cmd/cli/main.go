@@ -77,10 +77,11 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
+		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		cluster, _ := cmd.Flags().GetString("cluster")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
-		client, tenantId = cli.Connect(cluster, *provider)
+		client, tenantId = cli.Connect(cluster, filePath, *provider)
 		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -98,8 +99,7 @@ var rootCmd = &cobra.Command{
 			if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 				return err
 			}
-
-			client, tenantId = cli.Connect(cluster, *provider) // reconnect with the new token
+			client, tenantId = cli.Connect(cluster, filePath, *provider) // reconnect with the new token
 			go client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil
@@ -752,6 +752,8 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
+	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
+	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
@@ -804,8 +806,6 @@ func main() {
 	rootCmd.AddCommand(restartCmd)
 
 	// Compose Command
-	composeCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
-	composeCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
 	// composeCmd.Flags().String("env-file", "", "Specify an alternate environment file."); TODO: Implement compose option
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
