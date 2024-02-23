@@ -679,7 +679,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	}, nil
 }
 
-// This functions was copied from Fabric controller and slightly modified to work with BYOC
+// This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceInfo, error) {
 	if err := b.quota.Validate(service); err != nil {
 		return nil, err
@@ -710,10 +710,10 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	}
 	if hasIngress {
 		si.LbIps = b.privateLbIps // only set LB IPs if there are ingress ports
-		si.PublicFqdn = b.getFqdn(fqn, true)
+		si.PublicFqdn = b.getPublicFqdn(fqn)
 	}
 	if hasHost {
-		si.PrivateFqdn = b.getFqdn(fqn, false)
+		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
 	var warning Warning
@@ -747,11 +747,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	return si, warning
 }
 
-func newQualifiedName(tenant string, name string) qualifiedName {
-	return qualifiedName(fmt.Sprintf("%s.%s", tenant, name))
-}
-
-// This functions was copied from Fabric controller and slightly modified to work with BYOC
+// This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) (*v1.Secret, error) {
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
@@ -772,7 +768,7 @@ func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secre
 
 type qualifiedName = string // legacy
 
-// This functions was copied from Fabric controller and slightly modified to work with BYOC
+// This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
@@ -785,20 +781,22 @@ func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	}
 }
 
-// This functions was copied from Fabric controller and slightly modified to work with BYOC
-func (b byocAws) getFqdn(fqn qualifiedName, public bool) string {
+// This function was copied from Fabric controller and slightly modified to work with BYOC
+func (b byocAws) getPublicFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafe(fqn)
-	if public {
-		if b.customDomain == "" {
-			return "" //b.fqdn
-		}
-		return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
-	} else {
-		return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
+	if b.customDomain == "" {
+		return "" //b.fqdn
 	}
+	return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
 }
 
-// This functions was copied from Fabric controller and slightly modified to work with BYOC
+// This function was copied from Fabric controller and slightly modified to work with BYOC
+func (b byocAws) getPrivateFqdn(fqn qualifiedName) string {
+	safeFqn := dnsSafe(fqn)
+	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
+}
+
+// This function was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafe(fqn qualifiedName) string {
 	return strings.ReplaceAll(strings.ToLower(string(fqn)), ".", "-")
 }
