@@ -264,6 +264,21 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 					},
 				},
 			},
+			{
+				PolicyName: "AllowAssumeRole",
+				PolicyDocument: map[string]any{
+					"Version": "2012-10-17",
+					"Statement": []map[string]any{
+						{
+							"Effect": "Allow",
+							"Action": []string{
+								"sts:AssumeRole",
+							},
+							"Resource": "*",
+						},
+					},
+				},
+			},
 		},
 	}
 
