@@ -21,15 +21,19 @@ services:
       retries: 10
     secrets:
       - HF_TOKEN
-  ui:
-    build:
-      context: ui
-      dockerfile: Dockerfile
-    ports:
-      - mode: ingress
-        target: 3000
-    healthcheck:
-      test: ["CMD", "curl", "http://localhost:3000"]
-      interval: 1m
-      timeout: 10s
-      retries: 10
+  # ui:
+  #   build:
+  #     context: ui
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - mode: ingress
+  #       target: 3000
+  #   healthcheck:
+  #     test: ["CMD", "curl", "http://localhost:3000"]
+  #     interval: 1m
+  #     timeout: 10s
+  #     retries: 10
+
+secrets:
+  HF_TOKEN:
+    external: true

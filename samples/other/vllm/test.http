@@ -1,4 +1,4 @@
-POST https://defang-beta-mistral--8000.prod1.defang.dev/v1/completions
+POST https://mistral.raphaeltm.defang.app/v1/completions
 Content-Type: application/json
 
 {
