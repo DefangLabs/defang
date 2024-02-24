@@ -424,6 +424,9 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 			}
 			fmt.Println("   -", endpoint)
 		}
+		if serviceInfo.Service.Domainname != "" && serviceInfo.ZoneId != "" {
+			fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
+		}
 	}
 }
 
