@@ -46,32 +46,32 @@ func TestLoadDockerCompose(t *testing.T) {
 	DoDebug = true
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/noprojname/compose.yaml", "tenant-id")
+		p, err := LoadDockerCompose("../../tests/noprojname/compose.yaml", "tenant-id")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadDockerCompose() failed: %v", err)
 		}
 		if p.Name != "tenant-id" {
-			t.Errorf("loadDockerCompose() failed: expected project name tenant-id, got %q", p.Name)
+			t.Errorf("LoadDockerCompose() failed: expected project name tenant-id, got %q", p.Name)
 		}
 	})
 
 	t.Run("use project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/testproj/compose.yaml", "tests")
+		p, err := LoadDockerCompose("../../tests/testproj/compose.yaml", "tests")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadDockerCompose() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadDockerCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/noprojname/compose.yaml", "Valid-Username")
+		p, err := LoadDockerCompose("../../tests/noprojname/compose.yaml", "Valid-Username")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadDockerCompose() failed: %v", err)
 		}
 		if p.Name != "valid-username" {
-			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadDockerCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 }
