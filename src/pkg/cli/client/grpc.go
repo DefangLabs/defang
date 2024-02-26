@@ -164,3 +164,24 @@ func (g *GrpcClient) CheckLogin(ctx context.Context) error {
 	_, err := g.WhoAmI(ctx)
 	return err
 }
+
+func (g *GrpcClient) Destroy(ctx context.Context) (string, error) {
+	// Get all the services and delete them all at once
+	services, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	var names []string
+	for _, service := range services.Services {
+		names = append(names, service.Service.Name)
+	}
+	resp, err := g.Delete(ctx, &v1.DeleteRequest{Names: names})
+	if err != nil {
+		return "", err
+	}
+	return resp.Etag, nil
+}
+
+func (g *GrpcClient) TearDown(ctx context.Context) error {
+	return errors.New("the teardown command is not valid for the Defang provider")
+}

@@ -103,6 +103,7 @@ func LoadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, 
 	} else if len(files) == 1 {
 		filePath = files[0]
 	}
+	// TODO: Docker compose searches parent folders for compose files #117
 	Debug(" - Loading compose file", filePath, "for project", tenantId)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger

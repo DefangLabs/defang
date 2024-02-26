@@ -527,10 +527,10 @@ var composeRestartCmd = &cobra.Command{
 
 var composeDownCmd = &cobra.Command{
 	Use:         "down",
-	Aliases:     []string{"stop", "rm"},
+	Aliases:     []string{"rm"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Reads a Compose file and deletes services from the cluster",
+	Short:       "Like 'stop' but also deprovisions the services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var detach, _ = cmd.Flags().GetBool("detach")
@@ -585,7 +585,7 @@ var deleteCmd = &cobra.Command{
 	Use:         "delete",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Aliases:     []string{"del", "rm", "remove"},
+	Aliases:     []string{"del", "rm", "remove", "stop"},
 	Short:       "Delete a service from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
@@ -686,20 +686,20 @@ var logoutCmd = &cobra.Command{
 }
 
 var bootstrapCmd = &cobra.Command{
-	Use:   "bootstrap",
-	Args:  cobra.NoArgs,
-	Short: "Manage a BYOC account",
+	Use:     "cd",
+	Aliases: []string{"bootstrap"},
+	Args:    cobra.NoArgs,
+	Short:   "Manually run a command with the CD task",
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
 	Use:         "destroy",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Destroy the bootstrapped CD resources",
+	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		go client.Track("Bootstrap-Destroy Invoked")
 
-		cli.Warn(` ! This will fail unless you "down" the stacks first!`)
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
 }
@@ -708,11 +708,10 @@ var bootstrapDownCmd = &cobra.Command{
 	Use:         "down",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Destroy the service stack",
+	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		go client.Track("Bootstrap-Down Invoked")
 
-		cli.Warn(` ! Destroying the cluster`)
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
 	},
 }
@@ -721,11 +720,24 @@ var bootstrapRefreshCmd = &cobra.Command{
 	Use:         "refresh",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Refresh the service resources",
+	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		go client.Track("Bootstrap-Refresh Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
+	},
+}
+
+var tearDownCmd = &cobra.Command{
+	Use:         "teardown",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Destroy the CD cluster",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		go client.Track("TearDown Invoked")
+
+		cli.Warn(` ! Destroying the CD cluster; this does not destroy the services!`)
+		return cli.TearDown(cmd.Context(), client)
 	},
 }
 
@@ -845,6 +857,9 @@ func main() {
 	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
 	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
 	rootCmd.AddCommand(tailCmd)
+
+	// TearDown Command
+	rootCmd.AddCommand(tearDownCmd)
 
 	// Delete Command
 	deleteCmd.Flags().StringP("name", "n", "", "Name of the service (required)")

@@ -11,6 +11,8 @@ const (
 	ColorAuto ColorMode = "auto"
 	// ColorAlways enables color output.
 	ColorAlways ColorMode = "always"
+	// ColorRaw disables color output and does not escape any characters.
+	// ColorRaw ColorMode = "raw"
 )
 
 var allColorModes = []ColorMode{

@@ -7,6 +7,7 @@ import (
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
+// Deprecated: Use ComposeStop instead.
 func Delete(ctx context.Context, client client.Client, names ...string) (string, error) {
 	Debug(" - Deleting service", names)
 

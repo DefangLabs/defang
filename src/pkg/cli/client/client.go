@@ -22,6 +22,7 @@ type Client interface {
 	CheckLogin(context.Context) error
 	CreateUploadURL(context.Context, *v1.UploadURLRequest) (*v1.UploadURLResponse, error)
 	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
+	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
 	DeleteSubdomainZone(context.Context) error
 	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
@@ -35,6 +36,7 @@ type Client interface {
 	PutSecret(context.Context, *v1.SecretValue) error
 	RevokeToken(context.Context) error
 	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
+	TearDown(context.Context) error
 	Token(context.Context, *v1.TokenRequest) (*v1.TokenResponse, error)
 	Track(string, ...Property) error
 	WhoAmI(context.Context) (*v1.WhoAmIResponse, error)
