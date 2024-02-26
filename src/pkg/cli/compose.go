@@ -95,7 +95,7 @@ func convertPlatform(platform string) v1.Platform {
 	}
 }
 
-func loadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, error) {
+func LoadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, error) {
 	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
 	if files, _ := filepath.Glob(filePath); len(files) > 1 {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/types"
 )
@@ -29,7 +30,7 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 	return tenant, cluster
 }
 
-func Connect(cluster string, composeFilePath string, provider client.Provider) (client.Client, types.TenantID) {
+func Connect(cluster string, project *composeTypes.Project, provider client.Provider) (client.Client, types.TenantID) {
 	tenantId, host := SplitTenantHost(cluster)
 
 	accessToken := GetExistingToken(cluster)
@@ -43,18 +44,15 @@ func Connect(cluster string, composeFilePath string, provider client.Provider) (
 
 	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
 	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
-		projectName := string(tenantId)
-		project, err := loadDockerCompose(composeFilePath, tenantId)
-		if err != nil {
-			Info(" * Failed to load Compose file: ", err, "; assuming default project: ", tenantId)
-		} else {
-			projectName = project.Name
-		}
 		Info(" * Using AWS provider")
 		if !awsInEnv {
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}
-		byocClient := client.NewByocAWS(string(tenantId), projectName, defangClient) // TODO: custom domain
+		projectName := tenantId.String()
+		if project != nil {
+			projectName = project.Name
+		}
+		byocClient := client.NewByocAWS(string(tenantId), projectName, defangClient)
 		return byocClient, tenantId
 	}
 

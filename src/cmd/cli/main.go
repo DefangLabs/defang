@@ -22,6 +22,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
@@ -36,6 +37,7 @@ import (
 
 var (
 	client         cliClient.Client
+	project        *composeTypes.Project
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = cli.IsTerminal && !pkg.GetenvBool("CI")
 	tenantId       = types.DEFAULT_TENANT
@@ -81,7 +83,14 @@ var rootCmd = &cobra.Command{
 		cluster, _ := cmd.Flags().GetString("cluster")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
-		client, tenantId = cli.Connect(cluster, filePath, *provider)
+
+		var err error
+		project, err = cli.LoadDockerCompose(filePath, tenantId)
+		if err != nil {
+			cli.Info(" * Failed to load Compose file: ", err, "; assuming default project: ", tenantId)
+		}
+
+		client, tenantId = cli.Connect(cluster, project, *provider)
 		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -99,7 +108,7 @@ var rootCmd = &cobra.Command{
 			if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 				return err
 			}
-			client, tenantId = cli.Connect(cluster, filePath, *provider) // reconnect with the new token
+			client, tenantId = cli.Connect(cluster, project, *provider) // reconnect with the new token
 			go client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil
@@ -443,7 +452,7 @@ var composeUpCmd = &cobra.Command{
 		go client.Track("Compose-Up Invoked", P{"file", filePath}, P{"force", force}, P{"detach", detach})
 
 		since := time.Now()
-		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, force)
 		if err != nil {
 			return err
 		}
@@ -482,7 +491,7 @@ var composeStartCmd = &cobra.Command{
 
 		go client.Track("Compose-Start Invoked", P{"file", filePath}, P{"force", force})
 
-		project, err := cli.ComposeStart(cmd.Context(), client, filePath, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, force)
 		if err != nil {
 			return err
 		}
@@ -508,7 +517,7 @@ var composeRestartCmd = &cobra.Command{
 
 		go client.Track("Compose-Restart Invoked", P{"file", filePath})
 
-		_, err := cli.ComposeRestart(cmd.Context(), client, filePath, tenantId)
+		_, err := cli.ComposeRestart(cmd.Context(), client, project, tenantId)
 		if err != nil {
 			return err
 		}
@@ -529,7 +538,7 @@ var composeDownCmd = &cobra.Command{
 		go client.Track("Compose-Down Invoked", P{"file", filePath}, P{"detach", detach})
 
 		since := time.Now()
-		etag, err := cli.ComposeDown(cmd.Context(), client, filePath, tenantId)
+		etag, err := cli.ComposeDown(cmd.Context(), client, project, tenantId)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -566,8 +575,8 @@ var composeConfigCmd = &cobra.Command{
 
 		go client.Track("Compose-Config Invoked", P{"file", file})
 
-		cli.DoDryRun = true                                                      // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, file, tenantId, false) // force=false to calculate the digest
+		cli.DoDryRun = true                                                         // config is like start in a dry run
+		_, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, false) // force=false to calculate the digest
 		return err
 	},
 }

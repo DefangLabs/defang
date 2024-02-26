@@ -18,12 +18,10 @@ import (
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, c client.Client, filePath string, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
-	project, err := loadDockerCompose(filePath, tenantId)
-	if err != nil {
-		return nil, &ComposeError{err}
+func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
+	if project == nil {
+		return nil, &ComposeError{errors.New("no project found")}
 	}
-
 	for _, svccfg := range project.Services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
