@@ -880,7 +880,7 @@ func main() {
 
 	// Delete Command
 	deleteCmd.Flags().StringP("name", "n", "", "Name of the service (required)")
-	deleteCmd.Flags().BoolP("tail", "f", false, "Tail the service logs after deleting")
+	deleteCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
 	deleteCmd.MarkFlagRequired("name")
 	rootCmd.AddCommand(deleteCmd)
 
