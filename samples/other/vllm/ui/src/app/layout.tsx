@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Defang + vLLM",
-  description: "Deploy vLLM models with Defang",
+  title: "Defang + Mistral + vLLM",
+  description: "Deploy Mistral with vLLM using Defang",
 };
 
 export default function RootLayout({
