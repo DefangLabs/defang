@@ -80,6 +80,10 @@ func TestGetServices(t *testing.T) {
 }
 
 func TestPutSecret(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	const secretName = "hello"
 	b := NewByocAWS("TestPutSecret", "", nil)
 
@@ -124,6 +128,10 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	b := NewByocAWS("TestListSecrets", "", nil)
 
 	t.Run("list", func(t *testing.T) {

@@ -326,9 +326,9 @@ func (b byocAws) Get(ctx context.Context, s *v1.ServiceID) (*v1.ServiceInfo, err
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
-func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
+func (b *byocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	env := map[string]string{
+	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_PREFIX":            defangPrefix,
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -340,10 +340,10 @@ func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskA
 		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
 		"STACK":                    b.pulumiStack,
 	}
-	// for k, v := range env {
-	// 	fmt.Printf("%s=%q ", k, v)
-	// }
-	// fmt.Println()
+}
+
+func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
+	env := b.environment()
 	return b.driver.Run(ctx, env, cmd...)
 }
 
@@ -801,10 +801,7 @@ func dnsSafe(fqn qualifiedName) string {
 	return strings.ReplaceAll(strings.ToLower(string(fqn)), ".", "-")
 }
 
-func (b *byocAws) Destroy(ctx context.Context) error {
-	if err := b.setUp(ctx); err != nil {
-		return err
-	}
+func (b *byocAws) TearDown(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
@@ -817,4 +814,8 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string,
 		return "", annotateAwsError(err)
 	}
 	return awsecs.GetTaskID(cdTaskArn), nil
+}
+
+func (b *byocAws) Destroy(ctx context.Context) (string, error) {
+	return b.BootstrapCommand(ctx, "down")
 }

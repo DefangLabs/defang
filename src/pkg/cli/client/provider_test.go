@@ -1,6 +1,7 @@
 package client
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -22,6 +23,12 @@ func TestProvider(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "valid provider Defang",
+			provider: "Defang",
+			want:     ProviderDefang,
+			wantErr:  false,
+		},
+		{
 			name:     "invalid provider",
 			provider: "invalid",
 			wantErr:  true,
@@ -38,6 +45,12 @@ func TestProvider(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "valid provider AWS",
+			provider: "AWS",
+			want:     ProviderAWS,
+			wantErr:  false,
+		},
+		{
 			name:     "valid provider auto",
 			provider: "auto",
 			want:     ProviderAuto,
@@ -50,7 +63,7 @@ func TestProvider(t *testing.T) {
 			if err := p.Set(tt.provider); (err != nil) != tt.wantErr {
 				t.Errorf("Provider.Set() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && p.String() != tt.provider {
+			if !tt.wantErr && p.String() != strings.ToLower(tt.provider) {
 				t.Errorf("Provider.String() = %v, want %v", p.String(), tt.provider)
 			}
 			if p != tt.want {
