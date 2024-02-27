@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -343,23 +342,8 @@ func (b *byocAws) environment() map[string]string {
 	}
 }
 
-func (b *byocAws) runCommand(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
-	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	command.Env = os.Environ()
-	for k, v := range b.environment() {
-		command.Env = append(command.Env, k+"="+v)
-	}
-	return nil, command.Start()
-}
-
 func (b *byocAws) runCdCommand(ctx context.Context, cmd ...string) (awsecs.TaskArn, error) {
 	env := b.environment()
-	// for k, v := range env {
-	// 	fmt.Printf("%s=%q ", k, v)
-	// }
-	// fmt.Println()
 	return b.driver.Run(ctx, env, cmd...)
 }
 
@@ -818,11 +802,7 @@ func dnsSafe(fqn qualifiedName) string {
 }
 
 func (b *byocAws) TearDown(ctx context.Context) error {
-	// if err := b.setUp(ctx); err != nil {
-	// 	return err
-	// }
 	return b.driver.TearDown(ctx)
-
 }
 
 func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
