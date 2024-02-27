@@ -826,11 +826,6 @@ func (b *byocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	if command == "teardown" {
-		// TODO: do "down" first?
-		return "", b.driver.TearDown(ctx)
-	}
-
 	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
@@ -839,4 +834,8 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string,
 		return "", annotateAwsError(err)
 	}
 	return awsecs.GetTaskID(cdTaskArn), nil
+}
+
+func (b *byocAws) Destroy(ctx context.Context) (string, error) {
+	return b.BootstrapCommand(ctx, "down")
 }

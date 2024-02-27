@@ -6,11 +6,10 @@ import (
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func ComposeRestart(ctx context.Context, client client.Client, project *composeTypes.Project, tenantId types.TenantID) ([]*v1.ServiceInfo, error) {
+func ComposeRestart(ctx context.Context, client client.Client, project *composeTypes.Project) ([]*v1.ServiceInfo, error) {
 	if project == nil {
 		return nil, &ComposeError{errors.New("no project found")}
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // Deprecated: Use ComposeStop instead.
-func Delete(ctx context.Context, client client.Client, names ...string) (string, error) {
+func Delete(ctx context.Context, client client.Client, names ...string) (client.ETag, error) {
 	Debug(" - Deleting service", names)
 
 	if DoDryRun {

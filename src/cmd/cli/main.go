@@ -79,7 +79,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		var filePath, _ = cmd.InheritedFlags().GetString("file")
+		filePath, _ := cmd.InheritedFlags().GetString("file")
 		cluster, _ := cmd.Flags().GetString("cluster")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
@@ -91,7 +91,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		client, tenantId = cli.Connect(cluster, project, *provider)
-		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive})
+		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive}, P{"file", filePath})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -452,7 +452,7 @@ var composeUpCmd = &cobra.Command{
 		go client.Track("Compose-Up Invoked", P{"file", filePath}, P{"force", force}, P{"detach", detach})
 
 		since := time.Now()
-		project, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
 		}
@@ -491,7 +491,7 @@ var composeStartCmd = &cobra.Command{
 
 		go client.Track("Compose-Start Invoked", P{"file", filePath}, P{"force", force})
 
-		project, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, force)
+		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
 		}
@@ -517,7 +517,25 @@ var composeRestartCmd = &cobra.Command{
 
 		go client.Track("Compose-Restart Invoked", P{"file", filePath})
 
-		_, err := cli.ComposeRestart(cmd.Context(), client, project, tenantId)
+		_, err := cli.ComposeRestart(cmd.Context(), client, project)
+		if err != nil {
+			return err
+		}
+		return nil
+	},
+}
+
+var composeStopCmd = &cobra.Command{
+	Use:         "stop",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and stops its services",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var filePath, _ = cmd.InheritedFlags().GetString("file")
+
+		go client.Track("Compose-Stop Invoked", P{"file", filePath})
+
+		_, err := cli.ComposeStop(cmd.Context(), client, project)
 		if err != nil {
 			return err
 		}
@@ -538,7 +556,7 @@ var composeDownCmd = &cobra.Command{
 		go client.Track("Compose-Down Invoked", P{"file", filePath}, P{"detach", detach})
 
 		since := time.Now()
-		etag, err := cli.ComposeDown(cmd.Context(), client, project, tenantId)
+		etag, err := cli.ComposeDown(cmd.Context(), client)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -575,8 +593,8 @@ var composeConfigCmd = &cobra.Command{
 
 		go client.Track("Compose-Config Invoked", P{"file", file})
 
-		cli.DoDryRun = true                                                         // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, project, tenantId, false) // force=false to calculate the digest
+		cli.DoDryRun = true                                               // config is like start in a dry run
+		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
 		return err
 	},
 }
@@ -850,6 +868,7 @@ func main() {
 	composeCmd.AddCommand(composeStartCmd)
 	rootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
+	composeCmd.AddCommand(composeStopCmd)
 
 	// Tail Command
 	tailCmd.Flags().StringP("name", "n", "", "Name of the service")
