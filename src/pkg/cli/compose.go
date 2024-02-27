@@ -104,26 +104,20 @@ func LoadDockerCompose(filePath string, tenantId pkg.TenantID) (*types.Project, 
 		filePath = files[0]
 	}
 	// TODO: Docker compose searches parent folders for compose files #117
-	Debug(" - Loading compose file", filePath, "for project", tenantId)
+	Debug(" - Loading compose file", filePath, "for tenant", tenantId)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
 
-	projectName := "default"
-	if tenantId == "" {
-		logrus.Warnf("not logged in; using project name %q", projectName)
-		HadWarnings = true
-	} else {
-		projectName = strings.ToLower(string(tenantId)) // normalize to lowercase
-	}
+	defaultProjectName := strings.ToLower(string(tenantId)) // normalize to lowercase
 
 	project, err := loader.Load(types.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}, loader.WithDiscardEnvFiles, func(o *loader.Options) {
-		o.SetProjectName(projectName, false) // don't overwrite the declared project name in the compose file
-		o.SkipConsistencyCheck = true        // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		o.SetProjectName(defaultProjectName, false) // don't overwrite the declared project name in the compose file
+		o.SkipConsistencyCheck = true               // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	})
 	if err != nil {
 		return nil, err

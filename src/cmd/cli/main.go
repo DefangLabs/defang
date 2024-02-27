@@ -87,7 +87,7 @@ var rootCmd = &cobra.Command{
 		var err error
 		project, err = cli.LoadDockerCompose(filePath, tenantId)
 		if err != nil {
-			cli.Info(" * Failed to load Compose file: ", err, "; assuming default project: ", tenantId)
+			cli.Debug(" -", err)
 		}
 
 		client, tenantId = cli.Connect(cluster, project, *provider)

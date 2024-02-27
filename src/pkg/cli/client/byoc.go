@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	r53Types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
@@ -28,9 +29,8 @@ import (
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/logs"
 	"github.com/defang-io/defang/src/pkg/quota"
+	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-
-	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -90,7 +90,7 @@ func (w Warnings) Error() string {
 
 var _ Client = (*byocAws)(nil)
 
-func NewByocAWS(tenantId, project string, defClient *GrpcClient) *byocAws {
+func NewByocAWS(tenantId types.TenantID, project string, defClient *GrpcClient) *byocAws {
 	return &byocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]awsecs.TaskArn),
@@ -108,7 +108,7 @@ func NewByocAWS(tenantId, project string, defClient *GrpcClient) *byocAws {
 			Services:   40,
 			ShmSizeMiB: 30720,
 		},
-		tenantID: tenantId,
+		tenantID: string(tenantId),
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
@@ -272,7 +272,7 @@ func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 
 	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, types.RRTypeNs, r53Client)
+	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, r53Types.RRTypeNs, r53Client)
 	if err != nil {
 		return "", annotateAwsError(err)
 	}
