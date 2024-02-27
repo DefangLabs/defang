@@ -712,7 +712,7 @@ var bootstrapCmd = &cobra.Command{
 
 var bootstrapDestroyCmd = &cobra.Command{
 	Use:         "destroy",
-	Annotations: authNeededAnnotation,
+	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -724,7 +724,7 @@ var bootstrapDestroyCmd = &cobra.Command{
 
 var bootstrapDownCmd = &cobra.Command{
 	Use:         "down",
-	Annotations: authNeededAnnotation,
+	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -736,7 +736,7 @@ var bootstrapDownCmd = &cobra.Command{
 
 var bootstrapRefreshCmd = &cobra.Command{
 	Use:         "refresh",
-	Annotations: authNeededAnnotation,
+	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -746,15 +746,15 @@ var bootstrapRefreshCmd = &cobra.Command{
 	},
 }
 
-var tearDownCmd = &cobra.Command{
+var bootstrapTearDownCmd = &cobra.Command{
 	Use:         "teardown",
-	Annotations: authNeededAnnotation,
+	Annotations: autoConnectAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "Destroy the CD cluster",
+	Short:       "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		go client.Track("TearDown Invoked")
 
-		cli.Warn(` ! Destroying the CD cluster; this does not destroy the services!`)
+		cli.Warn(` ! Deleting the CD cluster; this does not delete the services!`)
 		return cli.TearDown(cmd.Context(), client)
 	},
 }
@@ -802,6 +802,7 @@ func main() {
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
+	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
@@ -876,9 +877,6 @@ func main() {
 	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
 	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
 	rootCmd.AddCommand(tailCmd)
-
-	// TearDown Command
-	rootCmd.AddCommand(tearDownCmd)
 
 	// Delete Command
 	deleteCmd.Flags().StringP("name", "n", "", "Name of the service (required)")
