@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Provider string
@@ -27,6 +28,7 @@ func (p Provider) String() string {
 }
 
 func (p *Provider) Set(str string) error {
+	str = strings.ToLower(str)
 	for _, provider := range allProviders {
 		if provider.String() == str {
 			*p = provider

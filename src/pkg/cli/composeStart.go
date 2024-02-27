@@ -12,13 +12,12 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/sirupsen/logrus"
 )
 
 // ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, tenantId types.TenantID, force bool) (*v1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*v1.DeployResponse, error) {
 	if project == nil {
 		return nil, &ComposeError{errors.New("no project found")}
 	}
