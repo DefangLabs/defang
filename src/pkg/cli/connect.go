@@ -49,10 +49,12 @@ func Connect(cluster string, project *composeTypes.Project, provider client.Prov
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}
 		projectName := tenantId.String()
-		if project != nil {
+		if project == nil {
+			Warn(" ! Failed to load Compose file; assuming project:", projectName)
+		} else {
 			projectName = project.Name
 		}
-		byocClient := client.NewByocAWS(string(tenantId), projectName, defangClient)
+		byocClient := client.NewByocAWS(tenantId, projectName, defangClient)
 		return byocClient, tenantId
 	}
 
