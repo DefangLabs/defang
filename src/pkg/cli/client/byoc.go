@@ -42,7 +42,7 @@ const (
 
 var (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/k4e3g1l1/cd:beta") // TODO: change to defang-io/cd
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:beta") // TODO: change to defang-io/cd
 )
 
 type byocAws struct {
@@ -126,10 +126,11 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	if b.customDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
-			return err
+			// return err; FIXME: ignore this error for now
+		} else {
+			b.customDomain = strings.ToLower(domain.Zone) // HACK: this should be DnsSafe
+			b.shouldDelegateSubdomain = true
 		}
-		b.customDomain = strings.ToLower(domain.Zone) // HACK: this should be DnsSafe
-		b.shouldDelegateSubdomain = true
 	}
 
 	b.setupDone = true
