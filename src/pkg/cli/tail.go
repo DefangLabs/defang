@@ -268,5 +268,14 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 }
 
 func isProgressDot(line string) bool {
-	return len(line) <= 1 || len(pkg.StripAnsi(line)) <= 1
+	if len(line) <= 1 {
+		return true
+	}
+	stripped := pkg.StripAnsi(line)
+	for _, r := range stripped {
+		if r != '.' {
+			return false
+		}
+	}
+	return true
 }
