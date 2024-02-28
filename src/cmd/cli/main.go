@@ -759,6 +759,31 @@ var bootstrapTearDownCmd = &cobra.Command{
 	},
 }
 
+var bootstrapListCmd = &cobra.Command{
+	Use:         "ls",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"list"},
+	Short:       "List all the projects and stacks in the CD cluster",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		go client.Track("Bootstrap-List Invoked")
+
+		return cli.BootstrapCommand(cmd.Context(), client, "list")
+	},
+}
+
+var bootstrapCancelCmd = &cobra.Command{
+	Use:         "cancel",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Cancel the current CD operation",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		go client.Track("Bootstrap-Cancel Invoked")
+
+		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
+	},
+}
+
 var tosCmd = &cobra.Command{
 	Use:         "terms",
 	Aliases:     []string{"tos", "eula", "tac", "tou"},
@@ -803,6 +828,8 @@ func main() {
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
 	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
+	bootstrapCmd.AddCommand(bootstrapListCmd)
+	bootstrapCmd.AddCommand(bootstrapCancelCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
