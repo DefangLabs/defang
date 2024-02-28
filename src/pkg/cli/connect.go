@@ -15,6 +15,18 @@ import (
 
 const DefaultCluster = "fabric-prod1.defang.dev"
 
+// Deprecated: should use grpc to get the tenant ID
+func GetTenantID(cluster string) types.TenantID {
+	tenantId, _ := SplitTenantHost(cluster)
+
+	// HACK: don't rely on info in token
+	accessToken := GetExistingToken(cluster)
+	if accessToken != "" {
+		tenantId, _, _ = tenantFromAccessToken(accessToken)
+	}
+	return tenantId
+}
+
 func SplitTenantHost(cluster string) (types.TenantID, string) {
 	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
@@ -33,6 +45,7 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 func Connect(cluster string, project *composeTypes.Project, provider client.Provider) (client.Client, types.TenantID) {
 	tenantId, host := SplitTenantHost(cluster)
 
+	// HACK: don't rely on info in token
 	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
 		tenantId, _, _ = tenantFromAccessToken(accessToken)

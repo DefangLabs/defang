@@ -85,9 +85,9 @@ var rootCmd = &cobra.Command{
 		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
 
 		var err error
-		project, err = cli.LoadDockerCompose(filePath, tenantId)
+		project, err = cli.LoadDockerCompose(filePath, cli.GetTenantID(cluster))
 		if err != nil {
-			cli.Debug(" -", err)
+			cli.Debug(" - Could not load docker compose file: ", err)
 		}
 
 		client, tenantId = cli.Connect(cluster, project, *provider)
