@@ -29,9 +29,9 @@ This guide demonstrates how to deploy Mistral using VLM. You'll need a Hugging F
 
    > **OpenAI SDK:** We use the OpenAI sdk, but set the `baseURL` to our Mistral endpoint.
 
-   > **Note:** The API route does not use a system prompt, as vLLM currently does not support this feature. To get around this we inject a couple messages at the front of the conversation providing the context (see the `ui/src/app/api/chat/route.ts` file). Other than that, the integration with the OpenAI SDK should be structured as expected.
+   > **Note:** The API route does not use a system prompt, as the Mistral model we're deploying currently does not support this feature. To get around this we inject a couple messages at the front of the conversation providing the context (see the `ui/src/app/api/chat/route.ts` file). Other than that, the integration with the OpenAI SDK should be structured as expected.
 
-   > **Changing the content:** The context for the bot is set in the `ui/src/app/api/chat/route.ts` file. You can edit the text in there to change the behaviour of the bot. You'll notice that it also pulls from `ui/src/app/docs.md` to provide content for the bot to use. You can edit this file to change the content it responds with.
+   > **Changing the content:** The content for the bot is set in the `ui/src/app/api/chat/route.ts` file. You can edit the prompt in there to change the behaviour. You'll notice that it also pulls from `ui/src/app/docs.md` to provide content for the bot to use. You can edit this file to change its "knowledge".
 
 ## Configuration
 
