@@ -2,22 +2,29 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
 	"github.com/docker/docker/api/types"
+
+	pkgtypes "github.com/defang-io/defang/src/pkg/types"
 )
 
-func (d *Docker) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
-	rc, err := d.ImagePull(ctx, image, types.ImagePullOptions{Platform: platform})
+func (d *Docker) SetUp(ctx context.Context, tasks []pkgtypes.Task) error {
+	if len(tasks) != 1 {
+		return errors.New("only one task is supported with docker driver")
+	}
+	task := tasks[0]
+	rc, err := d.ImagePull(ctx, task.Image, types.ImagePullOptions{Platform: task.Platform})
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 	_, err = io.Copy(contextAwareWriter{ctx, os.Stderr}, rc) // FIXME: this outputs JSON to stderr
-	d.image = image
-	d.memory = memory
-	d.platform = platform
+	d.image = task.Image
+	d.memory = task.Memory
+	d.platform = task.Platform
 	return err
 }
 

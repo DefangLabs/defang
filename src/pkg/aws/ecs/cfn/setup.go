@@ -15,6 +15,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 type AwsEcs struct {
@@ -35,7 +36,6 @@ func New(stack string, region region.Region) *AwsEcs {
 		AwsEcs: ecs.AwsEcs{
 			Aws:  common.Aws{Region: region},
 			Spot: true,
-			VCpu: 1.0,
 		},
 	}
 }
@@ -118,9 +118,8 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	return a.fillWithOutputs(ctx, dso)
 }
 
-func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
-	arch := ecs.PlatformToArch(platform)
-	template, err := createTemplate(a.stackName, image, float64(memory)/1024/1024, a.VCpu, a.Spot, arch).YAML()
+func (a *AwsEcs) SetUp(ctx context.Context, tasks []types.Task) error {
+	template, err := createTemplate(a.stackName, tasks, a.Spot).YAML()
 	if err != nil {
 		return err
 	}
