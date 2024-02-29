@@ -29,9 +29,9 @@ services:
       - mode: ingress
         target: 3000
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:3000"]
-      interval: 1m
-      timeout: 10s
+      test: ["CMD", "wget", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 2s
       retries: 10
     environment:
       - OPENAI_BASE_URL=http://mistral:8000/v1/
