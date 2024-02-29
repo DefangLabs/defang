@@ -60,6 +60,9 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		Tags: defaultTags,
 		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
 		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
+		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
+			Status: "Enabled",
+		},
 	}
 
 	// 2. ECS cluster
