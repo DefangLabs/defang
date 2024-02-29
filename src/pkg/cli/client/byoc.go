@@ -43,7 +43,7 @@ const (
 
 var (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:beta")
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
 )
 
 type byocAws struct {
