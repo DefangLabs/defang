@@ -26,12 +26,12 @@ type Client interface {
 	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
-	DeleteSubdomainZone(context.Context) error
+	DeleteSubdomainZone(context.Context, *v1.GetDelegateSubdomainZoneRequest) error
 	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
 	Destroy(context.Context) (ETag, error)
 	GenerateFiles(context.Context, *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error)
 	Get(context.Context, *v1.ServiceID) (*v1.ServiceInfo, error)
-	GetDelegateSubdomainZone(context.Context) (*v1.DelegateSubdomainZoneResponse, error)
+	GetDelegateSubdomainZone(context.Context, *v1.GetDelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
 	GetServices(context.Context) (*v1.ListServicesResponse, error)
 	GetVersion(context.Context) (*v1.Version, error)
 	ListSecrets(context.Context) (*v1.Secrets, error)

@@ -47,8 +47,8 @@ service FabricController {
   // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
-  rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse){
+  rpc DeleteSubdomainZone(GetDelegateSubdomainZoneRequest) returns (google.protobuf.Empty);
+  rpc GetDelegateSubdomainZone(GetDelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse){
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse){
@@ -321,8 +321,13 @@ message SubscribeResponse {
   repeated ServiceInfo services = 1;
 }
 
+message GetDelegateSubdomainZoneRequest {
+  string project = 1;
+}
+
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
+  string project = 2;
 }
 
 message DelegateSubdomainZoneResponse {

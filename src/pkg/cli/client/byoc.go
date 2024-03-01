@@ -154,7 +154,7 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	}
 
 	if b.customDomain == "" {
-		domain, err := b.GetDelegateSubdomainZone(ctx)
+		domain, err := b.GetDelegateSubdomainZone(ctx, &v1.GetDelegateSubdomainZoneRequest{Project: b.pulumiProject})
 		if err != nil {
 			// return err; FIXME: ignore this error for now
 		} else {
@@ -310,7 +310,7 @@ func (b byocAws) delegateSubdomain(ctx context.Context) (string, error) {
 		return "", errors.New("no NS records found for the subdomain zone")
 	}
 
-	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+	req := &v1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers, Project: b.pulumiProject}
 	resp, err := b.DelegateSubdomainZone(ctx, req)
 	if err != nil {
 		return "", err
