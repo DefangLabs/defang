@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 
 func Token(ctx context.Context, client client.Client, clientId string, tenant types.TenantID, dur time.Duration, scope scope.Scope) error {
 	if DoDryRun {
-		return errors.New("dry-run")
+		return ErrDryRun
 	}
 
 	code, err := github.StartAuthCodeFlow(ctx, clientId)
