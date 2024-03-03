@@ -801,6 +801,8 @@ var tosCmd = &cobra.Command{
 				return err
 			}
 			cli.Info(" * You have agreed to the Defang terms of service")
+		} else {
+			printDefangHint("To agree to the terms of service, do:", "terms --agree-tos")
 		}
 		return nil
 	},
@@ -971,7 +973,7 @@ func main() {
 			}
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
-			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree-tos")
+			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
 		os.Exit(int(code))
