@@ -248,7 +248,7 @@ func uploadTarball(ctx context.Context, client client.Client, body io.Reader, di
 	}
 
 	if DoDryRun {
-		return "", errors.New("dry run")
+		return "", ErrDryRun
 	}
 
 	// Do an HTTP PUT to the generated URL
