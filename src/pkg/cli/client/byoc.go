@@ -219,7 +219,7 @@ func (b *byocAws) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.Deploy
 	}, warnings
 }
 
-func (b byocAws) FindZone(ctx context.Context, domain, role string) (string, error) {
+func (b byocAws) findZone(ctx context.Context, domain, role string) (string, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -555,22 +555,24 @@ func (bs *byocServerStream) Receive() bool {
 		parseFirelensRecords := false
 		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 		event := events[0]
-		if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
-			// These events are from the CD task; detect stdout/stderr
-			bs.response.Etag = bs.etag // FIXME: this would show all deployments, not just the one we're interested in
-			bs.response.Host = "pulumi"
-			bs.response.Service = "cd"
-		} else if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-			// These events are from a awslogs service task: tenant/service_etag/taskID
-			bs.response.Host = parts[2] // TODO: figure out hostname/IP
-			parts = strings.Split(parts[1], "_")
-			if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
-				// ignore sidecar logs (like route53-sidecar or fluentbit)
-				return true
+		if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
+			if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
+				// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
+				bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
+				bs.response.Host = "pulumi"
+				bs.response.Service = "cd"
+			} else {
+				// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
+				bs.response.Host = parts[2] // TODO: figure out actual hostname/IP
+				parts = strings.Split(parts[1], "_")
+				if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
+					// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
+					return true
+				}
+				service, etag := parts[0], parts[1]
+				bs.response.Etag = etag
+				bs.response.Service = service
 			}
-			service, etag := parts[0], parts[1]
-			bs.response.Etag = etag
-			bs.response.Service = service
 		} else if strings.Contains(*event.LogStreamName, "-firelens-") {
 			// These events are from the Firelens sidecar; try to parse the JSON
 			if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
@@ -635,19 +637,24 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var cdTaskArn awsecs.TaskArn
+	var taskArn awsecs.TaskArn
 	var eventStream awsecs.EventStream
 	if etag != "" && !pkg.IsValidRandomID(etag) {
-		// Assume "etag" is the CD task ID
+		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
-		cdTaskArn, _ = b.driver.GetTaskArn(etag)
+		taskArn, _ = b.driver.GetTaskArn(etag)
 		etag = "" // no need to filter by etag
 	} else {
 		// Tail CD, kaniko, and all services
-		kanikoLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stackDir("kaniko"))     // must match logic in ecs/common.ts
-		servicesLogGroup := b.driver.MakeARN("logs", "log-group:"+b.stackDir("logGroup")) // must match logic in ecs/common.ts
-		eventStream, err = awsecs.TailLogGroups(ctx, b.driver.LogGroupARN, kanikoLogGroup, servicesLogGroup)
-		cdTaskArn = b.cdTasks[etag]
+		kanikoTail := awsecs.LogGroupInput{LogGroup: b.driver.MakeARN("logs", "log-group:"+b.stackDir("kaniko"))}     // must match logic in ecs/common.ts
+		servicesTail := awsecs.LogGroupInput{LogGroup: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logGroup"))} // must match logic in ecs/common.ts
+		cdTail := awsecs.LogGroupInput{LogGroup: b.driver.LogGroupARN}
+		taskArn = b.cdTasks[etag]
+		if taskArn != nil {
+			// Only tail the logstreams for the CD task
+			cdTail.LogStreamNames = []string{awsecs.GetLogStreamForTaskID(awsecs.GetTaskID(taskArn))}
+		}
+		eventStream, err = awsecs.TailLogGroups(ctx, cdTail, kanikoTail, servicesTail)
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
@@ -664,10 +671,10 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 
 	taskch := make(chan error)
 	var cancel func()
-	if cdTaskArn != nil {
+	if taskArn != nil {
 		ctx, cancel = context.WithCancel(ctx)
 		go func() {
-			taskch <- awsecs.WaitForTask(ctx, cdTaskArn, 3*time.Second)
+			taskch <- awsecs.WaitForTask(ctx, taskArn, 3*time.Second)
 		}()
 	}
 	return &byocServerStream{
@@ -687,7 +694,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 	}
 
 	// Check to make sure all required secrets are present in the secrets store
-	missing, err := b.checkForMissingSecrets(ctx, service.Secrets, b.tenantID)
+	missing, err := b.checkForMissingSecrets(ctx, service.Secrets)
 	if err != nil {
 		return nil, err
 	}
@@ -728,7 +735,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 			warning = WarningError(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
 		}
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			zoneId, err := b.FindZone(ctx, service.Domainname, service.DnsRole)
+			zoneId, err := b.findZone(ctx, service.Domainname, service.DnsRole)
 			if err != nil {
 				return nil, err
 			}
@@ -749,7 +756,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret, tenantId string) (*v1.Secret, error) {
+func (b byocAws) checkForMissingSecrets(ctx context.Context, secrets []*v1.Secret) (*v1.Secret, error) {
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
