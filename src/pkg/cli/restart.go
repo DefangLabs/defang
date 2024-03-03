@@ -9,9 +9,6 @@ import (
 
 func Restart(ctx context.Context, client client.Client, names ...string) ([]*v1.ServiceInfo, error) {
 	Debug(" - Restarting service", names)
-	if DoDryRun {
-		return nil, nil
-	}
 
 	// For now, we'll just get the service info and pass it to deploy as-is.
 	services := make([]*v1.Service, 0, len(names))
@@ -22,6 +19,10 @@ func Restart(ctx context.Context, client client.Client, names ...string) ([]*v1.
 			continue
 		}
 		services = append(services, serviceInfo.Service)
+	}
+
+	if DoDryRun {
+		return nil, ErrDryRun
 	}
 
 	resp, err := client.Deploy(ctx, &v1.DeployRequest{Services: services})
