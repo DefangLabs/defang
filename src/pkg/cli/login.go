@@ -7,21 +7,16 @@ import (
 	"os"
 	"path"
 
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-)
-
-var (
-	tokenDir = path.Join(pkg.Getenv("XDG_STATE_HOME", path.Join(os.Getenv("HOME"), ".local/state")), "defang")
 )
 
 func getTokenFile(fabric string) string {
 	if host, _, _ := net.SplitHostPort(fabric); host != "" {
 		fabric = host
 	}
-	return path.Join(tokenDir, fabric)
+	return path.Join(client.StateDir, fabric)
 }
 
 func GetExistingToken(fabric string) string {
@@ -55,7 +50,7 @@ func LoginWithGitHub(ctx context.Context, client client.Client, gitHubClientId, 
 func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
 	Debug(" - Saving access token to", tokenFile)
-	os.MkdirAll(tokenDir, 0700)
+	os.MkdirAll(client.StateDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
 		return err
 	}
