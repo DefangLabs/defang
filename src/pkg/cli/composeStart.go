@@ -175,8 +175,10 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			}
 			if s, ok := project.Secrets[secret.Source]; !ok {
 				logrus.Warnf("secret %q is not defined in the top-level secrets section", secret.Source)
+			} else if s.Name != "" && s.Name != secret.Source {
+				return nil, &ComposeError{fmt.Errorf("unsupported secret %q: cannot override name %q", secret.Source, s.Name)} // TODO: support custom secret names
 			} else if !s.External {
-				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source)
+				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source) // TODO: support secrets from environment/file
 			}
 		}
 		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {

@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+    secrets:
+      - dummy
+secrets:
+  dummy:
+    external: true
+    name: dummyx
