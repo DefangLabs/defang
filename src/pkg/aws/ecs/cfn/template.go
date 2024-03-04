@@ -307,7 +307,7 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		if platform == "" {
 			platform = task.Platform
 		} else if platform != task.Platform {
-			panic("all tasks must have the same platform")
+			panic("all containers must have the same platform")
 		}
 	}
 	mCpu, mib := awsecs.FixupFargateConfig(totalCpu, totalMiB)
