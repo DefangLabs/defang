@@ -15,14 +15,14 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 		return err
 	}
 
-	tasks := []types.Task{
+	containers := []types.Container{
 		{
 			Image:    image,
 			Memory:   memory,
 			Platform: platform,
 		},
 	}
-	if err := driver.SetUp(ctx, tasks); err != nil {
+	if err := driver.SetUp(ctx, containers); err != nil {
 		return err
 	}
 

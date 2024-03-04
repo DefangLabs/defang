@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53Types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/aws"
@@ -43,7 +42,7 @@ const (
 
 var (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:beta")
 )
 
 type byocAws struct {
@@ -119,37 +118,14 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
-	cdTaskName := cdTaskPrefix
-	tasks := []types.Task{
-		{
-			Image:     "pulumi/pulumi:latest",
-			Name:      awsecs.ContainerName,
-			Memory:    4 * 512_000_000, // 512 MiB
-			Essential: ptr.Bool(true),
-			VolumesFrom: []string{
-				cdTaskName,
-			},
-			EntryPoint: []string{"node", "lib/index.js"},
-		},
-		{
-			Image:     cdImage,
-			Name:      cdTaskName,
-			Essential: ptr.Bool(false),
-			Volumes: []types.TaskVolume{
-				{
-					Source:   "pulumi-plugins",
-					Target:   "/root/.pulumi/plugins",
-					ReadOnly: true,
-				},
-				{
-					Source:   "cd",
-					Target:   "/app",
-					ReadOnly: true,
-				},
-			},
-		},
-	}
-	if err := b.driver.SetUp(ctx, tasks); err != nil {
+	// TODO: can we stick to the vanilla pulumi-nodejs image?
+	containers := []types.Container{{
+		Image:    cdImage,
+		Name:     awsecs.ContainerName,
+		Memory:   512_000_000, // 512 MB
+		Platform: "linux/amd64",
+	}}
+	if err := b.driver.SetUp(ctx, containers); err != nil {
 		return annotateAwsError(err)
 	}
 
