@@ -11,7 +11,7 @@ func SecretsDelete(ctx context.Context, client client.Client, name string) error
 	Debug(" - Deleting secret", name)
 
 	if DoDryRun {
-		return nil
+		return ErrDryRun
 	}
 
 	// FIXME: create dedicated DeleteSecret method in client proto

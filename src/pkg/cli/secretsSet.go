@@ -16,7 +16,7 @@ func SecretsSet(ctx context.Context, client client.Client, name string, value st
 	}
 
 	if DoDryRun {
-		return nil
+		return ErrDryRun
 	}
 
 	err := client.PutSecret(ctx, &v1.SecretValue{Name: name, Value: value})

@@ -12,7 +12,7 @@ func Delete(ctx context.Context, client client.Client, names ...string) (client.
 	Debug(" - Deleting service", names)
 
 	if DoDryRun {
-		return "", nil
+		return "", ErrDryRun
 	}
 
 	resp, err := client.Delete(ctx, &v1.DeleteRequest{Names: names})

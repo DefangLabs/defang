@@ -406,7 +406,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		for _, service := range services {
 			PrintObject(service.Name, service)
 		}
-		return nil, nil
+		return nil, ErrDryRun
 	}
 
 	for _, service := range services {
