@@ -15,6 +15,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 type AwsEcs struct {
@@ -206,9 +207,9 @@ func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
-func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (string, error) {
+func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (*types.TaskInfo, error) {
 	if err := a.fillOutputs(ctx); err != nil {
-		return "", err
+		return nil, err
 	}
 	return a.AwsEcs.Info(ctx, taskArn)
 }

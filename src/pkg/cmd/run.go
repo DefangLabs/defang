@@ -31,8 +31,8 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 			time.Sleep(time.Second)
 			continue
 		}
-		if info != "" {
-			fmt.Println(info)
+		if info != nil {
+			fmt.Println("IP:", info.IP)
 		}
 		break
 	}
