@@ -147,7 +147,7 @@ You can find the latest version of the Defang CLI on the [releases page](https:/
 
 - MacOS users will need to allow the binary to run due to security settings:
     1. Attempt to run the binary. You'll see a security prompt preventing you from running it.
-    2. Go to System Preferences > Privacy & Security > General.
+    2. Go to System Preferences > Privacy & Security > Security.
     3. In the 'Allow applications downloaded from:' section, you should see a message about Defang being blocked. Click 'Open Anyway'.
     4. Alternatively, select the option "App Store and identified developers" to allow all applications from the App Store and identified developers to run.
     
