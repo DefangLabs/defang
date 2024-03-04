@@ -55,7 +55,7 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
-	lgi := LogGroupInput{LogGroup: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForTaskID(taskID)}}
+	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForTaskID(taskID)}}
 	for {
 		stream, err := TailLogGroup(ctx, lgi)
 		if err != nil {

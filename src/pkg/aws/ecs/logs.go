@@ -134,7 +134,7 @@ func TailLogGroups(ctx context.Context, logGroups ...LogGroupInput) (EventStream
 
 // LogGroupInput is like cloudwatchlogs.StartLiveTailInput but with only one loggroup and one logstream prefix.
 type LogGroupInput struct {
-	LogGroup              string
+	LogGroupARN           string
 	LogStreamNames        []string
 	LogStreamNamePrefix   string
 	LogEventFilterPattern string
@@ -150,7 +150,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error)
 		prefixes = []string{input.LogStreamNamePrefix}
 	}
 	return startTail(ctx, &cloudwatchlogs.StartLiveTailInput{
-		LogGroupIdentifiers:   []string{getLogGroupIdentifier(input.LogGroup)},
+		LogGroupIdentifiers:   []string{getLogGroupIdentifier(input.LogGroupARN)},
 		LogStreamNames:        input.LogStreamNames,
 		LogStreamNamePrefixes: prefixes,
 		LogEventFilterPattern: pattern,
@@ -158,13 +158,13 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error)
 }
 
 func Query(ctx context.Context, lgi LogGroupInput, start time.Time, end time.Time) ([]LogEvent, error) {
-	region := region.FromArn(lgi.LogGroup) // FIXME: ensure it's a log group ARN
+	region := region.FromArn(lgi.LogGroupARN)
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, err
 	}
 
-	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroup)
+	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	var prefix *string
 	if lgi.LogStreamNamePrefix != "" {
 		prefix = &lgi.LogStreamNamePrefix
