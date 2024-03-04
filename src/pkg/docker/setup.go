@@ -11,7 +11,7 @@ import (
 	pkgtypes "github.com/defang-io/defang/src/pkg/types"
 )
 
-func (d *Docker) SetUp(ctx context.Context, tasks []pkgtypes.Task) error {
+func (d *Docker) SetUp(ctx context.Context, tasks []pkgtypes.Container) error {
 	if len(tasks) != 1 {
 		return errors.New("only one task is supported with docker driver")
 	}
