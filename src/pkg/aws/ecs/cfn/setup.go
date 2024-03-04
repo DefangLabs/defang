@@ -82,7 +82,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, o)
+	return a.fillWithOutputs(o)
 }
 
 // create1s is a functional option for cloudformation.StackCreateCompleteWaiter that sets the MinDelay to 1
@@ -117,7 +117,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, dso)
+	return a.fillWithOutputs(dso)
 }
 
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
@@ -153,10 +153,10 @@ func (a *AwsEcs) fillOutputs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, dso)
+	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) fillWithOutputs(ctx context.Context, dso *cloudformation.DescribeStacksOutput) error {
+func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
