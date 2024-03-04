@@ -10,8 +10,27 @@ const (
 
 type TaskID *string
 
+type Container struct {
+	Image       string
+	Name        string
+	Cpus        float32
+	Memory      uint64
+	Platform    string
+	Essential   *bool
+	Volumes     []TaskVolume
+	VolumesFrom []string // container (default rw), container:rw, or container:ro
+	EntryPoint  []string
+	Command     []string // overridden by Run()
+}
+
+type TaskVolume struct {
+	Source   string
+	Target   string
+	ReadOnly bool
+}
+
 type Driver interface {
-	SetUp(ctx context.Context, image string, memory uint64, platform string) error
+	SetUp(ctx context.Context, containers []Container) error
 	TearDown(ctx context.Context) error
 	Run(ctx context.Context, env map[string]string, args ...string) (TaskID, error)
 	Tail(ctx context.Context, taskID TaskID) error

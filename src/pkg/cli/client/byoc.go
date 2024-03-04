@@ -119,7 +119,13 @@ func (b *byocAws) setUp(ctx context.Context) error {
 		return nil
 	}
 	// TODO: can we stick to the vanilla pulumi-nodejs image?
-	if err := b.driver.SetUp(ctx, cdImage, 512_000_000, "linux/amd64"); err != nil {
+	containers := []types.Container{{
+		Image:    cdImage,
+		Name:     awsecs.ContainerName,
+		Memory:   512_000_000, // 512 MB
+		Platform: "linux/amd64",
+	}}
+	if err := b.driver.SetUp(ctx, containers); err != nil {
 		return annotateAwsError(err)
 	}
 
