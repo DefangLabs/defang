@@ -595,7 +595,10 @@ var composeConfigCmd = &cobra.Command{
 
 		cli.DoDryRun = true                                               // config is like start in a dry run
 		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
-		return err
+		if !errors.Is(err, cli.ErrDryRun) {
+			return err
+		}
+		return nil
 	},
 }
 
