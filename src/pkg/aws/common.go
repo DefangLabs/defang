@@ -9,9 +9,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 type Region string
+
+const (
+	DockerRegistry    = "docker.io"
+	EcrPublicRegistry = "public.ecr.aws"
+	ProjectName       = types.ProjectName
+)
 
 type Aws struct {
 	Region Region
@@ -77,4 +84,27 @@ func newChainProvider(providers ...aws.CredentialsProvider) aws.CredentialsProvi
 			return aws.Credentials{}, errors.Join(errs...)
 		}),
 	)
+}
+
+func PlatformToArchOS(platform string) (string, string) {
+	parts := strings.SplitN(platform, "/", 3) // Can be "os/arch/variant" like "linux/arm64/v8"
+
+	if len(parts) == 1 {
+		arch := parts[0]
+		return normalizedArch(arch), ""
+	} else {
+		os := parts[0]
+		arch := parts[1]
+		os = strings.ToUpper(os)
+		return normalizedArch(arch), os
+	}
+}
+
+func normalizedArch(arch string) string {
+	// From https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-runtimeplatform.html#cfn-ecs-taskdefinition-runtimeplatform-cpuarchitecture
+	arch = strings.ToUpper(arch)
+	if arch == "AMD64" {
+		arch = "X86_64"
+	}
+	return arch
 }

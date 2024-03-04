@@ -4,25 +4,21 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"math"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/ec2"
 	"github.com/awslabs/goformation/v7/cloudformation/ecr"
-	"github.com/awslabs/goformation/v7/cloudformation/ecs"
 	"github.com/awslabs/goformation/v7/cloudformation/iam"
+	"github.com/awslabs/goformation/v7/cloudformation/lambda"
 	"github.com/awslabs/goformation/v7/cloudformation/logs"
-	"github.com/awslabs/goformation/v7/cloudformation/policies"
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 	"github.com/defang-io/defang/src/pkg/aws"
-	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
-	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
+	"github.com/defang-io/defang/src/pkg/aws/lambda/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
@@ -34,7 +30,6 @@ const (
 var (
 	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
 	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
-	retainBucket         = true // set to false in unit tests
 )
 
 func getCacheRepoPrefix(prefix, suffix string) string {
@@ -47,7 +42,11 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-func createTemplate(stack string, containers []types.Container, spot bool) *cloudformation.Template {
+func createTemplate(stack string, containers []types.Container) *cloudformation.Template {
+	if len(containers) != 1 {
+		panic("only one container is supported for lambda functions at the moment")
+	}
+
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -61,42 +60,12 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 
 	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
-	var bucketDeletionPolicy policies.DeletionPolicy
-	if retainBucket {
-		bucketDeletionPolicy = "RetainExceptOnCreate"
-	}
 	template.Resources[_bucket] = &s3.Bucket{
 		Tags: defaultTags,
 		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
-		AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
+		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",
-		},
-	}
-
-	// 2. ECS cluster
-	const _cluster = "Cluster"
-	template.Resources[_cluster] = &ecs.Cluster{
-		Tags: defaultTags,
-		// ClusterName: ptr.String(PREFIX + "cluster" + SUFFIX), // optional
-	}
-
-	// 3. ECS capacity provider
-	capacityProvider := "FARGATE"
-	if spot {
-		capacityProvider = "FARGATE_SPOT"
-	}
-	const _capacityProvider = "CapacityProvider"
-	template.Resources[_capacityProvider] = &ecs.ClusterCapacityProviderAssociations{
-		Cluster: cloudformation.Ref(_cluster),
-		CapacityProviders: []string{
-			capacityProvider,
-		},
-		DefaultCapacityProviderStrategy: []ecs.ClusterCapacityProviderAssociations_CapacityProviderStrategy{
-			{
-				CapacityProvider: capacityProvider,
-				Weight:           ptr.Int(1),
-			},
 		},
 	}
 
@@ -108,7 +77,7 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		RetentionInDays: ptr.Int(1),
 		// Make sure the log group cannot be deleted while the cluster is up
 		AWSCloudFormationDependsOn: []string{
-			_cluster,
+			// _cluster,
 		},
 	}
 
@@ -120,8 +89,8 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 	// * AWS GovCloud (US-East) (us-gov-east-1)
 	// * AWS GovCloud (US-West) (us-gov-west-1)
 	images := make([]string, 0, len(containers))
-	for _, task := range containers {
-		image := task.Image
+	for _, container := range containers {
+		image := container.Image
 		if repo, ok := strings.CutPrefix(image, aws.EcrPublicRegistry); ok {
 			const _pullThroughCache = "PullThroughCache"
 			ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
@@ -170,15 +139,15 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		images = append(images, image)
 	}
 
-	// 6. IAM roles for ECS task
-	assumeRolePolicyDocumentECS := map[string]any{
+	// TODO: 6. IAM roles for lambda
+	assumeRolePolicyDocumentLambda := map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []map[string]any{
 			{
 				"Effect": "Allow",
 				"Principal": map[string]any{
 					"Service": []string{
-						"ecs-tasks.amazonaws.com",
+						"lambda.amazonaws.com",
 					},
 				},
 				"Action": []string{
@@ -188,217 +157,25 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		},
 	}
 
-	// 6a. IAM exec role for task
-	execPolicies := []iam.Role_Policy{{
-		// From https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html#pull-through-cache-iam
-		PolicyName: "AllowECRPassThrough",
-		PolicyDocument: map[string]any{
-			"Version": "2012-10-17",
-			"Statement": []map[string]any{
-				{
-					"Effect": "Allow",
-					"Action": []string{
-						"ecr:CreatePullThroughCacheRule",
-						"ecr:BatchImportUpstreamImage", // should be registry permission instead
-						"ecr:CreateRepository",         // can be registry permission instead
-					},
-					"Resource": "*", // FIXME: restrict cloudformation.Sub("arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${PullThroughCache}:*"),
-				},
-			},
-		},
-	}}
-	if _, ok := template.Resources[_privateRepoSecret]; ok {
-		execPolicies = append(execPolicies, iam.Role_Policy{
-			PolicyName: "AllowGetRepoSecret",
-			PolicyDocument: map[string]any{
-				"Version": "2012-10-17",
-				"Statement": []map[string]any{
-					{
-						"Effect": "Allow",
-						"Action": []string{
-							"secretsmanager:GetSecretValue",
-							"ssm:GetParameters",
-							// "kms:Decrypt", Required only if your key uses a custom KMS key and not the default key
-						},
-						"Resource": cloudformation.Ref(_privateRepoSecret),
-					},
-				},
-			},
-		})
+	const _role = "Role"
+	template.Resources[_role] = &iam.Role{
+		Tags:                     defaultTags,
+		AssumeRolePolicyDocument: assumeRolePolicyDocumentLambda,
 	}
-	const _executionRole = "ExecutionRole"
-	template.Resources[_executionRole] = &iam.Role{
+
+	// 7. Lambda for docker image
+	const _lambda = "Lambda"
+	template.Resources[_lambda] = &lambda.Function{
 		Tags: defaultTags,
-		// RoleName: ptr.String(PREFIX + "execution-role" + SUFFIX), // optional
-		ManagedPolicyArns: []string{
-			"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+		Code: &lambda.Function_Code{ImageUri: ptr.String(images[0])},
+		ImageConfig: &lambda.Function_ImageConfig{
+			EntryPoint: containers[0].EntryPoint,
+			Command:    containers[0].Command,
+			// WorkingDirectory: containers[0].WorkingDirectory,
 		},
-		AssumeRolePolicyDocument: assumeRolePolicyDocumentECS,
-		Policies:                 execPolicies,
-	}
-
-	// 6b. IAM role for task (optional)
-	const _taskRole = "TaskRole"
-	template.Resources[_taskRole] = &iam.Role{
-		Tags: defaultTags,
-		// RoleName: ptr.String(PREFIX + "task-role" + SUFFIX), // optional
-		ManagedPolicyArns: []string{
-			"arn:aws:iam::aws:policy/AdministratorAccess", // TODO: make this configurable
-		},
-		AssumeRolePolicyDocument: assumeRolePolicyDocumentECS,
-		Policies: []iam.Role_Policy{
-			{
-				// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#ecs-exec-required-iam-permissions
-				PolicyName: "AllowExecuteCommand",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"ssmmessages:CreateDataChannel",
-								"ssmmessages:OpenDataChannel",
-								"ssmmessages:OpenControlChannel",
-								"ssmmessages:CreateControlChannel",
-							},
-							"Resource": "*", // TODO: restrict
-						},
-					},
-				},
-			},
-			{
-				PolicyName: "AllowPassRole",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"iam:PassRole",
-							},
-							"Resource": "*", // TODO: restrict to roles that are needed/created by the task
-						},
-					},
-				},
-			},
-			{
-				PolicyName: "AllowAssumeRole",
-				PolicyDocument: map[string]any{
-					"Version": "2012-10-17",
-					"Statement": []map[string]any{
-						{
-							"Effect": "Allow",
-							"Action": []string{
-								"sts:AssumeRole",
-							},
-							"Resource": "*",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// 7. ECS task definition
-	var totalCpu, totalMiB float64
-	var platform string
-	for _, task := range containers {
-		totalCpu += float64(task.Cpus)
-		totalMiB += math.Max(float64(task.Memory)/1024/1024, 6) // 6MiB min for the container
-		if platform == "" {
-			platform = task.Platform
-		} else if platform != task.Platform {
-			panic("all tasks must have the same platform")
-		}
-	}
-	mCpu, mib := awsecs.FixupFargateConfig(totalCpu, totalMiB)
-	arch, os := aws.PlatformToArchOS(platform)
-	var archP, osP *string
-	if arch != "" {
-		archP = ptr.String(arch)
-	}
-	if os != "" {
-		osP = ptr.String(os)
-	}
-
-	var volumes []ecs.TaskDefinition_Volume
-	var containerDefinitions []ecs.TaskDefinition_ContainerDefinition
-	for i, container := range containers {
-		for _, v := range container.Volumes {
-			volumes = append(volumes, ecs.TaskDefinition_Volume{
-				Name: ptr.String(v.Source),
-			})
-		}
-
-		volumesFrom := make([]ecs.TaskDefinition_VolumeFrom, 0, len(container.VolumesFrom))
-		for _, v := range container.VolumesFrom {
-			parts := strings.SplitN(v, ":", 2)
-			ro := false
-			if len(parts) == 2 && parts[1] == "ro" {
-				ro = true
-			}
-			volumesFrom = append(volumesFrom, ecs.TaskDefinition_VolumeFrom{
-				ReadOnly:        ptr.Bool(ro),
-				SourceContainer: ptr.String(parts[0]),
-			})
-		}
-
-		mountPoints := make([]ecs.TaskDefinition_MountPoint, 0, len(container.Volumes))
-		for _, v := range container.Volumes {
-			mountPoints = append(mountPoints, ecs.TaskDefinition_MountPoint{
-				ContainerPath: ptr.String(v.Target),
-				SourceVolume:  ptr.String(v.Source),
-				ReadOnly:      ptr.Bool(v.ReadOnly),
-			})
-		}
-
-		var cpuShares *int
-		if container.Cpus > 0 {
-			cpuShares = ptr.Int(int(container.Cpus * 1024))
-		}
-		name := container.Name
-		if name == "" {
-			name = awsecs.ContainerName // TODO: backwards compat; remove this
-		}
-		def := ecs.TaskDefinition_ContainerDefinition{
-			Name:        name,
-			Image:       images[i],
-			StopTimeout: ptr.Int(120), // TODO: make this configurable
-			Essential:   container.Essential,
-			Cpu:         cpuShares,
-			LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
-				LogDriver: "awslogs",
-				Options: map[string]string{
-					"awslogs-group":         cloudformation.Ref(_logGroup),
-					"awslogs-region":        cloudformation.Ref("AWS::Region"),
-					"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
-				},
-			},
-			VolumesFrom: volumesFrom,
-			MountPoints: mountPoints,
-			EntryPoint:  container.EntryPoint,
-			Command:     container.Command,
-			// WorkingDirectory: ptr.String("/app"), // TODO: make this configurable
-		}
-		containerDefinitions = append(containerDefinitions, def)
-	}
-
-	const _taskDefinition = "TaskDefinition"
-	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
-		Tags: defaultTags,
-		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
-			CpuArchitecture:       archP,
-			OperatingSystemFamily: osP,
-		},
-		Volumes:                 volumes,
-		ContainerDefinitions:    containerDefinitions,
-		Cpu:                     ptr.String(strconv.FormatUint(uint64(mCpu), 10)), // MilliCPU
-		ExecutionRoleArn:        cloudformation.RefPtr(_executionRole),
-		Memory:                  ptr.String(strconv.FormatUint(uint64(mib), 10)), // MiB
-		NetworkMode:             ptr.String("awsvpc"),
-		RequiresCompatibilities: []string{"FARGATE"},
-		TaskRoleArn:             cloudformation.RefPtr(_taskRole),
-		// Family:                  cloudformation.SubPtr("${AWS::StackName}-TaskDefinition"), // optional, but needed to avoid TaskDef replacement
+		Role: cloudformation.Ref(_role),
+		// Timeout: ptr.Int(300), // 5 minutes
+		// FunctionName: ptr.String(PREFIX + "lambda" + SUFFIX), // optional
 	}
 
 	var vpcId *string
@@ -487,14 +264,6 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 	}
 
 	// Declare stack outputs
-	template.Outputs[outputs.TaskDefArn] = cloudformation.Output{
-		Value:       cloudformation.Ref(_taskDefinition),
-		Description: ptr.String("ARN of the ECS task definition"),
-	}
-	template.Outputs[outputs.ClusterName] = cloudformation.Output{
-		Value:       cloudformation.Ref(_cluster),
-		Description: ptr.String("Name of the ECS cluster"),
-	}
 	template.Outputs[outputs.LogGroupARN] = cloudformation.Output{
 		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
 		Description: ptr.String("ARN of the CloudWatch log group"),
@@ -506,6 +275,10 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 	template.Outputs[outputs.BucketName] = cloudformation.Output{
 		Value:       cloudformation.Ref(_bucket),
 		Description: ptr.String("Name of the S3 bucket"),
+	}
+	template.Outputs[outputs.FunctionName] = cloudformation.Output{
+		Value:       cloudformation.Ref(_lambda),
+		Description: ptr.String("Name of the Lambda function"),
 	}
 
 	return template

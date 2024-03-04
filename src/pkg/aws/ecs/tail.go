@@ -9,12 +9,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/defang-io/defang/src/pkg"
+	"github.com/defang-io/defang/src/pkg/aws"
 	"github.com/defang-io/defang/src/pkg/aws/region"
 )
 
 const spinner = `-\|/`
 
-const AwsLogsStreamPrefix = ProjectName
+const AwsLogsStreamPrefix = aws.ProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskId := GetTaskID(taskArn)

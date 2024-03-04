@@ -14,7 +14,7 @@ var (
 	help     = pflag.BoolP("help", "h", false, "Show this help message")
 	color    = pflag.String("color", "auto", `Colorize output. Choices are: always, never, raw, auto`)
 	envs     = pflag.StringArrayP("env", "e", nil, "Environment variables to pass to the run command")
-	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
+	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use")
 	memory   = pflag.StringP("memory", "m", "2g", "Memory limit in bytes")
 	envFiles = pflag.StringArray("env-file", nil, "Read in a file of environment variables")
 	platform = pflag.String("platform", "", "Set platform if host is multi-platform capable")
