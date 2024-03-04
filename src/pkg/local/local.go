@@ -15,10 +15,10 @@ import (
 type PID = types.TaskID
 
 type Local struct {
-	name      string
-	cmd       *exec.Cmd
-	outReader io.ReadCloser
-	errReader io.ReadCloser
+	entrypoint []string
+	cmd        *exec.Cmd
+	outReader  io.ReadCloser
+	errReader  io.ReadCloser
 }
 
 var _ types.Driver = (*Local)(nil)
@@ -27,8 +27,14 @@ func New() *Local {
 	return &Local{}
 }
 
-func (l *Local) SetUp(ctx context.Context, name string, memory uint64, platform string) error {
-	l.name = name
+func (l *Local) SetUp(ctx context.Context, containers []types.Container) error {
+	if len(containers) != 1 {
+		return errors.New("expected exactly one container")
+	}
+	if len(containers[0].EntryPoint) == 0 {
+		return errors.New("entrypoint not set")
+	}
+	l.entrypoint = containers[0].EntryPoint
 	return nil
 }
 
@@ -41,13 +47,11 @@ func (l *Local) TearDown(ctx context.Context) error {
 }
 
 func (l *Local) Run(ctx context.Context, env map[string]string, args ...string) (PID, error) {
-	if l.name == "" {
-		return nil, errors.New("no name set")
-	}
 	if l.cmd != nil {
 		return nil, errors.New("already running")
 	}
-	cmd := exec.CommandContext(ctx, l.name, args...)
+	args = append(l.entrypoint[1:], args...)
+	cmd := exec.CommandContext(ctx, l.entrypoint[0], args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	or, err := cmd.StdoutPipe()
 	if err != nil {

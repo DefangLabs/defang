@@ -36,7 +36,6 @@ func New(stack string, region region.Region) *AwsEcs {
 		AwsEcs: ecs.AwsEcs{
 			Aws:  common.Aws{Region: region},
 			Spot: true,
-			VCpu: 1.0,
 		},
 	}
 }
@@ -50,6 +49,7 @@ func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) 
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
+// update1s is a functional option for cloudformation.StackUpdateCompleteWaiter that sets the MinDelay to 1
 func update1s(o *cloudformation.StackUpdateCompleteWaiterOptions) {
 	o.MinDelay = 1
 }
@@ -82,9 +82,10 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, o)
+	return a.fillWithOutputs(o)
 }
 
+// create1s is a functional option for cloudformation.StackCreateCompleteWaiter that sets the MinDelay to 1
 func create1s(o *cloudformation.StackCreateCompleteWaiterOptions) {
 	o.MinDelay = 1
 }
@@ -116,12 +117,11 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, dso)
+	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) SetUp(ctx context.Context, image string, memory uint64, platform string) error {
-	arch := ecs.PlatformToArch(platform)
-	template, err := createTemplate(a.stackName, image, float64(memory)/1024/1024, a.VCpu, a.Spot, arch).YAML()
+func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
+	template, err := createTemplate(a.stackName, containers, a.Spot).YAML()
 	if err != nil {
 		return err
 	}
@@ -153,10 +153,10 @@ func (a *AwsEcs) fillOutputs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(ctx, dso)
+	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) fillWithOutputs(ctx context.Context, dso *cloudformation.DescribeStacksOutput) error {
+func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
 	for _, stack := range dso.Stacks {
 		for _, output := range stack.Outputs {
 			switch *output.OutputKey {
@@ -229,7 +229,12 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 	}
 
 	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
-	return cloudformation.NewStackDeleteCompleteWaiter(cfn).Wait(ctx, &cloudformation.DescribeStacksInput{
+	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
+}
+
+// delete1s is a functional option for cloudformation.StackDeleteCompleteWaiter that sets the MinDelay to 1
+func delete1s(o *cloudformation.StackDeleteCompleteWaiterOptions) {
+	o.MinDelay = 1
 }

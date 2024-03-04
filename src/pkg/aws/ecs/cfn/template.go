@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -15,11 +16,13 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/ecs"
 	"github.com/awslabs/goformation/v7/cloudformation/iam"
 	"github.com/awslabs/goformation/v7/cloudformation/logs"
+	"github.com/awslabs/goformation/v7/cloudformation/policies"
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
 	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 const (
@@ -30,6 +33,7 @@ const (
 var (
 	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
 	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
+	retainBucket         = true // set to false in unit tests
 )
 
 func getCacheRepoPrefix(prefix, suffix string) string {
@@ -42,7 +46,7 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-func createTemplate(stack, image string, memory float64, vcpu float64, spot bool, arch *string) *cloudformation.Template {
+func createTemplate(stack string, containers []types.Container, spot bool) *cloudformation.Template {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -54,12 +58,16 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 
 	template := cloudformation.NewTemplate()
 
-	// 1. bucket (for state)
+	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
+	var bucketDeletionPolicy policies.DeletionPolicy
+	if retainBucket {
+		bucketDeletionPolicy = "RetainExceptOnCreate"
+	}
 	template.Resources[_bucket] = &s3.Bucket{
 		Tags: defaultTags,
 		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
-		AWSCloudFormationDeletionPolicy: "RetainExceptOnCreate",
+		AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",
 		},
@@ -103,7 +111,6 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 		},
 	}
 
-	const _pullThroughCache = "PullThroughCache"
 	const _privateRepoSecret = "PrivateRepoSecret"
 	// 5. ECR pull-through cache rules
 	// TODO: Creating pull through cache rules isn't supported in the following Regions:
@@ -111,49 +118,55 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 	// * China (Ningxia) (cn-northwest-1)
 	// * AWS GovCloud (US-East) (us-gov-east-1)
 	// * AWS GovCloud (US-West) (us-gov-west-1)
-	if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
-		const _pullThroughCache = "PullThroughCache"
-		ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
+	images := make([]string, 0, len(containers))
+	for _, task := range containers {
+		image := task.Image
+		if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
+			const _pullThroughCache = "PullThroughCache"
+			ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
 
-		// 5. The pull-through cache rule
-		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-			EcrRepositoryPrefix: ptr.String(ecrPublicPrefix),
-			UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
+			// 5. The pull-through cache rule
+			template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+				EcrRepositoryPrefix: ptr.String(ecrPublicPrefix),
+				UpstreamRegistryUrl: ptr.String(awsecs.EcrPublicRegistry),
+			}
+
+			image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
+		} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok && dockerHubUsername != "" && dockerHubAccessToken != "" {
+			const _pullThroughCache = "PullThroughCacheDocker"
+			dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
+
+			// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
+			// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
+			bytes, err := json.Marshal(struct {
+				Username    string `json:"username"`
+				AccessToken string `json:"accessToken"`
+			}{dockerHubUsername, dockerHubAccessToken})
+			if err != nil {
+				panic(err) // there's no reason this should ever fail
+			}
+
+			// This is $0.40 per secret per month, so make it opt-in (only done when DOCKERHUB_* env vars are set)
+			template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
+				Tags:         defaultTags,
+				Description:  ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
+				Name:         ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
+				SecretString: ptr.String(string(bytes)),
+			}
+
+			// 5b. The pull-through cache rule
+			template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
+				EcrRepositoryPrefix: ptr.String(dockerPublicPrefix),
+				UpstreamRegistryUrl: ptr.String("registry-1.docker.io"),
+				CredentialArn:       cloudformation.RefPtr(_privateRepoSecret),
+			}
+
+			image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + dockerPublicPrefix + repo)
+		} else {
+			// TODO: support pull through cache for other registries
+			// TODO: support private repos (with or without pull-through cache)
 		}
-
-		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + ecrPublicPrefix + repo)
-	} else if repo, ok := strings.CutPrefix(image, awsecs.DockerRegistry); ok && dockerHubUsername != "" && dockerHubAccessToken != "" {
-		dockerPublicPrefix := getCacheRepoPrefix(prefix, "docker-public")
-
-		// 5a. When creating the Secrets Manager secret that contains the upstream registry credentials, the secret name must use the `ecr-pullthroughcache/` prefix.
-		// This is the struct AWS wants, see https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-creating-secret.html
-		bytes, err := json.Marshal(struct {
-			Username    string `json:"username"`
-			AccessToken string `json:"accessToken"`
-		}{dockerHubUsername, dockerHubAccessToken})
-		if err != nil {
-			panic(err) // there's no reason this should ever fail
-		}
-
-		// This is $0.40 per secret per month, so make it opt-in (only done when DOCKERHUB_* env vars are set)
-		template.Resources[_privateRepoSecret] = &secretsmanager.Secret{
-			Tags:         defaultTags,
-			Description:  ptr.String("Docker Hub credentials for the ECR pull-through cache rule"),
-			Name:         ptr.String("ecr-pullthroughcache/" + dockerPublicPrefix),
-			SecretString: ptr.String(string(bytes)),
-		}
-
-		// 5b. The pull-through cache rule
-		template.Resources[_pullThroughCache] = &ecr.PullThroughCacheRule{
-			EcrRepositoryPrefix: ptr.String(dockerPublicPrefix),
-			UpstreamRegistryUrl: ptr.String("registry-1.docker.io"),
-			CredentialArn:       cloudformation.RefPtr(_privateRepoSecret),
-		}
-
-		image = cloudformation.Sub("${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/" + dockerPublicPrefix + repo)
-	} else {
-		// TODO: support pull through cache for other registries
-		// TODO: support private repos (with or without pull-through cache)
+		images = append(images, image)
 	}
 
 	// 6. IAM roles for ECS task
@@ -286,35 +299,101 @@ func createTemplate(stack, image string, memory float64, vcpu float64, spot bool
 	}
 
 	// 7. ECS task definition
-	cpu, mem := awsecs.FixupFargateConfig(vcpu, memory)
+	var totalCpu, totalMiB float64
+	var platform string
+	for _, task := range containers {
+		totalCpu += float64(task.Cpus)
+		totalMiB += math.Max(float64(task.Memory)/1024/1024, 6) // 6MiB min for the container
+		if platform == "" {
+			platform = task.Platform
+		} else if platform != task.Platform {
+			panic("all containers must have the same platform")
+		}
+	}
+	mCpu, mib := awsecs.FixupFargateConfig(totalCpu, totalMiB)
+	arch, os := awsecs.PlatformToArchOS(platform)
+	var archP, osP *string
+	if arch != "" {
+		archP = ptr.String(arch)
+	}
+	if os != "" {
+		osP = ptr.String(os)
+	}
+
+	var volumes []ecs.TaskDefinition_Volume
+	var containerDefinitions []ecs.TaskDefinition_ContainerDefinition
+	for i, container := range containers {
+		for _, v := range container.Volumes {
+			volumes = append(volumes, ecs.TaskDefinition_Volume{
+				Name: ptr.String(v.Source),
+			})
+		}
+
+		volumesFrom := make([]ecs.TaskDefinition_VolumeFrom, 0, len(container.VolumesFrom))
+		for _, v := range container.VolumesFrom {
+			parts := strings.SplitN(v, ":", 2)
+			ro := false
+			if len(parts) == 2 && parts[1] == "ro" {
+				ro = true
+			}
+			volumesFrom = append(volumesFrom, ecs.TaskDefinition_VolumeFrom{
+				ReadOnly:        ptr.Bool(ro),
+				SourceContainer: ptr.String(parts[0]),
+			})
+		}
+
+		mountPoints := make([]ecs.TaskDefinition_MountPoint, 0, len(container.Volumes))
+		for _, v := range container.Volumes {
+			mountPoints = append(mountPoints, ecs.TaskDefinition_MountPoint{
+				ContainerPath: ptr.String(v.Target),
+				SourceVolume:  ptr.String(v.Source),
+				ReadOnly:      ptr.Bool(v.ReadOnly),
+			})
+		}
+
+		var cpuShares *int
+		if container.Cpus > 0 {
+			cpuShares = ptr.Int(int(container.Cpus * 1024))
+		}
+		name := container.Name
+		if name == "" {
+			name = awsecs.ContainerName // TODO: backwards compat; remove this
+		}
+		def := ecs.TaskDefinition_ContainerDefinition{
+			Name:        name,
+			Image:       images[i],
+			StopTimeout: ptr.Int(120), // TODO: make this configurable
+			Essential:   container.Essential,
+			Cpu:         cpuShares,
+			LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
+				LogDriver: "awslogs",
+				Options: map[string]string{
+					"awslogs-group":         cloudformation.Ref(_logGroup),
+					"awslogs-region":        cloudformation.Ref("AWS::Region"),
+					"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
+				},
+			},
+			VolumesFrom: volumesFrom,
+			MountPoints: mountPoints,
+			EntryPoint:  container.EntryPoint,
+			Command:     container.Command,
+			// WorkingDirectory: ptr.String("/app"), // TODO: make this configurable
+		}
+		containerDefinitions = append(containerDefinitions, def)
+	}
+
 	const _taskDefinition = "TaskDefinition"
 	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
 		Tags: defaultTags,
 		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
-			CpuArchitecture:       arch,
-			OperatingSystemFamily: ptr.String("LINUX"), // TODO: support other OSes?
+			CpuArchitecture:       archP,
+			OperatingSystemFamily: osP,
 		},
-		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
-			{
-				Name:        awsecs.ContainerName,
-				Image:       image,
-				StopTimeout: ptr.Int(120),
-				// LinuxParameters: &ecs.TaskDefinition_LinuxParameters{
-				// 	InitProcessEnabled: ptr.Bool(true),
-				// },
-				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
-					LogDriver: "awslogs",
-					Options: map[string]string{
-						"awslogs-group":         cloudformation.Ref(_logGroup),
-						"awslogs-region":        cloudformation.Ref("AWS::Region"),
-						"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
-					},
-				},
-			},
-		},
-		Cpu:                     ptr.String(strconv.FormatUint(uint64(cpu), 10)),
+		Volumes:                 volumes,
+		ContainerDefinitions:    containerDefinitions,
+		Cpu:                     ptr.String(strconv.FormatUint(uint64(mCpu), 10)), // MilliCPU
 		ExecutionRoleArn:        cloudformation.RefPtr(_executionRole),
-		Memory:                  ptr.String(strconv.FormatUint(uint64(mem), 10)),
+		Memory:                  ptr.String(strconv.FormatUint(uint64(mib), 10)), // MiB
 		NetworkMode:             ptr.String("awsvpc"),
 		RequiresCompatibilities: []string{"FARGATE"},
 		TaskRoleArn:             cloudformation.RefPtr(_taskRole),

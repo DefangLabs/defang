@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string, platform, vpcId string) error {
@@ -13,7 +15,14 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 		return err
 	}
 
-	if err := driver.SetUp(ctx, image, memory, platform); err != nil {
+	containers := []types.Container{
+		{
+			Image:    image,
+			Memory:   memory,
+			Platform: platform,
+		},
+	}
+	if err := driver.SetUp(ctx, containers); err != nil {
 		return err
 	}
 
