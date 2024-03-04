@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func TestLocal(t *testing.T) {
@@ -11,7 +13,7 @@ func TestLocal(t *testing.T) {
 	ctx := context.TODO()
 
 	t.Run("SetUp", func(t *testing.T) {
-		if err := l.SetUp(ctx, "/bin/sh", 0, ""); err != nil {
+		if err := l.SetUp(ctx, []types.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {
 			t.Fatal(err)
 		}
 	})
