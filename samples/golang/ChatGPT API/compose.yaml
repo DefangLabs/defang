@@ -14,7 +14,7 @@ services:
         reservations:
           memory: 50M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
 secrets:
   OPENAI_KEY:
     external: true
