@@ -15,14 +15,14 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 		return err
 	}
 
-	tasks := []types.Task{
+	containers := []types.Container{
 		{
 			Image:    image,
 			Memory:   memory,
 			Platform: platform,
 		},
 	}
-	if err := driver.SetUp(ctx, tasks); err != nil {
+	if err := driver.SetUp(ctx, containers); err != nil {
 		return err
 	}
 
@@ -40,8 +40,8 @@ func Run(ctx context.Context, region Region, image string, memory uint64, color 
 			time.Sleep(time.Second)
 			continue
 		}
-		if info != "" {
-			fmt.Println(info)
+		if info != nil {
+			fmt.Println("IP:", info.IP)
 		}
 		break
 	}

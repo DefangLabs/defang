@@ -12,7 +12,7 @@ import (
 func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
 		Warn(" ! Dry run, not generating files")
-		return nil, nil
+		return nil, ErrDryRun
 	}
 
 	response, err := client.GenerateFiles(ctx, &v1.GenerateFilesRequest{

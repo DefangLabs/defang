@@ -62,7 +62,7 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error) {
+func TailLogGroups(ctx context.Context, logGroups ...LogGroupInput) (EventStream, error) {
 	var cs = collectionStream{
 		ch:    make(chan types.StartLiveTailResponseStream),
 		errCh: make(chan error),
@@ -70,7 +70,7 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 	}
 
 	var streams []EventStream
-	var pendingGroups []string
+	var pendingGroups []LogGroupInput
 
 	for _, lg := range logGroups {
 		es, err := TailLogGroup(ctx, lg)
@@ -88,9 +88,9 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 
 	// Start goroutines to wait for the log group to be created for the resource not found log groups
 	since := time.Now()
-	for _, lg := range pendingGroups {
+	for _, lgi := range pendingGroups {
 		cs.wg.Add(1)
-		go func(ctx context.Context, lgID string) {
+		go func(ctx context.Context, lgi LogGroupInput) {
 			defer cs.wg.Done()
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
@@ -100,10 +100,10 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 				case <-cs.done:
 					return
 				case <-ticker.C:
-					es, err := TailLogGroup(ctx, lgID)
+					es, err := TailLogGroup(ctx, lgi)
 					if err == nil {
 						// Query the logs between the start time and now
-						if events, err := Query(ctx, lgID, since, time.Now()); err == nil {
+						if events, err := Query(ctx, lgi, since, time.Now()); err == nil {
 							// println("found logs:", len(events))
 							cs.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 								Value: types.LiveTailSessionUpdate{SessionResults: events},
@@ -121,7 +121,7 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 					}
 				}
 			}
-		}(ctx, lg)
+		}(ctx, lgi)
 	}
 
 	// Only add and start watching the streams if there were no errors, prevent lingering goroutines
@@ -132,28 +132,50 @@ func TailLogGroups(ctx context.Context, logGroups ...string) (EventStream, error
 	return &cs, nil
 }
 
-func TailLogGroup(ctx context.Context, logGroupArn string, logStreams ...string) (EventStream, error) {
+// LogGroupInput is like cloudwatchlogs.StartLiveTailInput but with only one loggroup and one logstream prefix.
+type LogGroupInput struct {
+	LogGroupARN           string
+	LogStreamNames        []string
+	LogStreamNamePrefix   string
+	LogEventFilterPattern string
+}
+
+func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error) {
+	var pattern *string
+	if input.LogEventFilterPattern != "" {
+		pattern = &input.LogEventFilterPattern
+	}
+	var prefixes []string
+	if input.LogStreamNamePrefix != "" {
+		prefixes = []string{input.LogStreamNamePrefix}
+	}
 	return startTail(ctx, &cloudwatchlogs.StartLiveTailInput{
-		LogGroupIdentifiers: []string{getLogGroupIdentifier(logGroupArn)},
-		LogStreamNames:      logStreams,
+		LogGroupIdentifiers:   []string{getLogGroupIdentifier(input.LogGroupARN)},
+		LogStreamNames:        input.LogStreamNames,
+		LogStreamNamePrefixes: prefixes,
+		LogEventFilterPattern: pattern,
 	})
 }
 
-func Query(ctx context.Context, logGroupArn string, start time.Time, end time.Time) ([]LogEvent, error) {
-	region := region.FromArn(logGroupArn)
+func Query(ctx context.Context, lgi LogGroupInput, start time.Time, end time.Time) ([]LogEvent, error) {
+	region := region.FromArn(lgi.LogGroupARN)
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, err
 	}
 
-	logGroupIdentifier := getLogGroupIdentifier(logGroupArn)
+	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
+	var prefix *string
+	if lgi.LogStreamNamePrefix != "" {
+		prefix = &lgi.LogStreamNamePrefix
+	}
 	cw := cloudwatchlogs.NewFromConfig(cfg)
 	fleo, err := cw.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:          ptr.Int64(start.UnixMilli()),
-		EndTime:            ptr.Int64(end.UnixMilli()),
-		LogGroupIdentifier: &logGroupIdentifier,
-		// LogStreamNamePrefix:,
-		// LogStreamNames: ,
+		StartTime:           ptr.Int64(start.UnixMilli()),
+		EndTime:             ptr.Int64(end.UnixMilli()),
+		LogGroupIdentifier:  &logGroupIdentifier,
+		LogStreamNamePrefix: prefix,
+		LogStreamNames:      lgi.LogStreamNames,
 	})
 	if err != nil {
 		return nil, err

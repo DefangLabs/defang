@@ -55,9 +55,9 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
-	logStreamName := getLogStreamForTaskID(taskID)
+	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForTaskID(taskID)}}
 	for {
-		stream, err := TailLogGroup(ctx, a.LogGroupARN, logStreamName)
+		stream, err := TailLogGroup(ctx, lgi)
 		if err != nil {
 			var resourceNotFound *types.ResourceNotFoundException
 			if !errors.As(err, &resourceNotFound) {
@@ -77,7 +77,7 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 	}
 }
 
-func getLogStreamForTaskID(taskID string) string {
+func GetLogStreamForTaskID(taskID string) string {
 	return path.Join(AwsLogsStreamPrefix, ContainerName, taskID) // per "awslogs" driver
 }
 

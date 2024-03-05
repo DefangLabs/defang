@@ -91,7 +91,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		client, tenantId = cli.Connect(cluster, project, *provider)
-		go client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive}, P{"file", filePath})
+		client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive}, P{"file", filePath})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -109,7 +109,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			client, tenantId = cli.Connect(cluster, project, *provider) // reconnect with the new token
-			go client.Track("User Reconnected", P{"err", err.Error()})
+			client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil
 	},
@@ -124,7 +124,7 @@ var loginCmd = &cobra.Command{
 		cluster, _ := cmd.Flags().GetString("cluster")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		go client.Track("Login Invoked", P{"cluster", cluster}, P{"non-interactive", nonInteractive})
+		client.Track("Login Invoked", P{"cluster", cluster}, P{"non-interactive", nonInteractive})
 
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
@@ -148,7 +148,7 @@ var whoamiCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Whoami Invoked")
+		client.Track("Whoami Invoked")
 
 		err := cli.Whoami(cmd.Context(), client)
 		if err != nil {
@@ -167,7 +167,7 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		go client.Track("Generate Invoked", P{"non-interactive", nonInteractive})
+		client.Track("Generate Invoked", P{"non-interactive", nonInteractive})
 
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
@@ -218,7 +218,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			return err
 		}
 
-		go client.Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		client.Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// create the folder if needed
 		cd := ""
@@ -262,7 +262,7 @@ var getServicesCmd = &cobra.Command{
 	Aliases:     []string{"getServices", "ls", "list"},
 	Short:       "Get list of services on the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Services Invoked")
+		client.Track("Services Invoked")
 
 		err := cli.GetServices(cmd.Context(), client)
 		if err != nil {
@@ -280,7 +280,7 @@ var getVersionCmd = &cobra.Command{
 	Aliases:     []string{"ver", "stat", "status"}, // for backwards compatibility
 	Short:       "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Version Invoked")
+		client.Track("Version Invoked")
 
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
 		fmt.Println(GetCurrentVersion())
@@ -307,7 +307,7 @@ var tailCmd = &cobra.Command{
 		var raw, _ = cmd.Flags().GetBool("raw")
 		var since, _ = cmd.Flags().GetString("since")
 
-		go client.Track("Tail Invoked", P{"name", name}, P{"etag", etag}, P{"since", since}, P{"raw", raw})
+		client.Track("Tail Invoked", P{"name", name}, P{"etag", etag}, P{"since", since}, P{"raw", raw})
 
 		ts, err := cli.ParseTimeOrDuration(since)
 		if err != nil {
@@ -337,7 +337,7 @@ var secretsSetCmd = &cobra.Command{
 		var name, _ = cmd.Flags().GetString("name")
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		go client.Track("Secret-Set Invoked", P{"name", name}, P{"non-interactive", nonInteractive})
+		client.Track("Secret-Set Invoked", P{"name", name}, P{"non-interactive", nonInteractive})
 
 		var secret string
 		if !nonInteractive {
@@ -383,7 +383,7 @@ var secretsDeleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name, _ = cmd.Flags().GetString("name")
 
-		go client.Track("Secret-Delete Invoked", P{"name", name})
+		client.Track("Secret-Delete Invoked", P{"name", name})
 
 		if err := cli.SecretsDelete(cmd.Context(), client, name); err != nil {
 			// Show a warning (not an error) if the secret was not found
@@ -407,7 +407,7 @@ var secretsListCmd = &cobra.Command{
 	Aliases:     []string{"list"},
 	Short:       "List secrets",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Secret-List Invoked")
+		client.Track("Secret-List Invoked")
 
 		return cli.SecretsList(cmd.Context(), client)
 	},
@@ -449,7 +449,7 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
-		go client.Track("Compose-Up Invoked", P{"file", filePath}, P{"force", force}, P{"detach", detach})
+		client.Track("Compose-Up Invoked", P{"file", filePath}, P{"force", force}, P{"detach", detach})
 
 		since := time.Now()
 		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
@@ -489,7 +489,7 @@ var composeStartCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var force, _ = cmd.Flags().GetBool("force")
 
-		go client.Track("Compose-Start Invoked", P{"file", filePath}, P{"force", force})
+		client.Track("Compose-Start Invoked", P{"file", filePath}, P{"force", force})
 
 		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
@@ -515,7 +515,7 @@ var composeRestartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		go client.Track("Compose-Restart Invoked", P{"file", filePath})
+		client.Track("Compose-Restart Invoked", P{"file", filePath})
 
 		_, err := cli.ComposeRestart(cmd.Context(), client, project)
 		if err != nil {
@@ -533,7 +533,7 @@ var composeStopCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 
-		go client.Track("Compose-Stop Invoked", P{"file", filePath})
+		client.Track("Compose-Stop Invoked", P{"file", filePath})
 
 		_, err := cli.ComposeStop(cmd.Context(), client, project)
 		if err != nil {
@@ -553,7 +553,7 @@ var composeDownCmd = &cobra.Command{
 		var filePath, _ = cmd.InheritedFlags().GetString("file")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
-		go client.Track("Compose-Down Invoked", P{"file", filePath}, P{"detach", detach})
+		client.Track("Compose-Down Invoked", P{"file", filePath}, P{"detach", detach})
 
 		since := time.Now()
 		etag, err := cli.ComposeDown(cmd.Context(), client)
@@ -591,11 +591,14 @@ var composeConfigCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var file, _ = cmd.InheritedFlags().GetString("file")
 
-		go client.Track("Compose-Config Invoked", P{"file", file})
+		client.Track("Compose-Config Invoked", P{"file", file})
 
 		cli.DoDryRun = true                                               // config is like start in a dry run
 		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
-		return err
+		if !errors.Is(err, cli.ErrDryRun) {
+			return err
+		}
+		return nil
 	},
 }
 
@@ -609,7 +612,7 @@ var deleteCmd = &cobra.Command{
 		var name, _ = cmd.Flags().GetString("name")
 		var tail, _ = cmd.Flags().GetBool("tail")
 
-		go client.Track("Delete Invoked", P{"name", name}, P{"tail", tail})
+		client.Track("Delete Invoked", P{"name", name}, P{"tail", tail})
 
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), client, name)
@@ -640,7 +643,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Restart Invoked", P{"services", args})
+		client.Track("Restart Invoked", P{"services", args})
 
 		_, err := cli.Restart(cmd.Context(), client, args...)
 		if err != nil {
@@ -664,7 +667,7 @@ var sendCmd = &cobra.Command{
 		var contenttype, _ = cmd.Flags().GetString("content-type")
 		var subject, _ = cmd.Flags().GetString("subject")
 
-		go client.Track("Send Invoked", P{"id", id}, P{"type", _type}, P{"data", data}, P{"contenttype", contenttype}, P{"subject", subject})
+		client.Track("Send Invoked", P{"id", id}, P{"type", _type}, P{"data", data}, P{"contenttype", contenttype}, P{"subject", subject})
 
 		return cli.SendMsg(cmd.Context(), client, subject, _type, id, []byte(data), contenttype)
 	},
@@ -679,7 +682,7 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		go client.Track("Token Invoked", P{"scope", s}, P{"expires", expires})
+		client.Track("Token Invoked", P{"scope", s}, P{"expires", expires})
 
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
@@ -693,7 +696,7 @@ var logoutCmd = &cobra.Command{
 	Aliases:     []string{"logoff", "revoke"},
 	Short:       "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Logout Invoked")
+		client.Track("Logout Invoked")
 
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
@@ -716,7 +719,7 @@ var bootstrapDestroyCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Bootstrap-Destroy Invoked")
+		client.Track("Bootstrap-Destroy Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
@@ -728,7 +731,7 @@ var bootstrapDownCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Bootstrap-Down Invoked")
+		client.Track("Bootstrap-Down Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
 	},
@@ -740,7 +743,7 @@ var bootstrapRefreshCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Bootstrap-Refresh Invoked")
+		client.Track("Bootstrap-Refresh Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
 	},
@@ -752,7 +755,7 @@ var bootstrapTearDownCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("TearDown Invoked")
+		client.Track("TearDown Invoked")
 
 		cli.Warn(` ! Deleting the CD cluster; this does not delete the services!`)
 		return cli.TearDown(cmd.Context(), client)
@@ -766,7 +769,7 @@ var bootstrapListCmd = &cobra.Command{
 	Aliases:     []string{"list"},
 	Short:       "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Bootstrap-List Invoked")
+		client.Track("Bootstrap-List Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "list")
 	},
@@ -778,7 +781,7 @@ var bootstrapCancelCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		go client.Track("Bootstrap-Cancel Invoked")
+		client.Track("Bootstrap-Cancel Invoked")
 
 		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
@@ -793,7 +796,7 @@ var tosCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
-		go client.Track("Tos Invoked", P{"agree", agree})
+		client.Track("Tos Invoked", P{"agree", agree})
 
 		cli.Println(cli.Nop, "Our latest terms of service can be found at https://defang.io/terms-service.html")
 		if agree {
@@ -801,6 +804,8 @@ var tosCmd = &cobra.Command{
 				return err
 			}
 			cli.Info(" * You have agreed to the Defang terms of service")
+		} else {
+			printDefangHint("To agree to the terms of service, do:", "terms --agree-tos")
 		}
 		return nil
 	},
@@ -936,6 +941,16 @@ func main() {
 		cancel()
 	}()
 
+	origHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if client == nil {
+			cluster, _ := cmd.Flags().GetString("cluster")
+			_, host := cli.SplitTenantHost(cluster)
+			client = cliClient.NewGrpcClient(host, "")
+		}
+		client.Track("Help Invoked")
+		origHelp(cmd, args)
+	})
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			cli.Error("Error:", err)
@@ -971,7 +986,7 @@ func main() {
 			}
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
-			printDefangHint("Please use the following command to agree to the Defang terms of service:", "terms --agree-tos")
+			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
 		os.Exit(int(code))
