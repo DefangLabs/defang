@@ -129,6 +129,8 @@ func (b *byocAws) setUp(ctx context.Context) error {
 			VolumesFrom: []string{
 				cdTaskName,
 			},
+			WorkDir:    ptr.String("/app"),
+			DependsOn:  map[string]string{cdTaskName: "START"},
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
