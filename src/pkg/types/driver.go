@@ -21,6 +21,8 @@ type Container struct {
 	VolumesFrom []string // container (default rw), container:rw, or container:ro
 	EntryPoint  []string
 	Command     []string // overridden by Run()
+	WorkDir     *string
+	DependsOn   map[string]string // container name -> condition
 }
 
 type TaskVolume struct {
