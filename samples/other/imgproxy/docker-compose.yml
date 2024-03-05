@@ -6,3 +6,9 @@ services:
       - mode: ingress
         target: 8080
         protocol: http
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]

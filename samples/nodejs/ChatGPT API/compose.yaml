@@ -9,6 +9,12 @@ services:
         target: 3000
     secrets:
       - OPENAI_KEY
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
 secrets:
   OPENAI_KEY:
     external: true

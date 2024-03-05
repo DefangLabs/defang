@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,7 +27,7 @@ func Prompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqBody, _ := ioutil.ReadAll(r.Body)
+	reqBody, _ := io.ReadAll(r.Body)
 	promptText := string(reqBody)
 
 	messages := []Message{
@@ -55,7 +55,7 @@ func Prompt(w http.ResponseWriter, r *http.Request) {
 	resp, _ := client.Do(req)
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	var apiResponse interface{}
 	json.Unmarshal(body, &apiResponse)
