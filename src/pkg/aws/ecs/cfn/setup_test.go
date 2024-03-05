@@ -4,9 +4,12 @@ package cfn
 
 import (
 	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func TestNew(t *testing.T) {
@@ -14,7 +17,9 @@ func TestNew(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	aws := New("crun-test", region.Region("us-west-2")) // TODO: customize name
+	retainBucket = false      // delete bucket after test
+	user := os.Getenv("USER") // avoid conflict with other users in the same account
+	aws := New("crun-test-"+user, region.Region("us-west-2"))
 	if aws == nil {
 		t.Fatal("aws is nil")
 	}
@@ -22,7 +27,12 @@ func TestNew(t *testing.T) {
 	ctx := context.TODO()
 
 	t.Run("SetUp", func(t *testing.T) {
-		err := aws.SetUp(ctx, "docker.io/library/alpine:latest", 512_000_000, "linux/amd64")
+		containers := []types.Container{{
+			Image:    "public.ecr.aws/docker/library/alpine:latest",
+			Memory:   512_000_000,
+			Platform: "linux/amd64",
+		}}
+		err := aws.SetUp(ctx, containers)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -31,7 +41,42 @@ func TestNew(t *testing.T) {
 		}
 	})
 
+	var taskid types.TaskID
+	t.Run("Run", func(t *testing.T) {
+		var err error
+		taskid, err = aws.Run(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if taskid == nil || *taskid == "" {
+			t.Error("task id is empty")
+		}
+	})
+
+	t.Run("Tail", func(t *testing.T) {
+		if taskid == nil {
+			t.Skip("task id is empty")
+		}
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
+		err := aws.Tail(ctx, taskid)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("Stop", func(t *testing.T) {
+		if taskid == nil {
+			t.Skip("task id is empty")
+		}
+		err := aws.Stop(ctx, taskid)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	t.Run("Teardown", func(t *testing.T) {
+		// This will fail if the task is still running
 		err := aws.TearDown(ctx)
 		if err != nil {
 			t.Fatal(err)

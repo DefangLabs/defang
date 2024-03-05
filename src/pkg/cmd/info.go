@@ -13,6 +13,6 @@ func Info(ctx context.Context, region Region, id types.TaskID) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(info)
+	fmt.Println("IP:", info.IP)
 	return nil
 }

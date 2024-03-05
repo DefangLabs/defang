@@ -84,10 +84,6 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, service, etag string, since time.Time, raw bool) error {
-	if DoDryRun {
-		return nil
-	}
-
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
@@ -101,6 +97,10 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				Warn(" !", err)
 			}
 		}
+	}
+
+	if DoDryRun {
+		return ErrDryRun
 	}
 
 	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
@@ -198,7 +198,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
-		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko"
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric"
 		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
 			if onlyErrors && !e.Stderr {

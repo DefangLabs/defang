@@ -23,7 +23,7 @@ func SendMsg(ctx context.Context, client client.Client, subject, _type, id strin
 	Debug(" - Sending message to", subject, "with type", _type, "and id", id)
 
 	if DoDryRun {
-		return nil
+		return ErrDryRun
 	}
 
 	err := client.Publish(ctx, &v1.PublishRequest{Event: &v1.Event{

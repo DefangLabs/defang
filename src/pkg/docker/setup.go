@@ -11,11 +11,11 @@ import (
 	pkgtypes "github.com/defang-io/defang/src/pkg/types"
 )
 
-func (d *Docker) SetUp(ctx context.Context, tasks []pkgtypes.Task) error {
-	if len(tasks) != 1 {
-		return errors.New("only one task is supported with docker driver")
+func (d *Docker) SetUp(ctx context.Context, containers []pkgtypes.Container) error {
+	if len(containers) != 1 {
+		return errors.New("only one container is supported with docker driver")
 	}
-	task := tasks[0]
+	task := containers[0]
 	rc, err := d.ImagePull(ctx, task.Image, types.ImagePullOptions{Platform: task.Platform})
 	if err != nil {
 		return err

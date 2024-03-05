@@ -2,9 +2,12 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
@@ -29,7 +32,21 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-	return &GrpcClient{client: fabricClient, accessToken: accessToken, anonID: uuid.NewString()}
+
+	state := State{AnonID: uuid.NewString()}
+
+	// Restore anonID from config file
+	statePath := path.Join(StateDir, "state.json")
+	if bytes, err := os.ReadFile(statePath); err == nil {
+		json.Unmarshal(bytes, &state)
+	} else { // could be not found or path error
+		if bytes, err := json.MarshalIndent(state, "", "  "); err == nil {
+			os.MkdirAll(StateDir, 0700)
+			os.WriteFile(statePath, bytes, 0644)
+		}
+	}
+
+	return &GrpcClient{client: fabricClient, accessToken: accessToken, anonID: state.AnonID}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
