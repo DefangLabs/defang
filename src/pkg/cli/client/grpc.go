@@ -19,9 +19,8 @@ import (
 )
 
 type GrpcClient struct {
-	accessToken string // for WhoAmI
-	anonID      string
-	client      defangv1connect.FabricControllerClient
+	anonID string
+	client defangv1connect.FabricControllerClient
 }
 
 func NewGrpcClient(host, accessToken string) *GrpcClient {
@@ -46,7 +45,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 		}
 	}
 
-	return &GrpcClient{client: fabricClient, accessToken: accessToken, anonID: state.AnonID}
+	return &GrpcClient{client: fabricClient, anonID: state.AnonID}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -157,7 +156,7 @@ func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 }
 
 func (g *GrpcClient) Track(event string, properties ...Property) error {
-	if g == nil || g.client == nil {
+	if g == nil || g.client == nil { // FIXME: this hack doesn't work
 		return errors.New("not connected")
 	}
 

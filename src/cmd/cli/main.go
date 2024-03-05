@@ -40,7 +40,6 @@ var (
 	project        *composeTypes.Project
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = cli.IsTerminal && !pkg.GetenvBool("CI")
-	tenantId       = types.DEFAULT_TENANT
 )
 
 type P = cliClient.Property // shorthand for tracking properties
@@ -90,7 +89,7 @@ var rootCmd = &cobra.Command{
 			cli.Debug(" - Could not load docker compose file: ", err)
 		}
 
-		client, tenantId = cli.Connect(cluster, project, *provider)
+		client, _ = cli.Connect(cluster, project, *provider)
 		client.Track("User Connected", P{"cluster", cluster}, P{"provider", provider}, P{"color", *color}, P{"cwd", cd}, P{"non-interactive", nonInteractive}, P{"file", filePath})
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -108,7 +107,7 @@ var rootCmd = &cobra.Command{
 			if err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 				return err
 			}
-			client, tenantId = cli.Connect(cluster, project, *provider) // reconnect with the new token
+			client, _ = cli.Connect(cluster, project, *provider) // reconnect with the new token
 			client.Track("User Reconnected", P{"err", err.Error()})
 		}
 		return nil
@@ -606,16 +605,16 @@ var deleteCmd = &cobra.Command{
 	Use:         "delete",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Aliases:     []string{"del", "rm", "remove", "stop"},
+	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var name, _ = cmd.Flags().GetString("name")
+		var names, _ = cmd.Flags().GetStringArray("name")
 		var tail, _ = cmd.Flags().GetBool("tail")
 
-		client.Track("Delete Invoked", P{"name", name}, P{"tail", tail})
+		client.Track("Delete Invoked", P{"names", names}, P{"tail", tail})
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), client, name)
+		etag, err := cli.Delete(cmd.Context(), client, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -625,7 +624,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		cli.Info(" * Deleted service", name, "with deployment ID", etag)
+		cli.Info(" * Deleted service", names, "with deployment ID", etag)
 
 		if !tail {
 			printDefangHint("To track the update, do:", "tail --etag "+etag)
@@ -911,7 +910,7 @@ func main() {
 	rootCmd.AddCommand(tailCmd)
 
 	// Delete Command
-	deleteCmd.Flags().StringP("name", "n", "", "Name of the service (required)")
+	deleteCmd.Flags().StringArrayP("name", "n", nil, "Name of the service(s) (required)")
 	deleteCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
 	deleteCmd.MarkFlagRequired("name")
 	rootCmd.AddCommand(deleteCmd)
