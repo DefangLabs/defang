@@ -40,6 +40,7 @@ type Driver interface {
 	GetInfo(ctx context.Context, taskID TaskID) (*TaskInfo, error)
 	SetVpcID(vpcId string) error
 	PutSecret(ctx context.Context, name, value string) error
+	// DeleteSecrets(ctx context.Context, names ...string) error
 	ListSecrets(ctx context.Context) ([]string, error) // no values
 	CreateUploadURL(ctx context.Context, name string) (string, error)
 }
