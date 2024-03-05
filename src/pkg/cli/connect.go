@@ -63,7 +63,7 @@ func Connect(cluster string, project *composeTypes.Project, provider client.Prov
 		}
 		projectName := tenantId.String()
 		if project == nil {
-			Warn(" ! Failed to load Compose file; assuming project:", projectName)
+			Debug(" - Failed to load Compose file; assuming project:", projectName)
 		} else {
 			projectName = project.Name
 		}
