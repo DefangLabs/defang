@@ -42,11 +42,11 @@ service FabricController {
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
-  // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
       returns (DelegateSubdomainZoneResponse);

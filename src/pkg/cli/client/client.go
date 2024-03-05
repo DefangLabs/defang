@@ -26,6 +26,7 @@ type Client interface {
 	DelegateSubdomainZone(context.Context, *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *v1.DeleteRequest) (*v1.DeleteResponse, error)
+	DeleteSecrets(context.Context, *v1.Secrets) error
 	DeleteSubdomainZone(context.Context) error
 	Deploy(context.Context, *v1.DeployRequest) (*v1.DeployResponse, error)
 	Destroy(context.Context) (ETag, error)
