@@ -10,6 +10,12 @@ services:
     secrets:
       - AWS_ACCESS_KEY
       - AWS_SECRET_KEY
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
 secrets:
   AWS_ACCESS_KEY:
     external: true
