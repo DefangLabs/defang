@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/smithy-go"
@@ -41,24 +40,13 @@ var (
 	project        *composeTypes.Project
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = cli.IsTerminal && !pkg.GetenvBool("CI")
-	trackWG        = sync.WaitGroup{}
 )
-
-type P = cliClient.Property // shorthand for tracking properties
 
 const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
 var autoConnectAnnotation = map[string]string{autoConnect: ""}
 
 const authNeeded = "auth-needed"                                              // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: "", autoConnect: ""} // auth implies auto-connect
-
-func track(name string, props ...cliClient.Property) {
-	trackWG.Add(1)
-	go func() {
-		defer trackWG.Done()
-		client.Track(name, props...)
-	}()
-}
 
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
@@ -999,7 +987,7 @@ func main() {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
-		trackWG.Wait() // wait for all tracking to finish
+		flushAllTracking()
 		os.Exit(int(code))
 	}
 
@@ -1020,7 +1008,7 @@ func main() {
 		}
 	}
 
-	trackWG.Wait() // wait for all tracking to finish
+	flushAllTracking()
 }
 
 func prettyExecutable(def string) string {
