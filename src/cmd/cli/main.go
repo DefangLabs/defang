@@ -97,8 +97,9 @@ var rootCmd = &cobra.Command{
 			if nonInteractive {
 				return err
 			}
-			if connect.CodeOf(err) != connect.CodeFailedPrecondition {
-				// TODO: prompt for agreement to TOS
+			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
+				cli.Warn(" !", err)
+				return cli.InteractiveAgreeToS(cmd.Context(), client)
 			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -791,18 +792,19 @@ var tosCmd = &cobra.Command{
 	Short:       "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agree, _ := cmd.Flags().GetBool("agree-tos")
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
-		track("Tos Invoked", P{"agree", agree})
+		track("Tos Invoked", P{"agree", agree}, P{"non-interactive", nonInteractive})
 
-		cli.Println(cli.Nop, "Our latest terms of service can be found at https://defang.io/terms-service.html")
 		if agree {
-			if err := client.AgreeToS(cmd.Context()); err != nil {
-				return err
-			}
-			cli.Info(" * You have agreed to the Defang terms of service")
-		} else {
-			printDefangHint("To agree to the terms of service, do:", "terms --agree-tos")
+			return cli.NonInteractiveAgreeToS(cmd.Context(), client)
 		}
+
+		if !nonInteractive {
+			return cli.InteractiveAgreeToS(cmd.Context(), client)
+		}
+
+		printDefangHint("To agree to the terms of service, do:", "terms --agree-tos")
 		return nil
 	},
 }
@@ -992,9 +994,6 @@ func main() {
 
 	if hasTty && cli.HadWarnings {
 		cli.Println(cli.Nop, "For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
-		if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
-			fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
-		}
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
