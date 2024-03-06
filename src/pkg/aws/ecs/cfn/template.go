@@ -364,7 +364,7 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		if container.DependsOn != nil {
 			for name, condition := range container.DependsOn {
 				dependsOn = append(dependsOn, ecs.TaskDefinition_ContainerDependency{
-					Condition:     ptr.String(condition),
+					Condition:     ptr.String(string(condition)),
 					ContainerName: ptr.String(name),
 				})
 			}
