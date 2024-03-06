@@ -188,13 +188,13 @@ func (g *GrpcClient) CheckLogin(ctx context.Context) error {
 }
 
 func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
-	// Get all the services and delete them all at once
-	services, err := g.GetServices(ctx)
+	// Get all the services in the project and delete them all at once
+	project, err := g.GetServices(ctx)
 	if err != nil {
 		return "", err
 	}
 	var names []string
-	for _, service := range services.Services {
+	for _, service := range project.Services {
 		names = append(names, service.Service.Name)
 	}
 	resp, err := g.Delete(ctx, &v1.DeleteRequest{Names: names})
@@ -206,4 +206,19 @@ func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
 
 func (g *GrpcClient) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang provider")
+}
+
+func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
+	// For now, we'll just get the service info and pass it back to Deploy as-is.
+	services := make([]*v1.Service, 0, len(names))
+	for _, name := range names {
+		serviceInfo, err := g.Get(ctx, &v1.ServiceID{Name: name})
+		if err != nil {
+			return err
+		}
+		services = append(services, serviceInfo.Service)
+	}
+
+	_, err := g.Deploy(ctx, &v1.DeployRequest{Services: services})
+	return err
 }
