@@ -498,12 +498,7 @@ func (b byocAws) PutSecret(ctx context.Context, secret *v1.SecretValue) error {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
-	var err error
-	if secret.Value == "" {
-		err = b.driver.DeleteSecret(ctx, fqn)
-	} else {
-		err = b.driver.PutSecret(ctx, fqn, secret.Value)
-	}
+	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
@@ -859,4 +854,15 @@ func (b *byocAws) BootstrapCommand(ctx context.Context, command string) (string,
 
 func (b *byocAws) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
+}
+
+func (b *byocAws) DeleteSecrets(ctx context.Context, secrets *v1.Secrets) error {
+	ids := make([]string, len(secrets.Names))
+	for i, name := range secrets.Names {
+		ids[i] = b.getSecretID(name)
+	}
+	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
+		return annotateAwsError(err)
+	}
+	return nil
 }

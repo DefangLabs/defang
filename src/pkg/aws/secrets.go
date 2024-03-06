@@ -20,18 +20,16 @@ func IsParameterNotFoundError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func (a *Aws) DeleteSecret(ctx context.Context, name string) error {
+func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	secretId := getSecretID(name)
-
 	svc := ssm.NewFromConfig(cfg)
 
-	_, err = svc.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-		Name: secretId,
+	_, err = svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
+		Names: names, // works because getSecretID is a no-op
 	})
 	return err
 }
