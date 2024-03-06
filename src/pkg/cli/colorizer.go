@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != ""
+	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && os.Getenv("TERM") != ""
 	stdout     = termenv.NewOutput(os.Stdout)
 	stderr     = termenv.NewOutput(os.Stderr)
 	canColor   = doColor(stdout)
@@ -19,7 +19,6 @@ type Color = termenv.ANSIColor
 
 const (
 	Nop        Color = -1
-	Bright           = termenv.ANSIBrightWhite
 	BrightCyan       = termenv.ANSIBrightCyan
 	InfoColor        = termenv.ANSIBrightMagenta
 	ErrorColor       = termenv.ANSIBrightRed
