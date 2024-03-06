@@ -96,8 +96,14 @@ var rootCmd = &cobra.Command{
 		}
 
 		if err := client.CheckLogin(cmd.Context()); err != nil {
-			// Login now; only do this for authorization-related errors
-			if connect.CodeOf(err) != connect.CodeUnauthenticated || nonInteractive {
+			if nonInteractive {
+				return err
+			}
+			if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+				// TODO: prompt for agreement to TOS
+			}
+			// Login interactively now; only do this for authorization-related errors
+			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return err
 			}
 			cli.Warn(" !", err)
