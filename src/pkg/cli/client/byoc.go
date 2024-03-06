@@ -868,3 +868,7 @@ func (b *byocAws) DeleteSecrets(ctx context.Context, secrets *v1.Secrets) error 
 	}
 	return nil
 }
+
+func (b *byocAws) Restart(ctx context.Context, names ...string) error {
+	return errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+}

@@ -264,13 +264,19 @@ var getServicesCmd = &cobra.Command{
 	Aliases:     []string{"getServices", "ls", "list"},
 	Short:       "Get list of services on the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		track("Services Invoked")
+		long, _ := cmd.Flags().GetBool("long")
 
-		err := cli.GetServices(cmd.Context(), client)
+		track("Services Invoked", P{"long", long})
+
+		err := cli.GetServices(cmd.Context(), client, long)
 		if err != nil {
 			return err
 		}
-		// printDefangHint("To get more information about a service, do:", "get service <name>")
+
+		if !long {
+			printDefangHint("To see more information about your services, do:", cmd.CalledAs()+" -l")
+		}
+
 		return nil
 	},
 }
@@ -514,11 +520,7 @@ var composeRestartCmd = &cobra.Command{
 
 		track("Compose-Restart Invoked", P{"file", filePath})
 
-		_, err := cli.ComposeRestart(cmd.Context(), client, project)
-		if err != nil {
-			return err
-		}
-		return nil
+		return cli.ComposeRestart(cmd.Context(), client, project)
 	},
 }
 
@@ -642,11 +644,7 @@ var restartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		track("Restart Invoked", P{"services", args})
 
-		_, err := cli.Restart(cmd.Context(), client, args...)
-		if err != nil {
-			return err
-		}
-		return nil
+		return cli.Restart(cmd.Context(), client, args...)
 	},
 }
 
@@ -804,7 +802,7 @@ var tosCmd = &cobra.Command{
 			return cli.InteractiveAgreeToS(cmd.Context(), client)
 		}
 
-		printDefangHint("To agree to the terms of service, do:", "terms --agree-tos")
+		printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 		return nil
 	},
 }
@@ -859,6 +857,7 @@ func main() {
 	rootCmd.AddCommand(generateCmd)
 
 	// Get Services Command
+	getServicesCmd.Flags().BoolP("long", "l", false, "Show more details")
 	rootCmd.AddCommand(getServicesCmd)
 
 	// Get Status Command
