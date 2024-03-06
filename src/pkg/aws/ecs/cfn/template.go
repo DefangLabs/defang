@@ -395,7 +395,6 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 	}
 
 	const _taskDefinition = "TaskDefinition"
-	const cdTaskDefName = awsecs.ContainerName + "-cd"
 	template.Resources[_taskDefinition] = &ecs.TaskDefinition{
 		Tags: defaultTags,
 		RuntimePlatform: &ecs.TaskDefinition_RuntimePlatform{
