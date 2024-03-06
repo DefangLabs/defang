@@ -38,7 +38,9 @@ service FabricController {
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // SignToS
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
+
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
