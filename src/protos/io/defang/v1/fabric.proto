@@ -14,44 +14,49 @@ import "google/protobuf/timestamp.proto";
 service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };   // public
-  rpc GetVersion(google.protobuf.Empty) returns (Version){
-    option idempotency_level = NO_SIDE_EFFECTS;
   }; // public
-  rpc Token(TokenRequest) returns (TokenResponse);         // public
+  rpc GetVersion(google.protobuf.Empty) returns (Version) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };                                               // public
+  rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
-  rpc Get(ServiceID) returns (ServiceInfo){
+  rpc Get(ServiceID) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // should be GetService
+  };                                                  // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse){
+  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // SignToS
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
+
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc ListSecrets(google.protobuf.Empty) returns (Secrets){
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
-  // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
 
-  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest) returns (DelegateSubdomainZoneResponse);
-  rpc DeleteSubdomainZone(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetDelegateSubdomainZone(google.protobuf.Empty) returns (DelegateSubdomainZoneResponse){
+  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
+      returns (DelegateSubdomainZoneResponse);
+  rpc DeleteSubdomainZone(google.protobuf.Empty)
+      returns (google.protobuf.Empty);
+  rpc GetDelegateSubdomainZone(google.protobuf.Empty)
+      returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
-  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse){
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
@@ -63,9 +68,7 @@ message TrackRequest {
   map<string, string> properties = 3;
 }
 
-message DeployRequest {
-  repeated Service services = 1;
-}
+message DeployRequest { repeated Service services = 1; }
 
 message DeployResponse {
   repeated ServiceInfo services = 1;
@@ -277,7 +280,7 @@ message Build {
 message HealthCheck {
   repeated string test = 1;
   uint32 interval = 2; // in seconds
-  uint32 timeout = 3; // in seconds; must be less than interval
+  uint32 timeout = 3;  // in seconds; must be less than interval
   uint32 retries = 4;
   // uint32 start_period = 5;
   // uint32 start_interval = 5; not supported by ECS
@@ -317,17 +320,13 @@ message PublishRequest { Event event = 1; }
 
 message SubscribeRequest { string service = 1; }
 
-message SubscribeResponse {
-  repeated ServiceInfo services = 1;
-}
+message SubscribeResponse { repeated ServiceInfo services = 1; }
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
 }
 
-message DelegateSubdomainZoneResponse {
-  string zone = 1;
-}
+message DelegateSubdomainZoneResponse { string zone = 1; }
 
 message WhoAmIResponse {
   string tenant = 1;

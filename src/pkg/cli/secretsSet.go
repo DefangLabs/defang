@@ -12,7 +12,7 @@ func SecretsSet(ctx context.Context, client client.Client, name string, value st
 	Debug(" - Setting secret", name)
 
 	if value == "" {
-		return errors.New("value cannot be empty")
+		return errors.New("value cannot be empty") // FIXME: remove once we implement DeleteSecrets rpc
 	}
 
 	if DoDryRun {

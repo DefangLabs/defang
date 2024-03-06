@@ -117,6 +117,16 @@ func (g GrpcClient) PutSecret(ctx context.Context, req *v1.SecretValue) error {
 	return err
 }
 
+func (g GrpcClient) DeleteSecrets(ctx context.Context, req *v1.Secrets) error {
+	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
+	var errs []error
+	for _, name := range req.Names {
+		_, err := g.client.PutSecret(ctx, &connect.Request[v1.SecretValue]{Msg: &v1.SecretValue{Name: name}})
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
 func (g GrpcClient) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }
@@ -156,10 +166,6 @@ func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 }
 
 func (g *GrpcClient) Track(event string, properties ...Property) error {
-	if g == nil || g.client == nil { // FIXME: this hack doesn't work
-		return errors.New("not connected")
-	}
-
 	// Convert map[string]any to map[string]string
 	var props map[string]string
 	if len(properties) > 0 {
@@ -177,7 +183,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 }
 
 func (g *GrpcClient) CheckLogin(ctx context.Context) error {
-	_, err := g.WhoAmI(ctx)
+	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
