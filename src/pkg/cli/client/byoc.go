@@ -364,15 +364,17 @@ func (b *byocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":            defangPrefix,
-		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":               b.tenantID,
-		"DOMAIN":                   b.customDomain,
-		"PRIVATE_DOMAIN":           b.privateDomain,
-		"PROJECT":                  b.pulumiProject,
-		"PULUMI_BACKEND_URL":       fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
-		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
-		"STACK":                    b.pulumiStack,
+		"DEFANG_PREFIX":              defangPrefix,
+		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_ORG":                 b.tenantID,
+		"DOMAIN":                     b.customDomain,
+		"PRIVATE_DOMAIN":             b.privateDomain,
+		"PROJECT":                    b.pulumiProject,
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
+		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
+		"STACK":                      b.pulumiStack,
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
+		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 	}
 }
 
