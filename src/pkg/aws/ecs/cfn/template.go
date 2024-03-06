@@ -359,6 +359,17 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		if name == "" {
 			name = awsecs.ContainerName // TODO: backwards compat; remove this
 		}
+
+		var dependsOn []ecs.TaskDefinition_ContainerDependency
+		if container.DependsOn != nil {
+			for name, condition := range container.DependsOn {
+				dependsOn = append(dependsOn, ecs.TaskDefinition_ContainerDependency{
+					Condition:     ptr.String(string(condition)),
+					ContainerName: ptr.String(name),
+				})
+			}
+		}
+
 		def := ecs.TaskDefinition_ContainerDefinition{
 			Name:        name,
 			Image:       images[i],
@@ -373,11 +384,12 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 					"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
 				},
 			},
-			VolumesFrom: volumesFrom,
-			MountPoints: mountPoints,
-			EntryPoint:  container.EntryPoint,
-			Command:     container.Command,
-			// WorkingDirectory: ptr.String("/app"), // TODO: make this configurable
+			VolumesFrom:      volumesFrom,
+			MountPoints:      mountPoints,
+			EntryPoint:       container.EntryPoint,
+			Command:          container.Command,
+			WorkingDirectory: container.WorkDir,
+			DependsOnProp:    dependsOn,
 		}
 		containerDefinitions = append(containerDefinitions, def)
 	}

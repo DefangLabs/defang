@@ -9,6 +9,14 @@ const (
 )
 
 type TaskID *string
+type ContainerCondition string
+
+const (
+	ContainerStarted  ContainerCondition = "START"
+	ContainerComplete                    = "COMPLETE"
+	ContainerSuccess                     = "SUCCESS"
+	ContainerHealthy                     = "HEALTHY"
+)
 
 type Container struct {
 	Image       string
@@ -21,6 +29,8 @@ type Container struct {
 	VolumesFrom []string // container (default rw), container:rw, or container:ro
 	EntryPoint  []string
 	Command     []string // overridden by Run()
+	WorkDir     *string
+	DependsOn   map[string]ContainerCondition // container name -> condition
 }
 
 type TaskVolume struct {
