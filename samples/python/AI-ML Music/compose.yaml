@@ -14,3 +14,5 @@ services:
     ports:
       - mode: ingress
         target: 5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
