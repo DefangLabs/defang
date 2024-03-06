@@ -35,7 +35,7 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-func LoginWithGitHub(ctx context.Context, client client.Client, gitHubClientId, fabric string) (string, error) {
+func loginWithGitHub(ctx context.Context, client client.Client, gitHubClientId, fabric string) (string, error) {
 	Debug(" - Logging in to", fabric)
 
 	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId)
@@ -58,7 +58,7 @@ func saveAccessToken(fabric, at string) error {
 }
 
 func InteractiveLogin(ctx context.Context, client client.Client, gitHubClientId, fabric string) error {
-	at, err := LoginWithGitHub(ctx, client, gitHubClientId, fabric)
+	at, err := loginWithGitHub(ctx, client, gitHubClientId, fabric)
 	if err != nil {
 		return err
 	}
