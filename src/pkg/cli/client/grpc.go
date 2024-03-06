@@ -173,7 +173,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 }
 
 func (g *GrpcClient) CheckLogin(ctx context.Context) error {
-	_, err := g.WhoAmI(ctx)
+	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
