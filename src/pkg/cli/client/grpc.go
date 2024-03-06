@@ -156,10 +156,6 @@ func (g *GrpcClient) AgreeToS(ctx context.Context) error {
 }
 
 func (g *GrpcClient) Track(event string, properties ...Property) error {
-	if g == nil || g.client == nil { // FIXME: this hack doesn't work
-		return errors.New("not connected")
-	}
-
 	// Convert map[string]any to map[string]string
 	var props map[string]string
 	if len(properties) > 0 {
