@@ -122,9 +122,10 @@ func (b *byocAws) setUp(ctx context.Context) error {
 	cdTaskName := cdTaskPrefix
 	containers := []types.Container{
 		{
-			Image:     "pulumi/pulumi:latest",
+			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:latest",
 			Name:      awsecs.ContainerName,
-			Memory:    4 * 512_000_000, // 512 MiB
+			Cpus:      0.5,
+			Memory:    2048_000_000, // 2G
 			Essential: ptr.Bool(true),
 			VolumesFrom: []string{
 				cdTaskName,
