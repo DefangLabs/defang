@@ -38,6 +38,7 @@ type Client interface {
 	ListSecrets(context.Context) (*v1.Secrets, error)
 	Publish(context.Context, *v1.PublishRequest) error
 	PutSecret(context.Context, *v1.SecretValue) error
+	Restart(context.Context, ...string) error
 	RevokeToken(context.Context) error
 	Tail(context.Context, *v1.TailRequest) (ServerStream[v1.TailResponse], error)
 	TearDown(context.Context) error

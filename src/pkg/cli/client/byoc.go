@@ -451,16 +451,29 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 		}
 		for _, service := range dso.Services {
 			// Check whether this is indeed a service we want to manage
-			fqn := strings.SplitN(getQualifiedNameFromEcsName(*service.ServiceName), ".", 2)
+			fqn := strings.Split(getQualifiedNameFromEcsName(*service.ServiceName), ".")
 			if len(fqn) != 2 {
 				continue
 			}
-			// TODO: get the service definition from the task definition or tags
-			serviceInfos = append(serviceInfos, &v1.ServiceInfo{
+			serviceInfo := &v1.ServiceInfo{
+				CreatedAt: timestamppb.New(*service.CreatedAt),
+				Project:   fqn[0],
 				Service: &v1.Service{
 					Name: fqn[1],
+					Deploy: &v1.Deploy{
+						Replicas: uint32(service.DesiredCount),
+					},
 				},
-			})
+				Status: *service.Status,
+			}
+			// TODO: get the service definition from the task definition or tags
+			for _, tag := range service.Tags {
+				if *tag.Key == "etag" {
+					serviceInfo.Etag = *tag.Value
+					break
+				}
+			}
+			serviceInfos = append(serviceInfos, serviceInfo)
 		}
 	}
 	return &v1.ListServicesResponse{Services: serviceInfos}, nil
@@ -867,4 +880,8 @@ func (b *byocAws) DeleteSecrets(ctx context.Context, secrets *v1.Secrets) error 
 		return annotateAwsError(err)
 	}
 	return nil
+}
+
+func (b *byocAws) Restart(ctx context.Context, names ...string) error {
+	return errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
