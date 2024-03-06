@@ -2790,7 +2790,7 @@ var file_io_defang_v1_fabric_proto_rawDesc = []byte{
 	0x48, 0x54, 0x54, 0x50, 0x10, 0x03, 0x12, 0x09, 0x0a, 0x05, 0x48, 0x54, 0x54, 0x50, 0x32, 0x10,
 	0x04, 0x12, 0x08, 0x0a, 0x04, 0x47, 0x52, 0x50, 0x43, 0x10, 0x05, 0x2a, 0x1d, 0x0a, 0x04, 0x4d,
 	0x6f, 0x64, 0x65, 0x12, 0x08, 0x0a, 0x04, 0x48, 0x4f, 0x53, 0x54, 0x10, 0x00, 0x12, 0x0b, 0x0a,
-	0x07, 0x49, 0x4e, 0x47, 0x52, 0x45, 0x53, 0x53, 0x10, 0x01, 0x32, 0x87, 0x0d, 0x0a, 0x10, 0x46,
+	0x07, 0x49, 0x4e, 0x47, 0x52, 0x45, 0x53, 0x53, 0x10, 0x01, 0x32, 0xc7, 0x0d, 0x0a, 0x10, 0x46,
 	0x61, 0x62, 0x72, 0x69, 0x63, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x12,
 	0x3e, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x2e, 0x67,
 	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45,
@@ -2859,6 +2859,10 @@ var file_io_defang_v1_fabric_proto_rawDesc = []byte{
 	0x50, 0x75, 0x74, 0x53, 0x65, 0x63, 0x72, 0x65, 0x74, 0x12, 0x19, 0x2e, 0x69, 0x6f, 0x2e, 0x64,
 	0x65, 0x66, 0x61, 0x6e, 0x67, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x65, 0x63, 0x72, 0x65, 0x74, 0x56,
 	0x61, 0x6c, 0x75, 0x65, 0x1a, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x12, 0x3e, 0x0a, 0x0d,
+	0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x53, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x12, 0x15, 0x2e,
+	0x69, 0x6f, 0x2e, 0x64, 0x65, 0x66, 0x61, 0x6e, 0x67, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x65, 0x63,
+	0x72, 0x65, 0x74, 0x73, 0x1a, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x12, 0x41, 0x0a, 0x0b,
 	0x4c, 0x69, 0x73, 0x74, 0x53, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x12, 0x16, 0x2e, 0x67, 0x6f,
 	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d,
@@ -3015,38 +3019,40 @@ var file_io_defang_v1_fabric_proto_depIdxs = []int32{
 	45, // 40: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
 	45, // 41: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
 	15, // 42: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.SecretValue
-	45, // 43: io.defang.v1.FabricController.ListSecrets:input_type -> google.protobuf.Empty
-	11, // 44: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
-	38, // 45: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
-	45, // 46: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> google.protobuf.Empty
-	45, // 47: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> google.protobuf.Empty
-	45, // 48: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
-	3,  // 49: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
-	18, // 50: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
-	19, // 51: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
-	17, // 52: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
-	45, // 53: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
-	22, // 54: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
-	13, // 55: io.defang.v1.FabricController.Update:output_type -> io.defang.v1.ServiceInfo
-	5,  // 56: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
-	13, // 57: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
-	7,  // 58: io.defang.v1.FabricController.Delete:output_type -> io.defang.v1.DeleteResponse
-	45, // 59: io.defang.v1.FabricController.Publish:output_type -> google.protobuf.Empty
-	37, // 60: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
-	23, // 61: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.ListServicesResponse
-	10, // 62: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
-	45, // 63: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
-	45, // 64: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
-	45, // 65: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
-	14, // 66: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
-	12, // 67: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
-	39, // 68: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	45, // 69: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
-	39, // 70: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	40, // 71: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
-	45, // 72: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
-	50, // [50:73] is the sub-list for method output_type
-	27, // [27:50] is the sub-list for method input_type
+	14, // 43: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
+	45, // 44: io.defang.v1.FabricController.ListSecrets:input_type -> google.protobuf.Empty
+	11, // 45: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
+	38, // 46: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
+	45, // 47: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> google.protobuf.Empty
+	45, // 48: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> google.protobuf.Empty
+	45, // 49: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
+	3,  // 50: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
+	18, // 51: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
+	19, // 52: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
+	17, // 53: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
+	45, // 54: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
+	22, // 55: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
+	13, // 56: io.defang.v1.FabricController.Update:output_type -> io.defang.v1.ServiceInfo
+	5,  // 57: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
+	13, // 58: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
+	7,  // 59: io.defang.v1.FabricController.Delete:output_type -> io.defang.v1.DeleteResponse
+	45, // 60: io.defang.v1.FabricController.Publish:output_type -> google.protobuf.Empty
+	37, // 61: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
+	23, // 62: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.ListServicesResponse
+	10, // 63: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
+	45, // 64: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
+	45, // 65: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
+	45, // 66: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
+	45, // 67: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
+	14, // 68: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
+	12, // 69: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
+	39, // 70: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	45, // 71: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
+	39, // 72: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	40, // 73: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
+	45, // 74: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
+	51, // [51:75] is the sub-list for method output_type
+	27, // [27:51] is the sub-list for method input_type
 	27, // [27:27] is the sub-list for extension type_name
 	27, // [27:27] is the sub-list for extension extendee
 	0,  // [0:27] is the sub-list for field type_name
