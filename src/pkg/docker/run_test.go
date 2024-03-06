@@ -16,7 +16,7 @@ func TestRun(t *testing.T) {
 
 	d := New()
 
-	err := d.SetUp(context.TODO(), []types.Container{{Image: "alpine:latest", Memory: 6 * 1024 * 1024, Platform: d.platform}})
+	err := d.SetUp(context.TODO(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
 
 	if err != nil {
 		t.Fatal(err)
