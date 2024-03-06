@@ -117,6 +117,16 @@ func (g GrpcClient) PutSecret(ctx context.Context, req *v1.SecretValue) error {
 	return err
 }
 
+func (g GrpcClient) DeleteSecrets(ctx context.Context, req *v1.Secrets) error {
+	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
+	var errs []error
+	for _, name := range req.Names {
+		_, err := g.client.PutSecret(ctx, &connect.Request[v1.SecretValue]{Msg: &v1.SecretValue{Name: name}})
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
 func (g GrpcClient) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }

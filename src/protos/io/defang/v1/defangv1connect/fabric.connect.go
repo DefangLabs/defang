@@ -78,6 +78,9 @@ const (
 	// FabricControllerPutSecretProcedure is the fully-qualified name of the FabricController's
 	// PutSecret RPC.
 	FabricControllerPutSecretProcedure = "/io.defang.v1.FabricController/PutSecret"
+	// FabricControllerDeleteSecretsProcedure is the fully-qualified name of the FabricController's
+	// DeleteSecrets RPC.
+	FabricControllerDeleteSecretsProcedure = "/io.defang.v1.FabricController/DeleteSecrets"
 	// FabricControllerListSecretsProcedure is the fully-qualified name of the FabricController's
 	// ListSecrets RPC.
 	FabricControllerListSecretsProcedure = "/io.defang.v1.FabricController/ListSecrets"
@@ -118,6 +121,7 @@ type FabricControllerClient interface {
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
@@ -221,6 +225,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerPutSecretProcedure,
 			opts...,
 		),
+		deleteSecrets: connect_go.NewClient[v1.Secrets, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerDeleteSecretsProcedure,
+			opts...,
+		),
 		listSecrets: connect_go.NewClient[emptypb.Empty, v1.Secrets](
 			httpClient,
 			baseURL+FabricControllerListSecretsProcedure,
@@ -280,6 +289,7 @@ type fabricControllerClient struct {
 	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
+	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
@@ -369,6 +379,11 @@ func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.
 	return c.putSecret.CallUnary(ctx, req)
 }
 
+// DeleteSecrets calls io.defang.v1.FabricController.DeleteSecrets.
+func (c *fabricControllerClient) DeleteSecrets(ctx context.Context, req *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.deleteSecrets.CallUnary(ctx, req)
+}
+
 // ListSecrets calls io.defang.v1.FabricController.ListSecrets.
 func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error) {
 	return c.listSecrets.CallUnary(ctx, req)
@@ -423,6 +438,7 @@ type FabricControllerHandler interface {
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
@@ -522,6 +538,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.PutSecret,
 		opts...,
 	)
+	fabricControllerDeleteSecretsHandler := connect_go.NewUnaryHandler(
+		FabricControllerDeleteSecretsProcedure,
+		svc.DeleteSecrets,
+		opts...,
+	)
 	fabricControllerListSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListSecretsProcedure,
 		svc.ListSecrets,
@@ -594,6 +615,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerCheckToSHandler.ServeHTTP(w, r)
 		case FabricControllerPutSecretProcedure:
 			fabricControllerPutSecretHandler.ServeHTTP(w, r)
+		case FabricControllerDeleteSecretsProcedure:
+			fabricControllerDeleteSecretsHandler.ServeHTTP(w, r)
 		case FabricControllerListSecretsProcedure:
 			fabricControllerListSecretsHandler.ServeHTTP(w, r)
 		case FabricControllerCreateUploadURLProcedure:
@@ -679,6 +702,10 @@ func (UnimplementedFabricControllerHandler) CheckToS(context.Context, *connect_g
 
 func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutSecret is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteSecrets is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error) {

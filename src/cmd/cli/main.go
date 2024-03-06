@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
-	"golang.org/x/term"
 
 	"github.com/AlecAivazis/survey/v2"
 
@@ -344,27 +342,22 @@ var secretsSetCmd = &cobra.Command{
 
 		var secret string
 		if !nonInteractive {
-			// check if we are properly connected / authenticated before asking the questions
-			if err := client.CheckLogin(cmd.Context()); err != nil {
-				return err
+			// Prompt for secret value
+			var secretPrompt = &survey.Password{
+				Message: fmt.Sprintf("Enter value for secret %q:", name),
+				Help:    "The value will be stored securely and cannot be retrieved later.",
 			}
 
-			// Prompt for secret value
-			cli.Print(cli.Bright, "? Enter value for secret '", name, "': ")
-
-			byteSecret, err := term.ReadPassword(int(os.Stdin.Fd()))
+			err := survey.AskOne(secretPrompt, &secret)
 			if err != nil {
 				return err
 			}
-			fmt.Println()
-			secret = string(byteSecret)
 		} else {
-			reader := bufio.NewReader(os.Stdin)
-			s, err := reader.ReadString('\n')
+			bytes, err := io.ReadAll(os.Stdin)
 			if err != nil && err != io.EOF {
 				return fmt.Errorf("failed reading the secret from non-terminal: %w", err)
 			}
-			secret = strings.TrimSuffix(s, "\n")
+			secret = strings.TrimSuffix(string(bytes), "\n")
 		}
 
 		if err := cli.SecretsSet(cmd.Context(), client, name, secret); err != nil {
@@ -382,13 +375,13 @@ var secretsDeleteCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"del", "rm", "remove"},
-	Short:       "Deletes a secret",
+	Short:       "Deletes one or more secrets",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var name, _ = cmd.Flags().GetString("name")
+		var names, _ = cmd.Flags().GetStringArray("name")
 
-		track("Secret-Delete Invoked", P{"name", name})
+		track("Secret-Delete Invoked", P{"names", names})
 
-		if err := cli.SecretsDelete(cmd.Context(), client, name); err != nil {
+		if err := cli.SecretsDelete(cmd.Context(), client, names...); err != nil {
 			// Show a warning (not an error) if the secret was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				cli.Warn(" !", err)
@@ -396,7 +389,7 @@ var secretsDeleteCmd = &cobra.Command{
 			}
 			return err
 		}
-		cli.Info(" * Deleted secret", name)
+		cli.Info(" * Deleted secret", names)
 
 		printDefangHint("To list the secrets (but not their values), do:", "secret ls")
 		return nil
@@ -874,7 +867,7 @@ func main() {
 	secretsSetCmd.MarkFlagRequired("name")
 	secretsCmd.AddCommand(secretsSetCmd)
 
-	secretsDeleteCmd.Flags().StringP("name", "n", "", "Name of the secret (required)")
+	secretsDeleteCmd.Flags().StringArrayP("name", "n", nil, "Name of the secret(s) (required)")
 	secretsDeleteCmd.MarkFlagRequired("name")
 	secretsCmd.AddCommand(secretsDeleteCmd)
 

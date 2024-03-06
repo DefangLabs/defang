@@ -7,14 +7,14 @@ import (
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func SecretsDelete(ctx context.Context, client client.Client, name string) error {
-	Debug(" - Deleting secret", name)
+func SecretsDelete(ctx context.Context, client client.Client, names ...string) error {
+	Debug(" - Deleting secret", names)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
 	// FIXME: create dedicated DeleteSecret method in client proto
-	err := client.PutSecret(ctx, &v1.SecretValue{Name: name})
+	err := client.DeleteSecrets(ctx, &v1.Secrets{Names: names})
 	return err
 }
