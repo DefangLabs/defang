@@ -26,10 +26,10 @@ func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	if err != nil {
 		return cfg, err
 	}
-	a.Region = Region(cfg.Region)
-	if a.Region == "" {
+	if cfg.Region == "" {
 		return cfg, errors.New("missing AWS region: set AWS_REGION or edit your AWS profile")
 	}
+	a.Region = Region(cfg.Region)
 	return cfg, err
 }
 
