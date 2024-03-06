@@ -10,6 +10,7 @@ RUN apt-get update \
             build-essential \
             python3-dev \
             ca-certificates \
+            curl \
       && rm -rf /var/lib/apt/lists/*
 
 # Install any needed packages specified in requirements.txt
