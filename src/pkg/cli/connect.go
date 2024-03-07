@@ -17,13 +17,11 @@ const DefaultCluster = "fabric-prod1.defang.dev"
 
 // Deprecated: should use grpc to get the tenant ID
 func GetTenantID(cluster string) types.TenantID {
-	tenantId, _ := SplitTenantHost(cluster)
-
-	// HACK: don't rely on info in token
-	accessToken := GetExistingToken(cluster)
-	if accessToken != "" {
-		tenantId, _, _ = tenantFromAccessToken(accessToken)
+	if tenantId, _ := SplitTenantHost(cluster); tenantId != types.DEFAULT_TENANT {
+		return tenantId
 	}
+
+	_, tenantId := getExistingTokenAndTenant(cluster)
 	return tenantId
 }
 
@@ -42,18 +40,31 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 	return tenant, cluster
 }
 
-func Connect(cluster string, project *composeTypes.Project, provider client.Provider) (client.Client, types.TenantID) {
-	tenantId, host := SplitTenantHost(cluster)
-
-	// HACK: don't rely on info in token
+func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
+	var tenantId types.TenantID
 	accessToken := GetExistingToken(cluster)
 	if accessToken != "" {
+		// HACK: don't rely on info in token
 		tenantId, _, _ = tenantFromAccessToken(accessToken)
 	}
-	Debug(" - Using tenant", tenantId, "for cluster", cluster, "and provider", provider)
+	return accessToken, tenantId
+}
+
+func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
+	accessToken, tenantId := getExistingTokenAndTenant(cluster)
+
+	tenant, host := SplitTenantHost(cluster)
+	if tenant != types.DEFAULT_TENANT {
+		tenantId = tenant
+	}
+	Debug(" - Using tenant", tenantId, "for cluster", cluster)
 
 	Info(" * Connecting to", host)
-	defangClient := client.NewGrpcClient(host, accessToken)
+	return client.NewGrpcClient(host, accessToken), tenantId
+}
+
+func NewClient(cluster string, project *composeTypes.Project, provider client.Provider) client.Client {
+	defangClient, tenantId := Connect(cluster)
 
 	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
 	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
@@ -68,13 +79,13 @@ func Connect(cluster string, project *composeTypes.Project, provider client.Prov
 			projectName = project.Name
 		}
 		byocClient := client.NewByocAWS(tenantId, projectName, defangClient)
-		return byocClient, tenantId
+		return byocClient
 	}
 
 	if awsInEnv {
 		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
 	}
-	return defangClient, tenantId
+	return defangClient
 }
 
 // Deprecated: don't rely on info in token
