@@ -92,14 +92,13 @@ func (w Warnings) Error() string {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId types.TenantID, project string, defClient *GrpcClient) *byocAws {
-	return &byocAws{
+	b := &byocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]awsecs.TaskArn),
 		customDomain:  "",
-		driver:        cfn.New(cdTaskPrefix, aws.Region("")),  // default region
-		privateDomain: strings.ToLower(project + ".internal"), // must match the logic in ecs/common.ts
-		pulumiProject: project,                                // TODO: multi-project support
-		pulumiStack:   "beta",                                 // TODO: make customizable
+		driver:        cfn.New(cdTaskPrefix, aws.Region("")), // default region
+		pulumiProject: project,                               // TODO: multi-project support
+		pulumiStack:   "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -113,6 +112,8 @@ func NewByocAWS(tenantId types.TenantID, project string, defClient *GrpcClient) 
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
+	b.privateDomain = b.getProjectDomain("internal")
+	return b
 }
 
 func (b *byocAws) setUp(ctx context.Context) error {
@@ -831,14 +832,14 @@ func (b byocAws) getPublicFqdn(fqn qualifiedName) string {
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getPrivateFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafe(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.getProjectDomain(b.privateDomain))
+	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
 }
 
 func (b byocAws) getProjectDomain(domain string) string {
-	if b.pulumiProject != "" {
-		return dnsSafe(b.pulumiProject) + "." + domain
+	if b.pulumiProject == "" || strings.ToLower(b.pulumiProject) == strings.ToLower(string(b.tenantID)) {
+		return domain
 	}
-	return domain
+	return dnsSafe(b.pulumiProject) + "." + domain
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
