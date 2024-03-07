@@ -96,7 +96,7 @@ func TestPutSecret(t *testing.T) {
 	}
 
 	// Overwrite secret with empty; this should delete the secret
-	err = a.DeleteSecret(ctx, name)
+	err = a.DeleteSecrets(ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestPutSecret(t *testing.T) {
 	}
 
 	// Delete the secret again; this should return NotFound
-	err = a.DeleteSecret(ctx, name)
+	err = a.DeleteSecrets(ctx, name)
 	if !isErrCodeNotFound(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)
 	}
