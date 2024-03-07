@@ -810,12 +810,12 @@ type qualifiedName = string // legacy
 func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
-		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
+		return fmt.Sprintf("%s.%s:%d", safeFqn, b.getProjectDomain(b.privateDomain), port.Target)
 	} else {
 		if b.customDomain == "" {
 			return ":443" // placeholder for the public ALB/distribution
 		}
-		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.getProjectDomain(b.customDomain))
 	}
 }
 
@@ -825,13 +825,20 @@ func (b byocAws) getPublicFqdn(fqn qualifiedName) string {
 	if b.customDomain == "" {
 		return "" //b.fqdn
 	}
-	return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.getProjectDomain(b.customDomain))
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b byocAws) getPrivateFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafe(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.getProjectDomain(b.privateDomain))
+}
+
+func (b byocAws) getProjectDomain(domain string) string {
+	if b.pulumiProject != "" {
+		return dnsSafe(b.pulumiProject) + "." + domain
+	}
+	return domain
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
