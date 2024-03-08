@@ -109,8 +109,8 @@ var rootCmd = &cobra.Command{
 				}
 
 				client = cli.NewClient(cluster, project, *provider)     // reconnect with the new token
-				if err = client.CheckLogin(cmd.Context()); err != nil { // recheck (new token = new user)
-					return err
+				if err = client.CheckLogin(cmd.Context()); err == nil { // recheck (new token = new user)
+					return nil // success
 				}
 			}
 
@@ -122,7 +122,7 @@ var rootCmd = &cobra.Command{
 				}
 			}
 		}
-		return nil
+		return err
 	},
 }
 
