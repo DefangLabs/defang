@@ -322,20 +322,20 @@ var tailCmd = &cobra.Command{
 }
 
 var secretsCmd = &cobra.Command{
-	Use:     "secret",
+	Use:     "secret", // like Docker
 	Args:    cobra.NoArgs,
 	Aliases: []string{"secrets"},
 	Short:   "Add, update, or delete service secrets",
 }
 
 var secretsSetCmd = &cobra.Command{
-	Use:         "set",
+	Use:         "create", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Aliases:     []string{"add", "put"},
+	Args:        cobra.ExactArgs(1),
+	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var name, _ = cmd.Flags().GetString("name")
+		name := args[0]
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
 		var secret string
@@ -369,14 +369,12 @@ var secretsSetCmd = &cobra.Command{
 }
 
 var secretsDeleteCmd = &cobra.Command{
-	Use:         "delete",
+	Use:         "rm", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Aliases:     []string{"del", "rm", "remove"},
+	Args:        cobra.MinimumNArgs(1),
+	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Deletes one or more secrets",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var names, _ = cmd.Flags().GetStringArray("name")
-
+	RunE: func(cmd *cobra.Command, names []string) error {
 		if err := cli.SecretsDelete(cmd.Context(), client, names...); err != nil {
 			// Show a warning (not an error) if the secret was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -393,7 +391,7 @@ var secretsDeleteCmd = &cobra.Command{
 }
 
 var secretsListCmd = &cobra.Command{
-	Use:         "ls",
+	Use:         "ls", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
@@ -569,11 +567,10 @@ var composeConfigCmd = &cobra.Command{
 var deleteCmd = &cobra.Command{
 	Use:         "delete",
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
+	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var names, _ = cmd.Flags().GetStringArray("name")
+	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		since := time.Now()
@@ -798,12 +795,12 @@ func main() {
 	rootCmd.AddCommand(getVersionCmd)
 
 	// Secrets Command
-	secretsSetCmd.Flags().StringP("name", "n", "", "Name of the secret (required)")
-	secretsSetCmd.MarkFlagRequired("name")
+	secretsSetCmd.Flags().BoolP("name", "n", false, "Name of the secret (backwards compat)")
+	secretsSetCmd.Flags().MarkHidden("name")
 	secretsCmd.AddCommand(secretsSetCmd)
 
-	secretsDeleteCmd.Flags().StringArrayP("name", "n", nil, "Name of the secret(s) (required)")
-	secretsDeleteCmd.MarkFlagRequired("name")
+	secretsDeleteCmd.Flags().BoolP("name", "n", false, "Name of the secret(s) (backwards compat)")
+	secretsDeleteCmd.Flags().MarkHidden("name")
 	secretsCmd.AddCommand(secretsDeleteCmd)
 
 	secretsCmd.AddCommand(secretsListCmd)
@@ -842,9 +839,9 @@ func main() {
 	rootCmd.AddCommand(tailCmd)
 
 	// Delete Command
-	deleteCmd.Flags().StringArrayP("name", "n", nil, "Name of the service(s) (required)")
+	deleteCmd.Flags().BoolP("name", "n", false, "Name of the service(s) (backwards compat)")
+	deleteCmd.Flags().MarkHidden("name")
 	deleteCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
-	deleteCmd.MarkFlagRequired("name")
 	rootCmd.AddCommand(deleteCmd)
 
 	// Send Command
