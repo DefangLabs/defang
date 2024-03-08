@@ -10,6 +10,7 @@ import (
 func TestDomainMultipleProjectSupport(t *testing.T) {
 	port80 := &v1.Port{Mode: v1.Mode_INGRESS, Target: 80}
 	port8080 := &v1.Port{Mode: v1.Mode_INGRESS, Target: 8080}
+	hostModePort := &v1.Port{Mode: v1.Mode_HOST, Target: 80}
 	tests := []struct {
 		ProjectName string
 		TenantID    types.TenantID
@@ -20,10 +21,13 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PrivateFqdn string
 	}{
 		{"", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.internal"},
+		{"", "tenant1", "web", hostModePort, "web.internal:80", "web.example.com", "web.internal"},
 		{"project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
 		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
 		{"project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
 		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.internal:80", "web.example.com", "web.internal"},
 		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
 		{"Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
 		{"tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.internal"},

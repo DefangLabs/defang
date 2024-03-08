@@ -811,7 +811,7 @@ type qualifiedName = string // legacy
 func (b byocAws) getEndpoint(fqn qualifiedName, port *v1.Port) string {
 	safeFqn := dnsSafe(fqn)
 	if port.Mode == v1.Mode_HOST {
-		return fmt.Sprintf("%s.%s:%d", safeFqn, b.getProjectDomain(b.privateDomain), port.Target)
+		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
 		if b.customDomain == "" {
 			return ":443" // placeholder for the public ALB/distribution
@@ -836,7 +836,7 @@ func (b byocAws) getPrivateFqdn(fqn qualifiedName) string {
 }
 
 func (b byocAws) getProjectDomain(domain string) string {
-	if b.pulumiProject == "" || strings.ToLower(b.pulumiProject) == strings.ToLower(string(b.tenantID)) {
+	if b.pulumiProject == "" || strings.EqualFold(b.pulumiProject, string(b.tenantID)) {
 		return domain
 	}
 	return dnsSafe(b.pulumiProject) + "." + domain
