@@ -4,6 +4,7 @@ package cfn
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -12,12 +13,13 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func TestNew(t *testing.T) {
+func TestCloudFormation(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test")
+		t.Skip("skipping slow integration test")
 	}
 
-	retainBucket = false      // delete bucket after test
+	retainBucket = false // delete bucket after test
+
 	user := os.Getenv("USER") // avoid conflict with other users in the same account
 	aws := New("crun-test-"+user, region.Region("us-west-2"))
 	if aws == nil {
@@ -44,7 +46,7 @@ func TestNew(t *testing.T) {
 	var taskid types.TaskID
 	t.Run("Run", func(t *testing.T) {
 		var err error
-		taskid, err = aws.Run(ctx, nil)
+		taskid, err = aws.Run(ctx, nil, "echo", "hello")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,10 +59,10 @@ func TestNew(t *testing.T) {
 		if taskid == nil {
 			t.Skip("task id is empty")
 		}
-		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		err := aws.Tail(ctx, taskid)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			t.Fatal(err)
 		}
 	})

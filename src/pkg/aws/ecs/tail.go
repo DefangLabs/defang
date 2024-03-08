@@ -24,9 +24,17 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	taskch := make(chan error)
+	defer close(taskch)
+	go func() {
+		taskch <- WaitForTask(ctx, taskArn, time.Second*3)
+	}()
+
 	spinMe := 0
 	for {
-		err = printLogEvents(ctx, es) // blocking
+		err = printLogEvents(ctx, es, taskch) // blocking
 		if err != nil {
 			return err
 		}
@@ -34,7 +42,7 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 		err := getTaskStatus(ctx, a.Region, a.ClusterName, taskId)
 		if err != nil {
 			// Before we exit, print any remaining logs (ignore errors)
-			printLogEvents(ctx, es)
+			printLogEvents(ctx, es, nil)
 			return err
 		}
 
@@ -85,7 +93,7 @@ func GetTaskID(taskArn TaskArn) string {
 	return path.Base(*taskArn)
 }
 
-func printLogEvents(ctx context.Context, es EventStream) error {
+func printLogEvents(ctx context.Context, es EventStream, ch chan error) error {
 	for {
 		select {
 		case e := <-es.Events(): // blocking
@@ -99,6 +107,8 @@ func printLogEvents(ctx context.Context, es EventStream) error {
 			}
 		case <-ctx.Done():
 			return ctx.Err()
+		case err := <-ch:
+			return err
 		}
 	}
 }
