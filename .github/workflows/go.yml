@@ -6,9 +6,6 @@ on:
       - 'v*' # push events to tagged commits
     branches:
       - '**'
-    paths:
-      - '.github/workflows/go.yml'
-      - 'src/**'
 
 permissions:
   contents: read
