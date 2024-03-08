@@ -779,10 +779,7 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
 		}
 		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
-		cname, err := net.LookupCNAME(service.Domainname)
-		if err != nil {
-			warning = WarningError(fmt.Sprintf("error looking up CNAME %q: %v", service.Domainname, err))
-		}
+		cname, _ := net.LookupCNAME(service.Domainname)
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
 			zoneId, err := b.findZone(ctx, service.Domainname, service.DnsRole)
 			if err != nil {
