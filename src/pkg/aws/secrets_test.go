@@ -35,7 +35,7 @@ func TestPutSecret(t *testing.T) {
 	// Create random secret name and value
 	name := uuid.NewString()
 	value := uuid.NewString()
-	secretId := "/defang/" + name
+	secretId := name // caller should have added any prefix
 
 	exist, err := a.IsValidSecret(ctx, name)
 	if err != nil {

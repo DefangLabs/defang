@@ -28,10 +28,16 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 
 	svc := ssm.NewFromConfig(cfg)
 
-	_, err = svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
+	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
 		Names: names, // works because getSecretID is a no-op
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if len(o.InvalidParameters) > 0 && len(o.DeletedParameters) == 0 {
+		return &types.ParameterNotFound{}
+	}
+	return nil
 }
 
 func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
@@ -97,15 +103,19 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	svc := ssm.NewFromConfig(cfg)
 
+	var filters []types.ParameterStringFilter
+	// DescribeParameters fails if the BeginsWith value is empty
+	if prefix := *getSecretID(prefix); prefix != "" {
+		filters = append(filters, types.ParameterStringFilter{
+			Key:    ptr.String("Name"),
+			Option: ptr.String("BeginsWith"),
+			Values: []string{prefix},
+		})
+	}
+
 	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
 		// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
-		ParameterFilters: []types.ParameterStringFilter{
-			{
-				Key:    ptr.String("Name"),
-				Option: ptr.String("BeginsWith"),
-				Values: []string{*getSecretID(prefix)},
-			},
-		},
+		ParameterFilters: filters,
 	})
 	if err != nil {
 		return nil, err
