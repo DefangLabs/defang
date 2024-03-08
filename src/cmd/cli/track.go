@@ -4,11 +4,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
+
+var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
 type P = cliClient.Property // shorthand for tracking properties
 
@@ -17,6 +20,9 @@ var trackWG = sync.WaitGroup{}
 
 // track sends a tracking event to the server in a separate goroutine.
 func track(name string, props ...P) {
+	if disableAnalytics {
+		return
+	}
 	if client == nil {
 		client, _ = cli.Connect(cluster)
 	}
