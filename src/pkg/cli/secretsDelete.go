@@ -14,7 +14,5 @@ func SecretsDelete(ctx context.Context, client client.Client, names ...string) e
 		return ErrDryRun
 	}
 
-	// FIXME: create dedicated DeleteSecret method in client proto
-	err := client.DeleteSecrets(ctx, &v1.Secrets{Names: names})
-	return err
+	return client.DeleteSecrets(ctx, &v1.Secrets{Names: names})
 }

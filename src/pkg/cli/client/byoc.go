@@ -68,6 +68,7 @@ type Warning interface {
 	Warning() string
 }
 
+// Deprecated: replace with proper logging
 type WarningError string
 
 func (w WarningError) Error() string {
@@ -92,6 +93,10 @@ func (w Warnings) Error() string {
 var _ Client = (*byocAws)(nil)
 
 func NewByocAWS(tenantId types.TenantID, project string, defClient *GrpcClient) *byocAws {
+	// Resource naming (stack/stackDir) requires a project name
+	if project == "" {
+		project = tenantId.String()
+	}
 	b := &byocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]awsecs.TaskArn),
@@ -713,7 +718,7 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		errCh = errch.Errs()
 	}
 
-	taskch := make(chan error)
+	taskch := make(chan error) // TODO: close?
 	var cancel func()
 	if taskArn != nil {
 		ctx, cancel = context.WithCancel(ctx)
@@ -849,7 +854,7 @@ func (b byocAws) getPrivateFqdn(fqn qualifiedName) string {
 }
 
 func (b byocAws) getProjectDomain(domain string) string {
-	if b.pulumiProject == "" || strings.EqualFold(b.pulumiProject, string(b.tenantID)) {
+	if strings.EqualFold(b.pulumiProject, string(b.tenantID)) {
 		return domain
 	}
 	return dnsSafe(b.pulumiProject) + "." + domain
