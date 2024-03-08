@@ -121,7 +121,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	loadCfg := types.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
-		// Environment: map[string]string{}, // TODO: support environment variables?
+		Environment: map[string]string{}, // TODO: support environment variables?
 	}
 
 	loadOpts := []func(*loader.Options){
