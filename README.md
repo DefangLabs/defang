@@ -75,6 +75,7 @@ The Defang CLI recognizes the following environment variables:
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 * `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:beta`
 * `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
+* `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`
 * `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 * `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 * `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
