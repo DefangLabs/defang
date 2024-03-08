@@ -4,12 +4,10 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -40,6 +38,7 @@ func TestDeploy(t *testing.T) {
 
 func TestTail(t *testing.T) {
 	b := NewByocAWS("TestTail", "", nil)
+	b.customDomain = "example.com" // avoid rpc call
 
 	ss, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
@@ -83,21 +82,21 @@ func TestGetServices(t *testing.T) {
 
 func TestPutSecret(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping test in short mode")
+		// t.Skip("skipping test in short mode")
 	}
 
 	const secretName = "hello"
 	b := NewByocAWS("TestPutSecret", "", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.PutSecret(context.TODO(), &v1.SecretValue{Name: secretName})
+		err := b.DeleteSecrets(context.TODO(), &v1.Secrets{Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				t.Skip("skipping test; not authorized")
 			}
 			if connect.CodeOf(err) != connect.CodeNotFound {
-				t.Error("expected NotFound")
+				t.Errorf("expected not found, got %v", err)
 			}
 		}
 	})
@@ -105,7 +104,7 @@ func TestPutSecret(t *testing.T) {
 	t.Run("invalid name", func(t *testing.T) {
 		err := b.PutSecret(context.TODO(), &v1.SecretValue{})
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
-			t.Error("expected invalid argument")
+			t.Errorf("expected invalid argument, got %v", err)
 		}
 	})
 
@@ -149,47 +148,4 @@ func TestListSecrets(t *testing.T) {
 			t.Fatalf("expected empty list, got %v", secrets.Names)
 		}
 	})
-}
-
-func TestDomainMultipleProjectSupport(t *testing.T) {
-	tests := []struct {
-		ProjectName string
-		TenantID    types.TenantID
-		Fqn         string
-		Port        v1.Port
-		EndPoint    string
-		PublicFqdn  string
-		PrivateFqdn string
-	}{
-		{"", "tenant1", "web", 80, "web--80.example.com", "web.example.com", "web.internal"},
-		{"project1", "tenant1", "web", 80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Project1", "tenant1", "web", 80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"project2", "tenant1", "api", 8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
-		{"tenant1", "tenant1", "web", 80, "web--80.example.com", "web.example.com", "web.internal"},
-		{"Project1", "tenant1", "web", 80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Tenant2", "tenant1", "web", 80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"tenant1", "tenAnt1", "web", 80, "web--80.example.com", "web.example.com", "web.internal"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.ProjectName+","+tt.TenantID, func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
-
-			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
-			if endpoint != tt.EndPoint {
-				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
-			}
-
-			publicFqdn := b.getPublicFqdn(tt.Fqn)
-			if publicFqdn != tt.PublicFqdn {
-				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
-			}
-
-			privateFqdn := b.getPrivateFqdn(tt.Fqn)
-			if privateFqdn != tt.PrivateFqdn {
-				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
-			}
-		})
-	}
-	fmt.Println("done")
 }

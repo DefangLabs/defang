@@ -21,6 +21,10 @@ install: $(BINARY_NAME)
 test: $(PROTOS)
 	go test -test.short ./...
 
+.PHONY: integ
+integ: $(PROTOS)
+	go test -v -tags=integration ./...
+
 .PHONY: linux-amd64
 linux-amd64: test
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BINARY_NAME) $(GOFLAGS) ./cmd/cli
