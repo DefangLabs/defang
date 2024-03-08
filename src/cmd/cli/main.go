@@ -78,7 +78,13 @@ var rootCmd = &cobra.Command{
 
 		filePath, _ := cmd.InheritedFlags().GetString("file")
 
-		project, err = cli.LoadDockerCompose(filePath, cli.GetTenantID(cluster))
+		tenantID := cli.GetTenantID(cluster)
+		if cli.IsUsingAWSProvider(*provider) {
+			project, err = cli.LoadCompose(filePath, tenantID)
+		} else {
+			project, err = cli.LoadComposeWithProjectName(filePath, string(tenantID))
+		}
+
 		if err != nil {
 			cli.Debug(" - Could not load docker compose file: ", err)
 		}
