@@ -32,22 +32,22 @@ func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 		taskch <- WaitForTask(ctx, taskArn, time.Second*3)
 	}()
 
-	spinMe := 0
 	for {
-		err = printLogEvents(ctx, es, taskch) // blocking
-		if err != nil {
+		select {
+		case e := <-es.Events(): // blocking
+			events, err := GetLogEvents(e)
+			// Print before checking for errors, so we don't lose any logs in case of EOF
+			for _, event := range events {
+				fmt.Println(*event.Message)
+			}
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-taskch:
 			return err
 		}
-
-		err := getTaskStatus(ctx, a.Region, a.ClusterName, taskId)
-		if err != nil {
-			// Before we exit, print any remaining logs (ignore errors)
-			printLogEvents(ctx, es, nil)
-			return err
-		}
-
-		fmt.Printf("%c\r", spinner[spinMe%len(spinner)])
-		spinMe++
 	}
 }
 
@@ -91,24 +91,4 @@ func GetLogStreamForTaskID(taskID string) string {
 
 func GetTaskID(taskArn TaskArn) string {
 	return path.Base(*taskArn)
-}
-
-func printLogEvents(ctx context.Context, es EventStream, ch chan error) error {
-	for {
-		select {
-		case e := <-es.Events(): // blocking
-			events, err := GetLogEvents(e)
-			// Print before checking for errors, so we don't lose any logs in case of EOF
-			for _, event := range events {
-				fmt.Println(*event.Message)
-			}
-			if err != nil {
-				return err
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-ch:
-			return err
-		}
-	}
 }
