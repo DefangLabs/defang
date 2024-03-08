@@ -66,8 +66,8 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 func NewClient(cluster string, project *composeTypes.Project, provider client.Provider) client.Client {
 	defangClient, tenantId := Connect(cluster)
 
-	awsInEnv := os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-	if provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv) {
+	awsInEnv := awsInEnv()
+	if IsUsingAWSProvider(provider) {
 		Info(" * Using AWS provider")
 		if !awsInEnv {
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
@@ -86,6 +86,14 @@ func NewClient(cluster string, project *composeTypes.Project, provider client.Pr
 		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
 	}
 	return defangClient
+}
+
+func awsInEnv() bool {
+	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
+func IsUsingAWSProvider(provider client.Provider) bool {
+	return provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv())
 }
 
 // Deprecated: don't rely on info in token

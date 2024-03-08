@@ -20,6 +20,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 
+	"github.com/compose-spec/compose-go/v2/loader"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
@@ -78,7 +79,16 @@ var rootCmd = &cobra.Command{
 
 		filePath, _ := cmd.InheritedFlags().GetString("file")
 
-		project, err = cli.LoadDockerCompose(filePath, cli.GetTenantID(cluster))
+		overrideProjectName := true
+		if cli.IsUsingAWSProvider(*provider) {
+			overrideProjectName = false
+		}
+
+		project, err = cli.LoadDockerCompose(filePath, func(o *loader.Options) {
+			// Saas always use tenantId as project name to keep existing behavior
+			o.SetProjectName(strings.ToLower(string(cli.GetTenantID(cluster))), overrideProjectName)
+		})
+
 		if err != nil {
 			cli.Debug(" - Could not load docker compose file: ", err)
 		}
