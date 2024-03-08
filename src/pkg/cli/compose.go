@@ -26,6 +26,8 @@ import (
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+
+	pkg "github.com/defang-io/defang/src/pkg/types"
 )
 
 const (
@@ -94,7 +96,15 @@ func convertPlatform(platform string) v1.Platform {
 	}
 }
 
-func LoadDockerCompose(filePath string, loadOpts ...func(*loader.Options)) (*types.Project, error) {
+func LoadCompose(filePath string, tenantID pkg.TenantID) (*types.Project, error) {
+	return loadCompose(filePath, string(tenantID), false) // use tenantID as fallback for project name
+}
+
+func LoadComposeWithProjectName(filePath string, projectName string) (*types.Project, error) {
+	return loadCompose(filePath, projectName, true)
+}
+
+func loadCompose(filePath string, projectName string, overrideProjectName bool) (*types.Project, error) {
 	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
 	if files, _ := filepath.Glob(filePath); len(files) > 1 {
@@ -108,13 +118,21 @@ func LoadDockerCompose(filePath string, loadOpts ...func(*loader.Options)) (*typ
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
 
-	project, err := loader.Load(types.ConfigDetails{
+	loadCfg := types.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
-		Environment: map[string]string{}, // TODO: support environment variables?
-	}, loader.WithDiscardEnvFiles, func(o *loader.Options) {
-		o.SkipConsistencyCheck = true // TODO: check fails if secrets are used but top-level 'secrets:' is missing
-	})
+		// Environment: map[string]string{}, // TODO: support environment variables?
+	}
+
+	loadOpts := []func(*loader.Options){
+		loader.WithDiscardEnvFiles,
+		func(o *loader.Options) {
+			o.SkipConsistencyCheck = true // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+			o.SetProjectName(strings.ToLower(projectName), overrideProjectName)
+		},
+	}
+
+	project, err := loader.Load(loadCfg, loadOpts...)
 	if err != nil {
 		return nil, err
 	}

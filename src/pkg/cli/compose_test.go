@@ -41,39 +41,70 @@ func TestNormalizeServiceName(t *testing.T) {
 	}
 }
 
-func TestLoadDockerCompose(t *testing.T) {
+func TestLoadCompose(t *testing.T) {
 	DoVerbose = true
 	DoDebug = true
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		p, err := LoadDockerCompose("../../tests/noprojname/compose.yaml", "tenant-id")
+		p, err := LoadComposeWithProjectName("../../tests/noprojname/compose.yaml", "tenant-id")
 		if err != nil {
-			t.Fatalf("LoadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "tenant-id" {
-			t.Errorf("LoadDockerCompose() failed: expected project name tenant-id, got %q", p.Name)
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
 		}
 	})
 
 	t.Run("use project name", func(t *testing.T) {
-		p, err := LoadDockerCompose("../../tests/testproj/compose.yaml", "tests")
+		p, err := LoadComposeWithProjectName("../../tests/testproj/compose.yaml", "tests")
 		if err != nil {
-			t.Fatalf("LoadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("LoadDockerCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		p, err := LoadDockerCompose("../../tests/noprojname/compose.yaml", "Valid-Username")
+		p, err := LoadComposeWithProjectName("../../tests/noprojname/compose.yaml", "Valid-Username")
 		if err != nil {
-			t.Fatalf("LoadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "valid-username" {
-			t.Errorf("LoadDockerCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
+
+	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+		p, err := LoadCompose("../../tests/noprojname/compose.yaml", "tenant-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tenant-id" {
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		}
+	})
+
+	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
+		p, err := LoadCompose("../../tests/testproj/compose.yaml", "tenant-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
+		}
+	})
+
+	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+		p, err := LoadCompose("../../tests/noprojname/compose.yaml", "tenanT-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tenant-id" {
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		}
+	})
+
 }
 
 func TestConvertPort(t *testing.T) {
