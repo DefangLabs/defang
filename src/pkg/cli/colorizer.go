@@ -12,7 +12,7 @@ var (
 	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && os.Getenv("TERM") != ""
 	stdout     = termenv.NewOutput(os.Stdout)
 	stderr     = termenv.NewOutput(os.Stderr)
-	canColor   = doColor(stdout)
+	CanColor   = doColor(stdout)
 )
 
 type Color = termenv.ANSIColor
