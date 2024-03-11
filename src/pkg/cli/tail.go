@@ -110,7 +110,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
 	spinMe := 0
-	doSpinner := !raw && canColor && IsTerminal
+	doSpinner := !raw && CanColor && IsTerminal
 
 	if IsTerminal && !raw {
 		if doSpinner {

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -853,6 +854,13 @@ func main() {
 	sendCmd.MarkFlagRequired("subject")
 	sendCmd.MarkFlagRequired("type")
 	rootCmd.AddCommand(sendCmd)
+
+	if cli.CanColor {
+		// Add some emphasis to the help command
+		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
+		templ := re.ReplaceAllString(rootCmd.UsageTemplate(), "\033[1m$0\033[0m")
+		rootCmd.SetUsageTemplate(templ)
+	}
 
 	// Handle Ctrl+C so we can exit gracefully
 	ctx, cancel := context.WithCancel(context.Background())
