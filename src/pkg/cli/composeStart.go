@@ -92,9 +92,12 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			logrus.Warn("unsupported compose directive: logging")
 			HadWarnings = true
 		}
-		if _, ok := svccfg.Networks["default"]; !ok || len(svccfg.Networks) > 1 {
-			logrus.Warn("unsupported compose directive: networks")
-			HadWarnings = true
+		supportedNetworks := map[string]bool{"default": true, "public": true}
+		for name, _ := range svccfg.Networks {
+			if !supportedNetworks[name] {
+				logrus.Warnf("unsupported networks name: %v; only %v are supported", name, supportedNetworks)
+				HadWarnings = true
+			}
 		}
 		if len(svccfg.Volumes) > 0 {
 			logrus.Warn("unsupported compose directive: volumes") // TODO: add support for volumes
@@ -382,11 +385,17 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			dnsRole = fmt.Sprint(dnsRoleVal)
 		}
 
+		// Hack: Use maigic network name "public" to determine if the service is private
+		privateNetwork := true
+		if _, ok := svccfg.Networks["public"]; ok {
+			privateNetwork = false
+		}
+
 		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
-			Internal:    true, // TODO: support external services (w/o LB)
+			Internal:    privateNetwork, // TODO: support external services (w/o LB)
 			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
