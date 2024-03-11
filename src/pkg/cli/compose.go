@@ -257,10 +257,6 @@ func uploadTarball(ctx context.Context, client client.Client, body io.Reader, di
 		return "", err
 	}
 
-	if DoDryRun {
-		return "", ErrDryRun
-	}
-
 	// Do an HTTP PUT to the generated URL
 	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
 	if err != nil {
