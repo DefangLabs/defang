@@ -40,6 +40,7 @@ const (
 **/.git
 **/.github
 **/.idea
+**/.next
 **/.vscode
 **/__pycache__
 **/compose.yaml
