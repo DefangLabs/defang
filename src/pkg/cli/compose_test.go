@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -227,7 +228,8 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		var foundDockerfile bool
+		expected := []string{".dockerignore", "Dockerfile", "fileName.env"}
+		var actual []string
 		ar := tar.NewReader(g)
 		for {
 			h, err := ar.Next()
@@ -244,12 +246,10 @@ func TestCreateTarballReader(t *testing.T) {
 			if _, err := ar.Read(make([]byte, h.Size)); err != io.EOF {
 				t.Log(err)
 			}
-			if h.Name == "Dockerfile" {
-				foundDockerfile = true
-			}
+			actual = append(actual, h.Name)
 		}
-		if !foundDockerfile {
-			t.Error("Dockerfile not found in tarball")
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Expected files: %v, got %v", expected, actual)
 		}
 	})
 
