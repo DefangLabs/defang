@@ -260,6 +260,7 @@ message Build {
   string dockerfile = 2;        // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
   float shm_size = 4;           // in MiB
+  string target = 5;
 
   // string dockerfile_inline = 4; // inline Dockerfile
   // repeated string ssh = 4;
@@ -271,7 +272,6 @@ message Build {
   // map<string, string> labels = 4;
   // bool no_cache = 4;
   // bool pull = 4;
-  // string target = 4;
   // repeated Secret secrets = 4;
   // repeated string tags = 4;
   // repeated Platform platforms = 4;
@@ -296,12 +296,12 @@ message Service {
   repeated Port ports = 6;
   map<string, string> environment = 7;
   Build build = 8;
-  repeated Secret secrets = 9;
+  repeated Secret secrets = 9; // FIXME: these are actually env vars
   HealthCheck healthcheck = 10;
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // role arn used to access route53 to create dns records
+  string dns_role = 14; // role arn used to access route53 to create dns records; TODO: not part of spec
 }
 
 message Event {
