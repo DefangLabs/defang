@@ -42,8 +42,11 @@ var (
 	hasTty         = cli.IsTerminal && !pkg.GetenvBool("CI")
 )
 
-const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
-var authNeededAnnotation = map[string]string{authNeeded: ""}
+const autoConnect = "auto-connect" // annotation to indicate that a command needs to connect to the cluster
+var autoConnectAnnotation = map[string]string{autoConnect: ""}
+
+const authNeeded = "auth-needed"                                              // annotation to indicate that a command needs authorization
+var authNeededAnnotation = map[string]string{authNeeded: "", autoConnect: ""} // auth implies auto-connect
 
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
@@ -67,6 +70,11 @@ var rootCmd = &cobra.Command{
 			cli.ForceColor(true)
 		case ColorNever:
 			cli.ForceColor(false)
+		}
+
+		// Not all commands need a connection, so we should only connect when needed
+		if _, ok := cmd.Annotations[autoConnect]; !ok {
+			return nil
 		}
 
 		cd, _ := cmd.Flags().GetString("cwd")
@@ -128,9 +136,10 @@ var rootCmd = &cobra.Command{
 }
 
 var loginCmd = &cobra.Command{
-	Use:   "login",
-	Args:  cobra.NoArgs,
-	Short: "Authenticate to the Defang cluster",
+	Use:         "login",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Authenticate to the Defang cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
 
@@ -151,9 +160,10 @@ var loginCmd = &cobra.Command{
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Args:  cobra.NoArgs,
-	Short: "Show the current user",
+	Use:         "whoami",
+	Annotations: autoConnectAnnotation, // show login status, don't prompt for login
+	Args:        cobra.NoArgs,
+	Short:       "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.Whoami(cmd.Context(), client)
 		if err != nil {
@@ -281,10 +291,11 @@ var getServicesCmd = &cobra.Command{
 }
 
 var getVersionCmd = &cobra.Command{
-	Use:     "version",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
-	Short:   "Get version information for the CLI and Fabric service",
+	Use:         "version",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"ver", "stat", "status"}, // for backwards compatibility
+	Short:       "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Print(cli.BrightCyan, "Defang CLI:    ")
 		fmt.Println(GetCurrentVersion())
@@ -552,9 +563,10 @@ var composeDownCmd = &cobra.Command{
 }
 
 var composeConfigCmd = &cobra.Command{
-	Use:   "config",
-	Args:  cobra.NoArgs, // TODO: takes optional list of service names
-	Short: "Reads a Compose file and shows the generated config",
+	Use:         "config",
+	Annotations: autoConnectAnnotation, // try to get the tenantId from the cached token
+	Args:        cobra.NoArgs,          // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true                                               // config is like start in a dry run
 		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
@@ -640,10 +652,11 @@ var tokenCmd = &cobra.Command{
 }
 
 var logoutCmd = &cobra.Command{
-	Use:     "logout",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"logoff", "revoke"},
-	Short:   "Log out",
+	Use:         "logout",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"logoff", "revoke"},
+	Short:       "Log out",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
@@ -661,36 +674,40 @@ var bootstrapCmd = &cobra.Command{
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
-	Use:   "destroy",
-	Args:  cobra.NoArgs,
-	Short: "Destroy the service stack",
+	Use:         "destroy",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
 }
 
 var bootstrapDownCmd = &cobra.Command{
-	Use:   "down",
-	Args:  cobra.NoArgs,
-	Short: "Refresh and then destroy the service stack",
+	Use:         "down",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
 	},
 }
 
 var bootstrapRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Args:  cobra.NoArgs,
-	Short: "Refresh the service stack",
+	Use:         "refresh",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
 	},
 }
 
 var bootstrapTearDownCmd = &cobra.Command{
-	Use:   "teardown",
-	Args:  cobra.NoArgs,
-	Short: "Destroy the CD cluster without destroying the services",
+	Use:         "teardown",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.Warn(` ! Deleting the CD cluster; this does not delete the services!`)
 		return cli.TearDown(cmd.Context(), client)
@@ -698,19 +715,21 @@ var bootstrapTearDownCmd = &cobra.Command{
 }
 
 var bootstrapListCmd = &cobra.Command{
-	Use:     "ls",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"list"},
-	Short:   "List all the projects and stacks in the CD cluster",
+	Use:         "ls",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"list"},
+	Short:       "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "list")
 	},
 }
 
 var bootstrapCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs,
-	Short: "Cancel the current CD operation",
+	Use:         "cancel",
+	Annotations: autoConnectAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
