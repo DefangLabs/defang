@@ -345,18 +345,24 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		// Ignore files using the dockerignore patternmatcher
 		baseName := filepath.ToSlash(relPath)
-		ignore, err := pm.MatchesOrParentMatches(baseName)
-		if err != nil {
-			return err
-		}
-		if ignore {
-			Debug(" - Ignoring", relPath)
-			if de.IsDir() {
-				return filepath.SkipDir
+
+		// we need the Dockerfile, even if it's in the .dockerignore file
+		if !foundDockerfile && dockerfile == relPath {
+			foundDockerfile = true
+		} else {
+			// Ignore files using the dockerignore patternmatcher
+			ignore, err := pm.MatchesOrParentMatches(baseName)
+			if err != nil {
+				return err
 			}
-			return nil
+			if ignore {
+				Debug(" - Ignoring", relPath)
+				if de.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 		}
 
 		Debug(" - Adding", baseName)
@@ -390,10 +396,6 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 		defer file.Close()
-
-		if !foundDockerfile && dockerfile == relPath {
-			foundDockerfile = true
-		}
 
 		fileCount++
 		if fileCount == 11 {
