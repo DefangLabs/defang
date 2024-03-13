@@ -15,3 +15,7 @@
 **/node_modules
 **/Thumbs.db
 defang
+
+# Test to ensure Dockerfile is always included, even when excluded by .dockerignore
+Dockerfile
+.dockerignore
