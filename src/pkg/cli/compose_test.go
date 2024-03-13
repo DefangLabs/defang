@@ -14,6 +14,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/sirupsen/logrus"
 )
 
 func TestNormalizeServiceName(t *testing.T) {
@@ -265,4 +266,72 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
+}
+
+type MockClient struct {
+	client.Client
+}
+
+func (m MockClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
+	return &v1.DeployResponse{}, nil
+}
+
+func TestProjectValidationServiceName(t *testing.T) {
+	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	if err := validateProject(p); err != nil {
+		t.Fatalf("Project validation failed: %v", err)
+	}
+
+	svc := p.Services["dfnx"]
+	longName := "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError"
+	svc.Name = longName
+	p.Services[longName] = svc
+
+	if err := validateProject(p); err == nil {
+		t.Fatalf("Long project name should be an error")
+	}
+
+}
+
+func TestProjectValidationNetworks(t *testing.T) {
+	var warnings bytes.Buffer
+	logrus.SetOutput(&warnings)
+
+	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	dfnx := p.Services["dfnx"]
+	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"invalid-network-name": nil}
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("Invalid network name should not be an error: %v", err)
+	}
+	if !bytes.Contains(warnings.Bytes(), []byte("network invalid-network-name used by service dfnx is not defined")) {
+		t.Errorf("Invalid network name should trigger a warning")
+	}
+
+	warnings.Reset()
+	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"public": nil}
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("public network name should not be an error: %v", err)
+	}
+	if !bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
+		t.Errorf("missing public network in global networks section should trigger a warning")
+	}
+
+	warnings.Reset()
+	p.Networks["public"] = types.NetworkConfig{}
+	if err := validateProject(p); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
+		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
+	}
 }
