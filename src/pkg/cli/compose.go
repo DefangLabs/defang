@@ -288,6 +288,16 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
+	path := filepath.Join(cwd, ignorefile)
+	reader, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	Debug(" - Reading .dockerignore file from", ignorefile)
+	return reader
+}
+
 func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	foundDockerfile := false
 	if dockerfile == "" {
@@ -297,24 +307,18 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	}
 
 	// A Dockerfile-specific ignore-file takes precedence over the .dockerignore file at the root of the build context if both exist.
-	var reader io.ReadCloser
-	var err error
-	reader, err = os.Open(filepath.Join(root, dockerfile+".dockerignore"))
-	if err != nil {
-		reader, err = os.Open(filepath.Join(root, ".dockerignore"))
-		if err != nil {
+	dockerignore := dockerfile + ".dockerignore"
+	reader := tryReadIgnoreFile(root, dockerignore)
+	if reader == nil {
+		dockerignore = ".dockerignore"
+		reader = tryReadIgnoreFile(root, dockerignore)
+		if reader == nil {
 			Debug(" - No .dockerignore file found; using defaults")
 			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
-		} else {
-			Debug(" - Reading .dockerignore file")
 		}
-	} else {
-		Debug(" - Reading", dockerfile+".dockerignore file")
 	}
 	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
-	if reader != nil {
-		reader.Close()
-	}
+	reader.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -348,8 +352,10 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		baseName := filepath.ToSlash(relPath)
 
 		// we need the Dockerfile, even if it's in the .dockerignore file
-		if !foundDockerfile && dockerfile == relPath {
+		if !foundDockerfile && relPath == dockerfile {
 			foundDockerfile = true
+		} else if relPath == dockerignore {
+			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile
 		} else {
 			// Ignore files using the dockerignore patternmatcher
 			ignore, err := pm.MatchesOrParentMatches(baseName)
