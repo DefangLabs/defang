@@ -57,9 +57,8 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	if tenant != types.DEFAULT_TENANT {
 		tenantId = tenant
 	}
-	Debug(" - Using tenant", tenantId, "for cluster", cluster)
+	Debug(" - Using tenant", tenantId, "for cluster", host)
 
-	Info(" * Connecting to", host)
 	return client.NewGrpcClient(host, accessToken), tenantId
 }
 
@@ -68,7 +67,7 @@ func NewClient(cluster string, project *composeTypes.Project, provider client.Pr
 
 	awsInEnv := awsInEnv()
 	if IsUsingAWSProvider(provider) {
-		Info(" * Using AWS provider")
+		Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		if !awsInEnv {
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}
