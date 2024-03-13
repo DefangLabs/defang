@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: testproj
       args:
         DNS: dfnx
     env_file:

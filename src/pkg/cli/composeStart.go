@@ -148,9 +148,6 @@ func validateProject(project *compose.Project) error {
 			if svccfg.Build.Network != "" {
 				return &ComposeError{fmt.Errorf("unsupported compose directive: build network")}
 			}
-			if svccfg.Build.Target != "" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build target")} // TODO: add support for Kaniko --target
-			}
 			if len(svccfg.Build.Secrets) != 0 {
 				return &ComposeError{fmt.Errorf("unsupported compose directive: build secrets")} // TODO: support build secrets
 			}
@@ -346,6 +343,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
+				Target:     svccfg.Build.Target,
 			}
 
 			if len(svccfg.Build.Args) > 0 {
