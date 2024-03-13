@@ -748,7 +748,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
 	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
-	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging")
+	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging for troubleshooting the CLI")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
