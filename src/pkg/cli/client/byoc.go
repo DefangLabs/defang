@@ -20,6 +20,7 @@ import (
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53Types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
@@ -894,4 +895,33 @@ func (b *byocAws) DeleteSecrets(ctx context.Context, secrets *v1.Secrets) error 
 
 func (b *byocAws) Restart(ctx context.Context, names ...string) error {
 	return errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+}
+
+func (b *byocAws) BootstrapList(ctx context.Context) error {
+	if err := b.setUp(ctx); err != nil {
+		return err
+	}
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return annotateAwsError(err)
+	}
+	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
+	s3client := s3.NewFromConfig(cfg)
+	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: &b.driver.BucketName,
+		Prefix: &prefix,
+	})
+	if err != nil {
+		return annotateAwsError(err)
+	}
+	for _, obj := range out.Contents {
+		// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
+		if obj.Key == nil || !strings.HasSuffix(*obj.Key, ".json") || obj.Size == nil || *obj.Size < 700 {
+			continue
+		}
+		// Cut off the prefix and the .json suffix
+		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
+		fmt.Println(" - ", stack)
+	}
+	return nil
 }
