@@ -3,7 +3,7 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-uxPeGtKw/DZwWZwFHuNloMc2LIsy9s/nsmHFttbMKC8=";
+  vendorHash = "sha256-ztB85zaQpegt1JHBo8o65Vypd/jWTon2JN3o67ddxdk=";
 
   subPackages = [ "cmd/cli" ];
 
