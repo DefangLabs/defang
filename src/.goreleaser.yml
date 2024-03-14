@@ -73,6 +73,11 @@ nix:
     repository:
       owner: defang-io
       name: defang
+    post_install: |
+      installShellCompletion --cmd defang \
+        --bash <($out/bin/defang completion bash) \
+        --zsh <($out/bin/defang completion zsh) \
+        --fish <($out/bin/defang completion fish)
 
 changelog:
   filters:
