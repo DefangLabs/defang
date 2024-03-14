@@ -19,3 +19,11 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 	}
 	return Tail(ctx, client, "", etag, since, false)
 }
+
+func BootstrapList(ctx context.Context, client client.Client) error {
+	Debug(" - Running CD list")
+	if DoDryRun {
+		return ErrDryRun
+	}
+	return client.BootstrapList(ctx)
+}
