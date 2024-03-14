@@ -258,7 +258,11 @@ func validateProject(project *compose.Project) error {
 				}
 			}
 		}
-		reservations := getResourceReservations(svccfg.Deploy.Resources)
+		var reservations *compose.Resource
+		if svccfg.Deploy != nil {
+			reservations = getResourceReservations(svccfg.Deploy.Resources)
+		}
+
 		if svccfg.Deploy == nil || reservations == nil || reservations.MemoryBytes == 0 {
 			logrus.Warn("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
 			HadWarnings = true
