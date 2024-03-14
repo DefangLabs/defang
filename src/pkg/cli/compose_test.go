@@ -335,3 +335,17 @@ func TestProjectValidationNetworks(t *testing.T) {
 		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
 	}
 }
+
+func TestProjectValidationNoDeploy(t *testing.T) {
+	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	dfnx := p.Services["dfnx"]
+	dfnx.Deploy = nil
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("No deploy section should not be an error: %v", err)
+	}
+}
