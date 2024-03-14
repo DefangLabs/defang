@@ -44,7 +44,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Check nix-shell default.nix
-        run: nix-shell default.nix --run defang
+        run: nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest

@@ -3,9 +3,11 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-C358K4uQaoM8ZorwEVLc9nQnRqBMj8TcYBnuKausL5M=";
+  vendorHash = "sha256-uxPeGtKw/DZwWZwFHuNloMc2LIsy9s/nsmHFttbMKC8=";
 
   subPackages = [ "cmd/cli" ];
+
+  doCheck = false; # some unit tests need internet access
 
   postInstall = ''
     mv $out/bin/cli $out/bin/defang
