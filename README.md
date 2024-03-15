@@ -72,6 +72,7 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 
 ## Environment Variables
 The Defang CLI recognizes the following environment variables:
+* `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the name in the `compose.yaml` file
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
 * `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
 * `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
