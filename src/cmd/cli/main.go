@@ -79,16 +79,17 @@ var rootCmd = &cobra.Command{
 
 		filePath, _ := cmd.InheritedFlags().GetString("file")
 
-		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // override the project name, except in the playground env
-		tenantID := cli.GetTenantID(cluster)
-		if !cli.IsUsingAWSProvider(*provider) {
-			projectName = string(tenantID)
-			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
-		} else if projectName != "" {
+		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+		if projectName != "" {
 			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
 		} else {
+			tenantID := cli.GetTenantID(cluster)
 			projectName = string(tenantID)
-			project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
+			if !cli.IsUsingAWSProvider(*provider) {
+				project, err = cli.LoadComposeWithProjectName(filePath, projectName) // playground env
+			} else {
+				project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
+			}
 		}
 
 		if err != nil {
