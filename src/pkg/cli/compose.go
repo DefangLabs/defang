@@ -18,16 +18,15 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/loader"
-	"github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-
-	pkg "github.com/defang-io/defang/src/pkg/types"
 )
 
 const (
@@ -97,15 +96,15 @@ func convertPlatform(platform string) v1.Platform {
 	}
 }
 
-func LoadCompose(filePath string, tenantID pkg.TenantID) (*types.Project, error) {
+func LoadCompose(filePath string, tenantID types.TenantID) (*compose.Project, error) {
 	return loadCompose(filePath, string(tenantID), false) // use tenantID as fallback for project name
 }
 
-func LoadComposeWithProjectName(filePath string, projectName string) (*types.Project, error) {
+func LoadComposeWithProjectName(filePath string, projectName string) (*compose.Project, error) {
 	return loadCompose(filePath, projectName, true)
 }
 
-func loadCompose(filePath string, projectName string, overrideProjectName bool) (*types.Project, error) {
+func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
 	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
 	if files, _ := filepath.Glob(filePath); len(files) > 1 {
@@ -119,9 +118,9 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
 
-	loadCfg := types.ConfigDetails{
+	loadCfg := compose.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
-		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
+		ConfigFiles: []compose.ConfigFile{{Filename: filePath}},
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}
 
@@ -145,7 +144,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	return project, nil
 }
 
-func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force bool) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *compose.BuildConfig, force bool) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -173,7 +172,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
-func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
+func convertPort(port compose.ServicePortConfig) (*v1.Port, error) {
 	if port.Target < 1 || port.Target > 32767 {
 		return nil, fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
 	}
@@ -237,7 +236,7 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 	return pbPort, nil
 }
 
-func convertPorts(ports []types.ServicePortConfig) ([]*v1.Port, error) {
+func convertPorts(ports []compose.ServicePortConfig) ([]*v1.Port, error) {
 	var pbports []*v1.Port
 	for _, port := range ports {
 		pbPort, err := convertPort(port)
