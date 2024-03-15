@@ -79,18 +79,25 @@ var rootCmd = &cobra.Command{
 
 		filePath, _ := cmd.InheritedFlags().GetString("file")
 
+		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // override the project name, except in the playground env
 		tenantID := cli.GetTenantID(cluster)
-		if cli.IsUsingAWSProvider(*provider) {
-			project, err = cli.LoadCompose(filePath, tenantID)
+		if !cli.IsUsingAWSProvider(*provider) {
+			projectName = string(tenantID)
+			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
+		} else if projectName != "" {
+			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
 		} else {
-			project, err = cli.LoadComposeWithProjectName(filePath, string(tenantID))
+			projectName = string(tenantID)
+			project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
 		}
 
 		if err != nil {
 			cli.Debug(" - Could not load docker compose file: ", err)
+		} else {
+			projectName = project.Name
 		}
 
-		client = cli.NewClient(cluster, project, *provider)
+		client = cli.NewClient(cluster, projectName, *provider)
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -109,7 +116,8 @@ var rootCmd = &cobra.Command{
 					return err
 				}
 
-				client = cli.NewClient(cluster, project, *provider)     // reconnect with the new token
+				// FIXME: the new login might have changed the tenant, so we should reload the project
+				client = cli.NewClient(cluster, projectName, *provider) // reconnect with the new token
 				if err = client.CheckLogin(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
@@ -438,18 +446,18 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
+		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(project.Services)
+		printEndpoints(deploy.Services)
 
 		if detach {
 			return nil
 		}
 
-		etag := project.Etag
+		etag := deploy.Etag
 		services := "all services"
 		if etag != "" {
 			services = "deployment ID " + etag
@@ -474,16 +482,16 @@ var composeStartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		project, err := cli.ComposeStart(cmd.Context(), client, project, force)
+		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
 		}
 
-		printEndpoints(project.Services)
+		printEndpoints(deploy.Services)
 
 		command := "tail"
-		if project.Etag != "" {
-			command += " --etag " + project.Etag
+		if deploy.Etag != "" {
+			command += " --etag " + deploy.Etag
 		}
 		printDefangHint("To track the update, do:", command)
 		return nil
