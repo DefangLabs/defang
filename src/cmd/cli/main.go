@@ -703,7 +703,7 @@ var bootstrapListCmd = &cobra.Command{
 	Aliases: []string{"list"},
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "list")
+		return cli.BootstrapList(cmd.Context(), client)
 	},
 }
 

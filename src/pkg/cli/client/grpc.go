@@ -208,6 +208,10 @@ func (g *GrpcClient) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang provider")
 }
 
+func (g *GrpcClient) BootstrapList(context.Context) error {
+	return errors.New("the list command is not valid for the Defang provider")
+}
+
 func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*v1.Service, 0, len(names))
