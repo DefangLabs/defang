@@ -18,13 +18,13 @@ import (
 
 func validateProject(project *compose.Project) error {
 	if project == nil {
-		return &ComposeError{errors.New("no project found")}
+		return errors.New("no project found")
 	}
 	for _, svccfg := range project.Services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
 			// FIXME: this is too strict; we should allow more characters like underscores and dots
-			return &ComposeError{fmt.Errorf("service name is invalid: %q", svccfg.Name)}
+			return fmt.Errorf("service name is invalid: %q", svccfg.Name)
 		}
 		if normalized != svccfg.Name {
 			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
@@ -35,33 +35,33 @@ func validateProject(project *compose.Project) error {
 			HadWarnings = true
 		}
 		if svccfg.Hostname != "" {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")}
+			return fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")
 		}
 		if len(svccfg.DNSSearch) != 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: dns_search")}
+			return fmt.Errorf("unsupported compose directive: dns_search")
 		}
 		if len(svccfg.DNSOpts) != 0 {
 			logrus.Warn("unsupported compose directive: dns_opt")
 			HadWarnings = true
 		}
 		if len(svccfg.DNS) != 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: dns")}
+			return fmt.Errorf("unsupported compose directive: dns")
 		}
 		if len(svccfg.Devices) != 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: devices")}
+			return fmt.Errorf("unsupported compose directive: devices")
 		}
 		if len(svccfg.DependsOn) != 0 {
 			logrus.Warn("unsupported compose directive: depends_on")
 			HadWarnings = true
 		}
 		if len(svccfg.DeviceCgroupRules) != 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: device_cgroup_rules")}
+			return fmt.Errorf("unsupported compose directive: device_cgroup_rules")
 		}
 		if len(svccfg.Entrypoint) > 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: entrypoint")}
+			return fmt.Errorf("unsupported compose directive: entrypoint")
 		}
 		if len(svccfg.GroupAdd) > 0 {
-			return &ComposeError{fmt.Errorf("unsupported compose directive: group_add")}
+			return fmt.Errorf("unsupported compose directive: group_add")
 		}
 		if len(svccfg.Ipc) > 0 {
 			logrus.Warn("unsupported compose directive: ipc")
@@ -91,7 +91,7 @@ func validateProject(project *compose.Project) error {
 			logrus.Warn("unsupported compose directive: logging")
 			HadWarnings = true
 		}
-		for name, _ := range svccfg.Networks {
+		for name := range svccfg.Networks {
 			if _, ok := project.Networks[name]; !ok {
 				logrus.Warnf("network %v used by service %v is not defined in the top-level networks section", name, svccfg.Name)
 				HadWarnings = true
@@ -108,19 +108,19 @@ func validateProject(project *compose.Project) error {
 		if svccfg.Build != nil {
 			if svccfg.Build.Dockerfile != "" {
 				if filepath.IsAbs(svccfg.Build.Dockerfile) {
-					return &ComposeError{fmt.Errorf("dockerfile path must be relative to the build context: %q", svccfg.Build.Dockerfile)}
+					return fmt.Errorf("dockerfile path must be relative to the build context: %q", svccfg.Build.Dockerfile)
 				}
 				if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
-					return &ComposeError{fmt.Errorf("dockerfile path must be inside the build context: %q", svccfg.Build.Dockerfile)}
+					return fmt.Errorf("dockerfile path must be inside the build context: %q", svccfg.Build.Dockerfile)
 				}
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					return &ComposeError{fmt.Errorf("dockerfile not found: %q", dockerfilePath)}
+					return fmt.Errorf("dockerfile not found: %q", dockerfilePath)
 				}
 			}
 			if svccfg.Build.SSH != nil {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build ssh")}
+				return fmt.Errorf("unsupported compose directive: build ssh")
 			}
 			if len(svccfg.Build.Labels) != 0 {
 				logrus.Warn("unsupported compose directive: build labels") // TODO: add support for Kaniko --label
@@ -139,49 +139,49 @@ func validateProject(project *compose.Project) error {
 				HadWarnings = true
 			}
 			if len(svccfg.Build.ExtraHosts) != 0 {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build extra_hosts")}
+				return fmt.Errorf("unsupported compose directive: build extra_hosts")
 			}
 			if svccfg.Build.Isolation != "" {
 				logrus.Warn("unsupported compose directive: build isolation")
 				HadWarnings = true
 			}
 			if svccfg.Build.Network != "" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build network")}
+				return fmt.Errorf("unsupported compose directive: build network")
 			}
 			if len(svccfg.Build.Secrets) != 0 {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build secrets")} // TODO: support build secrets
+				return fmt.Errorf("unsupported compose directive: build secrets") // TODO: support build secrets
 			}
 			if len(svccfg.Build.Tags) != 0 {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build tags")}
+				return fmt.Errorf("unsupported compose directive: build tags")
 			}
 			if len(svccfg.Build.Platforms) != 0 {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build platforms")}
+				return fmt.Errorf("unsupported compose directive: build platforms")
 			}
 			if svccfg.Build.Privileged {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build privileged")}
+				return fmt.Errorf("unsupported compose directive: build privileged")
 			}
 			if svccfg.Build.DockerfileInline != "" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: build dockerfile_inline")}
+				return fmt.Errorf("unsupported compose directive: build dockerfile_inline")
 			}
 		}
 		for _, secret := range svccfg.Secrets {
 			if !pkg.IsValidSecretName(secret.Source) {
-				return &ComposeError{fmt.Errorf("secret name is invalid: %q", secret.Source)}
+				return fmt.Errorf("secret name is invalid: %q", secret.Source)
 			}
 			if secret.Target != "" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
+				return fmt.Errorf("unsupported compose directive: secret target")
 			}
 			if s, ok := project.Secrets[secret.Source]; !ok {
 				logrus.Warnf("secret %q is not defined in the top-level secrets section", secret.Source)
 			} else if s.Name != "" && s.Name != secret.Source {
-				return &ComposeError{fmt.Errorf("unsupported secret %q: cannot override name %q", secret.Source, s.Name)} // TODO: support custom secret names
+				return fmt.Errorf("unsupported secret %q: cannot override name %q", secret.Source, s.Name) // TODO: support custom secret names
 			} else if !s.External {
 				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source) // TODO: support secrets from environment/file
 			}
 		}
 		ports, err := convertPorts(svccfg.Ports)
 		if err != nil {
-			return &ComposeError{err}
+			return err
 		}
 		if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 			// Show a warning when we have ingress ports but no explicit healthcheck
@@ -211,7 +211,7 @@ func validateProject(project *compose.Project) error {
 			}
 			// Technically this should test for <= but both interval and timeout have 30s as the default value
 			if interval < timeout || timeout <= 0 {
-				return &ComposeError{fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)}
+				return fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				logrus.Warn("unsupported compose directive: healthcheck start_period")
@@ -224,27 +224,27 @@ func validateProject(project *compose.Project) error {
 		}
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode)}
+				return fmt.Errorf("unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode)
 			}
 			if len(svccfg.Deploy.Labels) > 0 {
 				logrus.Warn("unsupported compose directive: deploy labels")
 				HadWarnings = true
 			}
 			if svccfg.Deploy.UpdateConfig != nil {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: deploy update_config")}
+				return fmt.Errorf("unsupported compose directive: deploy update_config")
 			}
 			if svccfg.Deploy.RollbackConfig != nil {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: deploy rollback_config")}
+				return fmt.Errorf("unsupported compose directive: deploy rollback_config")
 			}
 			if svccfg.Deploy.RestartPolicy != nil {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: deploy restart_policy")}
+				return fmt.Errorf("unsupported compose directive: deploy restart_policy")
 			}
 			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
 				logrus.Warn("unsupported compose directive: deploy placement")
 				HadWarnings = true
 			}
 			if svccfg.Deploy.EndpointMode != "" {
-				return &ComposeError{fmt.Errorf("unsupported compose directive: deploy endpoint_mode")}
+				return fmt.Errorf("unsupported compose directive: deploy endpoint_mode")
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
 				logrus.Warn("no reservations specified; using limits as reservations")
@@ -254,7 +254,7 @@ func validateProject(project *compose.Project) error {
 			if reservations != nil && reservations.NanoCPUs != "" {
 				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
 				if err != nil || cpus < 0 { // "0" just means "as small as possible"
-					return &ComposeError{fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)}
+					return fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)
 				}
 			}
 		}
@@ -268,6 +268,17 @@ func validateProject(project *compose.Project) error {
 			HadWarnings = true
 		}
 
+		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
+			if _, ok := dnsRoleVal.(string); !ok {
+				return fmt.Errorf("x-defang-dns-role must be a string")
+			}
+		}
+
+		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
+			if _, ok := staticFilesVal.(string); !ok {
+				return fmt.Errorf("x-defang-static-files must be a string")
+			}
+		}
 	}
 	return nil
 }
@@ -275,7 +286,7 @@ func validateProject(project *compose.Project) error {
 // ComposeStart validates a compose project and uploads the services using the client
 func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*v1.DeployResponse, error) {
 	if err := validateProject(project); err != nil {
-		return nil, err
+		return nil, &ComposeError{err}
 	}
 	//
 	// Publish updates
@@ -388,9 +399,13 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		}
 
 		var dnsRole string
-		dnsRoleVal := svccfg.Extensions["x-dns-role"]
-		if dnsRoleVal != nil {
-			dnsRole = fmt.Sprint(dnsRoleVal)
+		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
+			dnsRole = dnsRoleVal.(string) // already validated above
+		}
+
+		var staticFiles string
+		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
+			staticFiles = staticFilesVal.(string) // already validated above
 		}
 
 		// Hack: Use magic network name "public" to determine if the service is private
@@ -415,6 +430,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			Domainname:  svccfg.DomainName,
 			Platform:    convertPlatform(svccfg.Platform),
 			DnsRole:     dnsRole,
+			StaticFiles: staticFiles,
 		})
 	}
 
