@@ -789,7 +789,10 @@ func (b byocAws) update(ctx context.Context, service *v1.Service) (*v1.ServiceIn
 			if zoneId != "" {
 				si.ZoneId = zoneId
 			} else {
-				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found", service.Domainname, si.PublicFqdn))
+				si.UseAcmeCert = true
+				// TODO: We should add link to documentation on how the acme cert workflow works
+				// TODO: Should we make this the default behavior or require the user to set a flag?
+				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn))
 			}
 		}
 	}
