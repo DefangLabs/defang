@@ -18,7 +18,7 @@ require (
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.0.0-rc.2
-	github.com/docker/docker v25.0.1+incompatible
+	github.com/docker/docker v25.0.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/cancelreader v0.2.2
