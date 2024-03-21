@@ -751,11 +751,6 @@ var tosCmd = &cobra.Command{
 }
 
 func main() {
-
-	if len(os.Args) > 1 && os.Args[1] == "gen-docs" {
-		gen_docs()
-		return
-	}
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
@@ -956,6 +951,11 @@ func main() {
 	}
 
 	flushAllTracking()
+
+	if len(os.Args) > 2 && os.Args[1] == "gen-docs" && os.Args[2] != "" {
+		gen_docs(os.Args[2])
+		return
+	}
 }
 
 func prettyExecutable(def string) string {
@@ -1003,9 +1003,10 @@ func printDefangHint(hint, args string) {
 	}
 }
 
-func gen_docs() {
-	// Assume 'rootCmd' is the root of your command tree
-	err := doc.GenMarkdownTree(rootCmd, "./docs")
+func gen_docs(docsPath string) {
+	_ = os.Mkdir(docsPath, 0755)
+
+	err := doc.GenMarkdownTree(rootCmd, docsPath)
 	if err != nil {
 		log.Fatal(err)
 	}
