@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"golang.org/x/mod/semver"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -749,6 +751,11 @@ var tosCmd = &cobra.Command{
 }
 
 func main() {
+
+	if len(os.Args) > 1 && os.Args[1] == "gen-docs" {
+		gen_docs()
+		return
+	}
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
@@ -993,5 +1000,13 @@ func printDefangHint(hint, args string) {
 	}
 	if rand.Intn(10) == 0 {
 		fmt.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")
+	}
+}
+
+func gen_docs() {
+	// Assume 'rootCmd' is the root of your command tree
+	err := doc.GenMarkdownTree(rootCmd, "./docs")
+	if err != nil {
+		log.Fatal(err)
 	}
 }
