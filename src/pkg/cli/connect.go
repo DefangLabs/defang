@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/types"
 )
@@ -62,7 +61,8 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	return client.NewGrpcClient(host, accessToken), tenantId
 }
 
-func NewClient(cluster string, project *composeTypes.Project, provider client.Provider) client.Client {
+func NewClient(cluster string, projectName string, provider client.Provider) client.Client {
+	Debug(" - Project", projectName)
 	defangClient, tenantId := Connect(cluster)
 
 	awsInEnv := awsInEnv()
@@ -71,12 +71,7 @@ func NewClient(cluster string, project *composeTypes.Project, provider client.Pr
 		if !awsInEnv {
 			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 		}
-		projectName := tenantId.String()
-		if project == nil {
-			Debug(" - Failed to load Compose file; assuming project:", projectName)
-		} else {
-			projectName = project.Name
-		}
+
 		byocClient := client.NewByocAWS(tenantId, projectName, defangClient)
 		return byocClient
 	}
