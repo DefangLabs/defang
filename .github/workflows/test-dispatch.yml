@@ -1,0 +1,18 @@
+name: Test Docs Dispatch
+
+on:
+  push:
+    branches:
+      - cli-autodoc
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: defang-io/defang-docs
+          event-type: test-deploy
+      
