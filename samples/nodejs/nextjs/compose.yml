@@ -2,6 +2,7 @@ version: '3'
 name: nextjs
 services:
   web:
+    restart: unless-stopped
     # domainname: mydomain.com # if you want to use your own domain
     build:
       context: ./web

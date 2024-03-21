@@ -2,6 +2,7 @@ version: '3.9'
 name: gpu-demo
 services:
   mistral:
+    restart: unless-stopped
     image: ghcr.io/mistralai/mistral-src/vllm:latest
     ports:
       - mode: host
@@ -22,6 +23,7 @@ services:
     secrets:
       - HF_TOKEN
   ui:
+    restart: unless-stopped
     build:
       context: ui
       dockerfile: Dockerfile
