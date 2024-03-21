@@ -399,11 +399,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			privateNetwork = false
 		}
 
-		ports, err := convertPorts(svccfg.Ports)
-		if err != nil {
-			// This should never happen as we have validated above
-			return nil, &ComposeError{err}
-		}
+		ports := convertPorts(svccfg.Ports)
 		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
