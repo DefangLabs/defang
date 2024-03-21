@@ -175,6 +175,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 
 // We can changed to slices.contains when we upgrade to go 1.21 or above
 var validProtocols = map[string]bool{"": true, "tcp": true, "udp": true, "http": true, "http2": true, "grpc": true}
+var validModes = map[string]bool{"": true, "host": true, "ingress": true}
 
 func validatePort(port types.ServicePortConfig) error {
 	if port.Target < 1 || port.Target > 32767 {
@@ -190,28 +191,7 @@ func validatePort(port types.ServicePortConfig) error {
 	if !validProtocols[port.Protocol] {
 		return fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
 	}
-
-	logrus := logrus.WithField("target", port.Target)
-
-	switch port.Mode {
-	case "":
-		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
-		HadWarnings = true
-		fallthrough
-	case "host":
-		// no other validation needed but should not fall under default
-	case "ingress":
-		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
-		if port.Published != "" {
-			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
-			HadWarnings = true
-			break
-		}
-		if port.Protocol == "tcp" || port.Protocol == "udp" {
-			logrus.Warn("TCP ingress is not supported; assuming HTTP")
-			HadWarnings = true
-		}
-	default:
+	if !validModes[port.Mode] {
 		return fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
 	}
 	return nil
@@ -227,17 +207,7 @@ func validatePorts(ports []types.ServicePortConfig) error {
 	return nil
 }
 
-func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
-	if port.Target < 1 || port.Target > 32767 {
-		return nil, fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
-	}
-	if port.HostIP != "" {
-		return nil, errors.New("port host_ip is not supported")
-	}
-	if port.Published != "" && port.Published != strconv.FormatUint(uint64(port.Target), 10) {
-		return nil, fmt.Errorf("port published must be empty or equal to target: %v", port.Published)
-	}
-
+func convertPort(port types.ServicePortConfig) *v1.Port {
 	pbPort := &v1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
@@ -260,37 +230,42 @@ func convertPort(port types.ServicePortConfig) (*v1.Port, error) {
 	case "grpc": // TODO: not per spec
 		pbPort.Protocol = v1.Protocol_GRPC
 	default:
-		return nil, fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+		panic(fmt.Sprintf("port protocol should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
 	}
 
 	switch port.Mode {
-	case "", "host":
+	case "":
+		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
+		HadWarnings = true
+		fallthrough
+	case "host":
 		pbPort.Mode = v1.Mode_HOST
 	case "ingress":
 		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
 		if port.Published != "" {
+			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
+			HadWarnings = true
 			break
 		}
 		pbPort.Mode = v1.Mode_INGRESS
 		if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
+			logrus.Warn("TCP ingress is not supported; assuming HTTP")
+			HadWarnings = true
 			pbPort.Protocol = v1.Protocol_HTTP
 		}
 	default:
-		return nil, fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
+		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
 	}
-	return pbPort, nil
+	return pbPort
 }
 
-func convertPorts(ports []types.ServicePortConfig) ([]*v1.Port, error) {
+func convertPorts(ports []types.ServicePortConfig) []*v1.Port {
 	var pbports []*v1.Port
 	for _, port := range ports {
-		pbPort, err := convertPort(port)
-		if err != nil {
-			return nil, err
-		}
+		pbPort := convertPort(port)
 		pbports = append(pbports, pbPort)
 	}
-	return pbports, nil
+	return pbports
 }
 
 func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
