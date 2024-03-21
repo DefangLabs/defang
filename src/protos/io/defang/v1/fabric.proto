@@ -38,7 +38,8 @@ service FabricController {
 
   rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty); // SignToS
+  rpc SignEULA(google.protobuf.Empty)
+      returns (google.protobuf.Empty); // SignToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
@@ -302,6 +303,7 @@ message Service {
   string domainname = 12;
   bool init = 13;
   string dns_role = 14; // role arn used to access route53 to create dns records; TODO: not part of spec
+  string static_files = 15; // folder with static files to serve; TODO: not part of spec
 }
 
 message Event {
