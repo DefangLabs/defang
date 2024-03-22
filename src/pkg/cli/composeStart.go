@@ -30,12 +30,20 @@ func validateProject(project *compose.Project) error {
 			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
 			HadWarnings = true
 		}
+		if svccfg.ReadOnly {
+			logrus.Warn("unsupported compose directive: read_only")
+			HadWarnings = true
+		}
+		if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
+			logrus.Warn("unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
+			HadWarnings = true
+		}
 		if svccfg.ContainerName != "" {
 			logrus.Warn("unsupported compose directive: container_name")
 			HadWarnings = true
 		}
 		if svccfg.Hostname != "" {
-			return fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")
+			return fmt.Errorf("unsupported compose directive: hostname; consider using 'domainname' instead")
 		}
 		if len(svccfg.DNSSearch) != 0 {
 			return fmt.Errorf("unsupported compose directive: dns_search")
