@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  django-helloworld:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - mode: ingress
+        target: 8001
+#secrets:
+  #API_KEY:
+    #external: true
