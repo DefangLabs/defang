@@ -1,6 +1,7 @@
 version: '3'
 services:
   imgproxy:
+    restart: unless-stopped
     image: darthsim/imgproxy
     ports:
       - mode: ingress
