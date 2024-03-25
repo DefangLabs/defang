@@ -339,7 +339,7 @@ var secretsCmd = &cobra.Command{
 }
 
 var secretsSetCmd = &cobra.Command{
-	Use:         "create", // like Docker
+	Use:         "create SECRET", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.ExactArgs(1),
 	Aliases:     []string{"set", "add", "put"},
@@ -379,7 +379,7 @@ var secretsSetCmd = &cobra.Command{
 }
 
 var secretsDeleteCmd = &cobra.Command{
-	Use:         "rm", // like Docker
+	Use:         "rm SECRET...", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
@@ -575,7 +575,7 @@ var composeConfigCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:         "delete",
+	Use:         "delete SERVICE...",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
@@ -607,7 +607,7 @@ var deleteCmd = &cobra.Command{
 }
 
 var restartCmd = &cobra.Command{
-	Use:         "restart",
+	Use:         "restart SERVICE...",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
