@@ -15,11 +15,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# For better security, set your secret key as an Environment Variable
+# Step 1: import os
+# Step 2: type 'defang secret create' to create the key for SECRET_KEY
+# Step 3: replace the content of your SECRET_KEY with os.environ.get('YOUR_SECRET_KEY')
+#         The 'YOUR_SECRET_KEY' refers tot the name of the key you set when using
+#         'defang secret create'
 SECRET_KEY = 'django-insecure-=cldztbc4jg&xl0!x673!*v2_=p$$eu)=7*f#d0#zs$44xx-h^'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
+# remove the wildcard and add your domain when you are ready to move to production
 ALLOWED_HOSTS = [
     '*'
 ]
