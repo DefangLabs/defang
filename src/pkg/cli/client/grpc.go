@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
@@ -178,6 +179,8 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
+		Os:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
 	}})
 	return err
 }
