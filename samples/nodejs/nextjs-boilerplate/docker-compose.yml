@@ -7,6 +7,3 @@ services:
     ports:
       - mode: ingress
         target: 3000
-#secrets:
-  #API_KE
-    #external: true

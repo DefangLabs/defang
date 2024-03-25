@@ -7,6 +7,3 @@ services:
     ports:
       - mode: ingress
         target: 8001
-#secrets:
-  #API_KEY:
-    #external: true
