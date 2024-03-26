@@ -61,6 +61,7 @@ func (g GrpcClient) GetVersion(ctx context.Context) (*v1.Version, error) {
 }
 
 func (g GrpcClient) Token(ctx context.Context, req *v1.TokenRequest) (*v1.TokenResponse, error) {
+	req.AnonId = g.anonID
 	return getMsg(g.client.Token(ctx, &connect.Request[v1.TokenRequest]{Msg: req}))
 }
 
