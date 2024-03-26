@@ -42,6 +42,10 @@ func flushAllTracking() {
 func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 	command := "Unknown"
 	if cmd != nil {
+		// Ignore tracking for shell completion requests
+		if cmd.Name() == cobra.ShellCompRequestCmd {
+			return
+		}
 		calledAs := cmd.CalledAs()
 		command = cmd.Use
 		cmd.VisitParents(func(c *cobra.Command) {
