@@ -25,14 +25,6 @@ type GrpcClient struct {
 }
 
 func NewGrpcClient(host, accessToken string) *GrpcClient {
-	baseUrl := "http://"
-	if strings.HasSuffix(host, ":443") {
-		baseUrl = "https://"
-	}
-	baseUrl += host
-	// Debug(" - Connecting to", baseUrl)
-	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
-
 	state := State{AnonID: uuid.NewString()}
 
 	// Restore anonID from config file
@@ -45,6 +37,17 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 			os.WriteFile(statePath, bytes, 0644)
 		}
 	}
+
+	scheme := "http://"
+	if strings.HasSuffix(host, ":443") {
+		scheme = "https://"
+	}
+	fabricClient := defangv1connect.NewFabricControllerClient(
+		http.DefaultClient,
+		scheme+host,
+		connect.WithGRPC(),
+		connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), NewAnonInterceptor(state.AnonID)),
+	)
 
 	return &GrpcClient{client: fabricClient, anonID: state.AnonID}
 }
