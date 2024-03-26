@@ -141,6 +141,7 @@ message TokenRequest {
   repeated string scope = 3; // "tail", "read", etc.
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
+  string anon_id = 6;
   // string refresh_token = 6;
 }
 
