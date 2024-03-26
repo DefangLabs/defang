@@ -30,12 +30,20 @@ func validateProject(project *compose.Project) error {
 			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
 			HadWarnings = true
 		}
+		if svccfg.ReadOnly {
+			logrus.Warn("unsupported compose directive: read_only")
+			HadWarnings = true
+		}
+		if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
+			logrus.Warn("unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
+			HadWarnings = true
+		}
 		if svccfg.ContainerName != "" {
 			logrus.Warn("unsupported compose directive: container_name")
 			HadWarnings = true
 		}
 		if svccfg.Hostname != "" {
-			return fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")
+			return fmt.Errorf("unsupported compose directive: hostname; consider using 'domainname' instead")
 		}
 		if len(svccfg.DNSSearch) != 0 {
 			return fmt.Errorf("unsupported compose directive: dns_search")
@@ -179,14 +187,14 @@ func validateProject(project *compose.Project) error {
 				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source) // TODO: support secrets from environment/file
 			}
 		}
-		ports, err := convertPorts(svccfg.Ports)
+		err := validatePorts(svccfg.Ports)
 		if err != nil {
 			return err
 		}
 		if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 			// Show a warning when we have ingress ports but no explicit healthcheck
-			for _, port := range ports {
-				if port.Mode == v1.Mode_INGRESS {
+			for _, port := range svccfg.Ports {
+				if port.Mode == "ingress" {
 					logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
 					HadWarnings = true
 					break
@@ -414,7 +422,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			privateNetwork = false
 		}
 
-		ports, _ := convertPorts(svccfg.Ports) // Validated above
+		ports := convertPorts(svccfg.Ports)
 		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,

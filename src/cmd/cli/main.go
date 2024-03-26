@@ -45,6 +45,10 @@ var (
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
+func awsInEnv() bool {
+	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
 var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -53,7 +57,7 @@ var rootCmd = &cobra.Command{
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
-		provider, _ := cmd.Flag("provider").Value.(*cliClient.Provider)
+		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
@@ -67,6 +71,23 @@ var rootCmd = &cobra.Command{
 			cli.ForceColor(true)
 		case ColorNever:
 			cli.ForceColor(false)
+		}
+
+		switch *provider {
+		case cliClient.ProviderAuto:
+			if awsInEnv() {
+				*provider = cliClient.ProviderAWS
+			} else {
+				*provider = cliClient.ProviderDefang
+			}
+		case cliClient.ProviderAWS:
+			if !awsInEnv() {
+				cli.Warn(" ! AWS provider was selected, but AWS environment variables are not set")
+			}
+		case cliClient.ProviderDefang:
+			if awsInEnv() {
+				cli.Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
+			}
 		}
 
 		cd, _ := cmd.Flags().GetString("cwd")
@@ -85,7 +106,7 @@ var rootCmd = &cobra.Command{
 		} else {
 			tenantID := cli.GetTenantID(cluster)
 			projectName = string(tenantID)
-			if !cli.IsUsingAWSProvider(*provider) {
+			if *provider == cliClient.ProviderDefang {
 				project, err = cli.LoadComposeWithProjectName(filePath, projectName) // playground env
 			} else {
 				project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
@@ -339,7 +360,7 @@ var secretsCmd = &cobra.Command{
 }
 
 var secretsSetCmd = &cobra.Command{
-	Use:         "create", // like Docker
+	Use:         "create SECRET", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.ExactArgs(1),
 	Aliases:     []string{"set", "add", "put"},
@@ -379,7 +400,7 @@ var secretsSetCmd = &cobra.Command{
 }
 
 var secretsDeleteCmd = &cobra.Command{
-	Use:         "rm", // like Docker
+	Use:         "rm SECRET...", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
@@ -575,7 +596,7 @@ var composeConfigCmd = &cobra.Command{
 }
 
 var deleteCmd = &cobra.Command{
-	Use:         "delete",
+	Use:         "delete SERVICE...",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
@@ -607,7 +628,7 @@ var deleteCmd = &cobra.Command{
 }
 
 var restartCmd = &cobra.Command{
-	Use:         "restart",
+	Use:         "restart SERVICE...",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
