@@ -67,6 +67,8 @@ message TrackRequest {
   string anon_id = 1;
   string event = 2;
   map<string, string> properties = 3;
+  string os = 4;
+  string arch = 5;
 }
 
 message DeployRequest { repeated Service services = 1; }
