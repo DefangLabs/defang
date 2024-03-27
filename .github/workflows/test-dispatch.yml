@@ -12,7 +12,7 @@ jobs:
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v1
         with:
-          token: ${{ secrets.ACTION_TRIGGER_TOKEN }}
+          token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: defang-io/defang-docs
           event-type: cli-autodoc
       
