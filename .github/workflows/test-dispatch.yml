@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Repository Dispatch
+        id: dispatch
         uses: peter-evans/repository-dispatch@v1
         with:
           token: ${{ secrets.ACTION_TRIGGER_TOKEN }}
