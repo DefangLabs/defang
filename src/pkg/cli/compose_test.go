@@ -159,7 +159,7 @@ func TestConvertPort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := convertPort(tt.input)
+			err := validatePort(tt.input)
 			if err != nil {
 				if tt.wantErr == "" {
 					t.Errorf("convertPort() unexpected error: %v", err)
@@ -168,6 +168,7 @@ func TestConvertPort(t *testing.T) {
 				}
 				return
 			}
+			got := convertPort(tt.input)
 			if got.String() != tt.expected.String() {
 				t.Errorf("convertPort() got %v, want %v", got, tt.expected.String())
 			}
