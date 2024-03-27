@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra/doc"
 )
 
+// runs in docs ci to generate markdown docs
 func main() {
 	if len(os.Args) < 2 {
 		panic("Missing required argument: docs path")
