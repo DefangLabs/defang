@@ -179,14 +179,14 @@ func validateProject(project *compose.Project) error {
 				logrus.Warnf("unsupported secret %q: not marked external:true", secret.Source) // TODO: support secrets from environment/file
 			}
 		}
-		ports, err := convertPorts(svccfg.Ports)
+		err := validatePorts(svccfg.Ports)
 		if err != nil {
 			return err
 		}
 		if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 			// Show a warning when we have ingress ports but no explicit healthcheck
-			for _, port := range ports {
-				if port.Mode == v1.Mode_INGRESS {
+			for _, port := range svccfg.Ports {
+				if port.Mode == "ingress" {
 					logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
 					HadWarnings = true
 					break
@@ -414,7 +414,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			privateNetwork = false
 		}
 
-		ports, _ := convertPorts(svccfg.Ports) // Validated above
+		ports := convertPorts(svccfg.Ports)
 		services = append(services, &v1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
