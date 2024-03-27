@@ -1,5 +1,6 @@
 services:
   echo:
+    restart: unless-stopped
     image: ealen/echo-server
     ports:
       - target: 80

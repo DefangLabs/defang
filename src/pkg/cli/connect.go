@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -65,29 +64,13 @@ func NewClient(cluster string, projectName string, provider client.Provider) cli
 	Debug(" - Project", projectName)
 	defangClient, tenantId := Connect(cluster)
 
-	awsInEnv := awsInEnv()
-	if IsUsingAWSProvider(provider) {
+	if provider == client.ProviderAWS {
 		Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		if !awsInEnv {
-			Warn(" ! AWS provider was selected, but AWS environment variables are not set")
-		}
-
 		byocClient := client.NewByocAWS(tenantId, projectName, defangClient)
 		return byocClient
 	}
 
-	if awsInEnv {
-		Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
-	}
 	return defangClient
-}
-
-func awsInEnv() bool {
-	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-}
-
-func IsUsingAWSProvider(provider client.Provider) bool {
-	return provider == client.ProviderAWS || (provider == client.ProviderAuto && awsInEnv())
 }
 
 // Deprecated: don't rely on info in token
