@@ -67,6 +67,8 @@ message TrackRequest {
   string anon_id = 1;
   string event = 2;
   map<string, string> properties = 3;
+  string os = 4;
+  string arch = 5;
 }
 
 message DeployRequest { repeated Service services = 1; }
@@ -139,6 +141,7 @@ message TokenRequest {
   repeated string scope = 3; // "tail", "read", etc.
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
+  string anon_id = 6;
   // string refresh_token = 6;
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
@@ -60,6 +61,7 @@ func (g GrpcClient) GetVersion(ctx context.Context) (*v1.Version, error) {
 }
 
 func (g GrpcClient) Token(ctx context.Context, req *v1.TokenRequest) (*v1.TokenResponse, error) {
+	req.AnonId = g.anonID
 	return getMsg(g.client.Token(ctx, &connect.Request[v1.TokenRequest]{Msg: req}))
 }
 
@@ -178,6 +180,8 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
+		Os:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
 	}})
 	return err
 }

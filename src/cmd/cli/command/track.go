@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"strings"
@@ -18,8 +18,8 @@ type P = cliClient.Property // shorthand for tracking properties
 // trackWG is used to wait for all tracking to complete.
 var trackWG = sync.WaitGroup{}
 
-// track sends a tracking event to the server in a separate goroutine.
-func track(name string, props ...P) {
+// Track sends a tracking event to the server in a separate goroutine.
+func Track(name string, props ...P) {
 	if disableAnalytics {
 		return
 	}
@@ -34,7 +34,7 @@ func track(name string, props ...P) {
 }
 
 // flushAllTracking waits for all tracking goroutines to complete.
-func flushAllTracking() {
+func FlushAllTracking() {
 	trackWG.Wait()
 }
 
@@ -42,12 +42,16 @@ func flushAllTracking() {
 func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 	command := "Unknown"
 	if cmd != nil {
+		command = cmd.Name()
+		// Ignore tracking for shell completion requests
+		if command == cobra.ShellCompRequestCmd {
+			return
+		}
 		calledAs := cmd.CalledAs()
-		command = cmd.Use
 		cmd.VisitParents(func(c *cobra.Command) {
 			calledAs = c.CalledAs() + " " + calledAs
 			if c.HasParent() { // skip root command
-				command = c.Use + "-" + command
+				command = c.Name() + "-" + command
 			}
 		})
 		props = append(props, P{Name: "CalledAs", Value: calledAs})
@@ -55,5 +59,5 @@ func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 			props = append(props, P{Name: f.Name, Value: f.Value})
 		})
 	}
-	track(strings.Title(command+" "+verb), props...)
+	Track(strings.Title(command+" "+verb), props...)
 }
