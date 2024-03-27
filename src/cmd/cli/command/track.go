@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"strings"
@@ -18,6 +18,10 @@ type P = cliClient.Property // shorthand for tracking properties
 // trackWG is used to wait for all tracking to complete.
 var trackWG = sync.WaitGroup{}
 
+func Track(name string, props ...P) {
+	track(name, props...)
+}
+
 // track sends a tracking event to the server in a separate goroutine.
 func track(name string, props ...P) {
 	if disableAnalytics {
@@ -34,7 +38,7 @@ func track(name string, props ...P) {
 }
 
 // flushAllTracking waits for all tracking goroutines to complete.
-func flushAllTracking() {
+func FlushAllTracking() {
 	trackWG.Wait()
 }
 
