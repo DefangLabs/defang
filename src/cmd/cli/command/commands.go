@@ -29,6 +29,7 @@ import (
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
+// GLOBALS
 var (
 	client         cliClient.Client
 	cluster        string
@@ -429,7 +430,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			return err
 		}
 
-		track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// create the folder if needed
 		cd := ""

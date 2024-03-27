@@ -18,12 +18,8 @@ type P = cliClient.Property // shorthand for tracking properties
 // trackWG is used to wait for all tracking to complete.
 var trackWG = sync.WaitGroup{}
 
+// Track sends a tracking event to the server in a separate goroutine.
 func Track(name string, props ...P) {
-	track(name, props...)
-}
-
-// track sends a tracking event to the server in a separate goroutine.
-func track(name string, props ...P) {
 	if disableAnalytics {
 		return
 	}
@@ -63,5 +59,5 @@ func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 			props = append(props, P{Name: f.Name, Value: f.Value})
 		})
 	}
-	track(strings.Title(command+" "+verb), props...)
+	Track(strings.Title(command+" "+verb), props...)
 }
