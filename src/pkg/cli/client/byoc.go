@@ -696,8 +696,8 @@ func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v
 		etag = "" // no need to filter by etag
 	} else {
 		// Tail CD, kaniko, and all services
-		kanikoTail := awsecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("kaniko"))}     // must match logic in ecs/common.ts
-		servicesTail := awsecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logGroup"))} // must match logic in ecs/common.ts
+		kanikoTail := awsecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
+		servicesTail := awsecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
 		cdTail := awsecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
