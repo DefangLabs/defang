@@ -73,8 +73,7 @@ func resolveEnv(k string) *string {
 	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
 	v, ok := os.LookupEnv(k)
 	if !ok {
-		logrus.Warnf("environment variable not found: %q", k)
-		HadWarnings = true
+		warnf("environment variable not found: %q", k)
 		// If the value could not be resolved, it should be removed
 		return nil
 	}
@@ -84,8 +83,7 @@ func resolveEnv(k string) *string {
 func convertPlatform(platform string) v1.Platform {
 	switch platform {
 	default:
-		logrus.Warnf("Unsupported platform: %q (assuming linux)", platform)
-		HadWarnings = true
+		warnf("Unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
 		return v1.Platform_LINUX_ANY
@@ -102,6 +100,11 @@ func LoadCompose(filePath string, tenantID types.TenantID) (*compose.Project, er
 
 func LoadComposeWithProjectName(filePath string, projectName string) (*compose.Project, error) {
 	return loadCompose(filePath, projectName, true)
+}
+
+func warnf(format string, args ...interface{}) {
+	logrus.Warnf(format, args...)
+	HadWarnings = true
 }
 
 func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
@@ -178,21 +181,41 @@ var validModes = map[string]bool{"": true, "host": true, "ingress": true}
 
 func validatePort(port compose.ServicePortConfig) error {
 	if port.Target < 1 || port.Target > 32767 {
-		return fmt.Errorf("port target must be an integer between 1 and 32767: %v", port.Target)
+		return fmt.Errorf("port 'target' must be an integer between 1 and 32767: %v", port.Target)
 	}
 	if port.HostIP != "" {
-		return errors.New("port host_ip is not supported")
+		return errors.New("port 'host_ip' is not supported")
 	}
-	if port.Published != "" && port.Published != strconv.FormatUint(uint64(port.Target), 10) {
-		return fmt.Errorf("port published must be empty or equal to target: %v", port.Published)
-	}
-
 	if !validProtocols[port.Protocol] {
-		return fmt.Errorf("port protocol not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+		return fmt.Errorf("port 'protocol' not one of [tcp udp http http2 grpc]: %v", port.Protocol)
 	}
 	if !validModes[port.Mode] {
-		return fmt.Errorf("port mode not one of [host ingress]: %v", port.Mode)
+		return fmt.Errorf("port 'mode' not one of [host ingress]: %v", port.Mode)
 	}
+	if port.Published != "" && (port.Mode == "host" || port.Protocol == "udp") {
+		portRange := strings.SplitN(port.Published, "-", 2)
+		start, err := strconv.ParseUint(portRange[0], 10, 16)
+		if err != nil {
+			return fmt.Errorf("port 'published' start must be an integer: %v", portRange[0])
+		}
+		if len(portRange) == 2 {
+			end, err := strconv.ParseUint(portRange[1], 10, 16)
+			if err != nil {
+				return fmt.Errorf("port 'published' end must be an integer: %v", portRange[1])
+			}
+			if start > end {
+				return fmt.Errorf("port 'published' start must be less than end: %v", port.Published)
+			}
+			if port.Target < uint32(start) || port.Target > uint32(end) {
+				return fmt.Errorf("port 'published' range must include 'target': %v", port.Published)
+			}
+		} else {
+			if start != uint64(port.Target) {
+				return fmt.Errorf("port 'published' must be empty or equal to 'target': %v", port.Published)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -229,29 +252,30 @@ func convertPort(port compose.ServicePortConfig) *v1.Port {
 	case "grpc": // TODO: not per spec
 		pbPort.Protocol = v1.Protocol_GRPC
 	default:
-		panic(fmt.Sprintf("port protocol should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
+		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
 	}
 
 	switch port.Mode {
 	case "":
-		logrus.Warn("No port mode was specified; assuming 'host' (add 'mode' to silence)")
-		HadWarnings = true
+		warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		fallthrough
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
+		if port.Protocol != "udp" {
+			if port.Published != "" {
+				warnf("Published ports are ignored in ingress mode")
+			}
+			pbPort.Mode = v1.Mode_INGRESS
+			if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
+				warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+				pbPort.Protocol = v1.Protocol_HTTP
+			}
+			break
+		}
+		warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
 		fallthrough
 	case "host":
 		pbPort.Mode = v1.Mode_HOST
-	case "ingress":
-		// This code is unnecessarily complex because compose-go silently converts short syntax to ingress+tcp
-		if port.Published != "" {
-			logrus.Warn("Published ports are not supported in ingress mode; assuming 'host' (add 'mode' to silence)")
-			HadWarnings = true
-			break
-		}
-		pbPort.Mode = v1.Mode_INGRESS
-		if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
-			logrus.Warn("TCP ingress is not supported; assuming HTTP")
-			HadWarnings = true
-			pbPort.Protocol = v1.Protocol_HTTP
-		}
 	default:
 		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
 	}
