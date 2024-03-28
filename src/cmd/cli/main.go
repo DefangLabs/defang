@@ -9,10 +9,6 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli"
 )
 
-//
-// GLOBALS
-//
-
 func main() {
 	// Handle Ctrl+C so we can exit gracefully
 	ctx, cancel := context.WithCancel(context.Background())
