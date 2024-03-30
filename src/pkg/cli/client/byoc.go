@@ -47,23 +47,6 @@ var (
 	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
 )
 
-type byocAws struct {
-	*GrpcClient
-
-	cdTasks                 map[string]awsecs.TaskArn
-	customDomain            string
-	driver                  *cfn.AwsEcs
-	privateDomain           string
-	privateLbIps            []string
-	publicNatIps            []string
-	pulumiProject           string
-	pulumiStack             string
-	quota                   quota.Quotas
-	setupDone               bool
-	tenantID                string
-	shouldDelegateSubdomain bool
-}
-
 type Warning interface {
 	Error() string
 	Warning() string
@@ -92,6 +75,23 @@ func (w Warnings) Error() string {
 }
 
 var _ Client = (*byocAws)(nil)
+
+type byocAws struct {
+	*GrpcClient
+
+	cdTasks                 map[string]awsecs.TaskArn
+	customDomain            string
+	driver                  *cfn.AwsEcs
+	privateDomain           string
+	privateLbIps            []string
+	publicNatIps            []string
+	pulumiProject           string
+	pulumiStack             string
+	quota                   quota.Quotas
+	setupDone               bool
+	tenantID                string
+	shouldDelegateSubdomain bool
+}
 
 func NewByocAWS(tenantId types.TenantID, project string, defClient *GrpcClient) *byocAws {
 	// Resource naming (stack/stackDir) requires a project name
@@ -486,31 +486,6 @@ func (b byocAws) GetServices(ctx context.Context) (*v1.ListServicesResponse, err
 	return &v1.ListServicesResponse{Services: serviceInfos}, nil
 }
 
-func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
-	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
-	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
-		return ""
-	}
-	serviceName := ecsService[:len(ecsService)-8]
-
-	// Replace the first underscore to get the FQN.
-	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
-}
-
-// annotateAwsError translates the AWS error to an error code the CLI client understands
-func annotateAwsError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, err)
-	}
-	if aws.IsParameterNotFoundError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	return err
-}
-
 func (b byocAws) getSecretID(name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", defangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
@@ -549,128 +524,6 @@ func (b *byocAws) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest)
 	return &v1.UploadURLResponse{
 		Url: url,
 	}, nil
-}
-
-// byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
-type byocServerStream struct {
-	cancelTaskCh func()
-	err          error
-	errCh        <-chan error
-	etag         string
-	response     *v1.TailResponse
-	service      string
-	stream       awsecs.EventStream
-	taskCh       <-chan error
-}
-
-var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
-
-func (bs *byocServerStream) Close() error {
-	if bs.cancelTaskCh != nil {
-		bs.cancelTaskCh()
-	}
-	return bs.stream.Close()
-}
-
-func (bs *byocServerStream) Err() error {
-	if bs.err == io.EOF {
-		return nil // same as the original gRPC/connect server stream
-	}
-	return annotateAwsError(bs.err)
-}
-
-func (bs *byocServerStream) Msg() *v1.TailResponse {
-	return bs.response
-}
-
-type hasErrCh interface {
-	Errs() <-chan error
-}
-
-func (bs *byocServerStream) Receive() bool {
-	select {
-	case e := <-bs.stream.Events(): // blocking
-		events, err := awsecs.GetLogEvents(e)
-		if err != nil {
-			bs.err = err
-			return false
-		}
-		bs.response = &v1.TailResponse{}
-		if len(events) == 0 {
-			// The original gRPC/connect server stream would never send an empty response.
-			// We could loop around the select, but returning an empty response updates the spinner.
-			return true
-		}
-		var record logs.FirelensMessage
-		parseFirelensRecords := false
-		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
-		event := events[0]
-		if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-			if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
-				// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
-				bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
-				bs.response.Host = "pulumi"
-				bs.response.Service = "cd"
-			} else {
-				// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
-				bs.response.Host = parts[2] // TODO: figure out actual hostname/IP
-				parts = strings.Split(parts[1], "_")
-				if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
-					// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
-					return true
-				}
-				service, etag := parts[0], parts[1]
-				bs.response.Etag = etag
-				bs.response.Service = service
-			}
-		} else if strings.Contains(*event.LogStreamName, "-firelens-") {
-			// These events are from the Firelens sidecar; try to parse the JSON
-			if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
-				bs.response.Etag = record.Etag
-				bs.response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
-				bs.response.Service = record.ContainerName // TODO: could be service_etag
-				parseFirelensRecords = true
-			}
-		}
-		if bs.etag != "" && bs.etag != bs.response.Etag {
-			return true // TODO: filter these out using the AWS StartLiveTail API
-		}
-		if bs.service != "" && bs.service != bs.response.Service {
-			return true // TODO: filter these out using the AWS StartLiveTail API
-		}
-		entries := make([]*v1.LogEntry, len(events))
-		for i, event := range events {
-			stderr := false //  TODO: detect somehow from source
-			message := *event.Message
-			if parseFirelensRecords {
-				if err := json.Unmarshal([]byte(message), &record); err == nil {
-					message = record.Log
-					if record.ContainerName == "kaniko" {
-						stderr = logs.IsLogrusError(message)
-					} else {
-						stderr = record.Source == logs.SourceStderr
-					}
-				}
-			} else if bs.response.Service == "cd" && strings.HasPrefix(message, " ** ") {
-				stderr = true
-			}
-			entries[i] = &v1.LogEntry{
-				Message:   message,
-				Stderr:    stderr,
-				Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
-			}
-		}
-		bs.response.Entries = entries
-		return true
-
-	case err := <-bs.errCh: // blocking (if not nil)
-		bs.err = err
-		return false
-
-	case err := <-bs.taskCh: // blocking (if not nil)
-		bs.err = err
-		return false // TODO: make sure we got all the logs from the task
-	}
 }
 
 func (b *byocAws) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
@@ -927,4 +780,151 @@ func (b *byocAws) BootstrapList(ctx context.Context) error {
 		fmt.Println(" - ", stack)
 	}
 	return nil
+}
+
+func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
+	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
+	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
+		return ""
+	}
+	serviceName := ecsService[:len(ecsService)-8]
+
+	// Replace the first underscore to get the FQN.
+	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
+}
+
+// annotateAwsError translates the AWS error to an error code the CLI client understands
+func annotateAwsError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "get credentials:") {
+		return connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if aws.IsParameterNotFoundError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	return err
+}
+
+// byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
+type byocServerStream struct {
+	cancelTaskCh func()
+	err          error
+	errCh        <-chan error
+	etag         string
+	response     *v1.TailResponse
+	service      string
+	stream       awsecs.EventStream
+	taskCh       <-chan error
+}
+
+var _ ServerStream[v1.TailResponse] = (*byocServerStream)(nil)
+
+func (bs *byocServerStream) Close() error {
+	if bs.cancelTaskCh != nil {
+		bs.cancelTaskCh()
+	}
+	return bs.stream.Close()
+}
+
+func (bs *byocServerStream) Err() error {
+	if bs.err == io.EOF {
+		return nil // same as the original gRPC/connect server stream
+	}
+	return annotateAwsError(bs.err)
+}
+
+func (bs *byocServerStream) Msg() *v1.TailResponse {
+	return bs.response
+}
+
+type hasErrCh interface {
+	Errs() <-chan error
+}
+
+func (bs *byocServerStream) Receive() bool {
+	select {
+	case e := <-bs.stream.Events(): // blocking
+		events, err := awsecs.GetLogEvents(e)
+		if err != nil {
+			bs.err = err
+			return false
+		}
+		bs.response = &v1.TailResponse{}
+		if len(events) == 0 {
+			// The original gRPC/connect server stream would never send an empty response.
+			// We could loop around the select, but returning an empty response updates the spinner.
+			return true
+		}
+		var record logs.FirelensMessage
+		parseFirelensRecords := false
+		// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
+		event := events[0]
+		if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
+			if strings.Contains(*event.LogGroupIdentifier, ":"+cdTaskPrefix) {
+				// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
+				bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
+				bs.response.Host = "pulumi"
+				bs.response.Service = "cd"
+			} else {
+				// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
+				bs.response.Host = parts[2] // TODO: figure out actual hostname/IP
+				parts = strings.Split(parts[1], "_")
+				if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
+					// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
+					return true
+				}
+				service, etag := parts[0], parts[1]
+				bs.response.Etag = etag
+				bs.response.Service = service
+			}
+		} else if strings.Contains(*event.LogStreamName, "-firelens-") {
+			// These events are from the Firelens sidecar; try to parse the JSON
+			if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
+				bs.response.Etag = record.Etag
+				bs.response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
+				bs.response.Service = record.ContainerName // TODO: could be service_etag
+				parseFirelensRecords = true
+			}
+		}
+		if bs.etag != "" && bs.etag != bs.response.Etag {
+			return true // TODO: filter these out using the AWS StartLiveTail API
+		}
+		if bs.service != "" && bs.service != bs.response.Service {
+			return true // TODO: filter these out using the AWS StartLiveTail API
+		}
+		entries := make([]*v1.LogEntry, len(events))
+		for i, event := range events {
+			stderr := false //  TODO: detect somehow from source
+			message := *event.Message
+			if parseFirelensRecords {
+				if err := json.Unmarshal([]byte(message), &record); err == nil {
+					message = record.Log
+					if record.ContainerName == "kaniko" {
+						stderr = logs.IsLogrusError(message)
+					} else {
+						stderr = record.Source == logs.SourceStderr
+					}
+				}
+			} else if bs.response.Service == "cd" && strings.HasPrefix(message, " ** ") {
+				stderr = true
+			}
+			entries[i] = &v1.LogEntry{
+				Message:   message,
+				Stderr:    stderr,
+				Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
+			}
+		}
+		bs.response.Entries = entries
+		return true
+
+	case err := <-bs.errCh: // blocking (if not nil)
+		bs.err = err
+		return false
+
+	case err := <-bs.taskCh: // blocking (if not nil)
+		bs.err = err
+		return false // TODO: make sure we got all the logs from the task
+	}
 }
