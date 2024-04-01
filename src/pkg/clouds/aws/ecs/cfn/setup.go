@@ -11,10 +11,10 @@ import (
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
-	common "github.com/defang-io/defang/src/pkg/aws"
-	"github.com/defang-io/defang/src/pkg/aws/ecs"
-	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
-	"github.com/defang-io/defang/src/pkg/aws/region"
+	common "github.com/defang-io/defang/src/pkg/clouds/aws"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
