@@ -1,6 +1,7 @@
-package client
+package byoc
 
 import (
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"testing"
 
 	"github.com/defang-io/defang/src/pkg/types"
@@ -35,20 +36,20 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
-			b.customDomain = "example.com"
+			b := clouds.NewByocAWS(tt.TenantID, tt.ProjectName, nil)
+			b.CustomDomain = "example.com"
 
-			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
+			endpoint := b.GetEndpoint(tt.Fqn, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.getPublicFqdn(tt.Fqn)
+			publicFqdn := b.GetPublicFqdn(tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.getPrivateFqdn(tt.Fqn)
+			privateFqdn := b.GetPrivateFqdn(tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}
