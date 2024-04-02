@@ -3,7 +3,7 @@ package ecs
 import (
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/aws"
+	"github.com/defang-io/defang/src/pkg/clouds/aws"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"strconv"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
@@ -180,7 +181,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	resp, err := c.Deploy(ctx, &v1.DeployRequest{
 		Services: services,
 	})
-	var warnings client.Warnings
+	var warnings clouds.Warnings
 	if errors.As(err, &warnings) {
 		if len(warnings) > 0 {
 			Warn(" !", warnings)

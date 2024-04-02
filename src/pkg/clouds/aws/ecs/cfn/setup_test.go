@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
