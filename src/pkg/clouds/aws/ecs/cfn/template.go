@@ -20,8 +20,8 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
-	awsecs "github.com/defang-io/defang/src/pkg/aws/ecs"
-	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn/outputs"
+	awsecs "github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 

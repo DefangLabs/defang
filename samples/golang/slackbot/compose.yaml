@@ -1,0 +1,19 @@
+version: '3.9'
+name: slack-invite-bot
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - mode: ingress
+        target: 8080
+    secrets:
+      - SLACK_TOKEN
+      - SLACK_CHANNEL_ID
+      
+secrets:
+  SLACK_TOKEN:
+    external: true
+  SLACK_CHANNEL_ID:
+    external: true

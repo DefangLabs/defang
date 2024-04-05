@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/defang-io/defang/src/pkg/aws/ecs/cfn"
-	"github.com/defang-io/defang/src/pkg/aws/region"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
 	"github.com/defang-io/defang/src/pkg/docker"
 	"github.com/defang-io/defang/src/pkg/types"
 )

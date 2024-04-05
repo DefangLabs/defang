@@ -1,9 +1,10 @@
 //go:build integration
 
-package client
+package byoc
 
 import (
 	"context"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"strings"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocAWS("ten ant", "", nil) // no domain
+	b := clouds.NewByocAWS("ten ant", "", nil) // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
@@ -37,8 +38,8 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocAWS("TestTail", "", nil)
-	b.customDomain = "example.com" // avoid rpc call
+	b := clouds.NewByocAWS("TestTail", "", nil)
+	b.CustomDomain = "example.com" // avoid rpc call
 
 	ss, err := b.Tail(context.TODO(), &v1.TailRequest{})
 	if err != nil {
@@ -64,7 +65,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocAWS("TestGetServices", "", nil)
+	b := clouds.NewByocAWS("TestGetServices", "", nil)
 
 	services, err := b.GetServices(context.TODO())
 	if err != nil {
@@ -86,7 +87,7 @@ func TestPutSecret(t *testing.T) {
 	}
 
 	const secretName = "hello"
-	b := NewByocAWS("TestPutSecret", "", nil)
+	b := clouds.NewByocAWS("TestPutSecret", "", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
 		err := b.DeleteSecrets(context.TODO(), &v1.Secrets{Names: []string{secretName}})
@@ -114,14 +115,14 @@ func TestPutSecret(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Check that the secret is in the list
-		secrets, err := b.driver.ListSecretsByPrefix(context.TODO(), b.tenantID+".")
+		secrets, err := b.Driver.ListSecretsByPrefix(context.TODO(), b.TenantID+".")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(secrets) != 1 {
 			t.Fatalf("expected 1 secret, got %v", secrets)
 		}
-		expected := b.tenantID + "." + secretName
+		expected := b.TenantID + "." + secretName
 		if secrets[0] != expected {
 			t.Fatalf("expected %q, got %q", expected, secrets[0])
 		}
@@ -133,7 +134,7 @@ func TestListSecrets(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	b := NewByocAWS("TestListSecrets", "", nil)
+	b := clouds.NewByocAWS("TestListSecrets", "", nil)
 
 	t.Run("list", func(t *testing.T) {
 		secrets, err := b.ListSecrets(context.TODO())
