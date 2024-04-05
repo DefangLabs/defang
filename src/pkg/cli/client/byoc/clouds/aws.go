@@ -7,6 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"sort"
+	"strings"
+	"time"
+
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -26,15 +33,9 @@ import (
 	"github.com/defang-io/defang/src/pkg/logs"
 	"github.com/defang-io/defang/src/pkg/quota"
 	"github.com/defang-io/defang/src/pkg/types"
-	"github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"net"
-	"os"
-	"sort"
-	"strings"
-	"time"
 )
 
 type ByocAws struct {
@@ -518,7 +519,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 			// Only tail the logstreams for the CD task
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, cdTail, kanikoTail, servicesTail)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail)
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
