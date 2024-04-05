@@ -114,6 +114,7 @@ message ServiceInfo {
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
+  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;
