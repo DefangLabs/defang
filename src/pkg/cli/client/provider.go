@@ -11,6 +11,7 @@ const (
 	ProviderAuto   Provider = "auto"
 	ProviderDefang Provider = "defang"
 	ProviderAWS    Provider = "aws"
+	ProviderDO     Provider = "do"
 	// ProviderAzure  Provider = "azure"
 	// ProviderGCP    Provider = "gcp"
 )
@@ -19,6 +20,7 @@ var allProviders = []Provider{
 	ProviderAuto,
 	ProviderDefang,
 	ProviderAWS,
+	ProviderDO,
 	// ProviderAzure,
 	// ProviderGCP,
 }
