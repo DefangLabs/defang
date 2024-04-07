@@ -104,7 +104,7 @@ func SetupCommands() {
 	colorMode := ColorAuto
 	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
 	rootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
-	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
+	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws or do" for bring-your-own-cloud`)
 	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging for troubleshooting the CLI")
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
@@ -262,6 +262,10 @@ var rootCmd = &cobra.Command{
 		case cliClient.ProviderAWS:
 			if !awsInEnv() {
 				cli.Warn(" ! AWS provider was selected, but AWS environment variables are not set")
+			}
+		case cliClient.ProviderDO:
+			if !doInEnv() {
+				cli.Warn(" ! DO provider was selected, but DO PAT environment variable not set")
 			}
 		case cliClient.ProviderDefang:
 			if awsInEnv() {
@@ -950,4 +954,8 @@ var tosCmd = &cobra.Command{
 
 func awsInEnv() bool {
 	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
+func doInEnv() bool {
+	return os.Getenv("DO_PAT") != ""
 }

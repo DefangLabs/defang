@@ -71,6 +71,12 @@ func NewClient(cluster string, projectName string, provider client.Provider) cli
 		return byocClient
 	}
 
+	if provider == client.ProviderDO {
+		Info(" # Using DO provider")
+		byocClient := clouds.NewByocDO(tenantId, projectName, defangClient)
+		return byocClient
+	}
+
 	return defangClient
 }
 
