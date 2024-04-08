@@ -7,6 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"sort"
+	"strings"
+	"time"
+
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -26,22 +33,16 @@ import (
 	"github.com/defang-io/defang/src/pkg/logs"
 	"github.com/defang-io/defang/src/pkg/quota"
 	"github.com/defang-io/defang/src/pkg/types"
-	"github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"net"
-	"os"
-	"sort"
-	"strings"
-	"time"
 )
 
 type ByocAws struct {
 	*client.GrpcClient
 
 	cdTasks                 map[string]ecs.TaskArn
-	CustomDomain            string
+	CustomDomain            string // TODO: Not BYOD domain which is per service, shoudl rename to something like delegated defang domain
 	Driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string

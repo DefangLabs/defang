@@ -76,6 +76,13 @@ func (g GrpcClient) Update(ctx context.Context, req *v1.Service) (*v1.ServiceInf
 
 func (g GrpcClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
 	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
+
+	for _, service := range req.Services {
+		if service.Domainname != "" {
+			return nil, fmt.Errorf("Defang provider does not support the domainname field for now, service: %v, domain: %v ", service.Name, service.Domainname)
+		}
+	}
+
 	var serviceInfos []*v1.ServiceInfo
 	for _, service := range req.Services {
 		// Info(" * Publishing service update for", service.Name)

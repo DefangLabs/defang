@@ -293,7 +293,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			cli.Debug(" - Could not load docker compose file: ", err)
+			cli.Warn(" - Could not load docker compose file: ", err)
 		} else {
 			projectName = project.Name
 		}
