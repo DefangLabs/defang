@@ -16,7 +16,7 @@ Here is a detailed guide:
 ### How to edit the blog
 1. Copy the code from our [Github Repository](https://github.com/defang-io/defang/tree/main/samples/nodejs) to your local machine
 2. In "_posts", there are three existing Markdown files, representing what is currently shown to you in the template. You could replace the content within.
-3. If you want to replace the cover image, you have to firstly add your image to the code. Then, find the "coverImage" tag and replace the directory (for example, "/assets/blog/dynamic-routing/cover.jpg") to the directory of your image.
+3. If you want to replace the cover image, you have to firstly add your image to the code. Then, find the "coverImage" tag and replace the directory (for example, "/assets/blog/exploration/cover.jpg") to the directory of your image.
 4. You may find other tags within the Markdown file:
 - Exerpt
 The exerpt tag refers to the summary you would see at the main page. 
@@ -32,6 +32,6 @@ The author tag refers to the name and the icon you would see beneath the blog ti
 
 ### Limitations
 1. If the images you add to the code is a local copy, you will not be able to adjust its size due to Next.js limitations.
-2. We convert Markdown to HTML before rendering it to your screen. HTML tags within the Markdown file (for example, <a href></a>) will not work. 
+2. We convert Markdown to HTML before rendering it to your screen. HTML tags within the Markdown file (for example, "<a href></a>") will not work. 
 
 

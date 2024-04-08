@@ -23,9 +23,11 @@ export function HeroPost({
 }: Props) {
   return (
     <section>
-      <div>
+      <div className="flex justify-center items-center">
         <CoverImage title={title} src={coverImage} slug={slug} />
       </div>
+      <br />
+      <br />
       <div className="md:grid md:grid-cols-2 md:gap-x-16 lg:gap-x-8 mb-20 md:mb-28">
         <div>
           <h3 className="mb-4 text-4xl lg:text-5xl leading-tight">

@@ -16,7 +16,7 @@ Defang helps you to quickly deploy your AI services and dynamic websites radical
 This tutorial will guide you through the whole process of deploying a Mistral AI model.
 [![Deploy your Mistral](/assets/blog/embeddedVideos/deployMistral.jpeg)](https://www.youtube.com/watch?v=n4RlMpsdTbs)
 
-For detailed guide, please refer to ["Deploy a GPU-powered application"](https://docs.defang.io/docs/tutorials/deploy-with-gpu)
+For detailed guides, please refer to ["Deploy a GPU-powered application"](https://docs.defang.io/docs/tutorials/deploy-with-gpu)
 
 ## How to use your own domain?
 This tutorial will guide you to quickly deploy your services to your designated domain name. 
