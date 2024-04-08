@@ -83,7 +83,17 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client client.Client, service, etag string, since time.Time, raw bool) error {
+type LogDisplayArgs struct {
+	Service    string
+	Etag       string
+	Since      time.Time
+	Raw        bool
+	TimeZone   *time.Location
+	TimeFormat string
+}
+
+func Tail(ctx context.Context, client client.Client, args LogDisplayArgs) error {
+	service := args.Service
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
@@ -103,16 +113,16 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
-	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: args.Etag, Since: timestamppb.New(args.Since)})
 	if err != nil {
 		return err
 	}
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
 	spinMe := 0
-	doSpinner := !raw && CanColor && IsTerminal
+	doSpinner := !args.Raw && CanColor && IsTerminal
 
-	if IsTerminal && !raw {
+	if IsTerminal && !args.Raw {
 		if doSpinner {
 			stdout.HideCursor()
 			defer stdout.ShowCursor()
@@ -152,18 +162,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 	}
 
-	timestampZone := time.Local
-	timestampFormat := TimestampFormat
-	if time.Since(since) >= 24*time.Hour {
-		timestampFormat = "2006-01-02T15:04:05.000000Z " // like RFC3339Nano but with 6 digits of precision
-		timestampZone = time.UTC
-	}
-
 	skipDuplicate := false
 	for {
 		if !tailClient.Receive() {
 			if errors.Is(tailClient.Err(), context.Canceled) {
-				return &CancelError{Service: service, Etag: etag, Last: since, error: tailClient.Err()}
+				return &CancelError{Service: service, Etag: args.Etag, Last: args.Since, error: tailClient.Err()}
 			}
 
 			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
@@ -171,16 +174,16 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
 				Debug(" - Disconnected:", tailClient.Err())
-				if !raw {
+				if !args.Raw {
 					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: args.Etag, Since: timestamppb.New(args.Since)})
 				if err != nil {
 					Debug(" - Reconnect failed:", err)
 					return err
 				}
-				if !raw {
+				if !args.Raw {
 					Fprintln(stderr, WarnColor, " ! Reconnected!   ")
 				}
 				skipDuplicate = true
@@ -206,15 +209,15 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 
 			ts := e.Timestamp.AsTime()
-			if skipDuplicate && ts.Equal(since) {
+			if skipDuplicate && ts.Equal(args.Since) {
 				skipDuplicate = false
 				continue
 			}
-			if ts.After(since) {
-				since = ts
+			if ts.After(args.Since) {
+				args.Since = ts
 			}
 
-			if raw {
+			if args.Raw {
 				out := stdout
 				if e.Stderr {
 					out = stderr
@@ -228,7 +231,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				continue
 			}
 
-			tsString := ts.In(timestampZone).Format(timestampFormat)
+			tsString := ts.In(args.TimeZone).Format(args.TimeFormat)
 			tsColor := termenv.ANSIWhite
 			if e.Stderr {
 				tsColor = termenv.ANSIBrightRed
@@ -237,8 +240,8 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = Print(tsColor, tsString)
-					if etag == "" {
+					prefixLen, _ = Print(tsColor, tsString+" ")
+					if args.Etag == "" {
 						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
 					}

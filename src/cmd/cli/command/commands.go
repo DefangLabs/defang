@@ -113,6 +113,9 @@ func SetupCommands() {
 	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
+	rootCmd.PersistentFlags().StringP("timezone", "z", "local", "Timezone to use for log timestamps when tailing")
+	rootCmd.PersistentFlags().StringP("timeformat", "F", "2006-01-02T15:04:05.000000Z", "Time format to use for log timestamps when tailing")
+
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
@@ -525,9 +528,21 @@ var tailCmd = &cobra.Command{
 			return fmt.Errorf("invalid duration or time: %w", err)
 		}
 
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+
 		ts = ts.UTC()
 		cli.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
-		return cli.Tail(cmd.Context(), client, name, etag, ts, raw)
+		return cli.Tail(cmd.Context(), client, cli.LogDisplayArgs{
+			Service:    name,
+			Etag:       etag,
+			Since:      ts,
+			Raw:        raw,
+			TimeZone:   tz,
+			TimeFormat: tf,
+		})
 	},
 }
 
@@ -646,6 +661,11 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
 		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
@@ -665,7 +685,14 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		cli.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		err = cli.Tail(cmd.Context(), client, cli.LogDisplayArgs{
+			Service:    "",
+			Etag:       etag,
+			Since:      since,
+			Raw:        false,
+			TimeZone:   tz,
+			TimeFormat: tf,
+		})
 		if err != nil {
 			return err
 		}
@@ -732,6 +759,11 @@ var composeDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var detach, _ = cmd.Flags().GetBool("detach")
 
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
 		etag, err := cli.ComposeDown(cmd.Context(), client)
 		if err != nil {
@@ -750,7 +782,14 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		err = cli.Tail(cmd.Context(), client, cli.LogDisplayArgs{
+			Service:    "",
+			Etag:       etag,
+			Since:      since,
+			Raw:        false,
+			TimeZone:   tz,
+			TimeFormat: tf,
+		})
 		if err != nil {
 			return err
 		}
@@ -783,6 +822,11 @@ var deleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), client, names...)
 		if err != nil {
@@ -802,7 +846,14 @@ var deleteCmd = &cobra.Command{
 		}
 
 		cli.Info(" * Tailing logs for update; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		return cli.Tail(cmd.Context(), client, cli.LogDisplayArgs{
+			Service:    "",
+			Etag:       etag,
+			Since:      since,
+			Raw:        false,
+			TimeZone:   tz,
+			TimeFormat: tf,
+		})
 	},
 }
 
@@ -874,7 +925,11 @@ var bootstrapDestroyCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), client, "destroy", tz, tf)
 	},
 }
 
@@ -883,7 +938,11 @@ var bootstrapDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "down")
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), client, "down", tz, tf)
 	},
 }
 
@@ -892,7 +951,11 @@ var bootstrapRefreshCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), client, "refresh", tz, tf)
 	},
 }
 
@@ -921,7 +984,11 @@ var bootstrapCancelCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
+		tz, tf, err := getTimezoneAndFormat(cmd)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), client, "cancel", tz, tf)
 	},
 }
 
@@ -950,4 +1017,16 @@ var tosCmd = &cobra.Command{
 
 func awsInEnv() bool {
 	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
+func getTimezoneAndFormat(cmd *cobra.Command) (*time.Location, string, error) {
+	var timezoneStr, _ = cmd.InheritedFlags().GetString("timezone")
+	var tf, _ = cmd.InheritedFlags().GetString("timeformat")
+
+	tz, err := time.LoadLocation(timezoneStr)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid timezone: %w", err)
+	}
+
+	return tz, tf, nil
 }
