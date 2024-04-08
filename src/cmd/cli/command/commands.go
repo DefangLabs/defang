@@ -26,6 +26,9 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+const DEFANG_PORTAL_HOST = "portal.defang.dev"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
@@ -618,6 +621,11 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
+func printPortalURL() {
+	cli.Info(" * Monitor your services' status in the defang portal")
+	cli.Println(cli.Nop, "   -", SERVICE_PORTAL_URL)
+}
+
 func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
@@ -637,6 +645,11 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	}
 }
 
+func isCommandUsingDefangPlayground(cmd *cobra.Command) bool {
+	var defangDefaultCluster = pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
+	return cmd.Flag("cluster").Value.String() == defangDefaultCluster
+}
+
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
@@ -650,6 +663,10 @@ var composeUpCmd = &cobra.Command{
 		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
+		}
+
+		if isCommandUsingDefangPlayground(cmd) {
+			printPortalURL()
 		}
 
 		printEndpoints(deploy.Services)
@@ -686,6 +703,10 @@ var composeStartCmd = &cobra.Command{
 		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
+		}
+
+		if isCommandUsingDefangPlayground(cmd) {
+			printPortalURL()
 		}
 
 		printEndpoints(deploy.Services)
