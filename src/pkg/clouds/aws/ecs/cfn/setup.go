@@ -3,7 +3,7 @@ package cfn
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -75,7 +75,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		return err // might call createStackAndWait depending on the error
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
+	log.Println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
 	o, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -110,7 +110,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		}
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
+	log.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
@@ -228,7 +228,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
+	log.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)

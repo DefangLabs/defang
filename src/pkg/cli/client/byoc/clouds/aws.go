@@ -7,6 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net"
+	"os"
+	"sort"
+	"strings"
+	"time"
+
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -26,15 +34,9 @@ import (
 	"github.com/defang-io/defang/src/pkg/logs"
 	"github.com/defang-io/defang/src/pkg/quota"
 	"github.com/defang-io/defang/src/pkg/types"
-	"github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"net"
-	"os"
-	"sort"
-	"strings"
-	"time"
 )
 
 type ByocAws struct {
@@ -208,6 +210,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
+	log.Println("Starting CFN deployment")
 	taskArn, err := b.runCdCommand(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
