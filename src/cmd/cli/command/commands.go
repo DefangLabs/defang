@@ -113,7 +113,7 @@ func SetupCommands() {
 	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	rootCmd.PersistentFlags().StringP("timezone", "z", "local", "Timezone to use for log timestamps when tailing")
+	rootCmd.PersistentFlags().StringP("timezone", "z", "Local", "Timezone to use for log timestamps when tailing")
 	rootCmd.PersistentFlags().StringP("timeformat", "F", "2006-01-02T15:04:05.000000Z", "Time format to use for log timestamps when tailing")
 
 	// Bootstrap command
