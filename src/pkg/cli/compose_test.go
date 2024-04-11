@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -107,6 +108,26 @@ func TestLoadCompose(t *testing.T) {
 		}
 	})
 
+	t.Run("load starting from a sub directory", func(t *testing.T) {
+		os.Chdir("../../tests/alttestproj/subdir/subdir2")
+		p, err := LoadComposeWithProjectName("compose.yaml", "tests")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+		}
+	})
+
+	t.Run("load alternative compose file", func(t *testing.T) {
+		p, err := LoadComposeWithProjectName("../../tests/alttestproj/alternate-compose.yaml", "tests")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+		}
+	})
 }
 
 func TestConvertPort(t *testing.T) {
