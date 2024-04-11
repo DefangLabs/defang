@@ -82,4 +82,5 @@ The Defang CLI recognizes the following environment variables:
 * `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 * `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, or `defang`
 * `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
+* `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 * `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
