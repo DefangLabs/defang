@@ -107,15 +107,42 @@ func warnf(format string, args ...interface{}) {
 	HadWarnings = true
 }
 
-func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
-	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
-	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	if files, _ := filepath.Glob(filePath); len(files) > 1 {
-		return nil, fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-	} else if len(files) == 1 {
-		filePath = files[0]
+func getComposeFileAndPath(composeFilePattern string) (string, error) {
+	dir, err := os.Getwd()
+	path := dir // default to the current working directory
+
+	if err != nil {
+		return path, err
 	}
-	// TODO: Docker compose searches parent folders for compose files #117
+
+	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory or higher.
+	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
+	for {
+		Debug("Looking in ", dir)
+		if files, _ := filepath.Glob(composeFilePattern); len(files) > 1 {
+			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+			break
+		} else if len(files) == 1 {
+			path = files[0]
+			break
+		}
+
+		// no files found, try parent directory
+		dir = filepath.Dir(dir)
+		err = os.Chdir(dir)
+	}
+
+	return path, err
+}
+
+func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
+	filePath, err := getComposeFileAndPath(filePath)
+	Debug("filePath", filePath)
+	Debug("err", err)
+	if err != nil {
+		return nil, err
+	}
+
 	Debug(" - Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
