@@ -107,38 +107,60 @@ func warnf(format string, args ...interface{}) {
 	HadWarnings = true
 }
 
-func getComposeFileAndPath(composeFilePattern string) (string, error) {
-	dir, err := os.Getwd()
-	path := dir // default to the current working directory
+func getComposeFilePath(composeDirAndFilePattern string) (string, error) {
+	filePattern := filepath.Base(composeDirAndFilePattern)
+	path := filepath.Dir(composeDirAndFilePattern)
 
-	if err != nil {
-		return path, err
+	// allow walking up the directory tree only if directory has not been specified
+	onlyLookInSpecificDir := strings.HasPrefix(composeDirAndFilePattern, path)
+
+	if !strings.HasSuffix(composeDirAndFilePattern, filePattern) {
+		return composeDirAndFilePattern, fmt.Errorf("no file or file pattern given")
 	}
 
-	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory or higher.
-	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	for {
-		Debug("Looking in ", dir)
-		if files, _ := filepath.Glob(composeFilePattern); len(files) > 1 {
-			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-			break
-		} else if len(files) == 1 {
-			path = files[0]
-			break
-		}
+	// change directory to get compose file from
+	err := os.Chdir(path)
+	if err == nil {
+		// path may not be full path name (e.g. ../.. ) so get full path name for logs and if we need to walk the directory tree
+		path, err = os.Getwd()
+	}
 
-		// no files found, try parent directory
-		dir = filepath.Dir(dir)
-		err = os.Chdir(dir)
+	// The Compose file is compose.yaml (preferred) or compose.yml that is placed in the current directory or higher.
+	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
+	// Users can override the file with another file pattern
+	if err == nil {
+		for {
+			Debug("Searching for ", filePattern, " in ", path)
+			if files, _ := filepath.Glob(filePattern); len(files) > 1 {
+				err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+				break
+			} else if len(files) == 1 {
+				path = files[0]
+				break
+			}
+
+			if onlyLookInSpecificDir {
+				err = fmt.Errorf("no Compose file found in %q", path)
+				break
+			}
+
+			// compose file not found, try parent directory
+			nextPath := filepath.Dir(path)
+			if nextPath == path {
+				// we're reached the root folder, we're done
+				err = fmt.Errorf("no Compose file found")
+				break
+			}
+			path = nextPath
+			err = os.Chdir(path)
+		}
 	}
 
 	return path, err
 }
 
 func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
-	filePath, err := getComposeFileAndPath(filePath)
-	Debug("filePath", filePath)
-	Debug("err", err)
+	filePath, err := getComposeFilePath(filePath)
 	if err != nil {
 		return nil, err
 	}
