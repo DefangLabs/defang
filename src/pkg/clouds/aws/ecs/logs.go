@@ -176,7 +176,6 @@ func Query(ctx context.Context, lgi LogGroupInput, start time.Time, end time.Tim
 		LogGroupIdentifier:  &logGroupIdentifier,
 		LogStreamNamePrefix: prefix,
 		LogStreamNames:      lgi.LogStreamNames,
-		// Limit:               ptr.Int32(10000),
 	})
 	if err != nil {
 		return nil, err
@@ -313,13 +312,13 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 		defer c.wg.Done()
 		if !since.IsZero() {
 			// Query the logs between the start time and now
-			if events, err := Query(c.ctx, lgi, since, time.Now()); err == nil {
-				// println("found logs:", len(events))
+			if events, err := Query(c.ctx, lgi, since, time.Now()); err != nil {
+				// println("error querying logs:", err); TODO: print debug message
+				// c.errCh <- err NO: tail is aborted on first error
+			} else {
 				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 					Value: types.LiveTailSessionUpdate{SessionResults: events},
 				}
-			} else {
-				// println("error querying logs:", err)
 			}
 		}
 		for {
@@ -352,10 +351,7 @@ func (c *collectionStream) Close() error {
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...) // nil if no errors
 }
 
 func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
