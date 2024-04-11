@@ -27,6 +27,8 @@ import (
 )
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
+const RFC3339Micro = "2006-01-02T15:04:05.000000Z"
+
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 // GLOBALS
@@ -113,8 +115,8 @@ func SetupCommands() {
 	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
 	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	rootCmd.PersistentFlags().StringP("timezone", "z", "Local", "Timezone to use for log timestamps when tailing")
-	rootCmd.PersistentFlags().StringP("timeformat", "F", "2006-01-02T15:04:05.000000Z", "Time format to use for log timestamps when tailing")
+	rootCmd.PersistentFlags().StringP("timezone", "z", "Local", "Timezone to use for log timestamps when tailing, valid valids are 'UTC' or 'Local' or any IANA timezone name")
+	rootCmd.PersistentFlags().StringP("timeformat", "F", RFC3339Micro, "Time format to use for log timestamps when tailing")
 
 	// Bootstrap command
 	rootCmd.AddCommand(bootstrapCmd)
@@ -534,7 +536,7 @@ var tailCmd = &cobra.Command{
 		}
 
 		ts = ts.UTC()
-		cli.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
+		cli.Info(" * Showing logs since", ts.Format(RFC3339Micro), "; press Ctrl+C to stop:")
 		return cli.Tail(cmd.Context(), client, cli.LogDisplayArgs{
 			Service:    name,
 			Etag:       etag,
