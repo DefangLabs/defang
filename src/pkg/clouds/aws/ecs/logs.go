@@ -62,20 +62,30 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func TailLogGroups(ctx context.Context, logGroups ...LogGroupInput) (EventStream, error) {
+func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupInput) (EventStream, error) {
+	child, cancel := context.WithCancel(ctx)
 	var cs = collectionStream{
-		ch:    make(chan types.StartLiveTailResponseStream),
-		errCh: make(chan error),
-		done:  make(chan struct{}),
+		cancel: cancel,
+		ch:     make(chan types.StartLiveTailResponseStream, 10), // max number of loggroups to query
+		ctx:    child,
+		errCh:  make(chan error, 1),
 	}
 
-	var streams []EventStream
+	type pair struct {
+		es  EventStream
+		lgi LogGroupInput
+	}
+	var pairs []pair
 	var pendingGroups []LogGroupInput
 
-	for _, lg := range logGroups {
-		es, err := TailLogGroup(ctx, lg)
+	sincePending := since
+	if sincePending.IsZero() {
+		sincePending = time.Now()
+	}
+	for _, lgi := range logGroups {
+		es, err := TailLogGroup(ctx, lgi)
 		if err == nil {
-			streams = append(streams, es)
+			pairs = append(pairs, pair{es, lgi})
 			continue
 		}
 
@@ -83,35 +93,25 @@ func TailLogGroups(ctx context.Context, logGroups ...LogGroupInput) (EventStream
 		if !errors.As(err, &resourceNotFound) {
 			return nil, err
 		}
-		pendingGroups = append(pendingGroups, lg)
+		pendingGroups = append(pendingGroups, lgi)
 	}
 
 	// Start goroutines to wait for the log group to be created for the resource not found log groups
-	since := time.Now()
 	for _, lgi := range pendingGroups {
 		cs.wg.Add(1)
-		go func(ctx context.Context, lgi LogGroupInput) {
+		go func(lgi LogGroupInput) {
 			defer cs.wg.Done()
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 
 			for {
 				select {
-				case <-cs.done:
+				case <-cs.ctx.Done():
 					return
 				case <-ticker.C:
-					es, err := TailLogGroup(ctx, lgi)
+					es, err := TailLogGroup(cs.ctx, lgi)
 					if err == nil {
-						// Query the logs between the start time and now
-						if events, err := Query(ctx, lgi, since, time.Now()); err == nil {
-							// println("found logs:", len(events))
-							cs.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-								Value: types.LiveTailSessionUpdate{SessionResults: events},
-							}
-						} else {
-							// println("error querying logs:", err)
-						}
-						cs.addAndStart(es)
+						cs.addAndStart(es, sincePending, lgi)
 						return
 					}
 					var resourceNotFound *types.ResourceNotFoundException
@@ -121,12 +121,12 @@ func TailLogGroups(ctx context.Context, logGroups ...LogGroupInput) (EventStream
 					}
 				}
 			}
-		}(ctx, lgi)
+		}(lgi)
 	}
 
 	// Only add and start watching the streams if there were no errors, prevent lingering goroutines
-	for _, s := range streams {
-		cs.addAndStart(s)
+	for _, s := range pairs {
+		cs.addAndStart(s.es, since, s.lgi)
 	}
 
 	return &cs, nil
@@ -293,22 +293,33 @@ type EventStream interface {
 }
 
 type collectionStream struct {
-	streams []EventStream
+	cancel  context.CancelFunc
 	ch      chan types.StartLiveTailResponseStream
+	ctx     context.Context // derived from the context passed to TailLogGroups
 	errCh   chan error
+	streams []EventStream
 
-	done chan struct{}
 	lock sync.Mutex
 	wg   sync.WaitGroup
 }
 
-func (c *collectionStream) addAndStart(s EventStream) {
+func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGroupInput) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.streams = append(c.streams, s)
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
+		if !since.IsZero() {
+			// Query the logs between the start time and now
+			if events, err := Query(c.ctx, lgi, since, time.Now()); err != nil {
+				c.errCh <- err // the caller will likely cancel the context
+			} else {
+				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+					Value: types.LiveTailSessionUpdate{SessionResults: events},
+				}
+			}
+		}
 		for {
 			// Double select to make sure context cancellation is not blocked by either the receive or send
 			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
@@ -316,10 +327,10 @@ func (c *collectionStream) addAndStart(s EventStream) {
 			case e := <-s.Events(): // blocking
 				select {
 				case c.ch <- e:
-				case <-c.done:
+				case <-c.ctx.Done():
 					return
 				}
-			case <-c.done: // blocking
+			case <-c.ctx.Done(): // blocking
 				return
 			}
 		}
@@ -327,7 +338,7 @@ func (c *collectionStream) addAndStart(s EventStream) {
 }
 
 func (c *collectionStream) Close() error {
-	close(c.done)
+	c.cancel()
 	c.wg.Wait() // Only close the channels after all goroutines have exited
 	close(c.ch)
 	close(c.errCh)
@@ -339,10 +350,7 @@ func (c *collectionStream) Close() error {
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...) // nil if no errors
 }
 
 func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
