@@ -313,8 +313,7 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 		if !since.IsZero() {
 			// Query the logs between the start time and now
 			if events, err := Query(c.ctx, lgi, since, time.Now()); err != nil {
-				// println("error querying logs:", err); TODO: print debug message
-				// c.errCh <- err NO: tail is aborted on first error
+				c.errCh <- err // the caller will likely cancel the context
 			} else {
 				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 					Value: types.LiveTailSessionUpdate{SessionResults: events},
