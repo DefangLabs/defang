@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: testproj
+      target: alttestproj
       args:
         DNS: dfnx
     deploy:
