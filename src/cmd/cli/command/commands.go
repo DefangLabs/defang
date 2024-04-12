@@ -621,9 +621,11 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printPortalURL() {
+func printPortalURL(serviceInfos []*v1.ServiceInfo) {
 	cli.Info(" * Monitor your services' status in the defang portal")
-	cli.Println(cli.Nop, "   -", SERVICE_PORTAL_URL)
+	for _, serviceInfo := range serviceInfos {
+		cli.Println(cli.Nop, "   - ", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+	}
 }
 
 func printEndpoints(serviceInfos []*v1.ServiceInfo) {
@@ -646,8 +648,7 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 }
 
 func isCommandUsingDefangPlayground(cmd *cobra.Command) bool {
-	var defangDefaultCluster = pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
-	return cmd.Flag("cluster").Value.String() == defangDefaultCluster
+	return *(cmd.Flag("provider").Value.(*cliClient.Provider)) == cliClient.ProviderDefang
 }
 
 var composeUpCmd = &cobra.Command{
@@ -666,7 +667,7 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		if isCommandUsingDefangPlayground(cmd) {
-			printPortalURL()
+			printPortalURL(deploy.Services)
 		}
 
 		printEndpoints(deploy.Services)
@@ -706,7 +707,7 @@ var composeStartCmd = &cobra.Command{
 		}
 
 		if isCommandUsingDefangPlayground(cmd) {
-			printPortalURL()
+			printPortalURL(deploy.Services)
 		}
 
 		printEndpoints(deploy.Services)
