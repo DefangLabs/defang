@@ -277,7 +277,10 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		filePath, _ := cmd.InheritedFlags().GetString("file")
+		filePath := ""
+		if cmd.Flags().Changed("file") {
+			filePath, _ = cmd.InheritedFlags().GetString("file")
+		}
 
 		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
 		if projectName != "" {

@@ -107,50 +107,56 @@ func warnf(format string, args ...interface{}) {
 	HadWarnings = true
 }
 
-func getComposeFilePath(composeDirAndFilePattern string) (string, error) {
-	filePattern := filepath.Base(composeDirAndFilePattern)
-	path := filepath.Dir(composeDirAndFilePattern)
-
-	// allow walking up the directory tree only if directory has not been specified
-	onlyLookInSpecificDir := strings.HasPrefix(composeDirAndFilePattern, path)
-
-	if !strings.HasSuffix(composeDirAndFilePattern, filePattern) {
-		return composeDirAndFilePattern, fmt.Errorf("no file or file pattern given")
-	}
-
-	// change directory to get compose file from
-	err := os.Chdir(path)
-	if err == nil {
-		// path may not be full path name (e.g. ../.. ) so get full path name for logs and if we need to walk the directory tree
-		path, err = os.Getwd()
-	}
-
+func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	// The Compose file is compose.yaml (preferred) or compose.yml that is placed in the current directory or higher.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	// Users can override the file with another file pattern
+	// Users can override the file by specifying file name
+	const DEFAULT_COMPOSE_FILE_PATTERN = "*compose.y*ml"
+
+	Debug("Loading compose file: ", userSpecifiedComposeFile)
+
+	path, err := os.Getwd()
+	if userSpecifiedComposeFile != "" {
+		// return to the original working directory once this function is done
+		defer os.Chdir(path)
+	}
+
+	var searchPattern string
+	if len(userSpecifiedComposeFile) > 0 {
+		searchPattern = userSpecifiedComposeFile
+	} else {
+		searchPattern = DEFAULT_COMPOSE_FILE_PATTERN
+	}
+
 	if err == nil {
+
+		// iterate through this loop at least once to find the compose file.
+		// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
+		// then walk the tree up to the root directory looking for a compose file.
 		for {
-			Debug("Searching for ", filePattern, " in ", path)
-			if files, _ := filepath.Glob(filePattern); len(files) > 1 {
+			Debug("Searching for ", searchPattern, " relative to ", path)
+			if files, _ := filepath.Glob(searchPattern); len(files) > 1 {
 				err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
 				break
 			} else if len(files) == 1 {
+				// found compose file, we're done
 				path = files[0]
 				break
 			}
 
-			if onlyLookInSpecificDir {
-				err = fmt.Errorf("no Compose file found in %q", path)
+			if len(userSpecifiedComposeFile) > 0 {
+				err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
 				break
 			}
 
 			// compose file not found, try parent directory
 			nextPath := filepath.Dir(path)
 			if nextPath == path {
-				// we're reached the root folder, we're done
+				// previous search was of root, we're done
 				err = fmt.Errorf("no Compose file found")
 				break
 			}
+
 			path = nextPath
 			err = os.Chdir(path)
 		}
