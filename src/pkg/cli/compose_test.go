@@ -110,9 +110,24 @@ func TestLoadCompose(t *testing.T) {
 
 	t.Run("load starting from a sub directory", func(t *testing.T) {
 		cwd, _ := os.Getwd()
-		os.Chdir("../../tests/alttestproj/subdir/subdir2")
-		defer os.Chdir(cwd)
-		p, err := LoadCompose("", "tests")
+
+		// setup
+		setup := func() {
+			os.MkdirAll("../../tests/alttestproj/subdir/subdir2", 0755)
+			os.Chdir("../../tests/alttestproj/subdir/subdir2")
+		}
+
+		//teardown
+		teardown := func() {
+			os.Chdir(cwd)
+			os.RemoveAll("../../tests/alttestproj/subdir")
+		}
+
+		setup()
+		defer teardown()
+
+		// execute test
+		p, err := LoadComposeWithProjectName("", "tests")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -122,7 +137,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
-		p, err := LoadCompose("../../tests/alttestproj/altcomp.yaml", "tests")
+		p, err := LoadComposeWithProjectName("../../tests/alttestproj/altcomp.yaml", "tests")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
