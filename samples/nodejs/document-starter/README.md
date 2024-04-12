@@ -1,4 +1,4 @@
-This template is a simple document starter developed using Nextra. It is ready to be deployed by Defang, and you could make your project available to the world in just 5 minutes!
+This template is a document starter project developed using Nextra, designed to streamline the creation of your digital documentation and quickly build your virtual library. By simply adding more Markdown files, your updates will be reflected on the screen swiftly and safely. This completely code-free solution requires no adjustments to the basic structure. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as detailed in the prerequisites, and following the commands in our step-by-step guide, your documentation site will be ready to go live to the world!
 
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
