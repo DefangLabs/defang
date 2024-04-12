@@ -1,0 +1,11 @@
+version: '3.9'
+name: django-hello-world
+services:
+  django-helloworld:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - mode: ingress
+        target: 8001
+        published: 8001
