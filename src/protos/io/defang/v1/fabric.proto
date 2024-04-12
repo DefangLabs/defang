@@ -306,8 +306,8 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // role arn used to access route53 to create dns records; TODO: not part of spec
-  string static_files = 15; // folder with static files to serve; TODO: not part of spec
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records; TODO: not part of spec
+  string static_files = 15; // x-defang-static-files: folder with static files to serve; TODO: not part of spec
 }
 
 message Event {

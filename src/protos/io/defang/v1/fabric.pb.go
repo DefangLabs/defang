@@ -1997,8 +1997,8 @@ type Service struct {
 	Command     []string          `protobuf:"bytes,11,rep,name=command,proto3" json:"command,omitempty"`
 	Domainname  string            `protobuf:"bytes,12,opt,name=domainname,proto3" json:"domainname,omitempty"`
 	Init        bool              `protobuf:"varint,13,opt,name=init,proto3" json:"init,omitempty"`
-	DnsRole     string            `protobuf:"bytes,14,opt,name=dns_role,json=dnsRole,proto3" json:"dns_role,omitempty"`             // role arn used to access route53 to create dns records; TODO: not part of spec
-	StaticFiles string            `protobuf:"bytes,15,opt,name=static_files,json=staticFiles,proto3" json:"static_files,omitempty"` // folder with static files to serve; TODO: not part of spec
+	DnsRole     string            `protobuf:"bytes,14,opt,name=dns_role,json=dnsRole,proto3" json:"dns_role,omitempty"`             // x-defang-dns-role: role arn used to access route53 to create dns records; TODO: not part of spec
+	StaticFiles string            `protobuf:"bytes,15,opt,name=static_files,json=staticFiles,proto3" json:"static_files,omitempty"` // x-defang-static-files: folder with static files to serve; TODO: not part of spec
 }
 
 func (x *Service) Reset() {
