@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -18,6 +21,29 @@ type RunContainerArgs struct {
 	Platform string
 	VpcID    string
 	SubnetID string
+}
+
+var cleanup = make(chan func())
+
+func init() {
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		var clanupFns []func()
+
+		for {
+			select {
+			case f := <-cleanup:
+				clanupFns = append(clanupFns, f)
+			case s := <-c:
+				fmt.Printf("Caught signal %v, cleaning up...\n", s)
+				for _, f := range clanupFns {
+					f()
+				}
+				os.Exit(0)
+			}
+		}
+	}()
 }
 
 func Run(ctx context.Context, args RunContainerArgs) error {
@@ -42,6 +68,10 @@ func Run(ctx context.Context, args RunContainerArgs) error {
 		return err
 	}
 
+	cleanup <- func() {
+		fmt.Printf("Stopping task %s...\n", *id)
+		driver.Stop(ctx, id)
+	}
 	fmt.Println("Task ID:", *id)
 
 	// Try 10 times to get the public IP address
