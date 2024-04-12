@@ -8,8 +8,6 @@ services:
       target: testproj
       args:
         DNS: dfnx
-    env_file:
-      - fileName.env
     deploy:
       resources:
         limits:
