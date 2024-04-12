@@ -1,4 +1,4 @@
-This template is a boilerplate project developed using Next.js, offering an excellent starting point to help you quickly build your website. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as detailed in the prerequisites, and executing the commands in our step-by-step guide, your website will be ready to go live to the world!
+This template is a boilerplate project developed using Next.js, offering a starting point to help you quickly build your website. We have prepared all the necessary files for deployment. By spending just a few minutes setting up the environment, as detailed in the prerequisites, and executing the commands in our step-by-step guide, your website will be ready to go live in no time!
 
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
