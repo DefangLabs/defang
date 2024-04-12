@@ -1,4 +1,4 @@
-This template is a blog starter project developed using Next.js, specifically designed to facilitate the creation and deployment of your blogs. It offers an excellent starting point to help you effortlessly publish your content by simply modifying the MDX files included in the code. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as outlined in the prerequisites, and following the commands in our step-by-step guide, your blog will be ready to go live to the world!
+This template is a starter project developed using Next.js designed to make it easy to launch a blog. It offers an excellent starting point to help you publish your content by simply modifying the MDX files included in `_posts` directory. We have prepared all the necessary files for deployment. By spending just a few minutes setting up the environment, as detailed in the prerequisites, and executing the commands in our step-by-step guide, your website will be ready to go live in no time!
 
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
@@ -11,6 +11,7 @@ This template is a blog starter project developed using Next.js, specifically de
 Plus, make sure that you have properly set your environment variables like `AWS_PROFILE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
 
 ## A Step-by-Step Guide
-1. Open the terminal and type `defang login`
-2. Type `defang compose up` in the CLI
-3. Now your application will be launched
+1. Edit your content in the `_posts` directory
+2. Open the terminal and type `defang login`
+3. Type `defang compose up` in the CLI
+4. Now your application will be launched
