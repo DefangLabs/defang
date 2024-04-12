@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -15,30 +16,37 @@ import (
 
 const taskCount = 1
 
+func (a *AwsEcs) PopulateVPCandSubnetID(ctx context.Context, vpcID, subnetID string) error {
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	if vpcID != "" && subnetID == "" {
+		a.VpcID = vpcID
+		a.SubNetID, err = getPublicSubnetId(ctx, cfg, vpcID)
+		if err != nil {
+			return err
+		}
+	} else if vpcID == "" && subnetID != "" {
+		a.SubNetID = subnetID
+		a.VpcID, err = getSubnetVPCId(ctx, cfg, subnetID)
+		if err != nil {
+			return err
+		}
+	} else {
+		a.VpcID = vpcID
+		a.SubNetID = subnetID
+	}
+	return nil
+}
+
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {
 	// a.Refresh(ctx)
 
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if a.SubNetID == "" {
-		// Get a subnet ID
-		subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
-			Filters: []ec2types.Filter{
-				{
-					Name:   ptr.String("vpc-id"),
-					Values: []string{a.VpcID},
-					// 		Name:   ptr.String("map-public-ip-on-launch"),
-					// 		Values: []string{"true"},
-				},
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		a.SubNetID = *subnetsOutput.Subnets[0].SubnetId // TODO: make configurable/deterministic
 	}
 
 	var pairs []types.KeyValuePair
@@ -55,10 +63,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	// 	return nil, err
 	// }
 
-	var securityGroups []string
-	if a.SubNetID == "" {
-		securityGroups = []string{a.SecurityGroupID} // TODO: only if ports are mapped
-	}
+	securityGroups := []string{a.SecurityGroupID} // TODO: only if ports are mapped
 	rti := ecs.RunTaskInput{
 		Count:          ptr.Int32(taskCount),
 		LaunchType:     types.LaunchTypeFargate,
@@ -112,6 +117,35 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	// bytes, _ := json.MarshalIndent(ecsOutput.Tasks, "", "  ")
 	// println(string(bytes))
 	return TaskArn(ecsOutput.Tasks[0].TaskArn), nil
+}
+
+func getPublicSubnetId(ctx context.Context, cfg aws.Config, vpcId string) (string, error) {
+	subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+		Filters: []ec2types.Filter{
+			{
+				Name:   ptr.String("vpc-id"),
+				Values: []string{vpcId},
+			},
+			{
+				Name:   ptr.String("map-public-ip-on-launch"),
+				Values: []string{"true"},
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return *subnetsOutput.Subnets[0].SubnetId, nil // TODO: make configurable/deterministic
+}
+
+func getSubnetVPCId(ctx context.Context, cfg aws.Config, subnetId string) (string, error) {
+	subnetsOutput, err := ec2.NewFromConfig(cfg).DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+		SubnetIds: []string{subnetId},
+	})
+	if err != nil {
+		return "", err
+	}
+	return *subnetsOutput.Subnets[0].VpcId, nil // TODO: make configurable/deterministic
 }
 
 type taskFailure struct {

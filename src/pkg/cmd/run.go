@@ -5,28 +5,39 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func Run(ctx context.Context, region Region, image string, memory uint64, color Color, args []string, env map[string]string, platform, vpcId string) error {
-	driver := createDriver(color, region)
+type RunContainerArgs struct {
+	Region   Region
+	Image    string
+	Memory   uint64
+	Args     []string
+	Env      map[string]string
+	Platform string
+	VpcID    string
+	SubnetID string
+}
 
-	if err := driver.SetVpcID(vpcId); err != nil { // VPC affects the cloudformation template
+func Run(ctx context.Context, args RunContainerArgs) error {
+	driver, err := createDriver(args.Region, cfn.OptionVPCAndSubnetID(ctx, args.VpcID, args.SubnetID))
+	if err != nil { // VPC affects the cloudformation template
 		return err
 	}
 
 	containers := []types.Container{
 		{
-			Image:    image,
-			Memory:   memory,
-			Platform: platform,
+			Image:    args.Image,
+			Memory:   args.Memory,
+			Platform: args.Platform,
 		},
 	}
 	if err := driver.SetUp(ctx, containers); err != nil {
 		return err
 	}
 
-	id, err := driver.Run(ctx, env, args...)
+	id, err := driver.Run(ctx, args.Env, args.Args...)
 	if err != nil {
 		return err
 	}
