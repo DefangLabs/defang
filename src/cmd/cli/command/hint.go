@@ -41,8 +41,8 @@ func printDefangHint(hint, args string) {
 	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n", hint)
-	providerFlag := rootCmd.Flag("provider")
-	clusterFlag := rootCmd.Flag("cluster")
+	providerFlag := RootCmd.Flag("provider")
+	clusterFlag := RootCmd.Flag("cluster")
 	if providerFlag.Changed {
 		fmt.Printf("\n  %s --provider %s %s\n\n", executable, providerFlag.Value.String(), args)
 	} else if clusterFlag.Changed {
