@@ -1,0 +1,14 @@
+{
+  "index": "Introduction",
+  "another": "Another Page",
+  "about": {
+    "title": "About",
+    "type": "page"
+  },
+  "contact": {
+    "title": "Contact ↗",
+    "type": "page",
+    "href": "https://twitter.com/DefangLabs",
+    "newWindow": true
+  }
+}
