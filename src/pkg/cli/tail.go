@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	ansiCyan        = "\033[36m"
-	ansiReset       = "\033[0m"
-	replaceString   = ansiCyan + "$0" + ansiReset
-	spinner         = `-\|/`
-	TimestampFormat = "15:04:05.000000 "
+	ansiCyan      = "\033[36m"
+	ansiReset     = "\033[0m"
+	replaceString = ansiCyan + "$0" + ansiReset
+	spinner       = `-\|/`
+	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00" // like RFC3339Nano but with 6 digits of precision
 )
 
 var (
@@ -152,13 +152,6 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 	}
 
-	timestampZone := time.Local
-	timestampFormat := TimestampFormat
-	if time.Since(since) >= 24*time.Hour {
-		timestampFormat = "2006-01-02T15:04:05.000000Z " // like RFC3339Nano but with 6 digits of precision
-		timestampZone = time.UTC
-	}
-
 	skipDuplicate := false
 	for {
 		if !tailClient.Receive() {
@@ -228,7 +221,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				continue
 			}
 
-			tsString := ts.In(timestampZone).Format(timestampFormat)
+			tsString := ts.Local().Format(RFC3339Micro)
 			tsColor := termenv.ANSIWhite
 			if e.Stderr {
 				tsColor = termenv.ANSIBrightRed
@@ -237,7 +230,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = Print(tsColor, tsString)
+					prefixLen, _ = Print(tsColor, tsString, " ")
 					if etag == "" {
 						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
