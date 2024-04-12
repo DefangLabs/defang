@@ -98,10 +98,6 @@ func (l *Local) GetInfo(ctx context.Context, taskID PID) (*types.TaskInfo, error
 	return nil, errors.New("not implemented for local driver")
 }
 
-func (l *Local) SetVpcID(vpcId string) error {
-	return errors.New("not implemented for local driver")
-}
-
 func (l *Local) PutSecret(ctx context.Context, name, value string) error {
 	return errors.New("not implemented for local driver")
 }

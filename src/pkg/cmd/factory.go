@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -11,10 +12,13 @@ import (
 
 var currentUser = os.Getenv("USER")
 
-func createDriver(color Color, reg Region) types.Driver {
+type DriverOptions func(types.Driver) error
+
+func createDriver(reg Region, opts ...DriverOptions) (types.Driver, error) {
+	var driver types.Driver
 	switch reg {
 	case "docker", "local", "":
-		return docker.New()
+		driver = docker.New()
 	case
 		region.AFSouth1,     // "af-south-1"
 		region.APEast1,      // "ap-east-1"
@@ -47,10 +51,18 @@ func createDriver(color Color, reg Region) types.Driver {
 		region.USEast2,      // "us-east-2"
 		region.USWest1,      // "us-west-1"
 		region.USWest2:      // "us-west-2"
-		return cfn.New(stackName(currentUser), reg)
+		driver = cfn.New(stackName(currentUser), reg)
 	default:
-		panic("unsupported region: " + reg)
+		return nil, fmt.Errorf("unsupported region: %v", reg)
 	}
+
+	for _, opt := range opts {
+		if err := opt(driver); err != nil {
+			return nil, err
+		}
+	}
+
+	return driver, nil
 }
 
 func stackName(stack string) string {
