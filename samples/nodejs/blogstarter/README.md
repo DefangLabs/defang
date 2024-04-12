@@ -1,4 +1,4 @@
-This template is a simple static web page project developed using Next.js. It is ready to be deployed by Defang, and you could make your project available to the world in just 5 minutes!
+This template is a blog starter project developed using Next.js, specifically designed to facilitate the creation and deployment of your blogs. It offers an excellent starting point to help you effortlessly publish your content by simply modifying the MDX files included in the code. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as outlined in the prerequisites, and following the commands in our step-by-step guide, your blog will be ready to go live to the world!
 
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
