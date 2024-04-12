@@ -3,9 +3,9 @@ name: Go package
 on:
   push:
     tags:
-      - 'v*' # push events to tagged commits
+      - "v*" # push events to tagged commits
     branches:
-      - '**'
+      - "**"
 
 permissions:
   contents: read
@@ -44,7 +44,9 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Check nix-shell default.nix
-        run: nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang
+        run: |
+          set -o pipefail
+          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=6::Replace the vendorHash with the correct value:|'
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
@@ -154,5 +156,3 @@ jobs:
           repository: defang-io/defang-docs
           event-type: cli-autodoc
           client-payload: '{"version": "${{ github.ref }}"}'
-
-      
