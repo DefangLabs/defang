@@ -3,3 +3,5 @@ node_modules/
 .direnv/
 .DS_Store
 /result
+/dist/
+/completions/

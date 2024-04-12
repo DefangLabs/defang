@@ -6,4 +6,5 @@ defang_darwin.zip
 generateEngine_test.log
 defang-amd64
 defang-arm64
-dist/
+/dist/
+/completions/

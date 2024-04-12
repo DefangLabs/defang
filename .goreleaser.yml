@@ -1,9 +1,14 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 project_name: defang
+before:
+  hooks:
+    - ./src/bin/completions.sh
+
 builds:
   - id: defang-mac
     main: ./cmd/cli
     binary: defang
+    dir: ./src
     goos:
       - darwin
     goarch:
@@ -11,10 +16,11 @@ builds:
       - arm64
     hooks:
       post:
-        - ./bin/codesign.sh "{{ .Path }}"
+        - ./src/bin/codesign.sh "{{ .Path }}"
 
   - id: defang-cli
     main: ./cmd/cli
+    dir: ./src
     binary: defang
     goos:
       - linux
@@ -33,10 +39,14 @@ universal_binaries:
     replace: true
     hooks:
       post:
-        - ./bin/codesign.sh "{{ .Path }}"
+        - ./src/bin/codesign.sh "{{ .Path }}"
 
 archives:
-  - format_overrides:
+  - files:
+      - ./README.md
+      - ./LICENSE
+      - completions/*
+    format_overrides:
       - goos: darwin
         format: zip
       - goos: windows

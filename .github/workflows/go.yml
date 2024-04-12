@@ -132,7 +132,6 @@ jobs:
           distribution: goreleaser # either 'goreleaser' (default) or 'goreleaser-pro'
           version: latest
           args: release --clean
-          workdir: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
