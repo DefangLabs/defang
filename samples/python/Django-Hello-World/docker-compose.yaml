@@ -7,3 +7,4 @@ services:
     ports:
       - mode: ingress
         target: 8001
+        published: 8001
