@@ -19,7 +19,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	for _, svccfg := range serviceConfigs {
-		if isPrivate(&svccfg) && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
@@ -160,12 +160,14 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			staticFiles = staticFilesVal.(string) // already validated above
 		}
 
+		network := network(&svccfg)
 		ports := convertPorts(svccfg.Ports)
 		services = append(services, &defangv1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
-			Internal:    isPrivate(&svccfg), // TODO: support external services (w/o LB)
+			Internal:    network == defangv1.Network_PRIVATE,
+			Networks:    network,
 			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
@@ -256,11 +258,11 @@ func convertPlatform(platform string) defangv1.Platform {
 	}
 }
 
-func isPrivate(svccfg *compose.ServiceConfig) bool {
-	// Hack: Use magic network name "public" to determine if the service is private
-	privateNetwork := true
+func network(svccfg *compose.ServiceConfig) defangv1.Network {
+	// HACK: Use magic network name "public" to determine if the service is public
 	if _, ok := svccfg.Networks["public"]; ok {
-		privateNetwork = false
+		return defangv1.Network_PUBLIC
 	}
-	return privateNetwork
+	// TODO: support external services (w/o LB),
+	return defangv1.Network_PRIVATE
 }
