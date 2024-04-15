@@ -11,14 +11,16 @@ import (
 )
 
 var (
-	help     = pflag.BoolP("help", "h", false, "Show this help message")
-	color    = pflag.String("color", "auto", `Colorize output. Choices are: always, never, raw, auto`)
-	envs     = pflag.StringArrayP("env", "e", nil, "Environment variables to pass to the run command")
-	region   = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
-	memory   = pflag.StringP("memory", "m", "2g", "Memory limit in bytes")
-	envFiles = pflag.StringArray("env-file", nil, "Read in a file of environment variables")
-	platform = pflag.String("platform", "", "Set platform if host is multi-platform capable")
-	vpcid    = pflag.String("vpcid", "", "VPC to use for the task")
+	help   = pflag.BoolP("help", "h", false, "Show this help message")
+	region = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
+
+	runFlags = pflag.NewFlagSet(os.Args[0]+" run", pflag.ExitOnError)
+	envs     = runFlags.StringArrayP("env", "e", nil, "Environment variables to pass to the run command")
+	memory   = runFlags.StringP("memory", "m", "2g", "Memory limit in bytes")
+	envFiles = runFlags.StringArray("env-file", nil, "Read in a file of environment variables")
+	platform = runFlags.String("platform", "", "Set platform if host is multi-platform capable")
+	vpcid    = runFlags.String("vpcid", "", "VPC to use for the task")
+	subnetid = runFlags.String("subnetid", "", "Subnet to use for the task")
 	// driver = pflag.StringP("driver", "d", "auto", "Container runner to use. Choices are: pulumi-ecs, docker")
 
 	version = "development" // overwritten by build script -ldflags "-X main.version=..."
@@ -26,7 +28,8 @@ var (
 
 func usage() {
 	fmt.Printf("Cloud runner (%s)\n\n", version)
-	pflag.Usage()
+	fmt.Printf("Usage: \n  %s [command] [options]\n\nGlobal Flags:\n", os.Args[0])
+	pflag.PrintDefaults()
 	fmt.Println(`
 Commands:
   run <image> [arg...]   Create and run a new task from an image
@@ -34,16 +37,19 @@ Commands:
   stop <task ID>         Stop a running task
   info <task ID>         Show information about a task
   destroy                Destroy all resources created by this tool`)
+	fmt.Printf("\n\nUsage of run subcommand: \n  %s run [options]\n\nFlags:\n", os.Args[0])
+	runFlags.PrintDefaults()
 }
 
 func main() {
+	pflag.Usage = usage
 	pflag.Parse()
+
 	if *help {
 		usage()
 		return
 	}
 
-	color := cmd.ParseColor(*color)
 	region := cmd.Region(*region)
 
 	envMap := make(map[string]string)
@@ -62,10 +68,18 @@ func main() {
 
 	ctx := context.Background()
 
+	command := pflag.Arg(0)
+	requireTaskID := func() string {
+		if pflag.NArg() != 2 {
+			cmd.Fatal(command + " requires a single task ID argument")
+		}
+		return pflag.Arg(1)
+	}
+
 	var err error
-	switch pflag.Arg(0) {
+	switch command {
 	default:
-		err = errors.New("unknown command: " + pflag.Arg(0))
+		err = errors.New("unknown command: " + command)
 	case "help", "":
 		usage()
 	case "run", "r":
@@ -73,41 +87,29 @@ func main() {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
 		memory := cmd.ParseMemory(*memory)
-		err = cmd.Run(ctx, region, pflag.Arg(1), memory, color, pflag.Args()[2:], envMap, *platform, *vpcid)
+		err = cmd.Run(ctx, cmd.RunContainerArgs{
+			Region:   region,
+			Image:    pflag.Arg(1),
+			Memory:   memory,
+			Args:     pflag.Args()[2:],
+			Env:      envMap,
+			Platform: *platform,
+			VpcID:    *vpcid,
+			SubnetID: *subnetid,
+		})
 	case "stop", "s":
-		if len(envMap) > 0 || *platform != "" || *vpcid != "" {
-			cmd.Fatal("stop does not take --env, --env-file, --platform, or --vpcid")
-		}
-		if pflag.NArg() != 2 {
-			cmd.Fatal("stop requires a single task ID")
-		}
-		taskID := pflag.Arg(1)
+		taskID := requireTaskID()
 		err = cmd.Stop(ctx, region, &taskID)
 	case "logs", "tail", "l":
-		if len(envMap) > 0 || *platform != "" || *vpcid != "" {
-			cmd.Fatal("logs does not take --env, --env-file, --platform, or --vpcid")
-		}
-		if pflag.NArg() != 2 {
-			cmd.Fatal("logs requires a single task ID")
-		}
-		taskID := pflag.Arg(1)
+		taskID := requireTaskID()
 		err = cmd.Logs(ctx, region, &taskID)
 	case "destroy", "teardown", "d":
-		if len(envMap) > 0 || *platform != "" || *vpcid != "" {
-			cmd.Fatal("destroy does not take --env, --env-file, --platform, or --vpcid")
-		}
 		if pflag.NArg() != 1 {
 			cmd.Fatal("destroy does not take any arguments")
 		}
-		err = cmd.Destroy(ctx, region, color)
+		err = cmd.Destroy(ctx, region)
 	case "info", "i":
-		if len(envMap) > 0 || *platform != "" || *vpcid != "" {
-			cmd.Fatal("info does not take --env, --env-file, --platform, or --vpcid")
-		}
-		if pflag.NArg() != 2 {
-			cmd.Fatal("info requires a single task ID")
-		}
-		taskID := pflag.Arg(1)
+		taskID := requireTaskID()
 		err = cmd.Info(ctx, region, &taskID)
 	}
 

@@ -7,6 +7,9 @@ import (
 )
 
 func Logs(ctx context.Context, region Region, id types.TaskID) error {
-	driver := createDriver(ColorAuto, region)
+	driver, err := createDriver(region)
+	if err != nil {
+		return err
+	}
 	return driver.Tail(ctx, id)
 }

@@ -27,6 +27,15 @@ type AwsEcs struct {
 
 const stackTimeout = time.Minute * 3
 
+func OptionVPCAndSubnetID(ctx context.Context, vpcID, subnetID string) func(types.Driver) error {
+	return func(d types.Driver) error {
+		if ecs, ok := d.(*AwsEcs); ok {
+			return ecs.PopulateVPCandSubnetID(ctx, vpcID, subnetID)
+		}
+		return errors.New("only AwsEcs driver supports VPC ID and Subnet ID option")
+	}
+}
+
 func New(stack string, region region.Region) *AwsEcs {
 	if stack == "" {
 		panic("stack must be set")
@@ -121,7 +130,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 }
 
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
-	template, err := createTemplate(a.stackName, containers, a.Spot).YAML()
+	template, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID}, a.Spot).YAML()
 	if err != nil {
 		return err
 	}
@@ -133,7 +142,6 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 		if ok := errors.As(err, &apiError); !ok || (apiError.ErrorCode() != "ValidationError") || !strings.HasSuffix(apiError.ErrorMessage(), "does not exist") {
 			return err
 		}
-
 		return a.createStackAndWait(ctx, string(template))
 	}
 	return nil

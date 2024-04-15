@@ -31,13 +31,6 @@ func New() *Docker {
 
 var _ types.Driver = (*Docker)(nil)
 
-func (Docker) SetVpcID(vpcId string) error {
-	if vpcId != "" {
-		return errors.New("docker does not support specifying VPC ID")
-	}
-	return nil
-}
-
 func (Docker) PutSecret(ctx context.Context, name, value string) error {
 	return errors.New("docker does not support secrets")
 }
