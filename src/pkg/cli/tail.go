@@ -191,7 +191,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
-		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric"
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric" || msg.Host == "kaniko" || msg.Host == "fabric"
 		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
 			if onlyErrors && !e.Stderr {
