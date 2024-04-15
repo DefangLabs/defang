@@ -122,37 +122,38 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 		searchPattern = userSpecifiedComposeFile
 	}
 
-	if err == nil {
+	if err != nil {
+		return path, fmt.Errorf("unable to get working directory for compose file")
+	}
 
-		// iterate through this loop at least once to find the compose file.
-		// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
-		// then walk the tree up to the root directory looking for a compose file.
-		Debug("Searching for", searchPattern)
-		for {
-			if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
-				err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-				break
-			} else if len(files) == 1 {
-				// found compose file, we're done
-				path = files[0]
-				break
-			}
-
-			if len(userSpecifiedComposeFile) > 0 {
-				err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
-				break
-			}
-
-			// compose file not found, try parent directory
-			nextPath := filepath.Dir(path)
-			if nextPath == path {
-				// previous search was of root, we're done
-				err = fmt.Errorf("no Compose file found")
-				break
-			}
-
-			path = nextPath
+	// iterate through this loop at least once to find the compose file.
+	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
+	// then walk the tree up to the root directory looking for a compose file.
+	Debug("Searching for", searchPattern)
+	for {
+		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
+			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+			break
+		} else if len(files) == 1 {
+			// found compose file, we're done
+			path = files[0]
+			break
 		}
+
+		if len(userSpecifiedComposeFile) > 0 {
+			err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
+			break
+		}
+
+		// compose file not found, try parent directory
+		nextPath := filepath.Dir(path)
+		if nextPath == path {
+			// previous search was of root, we're done
+			err = fmt.Errorf("no Compose file found")
+			break
+		}
+
+		path = nextPath
 	}
 
 	return path, err
