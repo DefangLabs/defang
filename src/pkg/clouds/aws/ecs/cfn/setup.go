@@ -130,7 +130,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 }
 
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
-	template, err := createTemplate(a.stackName, containers, map[string]string{"VpcID": a.VpcID}, a.Spot).YAML()
+	template, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID}, a.Spot).YAML()
 	if err != nil {
 		return err
 	}

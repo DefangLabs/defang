@@ -23,22 +23,14 @@ func (a *AwsEcs) PopulateVPCandSubnetID(ctx context.Context, vpcID, subnetID str
 	}
 
 	if vpcID != "" && subnetID == "" {
-		a.VpcID = vpcID
-		a.SubNetID, err = getPublicSubnetId(ctx, cfg, vpcID)
-		if err != nil {
-			return err
-		}
+		subnetID, err = getPublicSubnetId(ctx, cfg, vpcID)
 	} else if vpcID == "" && subnetID != "" {
-		a.SubNetID = subnetID
-		a.VpcID, err = getSubnetVPCId(ctx, cfg, subnetID)
-		if err != nil {
-			return err
-		}
-	} else {
-		a.VpcID = vpcID
-		a.SubNetID = subnetID
+		vpcID, err = getSubnetVPCId(ctx, cfg, subnetID)
 	}
-	return nil
+
+	a.VpcID = vpcID
+	a.SubNetID = subnetID
+	return err
 }
 
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {

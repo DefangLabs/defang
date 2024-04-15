@@ -46,7 +46,11 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-func createTemplate(stack string, containers []types.Container, refs map[string]string, spot bool) *cloudformation.Template {
+type TemplateOverrides struct {
+	VpcID string
+}
+
+func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides, spot bool) *cloudformation.Template {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -413,7 +417,7 @@ func createTemplate(stack string, containers []types.Container, refs map[string]
 	}
 
 	var vpcId *string
-	if refs["VpcID"] == "" && createVpcResources {
+	if overrides.VpcID == "" && createVpcResources {
 		// 8a. a VPC
 		const _vpc = "VPC"
 		template.Resources[_vpc] = &ec2.VPC{
@@ -474,8 +478,8 @@ func createTemplate(stack string, containers []types.Container, refs map[string]
 		}
 	}
 
-	if refs["VpcID"] != "" {
-		vpcId = ptr.String(refs["VpcID"])
+	if overrides.VpcID != "" {
+		vpcId = ptr.String(overrides.VpcID)
 	}
 
 	const _securityGroup = "SecurityGroup"

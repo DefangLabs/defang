@@ -12,9 +12,9 @@ import (
 
 var currentUser = os.Getenv("USER")
 
-type DriverOptions func(types.Driver) error
+type DriverOption func(types.Driver) error
 
-func createDriver(reg Region, opts ...DriverOptions) (types.Driver, error) {
+func createDriver(reg Region, opts ...DriverOption) (types.Driver, error) {
 	var driver types.Driver
 	switch reg {
 	case "docker", "local", "":
