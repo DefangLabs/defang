@@ -110,7 +110,7 @@ func SetupCommands() {
 	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
 	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
 	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
-	rootCmd.PersistentFlags().StringP("file", "f", "*compose.y*ml", `Compose file path`)
+	rootCmd.PersistentFlags().StringP("file", "f", "", `Compose file path`)
 	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
@@ -277,11 +277,7 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		filePath := ""
-		if cmd.Flags().Changed("file") {
-			filePath, _ = cmd.InheritedFlags().GetString("file")
-		}
-
+		filePath, _ := cmd.InheritedFlags().GetString("file")
 		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
 		if projectName != "" {
 			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
