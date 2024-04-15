@@ -116,16 +116,10 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	Debug("Loading compose file: ", userSpecifiedComposeFile)
 
 	path, err := os.Getwd()
-	if userSpecifiedComposeFile != "" {
-		// return to the original working directory once this function is done
-		defer os.Chdir(path)
-	}
-
-	var searchPattern string
+	searchPattern := DEFAULT_COMPOSE_FILE_PATTERN
 	if len(userSpecifiedComposeFile) > 0 {
+		path = ""
 		searchPattern = userSpecifiedComposeFile
-	} else {
-		searchPattern = DEFAULT_COMPOSE_FILE_PATTERN
 	}
 
 	if err == nil {
@@ -134,8 +128,8 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 		// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
 		// then walk the tree up to the root directory looking for a compose file.
 		for {
-			Debug("Searching for ", searchPattern, " relative to ", path)
-			if files, _ := filepath.Glob(searchPattern); len(files) > 1 {
+			Debug("Searching for", searchPattern)
+			if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
 				err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
 				break
 			} else if len(files) == 1 {
@@ -158,7 +152,6 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 			}
 
 			path = nextPath
-			err = os.Chdir(path)
 		}
 	}
 
