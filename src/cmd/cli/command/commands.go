@@ -647,8 +647,8 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	}
 }
 
-func isCommandUsingDefangPlayground(cmd *cobra.Command) bool {
-	return *(cmd.Flag("provider").Value.(*cliClient.Provider)) == cliClient.ProviderDefang
+func isCommandUsingDefangPlayground(provider *cliClient.Provider) bool {
+	return *provider == cliClient.ProviderDefang
 }
 
 var composeUpCmd = &cobra.Command{
@@ -666,7 +666,8 @@ var composeUpCmd = &cobra.Command{
 			return err
 		}
 
-		if isCommandUsingDefangPlayground(cmd) {
+		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
+		if isCommandUsingDefangPlayground(provider) {
 			printPortalURL(deploy.Services)
 		}
 
@@ -706,7 +707,8 @@ var composeStartCmd = &cobra.Command{
 			return err
 		}
 
-		if isCommandUsingDefangPlayground(cmd) {
+		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
+		if isCommandUsingDefangPlayground(provider) {
 			printPortalURL(deploy.Services)
 		}
 
