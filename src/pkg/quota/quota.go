@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 type Quotas struct {
@@ -18,7 +18,7 @@ type Quotas struct {
 	ShmSizeMiB float32
 }
 
-func (q Quotas) Validate(service *v1.Service) error {
+func (q Quotas) Validate(service *defangv1.Service) error {
 	if service.Name == "" {
 		return errors.New("service name is required") // CodeInvalidArgument
 	}
@@ -43,8 +43,8 @@ func (q Quotas) Validate(service *v1.Service) error {
 		if port.Target < 1 || port.Target > 32767 {
 			return fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
 		}
-		if port.Mode == v1.Mode_INGRESS {
-			if port.Protocol == v1.Protocol_TCP || port.Protocol == v1.Protocol_UDP {
+		if port.Mode == defangv1.Mode_INGRESS {
+			if port.Protocol == defangv1.Protocol_TCP || port.Protocol == defangv1.Protocol_UDP {
 				return fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
 			}
 		}
@@ -52,7 +52,7 @@ func (q Quotas) Validate(service *v1.Service) error {
 			return fmt.Errorf("duplicate port %d", port.Target) // CodeInvalidArgument
 		}
 		// hasHost = hasHost || port.Mode == v1.Mode_HOST
-		hasIngress = hasIngress || port.Mode == v1.Mode_INGRESS
+		hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
 		uniquePorts[port.Target] = true
 	}
 	if service.Healthcheck != nil && len(service.Healthcheck.Test) > 0 {
