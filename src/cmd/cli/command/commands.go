@@ -21,7 +21,7 @@ import (
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/scope"
 	"github.com/defang-io/defang/src/pkg/types"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -620,7 +620,7 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printPlaygroundPortalServiceURLs(provider *cliClient.Provider, serviceInfos []*v1.ServiceInfo) {
+func printPlaygroundPortalServiceURLs(provider *cliClient.Provider, serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the defang SaaS environment.
 	if *provider == cliClient.ProviderDefang {
 		cli.Info(" * Monitor your services' status in the defang portal")
@@ -630,7 +630,7 @@ func printPlaygroundPortalServiceURLs(provider *cliClient.Provider, serviceInfos
 	}
 }
 
-func printEndpoints(serviceInfos []*v1.ServiceInfo) {
+func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
 		if len(serviceInfo.Endpoints) > 0 {
@@ -638,7 +638,7 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 		}
 		cli.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
 		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == v1.Mode_INGRESS {
+			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
 				endpoint = "https://" + endpoint
 			}
 			fmt.Println("   -", endpoint)

@@ -13,7 +13,7 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -87,7 +87,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, &v1.ServiceID{Name: service}); err != nil {
+		if _, err := client.Get(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				Warn(" ! Service does not exist (yet):", service)
@@ -103,7 +103,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
-	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+	tailClient, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+				tailClient, err = client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
 					Debug(" - Reconnect failed:", err)
 					return err
