@@ -12,8 +12,6 @@ import (
 	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
 )
 
-const spinner = `-\|/`
-
 const AwsLogsStreamPrefix = ProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {

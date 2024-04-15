@@ -39,7 +39,7 @@ var (
 )
 
 func Execute(ctx context.Context) {
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			cli.Error("Error:", err)
 		}
@@ -102,19 +102,19 @@ func SetupCommands() {
 	defangProvider := cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 
 	colorMode := ColorAuto
-	rootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
-	rootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
-	rootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
-	rootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
-	rootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging for troubleshooting the CLI")
-	rootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
-	rootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
-	rootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
-	rootCmd.PersistentFlags().StringP("file", "f", "", `Compose file path`)
-	rootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+	RootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
+	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().VarP(&defangProvider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
+	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging")
+	RootCmd.PersistentFlags().BoolVar(&cli.DoDebug, "debug", false, "Debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
+	RootCmd.PersistentFlags().BoolP("non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
+	RootCmd.PersistentFlags().StringP("file", "f", "", `Compose file path`)
+	RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
-	rootCmd.AddCommand(bootstrapCmd)
+	RootCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
@@ -124,34 +124,34 @@ func SetupCommands() {
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
-	rootCmd.AddCommand(tosCmd)
+	RootCmd.AddCommand(tosCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("Scope of the token; one of %v (required)", scope.All()))
 	tokenCmd.MarkFlagRequired("scope")
-	rootCmd.AddCommand(tokenCmd)
+	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
 	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in"); TODO: Implement this
-	rootCmd.AddCommand(loginCmd)
+	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
-	rootCmd.AddCommand(whoamiCmd)
+	RootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
-	rootCmd.AddCommand(logoutCmd)
+	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
 	//generateCmd.Flags().StringP("name", "n", "service1", "Name of the service")
-	rootCmd.AddCommand(generateCmd)
+	RootCmd.AddCommand(generateCmd)
 
 	// Get Services Command
 	getServicesCmd.Flags().BoolP("long", "l", false, "Show more details")
-	rootCmd.AddCommand(getServicesCmd)
+	RootCmd.AddCommand(getServicesCmd)
 
 	// Get Status Command
-	rootCmd.AddCommand(getVersionCmd)
+	RootCmd.AddCommand(getVersionCmd)
 
 	// Secrets Command
 	secretsSetCmd.Flags().BoolP("name", "n", false, "Name of the secret (backwards compat)")
@@ -164,8 +164,8 @@ func SetupCommands() {
 
 	secretsCmd.AddCommand(secretsListCmd)
 
-	rootCmd.AddCommand(secretsCmd)
-	rootCmd.AddCommand(restartCmd)
+	RootCmd.AddCommand(secretsCmd)
+	RootCmd.AddCommand(restartCmd)
 
 	// Compose Command
 	// composeCmd.Flags().Bool("compatibility", false, "Run compose in backward compatibility mode"); TODO: Implement compose option
@@ -186,7 +186,7 @@ func SetupCommands() {
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
-	rootCmd.AddCommand(composeCmd)
+	RootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
 
@@ -195,13 +195,13 @@ func SetupCommands() {
 	tailCmd.Flags().String("etag", "", "ETag or deployment ID of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
 	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
-	rootCmd.AddCommand(tailCmd)
+	RootCmd.AddCommand(tailCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "Name of the service(s) (backwards compat)")
 	deleteCmd.Flags().MarkHidden("name")
 	deleteCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
-	rootCmd.AddCommand(deleteCmd)
+	RootCmd.AddCommand(deleteCmd)
 
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "Subject to send the message to (required)")
@@ -211,24 +211,24 @@ func SetupCommands() {
 	sendCmd.Flags().StringP("content-type", "c", "", "Content-Type of the data")
 	sendCmd.MarkFlagRequired("subject")
 	sendCmd.MarkFlagRequired("type")
-	rootCmd.AddCommand(sendCmd)
+	RootCmd.AddCommand(sendCmd)
 
 	if cli.CanColor {
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
-		templ := re.ReplaceAllString(rootCmd.UsageTemplate(), "\033[1m$0\033[0m")
-		rootCmd.SetUsageTemplate(templ)
+		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
+		RootCmd.SetUsageTemplate(templ)
 	}
 
-	origHelpFunc := rootCmd.HelpFunc()
-	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+	origHelpFunc := RootCmd.HelpFunc()
+	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		trackCmd(cmd, "Help", P{"args", args})
 		origHelpFunc(cmd, args)
 	})
 
 }
 
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Use:           "defang",
