@@ -127,8 +127,8 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 		// iterate through this loop at least once to find the compose file.
 		// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
 		// then walk the tree up to the root directory looking for a compose file.
+		Debug("Searching for", searchPattern)
 		for {
-			Debug("Searching for", searchPattern)
 			if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
 				err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
 				break
