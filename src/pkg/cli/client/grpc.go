@@ -197,6 +197,9 @@ func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(project.Services) == 0 {
+		return "", errors.New("no services found")
+	}
 	var names []string
 	for _, service := range project.Services {
 		names = append(names, service.Service.Name)
