@@ -621,10 +621,13 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printPortalURL(serviceInfos []*v1.ServiceInfo) {
-	cli.Info(" * Monitor your services' status in the defang portal")
-	for _, serviceInfo := range serviceInfos {
-		cli.Println(cli.Nop, "   - ", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+func printPlaygroundPortalServiceURLs(provider *cliClient.Provider, serviceInfos []*v1.ServiceInfo) {
+	// We can only show services deployed to the defang SaaS environment.
+	if *provider == cliClient.ProviderDefang {
+		cli.Info(" * Monitor your services' status in the defang portal")
+		for _, serviceInfo := range serviceInfos {
+			cli.Println(cli.Nop, "   - ", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+		}
 	}
 }
 
@@ -647,10 +650,6 @@ func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	}
 }
 
-func isCommandUsingDefangPlayground(provider *cliClient.Provider) bool {
-	return *provider == cliClient.ProviderDefang
-}
-
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
@@ -667,10 +666,7 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
-		if isCommandUsingDefangPlayground(provider) {
-			printPortalURL(deploy.Services)
-		}
-
+		printPlaygroundPortalServiceURLs(provider, deploy.Services)
 		printEndpoints(deploy.Services)
 
 		if detach {
@@ -708,10 +704,7 @@ var composeStartCmd = &cobra.Command{
 		}
 
 		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
-		if isCommandUsingDefangPlayground(provider) {
-			printPortalURL(deploy.Services)
-		}
-
+		printPlaygroundPortalServiceURLs(provider, deploy.Services)
 		printEndpoints(deploy.Services)
 
 		command := "tail"
