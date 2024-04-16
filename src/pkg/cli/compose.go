@@ -113,23 +113,21 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	// Users can override the file by specifying file name
 	const DEFAULT_COMPOSE_FILE_PATTERN = "*compose.y*ml"
 
-	Debug("Loading compose file: ", userSpecifiedComposeFile)
-
 	path, err := os.Getwd()
+	if err != nil {
+		return path, err
+	}
+
 	searchPattern := DEFAULT_COMPOSE_FILE_PATTERN
 	if len(userSpecifiedComposeFile) > 0 {
 		path = ""
 		searchPattern = userSpecifiedComposeFile
 	}
 
-	if err != nil {
-		return path, fmt.Errorf("unable to get working directory for compose file")
-	}
-
 	// iterate through this loop at least once to find the compose file.
 	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
 	// then walk the tree up to the root directory looking for a compose file.
-	Debug("Searching for", searchPattern)
+	Debug(" - Looking for compose file - searching for", searchPattern)
 	for {
 		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
 			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
