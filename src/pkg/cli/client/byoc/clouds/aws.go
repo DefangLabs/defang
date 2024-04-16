@@ -92,7 +92,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 		{
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:latest",
 			Name:      ecs.ContainerName,
-			Cpus:      0.5,
+			Cpus:      2.0,
 			Memory:    2048_000_000, // 2G
 			Essential: ptr.Bool(true),
 			VolumesFrom: []string{
