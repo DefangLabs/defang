@@ -26,6 +26,10 @@ var (
 	version = "development" // overwritten by build script -ldflags "-X main.version=..."
 )
 
+func init() {
+	runFlags.StringVarP(region, "region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
+}
+
 func usage() {
 	fmt.Printf("Cloud runner (%s)\n\n", version)
 	fmt.Printf("Usage: \n  %s [command] [options]\n\nGlobal Flags:\n", os.Args[0])
@@ -43,32 +47,22 @@ Commands:
 
 func main() {
 	pflag.Usage = usage
-	pflag.Parse()
-
-	if *help {
+	if len(os.Args) < 2 {
 		usage()
 		return
 	}
 
+	command := os.Args[1]
+
+	if command == "run" || command == "r" {
+		runFlags.Parse(os.Args[2:])
+	} else {
+		pflag.Parse()
+	}
+
 	region := cmd.Region(*region)
-
-	envMap := make(map[string]string)
-	// Apply env vars from files first, so they can be overridden by the command line
-	for _, envFile := range *envFiles {
-		if _, err := cmd.ParseEnvFile(envFile, envMap); err != nil {
-			cmd.Fatal(err)
-		}
-	}
-	// Apply env vars from the command line last, so they take precedence
-	for _, env := range *envs {
-		if key, value := cmd.ParseEnvLine(env); key != "" {
-			envMap[key] = value
-		}
-	}
-
 	ctx := context.Background()
 
-	command := pflag.Arg(0)
 	requireTaskID := func() string {
 		if pflag.NArg() != 2 {
 			cmd.Fatal(command + " requires a single task ID argument")
@@ -83,15 +77,30 @@ func main() {
 	case "help", "":
 		usage()
 	case "run", "r":
-		if pflag.NArg() < 2 {
+		if runFlags.NArg() < 1 {
 			cmd.Fatal("run requires an image name (and optional arguments)")
 		}
+
+		envMap := make(map[string]string)
+		// Apply env vars from files first, so they can be overridden by the command line
+		for _, envFile := range *envFiles {
+			if _, err := cmd.ParseEnvFile(envFile, envMap); err != nil {
+				cmd.Fatal(err)
+			}
+		}
+		// Apply env vars from the command line last, so they take precedence
+		for _, env := range *envs {
+			if key, value := cmd.ParseEnvLine(env); key != "" {
+				envMap[key] = value
+			}
+		}
+
 		memory := cmd.ParseMemory(*memory)
 		err = cmd.Run(ctx, cmd.RunContainerArgs{
 			Region:   region,
-			Image:    pflag.Arg(1),
+			Image:    runFlags.Arg(0),
 			Memory:   memory,
-			Args:     pflag.Args()[2:],
+			Args:     runFlags.Args()[1:],
 			Env:      envMap,
 			Platform: *platform,
 			VpcID:    *vpcid,
