@@ -227,8 +227,7 @@ func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
 }
 
 func isTaskTerminalState(status string) bool {
-	// println("status:", status)
-	// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/scheduling_tasks.html#task-lifecycle
+	// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-lifecycle-explanation.html
 	switch status {
 	case "DELETED", "STOPPED", "DEPROVISIONING":
 		return true

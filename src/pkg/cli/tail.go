@@ -104,11 +104,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
-	tailClient, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
-	defer tailClient.Close() // this works because it takes a pointer receiver
+	defer serverStream.Close() // this works because it takes a pointer receiver
 
 	spinMe := 0
 	doSpinner := !raw && term.CanColor && term.IsTerminal
@@ -155,21 +155,21 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 	skipDuplicate := false
 	for {
-		if !tailClient.Receive() {
-			if errors.Is(tailClient.Err(), context.Canceled) {
-				return &CancelError{Service: service, Etag: etag, Last: since, error: tailClient.Err()}
+		if !serverStream.Receive() {
+			if errors.Is(serverStream.Err(), context.Canceled) {
+				return &CancelError{Service: service, Etag: etag, Last: since, error: serverStream.Err()}
 			}
 
 			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
-			code := connect.CodeOf(tailClient.Err())
+			code := connect.CodeOf(serverStream.Err())
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
-				term.Debug(" - Disconnected:", tailClient.Err())
+			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
+				term.Debug(" - Disconnected:", serverStream.Err())
 				if !raw {
 					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
 					term.Debug(" - Reconnect failed:", err)
 					return err
@@ -181,9 +181,9 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				continue
 			}
 
-			return tailClient.Err() // returns nil on EOF
+			return serverStream.Err() // returns nil on EOF
 		}
-		msg := tailClient.Msg()
+		msg := serverStream.Msg()
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {

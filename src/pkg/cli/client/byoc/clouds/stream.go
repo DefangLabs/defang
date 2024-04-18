@@ -1,6 +1,7 @@
 package clouds
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -16,22 +17,20 @@ import (
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
-	cancelTaskCh func()
-	err          error
-	errCh        <-chan error
-	etag         string
-	response     *defangv1.TailResponse
-	service      string
-	stream       ecs.EventStream
-	taskCh       <-chan error
+	cancel   context.CancelCauseFunc
+	ctx      context.Context
+	err      error
+	errCh    <-chan error
+	etag     string
+	response *defangv1.TailResponse
+	service  string
+	stream   ecs.EventStream
 }
 
 var _ client.ServerStream[defangv1.TailResponse] = (*byocServerStream)(nil)
 
 func (bs *byocServerStream) Close() error {
-	if bs.cancelTaskCh != nil {
-		bs.cancelTaskCh()
-	}
+	bs.cancel(nil)
 	return bs.stream.Close()
 }
 
@@ -130,8 +129,8 @@ func (bs *byocServerStream) Receive() bool {
 		bs.err = err
 		return false // abort on first error?
 
-	case err := <-bs.taskCh: // blocking (if not nil)
-		bs.err = err
-		return false // TODO: make sure we got all the logs from the task
+	case <-bs.ctx.Done(): // blocking (if not nil)
+		bs.err = context.Cause(bs.ctx)
+		return false
 	}
 }

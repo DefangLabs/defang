@@ -302,7 +302,7 @@ func TestUploadTarball(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, digest)
+		url, err := uploadTarball(context.Background(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -313,7 +313,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, "")
+		url, err := uploadTarball(context.Background(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -325,7 +325,7 @@ func TestUploadTarball(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.TODO(), "../../tests/testproj", "")
+		buffer, err := createTarball(context.Background(), "../../tests/testproj", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -362,14 +362,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.TODO(), "../../tests", "Dockerfile.missing")
+		_, err := createTarball(context.Background(), "../../tests", "Dockerfile.missing")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.TODO(), "asdfqwer", "")
+		_, err := createTarball(context.Background(), "asdfqwer", "")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

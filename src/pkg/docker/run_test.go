@@ -16,14 +16,14 @@ func TestRun(t *testing.T) {
 
 	d := New()
 
-	err := d.SetUp(context.TODO(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
+	err := d.SetUp(context.Background(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.TearDown(context.TODO())
+	defer d.TearDown(context.Background())
 
-	id, err := d.Run(context.TODO(), nil, "sh", "-c", "echo hello world")
+	id, err := d.Run(context.Background(), nil, "sh", "-c", "echo hello world")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestRun(t *testing.T) {
 		t.Fatal("id is empty")
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	err = d.Tail(ctx, id)
 	if err != nil {
