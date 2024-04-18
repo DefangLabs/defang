@@ -1,8 +1,9 @@
 package clouds
 
 import (
-	"github.com/defang-io/defang/src/pkg"
 	"strings"
+
+	"github.com/defang-io/defang/src/pkg"
 )
 
 const (

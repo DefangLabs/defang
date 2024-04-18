@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/google/uuid"
 )
@@ -20,7 +21,7 @@ func SendMsg(ctx context.Context, client client.Client, subject, _type, id strin
 		id = uuid.NewString()
 	}
 
-	Debug(" - Sending message to", subject, "with type", _type, "and id", id)
+	term.Debug(" - Sending message to", subject, "with type", _type, "and id", id)
 
 	if DoDryRun {
 		return ErrDryRun

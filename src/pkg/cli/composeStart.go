@@ -9,6 +9,7 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
+	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -175,7 +176,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	}
 
 	for _, service := range services {
-		Info(" * Deploying service", service.Name)
+		term.Info(" * Deploying service", service.Name)
 	}
 
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
@@ -184,13 +185,13 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	var warnings clouds.Warnings
 	if errors.As(err, &warnings) {
 		if len(warnings) > 0 {
-			Warn(" !", warnings)
+			term.Warn(" !", warnings)
 		}
 	} else if err != nil {
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}

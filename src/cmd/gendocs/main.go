@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/defang-io/defang/src/cmd/cli/command"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/spf13/cobra/doc"
 )
 
@@ -22,6 +22,6 @@ func main() {
 
 	err := doc.GenMarkdownTree(command.RootCmd, docsPath)
 	if err != nil {
-		log.Fatal(err)
+		term.Fatal(err)
 	}
 }

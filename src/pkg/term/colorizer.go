@@ -1,4 +1,4 @@
-package cli
+package term
 
 import (
 	"fmt"
@@ -9,10 +9,13 @@ import (
 )
 
 var (
-	IsTerminal = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && os.Getenv("TERM") != ""
-	stdout     = termenv.NewOutput(os.Stdout)
-	stderr     = termenv.NewOutput(os.Stderr)
-	CanColor   = doColor(stdout)
+	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && os.Getenv("TERM") != ""
+	Stdout      = termenv.NewOutput(os.Stdout)
+	Stderr      = termenv.NewOutput(os.Stderr)
+	CanColor    = doColor(Stdout)
+	CanColorErr = doColor(Stderr)
+	DoDebug     bool
+	HadWarnings bool
 )
 
 type Color = termenv.ANSIColor
@@ -33,11 +36,11 @@ func doColor(o *termenv.Output) bool {
 
 func ForceColor(color bool) {
 	if color {
-		stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.ANSI))
-		stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.ANSI))
+		Stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.ANSI))
+		Stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.ANSI))
 	} else {
-		stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.Ascii))
-		stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.Ascii))
+		Stdout = termenv.NewOutput(os.Stdout, termenv.WithProfile(termenv.Ascii))
+		Stderr = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.Ascii))
 	}
 }
 
@@ -58,18 +61,18 @@ func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
 }
 
 func Print(c Color, v ...any) (int, error) {
-	return Fprint(stdout, c, v...)
+	return Fprint(Stdout, c, v...)
 }
 
 func Println(c Color, v ...any) (int, error) {
-	return Fprintln(stdout, c, v...)
+	return Fprintln(Stdout, c, v...)
 }
 
 func Debug(v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Fprintln(stderr, DebugColor, v...)
+	return Fprintln(Stderr, DebugColor, v...)
 }
 
 func Info(v ...any) (int, error) {
@@ -78,9 +81,14 @@ func Info(v ...any) (int, error) {
 
 func Warn(v ...any) (int, error) {
 	HadWarnings = true
-	return Fprintln(stderr, WarnColor, v...)
+	return Fprintln(Stderr, WarnColor, v...)
 }
 
 func Error(v ...any) (int, error) {
-	return Fprintln(stderr, ErrorColor, v...)
+	return Fprintln(Stderr, ErrorColor, v...)
+}
+
+func Fatal(msg any) {
+	Error("Error:", msg)
+	os.Exit(1)
 }

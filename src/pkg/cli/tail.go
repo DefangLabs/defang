@@ -28,6 +28,7 @@ const (
 
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
+	DoVerbose     = false
 )
 
 type P = client.Property // shorthand for tracking properties
@@ -90,11 +91,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		if _, err := client.Get(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
-				Warn(" ! Service does not exist (yet):", service)
+				term.Warn(" ! Service does not exist (yet):", service)
 			case connect.CodeUnknown:
 				// Ignore unknown (nil) errors
 			default:
-				Warn(" !", err)
+				term.Warn(" !", err)
 			}
 		}
 	}
@@ -110,16 +111,16 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	defer tailClient.Close() // this works because it takes a pointer receiver
 
 	spinMe := 0
-	doSpinner := !raw && CanColor && IsTerminal
+	doSpinner := !raw && term.CanColor && term.IsTerminal
 
-	if IsTerminal && !raw {
+	if term.IsTerminal && !raw {
 		if doSpinner {
-			stdout.HideCursor()
-			defer stdout.ShowCursor()
+			term.Stdout.HideCursor()
+			defer term.Stdout.ShowCursor()
 		}
 
 		if !DoVerbose {
-			Info(" * Press V to toggle verbose mode")
+			term.Info(" * Press V to toggle verbose mode")
 			oldState, err := term.MakeUnbuf(int(os.Stdin.Fd()))
 			if err != nil {
 				return err
@@ -136,7 +137,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					}
 					switch b[0] {
 					case 10, 13: // Enter or Return
-						Println(Nop, " ") // empty line, but overwrite the spinner
+						term.Println(term.Nop, " ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
@@ -144,7 +145,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						if verbose {
 							modeStr = "on"
 						}
-						Info(" * Verbose mode", modeStr)
+						term.Info(" * Verbose mode", modeStr)
 						go client.Track("Verbose Toggled", P{"verbose", verbose})
 					}
 				}
@@ -163,18 +164,18 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			code := connect.CodeOf(tailClient.Err())
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
-				Debug(" - Disconnected:", tailClient.Err())
+				term.Debug(" - Disconnected:", tailClient.Err())
 				if !raw {
-					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
 				tailClient, err = client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
-					Debug(" - Reconnect failed:", err)
+					term.Debug(" - Reconnect failed:", err)
 					return err
 				}
 				if !raw {
-					Fprintln(stderr, WarnColor, " ! Reconnected!   ")
+					term.Fprintln(term.Stderr, term.WarnColor, " ! Reconnected!   ")
 				}
 				skipDuplicate = true
 				continue
@@ -208,11 +209,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 
 			if raw {
-				out := stdout
+				out := term.Stdout
 				if e.Stderr {
-					out = stderr
+					out = term.Stderr
 				}
-				Fprintln(out, Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
+				term.Fprintln(out, term.Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
 			}
 
@@ -230,31 +231,31 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = Print(tsColor, tsString, " ")
+					prefixLen, _ = term.Print(tsColor, tsString, " ")
 					if etag == "" {
-						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
+						l, _ := term.Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
 					}
 					if service == "" {
-						l, _ := Print(termenv.ANSIGreen, msg.Service, " ")
+						l, _ := term.Print(termenv.ANSIGreen, msg.Service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := Print(termenv.ANSIMagenta, msg.Host, " ")
+						l, _ := term.Print(termenv.ANSIMagenta, msg.Host, " ")
 						prefixLen += l
 					}
 				} else {
-					Print(Nop, strings.Repeat(" ", prefixLen))
+					term.Print(term.Nop, strings.Repeat(" ", prefixLen))
 				}
-				if doColor(stdout) {
+				if term.CanColor {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
-					stdout.Reset()
+					term.Stdout.Reset()
 				} else {
 					line = pkg.StripAnsi(line)
 				}
-				Println(Nop, line)
+				term.Println(term.Nop, line)
 			}
 		}
 	}

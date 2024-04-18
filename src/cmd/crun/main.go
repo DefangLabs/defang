@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/defang-io/defang/src/pkg/cmd"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
 
@@ -65,7 +66,7 @@ func main() {
 
 	requireTaskID := func() string {
 		if pflag.NArg() != 2 {
-			cmd.Fatal(command + " requires a single task ID argument")
+			term.Fatal(command + " requires a single task ID argument")
 		}
 		return pflag.Arg(1)
 	}
@@ -78,14 +79,14 @@ func main() {
 		usage()
 	case "run", "r":
 		if runFlags.NArg() < 1 {
-			cmd.Fatal("run requires an image name (and optional arguments)")
+			term.Fatal("run requires an image name (and optional arguments)")
 		}
 
 		envMap := make(map[string]string)
 		// Apply env vars from files first, so they can be overridden by the command line
 		for _, envFile := range *envFiles {
 			if _, err := cmd.ParseEnvFile(envFile, envMap); err != nil {
-				cmd.Fatal(err)
+				term.Fatal(err)
 			}
 		}
 		// Apply env vars from the command line last, so they take precedence
@@ -114,15 +115,15 @@ func main() {
 		err = cmd.Logs(ctx, region, &taskID)
 	case "destroy", "teardown", "d":
 		if pflag.NArg() != 1 {
-			cmd.Fatal("destroy does not take any arguments")
+			term.Fatal("destroy does not take any arguments")
 		}
 		err = cmd.Destroy(ctx, region)
 	case "info", "i":
 		taskID := requireTaskID()
-		err = cmd.Info(ctx, region, &taskID)
+		err = cmd.PrintInfo(ctx, region, &taskID)
 	}
 
 	if err != nil {
-		cmd.Fatal(err)
+		term.Fatal(err)
 	}
 }
