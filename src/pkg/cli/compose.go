@@ -107,15 +107,62 @@ func warnf(format string, args ...interface{}) {
 	HadWarnings = true
 }
 
-func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
-	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
+func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
+	// The Compose file is compose.yaml (preferred) or compose.yml that is placed in the current directory or higher.
 	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	if files, _ := filepath.Glob(filePath); len(files) > 1 {
-		return nil, fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-	} else if len(files) == 1 {
-		filePath = files[0]
+	// Users can override the file by specifying file name
+	const DEFAULT_COMPOSE_FILE_PATTERN = "*compose.y*ml"
+
+	path, err := os.Getwd()
+	if err != nil {
+		return path, err
 	}
-	// TODO: Docker compose searches parent folders for compose files #117
+
+	searchPattern := DEFAULT_COMPOSE_FILE_PATTERN
+	if len(userSpecifiedComposeFile) > 0 {
+		path = ""
+		searchPattern = userSpecifiedComposeFile
+	}
+
+	// iterate through this loop at least once to find the compose file.
+	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
+	// then walk the tree up to the root directory looking for a compose file.
+	Debug(" - Looking for compose file - searching for", searchPattern)
+	for {
+		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
+			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+			break
+		} else if len(files) == 1 {
+			// found compose file, we're done
+			path = files[0]
+			break
+		}
+
+		if len(userSpecifiedComposeFile) > 0 {
+			err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
+			break
+		}
+
+		// compose file not found, try parent directory
+		nextPath := filepath.Dir(path)
+		if nextPath == path {
+			// previous search was of root, we're done
+			err = fmt.Errorf("no Compose file found")
+			break
+		}
+
+		path = nextPath
+	}
+
+	return path, err
+}
+
+func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
+	filePath, err := getComposeFilePath(filePath)
+	if err != nil {
+		return nil, err
+	}
+
 	Debug(" - Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
