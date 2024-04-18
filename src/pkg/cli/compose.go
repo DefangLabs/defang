@@ -22,7 +22,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/types"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
@@ -80,17 +80,17 @@ func resolveEnv(k string) *string {
 	return &v
 }
 
-func convertPlatform(platform string) v1.Platform {
+func convertPlatform(platform string) defangv1.Platform {
 	switch platform {
 	default:
 		warnf("Unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
-		return v1.Platform_LINUX_ANY
+		return defangv1.Platform_LINUX_ANY
 	case "linux/amd64":
-		return v1.Platform_LINUX_AMD64
+		return defangv1.Platform_LINUX_AMD64
 	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
-		return v1.Platform_LINUX_ARM64
+		return defangv1.Platform_LINUX_ARM64
 	}
 }
 
@@ -276,8 +276,8 @@ func validatePorts(ports []compose.ServicePortConfig) error {
 	return nil
 }
 
-func convertPort(port compose.ServicePortConfig) *v1.Port {
-	pbPort := &v1.Port{
+func convertPort(port compose.ServicePortConfig) *defangv1.Port {
+	pbPort := &defangv1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
 		// Published string `yaml:",omitempty" json:"published,omitempty"`
@@ -287,17 +287,17 @@ func convertPort(port compose.ServicePortConfig) *v1.Port {
 
 	switch port.Protocol {
 	case "":
-		pbPort.Protocol = v1.Protocol_ANY // defaults to HTTP in CD
+		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
 	case "tcp":
-		pbPort.Protocol = v1.Protocol_TCP
+		pbPort.Protocol = defangv1.Protocol_TCP
 	case "udp":
-		pbPort.Protocol = v1.Protocol_UDP
+		pbPort.Protocol = defangv1.Protocol_UDP
 	case "http": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_HTTP
+		pbPort.Protocol = defangv1.Protocol_HTTP
 	case "http2": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_HTTP2
+		pbPort.Protocol = defangv1.Protocol_HTTP2
 	case "grpc": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_GRPC
+		pbPort.Protocol = defangv1.Protocol_GRPC
 	default:
 		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
 	}
@@ -312,25 +312,25 @@ func convertPort(port compose.ServicePortConfig) *v1.Port {
 			if port.Published != "" {
 				warnf("Published ports are ignored in ingress mode")
 			}
-			pbPort.Mode = v1.Mode_INGRESS
-			if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
+			pbPort.Mode = defangv1.Mode_INGRESS
+			if pbPort.Protocol == defangv1.Protocol_TCP || pbPort.Protocol == defangv1.Protocol_UDP {
 				warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
-				pbPort.Protocol = v1.Protocol_HTTP
+				pbPort.Protocol = defangv1.Protocol_HTTP
 			}
 			break
 		}
 		warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
 		fallthrough
 	case "host":
-		pbPort.Mode = v1.Mode_HOST
+		pbPort.Mode = defangv1.Mode_HOST
 	default:
 		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
 	}
 	return pbPort
 }
 
-func convertPorts(ports []compose.ServicePortConfig) []*v1.Port {
-	var pbports []*v1.Port
+func convertPorts(ports []compose.ServicePortConfig) []*defangv1.Port {
+	var pbports []*defangv1.Port
 	for _, port := range ports {
 		pbPort := convertPort(port)
 		pbports = append(pbports, pbPort)
@@ -340,7 +340,7 @@ func convertPorts(ports []compose.ServicePortConfig) []*v1.Port {
 
 func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
-	ureq := &v1.UploadURLRequest{Digest: digest}
+	ureq := &defangv1.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err

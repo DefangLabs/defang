@@ -15,7 +15,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -151,7 +151,7 @@ func TestConvertPort(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    types.ServicePortConfig
-		expected *v1.Port
+		expected *defangv1.Port
 		wantErr  string
 	}{
 		{
@@ -162,47 +162,47 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Undefined mode and protocol, target only",
 			input:    types.ServicePortConfig{Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
 			name:     "Undefined mode and protocol, published equals target",
 			input:    types.ServicePortConfig{Target: 1234, Published: "1234"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
 			name:     "Undefined mode, udp protocol, target only",
 			input:    types.ServicePortConfig{Target: 1234, Protocol: "udp"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP}, // backwards compatibility
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
 		},
 		{
 			name:     "Undefined mode and published range xfail",
 			input:    types.ServicePortConfig{Target: 1234, Published: "1511-2222"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
 			name:     "Undefined mode and target in published range xfail",
 			input:    types.ServicePortConfig{Target: 1234, Published: "1111-2222"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
 			name:     "Undefined mode and published not equals target; common for local development",
 			input:    types.ServicePortConfig{Target: 1234, Published: "12345"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
 			name:     "Host mode and undefined protocol, target only",
 			input:    types.ServicePortConfig{Mode: "host", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
 			name:     "Host mode and udp protocol, target only",
 			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Protocol: "udp"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP},
 		},
 		{
 			name:     "Host mode and protocol, published equals target",
 			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1234"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
 			name:    "Host mode and protocol, published range xfail",
@@ -217,27 +217,27 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Host mode and protocol, target in published range",
 			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1111-2222"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
 			name:     "(Implied) ingress mode, defined protocol, only target", // - 1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
 			name:     "(Implied) ingress mode, udp protocol, only target", // - 1234/udp
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP}, // backwards compatibility
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
 		},
 		{
 			name:     "(Implied) ingress mode, defined protocol, published equals target", // - 1234:1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Published: "1234", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
 			name:     "(Implied) ingress mode, udp protocol, published equals target", // - 1234:1234/udp
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Published: "1234", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP}, // backwards compatibility
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
 		},
 		{
 			name:    "Localhost IP, unsupported mode and protocol xfail",
@@ -247,17 +247,17 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:     "Ingress mode without host IP, single target, published range xfail", // - 1511-2223:1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1511-2223"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
 			name:     "Ingress mode without host IP, single target, target in published range", // - 1111-2223:1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1111-2223"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
 			name:     "Ingress mode without host IP, published not equals target; common for local development", // - 12345:1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "12345"},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 	}
 	for _, tt := range tests {
@@ -379,8 +379,8 @@ type MockClient struct {
 	client.Client
 }
 
-func (m MockClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
-	return &v1.DeployResponse{}, nil
+func (m MockClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return &defangv1.DeployResponse{}, nil
 }
 
 func TestProjectValidationServiceName(t *testing.T) {

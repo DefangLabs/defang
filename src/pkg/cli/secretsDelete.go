@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 func SecretsDelete(ctx context.Context, client client.Client, names ...string) error {
@@ -14,5 +14,5 @@ func SecretsDelete(ctx context.Context, client client.Client, names ...string) e
 		return ErrDryRun
 	}
 
-	return client.DeleteSecrets(ctx, &v1.Secrets{Names: names})
+	return client.DeleteSecrets(ctx, &defangv1.Secrets{Names: names})
 }
