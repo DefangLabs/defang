@@ -491,6 +491,9 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
@@ -523,31 +526,27 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	// if es, err := awsecs.Query(ctx, b.Driver.LogGroupARN, req.Since.AsTime(), time.Now()); err == nil {
-	// 	for _, e := range es {
-	// 		println(*e.Message)
-	// 	}
-	// }
+
 	var errCh <-chan error
 	if errch, ok := eventStream.(hasErrCh); ok {
 		errCh = errch.Errs()
 	}
 
-	taskch := make(chan error) // TODO: close?
-	var cancel func()
 	if taskArn != nil {
-		ctx, cancel = context.WithCancel(ctx)
 		go func() {
-			taskch <- ecs.WaitForTask(ctx, taskArn, 3*time.Second)
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+				cancel(err)
+			}
 		}()
 	}
 	return &byocServerStream{
-		cancelTaskCh: cancel,
-		errCh:        errCh,
-		etag:         etag,
-		service:      req.Service,
-		stream:       eventStream,
-		taskCh:       taskch,
+		cancel:  cancel,
+		ctx:     ctx,
+		errCh:   errCh,
+		etag:    etag,
+		service: req.Service,
+		stream:  eventStream,
 	}, nil
 }
 
