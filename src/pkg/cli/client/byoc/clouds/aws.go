@@ -29,6 +29,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/quota"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
@@ -348,6 +349,13 @@ func (b *ByocAws) environment() map[string]string {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
+	if term.DoDebug {
+		debugEnv := " -"
+		for k, v := range env {
+			debugEnv += " " + k + "=" + v
+		}
+		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+	}
 	return b.driver.Run(ctx, env, cmd...)
 }
 
