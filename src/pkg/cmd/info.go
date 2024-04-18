@@ -7,7 +7,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func Info(ctx context.Context, region Region, id types.TaskID) error {
+func PrintInfo(ctx context.Context, region Region, id types.TaskID) error {
 	driver, err := createDriver(region)
 	if err != nil {
 		return err

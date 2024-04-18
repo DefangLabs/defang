@@ -15,6 +15,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/sirupsen/logrus"
 )
@@ -46,7 +47,7 @@ func TestNormalizeServiceName(t *testing.T) {
 
 func TestLoadCompose(t *testing.T) {
 	DoVerbose = true
-	DoDebug = true
+	term.DoDebug = true
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
 		p, err := LoadComposeWithProjectName("../../tests/noprojname/compose.yaml", "tenant-id")

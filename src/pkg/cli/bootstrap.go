@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
-	Debug(" - Running CD command", command)
+	term.Debug(" - Running CD command", command)
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -21,7 +22,7 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 }
 
 func BootstrapList(ctx context.Context, client client.Client) error {
-	Debug(" - Running CD list")
+	term.Debug(" - Running CD list")
 	if DoDryRun {
 		return ErrDryRun
 	}
