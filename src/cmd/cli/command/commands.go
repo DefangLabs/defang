@@ -26,6 +26,9 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+const DEFANG_PORTAL_HOST = "portal.defang.dev"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
@@ -618,6 +621,16 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
+func printPlaygroundPortalServiceURLs(provider *cliClient.Provider, serviceInfos []*v1.ServiceInfo) {
+	// We can only show services deployed to the defang SaaS environment.
+	if *provider == cliClient.ProviderDefang {
+		cli.Info(" * Monitor your services' status in the defang portal")
+		for _, serviceInfo := range serviceInfos {
+			cli.Println(cli.Nop, "   - ", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+		}
+	}
+}
+
 func printEndpoints(serviceInfos []*v1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
@@ -652,6 +665,8 @@ var composeUpCmd = &cobra.Command{
 			return err
 		}
 
+		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
+		printPlaygroundPortalServiceURLs(provider, deploy.Services)
 		printEndpoints(deploy.Services)
 
 		if detach {
@@ -688,6 +703,8 @@ var composeStartCmd = &cobra.Command{
 			return err
 		}
 
+		provider := cmd.Flag("provider").Value.(*cliClient.Provider)
+		printPlaygroundPortalServiceURLs(provider, deploy.Services)
 		printEndpoints(deploy.Services)
 
 		command := "tail"
