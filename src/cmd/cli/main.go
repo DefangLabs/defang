@@ -6,7 +6,7 @@ import (
 	"os/signal"
 
 	"github.com/defang-io/defang/src/cmd/cli/command"
-	"github.com/defang-io/defang/src/pkg/cli"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 	go func() {
 		<-sigs
 		signal.Stop(sigs)
-		cli.Debug("Received interrupt signal; cancelling...")
+		term.Debug("Received interrupt signal; cancelling...")
 		command.Track("User Interrupted")
 		command.FlushAllTracking()
 		cancel()

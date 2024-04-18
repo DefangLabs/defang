@@ -21,6 +21,7 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/moby/patternmatcher"
@@ -104,7 +105,7 @@ func LoadComposeWithProjectName(filePath string, projectName string) (*compose.P
 
 func warnf(format string, args ...interface{}) {
 	logrus.Warnf(format, args...)
-	HadWarnings = true
+	term.HadWarnings = true
 }
 
 func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
@@ -127,7 +128,7 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	// iterate through this loop at least once to find the compose file.
 	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
 	// then walk the tree up to the root directory looking for a compose file.
-	Debug(" - Looking for compose file - searching for", searchPattern)
+	term.Debug(" - Looking for compose file - searching for", searchPattern)
 	for {
 		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
 			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
@@ -163,10 +164,10 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		return nil, err
 	}
 
-	Debug(" - Loading compose file", filePath)
+	term.Debug(" - Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
-	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
+	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.CanColorErr, DisableLevelTruncation: true})
 
 	loadCfg := compose.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
@@ -187,7 +188,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
 	}
@@ -200,7 +201,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		return "", fmt.Errorf("invalid build context: %w", err)
 	}
 
-	Info(" * Compressing build context for", name, "at", root)
+	term.Info(" * Compressing build context for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
@@ -211,14 +212,14 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
-		Debug(" - Digest:", digest)
+		term.Debug(" - Digest:", digest)
 	}
 
 	if DoDryRun {
 		return root, nil
 	}
 
-	Info(" * Uploading build context for", name)
+	term.Info(" * Uploading build context for", name)
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
@@ -379,7 +380,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	Debug(" - Reading .dockerignore file from", ignorefile)
+	term.Debug(" - Reading .dockerignore file from", ignorefile)
 	return reader
 }
 
@@ -398,7 +399,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		dockerignore = ".dockerignore"
 		reader = tryReadIgnoreFile(root, dockerignore)
 		if reader == nil {
-			Debug(" - No .dockerignore file found; using defaults")
+			term.Debug(" - No .dockerignore file found; using defaults")
 			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
 		}
 	}
@@ -448,7 +449,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 				return err
 			}
 			if ignore {
-				Debug(" - Ignoring", relPath)
+				term.Debug(" - Ignoring", relPath)
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -456,7 +457,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			}
 		}
 
-		Debug(" - Adding", baseName)
+		term.Debug(" - Adding", baseName)
 
 		info, err := de.Info()
 		if err != nil {
@@ -490,7 +491,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == 11 {
-			Warn(" ! The build context contains more than 10 files; press Ctrl+C if this is unexpected.")
+			term.Warn(" ! The build context contains more than 10 files; press Ctrl+C if this is unexpected.")
 		}
 
 		_, err = io.Copy(tarWriter, file)

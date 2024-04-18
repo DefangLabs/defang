@@ -8,6 +8,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
 	"github.com/defang-io/defang/src/pkg/scope"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
@@ -27,7 +28,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant ty
 		return err
 	}
 
-	Print(BrightCyan, "Scoped access token: ")
+	term.Print(term.BrightCyan, "Scoped access token: ")
 	fmt.Println(at)
 	return nil
 }
@@ -42,7 +43,7 @@ func exchangeCodeForToken(ctx context.Context, client client.Client, code string
 		scopes = append(scopes, s.String())
 	}
 
-	Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
+	term.Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
 
 	token, err := client.Token(ctx, &defangv1.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())})
 	if err != nil {
