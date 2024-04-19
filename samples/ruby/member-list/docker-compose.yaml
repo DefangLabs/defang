@@ -1,0 +1,16 @@
+version: '3.9'
+name: teamlist
+services:
+  teamlist:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SECRET_KEY_BASE: example # set your own key here.
+    ports:
+      - mode: ingress
+        target: 3000
+    deploy:
+      resources:
+        reservations:
+          memory: 1GB
