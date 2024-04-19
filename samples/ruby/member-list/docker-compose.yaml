@@ -1,7 +1,7 @@
 version: '3.9'
 name: teamlist
 services:
-  teamlist:
+  memberlist:
     build:
       context: .
       dockerfile: Dockerfile
