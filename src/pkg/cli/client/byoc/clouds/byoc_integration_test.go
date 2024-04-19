@@ -17,7 +17,7 @@ func TestDeploy(t *testing.T) {
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
 
-		_, err := b.Deploy(context.TODO(), &defangv1.DeployRequest{
+		_, err := b.Deploy(context.Background(), &defangv1.DeployRequest{
 			Services: []*defangv1.Service{{
 				Name:  "test",
 				Image: "docker.io/library/nginx:latest",
@@ -40,7 +40,7 @@ func TestTail(t *testing.T) {
 	b := NewByocAWS("TestTail", "", nil)
 	b.customDomain = "example.com" // avoid rpc call
 
-	ss, err := b.Tail(context.TODO(), &defangv1.TailRequest{})
+	ss, err := b.Tail(context.Background(), &defangv1.TailRequest{})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
 		if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -66,7 +66,7 @@ func TestTail(t *testing.T) {
 func TestGetServices(t *testing.T) {
 	b := NewByocAWS("TestGetServices", "", nil)
 
-	services, err := b.GetServices(context.TODO())
+	services, err := b.GetServices(context.Background())
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			t.Skip("skipping test; not authorized")
@@ -89,7 +89,7 @@ func TestPutSecret(t *testing.T) {
 	b := NewByocAWS("TestPutSecret", "", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.DeleteSecrets(context.TODO(), &defangv1.Secrets{Names: []string{secretName}})
+		err := b.DeleteSecrets(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -102,19 +102,19 @@ func TestPutSecret(t *testing.T) {
 	})
 
 	t.Run("invalid name", func(t *testing.T) {
-		err := b.PutSecret(context.TODO(), &defangv1.SecretValue{})
+		err := b.PutSecret(context.Background(), &defangv1.SecretValue{})
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("expected invalid argument, got %v", err)
 		}
 	})
 
 	t.Run("put", func(t *testing.T) {
-		err := b.PutSecret(context.TODO(), &defangv1.SecretValue{Name: secretName, Value: "world"})
+		err := b.PutSecret(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Check that the secret is in the list
-		secrets, err := b.driver.ListSecretsByPrefix(context.TODO(), b.tenantID+".")
+		secrets, err := b.driver.ListSecretsByPrefix(context.Background(), b.tenantID+".")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -136,7 +136,7 @@ func TestListSecrets(t *testing.T) {
 	b := NewByocAWS("TestListSecrets", "", nil)
 
 	t.Run("list", func(t *testing.T) {
-		secrets, err := b.ListSecrets(context.TODO())
+		secrets, err := b.ListSecrets(context.Background())
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
