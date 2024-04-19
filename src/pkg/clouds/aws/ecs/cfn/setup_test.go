@@ -26,7 +26,7 @@ func TestCloudFormation(t *testing.T) {
 		t.Fatal("aws is nil")
 	}
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	t.Run("SetUp", func(t *testing.T) {
 		containers := []types.Container{{

@@ -24,7 +24,7 @@ func TestComposeStart(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err = ComposeStart(context.TODO(), client.MockClient{UploadUrl: server.URL + "/"}, project, false)
+	_, err = ComposeStart(context.Background(), client.MockClient{UploadUrl: server.URL + "/"}, project, false)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeStart() failed: %v", err)
 	}

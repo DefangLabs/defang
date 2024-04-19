@@ -18,7 +18,7 @@ func TestGetCurrentVersion(t *testing.T) {
 }
 
 func TestGetLatestVersion(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	v, err := GetLatestVersion(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestVersion() error = %v; want nil", err)
