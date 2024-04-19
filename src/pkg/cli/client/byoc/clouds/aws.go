@@ -527,11 +527,6 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		return nil, annotateAwsError(err)
 	}
 
-	var errCh <-chan error
-	if errch, ok := eventStream.(hasErrCh); ok {
-		errCh = errch.Errs()
-	}
-
 	if taskArn != nil {
 		go func() {
 			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
@@ -540,14 +535,8 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 			}
 		}()
 	}
-	return &byocServerStream{
-		cancel:  cancel,
-		ctx:     ctx,
-		errCh:   errCh,
-		etag:    etag,
-		service: req.Service,
-		stream:  eventStream,
-	}, nil
+
+	return newByocServerStream(ctx, eventStream, etag, req.Service), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
