@@ -4,27 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"strconv"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 // ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*v1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
 	if err := validateProject(project); err != nil {
 		return nil, &ComposeError{err}
 	}
 	//
 	// Publish updates
 	//
-	var services []*v1.Service
+	var services []*defangv1.Service
 	for _, svccfg := range project.Services {
-		var healthcheck *v1.HealthCheck
+		var healthcheck *defangv1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
-			healthcheck = &v1.HealthCheck{
+			healthcheck = &defangv1.HealthCheck{
 				Test: svccfg.HealthCheck.Test,
 			}
 			if nil != svccfg.HealthCheck.Interval {
@@ -38,9 +39,9 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			}
 		}
 
-		var deploy *v1.Deploy
+		var deploy *defangv1.Deploy
 		if svccfg.Deploy != nil {
-			deploy = &v1.Deploy{}
+			deploy = &defangv1.Deploy{}
 			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
@@ -56,16 +57,16 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 						panic(err) // was already validated above
 					}
 				}
-				var devices []*v1.Device
+				var devices []*defangv1.Device
 				for _, d := range reservations.Devices {
-					devices = append(devices, &v1.Device{
+					devices = append(devices, &defangv1.Device{
 						Capabilities: d.Capabilities,
 						Count:        uint32(d.Count),
 						Driver:       d.Driver,
 					})
 				}
-				deploy.Resources = &v1.Resources{
-					Reservations: &v1.Resource{
+				deploy.Resources = &defangv1.Resources{
+					Reservations: &defangv1.Resource{
 						Cpus:    float32(cpus),
 						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
@@ -75,7 +76,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		}
 
 		// Upload the build context, if any; TODO: parallelize
-		var build *v1.Build
+		var build *defangv1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
 			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
@@ -83,7 +84,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 				return nil, err
 			}
 
-			build = &v1.Build{
+			build = &defangv1.Build{
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
@@ -115,9 +116,9 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		}
 
 		// Extract secret references
-		var secrets []*v1.Secret
+		var secrets []*defangv1.Secret
 		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &v1.Secret{
+			secrets = append(secrets, &defangv1.Secret{
 				Source: secret.Source,
 			})
 		}
@@ -144,7 +145,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		}
 
 		ports := convertPorts(svccfg.Ports)
-		services = append(services, &v1.Service{
+		services = append(services, &defangv1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
@@ -175,22 +176,22 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	}
 
 	for _, service := range services {
-		Info(" * Deploying service", service.Name)
+		term.Info(" * Deploying service", service.Name)
 	}
 
-	resp, err := c.Deploy(ctx, &v1.DeployRequest{
+	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
 		Services: services,
 	})
-	var warnings clouds.Warnings
+	var warnings pkg.Warnings
 	if errors.As(err, &warnings) {
 		if len(warnings) > 0 {
-			Warn(" !", warnings)
+			term.Warn(" !", warnings)
 		}
 	} else if err != nil {
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}

@@ -46,7 +46,11 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 	return repo
 }
 
-func createTemplate(stack string, containers []types.Container, spot bool) *cloudformation.Template {
+type TemplateOverrides struct {
+	VpcID string
+}
+
+func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides, spot bool) *cloudformation.Template {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
@@ -413,7 +417,7 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 	}
 
 	var vpcId *string
-	if createVpcResources {
+	if overrides.VpcID == "" && createVpcResources {
 		// 8a. a VPC
 		const _vpc = "VPC"
 		template.Resources[_vpc] = &ec2.VPC{
@@ -474,11 +478,15 @@ func createTemplate(stack string, containers []types.Container, spot bool) *clou
 		}
 	}
 
+	if overrides.VpcID != "" {
+		vpcId = ptr.String(overrides.VpcID)
+	}
+
 	const _securityGroup = "SecurityGroup"
 	template.Resources[_securityGroup] = &ec2.SecurityGroup{
 		Tags:             defaultTags, // Name tag is ignored
 		GroupDescription: "Security group for the ECS task that allows all outbound and inbound traffic",
-		VpcId:            vpcId, // FIXME: should be the VpcId of the given subnet
+		VpcId:            vpcId,
 		SecurityGroupIngress: []ec2.SecurityGroup_Ingress{
 			{
 				IpProtocol: "tcp",

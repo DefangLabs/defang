@@ -1,0 +1,49 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <%= link_to 'Our Team', root_path, class:"navbar-brand" %>
+
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+
+      <li class="nav-item mr-2">
+        <%= link_to 'About Us', home_about_path, class:"nav-link" %>
+      </li>
+
+    <% if user_signed_in? %>
+
+        <li class="nav-item mr-2">
+        <%= link_to 'Add Member', new_member_path, class:"nav-link" %>
+        </li>
+
+     <li class="nav-item mr-2">
+        <%= link_to 'Edit Profile', edit_user_registration_path, class:"nav-link" %>
+     </li>
+
+        <li class="nav-item mr-2">
+         <%= link_to 'Sign-out', destroy_user_session_path, data: {turbo_method: :delete}, class:"nav-link" %>
+        </li>
+
+    <% else %>
+        <li class="nav-item mr-2">
+            <%= link_to 'Sign-up', new_user_registration_path, class:"nav-link" %>
+        </li>
+
+        <li class="nav-item mr-2">
+            <%= link_to 'Sign-in', new_user_session_path, class:"nav-link" %>
+        </li>
+
+    <% end %>
+
+
+
+
+    </ul>
+    <form class="form-inline my-2 my-lg-0">
+      <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+      <button class="btn my-2 my-sm-0" type="submit">Search</button>
+    </form>
+  </div>
+</nav>

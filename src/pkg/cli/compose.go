@@ -21,8 +21,9 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/sirupsen/logrus"
@@ -80,17 +81,17 @@ func resolveEnv(k string) *string {
 	return &v
 }
 
-func convertPlatform(platform string) v1.Platform {
+func convertPlatform(platform string) defangv1.Platform {
 	switch platform {
 	default:
 		warnf("Unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
-		return v1.Platform_LINUX_ANY
+		return defangv1.Platform_LINUX_ANY
 	case "linux/amd64":
-		return v1.Platform_LINUX_AMD64
+		return defangv1.Platform_LINUX_AMD64
 	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
-		return v1.Platform_LINUX_ARM64
+		return defangv1.Platform_LINUX_ARM64
 	}
 }
 
@@ -104,22 +105,69 @@ func LoadComposeWithProjectName(filePath string, projectName string) (*compose.P
 
 func warnf(format string, args ...interface{}) {
 	logrus.Warnf(format, args...)
-	HadWarnings = true
+	term.HadWarnings = true
+}
+
+func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
+	// The Compose file is compose.yaml (preferred) or compose.yml that is placed in the current directory or higher.
+	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
+	// Users can override the file by specifying file name
+	const DEFAULT_COMPOSE_FILE_PATTERN = "*compose.y*ml"
+
+	path, err := os.Getwd()
+	if err != nil {
+		return path, err
+	}
+
+	searchPattern := DEFAULT_COMPOSE_FILE_PATTERN
+	if len(userSpecifiedComposeFile) > 0 {
+		path = ""
+		searchPattern = userSpecifiedComposeFile
+	}
+
+	// iterate through this loop at least once to find the compose file.
+	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
+	// then walk the tree up to the root directory looking for a compose file.
+	term.Debug(" - Looking for compose file - searching for", searchPattern)
+	for {
+		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
+			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
+			break
+		} else if len(files) == 1 {
+			// found compose file, we're done
+			path = files[0]
+			break
+		}
+
+		if len(userSpecifiedComposeFile) > 0 {
+			err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
+			break
+		}
+
+		// compose file not found, try parent directory
+		nextPath := filepath.Dir(path)
+		if nextPath == path {
+			// previous search was of root, we're done
+			err = fmt.Errorf("no Compose file found")
+			break
+		}
+
+		path = nextPath
+	}
+
+	return path, err
 }
 
 func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {
-	// The default path for a Compose file is compose.yaml (preferred) or compose.yml that is placed in the working directory.
-	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	if files, _ := filepath.Glob(filePath); len(files) > 1 {
-		return nil, fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-	} else if len(files) == 1 {
-		filePath = files[0]
+	filePath, err := getComposeFilePath(filePath)
+	if err != nil {
+		return nil, err
 	}
-	// TODO: Docker compose searches parent folders for compose files #117
-	Debug(" - Loading compose file", filePath)
+
+	term.Debug(" - Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
-	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !doColor(stderr), DisableLevelTruncation: true})
+	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.CanColorErr, DisableLevelTruncation: true})
 
 	loadCfg := compose.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
@@ -140,7 +188,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
 	}
@@ -153,7 +201,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		return "", fmt.Errorf("invalid build context: %w", err)
 	}
 
-	Info(" * Compressing build context for", name, "at", root)
+	term.Info(" * Compressing build context for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
@@ -164,14 +212,14 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
-		Debug(" - Digest:", digest)
+		term.Debug(" - Digest:", digest)
 	}
 
 	if DoDryRun {
 		return root, nil
 	}
 
-	Info(" * Uploading build context for", name)
+	term.Info(" * Uploading build context for", name)
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
@@ -229,8 +277,8 @@ func validatePorts(ports []compose.ServicePortConfig) error {
 	return nil
 }
 
-func convertPort(port compose.ServicePortConfig) *v1.Port {
-	pbPort := &v1.Port{
+func convertPort(port compose.ServicePortConfig) *defangv1.Port {
+	pbPort := &defangv1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
 		// Published string `yaml:",omitempty" json:"published,omitempty"`
@@ -240,17 +288,17 @@ func convertPort(port compose.ServicePortConfig) *v1.Port {
 
 	switch port.Protocol {
 	case "":
-		pbPort.Protocol = v1.Protocol_ANY // defaults to HTTP in CD
+		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
 	case "tcp":
-		pbPort.Protocol = v1.Protocol_TCP
+		pbPort.Protocol = defangv1.Protocol_TCP
 	case "udp":
-		pbPort.Protocol = v1.Protocol_UDP
+		pbPort.Protocol = defangv1.Protocol_UDP
 	case "http": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_HTTP
+		pbPort.Protocol = defangv1.Protocol_HTTP
 	case "http2": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_HTTP2
+		pbPort.Protocol = defangv1.Protocol_HTTP2
 	case "grpc": // TODO: not per spec
-		pbPort.Protocol = v1.Protocol_GRPC
+		pbPort.Protocol = defangv1.Protocol_GRPC
 	default:
 		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
 	}
@@ -265,25 +313,25 @@ func convertPort(port compose.ServicePortConfig) *v1.Port {
 			if port.Published != "" {
 				warnf("Published ports are ignored in ingress mode")
 			}
-			pbPort.Mode = v1.Mode_INGRESS
-			if pbPort.Protocol == v1.Protocol_TCP || pbPort.Protocol == v1.Protocol_UDP {
+			pbPort.Mode = defangv1.Mode_INGRESS
+			if pbPort.Protocol == defangv1.Protocol_TCP || pbPort.Protocol == defangv1.Protocol_UDP {
 				warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
-				pbPort.Protocol = v1.Protocol_HTTP
+				pbPort.Protocol = defangv1.Protocol_HTTP
 			}
 			break
 		}
 		warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
 		fallthrough
 	case "host":
-		pbPort.Mode = v1.Mode_HOST
+		pbPort.Mode = defangv1.Mode_HOST
 	default:
 		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
 	}
 	return pbPort
 }
 
-func convertPorts(ports []compose.ServicePortConfig) []*v1.Port {
-	var pbports []*v1.Port
+func convertPorts(ports []compose.ServicePortConfig) []*defangv1.Port {
+	var pbports []*defangv1.Port
 	for _, port := range ports {
 		pbPort := convertPort(port)
 		pbports = append(pbports, pbPort)
@@ -293,7 +341,7 @@ func convertPorts(ports []compose.ServicePortConfig) []*v1.Port {
 
 func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
-	ureq := &v1.UploadURLRequest{Digest: digest}
+	ureq := &defangv1.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
@@ -332,7 +380,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	Debug(" - Reading .dockerignore file from", ignorefile)
+	term.Debug(" - Reading .dockerignore file from", ignorefile)
 	return reader
 }
 
@@ -351,7 +399,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		dockerignore = ".dockerignore"
 		reader = tryReadIgnoreFile(root, dockerignore)
 		if reader == nil {
-			Debug(" - No .dockerignore file found; using defaults")
+			term.Debug(" - No .dockerignore file found; using defaults")
 			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
 		}
 	}
@@ -401,7 +449,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 				return err
 			}
 			if ignore {
-				Debug(" - Ignoring", relPath)
+				term.Debug(" - Ignoring", relPath)
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -409,7 +457,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			}
 		}
 
-		Debug(" - Adding", baseName)
+		term.Debug(" - Adding", baseName)
 
 		info, err := de.Info()
 		if err != nil {
@@ -443,7 +491,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == 11 {
-			Warn(" ! The build context contains more than 10 files; press Ctrl+C if this is unexpected.")
+			term.Warn(" ! The build context contains more than 10 files; press Ctrl+C if this is unexpected.")
 		}
 
 		_, err = io.Copy(tarWriter, file)

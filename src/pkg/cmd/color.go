@@ -1,17 +1,6 @@
 package cmd
 
-import (
-	"os"
-
-	"golang.org/x/term"
-)
-
-var (
-	termEnv    = os.Getenv("TERM")
-	isTerminal = term.IsTerminal(int(os.Stdout.Fd())) && termEnv != ""
-	_, noColor = os.LookupEnv("NO_COLOR") // per spec, the value doesn't matter
-	CanColor   = isTerminal && !noColor && termEnv != "dumb"
-)
+import "github.com/defang-io/defang/src/pkg/term"
 
 type Color string
 
@@ -25,14 +14,14 @@ const (
 func ParseColor(color string) Color {
 	switch color {
 	case "auto":
-		if CanColor {
+		if term.CanColor {
 			return ColorAlways
 		}
 		fallthrough
 	case "always", "never", "raw":
 		return Color(color)
 	default:
-		Fatal("invalid color option: " + color)
+		term.Fatal("invalid color option: " + color)
 		panic("unreachable")
 	}
 }

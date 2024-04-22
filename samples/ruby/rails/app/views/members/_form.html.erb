@@ -1,0 +1,42 @@
+<%= form_with(model: member) do |form| %>
+  <% if member.errors.any? %>
+    <div style="color: red">
+      <h5><%= pluralize(member.errors.count, "error") %> prohibited this member from being saved:</h5>
+
+      <ul>
+        <% member.errors.each do |error| %>
+          <li class="text-danger"><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field form-group">
+    <%= form.label :first_name, style: "display: block" %>
+    <%= form.text_field :first_name, class:"form-control", placeholder:"AK" %>
+  </div>
+
+  <div class="field form-group">
+    <%= form.label :last_name, style: "display: block" %>
+    <%= form.text_field :last_name, class:"form-control", placeholder:"Kai" %>
+  </div>
+
+  <div class="field form-group">
+    <%= form.label :email, style: "display: block" %>
+    <%= form.text_field :email, class:"form-control", placeholder:"abc@gmail.com" %>
+  </div>
+
+  <div class="field form-group">
+    <%= form.label :phone, style: "display: block" %>
+    <%= form.text_field :phone, class:"form-control", placeholder:"562413" %>
+  </div>
+
+  <div class="field form-group">
+    <%= form.label :twitter, style: "display: block" %>
+    <%= form.text_field :twitter, class:"form-control", placeholder:"@AKAKKAKAK" %>
+  </div>
+
+  <div class="action">
+    <%= form.submit %>
+  </div>
+<% end %>

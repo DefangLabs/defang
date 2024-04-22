@@ -106,3 +106,30 @@ var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?
 func StripAnsi(s string) string {
 	return ansiRegex.ReplaceAllLiteralString(s, "")
 }
+
+type Warning interface {
+	Error() string
+	Warning() string
+}
+
+func (w Warnings) Error() string {
+	var buf strings.Builder
+	for _, warning := range w {
+		buf.WriteString(warning.Warning())
+		buf.WriteByte('\n')
+	}
+	return buf.String()
+}
+
+// Deprecated: replace with proper logging
+type WarningError string
+
+func (w WarningError) Error() string {
+	return string(w)
+}
+
+func (w WarningError) Warning() string {
+	return string(w)
+}
+
+type Warnings []Warning

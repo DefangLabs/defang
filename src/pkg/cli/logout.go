@@ -5,10 +5,11 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 func Logout(ctx context.Context, client client.Client) error {
-	Debug(" - Logging out")
+	term.Debug(" - Logging out")
 	err := client.RevokeToken(ctx)
 	// Ignore unauthenticated errors, since we're logging out anyway
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {
