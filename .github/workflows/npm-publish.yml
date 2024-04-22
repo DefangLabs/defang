@@ -1,0 +1,65 @@
+# This workflow will run tests using node and then publish a package to GitHub Packages when a release is created
+# For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
+
+name: Defang CLI Package
+
+on:
+  release:
+    types: [created]
+  push:
+    tags:
+      - "v*"
+
+env:
+  DEFANG_CLI_RELEASE_VERSION: ${{ github.ref_name }}
+  NODE_VERSION: "21"
+  NPM_REGISTRY_URL: "https://registry.npmjs.org"
+
+jobs:
+  publish-npm-binaries:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./packaging/npm
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+
+      - name: Install node
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.NPM_REGISTRY_URL }}
+
+      - name: Create Package files
+        uses: nowactions/envsubst@v1
+        with:
+          input: "./packaging/npm/package.json.template"
+          output: "./packaging/npm/package.json"
+        env:
+          DEFANG_CLI_VERSION: $DEFANG_CLI_RELEASE_VERSION
+
+      - name: Create Package Lock file
+        uses: nowactions/envsubst@v1
+        with:
+          input: "./packaging/npm/package-lock.json.template"
+          output: "./packaging/npm/package-lock.json"
+        env:
+          DEFANG_CLI_VERSION: $DEFANG_CLI_RELEASE_VERSION
+
+      - name: Publish to NPM
+        run: |
+          #install dependencies
+          npm install
+
+          #build
+          npm run build
+
+          # publish the package
+          # npm ci
+          # npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_AUTH_TOKEN }}
