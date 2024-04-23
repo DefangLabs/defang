@@ -19,11 +19,11 @@ install: $(BINARY_NAME)
 
 .PHONY: test
 test: $(PROTOS)
-	go test -test.short ./...
+	go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: integ
 integ: $(PROTOS)
-	go test -v -tags=integration ./...
+	go test -v -tags=integration ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: linux-amd64
 linux-amd64: test
