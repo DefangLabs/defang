@@ -34,24 +34,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: ${{ env.NPM_REGISTRY_URL }}
 
-      - name: Create Package files
-        uses: nowactions/envsubst@v1
-        with:
-          input: "./packaging/npm/package.json.template"
-          output: "./packaging/npm/package.json"
-        env:
-          DEFANG_CLI_VERSION: ${{ env.DEFANG_CLI_RELEASE_VERSION }}
-
-      - name: Create Package Lock file
-        uses: nowactions/envsubst@v1
-        with:
-          input: "./packaging/npm/package-lock.json.template"
-          output: "./packaging/npm/package-lock.json"
-        env:
-          DEFANG_CLI_VERSION: ${{ env.DEFANG_CLI_RELEASE_VERSION }}
-
       - name: Publish to NPM
         run: |
+          #update version
+          npm version ${{ env.DEFANG_CLI_RELEASE_VERSION }}
+
           # install dependencies
           npm ci --ignore-scripts
 

@@ -1,6 +1,6 @@
 {
   "name": "defang",
-  "version": "${DEFANG_CLI_VERSION}",
+  "version": "0.5.9",
   "author": "Defang Software Labs Inc.",
   "description": "CLI for the Defang Opinionated Platform",
   "license": "MIT",
