@@ -2,7 +2,7 @@
   "name": "defang",
   "version": "${DEFANG_CLI_VERSION}",
   "author": "Defang Software Labs Inc.",
-  "description": "Defang Opinionated Platform",
+  "description": "CLI for the Defang Opinionated Platform",
   "license": "MIT",
   "bin": {
     "defang": "./bin/cli.js"
