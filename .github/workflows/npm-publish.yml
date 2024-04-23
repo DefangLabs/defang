@@ -40,7 +40,7 @@ jobs:
           input: "./packaging/npm/package.json.template"
           output: "./packaging/npm/package.json"
         env:
-          DEFANG_CLI_VERSION: $DEFANG_CLI_RELEASE_VERSION
+          DEFANG_CLI_VERSION: ${{ env.DEFANG_CLI_RELEASE_VERSION }}
 
       - name: Create Package Lock file
         uses: nowactions/envsubst@v1
@@ -48,18 +48,18 @@ jobs:
           input: "./packaging/npm/package-lock.json.template"
           output: "./packaging/npm/package-lock.json"
         env:
-          DEFANG_CLI_VERSION: $DEFANG_CLI_RELEASE_VERSION
+          DEFANG_CLI_VERSION: ${{ env.DEFANG_CLI_RELEASE_VERSION }}
 
       - name: Publish to NPM
         run: |
-          #install dependencies
-          npm install
+          # install dependencies
+          npm ci --ignore-scripts
 
           #build
           npm run build
 
           # publish the package
-          # npm ci
           # npm publish --access public
+          npm publish --access public --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_AUTH_TOKEN }}
