@@ -9,9 +9,12 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/auth"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
@@ -63,7 +66,7 @@ func (g GrpcClient) GetVersion(ctx context.Context) (*defangv1.Version, error) {
 
 func (g GrpcClient) Token(ctx context.Context, req *defangv1.TokenRequest) (*defangv1.TokenResponse, error) {
 	req.AnonId = g.anonID
-	return getMsg(g.client.Token(ctx, &connect.Request[defangv1.TokenRequest]{Msg: req}))
+	return getMsg(g.client.Token(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) RevokeToken(ctx context.Context) error {
@@ -72,11 +75,11 @@ func (g GrpcClient) RevokeToken(ctx context.Context) error {
 }
 
 func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Update(ctx, &connect.Request[defangv1.Service]{Msg: req}))
+	return getMsg(g.client.Update(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
+	// return getMsg(g.client.Deploy(ctx, connect.NewRequest(req))); TODO: implement this
 	var serviceInfos []*defangv1.ServiceInfo
 	for _, service := range req.Services {
 		serviceInfo, err := g.Update(ctx, service)
@@ -94,15 +97,15 @@ func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 }
 
 func (g GrpcClient) Get(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Get(ctx, &connect.Request[defangv1.ServiceID]{Msg: req}))
+	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return getMsg(g.client.Delete(ctx, &connect.Request[defangv1.DeleteRequest]{Msg: req}))
+	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) error {
-	_, err := g.client.Publish(ctx, &connect.Request[defangv1.PublishRequest]{Msg: req})
+	_, err := g.client.Publish(ctx, connect.NewRequest(req))
 	return err
 }
 
@@ -111,16 +114,36 @@ func (g GrpcClient) GetServices(ctx context.Context) (*defangv1.ListServicesResp
 }
 
 func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error) {
-	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[defangv1.GenerateFilesRequest]{Msg: req}))
+	resp, err := g.client.StartGenerate(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	term.Info(" * Waiting for files to be generated...")
+	for {
+		res, err := g.client.GenerateStatus(ctx, connect.NewRequest(&defangv1.GenerateStatusRequest{Uuid: resp.Msg.Uuid}))
+		if err != nil {
+			if connect.CodeOf(err) == connect.CodeUnavailable {
+				retryAfter := res.Header().Get("retry-after") // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
+				seconds, err := strconv.ParseUint(retryAfter, 10, 63)
+				if err != nil || seconds < 1 {
+					seconds = 2
+				}
+				pkg.SleepWithContext(ctx, time.Duration(seconds)*time.Second)
+				continue // retry
+			}
+			return nil, err
+		}
+		return res.Msg, nil
+	}
 }
 
 func (g GrpcClient) PutSecret(ctx context.Context, req *defangv1.SecretValue) error {
-	_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: req})
+	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) error {
-	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
+	// _, err := g.client.DeleteSecrets(ctx, connect.NewRequest(req)); TODO: implement this in the server
 	var errs []error
 	for _, name := range req.Names {
 		_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: &defangv1.SecretValue{Name: name}})
@@ -134,7 +157,7 @@ func (g GrpcClient) ListSecrets(ctx context.Context) (*defangv1.Secrets, error) 
 }
 
 func (g GrpcClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	return getMsg(g.client.CreateUploadURL(ctx, &connect.Request[defangv1.UploadURLRequest]{Msg: req}))
+	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
@@ -142,7 +165,7 @@ func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error
 }
 
 func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect.Request[defangv1.DelegateSubdomainZoneRequest]{Msg: req}))
+	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
@@ -155,7 +178,7 @@ func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.Del
 }
 
 func (g *GrpcClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	return g.client.Tail(ctx, &connect.Request[defangv1.TailRequest]{Msg: req})
+	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
 func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (ETag, error) {
@@ -176,13 +199,13 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 			props[p.Name] = fmt.Sprint(p.Value)
 		}
 	}
-	_, err := g.client.Track(context.Background(), &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
+	_, err := g.client.Track(context.Background(), connect.NewRequest(&defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
 		Os:         runtime.GOOS,
 		Arch:       runtime.GOARCH,
-	}})
+	}))
 	return err
 }
 
