@@ -13,6 +13,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
@@ -78,13 +79,12 @@ func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
 	var serviceInfos []*defangv1.ServiceInfo
 	for _, service := range req.Services {
-		// Info(" * Publishing service update for", service.Name)
 		serviceInfo, err := g.Update(ctx, service)
 		if err != nil {
 			if len(serviceInfos) == 0 {
 				return nil, err // abort if the first service update fails
 			}
-			// Warn(" ! Failed to update service", service.Name, err)
+			term.Warn(" ! Failed to update service", service.Name, err)
 			continue
 		}
 
