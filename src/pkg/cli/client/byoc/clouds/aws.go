@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
@@ -14,8 +15,6 @@ import (
 
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
-	types3 "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	types2 "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -33,14 +32,13 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ByocAws struct {
 	*client.GrpcClient
 
 	cdTasks                 map[string]ecs.TaskArn
-	customDomain            string
+	customDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
 	driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string
@@ -149,13 +147,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, errors.New("maximum number of services reached")
 	}
 	serviceInfos := []*defangv1.ServiceInfo{}
-	var warnings Warnings
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
-		var warning Warning
-		if errors.As(err, &warning) && warning != nil {
-			warnings = append(warnings, warning)
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		serviceInfo.Etag = etag // same etag for all services
@@ -218,7 +212,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, warnings
+	}, nil
 }
 
 func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
@@ -391,68 +385,37 @@ func (b *ByocAws) getClusterNames() []string {
 }
 
 func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	var maxResults int32 = 100 // the maximum allowed by AWS
+	if err := b.driver.FillOutputs(ctx); err != nil {
+		return nil, err
+	}
+
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	clusters := make(map[string][]string)
-	ecsClient := ecs2.NewFromConfig(cfg)
-	for _, clusterName := range b.getClusterNames() {
-		serviceArns, err := ecsClient.ListServices(ctx, &ecs2.ListServicesInput{
-			Cluster:    &clusterName,
-			MaxResults: &maxResults, // TODO: handle pagination
-		})
-		if err != nil {
-			var notFound *types3.ClusterNotFoundException
-			if errors.As(err, &notFound) {
-				continue
-			}
-			return nil, annotateAwsError(err)
-		}
-		clusters[clusterName] = serviceArns.ServiceArns
+
+	s3Client := s3.NewFromConfig(cfg)
+	bucket := b.driver.BucketName
+	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
+
+	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &path,
+	})
+	if err != nil {
+		return nil, annotateAwsError(err)
 	}
-	// Query services for each cluster
-	serviceInfos := []*defangv1.ServiceInfo{}
-	for cluster, serviceNames := range clusters {
-		if len(serviceNames) == 0 {
-			continue
-		}
-		dso, err := ecsClient.DescribeServices(ctx, &ecs2.DescribeServicesInput{
-			Services: serviceNames,
-			Cluster:  &cluster,
-		})
-		if err != nil {
-			return nil, annotateAwsError(err)
-		}
-		for _, service := range dso.Services {
-			// Check whether this is indeed a service we want to manage
-			fqn := strings.Split(getQualifiedNameFromEcsName(*service.ServiceName), ".")
-			if len(fqn) != 2 {
-				continue
-			}
-			serviceInfo := &defangv1.ServiceInfo{
-				CreatedAt: timestamppb.New(*service.CreatedAt),
-				Project:   fqn[0],
-				Service: &defangv1.Service{
-					Name: fqn[1],
-					Deploy: &defangv1.Deploy{
-						Replicas: uint32(service.DesiredCount),
-					},
-				},
-				Status: *service.Status,
-			}
-			// TODO: get the service definition from the task definition or tags
-			for _, tag := range service.Tags {
-				if *tag.Key == "etag" {
-					serviceInfo.Etag = *tag.Value
-					break
-				}
-			}
-			serviceInfos = append(serviceInfos, serviceInfo)
-		}
+	defer getObjectOutput.Body.Close()
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
 	}
-	return &defangv1.ListServicesResponse{Services: serviceInfos}, nil
+	var serviceInfos defangv1.ListServicesResponse
+	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
+		return nil, err
+	}
+	return &serviceInfos, nil
 }
 
 func (b ByocAws) getSecretID(name string) string {
@@ -589,7 +552,6 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		si.PrivateFqdn = b.GetPrivateFqdn(fqn)
 	}
 
-	var warning Warning
 	if service.Domainname != "" {
 		if !hasIngress && service.StaticFiles == "" {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -605,7 +567,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 				si.UseAcmeCert = true
 				// TODO: We should add link to documentation on how the acme cert workflow works
 				// TODO: Should we make this the default behavior or require the user to set a flag?
-				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn))
+				term.Warnf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn)
 			} else {
 				si.ZoneId = zoneId
 			}
@@ -617,7 +579,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 	}
-	return si, warning
+	return si, nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -772,4 +734,8 @@ func annotateAwsError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
+}
+
+func (b *ByocAws) ServiceDNS(name string) string {
+	return dnsSafeLabel(name) // TODO: consider making it FQDN using the private domain
 }

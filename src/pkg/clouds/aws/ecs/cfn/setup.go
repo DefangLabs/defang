@@ -78,7 +78,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		// Go SDK doesn't have --no-fail-on-empty-changeset; ignore ValidationError: No updates are to be performed.
 		var apiError smithy.APIError
 		if ok := errors.As(err, &apiError); ok && apiError.ErrorCode() == "ValidationError" && apiError.ErrorMessage() == "No updates are to be performed." {
-			return a.fillOutputs(ctx)
+			return a.FillOutputs(ctx)
 		}
 		// TODO: handle UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
 		return err // might call createStackAndWait depending on the error
@@ -147,7 +147,7 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 	return nil
 }
 
-func (a *AwsEcs) fillOutputs(ctx context.Context) error {
+func (a *AwsEcs) FillOutputs(ctx context.Context) error {
 	// println("Filling outputs for stack", stackId)
 	cfn, err := a.newClient(ctx)
 	if err != nil {
@@ -194,7 +194,7 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 }
 
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (ecs.TaskArn, error) {
-	if err := a.fillOutputs(ctx); err != nil {
+	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
 
@@ -202,21 +202,21 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 }
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn ecs.TaskArn) error {
-	if err := a.fillOutputs(ctx); err != nil {
+	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Tail(ctx, taskArn)
 }
 
 func (a *AwsEcs) Stop(ctx context.Context, taskArn ecs.TaskArn) error {
-	if err := a.fillOutputs(ctx); err != nil {
+	if err := a.FillOutputs(ctx); err != nil {
 		return err
 	}
 	return a.AwsEcs.Stop(ctx, taskArn)
 }
 
 func (a *AwsEcs) GetInfo(ctx context.Context, taskArn ecs.TaskArn) (*types.TaskInfo, error) {
-	if err := a.fillOutputs(ctx); err != nil {
+	if err := a.FillOutputs(ctx); err != nil {
 		return nil, err
 	}
 	return a.AwsEcs.Info(ctx, taskArn)

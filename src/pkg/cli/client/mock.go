@@ -16,3 +16,7 @@ var _ Client = (*MockClient)(nil)
 func (m MockClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }
+
+func (m MockClient) ServiceDNS(service string) string {
+	return service
+}

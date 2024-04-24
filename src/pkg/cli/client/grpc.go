@@ -76,21 +76,13 @@ func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
-	var serviceInfos []*defangv1.ServiceInfo
+	// TODO: remove this when playground supports BYOD
 	for _, service := range req.Services {
-		serviceInfo, err := g.Update(ctx, service)
-		if err != nil {
-			if len(serviceInfos) == 0 {
-				return nil, err // abort if the first service update fails
-			}
-			term.Warn(" ! Failed to update service", service.Name, err)
-			continue
+		if service.Domainname != "" {
+			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
 		}
-
-		serviceInfos = append(serviceInfos, serviceInfo)
 	}
-	return &defangv1.DeployResponse{Services: serviceInfos}, nil
+	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 
 func (g GrpcClient) Get(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
@@ -186,7 +178,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	return err
 }
 
-func (g *GrpcClient) CheckLogin(ctx context.Context) error {
+func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
@@ -232,4 +224,9 @@ func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
 
 	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
 	return err
+}
+
+func (g GrpcClient) ServiceDNS(name string) string {
+	whoami, _ := g.WhoAmI(context.TODO())
+	return whoami.Tenant + "-" + name
 }
