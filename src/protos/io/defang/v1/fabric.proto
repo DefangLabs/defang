@@ -121,13 +121,14 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
+  repeated string lb_ips = 7;  // comma-separated list of internal CIDR for the load-balancer
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  string lb_dns = 14;         // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
   // string natsJwt = 5;

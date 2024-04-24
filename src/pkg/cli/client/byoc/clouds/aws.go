@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
@@ -14,8 +15,6 @@ import (
 
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
-	types3 "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	types2 "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -33,7 +32,6 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ByocAws struct {
@@ -391,68 +389,37 @@ func (b *ByocAws) getClusterNames() []string {
 }
 
 func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	var maxResults int32 = 100 // the maximum allowed by AWS
+	if err := b.driver.FillOutputs(ctx); err != nil {
+		return nil, err
+	}
+
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	clusters := make(map[string][]string)
-	ecsClient := ecs2.NewFromConfig(cfg)
-	for _, clusterName := range b.getClusterNames() {
-		serviceArns, err := ecsClient.ListServices(ctx, &ecs2.ListServicesInput{
-			Cluster:    &clusterName,
-			MaxResults: &maxResults, // TODO: handle pagination
-		})
-		if err != nil {
-			var notFound *types3.ClusterNotFoundException
-			if errors.As(err, &notFound) {
-				continue
-			}
-			return nil, annotateAwsError(err)
-		}
-		clusters[clusterName] = serviceArns.ServiceArns
+
+	s3Client := s3.NewFromConfig(cfg)
+	bucket := b.driver.BucketName
+	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
+
+	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &path,
+	})
+	if err != nil {
+		return nil, annotateAwsError(err)
 	}
-	// Query services for each cluster
-	serviceInfos := []*defangv1.ServiceInfo{}
-	for cluster, serviceNames := range clusters {
-		if len(serviceNames) == 0 {
-			continue
-		}
-		dso, err := ecsClient.DescribeServices(ctx, &ecs2.DescribeServicesInput{
-			Services: serviceNames,
-			Cluster:  &cluster,
-		})
-		if err != nil {
-			return nil, annotateAwsError(err)
-		}
-		for _, service := range dso.Services {
-			// Check whether this is indeed a service we want to manage
-			fqn := strings.Split(getQualifiedNameFromEcsName(*service.ServiceName), ".")
-			if len(fqn) != 2 {
-				continue
-			}
-			serviceInfo := &defangv1.ServiceInfo{
-				CreatedAt: timestamppb.New(*service.CreatedAt),
-				Project:   fqn[0],
-				Service: &defangv1.Service{
-					Name: fqn[1],
-					Deploy: &defangv1.Deploy{
-						Replicas: uint32(service.DesiredCount),
-					},
-				},
-				Status: *service.Status,
-			}
-			// TODO: get the service definition from the task definition or tags
-			for _, tag := range service.Tags {
-				if *tag.Key == "etag" {
-					serviceInfo.Etag = *tag.Value
-					break
-				}
-			}
-			serviceInfos = append(serviceInfos, serviceInfo)
-		}
+	defer getObjectOutput.Body.Close()
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
 	}
-	return &defangv1.ListServicesResponse{Services: serviceInfos}, nil
+	var serviceInfos defangv1.ListServicesResponse
+	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
+		return nil, err
+	}
+	return &serviceInfos, nil
 }
 
 func (b ByocAws) getSecretID(name string) string {
