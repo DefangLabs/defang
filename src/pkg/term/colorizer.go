@@ -44,7 +44,7 @@ func ForceColor(color bool) {
 	}
 }
 
-func output(w *termenv.Output, c Color, msg string) (int, error) {
+func output(w *termenv.Output, c Color, msg string, addNewLine bool) (int, error) {
 	if len(msg) == 0 {
 		return 0, nil
 	}
@@ -52,22 +52,30 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
 	}
-	if msg[len(msg)-1] != '\n' && msg[len(msg)-1] != '\r' {
+	if addNewLine && msg[len(msg)-1] != '\n' && msg[len(msg)-1] != '\r' {
 		msg += "\n"
 	}
 	return fmt.Fprint(w, msg)
 }
 
 func Fprint(w *termenv.Output, c Color, v ...any) (int, error) {
-	return output(w, c, fmt.Sprint(v...))
+	return output(w, c, fmt.Sprint(v...), false)
 }
 
 func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintln(v...))
+	return output(w, c, fmt.Sprintln(v...), false)
 }
 
 func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintf(format, v...))
+	return output(w, c, fmt.Sprintf(format, v...), false)
+}
+
+func Flog(w *termenv.Output, c Color, v ...any) (int, error) {
+	return output(w, c, fmt.Sprintln(v...), true)
+}
+
+func Flogf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
+	return output(w, c, fmt.Sprintf(format, v...), true)
 }
 
 func Print(c Color, v ...any) (int, error) {
@@ -86,40 +94,40 @@ func Debug(v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Fprintln(Stderr, DebugColor, v...)
+	return Flog(Stderr, DebugColor, v...)
 }
 
 func Debugf(format string, v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Fprintf(Stderr, DebugColor, format, v...)
+	return Flogf(Stderr, DebugColor, format, v...)
 }
 
 func Info(v ...any) (int, error) {
-	return Println(InfoColor, v...)
+	return Flog(Stdout, InfoColor, v...)
 }
 
 func Infof(format string, v ...any) (int, error) {
-	return Printf(InfoColor, format, v...)
+	return Flogf(Stdout, InfoColor, format, v...)
 }
 
 func Warn(v ...any) (int, error) {
 	HadWarnings = true
-	return Fprintln(Stderr, WarnColor, v...)
+	return Flog(Stderr, WarnColor, v...)
 }
 
 func Warnf(format string, v ...any) (int, error) {
 	HadWarnings = true
-	return Fprintf(Stderr, WarnColor, format, v...)
+	return Flogf(Stderr, WarnColor, format, v...)
 }
 
 func Error(v ...any) (int, error) {
-	return Fprintln(Stderr, ErrorColor, v...)
+	return Flog(Stderr, ErrorColor, v...)
 }
 
 func Errorf(format string, v ...any) (int, error) {
-	return Fprintf(Stderr, ErrorColor, format, v...)
+	return Flogf(Stderr, ErrorColor, format, v...)
 }
 
 func Fatal(msg any) {

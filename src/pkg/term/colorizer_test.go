@@ -9,11 +9,16 @@ import (
 
 var tests = []struct {
 	msg, output string
+	newLine     bool
 }{
-	{"Hello, World!", "Hello, World!\n"},
-	{"Hello, World!\r", "Hello, World!\r"},
-	{"Hello, World!\n", "Hello, World!\n"},
-	{"", ""},
+	{"Hello, World!", "Hello, World!\n", true},
+	{"Hello, World!\r", "Hello, World!\r", true},
+	{"Hello, World!\n", "Hello, World!\n", true},
+	{"", "", true},
+	{"Hello, World!", "Hello, World!", false},
+	{"Hello, World!\r", "Hello, World!\r", false},
+	{"Hello, World!\n", "Hello, World!\n", false},
+	{"", "", false},
 }
 
 func TestOutput(t *testing.T) {
@@ -21,7 +26,7 @@ func TestOutput(t *testing.T) {
 		var buf strings.Builder
 		out := termenv.NewOutput(&buf)
 		out.Profile = termenv.Ascii // Disable color
-		if _, err := output(out, InfoColor, test.msg); err != nil {
+		if _, err := output(out, InfoColor, test.msg, test.newLine); err != nil {
 			t.Errorf("output(out, InfoColor, %q) results in error: %v", test.msg, err)
 		}
 		if buf.String() != test.output {
