@@ -1,0 +1,39 @@
+{
+  "name": "defang",
+  "version": "<PLACEHOLDER>",
+  "author": "Defang Software Labs Inc.",
+  "description": "CLI for the Defang Opinionated Platform",
+  "license": "MIT",
+  "bin": {
+    "defang": "./bin/cli.js"
+  },
+  "keywords": [],
+  "homepage": "https://github.com/defang-io/defang#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/defang-io/defang.git"
+  },
+  "bugs": {
+    "url": "https://github.com/defang-io/defang/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "node ./bin/installer.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.12",
+    "axios": "^1.6.8",
+    "graceful-fs": "^4.2.11",
+    "https": "^1.0.0",
+    "os": "^0.1.2",
+    "tar": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/graceful-fs": "^4.1.9",
+    "@types/node": "^20.12.7",
+    "@types/tar": "^6.1.13",
+    "typescript": "^5.4.5"
+  },
+  "main": "./bin/cli.js"
+}
