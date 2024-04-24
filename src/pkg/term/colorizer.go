@@ -70,14 +70,6 @@ func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
 	return output(w, c, fmt.Sprintf(format, v...))
 }
 
-func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
-	if doColor(w) && c != Nop {
-		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
-		defer w.Reset()
-	}
-	return fmt.Fprintf(w, format, v...)
-}
-
 func Print(c Color, v ...any) (int, error) {
 	return Fprint(Stdout, c, v...)
 }
