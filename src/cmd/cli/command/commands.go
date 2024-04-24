@@ -31,7 +31,7 @@ const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 const authNeeded = "auth-needed"       // annotation to indicate that a command needs authorization
-const projectNeeded = "project-needed" // annotation to indicate that a command needs authorization
+const projectNeeded = "project-needed" // annotation to indicate that a command needs compose project exist in the current directory
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 var projectNeededAnnotation = map[string]string{projectNeeded: ""}
 var authAndProjectNeededAnnotation = map[string]string{authNeeded: "", projectNeeded: ""}
