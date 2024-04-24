@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -12,7 +11,6 @@ import (
 
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
@@ -214,12 +212,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
 		Services: services,
 	})
-	var warnings clouds.Warnings
-	if errors.As(err, &warnings) {
-		if len(warnings) > 0 {
-			term.Warn(" !", warnings)
-		}
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
