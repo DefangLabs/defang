@@ -175,7 +175,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					return err
 				}
 				if !raw {
-					term.Fprintln(term.Stderr, term.WarnColor, " ! Reconnected!   ")
+					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnected!   \r") // overwritten with logs
 				}
 				skipDuplicate = true
 				continue
