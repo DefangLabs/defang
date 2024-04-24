@@ -17,15 +17,10 @@ import (
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-// ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
-	if err := validateProject(project); err != nil {
-		return nil, &ComposeError{err}
-	}
-
+func convertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force bool) ([]*defangv1.Service, error) {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
-	for _, svccfg := range project.Services {
+	for _, svccfg := range serviceConfigs {
 		if isPrivate(&svccfg) && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
@@ -34,14 +29,14 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	}
 	var serviceNameRegex *regexp.Regexp
 	if len(serviceNames) > 0 {
-		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b"`)
+		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
 	}
 
 	//
 	// Publish updates
 	//
 	var services []*defangv1.Service
-	for _, svccfg := range project.Services {
+	for _, svccfg := range serviceConfigs {
 		var healthcheck *defangv1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
 			healthcheck = &defangv1.HealthCheck{
@@ -134,6 +129,7 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 				if serviceNameRegex != nil {
 					// Replace service names with their actual DNS names
 					val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+						println("serviceDNS found ", serviceName)
 						return c.ServiceDNS(NormalizeServiceName(serviceName))
 					})
 					if val != *value {
@@ -185,6 +181,19 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
 		})
+	}
+	return services, nil
+}
+
+// ComposeStart validates a compose project and uploads the services using the client
+func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
+	if err := validateProject(project); err != nil {
+		return nil, &ComposeError{err}
+	}
+
+	services, err := convertServices(ctx, c, project.Services, force)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(services) == 0 {
