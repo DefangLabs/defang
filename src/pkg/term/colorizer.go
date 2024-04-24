@@ -44,20 +44,30 @@ func ForceColor(color bool) {
 	}
 }
 
-func Fprint(w *termenv.Output, c Color, v ...any) (int, error) {
+func output(w *termenv.Output, c Color, msg string) (int, error) {
+	if len(msg) == 0 {
+		return 0, nil
+	}
 	if doColor(w) && c != Nop {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
 	}
-	return fmt.Fprint(w, v...)
+	if msg[len(msg)-1] != '\n' && msg[len(msg)-1] != '\r' {
+		msg += "\n"
+	}
+	return fmt.Fprint(w, msg)
+}
+
+func Fprint(w *termenv.Output, c Color, v ...any) (int, error) {
+	return output(w, c, fmt.Sprint(v...))
 }
 
 func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
-	if doColor(w) && c != Nop {
-		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
-		defer w.Reset()
-	}
-	return fmt.Fprintln(w, v...)
+	return output(w, c, fmt.Sprintln(v...))
+}
+
+func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
+	return output(w, c, fmt.Sprintf(format, v...))
 }
 
 func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {

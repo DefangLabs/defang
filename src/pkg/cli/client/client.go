@@ -22,7 +22,7 @@ type Client interface {
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (ETag, error)
 	BootstrapList(context.Context) error
-	CheckLogin(context.Context) error
+	CheckLoginAndToS(context.Context) error
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
@@ -41,6 +41,7 @@ type Client interface {
 	PutSecret(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) error
 	RevokeToken(context.Context) error
+	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)

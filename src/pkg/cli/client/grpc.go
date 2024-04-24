@@ -13,6 +13,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
@@ -75,6 +76,12 @@ func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	// TODO: remove this when playground supports BYOD
+	for _, service := range req.Services {
+		if service.Domainname != "" {
+			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
+		}
+	}
 	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 
@@ -171,7 +178,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	return err
 }
 
-func (g *GrpcClient) CheckLogin(ctx context.Context) error {
+func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
@@ -217,4 +224,9 @@ func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
 
 	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
 	return err
+}
+
+func (g GrpcClient) ServiceDNS(name string) string {
+	whoami, _ := g.WhoAmI(context.TODO())
+	return whoami.Tenant + "-" + name
 }

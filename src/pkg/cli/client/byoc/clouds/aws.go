@@ -38,7 +38,7 @@ type ByocAws struct {
 	*client.GrpcClient
 
 	cdTasks                 map[string]ecs.TaskArn
-	customDomain            string
+	customDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
 	driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string
@@ -147,13 +147,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, errors.New("maximum number of services reached")
 	}
 	serviceInfos := []*defangv1.ServiceInfo{}
-	var warnings Warnings
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
-		var warning Warning
-		if errors.As(err, &warning) && warning != nil {
-			warnings = append(warnings, warning)
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		serviceInfo.Etag = etag // same etag for all services
@@ -216,7 +212,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, warnings
+	}, nil
 }
 
 func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
@@ -556,7 +552,6 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		si.PrivateFqdn = b.GetPrivateFqdn(fqn)
 	}
 
-	var warning Warning
 	if service.Domainname != "" {
 		if !hasIngress && service.StaticFiles == "" {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -572,7 +567,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 				si.UseAcmeCert = true
 				// TODO: We should add link to documentation on how the acme cert workflow works
 				// TODO: Should we make this the default behavior or require the user to set a flag?
-				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn))
+				term.Warnf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn)
 			} else {
 				si.ZoneId = zoneId
 			}
@@ -584,7 +579,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 	}
-	return si, warning
+	return si, nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -739,4 +734,8 @@ func annotateAwsError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
+}
+
+func (b *ByocAws) ServiceDNS(name string) string {
+	return dnsSafeLabel(name) // TODO: consider making it FQDN using the private domain
 }
