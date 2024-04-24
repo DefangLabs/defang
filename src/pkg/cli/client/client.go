@@ -22,7 +22,7 @@ type Client interface {
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (ETag, error)
 	BootstrapList(context.Context) error
-	CheckLogin(context.Context) error
+	CheckLoginAndToS(context.Context) error
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
