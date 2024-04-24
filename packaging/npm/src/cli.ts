@@ -19,6 +19,10 @@ function getPathToExecutable(): string {
   }
 }
 
+// js wrapper to use by npx or npm exec, this will call the defang binary with
+// the arguments passed to the npx line. NPM installer will create a symlink
+// in the user PATH to the cli.js to execute. The symlink will name the same as
+// the package name i.e. defang.
 function run(): void {
   const args = process.argv.slice(2);
   const processResult = child_process.spawnSync(getPathToExecutable(), args, {
