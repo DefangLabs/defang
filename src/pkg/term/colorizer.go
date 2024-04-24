@@ -52,7 +52,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
 	}
-	if msg[len(msg)-1] != '\n' || msg[len(msg)-1] != '\r' {
+	if msg[len(msg)-1] != '\n' && msg[len(msg)-1] != '\r' {
 		msg += "\n"
 	}
 	return fmt.Fprint(w, msg)

@@ -79,7 +79,7 @@ func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	// TODO: remove this when playground supports BYOD
 	for _, service := range req.Services {
 		if service.Domainname != "" {
-			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v ", service.Name, service.Domainname)
+			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
 		}
 	}
 	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
