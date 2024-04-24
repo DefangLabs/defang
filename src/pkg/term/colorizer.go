@@ -60,12 +60,24 @@ func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
 	return fmt.Fprintln(w, v...)
 }
 
+func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
+	if doColor(w) && c != Nop {
+		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
+		defer w.Reset()
+	}
+	return fmt.Fprintf(w, format, v...)
+}
+
 func Print(c Color, v ...any) (int, error) {
 	return Fprint(Stdout, c, v...)
 }
 
 func Println(c Color, v ...any) (int, error) {
 	return Fprintln(Stdout, c, v...)
+}
+
+func Printf(c Color, format string, v ...any) (int, error) {
+	return Fprintf(Stdout, c, format, v...)
 }
 
 func Debug(v ...any) (int, error) {
@@ -75,8 +87,19 @@ func Debug(v ...any) (int, error) {
 	return Fprintln(Stderr, DebugColor, v...)
 }
 
+func Debugf(format string, v ...any) (int, error) {
+	if !DoDebug {
+		return 0, nil
+	}
+	return Fprintf(Stderr, DebugColor, format, v...)
+}
+
 func Info(v ...any) (int, error) {
 	return Println(InfoColor, v...)
+}
+
+func Infof(format string, v ...any) (int, error) {
+	return Printf(InfoColor, format, v...)
 }
 
 func Warn(v ...any) (int, error) {
@@ -84,11 +107,25 @@ func Warn(v ...any) (int, error) {
 	return Fprintln(Stderr, WarnColor, v...)
 }
 
+func Warnf(format string, v ...any) (int, error) {
+	HadWarnings = true
+	return Fprintf(Stderr, WarnColor, format, v...)
+}
+
 func Error(v ...any) (int, error) {
 	return Fprintln(Stderr, ErrorColor, v...)
 }
 
+func Errorf(format string, v ...any) (int, error) {
+	return Fprintf(Stderr, ErrorColor, format, v...)
+}
+
 func Fatal(msg any) {
 	Error("Error:", msg)
+	os.Exit(1)
+}
+
+func Fatalf(format string, v ...any) {
+	Errorf("Error: "+format, v...)
 	os.Exit(1)
 }

@@ -149,13 +149,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, errors.New("maximum number of services reached")
 	}
 	serviceInfos := []*defangv1.ServiceInfo{}
-	var warnings pkg.Warnings
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
-		var warning pkg.Warning
-		if errors.As(err, &warning) && warning != nil {
-			warnings = append(warnings, warning)
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		serviceInfo.Etag = etag // same etag for all services
@@ -218,7 +214,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
-	}, warnings
+	}, nil
 }
 
 func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
@@ -589,7 +585,6 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		si.PrivateFqdn = b.GetPrivateFqdn(fqn)
 	}
 
-	var warning pkg.Warning
 	if service.Domainname != "" {
 		if !hasIngress && service.StaticFiles == "" {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -605,7 +600,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 				si.UseAcmeCert = true
 				// TODO: We should add link to documentation on how the acme cert workflow works
 				// TODO: Should we make this the default behavior or require the user to set a flag?
-				warning = pkg.WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn))
+				term.Warnf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn)
 			} else {
 				si.ZoneId = zoneId
 			}
@@ -617,7 +612,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 	}
-	return si, warning
+	return si, nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
