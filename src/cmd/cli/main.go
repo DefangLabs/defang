@@ -20,11 +20,23 @@ func main() {
 		signal.Stop(sigs)
 		term.Debug("Received interrupt signal; cancelling...")
 		command.Track("User Interrupted")
-		command.FlushAllTracking()
+		command.FlushAllTracking() // needed? Execute should exit once cancelled
 		cancel()
 	}()
 
+	restore := term.EnableANSI()
+	defer restore()
+
 	command.SetupCommands()
-	command.Execute(ctx)
-	command.FlushAllTracking()
+	err := command.Execute(ctx)
+	command.FlushAllTracking() // TODO: track errors/panics
+
+	if err != nil {
+		// If the error is a command.ErrorCode, use its value as the exit code
+		ec, ok := err.(command.ExitCode)
+		if !ok {
+			ec = 1 // should not happen since we always return ErrorCode
+		}
+		os.Exit(int(ec))
+	}
 }

@@ -45,7 +45,7 @@ var (
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
 
-func Execute(ctx context.Context) {
+func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", err)
@@ -84,8 +84,7 @@ func Execute(ctx context.Context) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
-		FlushAllTracking() // TODO: track errors/panics
-		os.Exit(int(code))
+		return ExitCode(code)
 	}
 
 	if hasTty && term.HadWarnings {
@@ -101,7 +100,7 @@ func Execute(ctx context.Context) {
 			}
 		}
 	}
-
+	return nil
 }
 
 func SetupCommands() {
