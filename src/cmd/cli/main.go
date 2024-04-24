@@ -24,7 +24,7 @@ func main() {
 		cancel()
 	}()
 
-	restore := term.EnableANSI()
+	restore := term.EnableANSI() // FIXME: only enable ANSI if we want colorized output
 	defer restore()
 
 	command.SetupCommands()

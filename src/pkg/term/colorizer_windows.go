@@ -16,3 +16,7 @@ func EnableANSI() func() {
 		termenv.RestoreWindowsConsole(mode)
 	}
 }
+
+func isTerminal() bool {
+	return true
+}
