@@ -773,3 +773,7 @@ func annotateAwsError(err error) error {
 	}
 	return err
 }
+
+func (b *ByocAws) ServiceDNS(name string) string {
+	return dnsSafeLabel(name) // TODO: consider making it FQDN using the private domain
+}

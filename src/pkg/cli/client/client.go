@@ -41,6 +41,7 @@ type Client interface {
 	PutSecret(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) error
 	RevokeToken(context.Context) error
+	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)

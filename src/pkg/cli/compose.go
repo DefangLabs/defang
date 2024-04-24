@@ -70,31 +70,6 @@ func NormalizeServiceName(s string) string {
 	return nonAlphanumeric.ReplaceAllLiteralString(strings.ToLower(s), "-")
 }
 
-func resolveEnv(k string) *string {
-	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
-	v, ok := os.LookupEnv(k)
-	if !ok {
-		warnf("environment variable not found: %q", k)
-		// If the value could not be resolved, it should be removed
-		return nil
-	}
-	return &v
-}
-
-func convertPlatform(platform string) defangv1.Platform {
-	switch platform {
-	default:
-		warnf("Unsupported platform: %q (assuming linux)", platform)
-		fallthrough
-	case "", "linux":
-		return defangv1.Platform_LINUX_ANY
-	case "linux/amd64":
-		return defangv1.Platform_LINUX_AMD64
-	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
-		return defangv1.Platform_LINUX_ARM64
-	}
-}
-
 func LoadCompose(filePath string, tenantID types.TenantID) (*compose.Project, error) {
 	return loadCompose(filePath, string(tenantID), false) // use tenantID as fallback for project name
 }
