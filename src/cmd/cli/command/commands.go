@@ -217,6 +217,11 @@ func SetupCommands() {
 	sendCmd.MarkFlagRequired("type")
 	RootCmd.AddCommand(sendCmd)
 
+	// Cert management
+	// TODO: Add list, renew etc.
+	certCmd.AddCommand(certGenerateCmd)
+	RootCmd.AddCommand(certCmd)
+
 	if term.CanColor {
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
@@ -368,6 +373,26 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.Whoami(cmd.Context(), client)
+		if err != nil {
+			return err
+		}
+		return nil
+	},
+}
+
+var certCmd = &cobra.Command{
+	Use:   "cert",
+	Args:  cobra.NoArgs,
+	Short: "Manage certificates",
+}
+
+var certGenerateCmd = &cobra.Command{
+	Use:     "generate",
+	Aliases: []string{"gen"},
+	Args:    cobra.NoArgs,
+	Short:   "Generate an letsencrypt certificate",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := cli.GenerateLetsEncryptCert(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
@@ -644,8 +669,12 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 			}
 			fmt.Println("   -", endpoint)
 		}
-		if serviceInfo.Service.Domainname != "" && serviceInfo.ZoneId != "" {
-			fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
+		if serviceInfo.Service.Domainname != "" {
+			if serviceInfo.ZoneId != "" {
+				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
+			} else {
+				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after ACME cert activation)")
+			}
 		}
 	}
 }
