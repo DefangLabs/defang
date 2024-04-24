@@ -218,3 +218,8 @@ func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
 	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
 	return err
 }
+
+func (g GrpcClient) ServiceDNS(name string) string {
+	whoami, _ := g.WhoAmI(context.TODO())
+	return whoami.Tenant + "-" + name
+}
