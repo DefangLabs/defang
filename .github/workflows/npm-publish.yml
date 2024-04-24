@@ -36,7 +36,7 @@ jobs:
 
       - name: Publish to NPM
         run: |
-          #update version
+          #update version placeholder in package.json with version matching binary.
           npm version ${{ env.DEFANG_CLI_RELEASE_VERSION }}
 
           # install dependencies
@@ -44,6 +44,9 @@ jobs:
 
           #build
           npm run build
+
+          #make the cli.js executable
+          chmod u+x ./bin/cli.js
 
           # publish the package
           npm publish --access public

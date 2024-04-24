@@ -144,6 +144,8 @@ async function install() {
   try {
     console.log(`Starting install of defang cli`);
 
+    // the package.version (updated in GitHubAction) is used to identify
+    // the specific file version to download.
     const version = getVersion("package.json");
     const filename = getAppArchiveFilename(version, os.platform(), os.arch());
     const archiveFile = await downloadAppArchive(version, filename, __dirname);
@@ -151,11 +153,15 @@ async function install() {
       throw new Error(`Failed to download ${filename}`);
     }
 
+    // Because the releases are compressed tar.gz or .zip we need to
+    // uncompress them to the ./bin directory in the package in node_modules.
     const result = extractArchive(archiveFile, "./bin");
     if (result === false) {
       throw new Error(`Failed to install binaries!`);
     }
     console.log(`Successfully installed defang cli!`);
+    // Delete the downloaded archive since we have successfully downloaded
+    // and uncompressed it.
     deleteArchive(archiveFile);
   } catch (error) {
     console.error(error);
