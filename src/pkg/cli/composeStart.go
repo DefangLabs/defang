@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"regexp"
 	"strconv"
+	"strings"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -18,6 +21,14 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 	if err := validateProject(project); err != nil {
 		return nil, &ComposeError{err}
 	}
+
+	// Create a regexp to detect service names in environment variable values
+	var serviceNames []string
+	for _, svccfg := range project.Services {
+		serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+	}
+	serviceNameRegex := regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b"`)
+
 	//
 	// Publish updates
 	//
@@ -111,7 +122,14 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 				value = resolveEnv(key)
 			}
 			if value != nil {
-				envs[key] = *value
+				// Replace service names with their actual DNS names
+				replaced := serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+					return c.ServiceDNS(NormalizeServiceName(serviceName))
+				})
+				if replaced != *value {
+					warnf("service names were replaced in environment variable %q: %q", key, replaced)
+				}
+				envs[key] = replaced
 			}
 		}
 
@@ -205,4 +223,29 @@ func getResourceReservations(r compose.Resources) *compose.Resource {
 		return r.Limits
 	}
 	return r.Reservations
+}
+
+func resolveEnv(k string) *string {
+	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
+	v, ok := os.LookupEnv(k)
+	if !ok {
+		warnf("environment variable not found: %q", k)
+		// If the value could not be resolved, it should be removed
+		return nil
+	}
+	return &v
+}
+
+func convertPlatform(platform string) defangv1.Platform {
+	switch platform {
+	default:
+		warnf("Unsupported platform: %q (assuming linux)", platform)
+		fallthrough
+	case "", "linux":
+		return defangv1.Platform_LINUX_ANY
+	case "linux/amd64":
+		return defangv1.Platform_LINUX_AMD64
+	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
+		return defangv1.Platform_LINUX_ARM64
+	}
 }
