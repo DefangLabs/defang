@@ -44,7 +44,7 @@ service FabricController {
   }
 
   rpc SignEULA(google.protobuf.Empty)
-      returns (google.protobuf.Empty); // SignToS
+      returns (google.protobuf.Empty); // AgreeToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
@@ -93,6 +93,7 @@ message DeleteResponse { string etag = 1; }
 message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
+  bool agree_tos = 3;
 }
 
 message File {
