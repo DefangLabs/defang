@@ -171,7 +171,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	return err
 }
 
-func (g *GrpcClient) CheckLogin(ctx context.Context) error {
+func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }

@@ -17,6 +17,7 @@ func Generate(ctx context.Context, client client.Client, language string, descri
 	}
 
 	response, err := client.GenerateFiles(ctx, &defangv1.GenerateFilesRequest{
+		AgreeTos: true, // agreement was already checked by the caller
 		Language: language,
 		Prompt:   description,
 	})
