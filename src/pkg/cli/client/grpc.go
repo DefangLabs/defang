@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/auth"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
@@ -76,29 +75,7 @@ func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
-	var warnings pkg.Warnings
-	for _, service := range req.Services {
-		if service.Domainname != "" {
-			warnings = append(warnings, pkg.WarningError(fmt.Sprintf("Defang provider does not support the domainname field for now, service: %v, domain: %v ", service.Name, service.Domainname)))
-		}
-	}
-
-	var serviceInfos []*defangv1.ServiceInfo
-	for _, service := range req.Services {
-		// Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := g.Update(ctx, service)
-		if err != nil {
-			if len(serviceInfos) == 0 {
-				return nil, err // abort if the first service update fails
-			}
-			// Warn(" ! Failed to update service", service.Name, err)
-			continue
-		}
-
-		serviceInfos = append(serviceInfos, serviceInfo)
-	}
-	return &defangv1.DeployResponse{Services: serviceInfos}, warnings
+	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 
 func (g GrpcClient) Get(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {

@@ -36,10 +36,15 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
-  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc GenerateFiles(GenerateFilesRequest)
+      returns (GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
+  rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
+  rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc SignEULA(google.protobuf.Empty)
-      returns (google.protobuf.Empty); // SignToS
+      returns (google.protobuf.Empty); // AgreeToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
@@ -88,6 +93,7 @@ message DeleteResponse { string etag = 1; }
 message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
+  bool agree_tos = 3;
 }
 
 message File {
@@ -96,6 +102,14 @@ message File {
 }
 
 message GenerateFilesResponse { repeated File files = 1; }
+
+message StartGenerateResponse {
+  string uuid = 1;
+}
+
+message GenerateStatusRequest {
+  string uuid = 1;
+}
 
 message UploadURLRequest { string digest = 1; }
 
