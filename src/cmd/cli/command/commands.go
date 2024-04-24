@@ -30,8 +30,11 @@ import (
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
-const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
+const authNeeded = "auth-needed"       // annotation to indicate that a command needs authorization
+const projectNeeded = "project-needed" // annotation to indicate that a command needs compose project exist in the current directory
 var authNeededAnnotation = map[string]string{authNeeded: ""}
+var projectNeededAnnotation = map[string]string{projectNeeded: ""}
+var authAndProjectNeededAnnotation = map[string]string{authNeeded: "", projectNeeded: ""}
 
 // GLOBALS
 var (
@@ -284,28 +287,31 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		filePath, _ := cmd.InheritedFlags().GetString("file")
-		projectName := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
-		if projectName != "" {
-			project, err = cli.LoadComposeWithProjectName(filePath, projectName)
-		} else {
-			tenantID := cli.GetTenantID(cluster)
-			projectName = string(tenantID)
-			if provider == cliClient.ProviderDefang {
-				project, err = cli.LoadComposeWithProjectName(filePath, projectName) // playground env
+		var projectName string
+		if _, ok := cmd.Annotations[projectNeeded]; ok {
+			filePath, _ := cmd.InheritedFlags().GetString("file")
+			projectName = os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+			if projectName != "" {
+				project, err = cli.LoadComposeWithProjectName(filePath, projectName)
 			} else {
-				project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
+				tenantID := cli.GetTenantID(cluster)
+				projectName = string(tenantID)
+				if provider == cliClient.ProviderDefang {
+					project, err = cli.LoadComposeWithProjectName(filePath, projectName) // playground env
+				} else {
+					project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
+				}
 			}
-		}
 
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				term.Debug(" - Could not find docker compose file: ", err)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					term.Debug(" - Could not find docker compose file: ", err)
+				} else {
+					term.Warn(" - Error loading docker compose file: ", err)
+				}
 			} else {
-				term.Warn(" - Error loading docker compose file: ", err)
+				projectName = project.Name
 			}
-		} else {
-			projectName = project.Name
 		}
 
 		client = cli.NewClient(cluster, projectName, provider)
@@ -504,7 +510,7 @@ Generate will write files in the current folder. You can edit them and then depl
 
 var getServicesCmd = &cobra.Command{
 	Use:         "services",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"getServices", "ls", "list"},
 	Short:       "Get list of services on the cluster",
@@ -546,7 +552,7 @@ var getVersionCmd = &cobra.Command{
 
 var tailCmd = &cobra.Command{
 	Use:         "tail",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -575,7 +581,7 @@ var secretsCmd = &cobra.Command{
 
 var secretsSetCmd = &cobra.Command{
 	Use:         "create SECRET", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.ExactArgs(1),
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a secret",
@@ -614,7 +620,7 @@ var secretsSetCmd = &cobra.Command{
 
 var secretsDeleteCmd = &cobra.Command{
 	Use:         "rm SECRET...", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Deletes one or more secrets",
@@ -636,7 +642,7 @@ var secretsDeleteCmd = &cobra.Command{
 
 var secretsListCmd = &cobra.Command{
 	Use:         "ls", // like Docker
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
 	Short:       "List secrets",
@@ -687,7 +693,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -726,7 +732,7 @@ var composeUpCmd = &cobra.Command{
 var composeStartCmd = &cobra.Command{
 	Use:         "start",
 	Aliases:     []string{"deploy"},
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -761,7 +767,7 @@ var composeRestartCmd = &cobra.Command{
 
 var composeStopCmd = &cobra.Command{
 	Use:         "stop",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and stops its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -776,7 +782,7 @@ var composeStopCmd = &cobra.Command{
 var composeDownCmd = &cobra.Command{
 	Use:         "down",
 	Aliases:     []string{"rm"},
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Like 'stop' but also deprovisions the services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -811,9 +817,10 @@ var composeDownCmd = &cobra.Command{
 }
 
 var composeConfigCmd = &cobra.Command{
-	Use:   "config",
-	Args:  cobra.NoArgs, // TODO: takes optional list of service names
-	Short: "Reads a Compose file and shows the generated config",
+	Use:         "config",
+	Annotations: projectNeededAnnotation,
+	Args:        cobra.NoArgs, // TODO: takes optional list of service names
+	Short:       "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true                                               // config is like start in a dry run
 		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
@@ -826,7 +833,7 @@ var composeConfigCmd = &cobra.Command{
 
 var deleteCmd = &cobra.Command{
 	Use:         "delete SERVICE...",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
@@ -858,7 +865,7 @@ var deleteCmd = &cobra.Command{
 
 var restartCmd = &cobra.Command{
 	Use:         "restart SERVICE...",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -869,7 +876,7 @@ var restartCmd = &cobra.Command{
 var sendCmd = &cobra.Command{
 	Use:         "send",
 	Hidden:      true, // not available in private beta
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"msg", "message", "publish", "pub"},
 	Short:       "Send a message to a service",

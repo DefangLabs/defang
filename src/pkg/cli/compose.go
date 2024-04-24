@@ -115,7 +115,7 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 		}
 
 		if len(userSpecifiedComposeFile) > 0 {
-			err = fmt.Errorf("no Compose file found at %q", userSpecifiedComposeFile)
+			err = fmt.Errorf("no Compose file found at %q: %w", userSpecifiedComposeFile, os.ErrNotExist)
 			break
 		}
 
