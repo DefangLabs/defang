@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -22,12 +23,19 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		return nil, &ComposeError{err}
 	}
 
-	// Create a regexp to detect service names in environment variable values
+	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	for _, svccfg := range project.Services {
-		serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+		if isPrivate(&svccfg) && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+			return p.Mode == "host" // only private services with host ports get DNS names
+		}) {
+			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+		}
 	}
-	serviceNameRegex := regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b"`)
+	var serviceNameRegex *regexp.Regexp
+	if len(serviceNames) > 0 {
+		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b"`)
+	}
 
 	//
 	// Publish updates
@@ -122,14 +130,17 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 				value = resolveEnv(key)
 			}
 			if value != nil {
-				// Replace service names with their actual DNS names
-				replaced := serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-					return c.ServiceDNS(NormalizeServiceName(serviceName))
-				})
-				if replaced != *value {
-					warnf("service names were replaced in environment variable %q: %q", key, replaced)
+				val := *value
+				if serviceNameRegex != nil {
+					// Replace service names with their actual DNS names
+					val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+						return c.ServiceDNS(NormalizeServiceName(serviceName))
+					})
+					if val != *value {
+						warnf("service names were replaced in environment variable %q: %q", key, val)
+					}
 				}
-				envs[key] = replaced
+				envs[key] = val
 			}
 		}
 
@@ -156,18 +167,12 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 			staticFiles = staticFilesVal.(string) // already validated above
 		}
 
-		// Hack: Use magic network name "public" to determine if the service is private
-		privateNetwork := true
-		if _, ok := svccfg.Networks["public"]; ok {
-			privateNetwork = false
-		}
-
 		ports := convertPorts(svccfg.Ports)
 		services = append(services, &defangv1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
-			Internal:    privateNetwork, // TODO: support external services (w/o LB)
+			Internal:    isPrivate(&svccfg), // TODO: support external services (w/o LB)
 			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
@@ -248,4 +253,13 @@ func convertPlatform(platform string) defangv1.Platform {
 	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
 		return defangv1.Platform_LINUX_ARM64
 	}
+}
+
+func isPrivate(svccfg *compose.ServiceConfig) bool {
+	// Hack: Use magic network name "public" to determine if the service is private
+	privateNetwork := true
+	if _, ok := svccfg.Networks["public"]; ok {
+		privateNetwork = false
+	}
+	return privateNetwork
 }
