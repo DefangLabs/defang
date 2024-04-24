@@ -19,6 +19,7 @@ install: $(BINARY_NAME)
 
 .PHONY: test
 test: $(PROTOS)
+	go mod tidy
 	go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: integ
