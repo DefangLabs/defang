@@ -156,3 +156,49 @@ jobs:
           repository: defang-io/defang-docs
           event-type: cli-autodoc
           client-payload: '{"version": "${{ github.ref }}"}'
+
+  publish-npm-binaries:
+    runs-on: ubuntu-latest
+    needs: go-release
+
+    env:
+      NODE_VERSION: "21"
+      NPM_REGISTRY_URL: "https://registry.npmjs.org"
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./pkgs/npm
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+
+      - name: Install node
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.NPM_REGISTRY_URL }}
+
+      - name: Publish to NPM
+        run: |
+          # Get version number without the 'v'
+          export version_number=`echo "${{ github.ref_name }}" | cut -c2- `
+
+          echo "Setting version number to ${version_number}"
+          # update version placeholder in package.json with version matching binary.
+          npm version ${version_number}
+
+          # install dependencies
+          npm ci --ignore-scripts
+
+          #b uild
+          npm run build
+
+          # make the cli.js executable
+          chmod u+x ./bin/cli.js
+
+          # publish the package
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_AUTH_TOKEN }}
