@@ -35,3 +35,8 @@ func TestOutput(t *testing.T) {
 	}
 	// Output(Stdout, InfoColor, "Hello, World!")
 }
+
+func TestEnableANSI(t *testing.T) {
+	restore := EnableANSI()
+	restore()
+}
