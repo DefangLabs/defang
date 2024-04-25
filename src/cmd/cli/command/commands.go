@@ -247,10 +247,14 @@ var RootCmd = &cobra.Command{
 
 		// Do this first, since any errors will be printed to the console
 		switch colorMode {
-		case ColorAlways:
-			term.ForceColor(true)
 		case ColorNever:
 			term.ForceColor(false)
+		case ColorAlways:
+			term.ForceColor(true)
+			fallthrough
+		default:
+			restore := term.EnableANSI()
+			cobra.OnFinalize(restore)
 		}
 
 		switch provider {

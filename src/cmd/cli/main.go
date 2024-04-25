@@ -23,9 +23,6 @@ func main() {
 		cancel()
 	}()
 
-	restore := term.EnableANSI() // FIXME: only enable ANSI if we want colorized output
-	defer restore()
-
 	command.SetupCommands()
 	err := command.Execute(ctx)
 	command.FlushAllTracking() // TODO: track errors/panics
