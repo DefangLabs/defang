@@ -23,9 +23,11 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	}
 
 	var wg sync.WaitGroup
+	cnt := 0
 	for _, service := range services.Services {
 		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
 			wg.Add(1)
+			cnt++
 			go func(domain string, albDns string) {
 				defer wg.Done()
 				generateCert(ctx, domain, albDns)
@@ -33,6 +35,9 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		}
 	}
 	wg.Wait()
+	if cnt == 0 {
+		term.Infof("No services found need to generate Let's Encrypt cert")
+	}
 
 	return nil
 }
