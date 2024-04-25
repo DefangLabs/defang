@@ -155,7 +155,7 @@ jobs:
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: defang-io/defang-docs
           event-type: cli-autodoc
-          client-payload: '{"version": "${{ github.ref }}"}'
+          client-payload: '{"version": "${{ github.ref_name }}"}'
 
   publish-npm-binaries:
     runs-on: ubuntu-latest
