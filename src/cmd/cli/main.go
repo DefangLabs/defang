@@ -20,7 +20,6 @@ func main() {
 		signal.Stop(sigs)
 		term.Debug("Received interrupt signal; cancelling...")
 		command.Track("User Interrupted")
-		command.FlushAllTracking() // needed? Execute should exit once cancelled
 		cancel()
 	}()
 
