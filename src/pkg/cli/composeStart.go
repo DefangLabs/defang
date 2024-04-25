@@ -127,7 +127,6 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				if serviceNameRegex != nil {
 					// Replace service names with their actual DNS names
 					val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-						println("serviceDNS found ", serviceName)
 						return c.ServiceDNS(NormalizeServiceName(serviceName))
 					})
 					if val != *value {
