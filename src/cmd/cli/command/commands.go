@@ -222,6 +222,9 @@ func SetupCommands() {
 	RootCmd.AddCommand(sendCmd)
 
 	if term.CanColor {
+		restore := term.EnableANSI()
+		cobra.OnFinalize(restore)
+
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
 		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
@@ -233,7 +236,6 @@ func SetupCommands() {
 		trackCmd(cmd, "Help", P{"args", args})
 		origHelpFunc(cmd, args)
 	})
-
 }
 
 var RootCmd = &cobra.Command{
@@ -254,10 +256,6 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(false)
 		case ColorAlways:
 			term.ForceColor(true)
-			fallthrough
-		default:
-			restore := term.EnableANSI()
-			cobra.OnFinalize(restore)
 		}
 
 		switch provider {
