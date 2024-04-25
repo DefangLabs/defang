@@ -18,7 +18,7 @@ func main() {
 
 	_ = os.Mkdir(docsPath, 0755)
 
-	command.SetupCommands()
+	command.SetupCommands("")
 
 	err := doc.GenMarkdownTree(command.RootCmd, docsPath)
 	if err != nil {
