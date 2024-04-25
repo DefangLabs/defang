@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && os.Getenv("TERM") != ""
+	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && isTerminal()
 	Stdout      = termenv.NewOutput(os.Stdout)
 	Stderr      = termenv.NewOutput(os.Stderr)
 	CanColor    = doColor(Stdout)

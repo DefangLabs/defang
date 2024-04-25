@@ -48,7 +48,7 @@ var (
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
 
-func Execute(ctx context.Context) {
+func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", err)
@@ -87,8 +87,7 @@ func Execute(ctx context.Context) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
-		FlushAllTracking() // TODO: track errors/panics
-		os.Exit(int(code))
+		return ExitCode(code)
 	}
 
 	if hasTty && term.HadWarnings {
@@ -104,7 +103,7 @@ func Execute(ctx context.Context) {
 			}
 		}
 	}
-
+	return nil
 }
 
 func SetupCommands() {
@@ -228,6 +227,9 @@ func SetupCommands() {
 	RootCmd.AddCommand(certCmd)
 
 	if term.CanColor {
+		restore := term.EnableANSI()
+		cobra.OnFinalize(restore)
+
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
 		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
@@ -239,7 +241,6 @@ func SetupCommands() {
 		trackCmd(cmd, "Help", P{"args", args})
 		origHelpFunc(cmd, args)
 	})
-
 }
 
 var RootCmd = &cobra.Command{
@@ -256,10 +257,10 @@ var RootCmd = &cobra.Command{
 
 		// Do this first, since any errors will be printed to the console
 		switch colorMode {
-		case ColorAlways:
-			term.ForceColor(true)
 		case ColorNever:
 			term.ForceColor(false)
+		case ColorAlways:
+			term.ForceColor(true)
 		}
 
 		switch provider {
