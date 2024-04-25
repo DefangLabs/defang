@@ -48,7 +48,7 @@ var (
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
 
-func Execute(ctx context.Context) {
+func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", err)
@@ -87,8 +87,7 @@ func Execute(ctx context.Context) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
 
-		FlushAllTracking() // TODO: track errors/panics
-		os.Exit(int(code))
+		return ExitCode(code)
 	}
 
 	if hasTty && term.HadWarnings {
@@ -104,7 +103,7 @@ func Execute(ctx context.Context) {
 			}
 		}
 	}
-
+	return nil
 }
 
 func SetupCommands() {
@@ -251,10 +250,14 @@ var RootCmd = &cobra.Command{
 
 		// Do this first, since any errors will be printed to the console
 		switch colorMode {
-		case ColorAlways:
-			term.ForceColor(true)
 		case ColorNever:
 			term.ForceColor(false)
+		case ColorAlways:
+			term.ForceColor(true)
+			fallthrough
+		default:
+			restore := term.EnableANSI()
+			cobra.OnFinalize(restore)
 		}
 
 		switch provider {
