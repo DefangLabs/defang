@@ -171,15 +171,6 @@ jobs:
         working-directory: ./pkgs/npm
 
     steps:
-      # wait for go.yaml to finished creating binaries
-      - name: Wait for binary packaging
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: "go-release"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          allowed-conclusions: success
-
       - name: Checkout tag
         uses: actions/checkout@v4
 
