@@ -393,10 +393,11 @@ var certCmd = &cobra.Command{
 }
 
 var certGenerateCmd = &cobra.Command{
-	Use:     "generate",
-	Aliases: []string{"gen"},
-	Args:    cobra.NoArgs,
-	Short:   "Generate an letsencrypt certificate",
+	Use:         "generate",
+	Aliases:     []string{"gen"},
+	Annotations: projectNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "Generate an letsencrypt certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.GenerateLetsEncryptCert(cmd.Context(), client)
 		if err != nil {

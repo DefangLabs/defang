@@ -10,6 +10,7 @@ import (
 )
 
 var version = "development" // overwritten by build script -ldflags "-X main.version=..." and GoReleaser
+var httpClient = http.DefaultClient
 
 func GetCurrentVersion() string {
 	if v := semver.Canonical("v" + version); v != "" {
@@ -23,7 +24,7 @@ func GetLatestVersion(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
