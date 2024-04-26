@@ -9,6 +9,8 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+var httpClient = http.DefaultClient
+
 func GetCurrentVersion(version string) string {
 	if v := semver.Canonical("v" + version); v != "" {
 		return v
@@ -21,7 +23,7 @@ func GetLatestVersion(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
