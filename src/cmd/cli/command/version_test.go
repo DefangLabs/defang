@@ -9,12 +9,11 @@ import (
 )
 
 func TestGetCurrentVersion(t *testing.T) {
-	dev := GetCurrentVersion()
+	dev := GetCurrentVersion("development")
 	if dev != "development" {
 		t.Errorf("GetCurrentVersion() = %v; want development", dev)
 	}
-	version = "1.0.0"
-	v := GetCurrentVersion()
+	v := GetCurrentVersion("1.0.0")
 	if v != "v1.0.0" {
 		t.Errorf("GetCurrentVersion() = %v; want v1.0.0", v)
 	}

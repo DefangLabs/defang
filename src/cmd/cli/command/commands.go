@@ -95,30 +95,32 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
-		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
-			term.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion())
+		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(RootCmd.Version), ver) < 0 {
+			term.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion(RootCmd.Version))
 			term.Println(term.Nop, "A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}
 	}
+
 	return nil
 }
 
-func SetupCommands() {
+func SetupCommands(version string) {
 	defangFabric := pkg.Getenv("DEFANG_FABRIC", cli.DefaultCluster)
 
-	RootCmd.PersistentFlags().Var(&colorMode, "color", `Colorize output; "auto", "always" or "never"`)
+	RootCmd.Version = version
+	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; "auto", "always" or "never"`)
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `Cloud provider to use; use "aws" for bring-your-own-cloud`)
-	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "Verbose logging") // backwards compat: only used by tail
-	RootCmd.PersistentFlags().BoolVar(&term.DoDebug, "debug", false, "Debug logging for troubleshooting the CLI")
-	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "Dry run (don't actually change anything)")
-	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "Disable interactive prompts / no TTY")
-	RootCmd.PersistentFlags().StringP("cwd", "C", "", "Change directory before running the command")
+	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use; use "aws" for bring-your-own-cloud`)
+	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().BoolVar(&term.DoDebug, "debug", false, "debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
+	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	RootCmd.MarkPersistentFlagDirname("cwd")
-	RootCmd.PersistentFlags().StringP("file", "f", "", `Compose file path`)
+	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
 	RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
@@ -539,7 +541,7 @@ var getVersionCmd = &cobra.Command{
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Print(term.BrightCyan, "Defang CLI:    ")
-		fmt.Println(GetCurrentVersion())
+		fmt.Println(GetCurrentVersion(RootCmd.Version))
 
 		term.Print(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())

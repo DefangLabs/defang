@@ -9,10 +9,9 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-var version = "development" // overwritten by build script -ldflags "-X main.version=..." and GoReleaser
 var httpClient = http.DefaultClient
 
-func GetCurrentVersion() string {
+func GetCurrentVersion(version string) string {
 	if v := semver.Canonical("v" + version); v != "" {
 		return v
 	}
