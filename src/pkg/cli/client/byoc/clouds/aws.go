@@ -730,6 +730,9 @@ func annotateAwsError(err error) error {
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, err)
 	}
+	if aws.IsS3NoSuchKeyError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
 	if aws.IsParameterNotFoundError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
