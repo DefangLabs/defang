@@ -58,6 +58,8 @@ var (
 )
 
 func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	// Generate random state
 	state := uuid.NewString()
 
@@ -112,6 +114,8 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 				return // exit goroutine
 			}
 			switch b[0] {
+			case 3: // Ctrl-C
+				cancel()
 			case 10, 13: // Enter or Return
 				browser.OpenURL(server.URL)
 			}

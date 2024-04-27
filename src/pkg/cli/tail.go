@@ -104,6 +104,8 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
@@ -136,6 +138,8 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						return // exit goroutine
 					}
 					switch b[0] {
+					case 3: // Ctrl-C
+						cancel()
 					case 10, 13: // Enter or Return
 						term.Println(term.Nop, " ") // empty line, but overwrite the spinner
 					case 'v', 'V':
