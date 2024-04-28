@@ -1,4 +1,4 @@
-package clouds
+package byoc
 
 import (
 	"github.com/defang-io/defang/src/pkg"

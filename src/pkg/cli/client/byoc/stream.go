@@ -1,8 +1,9 @@
-package clouds
+package byoc
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 	"io"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func (bs *byocServerStream) Err() error {
 	if bs.err == io.EOF {
 		return nil // same as the original gRPC/connect server stream
 	}
-	return annotateAwsError(bs.err)
+	return aws.annotateAwsError(bs.err)
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
