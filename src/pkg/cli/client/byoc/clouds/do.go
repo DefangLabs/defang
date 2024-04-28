@@ -7,7 +7,13 @@ import (
 	"github.com/defang-io/defang/src/pkg/quota"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/digitalocean/godo"
 	"strings"
+)
+
+const (
+	DockerHub = "DOCKER_HUB"
+	Docr      = "DOCR"
 )
 
 type ByocDo struct {
@@ -43,14 +49,18 @@ func NewByocDO(tenantId types.TenantID, project string, defClient *client.GrpcCl
 	return b
 }
 
-func (b ByocDo) setUp(ctx context.Context) error {
-
-	return nil
-}
-
 func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	//etag := pkg.RandomID()
+
+	//serviceInfos := []*defangv1.ServiceInfo{}
+	//var warnings Warnings
+
+	resp := &defangv1.DeployResponse{}
+	return resp, nil
 }
 
 func (b ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
@@ -66,4 +76,42 @@ func (b ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 func (b ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 
 	return nil, nil
+}
+
+func (b ByocDo) setUp(ctx context.Context) error {
+	if b.setupDone {
+		return nil
+	}
+	cdTaskName := CdTaskPrefix
+	serviceContainers := []*godo.AppServiceSpec{
+		{
+			Name: "main",
+			Image: &godo.ImageSourceSpec{
+				Repository:   "pulumi-nodejs",
+				Registry:     "pulumi",
+				RegistryType: DockerHub,
+			},
+			RunCommand:       "node lib/index.js",
+			InstanceCount:    1,
+			InstanceSizeSlug: "basic-xxs",
+		},
+	}
+	jobContainers := []*godo.AppJobSpec{
+		{
+			Name: cdTaskName,
+			Image: &godo.ImageSourceSpec{
+				Repository:   "cd",
+				RegistryType: Docr,
+			},
+			InstanceCount:    1,
+			InstanceSizeSlug: "basic-xxs",
+			Kind:             godo.AppJobSpecKind_PreDeploy,
+		},
+	}
+
+	if err := b.Driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
+		return err
+	}
+
+	return nil
 }
