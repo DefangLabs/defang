@@ -1,4 +1,4 @@
-package clouds
+package aws
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 	"io"
 	"net"
 	"os"
@@ -38,7 +39,7 @@ type ByocAws struct {
 	*client.GrpcClient
 
 	cdTasks                 map[string]ecs.TaskArn
-	customDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
+	CustomDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
 	driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string
@@ -61,8 +62,8 @@ func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcC
 	b := &ByocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]ecs.TaskArn),
-		customDomain:  "",
-		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		CustomDomain:  "",
+		driver:        cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 		privateDomain: dnsSafeLabel(project) + ".internal",
 		pulumiProject: project, // TODO: multi-project support
 		pulumiStack:   "beta",  // TODO: make customizable
@@ -86,7 +87,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
-	cdTaskName := CdTaskPrefix
+	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:latest",
@@ -102,7 +103,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     CdImage,
+			Image:     byoc.CdImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -123,12 +124,12 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 		return annotateAwsError(err)
 	}
 
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
 			// return err; FIXME: ignore this error for now
 		} else {
-			b.customDomain = b.getProjectDomain(domain.Zone)
+			b.CustomDomain = b.GetProjectDomain(domain.Zone)
 			b.shouldDelegateSubdomain = true
 		}
 	}
@@ -247,10 +248,10 @@ func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, err
 }
 
 func (b ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		return "", errors.New("custom domain not set")
 	}
-	domain := b.customDomain
+	domain := b.CustomDomain
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -306,7 +307,7 @@ func (b ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 }
 
 func (ByocAws) GetVersion(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
+	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
@@ -327,10 +328,10 @@ func (b *ByocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":              DefangPrefix,
+		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.tenantID,
-		"DOMAIN":                     b.customDomain,
+		"DOMAIN":                     b.CustomDomain,
 		"PRIVATE_DOMAIN":             b.privateDomain,
 		"PROJECT":                    b.pulumiProject,
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
@@ -369,11 +370,11 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stack returns a stack-qualified name, like the Pulumi TS function `stack`
 func (b *ByocAws) stack(name string) string {
-	return fmt.Sprintf("%s-%s-%s-%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
+	return fmt.Sprintf("%s-%s-%s-%s", byoc.DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) stackDir(name string) string {
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) getClusterNames() []string {
@@ -419,7 +420,7 @@ func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 }
 
 func (b ByocAws) getSecretID(name string) string {
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
 func (b ByocAws) PutSecret(ctx context.Context, secret *defangv1.SecretValue) error {
@@ -507,7 +508,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		}()
 	}
 
-	return newByocServerStream(ctx, eventStream, etag, req.Service), nil
+	return clouds.newByocServerStream(ctx, eventStream, etag, req.Service), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -609,20 +610,20 @@ func (b ByocAws) GetEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 	if port.Mode == defangv1.Mode_HOST {
 		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
 	} else {
-		if b.customDomain == "" {
+		if b.CustomDomain == "" {
 			return ":443" // placeholder for the public ALB/distribution
 		}
-		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.CustomDomain)
 	}
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocAws) GetPublicFqdn(fqn qualifiedName) string {
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		return "" //b.fqdn
 	}
 	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.CustomDomain)
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -631,7 +632,7 @@ func (b ByocAws) GetPrivateFqdn(fqn qualifiedName) string {
 	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
 }
 
-func (b ByocAws) getProjectDomain(zone string) string {
+func (b ByocAws) GetProjectDomain(zone string) string {
 	projectLabel := dnsSafeLabel(b.pulumiProject)
 	if projectLabel == dnsSafeLabel(string(b.tenantID)) {
 		return dnsSafe(zone) // the zone will already have the tenant ID

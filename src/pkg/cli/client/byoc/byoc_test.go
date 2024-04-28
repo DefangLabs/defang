@@ -1,6 +1,7 @@
-package clouds
+package byoc
 
 import (
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 	"testing"
 
 	"github.com/defang-io/defang/src/pkg/types"
@@ -35,8 +36,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
-			b.customDomain = b.getProjectDomain("example.com")
+			b := aws.NewByocAWS(tt.TenantID, tt.ProjectName, nil)
+			b.CustomDomain = b.GetProjectDomain("example.com")
 
 			endpoint := b.GetEndpoint(tt.Fqn, tt.Port)
 			if endpoint != tt.EndPoint {

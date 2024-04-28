@@ -18,21 +18,19 @@ type DoApp struct {
 	Client      *godo.Client
 	Region      do.Region
 	ProjectName string
+	BucketName  string
+	AppID       string
 }
 
 func New(stack string, region do.Region) *DoApp {
 	if stack == "" {
 		panic("stack must be set")
 	}
-	pat := os.Getenv("DO_PAT")
-	if pat == "" {
-		panic("digital ocean pat must be set")
-	}
-	tokenSource := &oauth2.Token{AccessToken: pat}
-	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(tokenSource))
+
+	client := DoApp{}.newClient(context.Background())
 
 	return &DoApp{
-		Client:      godo.NewClient(client),
+		Client:      client,
 		Region:      region,
 		ProjectName: stack,
 	}
@@ -60,4 +58,29 @@ func (d DoApp) SetUp(ctx context.Context, services []*godo.AppServiceSpec, jobs 
 	}
 
 	return nil
+}
+
+func (d DoApp) Run(ctx context.Context, env map[string]string, cmd ...string) (string, error) {
+	client := d.newClient(ctx)
+
+	app, _, err := client.Apps.Get(ctx, d.AppID)
+	if err != nil {
+		return nil, err
+	}
+
+	appInfo, _, err := client.Apps.Update(ctx, d.AppID, &godo.AppUpdateRequest{
+		Spec: app.Spec,
+	})
+
+	return appInfo.ID, err
+}
+
+func (d DoApp) newClient(ctx context.Context) *godo.Client {
+	pat := os.Getenv("DO_PAT")
+	if pat == "" {
+		panic("digital ocean pat must be set")
+	}
+	tokenSource := &oauth2.Token{AccessToken: pat}
+	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(tokenSource))
+	return godo.NewClient(client)
 }
