@@ -656,7 +656,7 @@ var composeUpCmd = &cobra.Command{
 			return err
 		}
 
-		printEndpoints(deploy.Services)
+		//printEndpoints(deploy.Services)
 
 		if detach {
 			return nil

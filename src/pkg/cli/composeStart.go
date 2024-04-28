@@ -190,11 +190,11 @@ func ComposeStart(ctx context.Context, c client.Client, project *compose.Project
 		return nil, err
 	}
 
-	if DoDebug {
-		for _, service := range resp.Services {
-			PrintObject(service.Service.Name, service)
-		}
-	}
+	//if DoDebug {
+	//	for _, service := range resp.Services {
+	//		PrintObject(service.Service.Name, service)
+	//	}
+	//}
 	return resp, nil
 }
 
