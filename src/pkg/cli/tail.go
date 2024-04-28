@@ -13,21 +13,22 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	ansiCyan        = "\033[36m"
-	ansiReset       = "\033[0m"
-	replaceString   = ansiCyan + "$0" + ansiReset
-	spinner         = `-\|/`
-	TimestampFormat = "15:04:05.000000 "
+	ansiCyan      = "\033[36m"
+	ansiReset     = "\033[0m"
+	replaceString = ansiCyan + "$0" + ansiReset
+	spinner       = `-\|/`
+	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00" // like RFC3339Nano but with 6 digits of precision
 )
 
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
+	DoVerbose     = false
 )
 
 type P = client.Property // shorthand for tracking properties
@@ -87,14 +88,14 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	if service != "" {
 		service = NormalizeServiceName(service)
 		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, &v1.ServiceID{Name: service}); err != nil {
+		if _, err := client.Get(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
-				Warn(" ! Service does not exist (yet):", service)
+				term.Warn(" ! Service does not exist (yet):", service)
 			case connect.CodeUnknown:
 				// Ignore unknown (nil) errors
 			default:
-				Warn(" !", err)
+				term.Warn(" !", err)
 			}
 		}
 	}
@@ -103,23 +104,23 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
-	tailClient, err := client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
-	defer tailClient.Close() // this works because it takes a pointer receiver
+	defer serverStream.Close() // this works because it takes a pointer receiver
 
 	spinMe := 0
-	doSpinner := !raw && CanColor && IsTerminal
+	doSpinner := !raw && term.CanColor && term.IsTerminal
 
-	if IsTerminal && !raw {
+	if term.IsTerminal && !raw {
 		if doSpinner {
-			stdout.HideCursor()
-			defer stdout.ShowCursor()
+			term.Stdout.HideCursor()
+			defer term.Stdout.ShowCursor()
 		}
 
 		if !DoVerbose {
-			Info(" * Press V to toggle verbose mode")
+			term.Info(" * Press V to toggle verbose mode")
 			oldState, err := term.MakeUnbuf(int(os.Stdin.Fd()))
 			if err != nil {
 				return err
@@ -136,7 +137,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					}
 					switch b[0] {
 					case 10, 13: // Enter or Return
-						Println(Nop, " ") // empty line, but overwrite the spinner
+						term.Println(term.Nop, " ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
@@ -144,7 +145,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						if verbose {
 							modeStr = "on"
 						}
-						Info(" * Verbose mode", modeStr)
+						term.Info(" * Verbose mode", modeStr)
 						go client.Track("Verbose Toggled", P{"verbose", verbose})
 					}
 				}
@@ -152,44 +153,37 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 	}
 
-	timestampZone := time.Local
-	timestampFormat := TimestampFormat
-	if time.Since(since) >= 24*time.Hour {
-		timestampFormat = "2006-01-02T15:04:05.000000Z " // like RFC3339Nano but with 6 digits of precision
-		timestampZone = time.UTC
-	}
-
 	skipDuplicate := false
 	for {
-		if !tailClient.Receive() {
-			if errors.Is(tailClient.Err(), context.Canceled) {
-				return &CancelError{Service: service, Etag: etag, Last: since, error: tailClient.Err()}
+		if !serverStream.Receive() {
+			if errors.Is(serverStream.Err(), context.Canceled) {
+				return &CancelError{Service: service, Etag: etag, Last: since, error: serverStream.Err()}
 			}
 
 			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
-			code := connect.CodeOf(tailClient.Err())
+			code := connect.CodeOf(serverStream.Err())
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(tailClient.Err())) {
-				Debug(" - Disconnected:", tailClient.Err())
+			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
+				term.Debug(" - Disconnected:", serverStream.Err())
 				if !raw {
-					Fprint(stderr, WarnColor, " ! Reconnecting...\r") // overwritten below
+					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
 				time.Sleep(time.Second)
-				tailClient, err = client.Tail(ctx, &v1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 				if err != nil {
-					Debug(" - Reconnect failed:", err)
+					term.Debug(" - Reconnect failed:", err)
 					return err
 				}
 				if !raw {
-					Fprintln(stderr, WarnColor, " ! Reconnected!   ")
+					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnected!   \r") // overwritten with logs
 				}
 				skipDuplicate = true
 				continue
 			}
 
-			return tailClient.Err() // returns nil on EOF
+			return serverStream.Err() // returns nil on EOF
 		}
-		msg := tailClient.Msg()
+		msg := serverStream.Msg()
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
@@ -198,7 +192,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
-		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric"
+		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric" || msg.Host == "kaniko" || msg.Host == "fabric"
 		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
 			if onlyErrors && !e.Stderr {
@@ -215,11 +209,11 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			}
 
 			if raw {
-				out := stdout
+				out := term.Stdout
 				if e.Stderr {
-					out = stderr
+					out = term.Stderr
 				}
-				Fprintln(out, Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
+				term.Fprintln(out, term.Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
 			}
 
@@ -228,7 +222,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				continue
 			}
 
-			tsString := ts.In(timestampZone).Format(timestampFormat)
+			tsString := ts.Local().Format(RFC3339Micro)
 			tsColor := termenv.ANSIWhite
 			if e.Stderr {
 				tsColor = termenv.ANSIBrightRed
@@ -237,31 +231,31 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = Print(tsColor, tsString)
+					prefixLen, _ = term.Print(tsColor, tsString, " ")
 					if etag == "" {
-						l, _ := Print(termenv.ANSIYellow, msg.Etag, " ")
+						l, _ := term.Print(termenv.ANSIYellow, msg.Etag, " ")
 						prefixLen += l
 					}
 					if service == "" {
-						l, _ := Print(termenv.ANSIGreen, msg.Service, " ")
+						l, _ := term.Print(termenv.ANSIGreen, msg.Service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := Print(termenv.ANSIMagenta, msg.Host, " ")
+						l, _ := term.Print(termenv.ANSIMagenta, msg.Host, " ")
 						prefixLen += l
 					}
 				} else {
-					Print(Nop, strings.Repeat(" ", prefixLen))
+					term.Print(term.Nop, strings.Repeat(" ", prefixLen))
 				}
-				if doColor(stdout) {
+				if term.CanColor {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
-					stdout.Reset()
+					term.Stdout.Reset()
 				} else {
 					line = pkg.StripAnsi(line)
 				}
-				Println(Nop, line)
+				term.Println(term.Nop, line)
 			}
 		}
 	}

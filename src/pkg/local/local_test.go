@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 package local
 
 import (
@@ -10,7 +13,7 @@ import (
 
 func TestLocal(t *testing.T) {
 	l := New()
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	t.Run("SetUp", func(t *testing.T) {
 		if err := l.SetUp(ctx, []types.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {

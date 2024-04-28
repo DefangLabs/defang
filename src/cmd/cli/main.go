@@ -6,7 +6,7 @@ import (
 	"os/signal"
 
 	"github.com/defang-io/defang/src/cmd/cli/command"
-	"github.com/defang-io/defang/src/pkg/cli"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 func main() {
@@ -18,13 +18,21 @@ func main() {
 	go func() {
 		<-sigs
 		signal.Stop(sigs)
-		cli.Debug("Received interrupt signal; cancelling...")
+		term.Debug("Received interrupt signal; cancelling...")
 		command.Track("User Interrupted")
-		command.FlushAllTracking()
 		cancel()
 	}()
 
-	command.SetupCommands()
-	command.Execute(ctx)
-	command.FlushAllTracking()
+	command.SetupCommands(version)
+	err := command.Execute(ctx)
+	command.FlushAllTracking() // TODO: track errors/panics
+
+	if err != nil {
+		// If the error is a command.ExitCode, use its value as the exit code
+		ec, ok := err.(command.ExitCode)
+		if !ok {
+			ec = 1 // should not happen since we always return ExitCode
+		}
+		os.Exit(int(ec))
+	}
 }

@@ -1,20 +1,15 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/defang-io/defang/src/pkg/clouds/aws"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 type Region = aws.Region
-
-func Fatal(msg any) {
-	fmt.Println("Error:", msg) // TODO: color red
-	os.Exit(1)
-}
 
 func ParseMemory(memory string) uint64 {
 	i := strings.IndexAny(memory, "BKMGIbkmgi")
@@ -22,7 +17,7 @@ func ParseMemory(memory string) uint64 {
 	if i > 0 {
 		switch strings.ToUpper(memory[i:]) {
 		default:
-			Fatal("invalid suffix: " + memory)
+			term.Fatal("invalid suffix: " + memory)
 		case "G", "GIB":
 			memUnit = 1024 * 1024 * 1024
 		case "GB":
@@ -41,7 +36,7 @@ func ParseMemory(memory string) uint64 {
 	}
 	memoryB, err := strconv.ParseUint(memory, 10, 64)
 	if err != nil {
-		Fatal(err.Error())
+		term.Fatal(err.Error())
 	}
 	return memoryB * memUnit
 }
