@@ -6,16 +6,18 @@ import (
 	"os"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
-		Warn(" ! Dry run, not generating files")
+		term.Warn(" ! Dry run, not generating files")
 		return nil, ErrDryRun
 	}
 
-	response, err := client.GenerateFiles(ctx, &v1.GenerateFilesRequest{
+	response, err := client.GenerateFiles(ctx, &defangv1.GenerateFilesRequest{
+		AgreeTos: true, // agreement was already checked by the caller
 		Language: language,
 		Prompt:   description,
 	})
@@ -23,19 +25,19 @@ func Generate(ctx context.Context, client client.Client, language string, descri
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		// Print the files that were generated
 		for _, file := range response.Files {
-			Debug(file.Name + "\n```")
-			Debug(file.Content)
-			Debug("```")
-			Debug("")
-			Debug("")
+			term.Debug(file.Name + "\n```")
+			term.Debug(file.Content)
+			term.Debug("```")
+			term.Debug("")
+			term.Debug("")
 		}
 	}
 
 	// Write each file to disk
-	Info(" * Writing files to disk...")
+	term.Info(" * Writing files to disk...")
 	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)

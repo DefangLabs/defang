@@ -1,0 +1,31 @@
+<table class="table table-striped table-bordered table-hover">
+  <thread class="thread-dark">
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Phone</th>
+      <th>Twitter</th>
+      <th> </th>
+    </tr>
+  </thread>
+
+  <tbody>
+    <% @members.each do |member| %>
+      <tr>
+        <td><%= link_to member.first_name + ' ' + member.last_name, member %></td>
+        <td><%= member.email %></td>
+        <td><%= member.phone %></td>
+        <td><%= member.twitter %></td>
+        <td><%= link_to 'Delete', member_path(member), data: { turbo_method: :delete, turbo_confirm: 'Are you sure' } , class: "btn btn-outline-danger btn-sm" %></td>
+       # has to have a td to let this row be in the table, otherwise it will appear at the top
+
+      </tr>
+
+    <% end %>
+
+  </tbody>
+
+</table>
+
+
+<%= link_to "New member", new_member_path, class:"btn btn-secondary" %>

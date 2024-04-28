@@ -1,0 +1,55 @@
+name: tests
+services:
+  dfnx:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: alttestproj
+      args:
+        DNS: dfnx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    ports:
+      - target: 80
+        mode: ingress
+      - target: 1234
+        # mode: host
+    secrets:
+      - dummy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      # disable: true
+
+  # dfnx:
+  #   build:
+  #     context: .
+      # dockerfile: Dockerfile.dfn
+    # ports:
+      # - 80
+
+  echo:
+    image: ealen/echo-server
+    ports:
+      - target: 80
+        mode: ingress
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+    # domainname: echotest.gnafed.click
+    profiles:
+      - donotstart
+    x-defang-dns-role: arn:aws:iam::123456789012:role/ecs-service-role
+    x-defang-static: ./static
+
+secrets:
+  dummy:
+    external: true
+    name: dummy
+
+x-unsupported: unsupported

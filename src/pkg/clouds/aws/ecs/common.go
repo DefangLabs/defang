@@ -51,11 +51,6 @@ func normalizedArch(arch string) string {
 	return arch
 }
 
-func (a *AwsEcs) SetVpcID(vpcId string) error {
-	a.VpcID = vpcId
-	return nil
-}
-
 func (a *AwsEcs) GetVpcID() string {
 	return a.VpcID
 }

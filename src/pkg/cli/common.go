@@ -11,10 +11,7 @@ import (
 )
 
 var (
-	DoVerbose   = false
-	DoDebug     = false
-	DoDryRun    = false
-	HadWarnings = false
+	DoDryRun = false
 
 	ErrDryRun = errors.New("dry run")
 )

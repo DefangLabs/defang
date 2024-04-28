@@ -1,0 +1,10 @@
+services:
+  Mistral:
+    image: "mistral:latest"
+    ports:
+      - mode: host
+        target: 8000
+  ui:
+    image: "ui:latest"
+    environment:
+      - "API_URL=http://Mistral:8000"

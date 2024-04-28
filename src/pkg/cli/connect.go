@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
 	"net"
 	"strings"
+
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/clouds"
+	"github.com/defang-io/defang/src/pkg/term"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/types"
@@ -56,17 +58,17 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	if tenant != types.DEFAULT_TENANT {
 		tenantId = tenant
 	}
-	Debug(" - Using tenant", tenantId, "for cluster", host)
+	term.Debug(" - Using tenant", tenantId, "for cluster", host)
 
 	return client.NewGrpcClient(host, accessToken), tenantId
 }
 
 func NewClient(cluster string, projectName string, provider client.Provider) client.Client {
-	Debug(" - Project", projectName)
+	term.Debug(" - Project", projectName)
 	defangClient, tenantId := Connect(cluster)
 
 	if provider == client.ProviderAWS {
-		Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
+		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		byocClient := clouds.NewByocAWS(tenantId, projectName, defangClient)
 		return byocClient
 	}

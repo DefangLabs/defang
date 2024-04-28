@@ -13,7 +13,8 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg/auth"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -56,13 +57,13 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
-func (g GrpcClient) GetVersion(ctx context.Context) (*v1.Version, error) {
+func (g GrpcClient) GetVersion(ctx context.Context) (*defangv1.Version, error) {
 	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g GrpcClient) Token(ctx context.Context, req *v1.TokenRequest) (*v1.TokenResponse, error) {
+func (g GrpcClient) Token(ctx context.Context, req *defangv1.TokenRequest) (*defangv1.TokenResponse, error) {
 	req.AnonId = g.anonID
-	return getMsg(g.client.Token(ctx, &connect.Request[v1.TokenRequest]{Msg: req}))
+	return getMsg(g.client.Token(ctx, &connect.Request[defangv1.TokenRequest]{Msg: req}))
 }
 
 func (g GrpcClient) RevokeToken(ctx context.Context) error {
@@ -70,79 +71,70 @@ func (g GrpcClient) RevokeToken(ctx context.Context) error {
 	return err
 }
 
-func (g GrpcClient) Update(ctx context.Context, req *v1.Service) (*v1.ServiceInfo, error) {
-	return getMsg(g.client.Update(ctx, &connect.Request[v1.Service]{Msg: req}))
+func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv1.ServiceInfo, error) {
+	return getMsg(g.client.Update(ctx, &connect.Request[defangv1.Service]{Msg: req}))
 }
 
-func (g GrpcClient) Deploy(ctx context.Context, req *v1.DeployRequest) (*v1.DeployResponse, error) {
-	// return getMsg(g.client.Deploy(ctx, &connect.Request[v1.DeployRequest]{Msg: req})); TODO: implement this
-	var serviceInfos []*v1.ServiceInfo
+func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	// TODO: remove this when playground supports BYOD
 	for _, service := range req.Services {
-		// Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := g.Update(ctx, service)
-		if err != nil {
-			if len(serviceInfos) == 0 {
-				return nil, err // abort if the first service update fails
-			}
-			// Warn(" ! Failed to update service", service.Name, err)
-			continue
+		if service.Domainname != "" {
+			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
 		}
-
-		serviceInfos = append(serviceInfos, serviceInfo)
 	}
-	return &v1.DeployResponse{Services: serviceInfos}, nil
+	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 
-func (g GrpcClient) Get(ctx context.Context, req *v1.ServiceID) (*v1.ServiceInfo, error) {
-	return getMsg(g.client.Get(ctx, &connect.Request[v1.ServiceID]{Msg: req}))
+func (g GrpcClient) Get(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+	return getMsg(g.client.Get(ctx, &connect.Request[defangv1.ServiceID]{Msg: req}))
 }
 
-func (g GrpcClient) Delete(ctx context.Context, req *v1.DeleteRequest) (*v1.DeleteResponse, error) {
-	return getMsg(g.client.Delete(ctx, &connect.Request[v1.DeleteRequest]{Msg: req}))
+func (g GrpcClient) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	return getMsg(g.client.Delete(ctx, &connect.Request[defangv1.DeleteRequest]{Msg: req}))
 }
 
-func (g GrpcClient) Publish(ctx context.Context, req *v1.PublishRequest) error {
-	_, err := g.client.Publish(ctx, &connect.Request[v1.PublishRequest]{Msg: req})
+func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) error {
+	_, err := g.client.Publish(ctx, &connect.Request[defangv1.PublishRequest]{Msg: req})
 	return err
 }
 
-func (g GrpcClient) GetServices(ctx context.Context) (*v1.ListServicesResponse, error) {
+func (g GrpcClient) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	return getMsg(g.client.GetServices(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g GrpcClient) GenerateFiles(ctx context.Context, req *v1.GenerateFilesRequest) (*v1.GenerateFilesResponse, error) {
-	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[v1.GenerateFilesRequest]{Msg: req}))
+func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error) {
+	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[defangv1.GenerateFilesRequest]{Msg: req}))
 }
 
-func (g GrpcClient) PutSecret(ctx context.Context, req *v1.SecretValue) error {
-	_, err := g.client.PutSecret(ctx, &connect.Request[v1.SecretValue]{Msg: req})
+func (g GrpcClient) PutSecret(ctx context.Context, req *defangv1.SecretValue) error {
+	_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: req})
 	return err
 }
 
-func (g GrpcClient) DeleteSecrets(ctx context.Context, req *v1.Secrets) error {
+func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) error {
 	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
 	var errs []error
 	for _, name := range req.Names {
-		_, err := g.client.PutSecret(ctx, &connect.Request[v1.SecretValue]{Msg: &v1.SecretValue{Name: name}})
+		_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: &defangv1.SecretValue{Name: name}})
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
 }
 
-func (g GrpcClient) ListSecrets(ctx context.Context) (*v1.Secrets, error) {
+func (g GrpcClient) ListSecrets(ctx context.Context) (*defangv1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g GrpcClient) CreateUploadURL(ctx context.Context, req *v1.UploadURLRequest) (*v1.UploadURLResponse, error) {
-	return getMsg(g.client.CreateUploadURL(ctx, &connect.Request[v1.UploadURLRequest]{Msg: req}))
+func (g GrpcClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	return getMsg(g.client.CreateUploadURL(ctx, &connect.Request[defangv1.UploadURLRequest]{Msg: req}))
 }
 
-func (g GrpcClient) WhoAmI(ctx context.Context) (*v1.WhoAmIResponse, error) {
+func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *v1.DelegateSubdomainZoneRequest) (*v1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect.Request[v1.DelegateSubdomainZoneRequest]{Msg: req}))
+func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect.Request[defangv1.DelegateSubdomainZoneRequest]{Msg: req}))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
@@ -150,12 +142,12 @@ func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
 	return err
 }
 
-func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*v1.DelegateSubdomainZoneResponse, error) {
+func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g *GrpcClient) Tail(ctx context.Context, req *v1.TailRequest) (ServerStream[v1.TailResponse], error) {
-	return g.client.Tail(ctx, &connect.Request[v1.TailRequest]{Msg: req})
+func (g *GrpcClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+	return g.client.Tail(ctx, &connect.Request[defangv1.TailRequest]{Msg: req})
 }
 
 func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (ETag, error) {
@@ -176,7 +168,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 			props[p.Name] = fmt.Sprint(p.Value)
 		}
 	}
-	_, err := g.client.Track(context.Background(), &connect.Request[v1.TrackRequest]{Msg: &v1.TrackRequest{
+	_, err := g.client.Track(context.Background(), &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
@@ -186,7 +178,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	return err
 }
 
-func (g *GrpcClient) CheckLogin(ctx context.Context) error {
+func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
@@ -197,11 +189,14 @@ func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(project.Services) == 0 {
+		return "", errors.New("no services found")
+	}
 	var names []string
 	for _, service := range project.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &v1.DeleteRequest{Names: names})
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Names: names})
 	if err != nil {
 		return "", err
 	}
@@ -218,15 +213,20 @@ func (g *GrpcClient) BootstrapList(context.Context) error {
 
 func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
-	services := make([]*v1.Service, 0, len(names))
+	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {
-		serviceInfo, err := g.Get(ctx, &v1.ServiceID{Name: name})
+		serviceInfo, err := g.Get(ctx, &defangv1.ServiceID{Name: name})
 		if err != nil {
 			return err
 		}
 		services = append(services, serviceInfo.Service)
 	}
 
-	_, err := g.Deploy(ctx, &v1.DeployRequest{Services: services})
+	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
 	return err
+}
+
+func (g GrpcClient) ServiceDNS(name string) string {
+	whoami, _ := g.WhoAmI(context.TODO())
+	return whoami.Tenant + "-" + name
 }
