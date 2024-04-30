@@ -187,7 +187,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
-			fmt.Printf("%s", spin.Next())
+			fmt.Print(spin.Next())
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)

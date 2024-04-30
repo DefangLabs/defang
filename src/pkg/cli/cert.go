@@ -59,6 +59,7 @@ func generateCert(ctx context.Context, domain, albDns string) {
 	term.Infof("Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
+		// FIXME: The message below is only valid for BYOC, need to update when playground ACME cert support is added
 		term.Errorf("Please check for error messages from `/aws/lambda/acme-lambda` log group in cloudwatch for more details")
 		return
 	}
