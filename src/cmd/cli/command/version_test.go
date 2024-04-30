@@ -9,11 +9,14 @@ import (
 )
 
 func TestGetCurrentVersion(t *testing.T) {
-	dev := GetCurrentVersion("development")
+	RootCmd.Version = "development"
+	dev := GetCurrentVersion()
 	if dev != "development" {
 		t.Errorf("GetCurrentVersion() = %v; want development", dev)
 	}
-	v := GetCurrentVersion("1.0.0")
+
+	RootCmd.Version = "1.0.0" // as set by GoReleaser
+	v := GetCurrentVersion()
 	if v != "v1.0.0" {
 		t.Errorf("GetCurrentVersion() = %v; want v1.0.0", v)
 	}
