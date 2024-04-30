@@ -35,7 +35,7 @@ type Client interface {
 	Get(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
-	GetVersion(context.Context) (*defangv1.Version, error)
+	GetVersions(context.Context) (*defangv1.Version, error)
 	ListSecrets(context.Context) (*defangv1.Secrets, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutSecret(context.Context, *defangv1.SecretValue) error

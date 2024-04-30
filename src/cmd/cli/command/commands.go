@@ -95,8 +95,8 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
-		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(RootCmd.Version), ver) < 0 {
-			term.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion(RootCmd.Version))
+		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), ver) < 0 {
+			term.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion())
 			term.Println(term.Nop, "A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
@@ -541,7 +541,7 @@ var getVersionCmd = &cobra.Command{
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Print(term.BrightCyan, "Defang CLI:    ")
-		fmt.Println(GetCurrentVersion(RootCmd.Version))
+		fmt.Println(GetCurrentVersion())
 
 		term.Print(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())

@@ -305,7 +305,7 @@ func (b ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	}, nil
 }
 
-func (ByocAws) GetVersion(context.Context) (*defangv1.Version, error) {
+func (ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
 	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }

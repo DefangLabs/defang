@@ -11,7 +11,8 @@ import (
 
 var httpClient = http.DefaultClient
 
-func GetCurrentVersion(version string) string {
+func GetCurrentVersion() string {
+	version := RootCmd.Version
 	if v := semver.Canonical("v" + version); v != "" {
 		return v
 	}
