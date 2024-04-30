@@ -132,7 +132,6 @@ message ServiceInfo {
   string lb_dns = 14;         // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
-  // string natsJwt = 5;
 }
 
 // message Project {
@@ -307,11 +306,17 @@ message HealthCheck {
   // bool disable = 6;
 }
 
+enum Network {
+  UNSPECIFIED = 0; // was: internal=false
+  PRIVATE = 1;     // was: internal=true
+  PUBLIC = 2;
+}
+
 message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal; TODO: not part of spec
+  bool internal = 4; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -321,8 +326,11 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records; TODO: not part of spec
-  string static_files = 15; // x-defang-static-files: folder with static files to serve; TODO: not part of spec
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
+                        // create dns records; TODO: not part of spec
+  string static_files = 15; // x-defang-static-files: folder with static files
+                            // to serve; TODO: not part of spec
+  Network networks = 16; // currently only 1 network is supported
 }
 
 message Event {
