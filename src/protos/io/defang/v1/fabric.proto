@@ -172,7 +172,9 @@ message Status { string version = 1; }
 
 message Version {
   string fabric = 1;
-  string nats = 2;
+  reserved 2; // was "nats"
+  string cli_min = 3; // minimum CLI version
+  string pulumi_min = 4; // minimum Pulumi provider version
 }
 
 message TailRequest {
