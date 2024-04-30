@@ -38,17 +38,17 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
 			b.customDomain = b.getProjectDomain("example.com")
 
-			endpoint := b.GetEndpoint(tt.Fqn, tt.Port)
+			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.GetPublicFqdn(tt.Fqn)
+			publicFqdn := b.getPublicFqdn(tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.GetPrivateFqdn(tt.Fqn)
+			privateFqdn := b.getPrivateFqdn(tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}

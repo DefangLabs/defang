@@ -538,18 +538,18 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
 			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.GetEndpoint(fqn, port))
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
 		}
 	} else {
-		si.PublicFqdn = b.GetPublicFqdn(fqn)
+		si.PublicFqdn = b.getPublicFqdn(fqn)
 		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
 	}
 	if hasIngress {
 		si.LbIps = b.privateLbIps // only set LB IPs if there are ingress ports
-		si.PublicFqdn = b.GetPublicFqdn(fqn)
+		si.PublicFqdn = b.getPublicFqdn(fqn)
 	}
 	if hasHost {
-		si.PrivateFqdn = b.GetPrivateFqdn(fqn)
+		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
 	if service.Domainname != "" {
@@ -604,20 +604,21 @@ func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetEndpoint(fqn qualifiedName, port *defangv1.Port) string {
-	safeFqn := dnsSafeLabel(fqn)
+func (b ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 	if port.Mode == defangv1.Mode_HOST {
-		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
-	} else {
-		if b.customDomain == "" {
-			return ":443" // placeholder for the public ALB/distribution
-		}
-		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+		privateFqdn := b.getPrivateFqdn(fqn)
+		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
+	if b.customDomain == "" {
+		return ":443" // placeholder for the public ALB/distribution
+	}
+	safeFqn := dnsSafeLabel(fqn)
+	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetPublicFqdn(fqn qualifiedName) string {
+func (b ByocAws) getPublicFqdn(fqn qualifiedName) string {
 	if b.customDomain == "" {
 		return "" //b.fqdn
 	}
@@ -626,14 +627,14 @@ func (b ByocAws) GetPublicFqdn(fqn qualifiedName) string {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetPrivateFqdn(fqn qualifiedName) string {
+func (b ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain) // TODO: consider merging this with ServiceDNS
 }
 
 func (b ByocAws) getProjectDomain(zone string) string {
 	projectLabel := dnsSafeLabel(b.pulumiProject)
-	if projectLabel == dnsSafeLabel(string(b.tenantID)) {
+	if projectLabel == dnsSafeLabel(b.tenantID) {
 		return dnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + dnsSafe(zone)
@@ -641,7 +642,7 @@ func (b ByocAws) getProjectDomain(zone string) string {
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafeLabel(fqn qualifiedName) string {
-	return strings.ReplaceAll(dnsSafe(string(fqn)), ".", "-")
+	return strings.ReplaceAll(dnsSafe(fqn), ".", "-")
 }
 
 func dnsSafe(fqdn string) string {
@@ -740,5 +741,5 @@ func annotateAwsError(err error) error {
 }
 
 func (b *ByocAws) ServiceDNS(name string) string {
-	return dnsSafeLabel(name) // TODO: consider making it FQDN using the private domain
+	return dnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
 }
