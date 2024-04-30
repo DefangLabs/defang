@@ -209,14 +209,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 	b.cdTasks[etag] = taskArn
 
-	deployed, err := b.GetServices(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve deployed services: %w", err)
-	}
-	for _, si := range deployed.Services {
-		domain := si.Service.Domainname
+	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate let's encrypt SSL certificate for %v, run 'defang cert gen'", domain)
+			term.Infof("To activate let's encrypt SSL certificate for %v, run 'defang cert gen'", si.Service.Domainname)
 		}
 	}
 
