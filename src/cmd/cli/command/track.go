@@ -29,7 +29,7 @@ func Track(name string, props ...P) {
 	trackWG.Add(1)
 	go func(client cliClient.Client) {
 		defer trackWG.Done()
-		client.Track(name, props...)
+		_ = client.Track(name, props...)
 	}(client)
 }
 
