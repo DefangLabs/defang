@@ -584,6 +584,9 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
+	if len(secrets) == 0 {
+		return nil, nil // no secrets to check
+	}
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
@@ -591,14 +594,19 @@ func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1
 	}
 	for _, secret := range secrets {
 		fqn := b.getSecretID(secret.Source)
-		i := sort.Search(len(sorted), func(i int) bool {
-			return sorted[i] >= fqn
-		})
-		if i >= len(sorted) || sorted[i] != fqn {
+		if !searchSecret(sorted, fqn) {
 			return secret, nil // secret not found
 		}
 	}
-	return nil, nil // all secrets found (or none specified)
+	return nil, nil // all secrets found
+}
+
+// This function was copied from Fabric controller
+func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
+	i := sort.Search(len(sorted), func(i int) bool {
+		return sorted[i] >= fqn
+	})
+	return i < len(sorted) && sorted[i] == fqn
 }
 
 type qualifiedName = string // legacy
