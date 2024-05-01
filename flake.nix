@@ -11,6 +11,7 @@
           devShell = with pkgs; mkShell {
             buildInputs = [
               buf
+              crane
               git
               gnumake
               gnused # force Linux `sed` everywhere

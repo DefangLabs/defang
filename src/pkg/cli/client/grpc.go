@@ -57,7 +57,7 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
-func (g GrpcClient) GetVersion(ctx context.Context) (*defangv1.Version, error) {
+func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
 	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
 

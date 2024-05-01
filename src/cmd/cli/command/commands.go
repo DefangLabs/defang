@@ -95,8 +95,8 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
-		if ver, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(RootCmd.Version), ver) < 0 {
-			term.Debug("Latest Version:", ver, "Current Version:", GetCurrentVersion(RootCmd.Version))
+		if latest, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), latest) < 0 {
+			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			term.Println(term.Nop, "A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
@@ -318,6 +318,15 @@ var RootCmd = &cobra.Command{
 		}
 
 		client = cli.NewClient(cluster, projectName, provider)
+
+		if v, err := client.GetVersions(cmd.Context()); err == nil {
+			version := "v" + cmd.Root().Version // HACK to avoid circular dependency with RootCmd
+			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "Min CLI:", v.CliMin)
+			if hasTty && semver.Compare(version, v.CliMin) < 0 {
+				term.Warn(" ! Your CLI version is outdated. Please update to the latest version.")
+				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
+			}
+		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -541,7 +550,7 @@ var getVersionCmd = &cobra.Command{
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Print(term.BrightCyan, "Defang CLI:    ")
-		fmt.Println(GetCurrentVersion(RootCmd.Version))
+		fmt.Println(GetCurrentVersion())
 
 		term.Print(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())
