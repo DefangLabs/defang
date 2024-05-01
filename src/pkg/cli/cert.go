@@ -73,8 +73,11 @@ func waitForTLS(ctx context.Context, domain string) error {
 	timeout, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	term.Stdout.HideCursor()
-	defer term.Stdout.ShowCursor()
+	doSpinner := term.CanColor && term.IsTerminal
+	if doSpinner {
+		term.Stdout.HideCursor()
+		defer term.Stdout.ShowCursor()
+	}
 	spin := spinner.New()
 	for {
 		select {
@@ -84,7 +87,9 @@ func waitForTLS(ctx context.Context, domain string) error {
 			if err := checkTLSCert(timeout, domain); err == nil {
 				return nil
 			}
-			term.Printf(term.InfoColor, "%s", spin.Next())
+			if doSpinner {
+				term.Print(term.Nop, spin.Next())
+			}
 		}
 	}
 }
@@ -95,8 +100,11 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 
 	albDns = strings.TrimSuffix(albDns, ".")
 	msgShown := false
-	term.Stdout.HideCursor()
-	defer term.Stdout.ShowCursor()
+	doSpinner := term.CanColor && term.IsTerminal
+	if doSpinner {
+		term.Stdout.HideCursor()
+		defer term.Stdout.ShowCursor()
+	}
 	spin := spinner.New()
 	for {
 		select {
@@ -111,7 +119,9 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 					term.Infof("Note: DNS propagation may take a while, we will proceed as soon as the CNAME record is ready, checking...")
 					msgShown = true
 				}
-				term.Printf(term.InfoColor, "%s", spin.Next())
+				if doSpinner {
+					term.Print(term.Nop, spin.Next())
+				}
 			} else {
 				return nil
 			}

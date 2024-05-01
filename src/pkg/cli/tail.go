@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -191,7 +190,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
-			fmt.Print(spin.Next())
+			term.Print(term.Nop, spin.Next())
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
