@@ -474,7 +474,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			term.Warnf(" ! The build context contains more than %d files; press Ctrl+C if this is unexpected.", ContextFileLimit)
+			term.Warnf(" ! The build context contains more than %d files; use --debug or create .dockerignore", ContextFileLimit)
 		}
 
 		_, err = io.Copy(tarWriter, file)
