@@ -50,11 +50,7 @@ func generateCert(ctx context.Context, domain, albDns string) {
 		return
 	}
 	term.Infof("Triggering cert generation for %v", domain)
-
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
-		// Ignore possible tls error as cert attachment may take time
-		term.Debugf("Error triggering cert generation: %v", err)
-	}
+	triggerCertGeneration(ctx, domain)
 
 	term.Infof("Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
@@ -65,6 +61,33 @@ func generateCert(ctx context.Context, domain, albDns string) {
 	}
 
 	term.Infof("TLS cert for %v is ready", domain)
+}
+
+func triggerCertGeneration(ctx context.Context, domain string) {
+	doSpinner := term.CanColor && term.IsTerminal
+	if doSpinner {
+		spinCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go func() {
+			term.Stdout.HideCursor()
+			defer term.Stdout.ShowCursor()
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+			spin := spinner.New()
+			for {
+				select {
+				case <-spinCtx.Done():
+					return
+				case <-ticker.C:
+					term.Print(term.Nop, spin.Next())
+				}
+			}
+		}()
+	}
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
+		// Ignore possible tls error as cert attachment may take time
+		term.Debugf("Error triggering cert generation: %v", err)
+	}
 }
 
 func waitForTLS(ctx context.Context, domain string) error {
@@ -115,7 +138,7 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 			cname = strings.TrimSuffix(cname, ".")
 			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
 				if !msgShown {
-					term.Infof("Please setup CNAME record for %v to point to ALB %v, waiting for CNAME record setup and DNS propagation", domain, albDns)
+					term.Infof("Please setup CNAME record for %v to point to ALB %v, waiting for CNAME record setup and DNS propagation", domain, strings.ToLower(albDns))
 					term.Infof("Note: DNS propagation may take a while, we will proceed as soon as the CNAME record is ready, checking...")
 					msgShown = true
 				}
@@ -153,8 +176,5 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 			return ctx.Err()
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
