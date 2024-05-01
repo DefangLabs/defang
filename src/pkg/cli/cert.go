@@ -2,14 +2,15 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/spinner"
 	"github.com/defang-io/defang/src/pkg/term"
 )
 
@@ -22,19 +23,13 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		return err
 	}
 
-	var wg sync.WaitGroup
 	cnt := 0
 	for _, service := range services.Services {
 		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
-			wg.Add(1)
 			cnt++
-			go func(domain string, albDns string) {
-				defer wg.Done()
-				generateCert(ctx, domain, albDns)
-			}(service.Service.Domainname, service.LbDns)
+			generateCert(ctx, service.Service.Domainname, service.LbDns)
 		}
 	}
-	wg.Wait()
 	if cnt == 0 {
 		term.Infof("No services found need to generate Let's Encrypt cert")
 	}
@@ -49,21 +44,23 @@ func generateCert(ctx context.Context, domain, albDns string) {
 		return
 	}
 
-	term.Infof("CNAME record for %v is ready", domain)
+	term.Infof("%v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
 		term.Infof("TLS cert for %v is already ready", domain)
 		return
 	}
 	term.Infof("Triggering cert generation for %v", domain)
 
-	if err := getWithContext(ctx, fmt.Sprintf("http://%v", domain)); err != nil {
-		term.Errorf("Error triggering cert generation: %v", err)
-		return
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
+		// Ignore possible tls error as cert attachment may take time
+		term.Debugf("Error triggering cert generation: %v", err)
 	}
 
 	term.Infof("Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
-		term.Errorf("Error waiting for TLS: %v", err)
+		term.Errorf("Error waiting for TLS to be online: %v", err)
+		// FIXME: The message below is only valid for BYOC, need to update when playground ACME cert support is added
+		term.Errorf("Please check for error messages from `/aws/lambda/acme-lambda` log group in cloudwatch for more details")
 		return
 	}
 
@@ -76,6 +73,12 @@ func waitForTLS(ctx context.Context, domain string) error {
 	timeout, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
+	doSpinner := term.CanColor && term.IsTerminal
+	if doSpinner {
+		term.Stdout.HideCursor()
+		defer term.Stdout.ShowCursor()
+	}
+	spin := spinner.New()
 	for {
 		select {
 		case <-timeout.Done():
@@ -83,6 +86,9 @@ func waitForTLS(ctx context.Context, domain string) error {
 		case <-ticker.C:
 			if err := checkTLSCert(timeout, domain); err == nil {
 				return nil
+			}
+			if doSpinner {
+				term.Print(term.Nop, spin.Next())
 			}
 		}
 	}
@@ -94,6 +100,12 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 
 	albDns = strings.TrimSuffix(albDns, ".")
 	msgShown := false
+	doSpinner := term.CanColor && term.IsTerminal
+	if doSpinner {
+		term.Stdout.HideCursor()
+		defer term.Stdout.ShowCursor()
+	}
+	spin := spinner.New()
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,8 +115,12 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 			cname = strings.TrimSuffix(cname, ".")
 			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
 				if !msgShown {
-					term.Infof("Please setup CNAME record for %v to point to ALB %v", domain, albDns)
+					term.Infof("Please setup CNAME record for %v to point to ALB %v, waiting for CNAME record setup and DNS propagation", domain, albDns)
+					term.Infof("Note: DNS propagation may take a while, we will proceed as soon as the CNAME record is ready, checking...")
 					msgShown = true
+				}
+				if doSpinner {
+					term.Print(term.Nop, spin.Next())
 				}
 			} else {
 				return nil
@@ -114,16 +130,31 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 }
 
 func checkTLSCert(ctx context.Context, domain string) error {
-	return getWithContext(ctx, fmt.Sprintf("https://%v", domain))
+	return getWithRetries(ctx, fmt.Sprintf("https://%v", domain), 3)
 }
 
-func getWithContext(ctx context.Context, url string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
+func getWithRetries(ctx context.Context, url string, tries int) error {
+	var errs []error
+	for i := 0; i < tries; i++ {
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return err // No point retrying if we can't even create the request
+		}
+		if _, err := http.DefaultClient.Do(req); err != nil {
+			errs = append(errs, err)
+		}
+
+		delay := (100 * time.Millisecond) >> i // Simple exponential backoff
+		select {
+		case <-time.After(delay):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-	if _, err := http.DefaultClient.Do(req); err != nil {
-		return err
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 	return nil
 }
