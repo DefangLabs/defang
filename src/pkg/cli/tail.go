@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/spinner"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/muesli/termenv"
@@ -22,7 +22,6 @@ const (
 	ansiCyan      = "\033[36m"
 	ansiReset     = "\033[0m"
 	replaceString = ansiCyan + "$0" + ansiReset
-	spinner       = `-\|/`
 	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00" // like RFC3339Nano but with 6 digits of precision
 )
 
@@ -112,7 +111,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	}
 	defer serverStream.Close() // this works because it takes a pointer receiver
 
-	spinMe := 0
+	spin := spinner.New()
 	doSpinner := !raw && term.CanColor && term.IsTerminal
 
 	if term.IsTerminal && !raw {
@@ -191,8 +190,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
-			fmt.Printf("\r%c\r", spinner[spinMe%len(spinner)])
-			spinMe++
+			term.Print(term.Nop, spin.Next())
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)

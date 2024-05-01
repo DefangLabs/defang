@@ -209,8 +209,14 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 	b.cdTasks[etag] = taskArn
 
+	for _, si := range serviceInfos {
+		if si.UseAcmeCert {
+			term.Infof("To activate let's encrypt SSL certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+		}
+	}
+
 	return &defangv1.DeployResponse{
-		Services: serviceInfos,
+		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
 	}, nil
 }
@@ -567,7 +573,6 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 				si.UseAcmeCert = true
 				// TODO: We should add link to documentation on how the acme cert workflow works
 				// TODO: Should we make this the default behavior or require the user to set a flag?
-				term.Warnf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn)
 			} else {
 				si.ZoneId = zoneId
 			}
