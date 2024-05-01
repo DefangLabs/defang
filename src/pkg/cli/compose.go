@@ -32,6 +32,8 @@ import (
 
 const (
 	MiB                 = 1024 * 1024
+	ContextFileLimit    = 10
+	ContextSizeLimit    = 10 * MiB
 	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
 	defaultDockerIgnore = `# Default .dockerignore file for Defang
 **/.DS_Store
@@ -394,6 +396,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
 
+	doProgress := term.DoColor(term.Stdout) && term.IsTerminal
 	err = filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -432,7 +435,12 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			}
 		}
 
-		term.Debug(" - Adding", baseName)
+		if term.DoDebug {
+			term.Debug(" - Adding", baseName)
+		} else if doProgress {
+			fmt.Printf("%4d %s\r", fileCount, baseName)
+			defer term.Stdout.ClearLine()
+		}
 
 		info, err := de.Info()
 		if err != nil {
@@ -465,13 +473,13 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		defer file.Close()
 
 		fileCount++
-		if fileCount == 11 {
-			term.Warn(" ! The build context contains more than 10 files; press Ctrl+C if this is unexpected.")
+		if fileCount == ContextFileLimit+1 {
+			term.Warnf(" ! The build context contains more than %d files; press Ctrl+C if this is unexpected.", ContextFileLimit)
 		}
 
 		_, err = io.Copy(tarWriter, file)
-		if buf.Len() > 10*MiB {
-			return fmt.Errorf("build context is too large; this beta version is limited to 10MiB")
+		if buf.Len() > ContextSizeLimit {
+			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB", ContextSizeLimit/MiB)
 		}
 		return err
 	})
