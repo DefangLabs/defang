@@ -12,5 +12,6 @@ func New() *Spinner {
 
 func (s *Spinner) Next() string {
 	s.cnt++
-	return string([]byte{SpinnerChars[s.cnt%len(SpinnerChars)], '\b'})
+	runes := []rune(SpinnerChars)
+	return string([]rune{runes[s.cnt%len(runes)], '\b'})
 }
