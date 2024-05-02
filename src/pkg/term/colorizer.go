@@ -12,8 +12,8 @@ var (
 	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && isTerminal()
 	Stdout      = termenv.NewOutput(os.Stdout)
 	Stderr      = termenv.NewOutput(os.Stderr)
-	CanColor    = doColor(Stdout)
-	CanColorErr = doColor(Stderr)
+	CanColor    = DoColor(Stdout)
+	CanColorErr = DoColor(Stderr)
 	DoDebug     bool
 	HadWarnings bool
 )
@@ -28,8 +28,8 @@ const (
 	DebugColor = termenv.ANSIBrightBlack // Gray
 )
 
-// doColor returns true if the provided output's profile is not Ascii.
-func doColor(o *termenv.Output) bool {
+// DoColor returns true if the provided output's profile is not Ascii.
+func DoColor(o *termenv.Output) bool {
 	return o.Profile != termenv.Ascii
 }
 
@@ -47,7 +47,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	if len(msg) == 0 {
 		return 0, nil
 	}
-	if doColor(w) {
+	if DoColor(w) {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
 	}
