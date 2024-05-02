@@ -2,7 +2,7 @@ name: Trigger Docs Samples Rebuild
 
 on:
   push:
-    branches: build-samples-json # TODO: Change to main (deploy test)
+    branches: main
     paths:
       - 'samples/**'
 
