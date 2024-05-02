@@ -288,7 +288,6 @@ var RootCmd = &cobra.Command{
 
 		project.ComposeFilePath, _ = cmd.Flags().GetString("file")
 		project.TenantID = cli.GetTenantID(cluster)
-
 		client = cli.NewClient(cluster, provider)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {

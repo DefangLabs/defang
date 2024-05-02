@@ -41,6 +41,9 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			project.ComposeFilePath = "../../../../../tests/noprojname/compose.yaml"
 			project.TenantID = tt.TenantID
 			b := NewByocAWS(tt.TenantID, nil)
+			if _, err := b.LoadCompose(); err != nil {
+				t.Fatalf("LoadCompose() failed: %v", err)
+			}
 			b.customDomain = b.getProjectDomain("example.com")
 
 			endpoint := b.getEndpoint(tt.Fqn, tt.Port)

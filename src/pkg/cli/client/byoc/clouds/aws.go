@@ -51,34 +51,17 @@ type ByocAws struct {
 	setupDone               bool
 	tenantID                string
 	shouldDelegateSubdomain bool
-	project                 *compose.Project
 }
 
 var _ client.Client = (*ByocAws)(nil)
 
 func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
-
-	// Load the compose project at creation time
-	var proj *compose.Project
-	var err error
-	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
-	if projectNameOverride != "" {
-		proj, err = project.LoadWithProjectName(projectNameOverride)
-	} else {
-		proj, err = project.Load()
-	}
-	if err != nil {
-		term.Fatalf("Failed to load compose file: %v", err)
-	}
-
 	b := &ByocAws{
-		GrpcClient:    defClient,
-		cdTasks:       make(map[string]ecs.TaskArn),
-		customDomain:  "",
-		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		privateDomain: dnsSafeLabel(proj.Name) + ".internal",
-		pulumiProject: proj.Name, // TODO: multi-project support
-		pulumiStack:   "beta",    // TODO: make customizable
+		GrpcClient:   defClient,
+		cdTasks:      make(map[string]ecs.TaskArn),
+		customDomain: "",
+		driver:       cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		pulumiStack:  "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -89,7 +72,6 @@ func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws 
 			ShmSizeMiB: 30720,
 		},
 		tenantID: string(tenantId),
-		project:  proj,
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
@@ -97,7 +79,20 @@ func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws 
 }
 
 func (b *ByocAws) LoadCompose() (*compose.Project, error) {
-	return b.project, nil
+	var proj *compose.Project
+	var err error
+	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+	if projectNameOverride != "" {
+		proj, err = project.LoadWithProjectName(projectNameOverride)
+	} else {
+		proj, err = project.Load()
+	}
+	if err != nil {
+		return nil, err
+	}
+	b.privateDomain = dnsSafeLabel(proj.Name) + ".internal"
+	b.pulumiProject = proj.Name
+	return proj, nil
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {
