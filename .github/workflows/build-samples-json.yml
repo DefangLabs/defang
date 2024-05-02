@@ -2,7 +2,7 @@ name: Build and Publish JSON
 
 on:
   push:
-    branches: build-samples-json # TODO: Change to main
+    branches: build-samples-json # TODO: Change to main (deploy test)
     paths:
       - 'samples/**'
 
