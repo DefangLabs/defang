@@ -79,7 +79,7 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 				case <-spinCtx.Done():
 					return
 				case <-ticker.C:
-					term.Print(term.Nop, spin.Next())
+					fmt.Print(spin.Next())
 				}
 			}
 		}()
@@ -111,7 +111,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 				return nil
 			}
 			if doSpinner {
-				term.Print(term.Nop, spin.Next())
+				fmt.Print(spin.Next())
 			}
 		}
 	}
@@ -143,7 +143,7 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 					msgShown = true
 				}
 				if doSpinner {
-					term.Print(term.Nop, spin.Next())
+					fmt.Print(spin.Next())
 				}
 			} else {
 				return nil
