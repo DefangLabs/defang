@@ -8,9 +8,9 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli/client"
 )
 
-func ComposeRestart(ctx context.Context, client client.Client, project *composeTypes.Project) error {
+func ComposeRestart(ctx context.Context, client client.Client, project *composeTypes.Project) (client.ETag, error) {
 	if project == nil {
-		return &ComposeError{errors.New("no project found")}
+		return "", &ComposeError{errors.New("no project found")}
 	}
 	names := make([]string, 0, len(project.Services))
 	for _, service := range project.Services {
