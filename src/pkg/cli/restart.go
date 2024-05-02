@@ -7,11 +7,11 @@ import (
 	"github.com/defang-io/defang/src/pkg/term"
 )
 
-func Restart(ctx context.Context, client client.Client, names ...string) error {
+func Restart(ctx context.Context, client client.Client, names ...string) (client.ETag, error) {
 	term.Debug(" - Restarting service", names)
 
 	if DoDryRun {
-		return ErrDryRun
+		return "", ErrDryRun
 	}
 
 	return client.Restart(ctx, names...)

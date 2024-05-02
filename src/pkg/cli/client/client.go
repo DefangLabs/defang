@@ -39,7 +39,7 @@ type Client interface {
 	ListSecrets(context.Context) (*defangv1.Secrets, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutSecret(context.Context, *defangv1.SecretValue) error
-	Restart(context.Context, ...string) error
+	Restart(context.Context, ...string) (ETag, error)
 	RevokeToken(context.Context) error
 	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
