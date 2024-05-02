@@ -770,7 +770,7 @@ var composeStartCmd = &cobra.Command{
 
 var composeRestartCmd = &cobra.Command{
 	Use:         "restart",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and restarts its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
