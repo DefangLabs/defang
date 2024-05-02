@@ -1,4 +1,4 @@
-name: Build and Publish JSON
+name: Trigger Docs Samples Rebuild
 
 on:
   push:
