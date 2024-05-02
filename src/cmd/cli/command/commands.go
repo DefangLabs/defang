@@ -15,10 +15,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/scope"
 	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
@@ -30,11 +30,8 @@ import (
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
-const authNeeded = "auth-needed"       // annotation to indicate that a command needs authorization
-const projectNeeded = "project-needed" // annotation to indicate that a command needs compose project exist in the current directory
+const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
-var projectNeededAnnotation = map[string]string{projectNeeded: ""}
-var authAndProjectNeededAnnotation = map[string]string{authNeeded: "", projectNeeded: ""}
 
 // GLOBALS
 var (
@@ -44,7 +41,6 @@ var (
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
-	project        *composeTypes.Project
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
 
@@ -290,34 +286,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		var projectName string
-		if _, ok := cmd.Annotations[projectNeeded]; ok {
-			filePath, _ := cmd.InheritedFlags().GetString("file")
-			projectName = os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
-			if projectName != "" {
-				project, err = cli.LoadComposeWithProjectName(filePath, projectName)
-			} else {
-				tenantID := cli.GetTenantID(cluster)
-				projectName = string(tenantID)
-				if provider == cliClient.ProviderDefang {
-					project, err = cli.LoadComposeWithProjectName(filePath, projectName) // playground env
-				} else {
-					project, err = cli.LoadCompose(filePath, tenantID) // fallback to tenant ID
-				}
-			}
+		project.ComposeFilePath, _ = cmd.Flags().GetString("file")
+		project.TenantID = cli.GetTenantID(cluster)
 
-			if err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					term.Debug(" - Could not find docker compose file: ", err)
-				} else {
-					term.Warn(" - Error loading docker compose file: ", err)
-				}
-			} else {
-				projectName = project.Name
-			}
-		}
-
-		client = cli.NewClient(cluster, projectName, provider)
+		client = cli.NewClient(cluster, provider)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := "v" + cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -346,7 +318,7 @@ var RootCmd = &cobra.Command{
 				}
 
 				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client = cli.NewClient(cluster, projectName, provider)        // reconnect with the new token
+				client = cli.NewClient(cluster, provider)                     // reconnect with the new token
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
@@ -405,11 +377,10 @@ var certCmd = &cobra.Command{
 }
 
 var certGenerateCmd = &cobra.Command{
-	Use:         "generate",
-	Aliases:     []string{"gen"},
-	Annotations: projectNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Short:       "Generate an letsencrypt certificate",
+	Use:     "generate",
+	Aliases: []string{"gen"},
+	Args:    cobra.NoArgs,
+	Short:   "Generate an letsencrypt certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.GenerateLetsEncryptCert(cmd.Context(), client)
 		if err != nil {
@@ -523,7 +494,7 @@ Generate will write files in the current folder. You can edit them and then depl
 
 var getServicesCmd = &cobra.Command{
 	Use:         "services",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"getServices", "ls", "list"},
 	Short:       "Get list of services on the cluster",
@@ -565,7 +536,7 @@ var getVersionCmd = &cobra.Command{
 
 var tailCmd = &cobra.Command{
 	Use:         "tail",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -594,7 +565,7 @@ var secretsCmd = &cobra.Command{
 
 var secretsSetCmd = &cobra.Command{
 	Use:         "create SECRET", // like Docker
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.ExactArgs(1),
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a secret",
@@ -633,7 +604,7 @@ var secretsSetCmd = &cobra.Command{
 
 var secretsDeleteCmd = &cobra.Command{
 	Use:         "rm SECRET...", // like Docker
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Deletes one or more secrets",
@@ -655,7 +626,7 @@ var secretsDeleteCmd = &cobra.Command{
 
 var secretsListCmd = &cobra.Command{
 	Use:         "ls", // like Docker
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
 	Short:       "List secrets",
@@ -706,7 +677,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Like 'start' but immediately tracks the progress of the deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -714,7 +685,11 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
+		proj, err := client.LoadCompose()
+		if err != nil {
+			return err
+		}
+		deploy, err := cli.ComposeStart(cmd.Context(), client, proj, force)
 		if err != nil {
 			return err
 		}
@@ -745,13 +720,17 @@ var composeUpCmd = &cobra.Command{
 var composeStartCmd = &cobra.Command{
 	Use:         "start",
 	Aliases:     []string{"deploy"},
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and deploys services to the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
+		proj, err := client.LoadCompose()
+		if err != nil {
+			return err
+		}
+		deploy, err := cli.ComposeStart(cmd.Context(), client, proj, force)
 		if err != nil {
 			return err
 		}
@@ -774,18 +753,27 @@ var composeRestartCmd = &cobra.Command{
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and restarts its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.ComposeRestart(cmd.Context(), client, project)
+
+		proj, err := client.LoadCompose()
+		if err != nil {
+			return err
+		}
+		return cli.ComposeRestart(cmd.Context(), client, proj)
 	},
 }
 
 var composeStopCmd = &cobra.Command{
 	Use:         "stop",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and stops its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := cli.ComposeStop(cmd.Context(), client, project)
+		proj, err := client.LoadCompose()
 		if err != nil {
+			return err
+		}
+
+		if _, err := cli.ComposeStop(cmd.Context(), client, proj); err != nil {
 			return err
 		}
 		return nil
@@ -795,7 +783,7 @@ var composeStopCmd = &cobra.Command{
 var composeDownCmd = &cobra.Command{
 	Use:         "down",
 	Aliases:     []string{"rm"},
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Like 'stop' but also deprovisions the services from the cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -830,14 +818,18 @@ var composeDownCmd = &cobra.Command{
 }
 
 var composeConfigCmd = &cobra.Command{
-	Use:         "config",
-	Annotations: projectNeededAnnotation,
-	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Reads a Compose file and shows the generated config",
+	Use:   "config",
+	Args:  cobra.NoArgs, // TODO: takes optional list of service names
+	Short: "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cli.DoDryRun = true                                               // config is like start in a dry run
-		_, err := cli.ComposeStart(cmd.Context(), client, project, false) // force=false to calculate the digest
-		if !errors.Is(err, cli.ErrDryRun) {
+		cli.DoDryRun = true // config is like start in a dry run
+		proj, err := client.LoadCompose()
+		if err != nil {
+			return err
+		}
+
+		// force=false to calculate the digest
+		if _, err := cli.ComposeStart(cmd.Context(), client, proj, false); !errors.Is(err, cli.ErrDryRun) {
 			return err
 		}
 		return nil
@@ -846,7 +838,7 @@ var composeConfigCmd = &cobra.Command{
 
 var deleteCmd = &cobra.Command{
 	Use:         "delete SERVICE...",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
@@ -878,7 +870,7 @@ var deleteCmd = &cobra.Command{
 
 var restartCmd = &cobra.Command{
 	Use:         "restart SERVICE...",
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -889,7 +881,7 @@ var restartCmd = &cobra.Command{
 var sendCmd = &cobra.Command{
 	Use:         "send",
 	Hidden:      true, // not available in private beta
-	Annotations: authAndProjectNeededAnnotation,
+	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"msg", "message", "publish", "pub"},
 	Short:       "Send a message to a service",

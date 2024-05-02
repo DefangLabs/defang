@@ -21,8 +21,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/clouds/aws"
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -49,23 +51,34 @@ type ByocAws struct {
 	setupDone               bool
 	tenantID                string
 	shouldDelegateSubdomain bool
+	project                 *compose.Project
 }
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcClient) *ByocAws {
-	// Resource naming (stack/stackDir) requires a project name
-	if project == "" {
-		project = tenantId.String()
+func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
+
+	// Load the compose project at creation time
+	var proj *compose.Project
+	var err error
+	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+	if projectNameOverride != "" {
+		proj, err = project.LoadWithProjectName(projectNameOverride)
+	} else {
+		proj, err = project.Load()
 	}
+	if err != nil {
+		term.Fatalf("Failed to load compose file: %v", err)
+	}
+
 	b := &ByocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]ecs.TaskArn),
 		customDomain:  "",
 		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		privateDomain: dnsSafeLabel(project) + ".internal",
-		pulumiProject: project, // TODO: multi-project support
-		pulumiStack:   "beta",  // TODO: make customizable
+		privateDomain: dnsSafeLabel(proj.Name) + ".internal",
+		pulumiProject: proj.Name, // TODO: multi-project support
+		pulumiStack:   "beta",    // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -76,10 +89,15 @@ func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcC
 			ShmSizeMiB: 30720,
 		},
 		tenantID: string(tenantId),
+		project:  proj,
 		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
 	return b
+}
+
+func (b *ByocAws) LoadCompose() (*compose.Project, error) {
+	return b.project, nil
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {

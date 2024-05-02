@@ -15,6 +15,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/sirupsen/logrus"
@@ -50,7 +51,8 @@ func TestLoadCompose(t *testing.T) {
 	term.DoDebug = true
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		p, err := LoadComposeWithProjectName("../../tests/noprojname/compose.yaml", "tenant-id")
+		project.ComposeFilePath = "../../tests/noprojname/compose.yaml"
+		p, err := project.LoadWithProjectName("tenant-id")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -60,7 +62,8 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name", func(t *testing.T) {
-		p, err := LoadComposeWithProjectName("../../tests/testproj/compose.yaml", "tests")
+		project.ComposeFilePath = "../../tests/testproj/compose.yaml"
+		p, err := project.LoadWithProjectName("tests")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -70,7 +73,8 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		p, err := LoadComposeWithProjectName("../../tests/noprojname/compose.yaml", "Valid-Username")
+		project.ComposeFilePath = "../../tests/noprojname/compose.yaml"
+		p, err := project.LoadWithProjectName("Valid-Username")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -80,7 +84,9 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		p, err := LoadCompose("../../tests/noprojname/compose.yaml", "tenant-id")
+		project.ComposeFilePath = "../../tests/noprojname/compose.yaml"
+		project.TenantID = "tenant-id"
+		p, err := project.Load()
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -90,7 +96,9 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
-		p, err := LoadCompose("../../tests/testproj/compose.yaml", "tenant-id")
+		project.ComposeFilePath = "../../tests/testproj/compose.yaml"
+		project.TenantID = "tenant-id"
+		p, err := project.Load()
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -100,7 +108,9 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		p, err := LoadCompose("../../tests/noprojname/compose.yaml", "tenanT-id")
+		project.ComposeFilePath = "../../tests/noprojname/compose.yaml"
+		project.TenantID = "tenant-id"
+		p, err := project.Load()
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -128,7 +138,8 @@ func TestLoadCompose(t *testing.T) {
 		defer teardown()
 
 		// execute test
-		p, err := LoadComposeWithProjectName("", "tests")
+		project.ComposeFilePath = ""
+		p, err := project.LoadWithProjectName("tests")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -138,7 +149,8 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
-		p, err := LoadComposeWithProjectName("../../tests/alttestproj/altcomp.yaml", "tests")
+		project.ComposeFilePath = "../../tests/alttestproj/altcomp.yaml"
+		p, err := project.LoadWithProjectName("tests")
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -385,7 +397,9 @@ func (m MockClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 }
 
 func TestProjectValidationServiceName(t *testing.T) {
-	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	project.ComposeFilePath = "../../tests/testproj/compose.yaml"
+	project.TenantID = "tests"
+	p, err := project.Load()
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -409,7 +423,9 @@ func TestProjectValidationNetworks(t *testing.T) {
 	var warnings bytes.Buffer
 	logrus.SetOutput(&warnings)
 
-	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	project.ComposeFilePath = "../../tests/testproj/compose.yaml"
+	project.TenantID = "tests"
+	p, err := project.Load()
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -445,7 +461,9 @@ func TestProjectValidationNetworks(t *testing.T) {
 }
 
 func TestProjectValidationNoDeploy(t *testing.T) {
-	p, err := LoadCompose("../../tests/testproj/compose.yaml", "tests")
+	project.ComposeFilePath = "../../tests/testproj/compose.yaml"
+	project.TenantID = "tests"
+	p, err := project.Load()
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}

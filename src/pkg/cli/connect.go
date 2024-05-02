@@ -63,13 +63,12 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	return client.NewGrpcClient(host, accessToken), tenantId
 }
 
-func NewClient(cluster string, projectName string, provider client.Provider) client.Client {
-	term.Debug(" - Project", projectName)
+func NewClient(cluster string, provider client.Provider) client.Client {
 	defangClient, tenantId := Connect(cluster)
 
 	if provider == client.ProviderAWS {
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		byocClient := clouds.NewByocAWS(tenantId, projectName, defangClient)
+		byocClient := clouds.NewByocAWS(tenantId, defangClient)
 		return byocClient
 	}
 

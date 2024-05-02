@@ -1,8 +1,10 @@
 package clouds
 
 import (
+	"os"
 	"testing"
 
+	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
@@ -35,7 +37,10 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
+			os.Setenv("COMPOSE_PROJECT_NAME", tt.ProjectName)
+			project.ComposeFilePath = "../../../../../tests/noprojname/compose.yaml"
+			project.TenantID = tt.TenantID
+			b := NewByocAWS(tt.TenantID, nil)
 			b.customDomain = b.getProjectDomain("example.com")
 
 			endpoint := b.getEndpoint(tt.Fqn, tt.Port)

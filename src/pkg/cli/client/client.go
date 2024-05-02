@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	compose "github.com/compose-spec/compose-go/v2/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -47,6 +48,8 @@ type Client interface {
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
+
+	LoadCompose() (*compose.Project, error)
 }
 
 type Property struct {

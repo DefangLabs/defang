@@ -12,7 +12,9 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/auth"
+	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
@@ -55,6 +57,10 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 		return nil, err
 	}
 	return resp.Msg, nil
+}
+
+func (g GrpcClient) LoadCompose() (*compose.Project, error) {
+	return project.Load()
 }
 
 func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
