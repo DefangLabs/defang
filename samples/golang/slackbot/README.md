@@ -18,16 +18,16 @@ Make sure to:
 
 ## Configure
 
-Before deploying the Slackbot, you need to set up some secrets. These secrets are environment variables that the Slackbot needs to function correctly. The secrets are:
+Before deploying the Slackbot, you need to set up some configs parameters. These config parameters are environment variables that the Slackbot needs to function correctly. The parameters are:
 
 - `SLACK_TOKEN`: This is the token you copied previously for the Slack API.
 - `SLACK_CHANNEL_ID`: This is the ID of the Slack channel where the bot will post messages.
 
-You can set these secrets using the `defang secret set` command. Here's how:
+You can set these config parameters using the `defang config set` command. Here's how:
 
 ```sh
-defang secret set --name SLACK_TOKEN --value your_slack_token
-defang secret set --name SLACK_CHANNEL_ID --value your_slack_channel_id
+defang config set --name SLACK_TOKEN --value your_slack_token
+defang config set --name SLACK_CHANNEL_ID --value your_slack_channel_id
 ```
 
 ## Deploy
