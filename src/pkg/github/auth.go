@@ -58,6 +58,8 @@ var (
 )
 
 func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	// Generate random state
 	state := uuid.NewString()
 
@@ -101,7 +103,7 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
 
 	n, _ := fmt.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
-	defer fmt.Print(strings.Repeat(" ", n), "\r")
+	defer fmt.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	input := term.NewNonBlockingStdin()
 	defer input.Close() // abort the read
@@ -112,6 +114,8 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 				return // exit goroutine
 			}
 			switch b[0] {
+			case 3: // Ctrl-C
+				cancel()
 			case 10, 13: // Enter or Return
 				browser.OpenURL(server.URL)
 			}
