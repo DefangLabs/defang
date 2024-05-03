@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
@@ -14,14 +15,13 @@ import (
 
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	ecs2 "github.com/aws/aws-sdk-go-v2/service/ecs"
-	types3 "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	types2 "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/clouds/aws"
@@ -33,14 +33,13 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ByocAws struct {
 	*client.GrpcClient
 
 	cdTasks                 map[string]ecs.TaskArn
-	customDomain            string
+	customDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
 	driver                  *cfn.AwsEcs
 	privateDomain           string
 	privateLbIps            []string
@@ -55,19 +54,13 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcClient) *ByocAws {
-	// Resource naming (stack/stackDir) requires a project name
-	if project == "" {
-		project = tenantId.String()
-	}
+func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 	b := &ByocAws{
-		GrpcClient:    defClient,
-		cdTasks:       make(map[string]ecs.TaskArn),
-		customDomain:  "",
-		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		privateDomain: dnsSafeLabel(project) + ".internal",
-		pulumiProject: project, // TODO: multi-project support
-		pulumiStack:   "beta",  // TODO: make customizable
+		GrpcClient:   defClient,
+		cdTasks:      make(map[string]ecs.TaskArn),
+		customDomain: "",
+		driver:       cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		pulumiStack:  "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -82,6 +75,24 @@ func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcC
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
 	return b
+}
+
+func (b *ByocAws) LoadProject() (*compose.Project, error) {
+	var proj *compose.Project
+	var err error
+	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+	loader := b.GrpcClient.Loader
+	if projectNameOverride != "" {
+		proj, err = loader.LoadWithProjectName(projectNameOverride)
+	} else {
+		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	b.privateDomain = dnsSafeLabel(proj.Name) + ".internal"
+	b.pulumiProject = proj.Name
+	return proj, nil
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {
@@ -149,13 +160,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, errors.New("maximum number of services reached")
 	}
 	serviceInfos := []*defangv1.ServiceInfo{}
-	var warnings Warnings
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
-		var warning Warning
-		if errors.As(err, &warning) && warning != nil {
-			warnings = append(warnings, warning)
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		serviceInfo.Etag = etag // same etag for all services
@@ -215,10 +222,16 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 	b.cdTasks[etag] = taskArn
 
+	for _, si := range serviceInfos {
+		if si.UseAcmeCert {
+			term.Infof("To activate let's encrypt SSL certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+		}
+	}
+
 	return &defangv1.DeployResponse{
-		Services: serviceInfos,
+		Services: serviceInfos, // TODO: Should we use the retrieved services instead?
 		Etag:     etag,
-	}, warnings
+	}, nil
 }
 
 func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
@@ -311,7 +324,7 @@ func (b ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	}, nil
 }
 
-func (ByocAws) GetVersion(context.Context) (*defangv1.Version, error) {
+func (ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
 	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
@@ -391,68 +404,37 @@ func (b *ByocAws) getClusterNames() []string {
 }
 
 func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	var maxResults int32 = 100 // the maximum allowed by AWS
+	if err := b.driver.FillOutputs(ctx); err != nil {
+		return nil, err
+	}
+
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	clusters := make(map[string][]string)
-	ecsClient := ecs2.NewFromConfig(cfg)
-	for _, clusterName := range b.getClusterNames() {
-		serviceArns, err := ecsClient.ListServices(ctx, &ecs2.ListServicesInput{
-			Cluster:    &clusterName,
-			MaxResults: &maxResults, // TODO: handle pagination
-		})
-		if err != nil {
-			var notFound *types3.ClusterNotFoundException
-			if errors.As(err, &notFound) {
-				continue
-			}
-			return nil, annotateAwsError(err)
-		}
-		clusters[clusterName] = serviceArns.ServiceArns
+
+	s3Client := s3.NewFromConfig(cfg)
+	bucket := b.driver.BucketName
+	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
+
+	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &path,
+	})
+	if err != nil {
+		return nil, annotateAwsError(err)
 	}
-	// Query services for each cluster
-	serviceInfos := []*defangv1.ServiceInfo{}
-	for cluster, serviceNames := range clusters {
-		if len(serviceNames) == 0 {
-			continue
-		}
-		dso, err := ecsClient.DescribeServices(ctx, &ecs2.DescribeServicesInput{
-			Services: serviceNames,
-			Cluster:  &cluster,
-		})
-		if err != nil {
-			return nil, annotateAwsError(err)
-		}
-		for _, service := range dso.Services {
-			// Check whether this is indeed a service we want to manage
-			fqn := strings.Split(getQualifiedNameFromEcsName(*service.ServiceName), ".")
-			if len(fqn) != 2 {
-				continue
-			}
-			serviceInfo := &defangv1.ServiceInfo{
-				CreatedAt: timestamppb.New(*service.CreatedAt),
-				Project:   fqn[0],
-				Service: &defangv1.Service{
-					Name: fqn[1],
-					Deploy: &defangv1.Deploy{
-						Replicas: uint32(service.DesiredCount),
-					},
-				},
-				Status: *service.Status,
-			}
-			// TODO: get the service definition from the task definition or tags
-			for _, tag := range service.Tags {
-				if *tag.Key == "etag" {
-					serviceInfo.Etag = *tag.Value
-					break
-				}
-			}
-			serviceInfos = append(serviceInfos, serviceInfo)
-		}
+	defer getObjectOutput.Body.Close()
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
 	}
-	return &defangv1.ListServicesResponse{Services: serviceInfos}, nil
+	var serviceInfos defangv1.ListServicesResponse
+	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
+		return nil, err
+	}
+	return &serviceInfos, nil
 }
 
 func (b ByocAws) getSecretID(name string) string {
@@ -575,21 +557,20 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
 			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.GetEndpoint(fqn, port))
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
 		}
 	} else {
-		si.PublicFqdn = b.GetPublicFqdn(fqn)
+		si.PublicFqdn = b.getPublicFqdn(fqn)
 		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
 	}
 	if hasIngress {
 		si.LbIps = b.privateLbIps // only set LB IPs if there are ingress ports
-		si.PublicFqdn = b.GetPublicFqdn(fqn)
+		si.PublicFqdn = b.getPublicFqdn(fqn)
 	}
 	if hasHost {
-		si.PrivateFqdn = b.GetPrivateFqdn(fqn)
+		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
-	var warning Warning
 	if service.Domainname != "" {
 		if !hasIngress && service.StaticFiles == "" {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
@@ -605,7 +586,6 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 				si.UseAcmeCert = true
 				// TODO: We should add link to documentation on how the acme cert workflow works
 				// TODO: Should we make this the default behavior or require the user to set a flag?
-				warning = WarningError(fmt.Sprintf("CNAME %q does not point to %q and no route53 zone managing domain was found, a let's encrypt cert will be used on first visit to the http end point", service.Domainname, si.PublicFqdn))
 			} else {
 				si.ZoneId = zoneId
 			}
@@ -617,11 +597,14 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 	}
-	return si, warning
+	return si, nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
+	if len(secrets) == 0 {
+		return nil, nil // no secrets to check
+	}
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
@@ -629,33 +612,39 @@ func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1
 	}
 	for _, secret := range secrets {
 		fqn := b.getSecretID(secret.Source)
-		i := sort.Search(len(sorted), func(i int) bool {
-			return sorted[i] >= fqn
-		})
-		if i >= len(sorted) || sorted[i] != fqn {
+		if !searchSecret(sorted, fqn) {
 			return secret, nil // secret not found
 		}
 	}
-	return nil, nil // all secrets found (or none specified)
+	return nil, nil // all secrets found
+}
+
+// This function was copied from Fabric controller
+func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
+	i := sort.Search(len(sorted), func(i int) bool {
+		return sorted[i] >= fqn
+	})
+	return i < len(sorted) && sorted[i] == fqn
 }
 
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetEndpoint(fqn qualifiedName, port *defangv1.Port) string {
-	safeFqn := dnsSafeLabel(fqn)
+func (b ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 	if port.Mode == defangv1.Mode_HOST {
-		return fmt.Sprintf("%s.%s:%d", safeFqn, b.privateDomain, port.Target)
-	} else {
-		if b.customDomain == "" {
-			return ":443" // placeholder for the public ALB/distribution
-		}
-		return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+		privateFqdn := b.getPrivateFqdn(fqn)
+		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
+	if b.customDomain == "" {
+		return ":443" // placeholder for the public ALB/distribution
+	}
+	safeFqn := dnsSafeLabel(fqn)
+	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetPublicFqdn(fqn qualifiedName) string {
+func (b ByocAws) getPublicFqdn(fqn qualifiedName) string {
 	if b.customDomain == "" {
 		return "" //b.fqdn
 	}
@@ -664,14 +653,14 @@ func (b ByocAws) GetPublicFqdn(fqn qualifiedName) string {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) GetPrivateFqdn(fqn qualifiedName) string {
+func (b ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain) // TODO: consider merging this with ServiceDNS
 }
 
 func (b ByocAws) getProjectDomain(zone string) string {
 	projectLabel := dnsSafeLabel(b.pulumiProject)
-	if projectLabel == dnsSafeLabel(string(b.tenantID)) {
+	if projectLabel == dnsSafeLabel(b.tenantID) {
 		return dnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + dnsSafe(zone)
@@ -679,7 +668,7 @@ func (b ByocAws) getProjectDomain(zone string) string {
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func dnsSafeLabel(fqn qualifiedName) string {
-	return strings.ReplaceAll(dnsSafe(string(fqn)), ".", "-")
+	return strings.ReplaceAll(dnsSafe(fqn), ".", "-")
 }
 
 func dnsSafe(fqdn string) string {
@@ -716,8 +705,8 @@ func (b *ByocAws) DeleteSecrets(ctx context.Context, secrets *defangv1.Secrets) 
 	return nil
 }
 
-func (b *ByocAws) Restart(ctx context.Context, names ...string) error {
-	return errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+func (b *ByocAws) Restart(ctx context.Context, names ...string) (client.ETag, error) {
+	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) error {
@@ -768,8 +757,15 @@ func annotateAwsError(err error) error {
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, err)
 	}
+	if aws.IsS3NoSuchKeyError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
 	if aws.IsParameterNotFoundError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
+}
+
+func (b *ByocAws) ServiceDNS(name string) string {
+	return dnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
 }

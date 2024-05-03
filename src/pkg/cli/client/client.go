@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	compose "github.com/compose-spec/compose-go/v2/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -15,6 +16,11 @@ type ServerStream[Res any] interface {
 
 type ETag = string
 
+type ProjectLoader interface {
+	LoadWithDefaultProjectName(string) (*compose.Project, error)
+	LoadWithProjectName(string) (*compose.Project, error)
+}
+
 type Client interface {
 	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
@@ -22,7 +28,7 @@ type Client interface {
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (ETag, error)
 	BootstrapList(context.Context) error
-	CheckLogin(context.Context) error
+	CheckLoginAndToS(context.Context) error
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
@@ -35,17 +41,20 @@ type Client interface {
 	Get(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
-	GetVersion(context.Context) (*defangv1.Version, error)
+	GetVersions(context.Context) (*defangv1.Version, error)
 	ListSecrets(context.Context) (*defangv1.Secrets, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutSecret(context.Context, *defangv1.SecretValue) error
-	Restart(context.Context, ...string) error
+	Restart(context.Context, ...string) (ETag, error)
 	RevokeToken(context.Context) error
+	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
+
+	LoadProject() (*compose.Project, error)
 }
 
 type Property struct {

@@ -12,6 +12,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/spinner"
 	"github.com/defang-io/defang/src/pkg/term"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/muesli/termenv"
@@ -22,7 +23,6 @@ const (
 	ansiCyan      = "\033[36m"
 	ansiReset     = "\033[0m"
 	replaceString = ansiCyan + "$0" + ansiReset
-	spinner       = `-\|/`
 	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00" // like RFC3339Nano but with 6 digits of precision
 )
 
@@ -104,13 +104,15 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		return ErrDryRun
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
 		return err
 	}
 	defer serverStream.Close() // this works because it takes a pointer receiver
 
-	spinMe := 0
+	spin := spinner.New()
 	doSpinner := !raw && term.CanColor && term.IsTerminal
 
 	if term.IsTerminal && !raw {
@@ -136,8 +138,10 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						return // exit goroutine
 					}
 					switch b[0] {
+					case 3: // Ctrl-C
+						cancel()
 					case 10, 13: // Enter or Return
-						term.Println(term.Nop, " ") // empty line, but overwrite the spinner
+						fmt.Println(" ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
@@ -175,7 +179,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					return err
 				}
 				if !raw {
-					term.Fprintln(term.Stderr, term.WarnColor, " ! Reconnected!   ")
+					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnected!   \r") // overwritten with logs
 				}
 				skipDuplicate = true
 				continue
@@ -187,8 +191,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
-			fmt.Printf("\r%c\r", spinner[spinMe%len(spinner)])
-			spinMe++
+			fmt.Print(spin.Next())
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
@@ -213,7 +216,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				if e.Stderr {
 					out = term.Stderr
 				}
-				term.Fprintln(out, term.Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
+				fmt.Fprintln(out, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
 			}
 
@@ -245,7 +248,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						prefixLen += l
 					}
 				} else {
-					term.Print(term.Nop, strings.Repeat(" ", prefixLen))
+					fmt.Print(strings.Repeat(" ", prefixLen))
 				}
 				if term.CanColor {
 					if !strings.Contains(line, "\033[") {
@@ -255,7 +258,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				} else {
 					line = pkg.StripAnsi(line)
 				}
-				term.Println(term.Nop, line)
+				fmt.Println(line)
 			}
 		}
 	}

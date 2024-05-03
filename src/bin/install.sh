@@ -5,7 +5,7 @@
 # This script installs the latest release of defang from GitHub. It is designed                #
 # to be run like this:                                                                         #
 #                                                                                              #
-# . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)      #
+# . <(curl -Ls https://s.defang.io/install.sh)      #
 #                                                                                              #
 # This allows us to do some interactive stuff where we can prompt the user for input.          #
 #                                                                                              #
@@ -138,6 +138,36 @@ fi
 echo "Cleaning up..."
 rm -r "$EXTRACT_DIR"
 
+prompt_and_append_to_profile() {
+    local prompt=$1
+    local profile_file=$2
+    local line="export PATH=\"\$PATH:$INSTALL_DIR\""
+    echo "We'd like this line to your $profile_file:"
+    echo
+    echo "  $line"
+    echo
+    if [[ "$CI" != "1" ]]; then
+        # Prompt the user for confirmation
+        echo -n "$prompt $profile_file? (y/n) "
+        read REPLY
+        echo    # move to a new line
+    fi
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Append the line to the profile file
+        echo >> "$profile_file"
+        echo "$line # Added by Defang install.sh" >> "$profile_file"
+    else
+        # Print the command for the user to run manually
+        echo "To add $INSTALL_DIR to your PATH, run the following command:"
+        echo
+        echo "  echo '$line' >> \"$profile_file\""
+        echo
+    fi
+}
+
+# Get the name of the current shell
+CURRENT_SHELL=$(basename "$SHELL")
+
 # Add the installation directory to PATH if not already present
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to your PATH for this session."
@@ -145,63 +175,34 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
 
     # Define the possible shell profile files
     PROFILE_FILES=(".bashrc" ".zshrc" ".kshrc")
-    FOUND_PROFILE_FILE=false
 
     # Loop over the possible profile files
+    FOUND_PROFILE_FILE=false
     for profile_file in "${PROFILE_FILES[@]}"; do
-        # If the profile file exists in the user's home directory
+        # If the profile file exists in the user's home directory, add a line to it
         if [[ -f "$HOME/$profile_file" ]]; then
             FOUND_PROFILE_FILE=true
-            if [[ "$CI" != "1" ]]; then
-                # Prompt the user for confirmation
-                echo -n "Can we append the necessary line to $HOME/$profile_file? (y/n) "
-                read REPLY
-                echo    # move to a new line
-            fi
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                # Append the line to the profile file
-                echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang install.sh" >> "$HOME/$profile_file"
-            else
-                # Print the command for the user to run manually
-                echo "To add $INSTALL_DIR to your PATH, run the following command:"
-                echo
-                echo "\techo \"export PATH=\\\"\\\$PATH:$INSTALL_DIR\\\"\" >> \"\$HOME/$profile_file\""
-                echo
-                echo "Alternatively, you can add the following line to your profile file:"
-                echo
-                echo "\texport PATH=\"\$PATH:$INSTALL_DIR\""
-                echo
-            fi
+            prompt_and_append_to_profile "Can we append the necessary line to" "$HOME/$profile_file"
         fi
     done
 
     # If no profile file was found
     if [[ $FOUND_PROFILE_FILE == false ]]; then
-        # Get the name of the current shell
-        CURRENT_SHELL=$(basename "$SHELL")
-        if [[ "$CI" != "1" ]]; then
-            # Prompt the user to create a new profile file
-            echo -n "No existing profile file found. Would you like to create a .$CURRENT_SHELL"rc" file? (y/n) "
-            read REPLY
-            echo    # move to a new line
-        fi
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # Create the new profile file and append the line
-            echo "export PATH=\"\$PATH:$INSTALL_DIR\" # Added by Defang install.sh" >> "$HOME/.${CURRENT_SHELL}rc"
-        else
-            # Print the command for the user to run manually
-            echo "To add $INSTALL_DIR to your PATH, run the following command:"
-            echo
-            echo "  echo \"export PATH=\\\"\\\$PATH:$INSTALL_DIR\\\"\" >> \"\$HOME/.${CURRENT_SHELL}rc\""
-            echo
-            # alternatively just print the export path command and tell them to add it to their profile file
-            echo "Alternatively, you can add the following line to your profile file:"
-            echo
-            echo "  export PATH=\"\$PATH:$INSTALL_DIR\""
-            echo
-        fi
+        # Prompt the user to create a new profile file
+        prompt_and_append_to_profile "No existing profile file found. Can we create" "$HOME/.${CURRENT_SHELL}rc"
     fi
 fi
+
+# TODO: Install shell completion script
+
+
+# Loop over the possible profile files
+for profile_file in "${PROFILE_FILES[@]}"; do
+    # If the profile file exists in the user's home directory, add a line to it
+    if [[ -f "$HOME/$profile_file" ]]; then
+        prompt_and_append_to_profile "Can we append the necessary line to" "$HOME/$profile_file"
+    fi
+done
 
 # Cleanup: Remove the originally downloaded file
 rm "$FILENAME"

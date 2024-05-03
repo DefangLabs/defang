@@ -36,10 +36,15 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
-  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc GenerateFiles(GenerateFilesRequest)
+      returns (GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
+  rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
+  rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc SignEULA(google.protobuf.Empty)
-      returns (google.protobuf.Empty); // SignToS
+      returns (google.protobuf.Empty); // AgreeToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
@@ -88,6 +93,7 @@ message DeleteResponse { string etag = 1; }
 message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
+  bool agree_tos = 3;
 }
 
 message File {
@@ -96,6 +102,14 @@ message File {
 }
 
 message GenerateFilesResponse { repeated File files = 1; }
+
+message StartGenerateResponse {
+  string uuid = 1;
+}
+
+message GenerateStatusRequest {
+  string uuid = 1;
+}
 
 message UploadURLRequest { string digest = 1; }
 
@@ -108,16 +122,16 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
+  repeated string lb_ips = 7;  // comma-separated list of internal CIDR for the load-balancer
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  string lb_dns = 14;         // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
-  // string natsJwt = 5;
 }
 
 // message Project {
@@ -158,7 +172,9 @@ message Status { string version = 1; }
 
 message Version {
   string fabric = 1;
-  string nats = 2;
+  reserved 2; // was "nats"
+  string cli_min = 3; // minimum CLI version
+  string pulumi_min = 4; // minimum Pulumi provider version
 }
 
 message TailRequest {
@@ -292,11 +308,17 @@ message HealthCheck {
   // bool disable = 6;
 }
 
+enum Network {
+  UNSPECIFIED = 0; // was: internal=false
+  PRIVATE = 1;     // was: internal=true
+  PUBLIC = 2;
+}
+
 message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal; TODO: not part of spec
+  bool internal = 4; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -306,8 +328,11 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records; TODO: not part of spec
-  string static_files = 15; // x-defang-static-files: folder with static files to serve; TODO: not part of spec
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
+                        // create dns records; TODO: not part of spec
+  string static_files = 15; // x-defang-static-files: folder with static files
+                            // to serve; TODO: not part of spec
+  Network networks = 16; // currently only 1 network is supported
 }
 
 message Event {

@@ -11,10 +11,11 @@
           devShell = with pkgs; mkShell {
             buildInputs = [
               buf
+              crane
               git
               gnumake
               gnused # force Linux `sed` everywhere
-              go_1_20
+              go_1_21
               nixfmt
               nodejs_20 # for Pulumi, must match values in package.json
               pulumi-bin

@@ -7,9 +7,9 @@ import (
 )
 
 func GetVersion(ctx context.Context, client client.Client) (string, error) {
-	status, err := client.GetVersion(ctx)
+	versions, err := client.GetVersions(ctx)
 	if err != nil {
 		return "", err
 	}
-	return status.Fabric, nil
+	return versions.Fabric, nil
 }

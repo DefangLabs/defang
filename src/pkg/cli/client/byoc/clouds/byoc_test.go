@@ -3,6 +3,8 @@ package clouds
 import (
 	"testing"
 
+	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
@@ -35,23 +37,42 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, tt.ProjectName, nil)
+			b := NewByocAWS(tt.TenantID, &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}})
+			if _, err := b.LoadProject(); err != nil {
+				t.Fatalf("LoadCompose() failed: %v", err)
+			}
 			b.customDomain = b.getProjectDomain("example.com")
 
-			endpoint := b.GetEndpoint(tt.Fqn, tt.Port)
+			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.GetPublicFqdn(tt.Fqn)
+			publicFqdn := b.getPublicFqdn(tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.GetPrivateFqdn(tt.Fqn)
+			privateFqdn := b.getPrivateFqdn(tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}
 		})
 	}
+}
+
+type FakeLoader struct {
+	ProjectName string
+}
+
+func (f FakeLoader) LoadWithDefaultProjectName(defaultName string) (*compose.Project, error) {
+	name := defaultName
+	if f.ProjectName != "" {
+		name = f.ProjectName
+	}
+	return &compose.Project{Name: name}, nil
+}
+
+func (f FakeLoader) LoadWithProjectName(projectName string) (*compose.Project, error) {
+	return &compose.Project{Name: projectName}, nil
 }
