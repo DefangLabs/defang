@@ -683,8 +683,8 @@ var composeCmd = &cobra.Command{
 }
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
-	// We can only show services deployed to the defang SaaS environment.
-	if provider == cliClient.ProviderDefang {
+	// We can only show services deployed to the prod1 defang SaaS environment.
+	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
 		term.Info(" * Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
