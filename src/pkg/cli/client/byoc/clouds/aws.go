@@ -24,7 +24,6 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/clouds/aws"
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
 	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -78,14 +77,15 @@ func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws 
 	return b
 }
 
-func (b *ByocAws) LoadCompose() (*compose.Project, error) {
+func (b *ByocAws) LoadProject() (*compose.Project, error) {
 	var proj *compose.Project
 	var err error
 	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+	loader := b.GrpcClient.Loader
 	if projectNameOverride != "" {
-		proj, err = project.LoadWithProjectName(projectNameOverride)
+		proj, err = loader.LoadWithProjectName(projectNameOverride)
 	} else {
-		proj, err = project.Load()
+		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
 	}
 	if err != nil {
 		return nil, err

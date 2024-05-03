@@ -18,7 +18,6 @@ import (
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli"
 	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/cli/project"
 	"github.com/defang-io/defang/src/pkg/scope"
 	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
@@ -297,9 +296,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		project.ComposeFilePath, _ = cmd.Flags().GetString("file")
-		project.TenantID = cli.GetTenantID(cluster)
-		client = cli.NewClient(cluster, provider)
+		composeFilePath, _ := cmd.Flags().GetString("file")
+		loader := cli.ComposeLoader{ComposeFilePath: composeFilePath}
+		client = cli.NewClient(cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := "v" + cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -328,7 +327,7 @@ var RootCmd = &cobra.Command{
 				}
 
 				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client = cli.NewClient(cluster, provider)                     // reconnect with the new token
+				client = cli.NewClient(cluster, provider, loader)             // reconnect with the new token
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
@@ -695,11 +694,7 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		proj, err := client.LoadCompose()
-		if err != nil {
-			return err
-		}
-		deploy, err := cli.ComposeStart(cmd.Context(), client, proj, force)
+		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
 		if err != nil {
 			return err
 		}
@@ -737,11 +732,7 @@ var composeStartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		proj, err := client.LoadCompose()
-		if err != nil {
-			return err
-		}
-		deploy, err := cli.ComposeStart(cmd.Context(), client, proj, force)
+		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
 		if err != nil {
 			return err
 		}
@@ -764,11 +755,7 @@ var composeRestartCmd = &cobra.Command{
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and restarts its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		proj, err := client.LoadCompose()
-		if err != nil {
-			return err
-		}
-		etag, err := cli.ComposeRestart(cmd.Context(), client, proj)
+		etag, err := cli.ComposeRestart(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
@@ -783,11 +770,7 @@ var composeStopCmd = &cobra.Command{
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and stops its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		proj, err := client.LoadCompose()
-		if err != nil {
-			return err
-		}
-		etag, err := cli.ComposeStop(cmd.Context(), client, proj)
+		etag, err := cli.ComposeStop(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
@@ -839,13 +822,8 @@ var composeConfigCmd = &cobra.Command{
 	Short: "Reads a Compose file and shows the generated config",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true // config is like start in a dry run
-		proj, err := client.LoadCompose()
-		if err != nil {
-			return err
-		}
-
 		// force=false to calculate the digest
-		if _, err := cli.ComposeStart(cmd.Context(), client, proj, false); !errors.Is(err, cli.ErrDryRun) {
+		if _, err := cli.ComposeStart(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
 			return err
 		}
 		return nil

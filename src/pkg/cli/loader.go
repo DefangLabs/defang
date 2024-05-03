@@ -1,4 +1,4 @@
-package project
+package cli
 
 import (
 	"fmt"
@@ -9,20 +9,20 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-var ComposeFilePath string
-var TenantID types.TenantID
-
-func Load() (*compose.Project, error) {
-	return loadCompose(ComposeFilePath, string(TenantID), false) // use tenantID as fallback for project name
+type ComposeLoader struct {
+	ComposeFilePath string
 }
 
-func LoadWithProjectName(projectName string) (*compose.Project, error) {
-	return loadCompose(ComposeFilePath, projectName, true)
+func (c ComposeLoader) LoadWithDefaultProjectName(name string) (*compose.Project, error) {
+	return loadCompose(c.ComposeFilePath, name, false) // use tenantID as fallback for project name
+}
+
+func (c ComposeLoader) LoadWithProjectName(name string) (*compose.Project, error) {
+	return loadCompose(c.ComposeFilePath, name, true)
 }
 
 func loadCompose(filePath string, projectName string, overrideProjectName bool) (*compose.Project, error) {

@@ -16,6 +16,11 @@ type ServerStream[Res any] interface {
 
 type ETag = string
 
+type ProjectLoader interface {
+	LoadWithDefaultProjectName(string) (*compose.Project, error)
+	LoadWithProjectName(string) (*compose.Project, error)
+}
+
 type Client interface {
 	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
@@ -49,7 +54,7 @@ type Client interface {
 	Track(string, ...Property) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
-	LoadCompose() (*compose.Project, error)
+	LoadProject() (*compose.Project, error)
 }
 
 type Property struct {

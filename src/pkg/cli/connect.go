@@ -51,7 +51,7 @@ func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
 	return accessToken, tenantId
 }
 
-func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
+func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, types.TenantID) {
 	accessToken, tenantId := getExistingTokenAndTenant(cluster)
 
 	tenant, host := SplitTenantHost(cluster)
@@ -60,11 +60,11 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	}
 	term.Debug(" - Using tenant", tenantId, "for cluster", host)
 
-	return client.NewGrpcClient(host, accessToken), tenantId
+	return client.NewGrpcClient(host, accessToken, tenantId, loader), tenantId
 }
 
-func NewClient(cluster string, provider client.Provider) client.Client {
-	defangClient, tenantId := Connect(cluster)
+func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
+	defangClient, tenantId := Connect(cluster, loader)
 
 	if provider == client.ProviderAWS {
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
