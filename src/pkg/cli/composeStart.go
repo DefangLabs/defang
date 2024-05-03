@@ -117,24 +117,30 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		// Extract environment variables
+		unsetEnvs := []string{}
 		envs := make(map[string]string)
 		for key, value := range svccfg.Environment {
 			if value == nil {
 				value = resolveEnv(key)
 			}
-			if value != nil {
-				val := *value
-				if serviceNameRegex != nil {
-					// Replace service names with their actual DNS names
-					val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-						return c.ServiceDNS(NormalizeServiceName(serviceName))
-					})
-					if val != *value {
-						warnf("service names were replaced in environment variable %q: %q", key, val)
-					}
-				}
-				envs[key] = val
+
+			// keep track of what environment variables were declared but not set in the compose environment section
+			if value == nil {
+				unsetEnvs = append(unsetEnvs, key)
+				continue
 			}
+
+			val := *value
+			if serviceNameRegex != nil {
+				// Replace service names with their actual DNS names
+				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+					return c.ServiceDNS(NormalizeServiceName(serviceName))
+				})
+				if val != *value {
+					warnf("service names were replaced in environment variable %q: %q", key, val)
+				}
+			}
+			envs[key] = val
 		}
 
 		// Extract secret references
@@ -142,6 +148,13 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		for _, secret := range svccfg.Secrets {
 			secrets = append(secrets, &defangv1.Secret{
 				Source: secret.Source,
+			})
+		}
+
+		// add unset environment variables as secrets
+		for _, unsetEnv := range unsetEnvs {
+			secrets = append(secrets, &defangv1.Secret{
+				Source: unsetEnv,
 			})
 		}
 
@@ -185,7 +198,12 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 }
 
 // ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+	project, err := c.LoadProject()
+	if err != nil {
+		return nil, err
+	}
+
 	if err := validateProject(project); err != nil {
 		return nil, &ComposeError{err}
 	}
