@@ -89,7 +89,7 @@ func TestPutSecret(t *testing.T) {
 	b := NewByocAWS("TestPutSecret", "", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.DeleteSecrets(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -102,14 +102,14 @@ func TestPutSecret(t *testing.T) {
 	})
 
 	t.Run("invalid name", func(t *testing.T) {
-		err := b.PutSecret(context.Background(), &defangv1.SecretValue{})
+		err := b.PutConfig(context.Background(), &defangv1.SecretValue{})
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("expected invalid argument, got %v", err)
 		}
 	})
 
 	t.Run("put", func(t *testing.T) {
-		err := b.PutSecret(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
+		err := b.PutConfig(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -136,7 +136,7 @@ func TestListSecrets(t *testing.T) {
 	b := NewByocAWS("TestListSecrets", "", nil)
 
 	t.Run("list", func(t *testing.T) {
-		secrets, err := b.ListSecrets(context.Background())
+		secrets, err := b.ListConfig(context.Background())
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
