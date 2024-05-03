@@ -198,7 +198,12 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 }
 
 // ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+	project, err := c.LoadProject()
+	if err != nil {
+		return nil, err
+	}
+
 	if err := validateProject(project); err != nil {
 		return nil, &ComposeError{err}
 	}

@@ -164,7 +164,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		if err != nil {
 			return err // No point retrying if we can't even create the request
 		}
-		if _, err := http.DefaultClient.Do(req); err != nil {
+		if _, err := httpClient.Do(req); err != nil {
 			errs = append(errs, err)
 		}
 
