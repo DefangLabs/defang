@@ -8,3 +8,4 @@ services:
     image: "ui:latest"
     environment:
       - "API_URL=http://Mistral:8000"
+      - "SENSITIVE_DATA"
