@@ -1,0 +1,31 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:14
+    volumes: ["./tmp/postgres:/var/lib/postgresql/data/"]
+    environment:
+    - POSTGRES_DB=mydatabase
+    - POSTGRES_USER=myuser
+    - POSTGRES_PASSWORD=mypassword
+    ports:
+      - mode: host
+        target: 5432
+  django-crm:
+    build: .
+    ports: 
+      - mode: ingress
+        target: 8000
+        # Uncomment the following line if you want to run it locally
+        # published: 8000
+    environment:
+      - DB_HOST=db
+      - DEBUG=False
+    deploy:
+      resources:
+        reservations:
+          memory: 1GB
+    # volumes: [".:/code"]
+    depends_on:
+      - db
+    # command: python manage.py runserver 0.0.0.0:8000
+ 
