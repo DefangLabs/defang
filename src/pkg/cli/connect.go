@@ -62,12 +62,12 @@ func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, t
 	term.Debug(" - Using tenant", tenantId, "for cluster", host)
 
 	defangClient := client.NewGrpcClient(host, accessToken, tenantId, loader)
-	resp, err := defangClient.WhoAmI(context.Background()) // TODO: Should we pass in the command context?
+	resp, err := defangClient.WhoAmI(context.TODO()) // TODO: Should we pass in the command context?
 	if err != nil {
 		term.Debug(" - Unable to validate tenant ID with server:", err)
 	}
 	if resp != nil && tenantId != types.TenantID(resp.Tenant) {
-		term.Warnf(" - Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
+		term.Warnf(" ! Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
 		tenantId = types.TenantID(resp.Tenant)
 	}
 	return defangClient, tenantId
