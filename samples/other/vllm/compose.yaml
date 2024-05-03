@@ -20,7 +20,7 @@ services:
       interval: 5m
       timeout: 30s
       retries: 10
-    secrets:
+    environment:
       - HF_TOKEN
   ui:
     restart: unless-stopped
@@ -41,7 +41,3 @@ services:
       retries: 10
     environment:
       - OPENAI_BASE_URL=http://mistral:8000/v1/
-
-secrets:
-  HF_TOKEN:
-    external: true

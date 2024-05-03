@@ -144,16 +144,18 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		// Extract secret references
-		var secrets []*defangv1.Secret
-		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &defangv1.Secret{
+		var configs []*defangv1.Secret
+		for i, secret := range svccfg.Secrets {
+			if i == 0 {
+				warnf("secrets will be exposed as environment variables, not files (use 'environment' to silence)")
+			}
+			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
 			})
 		}
-
 		// add unset environment variables as secrets
 		for _, unsetEnv := range unsetEnvs {
-			secrets = append(secrets, &defangv1.Secret{
+			configs = append(configs, &defangv1.Secret{
 				Source: unsetEnv,
 			})
 		}
@@ -186,7 +188,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			Healthcheck: healthcheck,
 			Deploy:      deploy,
 			Environment: envs,
-			Secrets:     secrets,
+			Secrets:     configs,
 			Command:     svccfg.Command,
 			Domainname:  svccfg.DomainName,
 			Platform:    convertPlatform(svccfg.Platform),
