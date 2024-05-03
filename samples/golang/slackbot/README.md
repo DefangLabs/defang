@@ -18,7 +18,7 @@ Make sure to:
 
 ## Configure
 
-Before deploying the Slackbot, you need to set up some configs parameters. These config parameters are environment variables that the Slackbot needs to function correctly. The parameters are:
+Before deploying the Slackbot, you need to set up some config values. These config values are environment variables that the Slackbot needs to function correctly. The values are:
 
 - `SLACK_TOKEN`: This is the token you copied previously for the Slack API.
 - `SLACK_CHANNEL_ID`: This is the ID of the Slack channel where the bot will post messages.
