@@ -9,7 +9,7 @@ services:
       resources:
         reservations:
           cpus: '1.0'
-          memory: 2048M
+          memory: 512M
     ports:
       - mode: ingress
         target: 5000
