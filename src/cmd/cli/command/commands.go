@@ -568,7 +568,7 @@ var tailCmd = &cobra.Command{
 var configCmd = &cobra.Command{
 	Use:     "config", // like Docker
 	Args:    cobra.NoArgs,
-	Aliases: []string{"secrets", "secret", "env"},
+	Aliases: []string{"secrets", "secret"},
 	Short:   "Add, update, or delete service config",
 }
 
