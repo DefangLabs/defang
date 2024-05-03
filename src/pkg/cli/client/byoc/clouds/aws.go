@@ -441,7 +441,7 @@ func (b ByocAws) getSecretID(name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
-func (b ByocAws) PutSecret(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
@@ -450,17 +450,17 @@ func (b ByocAws) PutSecret(ctx context.Context, secret *defangv1.SecretValue) er
 	return annotateAwsError(err)
 }
 
-func (b ByocAws) ListSecrets(ctx context.Context) (*defangv1.Secrets, error) {
+func (b ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
-	secrets := make([]string, len(awsSecrets))
+	configs := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
-		secrets[i] = strings.TrimPrefix(secret, prefix)
+		configs[i] = strings.TrimPrefix(secret, prefix)
 	}
-	return &defangv1.Secrets{Names: secrets}, nil
+	return &defangv1.Secrets{Names: configs}, nil
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -541,7 +541,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		return nil, err
 	}
 	if missing != nil {
-		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
+		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
 	}
 
 	si := &defangv1.ServiceInfo{
@@ -694,7 +694,7 @@ func (b *ByocAws) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
 }
 
-func (b *ByocAws) DeleteSecrets(ctx context.Context, secrets *defangv1.Secrets) error {
+func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	ids := make([]string, len(secrets.Names))
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(name)
