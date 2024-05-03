@@ -217,19 +217,22 @@ func (g *GrpcClient) BootstrapList(context.Context) error {
 	return errors.New("the list command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
+func (g *GrpcClient) Restart(ctx context.Context, names ...string) (ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {
 		serviceInfo, err := g.Get(ctx, &defangv1.ServiceID{Name: name})
 		if err != nil {
-			return err
+			return "", err
 		}
 		services = append(services, serviceInfo.Service)
 	}
 
-	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
-	return err
+	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	if err != nil {
+		return "", err
+	}
+	return dr.Etag, nil
 }
 
 func (g GrpcClient) ServiceDNS(name string) string {
