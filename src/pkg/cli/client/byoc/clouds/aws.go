@@ -456,11 +456,11 @@ func (b ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	if err != nil {
 		return nil, err
 	}
-	secrets := make([]string, len(awsSecrets))
+	configs := make([]string, len(awsSecrets))
 	for i, secret := range awsSecrets {
-		secrets[i] = strings.TrimPrefix(secret, prefix)
+		configs[i] = strings.TrimPrefix(secret, prefix)
 	}
-	return &defangv1.Secrets{Names: secrets}, nil
+	return &defangv1.Secrets{Names: configs}, nil
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -541,7 +541,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 		return nil, err
 	}
 	if missing != nil {
-		return nil, fmt.Errorf("missing secret %s", missing) // retryable CodeFailedPrecondition
+		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
 	}
 
 	si := &defangv1.ServiceInfo{
