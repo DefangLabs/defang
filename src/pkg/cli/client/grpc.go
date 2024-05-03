@@ -12,8 +12,10 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/auth"
 	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
@@ -23,9 +25,12 @@ import (
 type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
+
+	tenantID types.TenantID
+	Loader   ProjectLoader
 }
 
-func NewGrpcClient(host, accessToken string) *GrpcClient {
+func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader ProjectLoader) *GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
@@ -47,7 +52,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 		}
 	}
 
-	return &GrpcClient{client: fabricClient, anonID: state.AnonID}
+	return &GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -55,6 +60,10 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 		return nil, err
 	}
 	return resp.Msg, nil
+}
+
+func (g GrpcClient) LoadProject() (*compose.Project, error) {
+	return g.Loader.LoadWithDefaultProjectName(string(g.tenantID))
 }
 
 func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
@@ -211,19 +220,22 @@ func (g *GrpcClient) BootstrapList(context.Context) error {
 	return errors.New("the list command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
+func (g *GrpcClient) Restart(ctx context.Context, names ...string) (ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {
 		serviceInfo, err := g.Get(ctx, &defangv1.ServiceID{Name: name})
 		if err != nil {
-			return err
+			return "", err
 		}
 		services = append(services, serviceInfo.Service)
 	}
 
-	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
-	return err
+	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	if err != nil {
+		return "", err
+	}
+	return dr.Etag, nil
 }
 
 func (g GrpcClient) ServiceDNS(name string) string {

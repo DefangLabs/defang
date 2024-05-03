@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -51,7 +52,7 @@ func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
 	return accessToken, tenantId
 }
 
-func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
+func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, types.TenantID) {
 	accessToken, tenantId := getExistingTokenAndTenant(cluster)
 
 	tenant, host := SplitTenantHost(cluster)
@@ -60,16 +61,24 @@ func Connect(cluster string) (*client.GrpcClient, types.TenantID) {
 	}
 	term.Debug(" - Using tenant", tenantId, "for cluster", host)
 
-	return client.NewGrpcClient(host, accessToken), tenantId
+	defangClient := client.NewGrpcClient(host, accessToken, tenantId, loader)
+	resp, err := defangClient.WhoAmI(context.TODO()) // TODO: Should we pass in the command context?
+	if err != nil {
+		term.Debug(" - Unable to validate tenant ID with server:", err)
+	}
+	if resp != nil && tenantId != types.TenantID(resp.Tenant) {
+		term.Warnf(" ! Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
+		tenantId = types.TenantID(resp.Tenant)
+	}
+	return defangClient, tenantId
 }
 
-func NewClient(cluster string, projectName string, provider client.Provider) client.Client {
-	term.Debug(" - Project", projectName)
-	defangClient, tenantId := Connect(cluster)
+func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
+	defangClient, tenantId := Connect(cluster, loader)
 
 	if provider == client.ProviderAWS {
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		byocClient := clouds.NewByocAWS(tenantId, projectName, defangClient)
+		byocClient := clouds.NewByocAWS(tenantId, defangClient)
 		return byocClient
 	}
 

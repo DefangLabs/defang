@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	compose "github.com/compose-spec/compose-go/v2/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
@@ -14,6 +15,11 @@ type ServerStream[Res any] interface {
 }
 
 type ETag = string
+
+type ProjectLoader interface {
+	LoadWithDefaultProjectName(string) (*compose.Project, error)
+	LoadWithProjectName(string) (*compose.Project, error)
+}
 
 type Client interface {
 	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -39,7 +45,7 @@ type Client interface {
 	ListSecrets(context.Context) (*defangv1.Secrets, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutSecret(context.Context, *defangv1.SecretValue) error
-	Restart(context.Context, ...string) error
+	Restart(context.Context, ...string) (ETag, error)
 	RevokeToken(context.Context) error
 	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
@@ -47,6 +53,8 @@ type Client interface {
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
+
+	LoadProject() (*compose.Project, error)
 }
 
 type Property struct {

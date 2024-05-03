@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/clouds/aws"
@@ -53,19 +54,13 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcClient) *ByocAws {
-	// Resource naming (stack/stackDir) requires a project name
-	if project == "" {
-		project = tenantId.String()
-	}
+func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 	b := &ByocAws{
-		GrpcClient:    defClient,
-		cdTasks:       make(map[string]ecs.TaskArn),
-		customDomain:  "",
-		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		privateDomain: dnsSafeLabel(project) + ".internal",
-		pulumiProject: project, // TODO: multi-project support
-		pulumiStack:   "beta",  // TODO: make customizable
+		GrpcClient:   defClient,
+		cdTasks:      make(map[string]ecs.TaskArn),
+		customDomain: "",
+		driver:       cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		pulumiStack:  "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -80,6 +75,24 @@ func NewByocAWS(tenantId types.TenantID, project string, defClient *client.GrpcC
 		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
 	}
 	return b
+}
+
+func (b *ByocAws) LoadProject() (*compose.Project, error) {
+	var proj *compose.Project
+	var err error
+	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
+	loader := b.GrpcClient.Loader
+	if projectNameOverride != "" {
+		proj, err = loader.LoadWithProjectName(projectNameOverride)
+	} else {
+		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	b.privateDomain = dnsSafeLabel(proj.Name) + ".internal"
+	b.pulumiProject = proj.Name
+	return proj, nil
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {
@@ -692,8 +705,8 @@ func (b *ByocAws) DeleteSecrets(ctx context.Context, secrets *defangv1.Secrets) 
 	return nil
 }
 
-func (b *ByocAws) Restart(ctx context.Context, names ...string) error {
-	return errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+func (b *ByocAws) Restart(ctx context.Context, names ...string) (client.ETag, error) {
+	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) error {
