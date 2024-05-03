@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -12,7 +13,7 @@ import (
 var ErrTermsNotAgreed = errors.New("You must agree to the Defang terms of service to use this tool")
 
 func InteractiveAgreeToS(ctx context.Context, client client.Client) error {
-	term.Println(term.Nop, "Our latest terms of service can be found at https://defang.io/terms-service.html")
+	fmt.Println("Our latest terms of service can be found at https://defang.io/terms-service.html")
 
 	var agreeToS bool
 	err := survey.AskOne(&survey.Confirm{

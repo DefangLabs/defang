@@ -48,10 +48,21 @@ var (
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
 
+func prettyError(err error) error {
+	// To avoid printing the internal gRPC error code
+	var cerr *connect.Error
+	if errors.As(err, &cerr) {
+		term.Debug(" - Server error:", err)
+		err = errors.Unwrap(err)
+	}
+	return err
+
+}
+
 func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			term.Error("Error:", err)
+			term.Error("Error:", prettyError(err))
 		}
 
 		var derr *cli.ComposeError
@@ -91,13 +102,13 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings {
-		term.Println(term.Nop, "For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), latest) < 0 {
-			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			term.Println(term.Nop, "A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
+			fmt.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
@@ -339,7 +350,7 @@ var RootCmd = &cobra.Command{
 			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				term.Warn(" !", err)
+				term.Warn(" !", prettyError(err))
 
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
@@ -354,7 +365,7 @@ var RootCmd = &cobra.Command{
 
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				term.Warn(" !", err)
+				term.Warn(" !", prettyError(err))
 				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 					return err
 				}
@@ -390,7 +401,7 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.Whoami(cmd.Context(), client)
+		err := cli.Whoami(cmd.Context(), client) // always prints
 		if err != nil {
 			return err
 		}
@@ -641,7 +652,7 @@ var secretsDeleteCmd = &cobra.Command{
 		if err := cli.SecretsDelete(cmd.Context(), client, names...); err != nil {
 			// Show a warning (not an error) if the secret was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(" !", err)
+				term.Warn(" !", prettyError(err))
 				return nil
 			}
 			return err
@@ -672,11 +683,11 @@ var composeCmd = &cobra.Command{
 }
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
-	// We can only show services deployed to the defang SaaS environment.
-	if provider == cliClient.ProviderDefang {
+	// We can only show services deployed to the prod1 defang SaaS environment.
+	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
 		term.Info(" * Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
-			term.Println(term.Nop, "   - ", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
 		}
 	}
 }
@@ -720,9 +731,10 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		printPlaygroundPortalServiceURLs(deploy.Services)
-		printEndpoints(deploy.Services)
+		printEndpoints(deploy.Services) // TODO: do this at the end
 
 		if detach {
+			term.Info(" * Done.")
 			return nil
 		}
 
@@ -757,7 +769,7 @@ var composeStartCmd = &cobra.Command{
 		}
 
 		printPlaygroundPortalServiceURLs(deploy.Services)
-		printEndpoints(deploy.Services)
+		printEndpoints(deploy.Services) // TODO: do this at the end
 
 		command := "tail"
 		if deploy.Etag != "" {
@@ -770,11 +782,16 @@ var composeStartCmd = &cobra.Command{
 
 var composeRestartCmd = &cobra.Command{
 	Use:         "restart",
-	Annotations: authNeededAnnotation,
+	Annotations: authAndProjectNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and restarts its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.ComposeRestart(cmd.Context(), client, project)
+		etag, err := cli.ComposeRestart(cmd.Context(), client, project)
+		if err != nil {
+			return err
+		}
+		term.Info(" * Restarted services with deployment ID", etag)
+		return nil
 	},
 }
 
@@ -784,10 +801,11 @@ var composeStopCmd = &cobra.Command{
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and stops its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := cli.ComposeStop(cmd.Context(), client, project)
+		etag, err := cli.ComposeStop(cmd.Context(), client, project)
 		if err != nil {
 			return err
 		}
+		term.Info(" * Stopped services with deployment ID", etag)
 		return nil
 	},
 }
@@ -806,7 +824,7 @@ var composeDownCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(" !", err)
+				term.Warn(" !", prettyError(err))
 				return nil
 			}
 			return err
@@ -858,7 +876,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(" !", err)
+				term.Warn(" !", prettyError(err))
 				return nil
 			}
 			return err
@@ -882,7 +900,12 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.Restart(cmd.Context(), client, args...)
+		etag, err := cli.Restart(cmd.Context(), client, args...)
+		if err != nil {
+			return err
+		}
+		term.Info(" * Restarted service", args, "with deployment ID", etag)
+		return nil
 	},
 }
 

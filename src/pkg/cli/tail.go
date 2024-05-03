@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -140,7 +141,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					case 3: // Ctrl-C
 						cancel()
 					case 10, 13: // Enter or Return
-						term.Println(term.Nop, " ") // empty line, but overwrite the spinner
+						fmt.Println(" ") // empty line, but overwrite the spinner
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
@@ -190,7 +191,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 
 		// Show a spinner if we're not in raw mode and have a TTY
 		if doSpinner {
-			term.Print(term.Nop, spin.Next())
+			fmt.Print(spin.Next())
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
@@ -215,7 +216,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				if e.Stderr {
 					out = term.Stderr
 				}
-				term.Fprintln(out, term.Nop, e.Message) // TODO: trim trailing newline because we're already printing one?
+				fmt.Fprintln(out, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
 			}
 
@@ -247,7 +248,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 						prefixLen += l
 					}
 				} else {
-					term.Print(term.Nop, strings.Repeat(" ", prefixLen))
+					fmt.Print(strings.Repeat(" ", prefixLen))
 				}
 				if term.CanColor {
 					if !strings.Contains(line, "\033[") {
@@ -257,7 +258,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 				} else {
 					line = pkg.StripAnsi(line)
 				}
-				term.Println(term.Nop, line)
+				fmt.Println(line)
 			}
 		}
 	}
