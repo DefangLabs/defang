@@ -8,12 +8,6 @@ services:
     ports:
       - mode: ingress
         target: 8080
-    secrets:
+    environment:
       - SLACK_TOKEN
       - SLACK_CHANNEL_ID
-      
-secrets:
-  SLACK_TOKEN:
-    external: true
-  SLACK_CHANNEL_ID:
-    external: true
