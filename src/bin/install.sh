@@ -36,7 +36,7 @@ RELEASE_JSON=$(curl -s $RELEASE_API_URL)
 # Check for curl failure
 if [ $? -ne 0 ]; then
     echo "Error fetching release information. Please check your connection or if the URL is correct."
-    exit 1
+    return 1
 fi
 
 # Determine system architecture and operating system
@@ -48,7 +48,7 @@ case $ARCH in
     x86_64) ARCH_SUFFIX="amd64" ;;
     arm64) ARCH_SUFFIX="arm64" ;;
     aarch64) ARCH_SUFFIX="arm64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+    *) echo "Unsupported architecture: $ARCH"; return 2 ;;
 esac
 
 # Initialize the download URL variable
@@ -64,7 +64,7 @@ fi
 # Abort if the download URL is not found
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "Could not find a download URL for your operating system ($OS) and architecture ($ARCH_SUFFIX)."
-    exit 1
+    return 3
 fi
 
 echo "Downloading $DOWNLOAD_URL..."
@@ -80,7 +80,7 @@ fi
 # Download the file
 if ! curl -s -L "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
-    exit 1
+    return 4
 fi
 
 # Create a temporary directory for extraction
@@ -91,12 +91,12 @@ echo "Extracting the downloaded file to $EXTRACT_DIR..."
 if [ "$OS" = "Darwin" ]; then
     if ! unzip -q "$FILENAME" -d "$EXTRACT_DIR"; then
         echo "Failed to extract the downloaded file. The file might be corrupted."
-        exit 1
+        return 5
     fi
 elif [ "$OS" = "Linux" ]; then
     if ! tar -xzf "$FILENAME" -C "$EXTRACT_DIR"; then
         echo "Failed to extract the downloaded file. The file might be corrupted."
-        exit 1
+        return 6
     fi
 fi
 
@@ -111,11 +111,11 @@ if [ ! -d "$INSTALL_DIR" ]; then
     echo "The installation directory ($INSTALL_DIR) does not exist. Creating it now..."
     if ! mkdir -p "$INSTALL_DIR"; then
         echo "Failed to create the installation directory. Please check your permissions and try again."
-        exit 1
+        return 7
     fi
 elif [ ! -w "$INSTALL_DIR" ]; then
     echo "The installation directory ($INSTALL_DIR) is not writable. Please check your permissions and try again."
-    exit 1
+    return 8
 fi
 
 # Assuming the binary or application name is predictable and consistent
@@ -125,13 +125,13 @@ BINARY_NAME='defang' # Adjust this based on actual content
 echo "Moving defang to $INSTALL_DIR"
 if ! mv "$EXTRACT_DIR/$BINARY_NAME" "$INSTALL_DIR"; then
     echo "Failed to move defang. Please check your permissions and try again."
-    exit 1
+    return 9
 fi
 
 # Make the binary executable
 if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
     echo "Failed to make defang executable. Please check your permissions and try again."
-    exit 1
+    return 10
 fi
 
 # Cleanup: Remove the temporary directory
