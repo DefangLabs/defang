@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/muesli/cancelreader"
+	"github.com/ross96D/cancelreader"
 )
 
 var ErrClosed = errors.New("closed")
