@@ -55,6 +55,11 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
+	if term.CanColor { // TODO: should use DoColor(…) instead
+		restore := term.EnableANSI()
+		defer restore()
+	}
+
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", prettyError(err))
@@ -234,10 +239,7 @@ func SetupCommands(version string) {
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
 
-	if term.CanColor {
-		restore := term.EnableANSI()
-		cobra.OnFinalize(restore)
-
+	if term.CanColor { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
 		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
