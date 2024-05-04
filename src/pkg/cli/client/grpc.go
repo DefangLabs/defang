@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -42,7 +42,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 	state := State{AnonID: uuid.NewString()}
 
 	// Restore anonID from config file
-	statePath := path.Join(StateDir, "state.json")
+	statePath := filepath.Join(StateDir, "state.json")
 	if bytes, err := os.ReadFile(statePath); err == nil {
 		json.Unmarshal(bytes, &state)
 	} else { // could be not found or path error

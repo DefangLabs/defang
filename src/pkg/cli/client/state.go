@@ -2,13 +2,25 @@ package client
 
 import (
 	"os"
-	"path"
+	"path/filepath"
+	"runtime"
 
 	"github.com/defang-io/defang/src/pkg"
 )
 
+func userStateDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		return os.UserCacheDir()
+	} else {
+		home, err := os.UserHomeDir()
+		return pkg.Getenv("XDG_STATE_HOME", filepath.Join(home, ".local/state")), err
+	}
+}
+
 var (
-	StateDir = path.Join(pkg.Getenv("XDG_STATE_HOME", path.Join(os.Getenv("HOME"), ".local/state")), "defang")
+	stateDir, _ = userStateDir()
+	// StateDir is the directory where the state file is stored
+	StateDir = filepath.Join(stateDir, "defang")
 )
 
 type State struct {
