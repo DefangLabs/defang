@@ -56,11 +56,12 @@ var _ client.Client = (*ByocAws)(nil)
 
 func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 	b := &ByocAws{
-		GrpcClient:   defClient,
-		cdTasks:      make(map[string]ecs.TaskArn),
-		customDomain: "",
-		driver:       cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		pulumiStack:  "beta",                                // TODO: make customizable
+		GrpcClient:    defClient,
+		cdTasks:       make(map[string]ecs.TaskArn),
+		customDomain:  "",
+		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),     // overrides the project name, except in the playground env
+		pulumiStack:   "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -78,12 +79,14 @@ func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws 
 }
 
 func (b *ByocAws) LoadProject() (*compose.Project, error) {
+	if b.privateDomain != "" {
+		panic("LoadProject should only be called once")
+	}
 	var proj *compose.Project
 	var err error
-	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
 	loader := b.GrpcClient.Loader
-	if projectNameOverride != "" {
-		proj, err = loader.LoadWithProjectName(projectNameOverride)
+	if b.pulumiProject != "" {
+		proj, err = loader.LoadWithProjectName(b.pulumiProject)
 	} else {
 		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
 	}
