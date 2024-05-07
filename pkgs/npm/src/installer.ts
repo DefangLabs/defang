@@ -41,7 +41,7 @@ async function downloadFile(
     fs.writeFileSync(downloadTargetFile, response.data);
     return downloadTargetFile;
   } catch (error) {
-    console.error(`Failed to download ${downloadUrl}. ${error}`);
+    console.error(error);
     fs.unlinkSync(downloadTargetFile);
     return "";
   }
@@ -165,7 +165,6 @@ async function install() {
     deleteArchive(archiveFile);
   } catch (error) {
     console.error(error);
-    process.exit(1);
   }
 }
 
