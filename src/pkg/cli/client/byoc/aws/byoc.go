@@ -1,4 +1,4 @@
-package clouds
+package aws
 
 import (
 	"bytes"
@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	types2 "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
@@ -54,7 +54,7 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
+func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 	b := &ByocAws{
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]ecs.TaskArn),
@@ -246,7 +246,7 @@ func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, err
 	if role != "" {
 		stsClient := sts.NewFromConfig(cfg)
 		creds := stscreds.NewAssumeRoleProvider(stsClient, role)
-		cfg.Credentials = aws2.NewCredentialsCache(creds)
+		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
 	r53Client := route53.NewFromConfig(cfg)
@@ -290,7 +290,7 @@ func (b ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 
 	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, types2.RRTypeNs, r53Client)
+	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, r53types.RRTypeNs, r53Client)
 	if err != nil {
 		return "", annotateAwsError(err)
 	}
