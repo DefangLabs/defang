@@ -1,120 +1,123 @@
 package main
 
 import (
-	"html/template"
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"strconv"
-	"sync"
+	"os"
+	"strings"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Task represents a single task in the task list
 type Task struct {
-	Content string
+	ID          primitive.ObjectID `bson:"_id,omitempty"`
+	Description string             `bson:"description"`
+	Completed   bool               `bson:"completed"`
 }
 
-// TaskList holds all tasks in memory
-var (
-	taskList []Task
-	mu       sync.Mutex
-)
-
-// Define templates with embedded HTML and CSS
-var indexTmpl = template.Must(template.New("index").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        #task-app { width: 300px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
-        input[type="text"], input[type="submit"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; }
-        ul { list-style: none; padding: 0; }
-        li { margin: 10px 0; padding: 10px; background-color: #f9f9f9; border: 1px solid #e1e1e1; position: relative; }
-        .delete-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); }
-        .delete-btn input[type="submit"] { background: none; border: none; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div id="task-app">
-        <h1>Task Manager</h1>
-        <form action="/add-task" method="post">
-            <input type="text" name="task" placeholder="Add a new task">
-            <input type="submit" value="Add Task">
-        </form>
-        <ul>
-            {{range $index, $task := .}}
-                <li>
-                    {{.Content}}
-                    <form action="/remove-task" method="post" class="delete-btn">
-                        <input type="hidden" name="index" value="{{$index}}">
-                        <input type="submit" value="-">
-                    </form>
-                </li>
-            {{else}}
-                <li>No tasks yet!</li>
-            {{end}}
-        </ul>
-    </div>
-</body>
-</html>
-`))
-
 func main() {
-	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/add-task", addTaskHandler)
-	http.HandleFunc("/remove-task", removeTaskHandler)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	log.Println("Server starting on http://localhost:8080/")
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_URI")))
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer client.Disconnect(ctx)
+
+	if err = client.Ping(ctx, nil); err != nil {
+		panic(err)
+	}
+	fmt.Println("Connected to MongoDB!")
+
+	collection := client.Database("taskManager").Collection("tasks")
+
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs)
+	http.HandleFunc("/tasks", makeTaskHandler(collection))
+	http.HandleFunc("/tasks/", makeTaskByIDHandler(collection))
+
+	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-	if err := indexTmpl.Execute(w, taskList); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func enableCORS(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
+func makeTaskHandler(collection *mongo.Collection) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(&w)
+		switch r.Method {
+		case "GET":
+			tasks, err := getAllTasks(collection)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(tasks)
+		case "POST":
+			var task Task
+			if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			insertResult, err := collection.InsertOne(context.TODO(), task)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(insertResult)
+		default:
+			http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
+		}
 	}
 }
 
-func addTaskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
+func makeTaskByIDHandler(collection *mongo.Collection) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(&w)
+		if r.Method == "DELETE" {
+			id := strings.TrimPrefix(r.URL.Path, "/tasks/")
+			objID, err := primitive.ObjectIDFromHex(id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			deleteResult, err := collection.DeleteOne(context.TODO(), bson.M{"_id": objID})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(deleteResult)
+		} else {
+			http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
+		}
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	taskContent := r.FormValue("task")
-	if taskContent != "" {
-		taskList = append(taskList, Task{Content: taskContent})
-	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func removeTaskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+func getAllTasks(collection *mongo.Collection) ([]*Task, error) {
+	var tasks []*Task
+	cursor, err := collection.Find(context.TODO(), bson.D{})
+	if err != nil {
+		return nil, err
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	index := r.FormValue("index")
-	if index == "" {
-		http.Error(w, "Invalid index", http.StatusBadRequest)
-		return
+	for cursor.Next(context.TODO()) {
+		var task Task
+		if err = cursor.Decode(&task); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, &task)
 	}
-
-	i, err := strconv.Atoi(index)
-	if err != nil || i < 0 || i >= len(taskList) {
-		http.Error(w, "Invalid index", http.StatusBadRequest)
-		return
-	}
-
-	taskList = append(taskList[:i], taskList[i+1:]...)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	cursor.Close(context.TODO())
+	return tasks, nil
 }
