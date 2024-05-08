@@ -34,7 +34,7 @@ function run(): void {
     process.exitCode = processResult.status ?? 1;
   } catch (error) {
     console.error(error);
-    process.exitCode = 1;
+    process.exitCode = 2;
   }
 }
 

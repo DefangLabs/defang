@@ -1,9 +1,9 @@
-import * as fs from "graceful-fs";
 import * as os from "os";
 import * as path from "path";
 import * as tar from "tar";
 import * as AdmZip from "adm-zip";
 import axios from "axios";
+import { promises as fsPromise } from "fs";
 
 async function downloadAppArchive(
   version: string,
@@ -22,8 +22,6 @@ async function downloadFile(
   downloadTargetFile: string
 ): Promise<string> {
   try {
-    const writeFileStream = fs.createWriteStream(downloadTargetFile);
-
     console.log(`Downloading ${downloadUrl}`);
     const response = await axios.get(downloadUrl, {
       responseType: "arraybuffer",
@@ -38,11 +36,12 @@ async function downloadFile(
       );
     }
 
-    fs.writeFileSync(downloadTargetFile, response.data);
+    await fsPromise.writeFile(downloadTargetFile, response.data);
+
     return downloadTargetFile;
   } catch (error) {
     console.error(error);
-    fs.unlinkSync(downloadTargetFile);
+    await fsPromise.unlink(downloadTargetFile);
     return "";
   }
 }
@@ -92,12 +91,12 @@ function extractTarGz(tarGzFilePath: string, outputPath: string): boolean {
   }
 }
 
-function deleteArchive(archiveFilePath: string): void {
-  fs.unlinkSync(archiveFilePath);
+async function deleteArchive(archiveFilePath: string): Promise<void> {
+  await fsPromise.unlink(archiveFilePath);
 }
 
-function getVersion(filename: string): string {
-  const data = fs.readFileSync(filename, "utf8");
+async function getVersion(filename: string): Promise<string> {
+  const data = await fsPromise.readFile(filename, "utf8");
   const pkg = JSON.parse(data);
   return pkg.version;
 }
@@ -146,7 +145,7 @@ async function install() {
 
     // the package.version (updated in GitHubAction) is used to identify
     // the specific file version to download.
-    const version = getVersion("package.json");
+    const version = await getVersion("package.json");
     const filename = getAppArchiveFilename(version, os.platform(), os.arch());
     const archiveFile = await downloadAppArchive(version, filename, __dirname);
     if (archiveFile.length === 0) {
@@ -162,7 +161,7 @@ async function install() {
     console.log(`Successfully installed defang cli!`);
     // Delete the downloaded archive since we have successfully downloaded
     // and uncompressed it.
-    deleteArchive(archiveFile);
+    await deleteArchive(archiveFile);
   } catch (error) {
     console.error(error);
   }
