@@ -1,6 +1,6 @@
 version: '3.9'
 services:
-  service1:
+  app:
     restart: unless-stopped
     build:
       context: .
@@ -9,9 +9,5 @@ services:
       - mode: ingress
         target: 8080
         published: 8080
-    deploy:
-      resources:
-        reservations:
-          memory: 50M
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+    environment:
+      - MONGO_URI=mongodb+srv://ichrisjiang:Chris6211@cluster0.sduawcf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0 

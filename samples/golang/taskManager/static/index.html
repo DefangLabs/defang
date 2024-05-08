@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        ul li {
+            padding: 8px;
+            margin-bottom: 10px;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        li button {
+            float: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>Task Manager</h1>
+    <form id="taskForm">
+        <input type="text" id="taskDescription" placeholder="Add a new task" required>
+        <button type="submit">Add Task</button>
+    </form>
+    <ul id="taskList"></ul>
+
+    <script>
+        const taskForm = document.getElementById('taskForm');
+        const taskList = document.getElementById('taskList');
+        const taskDescription = document.getElementById('taskDescription');
+
+        taskForm.onsubmit = async function(e) {
+            e.preventDefault();
+            const description = taskDescription.value;
+            await fetch('/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ description, completed: false })
+            });
+            taskDescription.value = '';
+            loadTasks();
+        };
+
+        async function loadTasks() {
+            const response = await fetch('/tasks');
+            const tasks = await response.json();
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.textContent = task.Description;
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.onclick = async function() {
+                    await fetch(`/tasks/${task.ID}`, { method: 'DELETE' });
+                    loadTasks();
+                };
+                li.appendChild(deleteButton);
+                taskList.appendChild(li);
+            });
+        }
+
+        // Initial load of tasks
+        loadTasks();
+    </script>
+</body>
+</html>
