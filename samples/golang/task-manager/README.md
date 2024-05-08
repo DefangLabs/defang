@@ -14,5 +14,3 @@ Environment: Designed to run in containerized environments using Docker, which e
 
 There is a environment variable named MONGO_URI, in the compose file, be sure to put your mongodb URI, i.e. 
 mongodb+srv://<username>:<pwd>@host
-# Note:
-Take note that this is a simulation, projects with databases should not be ran on Defang as the data may be lost if a container shuts down. 
