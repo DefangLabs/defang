@@ -1,4 +1,4 @@
-package clouds
+package aws
 
 import (
 	"bytes"
@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	types2 "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
@@ -54,13 +54,14 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
+func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 	b := &ByocAws{
-		GrpcClient:   defClient,
-		cdTasks:      make(map[string]ecs.TaskArn),
-		customDomain: "",
-		driver:       cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		pulumiStack:  "beta",                                // TODO: make customizable
+		GrpcClient:    defClient,
+		cdTasks:       make(map[string]ecs.TaskArn),
+		customDomain:  "",
+		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
+		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),     // overrides the project name, except in the playground env
+		pulumiStack:   "beta",                                // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -78,12 +79,14 @@ func NewByocAWS(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws 
 }
 
 func (b *ByocAws) LoadProject() (*compose.Project, error) {
+	if b.privateDomain != "" {
+		panic("LoadProject should only be called once")
+	}
 	var proj *compose.Project
 	var err error
-	projectNameOverride := os.Getenv("COMPOSE_PROJECT_NAME") // overrides the project name, except in the playground env
 	loader := b.GrpcClient.Loader
-	if projectNameOverride != "" {
-		proj, err = loader.LoadWithProjectName(projectNameOverride)
+	if b.pulumiProject != "" {
+		proj, err = loader.LoadWithProjectName(b.pulumiProject)
 	} else {
 		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
 	}
@@ -243,7 +246,7 @@ func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, err
 	if role != "" {
 		stsClient := sts.NewFromConfig(cfg)
 		creds := stscreds.NewAssumeRoleProvider(stsClient, role)
-		cfg.Credentials = aws2.NewCredentialsCache(creds)
+		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
 	r53Client := route53.NewFromConfig(cfg)
@@ -287,7 +290,7 @@ func (b ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 
 	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, types2.RRTypeNs, r53Client)
+	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, r53types.RRTypeNs, r53Client)
 	if err != nil {
 		return "", annotateAwsError(err)
 	}
