@@ -55,6 +55,11 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
+	if term.CanColor { // TODO: should use DoColor(…) instead
+		restore := term.EnableANSI()
+		defer restore()
+	}
+
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", prettyError(err))
@@ -71,7 +76,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if strings.Contains(err.Error(), "secret") {
-			printDefangHint("To manage service secrets, use:", "secret")
+			printDefangHint("To manage sensitive service config, use:", "config")
 		}
 
 		var cerr *cli.CancelError
@@ -169,18 +174,18 @@ func SetupCommands(version string) {
 	// Get Status Command
 	RootCmd.AddCommand(getVersionCmd)
 
-	// Secrets Command
-	secretsSetCmd.Flags().BoolP("name", "n", false, "Name of the secret (backwards compat)")
-	secretsSetCmd.Flags().MarkHidden("name")
-	secretsCmd.AddCommand(secretsSetCmd)
+	// Config Command (was: secrets)
+	configSetCmd.Flags().BoolP("name", "n", false, "Name of the config (backwards compat)")
+	configSetCmd.Flags().MarkHidden("name")
+	configCmd.AddCommand(configSetCmd)
 
-	secretsDeleteCmd.Flags().BoolP("name", "n", false, "Name of the secret(s) (backwards compat)")
-	secretsDeleteCmd.Flags().MarkHidden("name")
-	secretsCmd.AddCommand(secretsDeleteCmd)
+	configDeleteCmd.Flags().BoolP("name", "n", false, "Name of the config(s) (backwards compat)")
+	configDeleteCmd.Flags().MarkHidden("name")
+	configCmd.AddCommand(configDeleteCmd)
 
-	secretsCmd.AddCommand(secretsListCmd)
+	configCmd.AddCommand(configListCmd)
 
-	RootCmd.AddCommand(secretsCmd)
+	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(restartCmd)
 
 	// Compose Command
@@ -234,10 +239,7 @@ func SetupCommands(version string) {
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
 
-	if term.CanColor {
-		restore := term.EnableANSI()
-		cobra.OnFinalize(restore)
-
+	if term.CanColor { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
 		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
@@ -565,82 +567,82 @@ var tailCmd = &cobra.Command{
 	},
 }
 
-var secretsCmd = &cobra.Command{
-	Use:     "secret", // like Docker
+var configCmd = &cobra.Command{
+	Use:     "config", // like Docker
 	Args:    cobra.NoArgs,
-	Aliases: []string{"secrets"},
-	Short:   "Add, update, or delete service secrets",
+	Aliases: []string{"secrets", "secret"},
+	Short:   "Add, update, or delete service config",
 }
 
-var secretsSetCmd = &cobra.Command{
-	Use:         "create SECRET", // like Docker
+var configSetCmd = &cobra.Command{
+	Use:         "create CONFIG", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.ExactArgs(1),
 	Aliases:     []string{"set", "add", "put"},
-	Short:       "Adds or updates a secret",
+	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
-		var secret string
+		var value string
 		if !nonInteractive {
-			// Prompt for secret value
-			var secretPrompt = &survey.Password{
-				Message: fmt.Sprintf("Enter value for secret %q:", name),
+			// Prompt for sensitive value
+			var sensitivePrompt = &survey.Password{
+				Message: fmt.Sprintf("Enter value for %q:", name),
 				Help:    "The value will be stored securely and cannot be retrieved later.",
 			}
 
-			err := survey.AskOne(secretPrompt, &secret)
+			err := survey.AskOne(sensitivePrompt, &value)
 			if err != nil {
 				return err
 			}
 		} else {
 			bytes, err := io.ReadAll(os.Stdin)
 			if err != nil && err != io.EOF {
-				return fmt.Errorf("failed reading the secret from non-terminal: %w", err)
+				return fmt.Errorf("failed reading the value from non-terminal: %w", err)
 			}
-			secret = strings.TrimSuffix(string(bytes), "\n")
+			value = strings.TrimSuffix(string(bytes), "\n")
 		}
 
-		if err := cli.SecretsSet(cmd.Context(), client, name, secret); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
 			return err
 		}
-		term.Info(" * Updated secret value for", name)
+		term.Info(" * Updated value for", name)
 
 		printDefangHint("To update the deployed values, do:", "compose start")
 		return nil
 	},
 }
 
-var secretsDeleteCmd = &cobra.Command{
-	Use:         "rm SECRET...", // like Docker
+var configDeleteCmd = &cobra.Command{
+	Use:         "rm CONFIG...", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "delete", "remove"},
-	Short:       "Deletes one or more secrets",
+	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
-		if err := cli.SecretsDelete(cmd.Context(), client, names...); err != nil {
-			// Show a warning (not an error) if the secret was not found
+		if err := cli.ConfigDelete(cmd.Context(), client, names...); err != nil {
+			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(" !", prettyError(err))
 				return nil
 			}
 			return err
 		}
-		term.Info(" * Deleted secret", names)
+		term.Info(" * Deleted", names)
 
-		printDefangHint("To list the secrets (but not their values), do:", "secret ls")
+		printDefangHint("To list the configs (but not their values), do:", "config ls")
 		return nil
 	},
 }
 
-var secretsListCmd = &cobra.Command{
+var configListCmd = &cobra.Command{
 	Use:         "ls", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"list"},
-	Short:       "List secrets",
+	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.SecretsList(cmd.Context(), client)
+		return cli.ConfigList(cmd.Context(), client)
 	},
 }
 

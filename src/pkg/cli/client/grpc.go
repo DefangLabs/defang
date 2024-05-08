@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -42,7 +42,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 	state := State{AnonID: uuid.NewString()}
 
 	// Restore anonID from config file
-	statePath := path.Join(StateDir, "state.json")
+	statePath := filepath.Join(StateDir, "state.json")
 	if bytes, err := os.ReadFile(statePath); err == nil {
 		json.Unmarshal(bytes, &state)
 	} else { // could be not found or path error
@@ -115,12 +115,12 @@ func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFil
 	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[defangv1.GenerateFilesRequest]{Msg: req}))
 }
 
-func (g GrpcClient) PutSecret(ctx context.Context, req *defangv1.SecretValue) error {
+func (g GrpcClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) error {
 	_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: req})
 	return err
 }
 
-func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) error {
+func (g GrpcClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
 	var errs []error
 	for _, name := range req.Names {
@@ -130,7 +130,7 @@ func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) er
 	return errors.Join(errs...)
 }
 
-func (g GrpcClient) ListSecrets(ctx context.Context) (*defangv1.Secrets, error) {
+func (g GrpcClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }
 

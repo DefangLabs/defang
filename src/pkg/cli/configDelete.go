@@ -8,12 +8,12 @@ import (
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func SecretsDelete(ctx context.Context, client client.Client, names ...string) error {
-	term.Debug(" - Deleting secret", names)
+func ConfigDelete(ctx context.Context, client client.Client, names ...string) error {
+	term.Debug(" - Deleting config", names)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	return client.DeleteSecrets(ctx, &defangv1.Secrets{Names: names})
+	return client.DeleteConfig(ctx, &defangv1.Secrets{Names: names})
 }
