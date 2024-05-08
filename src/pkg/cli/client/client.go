@@ -33,7 +33,7 @@ type Client interface {
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
-	DeleteSecrets(context.Context, *defangv1.Secrets) error
+	DeleteConfig(context.Context, *defangv1.Secrets) error
 	DeleteSubdomainZone(context.Context) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context) (ETag, error)
@@ -42,9 +42,9 @@ type Client interface {
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
-	ListSecrets(context.Context) (*defangv1.Secrets, error)
+	ListConfig(context.Context) (*defangv1.Secrets, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
-	PutSecret(context.Context, *defangv1.SecretValue) error
+	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (ETag, error)
 	RevokeToken(context.Context) error
 	ServiceDNS(name string) string

@@ -5,14 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - mode: ingress
-        target: 8080
-    environment:
-      - OPENAI_KEY
     deploy:
       resources:
         reservations:
-          memory: 50M
+          cpus: '1.0'
+          memory: 512M
+    ports:
+      - mode: ingress
+        target: 5000
+        published: 5000
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]

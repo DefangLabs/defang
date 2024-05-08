@@ -1,4 +1,4 @@
-package clouds
+package aws
 
 import (
 	"testing"
@@ -37,7 +37,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			b := NewByocAWS(tt.TenantID, &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}})
+			b := NewByoc(tt.TenantID, &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}})
 			if _, err := b.LoadProject(); err != nil {
 				t.Fatalf("LoadCompose() failed: %v", err)
 			}

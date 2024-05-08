@@ -1,6 +1,6 @@
 //go:build integration
 
-package clouds
+package aws
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestDeploy(t *testing.T) {
-	b := NewByocAWS("ten ant", "", nil) // no domain
+	b := NewByoc("ten ant", nil) // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
@@ -37,7 +37,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocAWS("TestTail", "", nil)
+	b := NewByoc("TestTail", nil)
 	b.customDomain = "example.com" // avoid rpc call
 
 	ss, err := b.Tail(context.Background(), &defangv1.TailRequest{})
@@ -64,7 +64,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocAWS("TestGetServices", "", nil)
+	b := NewByoc("TestGetServices", nil)
 
 	services, err := b.GetServices(context.Background())
 	if err != nil {
@@ -86,10 +86,10 @@ func TestPutSecret(t *testing.T) {
 	}
 
 	const secretName = "hello"
-	b := NewByocAWS("TestPutSecret", "", nil)
+	b := NewByoc("TestPutSecret", nil)
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.DeleteSecrets(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -102,14 +102,14 @@ func TestPutSecret(t *testing.T) {
 	})
 
 	t.Run("invalid name", func(t *testing.T) {
-		err := b.PutSecret(context.Background(), &defangv1.SecretValue{})
+		err := b.PutConfig(context.Background(), &defangv1.SecretValue{})
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("expected invalid argument, got %v", err)
 		}
 	})
 
 	t.Run("put", func(t *testing.T) {
-		err := b.PutSecret(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
+		err := b.PutConfig(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -133,10 +133,10 @@ func TestListSecrets(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	b := NewByocAWS("TestListSecrets", "", nil)
+	b := NewByoc("TestListSecrets", nil)
 
 	t.Run("list", func(t *testing.T) {
-		secrets, err := b.ListSecrets(context.Background())
+		secrets, err := b.ListConfig(context.Background())
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {

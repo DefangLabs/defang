@@ -11,10 +11,10 @@ This guide demonstrates how to deploy Mistral using VLM. You'll need a Hugging F
 
 1. **Set the Hugging Face Token**
 
-   First, set the Hugging Face token using the `defang secrets` command.
+   First, set the Hugging Face token using the `defang config` command.
 
    ```bash
-   defang secrets set --name HF_TOKEN
+   defang config set --name HF_TOKEN
    ```
 
 2. **Launch with Defang Compose**
