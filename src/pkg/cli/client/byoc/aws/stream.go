@@ -1,4 +1,4 @@
-package clouds
+package aws
 
 import (
 	"context"
