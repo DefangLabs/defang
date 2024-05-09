@@ -84,11 +84,10 @@ func (b *ByocAws) LoadProject() (*compose.Project, error) {
 	}
 	var proj *compose.Project
 	var err error
-	loader := b.GrpcClient.Loader
 	if b.pulumiProject != "" {
-		proj, err = loader.LoadWithProjectName(b.pulumiProject)
+		proj, err = b.GrpcClient.Loader.LoadWithProjectName(b.pulumiProject)
 	} else {
-		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
+		proj, err = b.GrpcClient.Loader.LoadWithDefaultProjectName(b.tenantID)
 	}
 	if err != nil {
 		return nil, err
