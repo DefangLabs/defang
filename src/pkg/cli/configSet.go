@@ -9,12 +9,15 @@ import (
 )
 
 func ConfigSet(ctx context.Context, client client.Client, name string, value string) error {
-	term.Debug(" - Setting config", name)
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+	term.Debug(" - Setting config", name, "in project", projectName)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	err := client.PutConfig(ctx, &defangv1.SecretValue{Name: name, Value: value})
-	return err
+	return client.PutConfig(ctx, &defangv1.SecretValue{Name: name, Value: value})
 }
