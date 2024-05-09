@@ -159,7 +159,7 @@ func (g *GrpcClient) Tail(ctx context.Context, req *defangv1.TailRequest) (Serve
 	return g.client.Tail(ctx, &connect.Request[defangv1.TailRequest]{Msg: req})
 }
 
-func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (ETag, error) {
+func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
 	return "", errors.New("the bootstrap command is not valid for the Defang provider")
 }
 
@@ -192,7 +192,7 @@ func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	return err
 }
 
-func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
+func (g *GrpcClient) Destroy(ctx context.Context) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
 	project, err := g.GetServices(ctx)
 	if err != nil {
@@ -220,7 +220,7 @@ func (g *GrpcClient) BootstrapList(context.Context) error {
 	return errors.New("the list command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) Restart(ctx context.Context, names ...string) (ETag, error) {
+func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {

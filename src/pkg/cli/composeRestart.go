@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func ComposeRestart(ctx context.Context, client client.Client) (client.ETag, error) {
+func ComposeRestart(ctx context.Context, client client.Client) (types.ETag, error) {
 	project, err := client.LoadProject()
 	if err != nil {
 		return "", err
