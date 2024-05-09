@@ -928,33 +928,41 @@ var logoutCmd = &cobra.Command{
 var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
-	Args:    cobra.NoArgs,
 	Short:   "Manually run a command with the CD task",
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
-	Use:   "destroy",
-	Args:  cobra.NoArgs,
+	Use:   "destroy [PROJECT]",
+	Args:  cobra.MaximumNArgs(1),
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
+		}
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
 }
 
 var bootstrapDownCmd = &cobra.Command{
-	Use:   "down",
-	Args:  cobra.NoArgs,
+	Use:   "down [PROJECT]",
+	Args:  cobra.MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
+		}
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
 	},
 }
 
 var bootstrapRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Args:  cobra.NoArgs,
+	Use:   "refresh [PROJECT]",
+	Args:  cobra.MaximumNArgs(1),
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
+		}
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
 	},
 }
