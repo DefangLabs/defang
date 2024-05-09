@@ -12,8 +12,7 @@ This Go application demonstrates a simple form submission using the standard net
 
 ## Prerequisite
 1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
-2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>
-3. Make sure all environment variables are set up properly. 
+2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide
 1. Open the terminal and type `defang login`
