@@ -713,17 +713,22 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (client.ETag, er
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) error {
-	if err := b.setUp(ctx); err != nil {
-		return err
+	bucketName := os.Getenv("DEFANG_CD_BUCKET")
+	if bucketName == "" {
+		if err := b.driver.FillOutputs(ctx); err != nil {
+			return annotateAwsError(err)
+		}
+		bucketName = b.driver.BucketName
 	}
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return annotateAwsError(err)
 	}
+	term.Debug(" - Listing stacks in bucket", bucketName)
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 	s3client := s3.NewFromConfig(cfg)
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: &b.driver.BucketName,
+		Bucket: &bucketName,
 		Prefix: &prefix,
 	})
 	if err != nil {
