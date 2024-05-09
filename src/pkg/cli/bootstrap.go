@@ -24,7 +24,14 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 	if err != nil || etag == "" {
 		return err
 	}
-	return Tail(ctx, client, "", etag, since, false)
+	params := TailOptions{
+		Service: "",
+		Etag:    etag,
+		Since:   since,
+		Raw:     false,
+	}
+
+	return Tail(ctx, client, params)
 }
 
 func BootstrapList(ctx context.Context, client client.Client) error {
