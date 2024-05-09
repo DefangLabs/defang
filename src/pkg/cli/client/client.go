@@ -54,7 +54,7 @@ type Client interface {
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
 	LoadProject() (*compose.Project, error)
-	LoadProjectName() (string, error)
+	LoadProjectName() (string, error) // TODO: should probably be a private method
 }
 
 type Property struct {
