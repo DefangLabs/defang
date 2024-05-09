@@ -53,6 +53,13 @@ func prettyError(err error) error {
 
 }
 
+func endLogFunc(service string, host string, eventLog string) bool {
+	result := service == "cd" &&
+		host == "pulumi" &&
+		strings.Contains(eventLog, "Update succeeded")
+	return result
+}
+
 func Execute(ctx context.Context) error {
 	if term.CanColor { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -561,8 +568,14 @@ var tailCmd = &cobra.Command{
 		}
 
 		ts = ts.UTC()
-		term.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
-		return cli.Tail(cmd.Context(), client, name, etag, ts, raw)
+		tailOptions := cli.TailOptions{
+			Service: name,
+			Etag:    etag,
+			Since:   ts,
+			Raw:     raw,
+		}
+
+		return cli.Tail(cmd.Context(), client, tailOptions)
 	},
 }
 
@@ -715,7 +728,15 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service:            "",
+			Etag:               etag,
+			Since:              since,
+			Raw:                false,
+			EndEventDetectFunc: endLogFunc,
+		}
+
+		err = cli.Tail(cmd.Context(), client, tailParams)
 		if err != nil {
 			return err
 		}
@@ -807,7 +828,15 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service:            "",
+			Etag:               etag,
+			Since:              since,
+			Raw:                false,
+			EndEventDetectFunc: endLogFunc,
+		}
+
+		err = cli.Tail(cmd.Context(), client, tailParams)
 		if err != nil {
 			return err
 		}
@@ -859,7 +888,13 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service: "",
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
+		}
+		return cli.Tail(cmd.Context(), client, tailParams)
 	},
 }
 
