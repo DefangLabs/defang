@@ -734,18 +734,18 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, err
 	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
-func (b *ByocAws) BootstrapList(ctx context.Context) error {
+func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			return annotateAwsError(err)
+			return nil, annotateAwsError(err)
 		}
 		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return annotateAwsError(err)
+		return nil, annotateAwsError(err)
 	}
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
@@ -757,8 +757,9 @@ func (b *ByocAws) BootstrapList(ctx context.Context) error {
 		Prefix: &prefix,
 	})
 	if err != nil {
-		return annotateAwsError(err)
+		return nil, annotateAwsError(err)
 	}
+	var stacks []string
 	for _, obj := range out.Contents {
 		// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
 		if obj.Key == nil || !strings.HasSuffix(*obj.Key, ".json") || obj.Size == nil || *obj.Size < 700 {
@@ -766,20 +767,9 @@ func (b *ByocAws) BootstrapList(ctx context.Context) error {
 		}
 		// Cut off the prefix and the .json suffix
 		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
-		fmt.Println(" - ", stack)
+		stacks = append(stacks, stack)
 	}
-	return nil
-}
-
-func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
-	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
-	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
-		return ""
-	}
-	serviceName := ecsService[:len(ecsService)-8]
-
-	// Replace the first underscore to get the FQN.
-	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
+	return stacks, nil
 }
 
 // annotateAwsError translates the AWS error to an error code the CLI client understands

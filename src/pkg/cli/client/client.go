@@ -26,7 +26,7 @@ type Client interface {
 	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (types.ETag, error)
-	BootstrapList(context.Context) error
+	BootstrapList(context.Context) ([]string, error)
 	CheckLoginAndToS(context.Context) error
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)

@@ -217,8 +217,8 @@ func (g *GrpcClient) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) BootstrapList(context.Context) error {
-	return errors.New("the list command is not valid for the Defang provider")
+func (g *GrpcClient) BootstrapList(context.Context) ([]string, error) {
+	return nil, errors.New("this command is not valid for the Defang provider")
 }
 
 func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
