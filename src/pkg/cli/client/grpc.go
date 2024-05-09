@@ -63,7 +63,8 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 }
 
 func (g GrpcClient) LoadProject() (*compose.Project, error) {
-	return g.Loader.LoadWithDefaultProjectName(string(g.tenantID))
+	projectName, _ := g.LoadProjectName()
+	return g.Loader.LoadWithDefaultProjectName(projectName)
 }
 
 func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
@@ -216,8 +217,8 @@ func (g *GrpcClient) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) BootstrapList(context.Context) error {
-	return errors.New("the list command is not valid for the Defang provider")
+func (g *GrpcClient) BootstrapList(context.Context) ([]string, error) {
+	return nil, errors.New("this command is not valid for the Defang provider")
 }
 
 func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
@@ -241,4 +242,8 @@ func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, 
 func (g GrpcClient) ServiceDNS(name string) string {
 	whoami, _ := g.WhoAmI(context.TODO())
 	return whoami.Tenant + "-" + name
+}
+
+func (g GrpcClient) LoadProjectName() (string, error) {
+	return string(g.tenantID), nil
 }

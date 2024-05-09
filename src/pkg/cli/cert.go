@@ -18,6 +18,13 @@ var resolver = net.Resolver{}
 var httpClient = http.Client{}
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+
+	term.Debug(" - Generating Let's Encrypt cert for project", projectName)
+
 	services, err := client.GetServices(ctx)
 	if err != nil {
 		return err
