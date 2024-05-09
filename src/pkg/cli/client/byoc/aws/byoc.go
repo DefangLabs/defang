@@ -395,10 +395,16 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stack returns a stack-qualified name, like the Pulumi TS function `stack`
 func (b *ByocAws) stack(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("%s-%s-%s-%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) stackDir(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
@@ -449,6 +455,9 @@ func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 }
 
 func (b ByocAws) getSecretID(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
@@ -457,12 +466,14 @@ func (b ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
+	term.Debug(" - Putting parameter", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
 func (b ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
+	term.Debug(" - Listing parameters with prefix", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -710,6 +721,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(name)
 	}
+	term.Debug(" - Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return annotateAwsError(err)
 	}
@@ -787,4 +799,15 @@ func annotateAwsError(err error) error {
 
 func (b *ByocAws) ServiceDNS(name string) string {
 	return dnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+}
+
+func (b *ByocAws) LoadProjectName() (string, error) {
+	if b.pulumiProject != "" {
+		return b.pulumiProject, nil
+	}
+	p, err := b.LoadProject()
+	if err != nil {
+		return "", err
+	}
+	return p.Name, nil
 }
