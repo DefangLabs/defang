@@ -100,6 +100,12 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 	}
 
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+	term.Debug(" - Tailing logs in project", projectName)
+
 	if DoDryRun {
 		return ErrDryRun
 	}
