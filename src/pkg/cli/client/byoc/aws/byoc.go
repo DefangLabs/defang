@@ -350,6 +350,9 @@ func (b *ByocAws) bucketName() string {
 }
 
 func (b *ByocAws) environment() map[string]string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
