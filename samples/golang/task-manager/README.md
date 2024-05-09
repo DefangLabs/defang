@@ -12,5 +12,17 @@ Database: MongoDB is used for storing tasks. It is a NoSQL database that offers 
 Frontend: Basic HTML and JavaScript are used for the frontend to interact with the backend via API calls.
 Environment: Designed to run in containerized environments using Docker, which ensures consistency across different development and production environments.
 
+## Prerequisite
+1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>
+Plus, make sure that you have properly set all environment variables up
+3. go.mod should include necessary packages that will be installed when deploying / running the project. 
+4. Make sure the appropriate environment variables are set up 
+
+## A Step-by-Step Guide
+1. Open the terminal and type `defang login`
+2. Type `defang compose up` in the CLI
+3. Your app should be up and running with Defang in minutes!
+
 There is a environment variable named MONGO_URI, in the compose file, be sure to put your mongodb URI, i.e. 
 mongodb+srv://<username>:<pwd>@host
