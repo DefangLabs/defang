@@ -139,6 +139,7 @@ func SetupCommands(version string) {
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
+	bootstrapTearDownCmd.Flags().Bool("force", false, "Force the teardown of the CD stack")
 	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
 	bootstrapCmd.AddCommand(bootstrapListCmd)
 	bootstrapCmd.AddCommand(bootstrapCancelCmd)
@@ -972,8 +973,9 @@ var bootstrapTearDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		term.Warn(` ! Deleting the CD cluster; this does not delete the services!`)
-		return cli.TearDown(cmd.Context(), client)
+		force, _ := cmd.Flags().GetBool("force")
+
+		return cli.TearDown(cmd.Context(), client, force)
 	},
 }
 
