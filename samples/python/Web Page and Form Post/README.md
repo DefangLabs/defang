@@ -1,6 +1,6 @@
 # Simple Form Submission Flask App
 
-This Flask application provides a basic example of handling form submissions. It displays an HTML form where users can input their first name. Upon submission, the application greets the user by name on a new page.
+This Flask application provides a basic example of handling form submissions. It displays an HTML form where users can input their first name. Upon submission, the application greets the user by name on a new page. Note that alognside your .py file, include a requirements.txt so that the Dockerfile can install the necessary packages with pip. 
 
 
 ## Essential Setup Files
@@ -9,9 +9,7 @@ This Flask application provides a basic example of handling form submissions. It
 
 ## Prerequisite
 1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
-2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>
-Plus, make sure that you have properly set all the environment variables i.e. `AWS_PROFILE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`
-3. Requriements.txt should list all the necessary packages that can be installed by pip
+2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide
 1. Open the terminal and type `defang login`
