@@ -345,6 +345,10 @@ func (b ByocAws) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
+func (b *ByocAws) bucketName() string {
+	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
+}
+
 func (b *ByocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
@@ -355,8 +359,8 @@ func (b *ByocAws) environment() map[string]string {
 		"DOMAIN":                     b.customDomain,
 		"PRIVATE_DOMAIN":             b.privateDomain,
 		"PROJECT":                    b.pulumiProject,
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region), // TODO: add a way to override bucket
-		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
+		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.pulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
@@ -407,8 +411,12 @@ func (b *ByocAws) getClusterNames() []string {
 }
 
 func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	if err := b.driver.FillOutputs(ctx); err != nil {
-		return nil, err
+	bucketName := b.bucketName()
+	if bucketName == "" {
+		if err := b.driver.FillOutputs(ctx); err != nil {
+			return nil, annotateAwsError(err)
+		}
+		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -417,12 +425,12 @@ func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	bucket := b.driver.BucketName
 	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
 
+	term.Debug(" - Getting services from", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &bucket,
+		Bucket: &bucketName,
 		Key:    &path,
 	})
 	if err != nil {
@@ -713,17 +721,25 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (client.ETag, er
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) error {
-	if err := b.setUp(ctx); err != nil {
-		return err
+	bucketName := b.bucketName()
+	if bucketName == "" {
+		if err := b.driver.FillOutputs(ctx); err != nil {
+			return annotateAwsError(err)
+		}
+		bucketName = b.bucketName()
 	}
+
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return annotateAwsError(err)
 	}
+
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 	s3client := s3.NewFromConfig(cfg)
+
+	term.Debug(" - Listing stacks in bucket", bucketName)
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: &b.driver.BucketName,
+		Bucket: &bucketName,
 		Prefix: &prefix,
 	})
 	if err != nil {
