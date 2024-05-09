@@ -1,6 +1,6 @@
-# Task Manager Application
+# Go MongoDB Atlas sample
 ## Overview
-This sample is is a web-based task manager designed to help users manage their tasks efficiently. It allows users to add, delete, and view tasks in a simple and intuitive interface. This application is ideal for anyone looking to enhance their productivity by keeping track of their daily activities.
+This sample is is a web-based task manager designed to help users manage their tasks efficiently. It allows users to add, delete, and view tasks in a simple and intuitive interface. This application is ideal for anyone looking to enhance their productivity by keeping track of their daily activities. 
 
 ## Features
 Create Tasks: Users can add new tasks with descriptions.
