@@ -708,7 +708,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) Restart(ctx context.Context, names ...string) (client.ETag, error) {
+func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
