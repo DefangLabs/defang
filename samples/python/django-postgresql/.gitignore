@@ -132,4 +132,4 @@ cython_debug/
 .prof
 
 # Ignore the static files
-staticfiles/
+.staticfiles/
