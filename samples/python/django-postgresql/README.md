@@ -1,6 +1,9 @@
 
 This template is a customer relationship management list project developed using Python Django framework, offering a starting point to help you quickly build your customer management system. We use PostgreSQL as the database. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as detailed in the prerequisites, and executing the commands in our step-by-step guide, your website will be ready to go live to the world!
 
+## Alert
+1. This sample showcases how you could deploy a full-stack application with Defang in Python Django. However, in actual production use cases, PostgreSQL is not recommended. Managed database like RDS and Aiven is more ideal. If you deploy Postgres as a Defang service, your stored data might be lost after a while. Defang's future plan is to automatically create an RDS database for you, ensuring that data is permanently retained.
+
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
 2. A <a href="https://docs.defang.io/docs/concepts/compose">docker-compose file</a> to define and run multi-container Docker applications.
