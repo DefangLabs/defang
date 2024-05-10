@@ -2,7 +2,7 @@
 This template is a member list project developed using Ruby on Rails, offering a starting point to help you quickly build your team management system. We have prepared all the essential files for deployment. By spending less than 10 minutes setting up the environment, as detailed in the prerequisites, and executing the commands in our step-by-step guide, your website will be ready to go live to the world!
 
 ## Alert
-1. This sample showcases how you could deploy a full-stack application with Defang in Ruby on Rails. However, in actual production use cases, SQLite is not recommended. Managed database like RDS and Aiven is more ideal. If you stick to Rail's default database SQLite, your stored data might be lost after a while. Defang's future plan is to automatically create an RDS database for you, ensuring that data is permanently retained.
+1. This sample showcases how you could deploy a full-stack application with Defang in Ruby on Rails. However, it uses a SQLite database, which isn't production-ready and will be reset with every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. If you stick to Rail's default SQLite database, your stored data will be lost on every deployment, and in some other cases. In the future, Defang will help you provision and connect to managed databases.
 
 ## Essential Setup Files
 1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a> to describe the basic image of your applications.
