@@ -54,9 +54,11 @@ func prettyError(err error) error {
 }
 
 func endLogFunc(service string, host string, eventLog string) bool {
-	result := service == "cd" &&
-		host == "pulumi" &&
-		strings.Contains(eventLog, "Update succeeded")
+	result := false
+	if service == "cd" && host == "pulumi" {
+		result = strings.Contains(eventLog, "Update succeeded") ||
+			strings.Contains(eventLog, "Update completed")
+	}
 	return result
 }
 
