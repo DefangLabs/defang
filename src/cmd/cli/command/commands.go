@@ -933,38 +933,38 @@ var bootstrapCmd = &cobra.Command{
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
-	Use:   "destroy [PROJECT]",
-	Args:  cobra.MaximumNArgs(1),
+	Use:   "destroy",
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
-		}
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
 	},
 }
 
 var bootstrapDownCmd = &cobra.Command{
-	Use:   "down [PROJECT]",
-	Args:  cobra.MaximumNArgs(1),
+	Use:   "down",
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
-		}
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
 	},
 }
 
 var bootstrapRefreshCmd = &cobra.Command{
-	Use:   "refresh [PROJECT]",
-	Args:  cobra.MaximumNArgs(1),
+	Use:   "refresh",
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			os.Setenv("COMPOSE_PROJECT_NAME", args[0])
-		}
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
+	},
+}
+
+var bootstrapCancelCmd = &cobra.Command{
+	Use:   "cancel",
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Short: "Cancel the current CD operation",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
 }
 
@@ -986,15 +986,6 @@ var bootstrapListCmd = &cobra.Command{
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapList(cmd.Context(), client)
-	},
-}
-
-var bootstrapCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs,
-	Short: "Cancel the current CD operation",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
 }
 
