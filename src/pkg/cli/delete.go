@@ -5,11 +5,12 @@ import (
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 // Deprecated: Use ComposeStop instead.
-func Delete(ctx context.Context, client client.Client, names ...string) (client.ETag, error) {
+func Delete(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
 	term.Debug(" - Deleting service", names)
 
 	if DoDryRun {

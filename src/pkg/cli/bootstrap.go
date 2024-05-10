@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -9,7 +10,12 @@ import (
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
-	term.Debug(" - Running CD command", command)
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+
+	term.Debug(" - Running CD command", command, "in project", projectName)
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -26,5 +32,12 @@ func BootstrapList(ctx context.Context, client client.Client) error {
 	if DoDryRun {
 		return ErrDryRun
 	}
-	return client.BootstrapList(ctx)
+	stacks, err := client.BootstrapList(ctx)
+	if err != nil {
+		return err
+	}
+	for _, stack := range stacks {
+		fmt.Println(" -", stack)
+	}
+	return nil
 }

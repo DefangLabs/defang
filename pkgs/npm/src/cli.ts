@@ -24,11 +24,18 @@ function getPathToExecutable(): string {
 // in the user PATH to the cli.js to execute. The symlink will name the same as
 // the package name i.e. defang.
 function run(): void {
-  const args = process.argv.slice(2);
-  const processResult = child_process.spawnSync(getPathToExecutable(), args, {
-    stdio: "inherit",
-  });
-  process.exit(processResult.status ?? 0);
+  try {
+    const args = process.argv.slice(2);
+    const processResult = child_process.spawnSync(getPathToExecutable(), args, {
+      stdio: "inherit",
+    });
+
+    processResult.error && console.error(processResult.error);
+    process.exitCode = processResult.status ?? 1;
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 2;
+  }
 }
 
 run();
