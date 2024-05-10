@@ -53,11 +53,19 @@ func prettyError(err error) error {
 
 }
 
-func detectEndLogEventFunc(service string, host string, eventLog string) bool {
+func detectComposeUpEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
 		result = strings.Contains(eventLog, "Update succeeded") ||
-				 strings.Contains(eventLog, "Update completed")
+			strings.Contains(eventLog, "Update completed")
+	}
+	return result
+}
+
+func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
+	result := false
+	if service == "cd" && host == "pulumi" {
+		result = strings.Contains(eventLog, "Destroy succeeded")
 	}
 	return result
 }
@@ -735,7 +743,7 @@ var composeUpCmd = &cobra.Command{
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: detectEndLogEventFunc,
+			EndEventDetectFunc: detectComposeUpEndLogEventFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
@@ -835,7 +843,7 @@ var composeDownCmd = &cobra.Command{
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: detectEndLogEventFunc,
+			EndEventDetectFunc: detectComposeDownEndLogEventFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
