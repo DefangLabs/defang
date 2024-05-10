@@ -18,7 +18,7 @@ echo "\
                           /____/
 "
 
-# Check for -y flag or CI var and the REPLY variable to "y" if it is present
+# Check for -y flag or CI var and set the REPLY variable to "y" if it is present
 if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
     REPLY="y" # TODO: this will fail in Fish shell
     CI="1"
