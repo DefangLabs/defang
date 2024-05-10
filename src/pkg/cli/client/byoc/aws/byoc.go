@@ -84,11 +84,10 @@ func (b *ByocAws) LoadProject() (*compose.Project, error) {
 	}
 	var proj *compose.Project
 	var err error
-	loader := b.GrpcClient.Loader
 	if b.pulumiProject != "" {
-		proj, err = loader.LoadWithProjectName(b.pulumiProject)
+		proj, err = b.GrpcClient.Loader.LoadWithProjectName(b.pulumiProject)
 	} else {
-		proj, err = loader.LoadWithDefaultProjectName(b.tenantID)
+		proj, err = b.GrpcClient.Loader.LoadWithDefaultProjectName(b.tenantID)
 	}
 	if err != nil {
 		return nil, err
@@ -350,6 +349,9 @@ func (b *ByocAws) bucketName() string {
 }
 
 func (b *ByocAws) environment() map[string]string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
@@ -395,10 +397,16 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stack returns a stack-qualified name, like the Pulumi TS function `stack`
 func (b *ByocAws) stack(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("%s-%s-%s-%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) stackDir(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
@@ -449,6 +457,9 @@ func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 }
 
 func (b ByocAws) getSecretID(name string) string {
+	if b.pulumiProject == "" {
+		panic("pulumiProject not set")
+	}
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
@@ -457,12 +468,14 @@ func (b ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
+	term.Debug(" - Putting parameter", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
 func (b ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
+	term.Debug(" - Listing parameters with prefix", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -710,6 +723,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(name)
 	}
+	term.Debug(" - Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return annotateAwsError(err)
 	}
@@ -720,18 +734,18 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, err
 	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
-func (b *ByocAws) BootstrapList(ctx context.Context) error {
+func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			return annotateAwsError(err)
+			return nil, annotateAwsError(err)
 		}
 		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return annotateAwsError(err)
+		return nil, annotateAwsError(err)
 	}
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
@@ -743,8 +757,9 @@ func (b *ByocAws) BootstrapList(ctx context.Context) error {
 		Prefix: &prefix,
 	})
 	if err != nil {
-		return annotateAwsError(err)
+		return nil, annotateAwsError(err)
 	}
+	var stacks []string
 	for _, obj := range out.Contents {
 		// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
 		if obj.Key == nil || !strings.HasSuffix(*obj.Key, ".json") || obj.Size == nil || *obj.Size < 700 {
@@ -752,20 +767,9 @@ func (b *ByocAws) BootstrapList(ctx context.Context) error {
 		}
 		// Cut off the prefix and the .json suffix
 		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
-		fmt.Println(" - ", stack)
+		stacks = append(stacks, stack)
 	}
-	return nil
-}
-
-func getQualifiedNameFromEcsName(ecsService string) qualifiedName {
-	// HACK: Pulumi adds a random 8-char suffix to the service name, so we need to strip it off.
-	if len(ecsService) < 10 || ecsService[len(ecsService)-8] != '-' {
-		return ""
-	}
-	serviceName := ecsService[:len(ecsService)-8]
-
-	// Replace the first underscore to get the FQN.
-	return qualifiedName(strings.Replace(serviceName, "_", ".", 1))
+	return stacks, nil
 }
 
 // annotateAwsError translates the AWS error to an error code the CLI client understands
@@ -787,4 +791,15 @@ func annotateAwsError(err error) error {
 
 func (b *ByocAws) ServiceDNS(name string) string {
 	return dnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+}
+
+func (b *ByocAws) LoadProjectName() (string, error) {
+	if b.pulumiProject != "" {
+		return b.pulumiProject, nil
+	}
+	p, err := b.LoadProject()
+	if err != nil {
+		return "", err
+	}
+	return p.Name, nil
 }

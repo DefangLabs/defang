@@ -1,6 +1,6 @@
-# Task Manager Application
+# Go MongoDB Atlas sample
 ## Overview
-This sample is is a web-based task manager designed to help users manage their tasks efficiently. It allows users to add, delete, and view tasks in a simple and intuitive interface. This application is ideal for anyone looking to enhance their productivity by keeping track of their daily activities.
+This sample is is a web-based task manager designed to help users manage their tasks efficiently. It allows users to add, delete, and view tasks in a simple and intuitive interface. This application is ideal for anyone looking to enhance their productivity by keeping track of their daily activities. There is a go.mod file that includes dependencies for the Dockerfile to install
 
 ## Features
 Create Tasks: Users can add new tasks with descriptions.
@@ -16,13 +16,10 @@ Environment: Designed to run in containerized environments using Docker, which e
 1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>
 Plus, make sure that you have properly set all environment variables up
-3. go.mod should include necessary packages that will be installed when deploying / running the project. 
-4. Make sure the appropriate environment variables are set up 
+3. There is a environment variable named MONGO_URI for the MONGODB connection string, in the compose file, be sure to put your mongodb URI, i.e. 
+mongodb+srv://<username>:<pwd>@host
 
 ## A Step-by-Step Guide
 1. Open the terminal and type `defang login`
 2. Type `defang compose up` in the CLI
 3. Your app should be up and running with Defang in minutes!
-
-There is a environment variable named MONGO_URI, in the compose file, be sure to put your mongodb URI, i.e. 
-mongodb+srv://<username>:<pwd>@host

@@ -100,6 +100,12 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 	}
 
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+	term.Debug(" - Tailing logs in project", projectName)
+
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -145,9 +151,9 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 					case 'v', 'V':
 						verbose := !DoVerbose
 						DoVerbose = verbose
-						modeStr := "off"
+						modeStr := "OFF"
 						if verbose {
-							modeStr = "on"
+							modeStr = "ON"
 						}
 						term.Info(" * Verbose mode", modeStr)
 						go client.Track("Verbose Toggled", P{"verbose", verbose})
