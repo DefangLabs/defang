@@ -53,11 +53,11 @@ func prettyError(err error) error {
 
 }
 
-func endLogFunc(service string, host string, eventLog string) bool {
+func detectEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
 		result = strings.Contains(eventLog, "Update succeeded") ||
-			strings.Contains(eventLog, "Update completed")
+				 strings.Contains(eventLog, "Update completed")
 	}
 	return result
 }
@@ -735,7 +735,7 @@ var composeUpCmd = &cobra.Command{
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: endLogFunc,
+			EndEventDetectFunc: detectEndLogEventFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
@@ -835,7 +835,7 @@ var composeDownCmd = &cobra.Command{
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: endLogFunc,
+			EndEventDetectFunc: detectEndLogEventFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
