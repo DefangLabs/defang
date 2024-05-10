@@ -23,7 +23,6 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
-	"golang.org/x/mod/semver"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -106,7 +105,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
-		if latest, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), latest) < 0 {
+		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
@@ -139,22 +138,23 @@ func SetupCommands(version string) {
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
 	bootstrapCmd.AddCommand(bootstrapDownCmd)
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
+	bootstrapTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
 	bootstrapCmd.AddCommand(bootstrapListCmd)
 	bootstrapCmd.AddCommand(bootstrapCancelCmd)
 
 	// Eula command
-	tosCmd.Flags().Bool("agree-tos", false, "Agree to the Defang terms of service")
+	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
 	RootCmd.AddCommand(tosCmd)
 
 	// Token command
-	tokenCmd.Flags().Duration("expires", 24*time.Hour, "Validity duration of the token")
-	tokenCmd.Flags().String("scope", "", fmt.Sprintf("Scope of the token; one of %v (required)", scope.All()))
+	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
+	tokenCmd.Flags().String("scope", "", fmt.Sprintf("scope of the token; one of %v (required)", scope.All())) // TODO: make it an Option
 	tokenCmd.MarkFlagRequired("scope")
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
-	// loginCmd.Flags().Bool("skip-prompt", false, "Skip the login prompt if already logged in"); TODO: Implement this
+	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
@@ -164,22 +164,21 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	//generateCmd.Flags().StringP("name", "n", "service1", "Name of the service")
 	RootCmd.AddCommand(generateCmd)
 
 	// Get Services Command
-	getServicesCmd.Flags().BoolP("long", "l", false, "Show more details")
+	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
 	RootCmd.AddCommand(getServicesCmd)
 
 	// Get Status Command
 	RootCmd.AddCommand(getVersionCmd)
 
 	// Config Command (was: secrets)
-	configSetCmd.Flags().BoolP("name", "n", false, "Name of the config (backwards compat)")
+	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().MarkHidden("name")
 	configCmd.AddCommand(configSetCmd)
 
-	configDeleteCmd.Flags().BoolP("name", "n", false, "Name of the config(s) (backwards compat)")
+	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
 	configDeleteCmd.Flags().MarkHidden("name")
 	configCmd.AddCommand(configDeleteCmd)
 
@@ -195,40 +194,40 @@ func SetupCommands(version string) {
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
-	composeUpCmd.Flags().Bool("tail", false, "Tail the service logs after updating") // obsolete, but keep for backwards compatibility
+	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
-	composeUpCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
+	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
+	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
-	composeDownCmd.Flags().Bool("tail", false, "Tail the service logs after deleting") // obsolete, but keep for backwards compatibility
-	composeDownCmd.Flags().BoolP("detach", "d", false, "Run in detached mode")
+	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
+	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeDownCmd.Flags().MarkHidden("tail")
 	composeCmd.AddCommand(composeDownCmd)
-	composeStartCmd.Flags().Bool("force", false, "Force a build of the image even if nothing has changed")
+	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
 	RootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
 
 	// Tail Command
-	tailCmd.Flags().StringP("name", "n", "", "Name of the service")
-	tailCmd.Flags().String("etag", "", "ETag or deployment ID of the service")
-	tailCmd.Flags().BoolP("raw", "r", false, "Show raw (unparsed) logs")
-	tailCmd.Flags().String("since", "5s", "Show logs since duration/time")
+	tailCmd.Flags().StringP("name", "n", "", "name of the service")
+	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	tailCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
+	tailCmd.Flags().String("since", "5s", "show logs since duration/time")
 	RootCmd.AddCommand(tailCmd)
 
 	// Delete Command
-	deleteCmd.Flags().BoolP("name", "n", false, "Name of the service(s) (backwards compat)")
+	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
 	deleteCmd.Flags().MarkHidden("name")
-	deleteCmd.Flags().Bool("tail", false, "Tail the service logs after deleting")
+	deleteCmd.Flags().Bool("tail", false, "tail the service logs after deleting")
 	RootCmd.AddCommand(deleteCmd)
 
 	// Send Command
-	sendCmd.Flags().StringP("subject", "n", "", "Subject to send the message to (required)")
-	sendCmd.Flags().StringP("type", "t", "", "Type of message to send (required)")
+	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
+	sendCmd.Flags().StringP("type", "t", "", "type of message to send (required)")
 	sendCmd.Flags().String("id", "", "ID of the message")
-	sendCmd.Flags().StringP("data", "d", "", "String data to send")
+	sendCmd.Flags().StringP("data", "d", "", "string data to send")
 	sendCmd.Flags().StringP("content-type", "c", "", "Content-Type of the data")
 	sendCmd.MarkFlagRequired("subject")
 	sendCmd.MarkFlagRequired("type")
@@ -303,9 +302,9 @@ var RootCmd = &cobra.Command{
 		client = cli.NewClient(cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
-			version := "v" + cmd.Root().Version // HACK to avoid circular dependency with RootCmd
-			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "Min CLI:", v.CliMin)
-			if hasTty && semver.Compare(version, v.CliMin) < 0 {
+			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
+			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
+			if hasTty && isNewer(version, v.CliMin) {
 				term.Warn(" ! Your CLI version is outdated. Please update to the latest version.")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
 			}
@@ -928,13 +927,12 @@ var logoutCmd = &cobra.Command{
 var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
-	Args:    cobra.NoArgs,
 	Short:   "Manually run a command with the CD task",
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
 	Use:   "destroy",
-	Args:  cobra.NoArgs,
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
@@ -943,7 +941,7 @@ var bootstrapDestroyCmd = &cobra.Command{
 
 var bootstrapDownCmd = &cobra.Command{
 	Use:   "down",
-	Args:  cobra.NoArgs,
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "down")
@@ -952,10 +950,19 @@ var bootstrapDownCmd = &cobra.Command{
 
 var bootstrapRefreshCmd = &cobra.Command{
 	Use:   "refresh",
-	Args:  cobra.NoArgs,
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
+	},
+}
+
+var bootstrapCancelCmd = &cobra.Command{
+	Use:   "cancel",
+	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Short: "Cancel the current CD operation",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
 }
 
@@ -964,8 +971,9 @@ var bootstrapTearDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		term.Warn(` ! Deleting the CD cluster; this does not delete the services!`)
-		return cli.TearDown(cmd.Context(), client)
+		force, _ := cmd.Flags().GetBool("force")
+
+		return cli.TearDown(cmd.Context(), client, force)
 	},
 }
 
@@ -976,15 +984,6 @@ var bootstrapListCmd = &cobra.Command{
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.BootstrapList(cmd.Context(), client)
-	},
-}
-
-var bootstrapCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs,
-	Short: "Cancel the current CD operation",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
 	},
 }
 
