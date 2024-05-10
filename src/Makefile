@@ -10,8 +10,7 @@ $(BINARY_NAME): test
 	go build -o $@ $(GOFLAGS) ./cmd/cli
 
 $(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
-	cd protos
-	buf lint
+	cd protos && buf lint
 	buf generate protos
 
 .PHONY: install
