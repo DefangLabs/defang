@@ -65,7 +65,8 @@ func detectComposeUpEndLogEventFunc(service string, host string, eventLog string
 func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Destroy succeeded")
+		result = strings.Contains(eventLog, "Destroy succeeded") ||
+			strings.Contains(eventLog, "Update completed")
 	}
 	return result
 }
