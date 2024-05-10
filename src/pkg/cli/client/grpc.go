@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
@@ -178,7 +179,9 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 			props[p.Name] = fmt.Sprint(p.Value)
 		}
 	}
-	_, err := g.client.Track(context.Background(), &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
+	context, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := g.client.Track(context, &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
