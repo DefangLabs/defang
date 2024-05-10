@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/HongchenY/documentation-starter-kit",
   "dependencies": {
-    "next": "^13.0.6",
+    "next": "^14.1.1",
     "nextra": "latest",
     "nextra-theme-docs": "latest",
     "react": "^18.2.0",
