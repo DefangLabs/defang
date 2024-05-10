@@ -23,7 +23,6 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
-	"golang.org/x/mod/semver"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -106,7 +105,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
-		if latest, err := GetLatestVersion(ctx); err == nil && semver.Compare(GetCurrentVersion(), latest) < 0 {
+		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
@@ -303,9 +302,9 @@ var RootCmd = &cobra.Command{
 		client = cli.NewClient(cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
-			version := "v" + cmd.Root().Version // HACK to avoid circular dependency with RootCmd
-			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "Min CLI:", v.CliMin)
-			if hasTty && semver.Compare(version, v.CliMin) < 0 {
+			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
+			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
+			if hasTty && isNewer(version, v.CliMin) {
 				term.Warn(" ! Your CLI version is outdated. Please update to the latest version.")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
 			}
