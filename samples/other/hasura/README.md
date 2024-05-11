@@ -17,7 +17,7 @@ To start the development environment, run `docker compose -f ./compose.yml -f ./
 
 ### Editing the database/permissions etc.
 
-If you want to edit the database, permissions, or any other Hasura settings such that you can deploy them to production, you should [install the Hasura CLI](https://hasura.io/docs/latest/hasura-cli/install-hasura-cli/). Then, after starting the development environment, you can run `hasura console` _inside the `./hasura` directory. This will open the Hasura console in your browser. Any changes you make in the console will be saved to the `migrations` and `metadata` directories. When you run `defang compose up` these changes will be applied to the production environment.
+If you want to edit the database, permissions, or any other Hasura settings such that you can deploy them to production, you should [install the Hasura CLI](https://hasura.io/docs/latest/hasura-cli/install-hasura-cli/). Then, after starting the development environment, you can run `hasura console` _inside the `./hasura` directory_. This will open the Hasura console in your browser. Any changes you make in the console will be saved to the `migrations` and `metadata` directories. When you run `defang compose up` these changes will be applied to the production environment.
 
 ## Deploying
 1. Open the terminal and type `defang login`
