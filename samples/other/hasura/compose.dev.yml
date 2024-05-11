@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  hasura:
+    depends_on:
+      - postgres
+    restart: on-failure
+    environment: 
+      - HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:postgres@postgres:5432/postgres
+      - HASURA_GRAPHQL_ADMIN_SECRET=password
+    volumes:
+      - ./hasura:/hasura
+
+volumes:
+  postgres_data:

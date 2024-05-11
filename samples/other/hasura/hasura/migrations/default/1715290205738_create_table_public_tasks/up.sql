@@ -1,0 +1,2 @@
+CREATE TABLE "public"."tasks" ("id" uuid NOT NULL DEFAULT gen_random_uuid(), "title" text NOT NULL, "description" text NOT NULL, "status" text, "assignedTo" uuid, PRIMARY KEY ("id") , FOREIGN KEY ("status") REFERENCES "public"."taskStatuses"("value") ON UPDATE cascade ON DELETE set null, FOREIGN KEY ("assignedTo") REFERENCES "public"."users"("id") ON UPDATE cascade ON DELETE set null);
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
