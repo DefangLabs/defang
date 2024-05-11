@@ -12,7 +12,8 @@ This sample project demonstrates how to deploy Hasura with Defang and connect it
 
 For development, we use a Postgres container. The Postgres container is defined in the `compose.dev.yml` file. The Hasura container is defined in the `compose.yml` file, with some overrides in the `compose.dev.yml` file so it can correctly connect to the development database container. 
 
-To start the development environment, run `docker compose -f ./compose.yml -f ./compose.dev.yml up`. This will start the Postgres container and the Hasura container. The Hasura console will be available at `http://localhost:8080` with the password `password`. **Note:** If you want to make changes to your database, permissions, etc. you should use the Hasura console and the Hasura CLI to make those changes. See the next section for more information.
+To start the development environment, run `docker compose -f ./compose.yml -f ./compose.dev.yml up`. This will start the Postgres container and the Hasura container. The Hasura console will be available at `http://localhost:8080` with the password `password`. 
+**Note:** _If you want to make changes to your database, permissions, etc. you should use the Hasura console and the Hasura CLI to make those changes. See the next section for more information._
 
 ### Editing the database/permissions etc.
 
