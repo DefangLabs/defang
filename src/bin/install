@@ -207,7 +207,7 @@ _install_completion_script() {
                 echo "Warning: bash completions require package bash-completion to be installed."
                 return 14
             fi
-            _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "source /etc/bash_completion"
+            _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "source \$HOME/.local/share/bash-completion.d/defang"
             ;;
         zsh)
             _generate_completion_script $shell "$HOME/.local/share/zsh/site-functions/_defang" || return 12
