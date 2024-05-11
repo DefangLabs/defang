@@ -1,0 +1,12 @@
+table:
+  name: taskStatuses
+  schema: public
+is_enum: true
+array_relationships:
+  - name: tasks
+    using:
+      foreign_key_constraint_on:
+        column: status
+        table:
+          name: tasks
+          schema: public
