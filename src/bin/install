@@ -24,12 +24,9 @@ if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
     CI="1"
 fi
 
-# Define the GitHub API URL for the latest release
-RELEASE_API_URL="https://api.github.com/repos/defang-io/defang/releases/latest"
-
 # Use curl to fetch the latest release data
 echo "Fetching the latest release information..."
-RELEASE_JSON=$(curl -s -L $RELEASE_API_URL)
+RELEASE_JSON=$(curl -s -L https://api.github.com/repos/defang-io/defang/releases/latest)
 
 # Check for curl failure
 if [ $? -ne 0 ]; then
@@ -131,8 +128,8 @@ if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
     return 10
 fi
 
-# Usage: _prompt_and_append_to_profile "Prompt string" "path/to/.rcfile" "line to add"
-_prompt_and_append_to_profile() {
+# Usage: _prompt_and_append_to_file "Prompt string" "path/to/.rcfile" "line to add"
+_prompt_and_append_to_file() {
     local prompt=$1
     local profile_file=$2
     local line=$3
@@ -163,9 +160,6 @@ _prompt_and_append_to_profile() {
     fi
 }
 
-# Get the name of the current shell
-CURRENT_SHELL=$(basename "$SHELL")
-
 # Add the installation directory to PATH if not already present
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to your PATH for this session."
@@ -174,56 +168,59 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to your PATH for future sessions."
     EXPORT_PATH="export PATH=\"\$PATH:$INSTALL_DIR\""
 
-    # Define the possible shell profile files
-    PROFILE_FILES=(".bashrc" ".zshrc" ".kshrc")
-
     # Loop over the possible profile files
     FOUND_PROFILE_FILE=false
-    for profile_file in "${PROFILE_FILES[@]}"; do
+    for CURRENT_SHELL in bash zsh ksh; do
         # If the profile file exists in the user's home directory, add a line to it
-        if [[ -f "$HOME/$profile_file" ]]; then
+        if [[ -f "$HOME/.${CURRENT_SHELL}rc" ]]; then
             FOUND_PROFILE_FILE=true
-            _prompt_and_append_to_profile "Can we append the necessary line to" "$HOME/$profile_file" "$EXPORT_PATH"
+            _prompt_and_append_to_file "Can we append the necessary line to" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
         fi
     done
 
     # If no profile file was found
     if [[ $FOUND_PROFILE_FILE == false ]]; then
+        # Get the name of the current shell
+        CURRENT_SHELL="$(basename "${SHELL:-$0}")"
         # Prompt the user to create a new profile file
-        CURRENT_RC="$HOME/.${CURRENT_SHELL}rc"
-        _prompt_and_append_to_profile "No existing profile file found. Can we create" "$CURRENT_RC" "$EXPORT_PATH"
+        _prompt_and_append_to_file "No existing profile file found. Can we create" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
     fi
 fi
 
-# Usage: _generate_completion_script "path/to/completion/_script"
+# Usage: _generate_completion_script "shell" "path/to/completion/_script"
 _generate_completion_script() {
-    local target=$1
+    local shell=$1
+    local target=$2
     echo "Generating completion script at $target"
     mkdir -p "$(dirname "$target")"
-    defang completion $CURRENT_SHELL > "$target"
+    defang completion $shell > "$target"
 }
 
 # Usage: _install_completion_script "shell"
 _install_completion_script() {
-    local shell=$1
+    local shell=$(basename "$1")
     local profile_file=".${shell}rc"
     case $shell in
         bash)
-            _generate_completion_script "$HOME/.local/share/bash-completion.d/defang" || return 11
-            _prompt_and_append_to_profile "Can we add shell completions to" "$HOME/$profile_file" "source \$HOME/.local/share/bash-completion.d/defang"
+            _generate_completion_script $shell "$HOME/.local/share/bash-completion.d/defang" || return 11
+            if [[ -z "$BASH_COMPLETION_VERSINFO" ]]; then
+                echo "Warning: bash completions require package bash-completion to be installed."
+                return 14
+            fi
+            _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "source /etc/bash_completion"
             ;;
         zsh)
-            _generate_completion_script "$HOME/.local/share/zsh/site-functions/_defang" || return 12
+            _generate_completion_script $shell "$HOME/.local/share/zsh/site-functions/_defang" || return 12
             if [[ ":$FPATH:" != *":$HOME/.local/share/zsh/site_functions:"* ]]; then
-                _prompt_and_append_to_profile "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)"
+                _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)"
             fi
             ;;
         *) return 13 ;;
     esac
 }
 
-_install_completion_script $CURRENT_SHELL
-[[ $0 != $CURRENT_SHELL ]] && _install_completion_script $0
+_install_completion_script $SHELL
+[[ $0 != $SHELL ]] && _install_completion_script $0
 
 # Cleanup: Remove the temporary directory
 echo "Cleaning up..."
@@ -233,3 +230,7 @@ rm -r "$EXTRACT_DIR"
 rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
+
+# Unset the variables and functions to avoid polluting the user's environment
+unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
+unset -f _prompt_and_append_to_file _generate_completion_script _install_completion_script
