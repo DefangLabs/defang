@@ -219,8 +219,8 @@ _install_completion_script() {
     esac
 }
 
-_install_completion_script $SHELL
-[[ $0 != $SHELL ]] && _install_completion_script $0
+_install_completion_script $SHELL || true
+[[ $0 != $SHELL ]] && _install_completion_script $0 || true
 
 # Cleanup: Remove the temporary directory
 echo "Cleaning up..."
