@@ -1,0 +1,22 @@
+name: Install script
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/install.yml'
+      - 'src/bin/install'
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install defang
+        run: . <(curl -Ls https://s.defang.io/install)
+
+      - name: Login to Defang
+        run: defang version

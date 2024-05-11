@@ -150,7 +150,7 @@ _prompt_and_append_to_file() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         # Append the line to the profile file
         echo >> "$profile_file"
-        echo "$line # Added by Defang install.sh" >> "$profile_file"
+        echo "$line # Added by Defang install" >> "$profile_file"
     else
         # Print the command for the user to run manually
         echo "To manually add the required line, run the following command:"
