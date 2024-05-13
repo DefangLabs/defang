@@ -14,6 +14,7 @@ import (
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/spinner"
 	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -35,7 +36,7 @@ type TailDetectStopEventFunc func(service string, host string, eventlog string) 
 
 type TailOptions struct {
 	Service            string
-	Etag               string
+	Etag               types.ETag
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
@@ -121,6 +122,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 	if err != nil {
@@ -155,7 +157,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 					}
 					switch b[0] {
 					case 3: // Ctrl-C
-						cancel()
+						return
 					case 10, 13: // Enter or Return
 						fmt.Println(" ") // empty line, but overwrite the spinner
 					case 'v', 'V':
@@ -216,7 +218,6 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		for _, e := range msg.Entries {
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, e.Message) {
-					cancel()
 					return nil
 				}
 				continue
@@ -282,6 +283,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, line) {
+					fmt.Println("End event detected")
 					cancel()
 					return nil
 				}
