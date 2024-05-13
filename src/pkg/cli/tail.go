@@ -283,7 +283,6 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, line) {
-					fmt.Println("End event detected")
 					cancel()
 					return nil
 				}
