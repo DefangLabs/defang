@@ -56,8 +56,7 @@ func prettyError(err error) error {
 func detectComposeUpEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Update succeeded") ||
-			strings.Contains(eventLog, "Update completed")
+		result = strings.Contains(eventLog, "Update succeeded in")
 	}
 	return result
 }
@@ -65,8 +64,8 @@ func detectComposeUpEndLogEventFunc(service string, host string, eventLog string
 func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Destroy succeeded") ||
-			strings.Contains(eventLog, "Update completed")
+		result = strings.Contains(eventLog, "Destroy succeeded in") ||
+			strings.Contains(eventLog, "Update succeeded in")
 	}
 	return result
 }
