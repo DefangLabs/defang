@@ -122,7 +122,6 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 	if err != nil {
@@ -157,6 +156,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 					}
 					switch b[0] {
 					case 3: // Ctrl-C
+						cancel()
 						return
 					case 10, 13: // Enter or Return
 						fmt.Println(" ") // empty line, but overwrite the spinner
