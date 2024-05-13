@@ -111,6 +111,7 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
 	if err != nil {
@@ -128,38 +129,37 @@ func Tail(ctx context.Context, client client.Client, service, etag string, since
 		}
 
 		if !DoVerbose {
-			term.Info(" * Press V to toggle verbose mode")
-			oldState, err := term.MakeUnbuf(int(os.Stdin.Fd()))
-			if err != nil {
-				return err
-			}
-			defer term.Restore(int(os.Stdin.Fd()), oldState)
+			// Allow the user to toggle verbose mode with the V key
+			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
+				defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-			input := term.NewNonBlockingStdin()
-			defer input.Close() // abort the read
-			go func() {
-				var b [1]byte
-				for {
-					if _, err := input.Read(b[:]); err != nil {
-						return // exit goroutine
-					}
-					switch b[0] {
-					case 3: // Ctrl-C
-						cancel()
-					case 10, 13: // Enter or Return
-						fmt.Println(" ") // empty line, but overwrite the spinner
-					case 'v', 'V':
-						verbose := !DoVerbose
-						DoVerbose = verbose
-						modeStr := "OFF"
-						if verbose {
-							modeStr = "ON"
+				term.Info(" * Press V to toggle verbose mode")
+				input := term.NewNonBlockingStdin()
+				defer input.Close() // abort the read loop
+				go func() {
+					var b [1]byte
+					for {
+						if _, err := input.Read(b[:]); err != nil {
+							return // exit goroutine
 						}
-						term.Info(" * Verbose mode", modeStr)
-						go client.Track("Verbose Toggled", P{"verbose", verbose})
+						switch b[0] {
+						case 3: // Ctrl-C
+							cancel() // cancel the tail context
+						case 10, 13: // Enter or Return
+							fmt.Println(" ") // empty line, but overwrite the spinner
+						case 'v', 'V':
+							verbose := !DoVerbose
+							DoVerbose = verbose
+							modeStr := "OFF"
+							if verbose {
+								modeStr = "ON"
+							}
+							term.Info(" * Verbose mode", modeStr)
+							go client.Track("Verbose Toggled", P{"verbose", verbose})
+						}
 					}
-				}
-			}()
+				}()
+			}
 		}
 	}
 
