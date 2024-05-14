@@ -53,14 +53,6 @@ func prettyError(err error) error {
 
 }
 
-func detectComposeUpEndLogEventFunc(service string, host string, eventLog string) bool {
-	result := false
-	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Update succeeded in ")
-	}
-	return result
-}
-
 func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
@@ -744,11 +736,10 @@ var composeUpCmd = &cobra.Command{
 
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Service:            "",
-			Etag:               etag,
-			Since:              since,
-			Raw:                false,
-			EndEventDetectFunc: detectComposeUpEndLogEventFunc,
+			Service: "",
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
