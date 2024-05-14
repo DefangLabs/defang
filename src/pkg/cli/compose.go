@@ -318,12 +318,14 @@ func uploadTarball(ctx context.Context, client client.Client, body io.Reader, di
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
 	ureq := &defangv1.UploadURLRequest{Digest: digest}
 	res, err := client.CreateUploadURL(ctx, ureq)
+	term.Debug("tarball UPLOAD URL: %s", res.Url)
 	if err != nil {
 		return "", err
 	}
 
 	// Do an HTTP PUT to the generated URL
 	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
+	term.Debug("TARBALL PUT RES: %s", resp.Status)
 	if err != nil {
 		return "", err
 	}

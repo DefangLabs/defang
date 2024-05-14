@@ -23,7 +23,7 @@ func main() {
 		cancel()
 	}()
 
-	command.SetupCommands(version)
+	command.SetupCommands("1")
 	err := command.Execute(ctx)
 	command.FlushAllTracking() // TODO: track errors/panics
 

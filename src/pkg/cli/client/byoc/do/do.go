@@ -3,18 +3,17 @@ package do
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"github.com/defang-io/defang/src/pkg"
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
+	"github.com/defang-io/defang/src/pkg/clouds/do"
 	"github.com/defang-io/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/defang-io/defang/src/pkg/http"
 	"github.com/defang-io/defang/src/pkg/quota"
 	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/digitalocean/godo"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"strings"
@@ -47,10 +46,16 @@ func NewByocDO(tenantId types.TenantID, project string, defClient *client.GrpcCl
 		project = tenantId.String()
 	}
 
+	regionString := os.Getenv("REGION")
+
+	if regionString == "" {
+		regionString = "sfo3"
+	}
+
 	b := &ByocDo{
 		GrpcClient:    defClient,
 		CustomDomain:  "",
-		Driver:        appPlatform.New(byoc.CdTaskPrefix, ""),
+		Driver:        appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 		pulumiProject: project,
 		pulumiStack:   "beta",
 		TenantID:      tenantId.String(),
@@ -97,43 +102,45 @@ func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defan
 		return nil, err
 	}
 
-	var payloadString string
-	if len(data) < 1000 {
-		// Small payloads can be sent as base64-encoded command-line argument
-		payloadString = base64.StdEncoding.EncodeToString(data)
-		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
-	} else {
-		url, err := b.Driver.CreateUploadURL(ctx, etag)
-		if err != nil {
-			return nil, err
-		}
-
-		// Do an HTTP PUT to the generated URL
-		resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
-		}
-		payloadString = http.RemoveQueryParam(url)
-		// FIXME: this code path didn't work
-	}
-
-	appID, err := b.runCdCommand(ctx, "up", payloadString)
+	url, err := b.Driver.CreateUploadUrl(ctx, etag)
 	if err != nil {
 		return nil, err
 	}
-	b.AppIds[etag] = appID
+
+	// Do an HTTP PUT to the generated URL
+	resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
+	}
+	payloadUrl := strings.Split(http.RemoveQueryParam(url), "/")
+
+	payloadFileName := payloadUrl[len(payloadUrl)-1]
+
+	payloadString, err := b.Driver.CreateS3DownloadUrl(ctx, fmt.Sprintf("uploads/%s", payloadFileName))
+
+	if err != nil {
+		return nil, err
+	}
+
+	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
+
+	//appID, err := b.runCdCommand(ctx, "up", payloadString)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//b.AppIds[etag] = appID
 
 	//return &defangv1.DeployResponse{
 	//	Services: serviceInfos,
 	//	Etag:     etag,
 	//}, nil
 
-	resp := &defangv1.DeployResponse{}
-	return resp, nil
+	res := &defangv1.DeployResponse{}
+	return res, nil
 }
 
 func (b ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
@@ -173,8 +180,8 @@ func (b ByocDo) environment() map[string]string {
 		"DOMAIN":                     b.CustomDomain,
 		"PRIVATE_DOMAIN":             b.privateDomain,
 		"PROJECT":                    b.pulumiProject,
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.Driver.BucketName, region), // TODO: add a way to override bucket
-		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                          // TODO: make customizable
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.Driver.BucketName), // TODO: add a way to override bucket
+		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
 		"STACK":                      b.pulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
@@ -202,36 +209,36 @@ func (b ByocDo) setUp(ctx context.Context) error {
 		return nil
 	}
 
-	cdTaskName := byoc.CdTaskPrefix
-	serviceContainers := []*godo.AppServiceSpec{
-		{
-			Name: "main",
-			Image: &godo.ImageSourceSpec{
-				Repository:   "pulumi-nodejs",
-				Registry:     "pulumi",
-				RegistryType: DockerHub,
-			},
-			RunCommand:       "node lib/index.js",
-			InstanceCount:    1,
-			InstanceSizeSlug: "basic-xs",
-		},
-	}
-	jobContainers := []*godo.AppJobSpec{
-		{
-			Name: cdTaskName,
-			Image: &godo.ImageSourceSpec{
-				Repository:   "cd",
-				RegistryType: Docr,
-			},
-			InstanceCount:    1,
-			InstanceSizeSlug: "basic-xxs",
-			Kind:             godo.AppJobSpecKind_PreDeploy,
-		},
-	}
+	//cdTaskName := byoc.CdTaskPrefix
+	//serviceContainers := []*godo.AppServiceSpec{
+	//	{
+	//		Name: "main",
+	//		Image: &godo.ImageSourceSpec{
+	//			Repository:   "pulumi-nodejs",
+	//			Registry:     "pulumi",
+	//			RegistryType: DockerHub,
+	//		},
+	//		RunCommand:       "node lib/index.js",
+	//		InstanceCount:    1,
+	//		InstanceSizeSlug: "basic-xs",
+	//	},
+	//}
+	//jobContainers := []*godo.AppJobSpec{
+	//	{
+	//		Name: cdTaskName,
+	//		Image: &godo.ImageSourceSpec{
+	//			Repository:   "cd",
+	//			RegistryType: DockerHub,
+	//		},
+	//		InstanceCount:    1,
+	//		InstanceSizeSlug: "basic-xxs",
+	//		Kind:             godo.AppJobSpecKind_PreDeploy,
+	//	},
+	//}
 
-	if err := b.Driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
-		return err
-	}
+	//if err := b.Driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
+	//	return err
+	//}
 
 	b.setupDone = true
 
