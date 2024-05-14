@@ -61,21 +61,21 @@ Defang supports various ways of creating and deploying services to the cloud. Th
 By default, all the output (stdout and stderr) from your app is logged. You can view these logs in real-time. You can view logs for all your services, one service, or even one specific deployment of a service.
 
 - From the CLI:
-    
+
     ```tsx
     defang tail --name service1
     ```
-    
+
 - From the Defang Portal:
-    
-    [https://portal.defang.dev/](https://portal.defang.dev/) 
+
+    [https://portal.defang.dev/](https://portal.defang.dev/)
 
 
 :::info
 * To learn more about observability in Defang, check out the [observability page](../concepts/observability.md).
 * Note that the Defang Portal only displays services deployed to Defang Playground.
 :::
-    
+
 
 ### Update Services
 
@@ -107,7 +107,7 @@ brew install defang-io/defang/defang
 You can install the Defang CLI using a bash script. Just run the following command in your terminal:
 
 ```bash
-. <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)
+. <(curl -Ls https://s.defang.io/install)
 ```
 
 The script will try to download the appropriate binary for your operating system and architecture, add it to `~/.local/bin`, and add `~/.local/bin` to your `PATH` if it's not already there, with your permission. If you do not provide permission it will print an appropriate instruction for you to follow to add it manually. You can also customize the installation directory by setting the `INSTALL_DIR` environment variable before running the script.
@@ -150,7 +150,7 @@ You can find the latest version of the Defang CLI on the [releases page](https:/
     2. Go to System Preferences > Privacy & Security > Security.
     3. In the 'Allow applications downloaded from:' section, you should see a message about Defang being blocked. Click 'Open Anyway'.
     4. Alternatively, select the option "App Store and identified developers" to allow all applications from the App Store and identified developers to run.
-    
+
 ## Warnings
 
 ### "The folder is not empty. Files may be overwritten."

@@ -1,6 +1,7 @@
 package term
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -9,31 +10,32 @@ import (
 
 var tests = []struct {
 	msg, output string
-	newLine     bool
+	profile     termenv.Profile
 }{
-	{"Hello, World!", "Hello, World!\n", true},
-	{"Hello, World!\r", "Hello, World!\r", true},
-	{"Hello, World!\n", "Hello, World!\n", true},
-	{"", "", true},
-	{"Hello, World!", "Hello, World!", false},
-	{"Hello, World!\r", "Hello, World!\r", false},
-	{"Hello, World!\n", "Hello, World!\n", false},
-	{"", "", false},
+	{"Hello, World!", "Hello, World!\n", termenv.Ascii},
+	{"Hello, World!\r", "Hello, World!\r", termenv.Ascii},
+	{"Hello, World!\n", "Hello, World!\n", termenv.Ascii},
+	{"", "\n", termenv.Ascii},
+	{"Hello, World!", "\x1b[95mHello, World!\n\x1b[0m", termenv.ANSI},
+	{"Hello, World!\r", "\x1b[95mHello, World!\r\x1b[0m", termenv.ANSI},
+	{"Hello, World!\n", "\x1b[95mHello, World!\n\x1b[0m", termenv.ANSI},
+	{"", "\x1b[95m\n\x1b[0m", termenv.ANSI},
 }
 
-func TestOutput(t *testing.T) {
-	for _, test := range tests {
-		var buf strings.Builder
-		out := termenv.NewOutput(&buf)
-		out.Profile = termenv.Ascii // Disable color
-		if _, err := output(out, InfoColor, test.msg, test.newLine); err != nil {
-			t.Errorf("output(out, InfoColor, %q) results in error: %v", test.msg, err)
-		}
-		if buf.String() != test.output {
-			t.Errorf("output(out, InfoColor, %q) = %q, want %q", test.msg, buf.String(), test.output)
-		}
+func TestOutputf(t *testing.T) {
+	for i, test := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			var buf strings.Builder
+			out := termenv.NewOutput(&buf)
+			out.Profile = test.profile
+			if _, err := outputf(out, InfoColor, test.msg); err != nil {
+				t.Errorf("outputf(out, InfoColor, %q) results in error: %v", test.msg, err)
+			}
+			if buf.String() != test.output {
+				t.Errorf("outputf(out, InfoColor, %q) = %q, want %q", test.msg, buf.String(), test.output)
+			}
+		})
 	}
-	// Output(Stdout, InfoColor, "Hello, World!")
 }
 
 func TestEnableANSI(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/github"
@@ -17,7 +17,7 @@ func getTokenFile(fabric string) string {
 	if host, _, _ := net.SplitHostPort(fabric); host != "" {
 		fabric = host
 	}
-	return path.Join(client.StateDir, fabric)
+	return filepath.Join(client.StateDir, fabric)
 }
 
 func GetExistingToken(fabric string) string {

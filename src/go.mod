@@ -22,10 +22,10 @@ require (
 	github.com/docker/docker v25.0.5+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/moby/patternmatcher v0.6.0
-	github.com/muesli/cancelreader v0.2.2
 	github.com/muesli/termenv v0.15.2
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+	github.com/ross96D/cancelreader v0.2.6
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5

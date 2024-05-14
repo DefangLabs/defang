@@ -1,11 +1,11 @@
 
 ## Setup
-This sample requires an API key to access AWS S3. The name of the secret is referenced in the docker-compose.yml file.
+This sample requires an API key to access AWS S3. The name of the config values is referenced in the docker-compose.yml file.
 To provide a value for it, you can use the Defang CLI like this:
 
 ```
-defang secrets set --name AWS_ACCESS_KEY
-defang secrets set --name AWS_SECRET_KEY
+defang config set --name AWS_ACCESS_KEY
+defang config set --name AWS_SECRET_KEY
 ```
 
 and then enter the value when prompted.
