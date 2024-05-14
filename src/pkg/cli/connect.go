@@ -76,8 +76,8 @@ func NewClient(cluster string, projectName string, provider client.Provider) cli
 
 	if provider == client.ProviderDO {
 		term.Info(" # Using DO provider")
-		byocClient := do.NewByocDO(tenantId, projectName, defangClient)
-		return byocClient
+		doByocClient := do.NewByocDO(tenantId, projectName, defangClient)
+		return doByocClient
 	}
 
 	return defangClient

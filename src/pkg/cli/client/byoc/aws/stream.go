@@ -1,9 +1,9 @@
-package byoc
+package aws
 
 import (
 	"context"
 	"encoding/json"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 	"io"
 	"strings"
 	"time"
@@ -28,7 +28,7 @@ type byocServerStream struct {
 	stream   ecs.EventStream
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag, service string) *byocServerStream {
+func NewByocServerStream(ctx context.Context, stream ecs.EventStream, etag, service string) *byocServerStream {
 	var errCh <-chan error
 	if errch, ok := stream.(hasErrCh); ok {
 		errCh = errch.Errs()
@@ -53,7 +53,7 @@ func (bs *byocServerStream) Err() error {
 	if bs.err == io.EOF {
 		return nil // same as the original gRPC/connect server stream
 	}
-	return aws.annotateAwsError(bs.err)
+	return annotateAwsError(bs.err)
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
@@ -101,7 +101,7 @@ func (bs *byocServerStream) parseEvents(e types.StartLiveTailResponseStream) ([]
 	// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 	event := events[0]
 	if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-		if strings.Contains(*event.LogGroupIdentifier, ":"+CdTaskPrefix) {
+		if strings.Contains(*event.LogGroupIdentifier, ":"+byoc.CdTaskPrefix) {
 			// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
 			bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
 			bs.response.Host = "pulumi"

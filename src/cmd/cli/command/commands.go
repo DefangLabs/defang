@@ -709,6 +709,8 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
+		fakeUpload, _ := client.CreateUploadURL(cmd.Context(), &defangv1.UploadURLRequest{})
+		term.Debug("UP URL", fakeUpload)
 		deploy, err := cli.ComposeStart(cmd.Context(), client, project, force)
 		if err != nil {
 			return err
