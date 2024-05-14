@@ -9,7 +9,15 @@ const (
 )
 
 type TaskID *string
+type ServiceStatus string
 type ContainerCondition string
+
+const (
+	ServicesAllStopped ServiceStatus = "ALLSTOPPED"
+	ServicesAllStarted ServiceStatus = "ALLSTARTED"
+	ServicesStarting   ServiceStatus = "STARTING"
+	ServicesStopping   ServiceStatus = "STOPPING"
+)
 
 const (
 	ContainerStarted  ContainerCondition = "START"

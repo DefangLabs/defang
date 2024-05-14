@@ -53,6 +53,11 @@ func prettyError(err error) error {
 
 }
 
+func detectServiceStatus(serviceNotifier chan<- types.ServiceStatus) {
+	// TODO: detect service status
+	serviceNotifier <- types.ServicesStarting
+}
+
 func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
 	result := false
 	if service == "cd" && host == "pulumi" {
@@ -714,6 +719,9 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
+		serviceNotifier := make(chan types.ServiceStatus, 10)
+		go detectServiceStatus(serviceNotifier)
+
 		since := time.Now()
 		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
 		if err != nil {
@@ -736,12 +744,14 @@ var composeUpCmd = &cobra.Command{
 
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Service: "",
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
+			Service:           "",
+			Etag:              etag,
+			Since:             since,
+			Raw:               false,
+			ServiceUpNotifier: serviceNotifier,
 		}
 
+		serviceNotifier <- types.ServicesAllStarted
 		err = cli.Tail(cmd.Context(), client, tailParams)
 		if err != nil {
 			return err

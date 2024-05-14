@@ -33,6 +33,7 @@ var (
 )
 
 type TailDetectStopEventFunc func(service string, host string, eventlog string) bool
+type ServiceUpNotifier <-chan types.ServiceStatus
 
 type TailOptions struct {
 	Service            string
@@ -40,6 +41,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
+	ServiceUpNotifier  ServiceUpNotifier
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -95,6 +97,23 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
+func onServiceUpHandler(notifier ServiceUpNotifier, cancel context.CancelFunc) {
+	for event := range notifier {
+		switch event {
+		case types.ServicesStarting:
+			fmt.Println("Service starting")
+		case types.ServicesAllStarted:
+			fmt.Println("Service all started")
+			cancel()
+			return
+		case types.ServicesAllStopped:
+			fmt.Println("Service all stopped")
+		case types.ServicesStopping:
+			fmt.Println("Service stoping")
+		}
+	}
+}
+
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if params.Service != "" {
 		params.Service = NormalizeServiceName(params.Service)
@@ -123,6 +142,10 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	if params.ServiceUpNotifier != nil {
+		onServiceUpHandler(params.ServiceUpNotifier, cancel)
+	}
 
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 	if err != nil {
