@@ -10,22 +10,22 @@ system ? builtins.currentSystem
 }:
 let
   shaMap = {
-    x86_64-linux = "0x02y7p4mp293pwim5fir2qp5rjrr71grpn421w6y0nnajs2gf1k";
-    aarch64-linux = "04f4nkph90rdh8zm5jzdnj5w9dk5gz0cxjmhyj14nfqgjj3lr1j4";
-    x86_64-darwin = "04px1gl860bvyrvgjlvk0m204a856yxk5w4l7a06i3jqc0awrjp8";
-    aarch64-darwin = "04px1gl860bvyrvgjlvk0m204a856yxk5w4l7a06i3jqc0awrjp8";
+    x86_64-linux = "1958pxh2jrjr9f9xdvg70a6plmzklxnrzf3fk2451wy4zrb3klkp";
+    aarch64-linux = "1krsjbfl3icrp4ppdjjmwhcvg66i7gaqpvhc65iyg4lnhvc23ln9";
+    x86_64-darwin = "1b4bmks0nq1g0ixih6k947dw11gg71y5xsihzryvam0af2z1nhnb";
+    aarch64-darwin = "1b4bmks0nq1g0ixih6k947dw11gg71y5xsihzryvam0af2z1nhnb";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.15/defang_0.5.15_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.15/defang_0.5.15_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.15/defang_0.5.15_macOS.zip";
-    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.15/defang_0.5.15_macOS.zip";
+    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_macOS.zip";
+    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_macOS.zip";
   };
 in
 stdenvNoCC.mkDerivation {
   pname = "defang";
-  version = "0.5.15";
+  version = "0.5.16";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -38,6 +38,12 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     mkdir -p $out/bin
     cp -vr ./defang $out/bin/defang
+  '';
+  postInstall = ''
+    installShellCompletion --cmd defang \
+    --bash <($out/bin/defang completion bash) \
+    --zsh <($out/bin/defang completion zsh) \
+    --fish <($out/bin/defang completion fish)
   '';
 
   system = system;
