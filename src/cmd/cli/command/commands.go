@@ -575,6 +575,7 @@ var tailCmd = &cobra.Command{
 		}
 
 		ts = ts.UTC()
+		term.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
 		tailOptions := cli.TailOptions{
 			Service: name,
 			Etag:    etag,
