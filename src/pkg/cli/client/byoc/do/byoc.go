@@ -42,10 +42,7 @@ type ByocDo struct {
 	shouldDelegateSubdomain bool
 }
 
-func NewByocDO(tenantId types.TenantID, project string, defClient *client.GrpcClient) *ByocDo {
-	if project == "" {
-		project = tenantId.String()
-	}
+func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocDo {
 
 	regionString := os.Getenv("REGION")
 
@@ -57,7 +54,7 @@ func NewByocDO(tenantId types.TenantID, project string, defClient *client.GrpcCl
 		GrpcClient:    defClient,
 		CustomDomain:  "",
 		Driver:        appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
-		pulumiProject: project,
+		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
 		pulumiStack:   "beta",
 		TenantID:      tenantId.String(),
 	}
