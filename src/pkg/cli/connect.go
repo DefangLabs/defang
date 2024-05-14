@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/do"
 	"net"
 	"strings"
 
@@ -79,6 +80,12 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 	if provider == client.ProviderAWS {
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		byocClient := aws.NewByoc(tenantId, defangClient)
+		return byocClient
+	}
+
+	if provider == client.ProviderDO {
+		term.Info("# Using DO provider")
+		byocClient := do.NewByoc(tenantId, defangClient)
 		return byocClient
 	}
 
