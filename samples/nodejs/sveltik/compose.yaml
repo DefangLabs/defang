@@ -1,51 +1,32 @@
+version: "3.8"
+
 services:
   db:
-    image: mysql:latest # Using MySQL 5.7, you can choose another version if required
+    image: mysql:latest
     environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: true
       MYSQL_DATABASE: todoApp
       MYSQL_USER: admin
       MYSQL_PASSWORD: Defang12345
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
-
+      - target: 3306
+        mode: host
   backend:
-    build: ./backend/
+    build: .
     environment:
-      DATABASE_HOST: db # Uses the service name as the hostname
+      DATABASE_HOST: db
       DATABASE_USER: admin
       DATABASE_PASSWORD: Defang12345
       DATABASE_NAME: todoApp
     ports:
-      - "3001"
+      - "3001:3001"
     depends_on:
       - db
-    labels:
-      - "traefik.http.routers.backend.rule=PathPrefix(`/tasks`)"
-      - "traefik.http.routers.backend.priority=9999"
-
-  frontend:
-    build: ./frontend/
-    ports:
-      - "3000"
-    depends_on:
-      - backend
-    labels:
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-
-  traefik:
-    image: traefik:latest
-    container_name: traefik
-    command: --api.insecure=true --providers.docker=true --entrypoints.web.address=:80 --log.level=DEBUG --accessLog=true
-    ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
 networks:
-  backend-network: # Define the custom network
+  backend-network:
 
 volumes:
   mysql_data:
