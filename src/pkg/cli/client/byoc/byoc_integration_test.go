@@ -4,9 +4,10 @@ package byoc
 
 import (
 	"context"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 	"strings"
 	"testing"
+
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 
 	"github.com/bufbuild/connect-go"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"

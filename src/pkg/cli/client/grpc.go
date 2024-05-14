@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/auth"
 	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
@@ -23,9 +26,12 @@ import (
 type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
+
+	tenantID types.TenantID
+	Loader   ProjectLoader
 }
 
-func NewGrpcClient(host, accessToken string) *GrpcClient {
+func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader ProjectLoader) *GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
@@ -37,7 +43,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 	state := State{AnonID: uuid.NewString()}
 
 	// Restore anonID from config file
-	statePath := path.Join(StateDir, "state.json")
+	statePath := filepath.Join(StateDir, "state.json")
 	if bytes, err := os.ReadFile(statePath); err == nil {
 		json.Unmarshal(bytes, &state)
 	} else { // could be not found or path error
@@ -47,7 +53,7 @@ func NewGrpcClient(host, accessToken string) *GrpcClient {
 		}
 	}
 
-	return &GrpcClient{client: fabricClient, anonID: state.AnonID}
+	return &GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -57,7 +63,12 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
-func (g GrpcClient) GetVersion(ctx context.Context) (*defangv1.Version, error) {
+func (g GrpcClient) LoadProject() (*compose.Project, error) {
+	projectName, _ := g.LoadProjectName()
+	return g.Loader.LoadWithDefaultProjectName(projectName)
+}
+
+func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
 	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
@@ -106,12 +117,12 @@ func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFil
 	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[defangv1.GenerateFilesRequest]{Msg: req}))
 }
 
-func (g GrpcClient) PutSecret(ctx context.Context, req *defangv1.SecretValue) error {
+func (g GrpcClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) error {
 	_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: req})
 	return err
 }
 
-func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) error {
+func (g GrpcClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
 	var errs []error
 	for _, name := range req.Names {
@@ -121,7 +132,7 @@ func (g GrpcClient) DeleteSecrets(ctx context.Context, req *defangv1.Secrets) er
 	return errors.Join(errs...)
 }
 
-func (g GrpcClient) ListSecrets(ctx context.Context) (*defangv1.Secrets, error) {
+func (g GrpcClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
@@ -150,7 +161,7 @@ func (g *GrpcClient) Tail(ctx context.Context, req *defangv1.TailRequest) (Serve
 	return g.client.Tail(ctx, &connect.Request[defangv1.TailRequest]{Msg: req})
 }
 
-func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (ETag, error) {
+func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
 	return "", errors.New("the bootstrap command is not valid for the Defang provider")
 }
 
@@ -168,7 +179,9 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 			props[p.Name] = fmt.Sprint(p.Value)
 		}
 	}
-	_, err := g.client.Track(context.Background(), &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
+	context, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := g.client.Track(context, &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
@@ -183,7 +196,7 @@ func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	return err
 }
 
-func (g *GrpcClient) Destroy(ctx context.Context) (ETag, error) {
+func (g *GrpcClient) Destroy(ctx context.Context) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
 	project, err := g.GetServices(ctx)
 	if err != nil {
@@ -207,26 +220,33 @@ func (g *GrpcClient) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) BootstrapList(context.Context) error {
-	return errors.New("the list command is not valid for the Defang provider")
+func (g *GrpcClient) BootstrapList(context.Context) ([]string, error) {
+	return nil, errors.New("this command is not valid for the Defang provider")
 }
 
-func (g *GrpcClient) Restart(ctx context.Context, names ...string) error {
+func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {
 		serviceInfo, err := g.Get(ctx, &defangv1.ServiceID{Name: name})
 		if err != nil {
-			return err
+			return "", err
 		}
 		services = append(services, serviceInfo.Service)
 	}
 
-	_, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
-	return err
+	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	if err != nil {
+		return "", err
+	}
+	return dr.Etag, nil
 }
 
 func (g GrpcClient) ServiceDNS(name string) string {
 	whoami, _ := g.WhoAmI(context.TODO())
 	return whoami.Tenant + "-" + name
+}
+
+func (g GrpcClient) LoadProjectName() (string, error) {
+	return string(g.tenantID), nil
 }

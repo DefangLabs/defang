@@ -1,8 +1,9 @@
 package byoc
 
 import (
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 	"testing"
+
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"

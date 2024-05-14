@@ -45,7 +45,9 @@ service FabricController {
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
-  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
@@ -85,6 +87,7 @@ message DeployResponse {
 
 message DeleteRequest {
   repeated string names = 1;
+
   // string project = 2; // defaults to tenant ID
 }
 
@@ -132,7 +135,6 @@ message ServiceInfo {
   string lb_dns = 14;         // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
-  // string natsJwt = 5;
 }
 
 // message Project {
@@ -158,11 +160,13 @@ message TokenRequest {
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
   string anon_id = 6;
+
   // string refresh_token = 6;
 }
 
 message TokenResponse {
   string access_token = 1; // our JWT
+
   // string refresh_token = 2;
   // string token_type = 3; // "Bearer"
   // uint32 expires_in = 4; // 3600
@@ -173,13 +177,16 @@ message Status { string version = 1; }
 
 message Version {
   string fabric = 1;
-  string nats = 2;
+  reserved 2; // was "nats"
+  string cli_min = 3; // minimum CLI version
+  string pulumi_min = 4; // minimum Pulumi provider version
 }
 
 message TailRequest {
   string service = 1; // was "name"
   google.protobuf.Timestamp since = 2;
   string etag = 3;
+
   // string host = 4;
 }
 
@@ -211,6 +218,7 @@ message Device {
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
+
   // repeated string device_ids = 4; // device IDs to reserve
   // map<string, string> options = 5;
 }
@@ -232,12 +240,14 @@ message Resource {
 
 message Resources {
   Resource reservations = 1; // requested resources
+
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
   uint32 replicas = 1;     // number of initial replicas
   Resources resources = 2; // reservations and limits
+
   // Placement placement = 3;
   // EndpointMode endpoint_mode
   // Mode mode
@@ -266,6 +276,7 @@ message Port {
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
+
   // string host_ip "127.0.0.1"
   // Range published "8080"
 }
@@ -302,16 +313,23 @@ message HealthCheck {
   uint32 interval = 2; // in seconds
   uint32 timeout = 3;  // in seconds; must be less than interval
   uint32 retries = 4;
+
   // uint32 start_period = 5;
   // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;
+}
+
+enum Network {
+  UNSPECIFIED = 0; // was: internal=false
+  PRIVATE = 1;     // was: internal=true
+  PUBLIC = 2;
 }
 
 message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal; TODO: not part of spec
+  bool internal = 4; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -321,8 +339,11 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records; TODO: not part of spec
-  string static_files = 15; // x-defang-static-files: folder with static files to serve; TODO: not part of spec
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
+                        // create dns records; TODO: not part of spec
+  string static_files = 15; // x-defang-static-files: folder with static files
+                            // to serve; TODO: not part of spec
+  Network networks = 16; // currently only 1 network is supported
 }
 
 message Event {

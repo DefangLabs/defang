@@ -6,13 +6,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 	"io"
 	"net"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 
 	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"

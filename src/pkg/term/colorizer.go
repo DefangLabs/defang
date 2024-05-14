@@ -12,8 +12,8 @@ var (
 	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && isTerminal()
 	Stdout      = termenv.NewOutput(os.Stdout)
 	Stderr      = termenv.NewOutput(os.Stderr)
-	CanColor    = doColor(Stdout)
-	CanColorErr = doColor(Stderr)
+	CanColor    = DoColor(Stdout)
+	CanColorErr = DoColor(Stderr)
 	DoDebug     bool
 	HadWarnings bool
 )
@@ -21,16 +21,15 @@ var (
 type Color = termenv.ANSIColor
 
 const (
-	Nop        Color = -1
-	BrightCyan       = termenv.ANSIBrightCyan
-	InfoColor        = termenv.ANSIBrightMagenta
-	ErrorColor       = termenv.ANSIBrightRed
-	WarnColor        = termenv.ANSIBrightYellow
-	DebugColor       = termenv.ANSIBrightBlack // Gray
+	BrightCyan = termenv.ANSIBrightCyan
+	InfoColor  = termenv.ANSIBrightMagenta
+	ErrorColor = termenv.ANSIBrightRed
+	WarnColor  = termenv.ANSIBrightYellow
+	DebugColor = termenv.ANSIBrightBlack // Gray
 )
 
-// doColor returns true if the provided output's profile is not Ascii.
-func doColor(o *termenv.Output) bool {
+// DoColor returns true if the provided output's profile is not Ascii.
+func DoColor(o *termenv.Output) bool {
 	return o.Profile != termenv.Ascii
 }
 
@@ -44,38 +43,35 @@ func ForceColor(color bool) {
 	}
 }
 
-func output(w *termenv.Output, c Color, msg string, addNewLine bool) (int, error) {
+func output(w *termenv.Output, c Color, msg string) (int, error) {
 	if len(msg) == 0 {
 		return 0, nil
 	}
-	if doColor(w) && c != Nop {
+	if DoColor(w) {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
 	}
-	if addNewLine && msg[len(msg)-1] != '\n' && msg[len(msg)-1] != '\r' {
-		msg += "\n"
+	return w.WriteString(msg)
+}
+
+func outputf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
+	line := fmt.Sprintf(format, v...)
+	if len(line) == 0 || (line[len(line)-1] != '\n' && line[len(line)-1] != '\r') {
+		line += "\n" // add newline, like log.Printf
 	}
-	return fmt.Fprint(w, msg)
+	return output(w, c, line)
 }
 
 func Fprint(w *termenv.Output, c Color, v ...any) (int, error) {
-	return output(w, c, fmt.Sprint(v...), false)
+	return output(w, c, fmt.Sprint(v...))
 }
 
 func Fprintln(w *termenv.Output, c Color, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintln(v...), false)
+	return output(w, c, fmt.Sprintln(v...))
 }
 
 func Fprintf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintf(format, v...), false)
-}
-
-func Flog(w *termenv.Output, c Color, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintln(v...), true)
-}
-
-func Flogf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
-	return output(w, c, fmt.Sprintf(format, v...), true)
+	return output(w, c, fmt.Sprintf(format, v...))
 }
 
 func Print(c Color, v ...any) (int, error) {
@@ -94,40 +90,40 @@ func Debug(v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Flog(Stderr, DebugColor, v...)
+	return Fprintln(Stderr, DebugColor, v...)
 }
 
 func Debugf(format string, v ...any) (int, error) {
 	if !DoDebug {
 		return 0, nil
 	}
-	return Flogf(Stderr, DebugColor, format, v...)
+	return outputf(Stderr, DebugColor, format, v...)
 }
 
 func Info(v ...any) (int, error) {
-	return Flog(Stdout, InfoColor, v...)
+	return Fprintln(Stdout, InfoColor, v...)
 }
 
 func Infof(format string, v ...any) (int, error) {
-	return Flogf(Stdout, InfoColor, format, v...)
+	return outputf(Stdout, InfoColor, format, v...)
 }
 
 func Warn(v ...any) (int, error) {
 	HadWarnings = true
-	return Flog(Stderr, WarnColor, v...)
+	return Fprintln(Stderr, WarnColor, v...)
 }
 
 func Warnf(format string, v ...any) (int, error) {
 	HadWarnings = true
-	return Flogf(Stderr, WarnColor, format, v...)
+	return outputf(Stderr, WarnColor, format, v...)
 }
 
 func Error(v ...any) (int, error) {
-	return Flog(Stderr, ErrorColor, v...)
+	return Fprintln(Stderr, ErrorColor, v...)
 }
 
 func Errorf(format string, v ...any) (int, error) {
-	return Flogf(Stderr, ErrorColor, format, v...)
+	return outputf(Stderr, ErrorColor, format, v...)
 }
 
 func Fatal(msg any) {

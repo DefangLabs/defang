@@ -23,7 +23,7 @@ Install the Defang CLI from one of the following sources:
   ```
 * Using a shell script:
   ```
-  . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)
+  . <(curl -Ls https://s.defang.io/install)
   ```
 * Using [Go](https://go.dev):
   ```
@@ -74,6 +74,7 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 The Defang CLI recognizes the following environment variables:
 * `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the name in the `compose.yaml` file
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
+* `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
 * `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
 * `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
 * `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`

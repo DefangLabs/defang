@@ -16,7 +16,8 @@ func TestComposeStart(t *testing.T) {
 	DoDryRun = true
 	defer func() { DoDryRun = false }()
 
-	project, err := LoadComposeWithProjectName("../../tests/testproj/compose.yaml", "tenant-id")
+	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+	proj, err := loader.LoadWithProjectName("tenant-id")
 	if err != nil {
 		t.Fatalf("LoadComposeWithProjectName() failed: %v", err)
 	}
@@ -26,19 +27,20 @@ func TestComposeStart(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err = ComposeStart(context.Background(), client.MockClient{UploadUrl: server.URL + "/"}, project, false)
+	_, err = ComposeStart(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeStart() failed: %v", err)
 	}
 }
 
 func TestComposeFixupEnv(t *testing.T) {
-	project, err := LoadComposeWithProjectName("../../tests/fixupenv/compose.yaml", "tenant-id")
+	loader := ComposeLoader{"../../tests/fixupenv/compose.yaml"}
+	proj, err := loader.LoadWithProjectName("tenant-id")
 	if err != nil {
 		t.Fatalf("LoadComposeWithProjectName() failed: %v", err)
 	}
 
-	services, err := convertServices(context.Background(), client.MockClient{}, project.Services, false)
+	services, err := convertServices(context.Background(), client.MockClient{}, proj.Services, false)
 	if err != nil {
 		t.Fatalf("convertServices() failed: %v", err)
 	}
@@ -51,5 +53,23 @@ func TestComposeFixupEnv(t *testing.T) {
 	got := services[ui].Environment["API_URL"]
 	if got != expected {
 		t.Errorf("convertServices() failed: expected API_URL=%s, got %s", expected, got)
+	}
+
+	const sensitiveKey = "SENSITIVE_DATA"
+	_, ok := services[ui].Environment[sensitiveKey]
+	if ok {
+		t.Errorf("convertServices() failed: , %s found in environment map but should not be.", sensitiveKey)
+	}
+
+	found := false
+	for _, value := range services[ui].Secrets {
+		if value.Source == sensitiveKey {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("convertServices() failed: unable to find sensitive config variable %s", sensitiveKey)
 	}
 }

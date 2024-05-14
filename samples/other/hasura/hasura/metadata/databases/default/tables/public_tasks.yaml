@@ -1,0 +1,50 @@
+table:
+  name: tasks
+  schema: public
+object_relationships:
+  - name: assignee
+    using:
+      foreign_key_constraint_on: assignedTo
+  - name: taskStatus
+    using:
+      foreign_key_constraint_on: status
+insert_permissions:
+  - role: public
+    permission:
+      check: {}
+      columns:
+        - description
+        - status
+        - title
+        - assignedTo
+        - id
+    comment: ""
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - description
+        - status
+        - title
+        - assignedTo
+        - id
+      filter: {}
+      allow_aggregations: true
+    comment: ""
+update_permissions:
+  - role: public
+    permission:
+      columns:
+        - description
+        - status
+        - title
+        - assignedTo
+        - id
+      filter: {}
+      check: {}
+    comment: ""
+delete_permissions:
+  - role: public
+    permission:
+      filter: {}
+    comment: ""

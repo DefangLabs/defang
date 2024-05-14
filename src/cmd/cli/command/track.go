@@ -24,16 +24,16 @@ func Track(name string, props ...P) {
 		return
 	}
 	if client == nil {
-		client, _ = cli.Connect(cluster)
+		client, _ = cli.Connect(cluster, nil)
 	}
 	trackWG.Add(1)
 	go func(client cliClient.Client) {
 		defer trackWG.Done()
-		client.Track(name, props...)
+		_ = client.Track(name, props...)
 	}(client)
 }
 
-// flushAllTracking waits for all tracking goroutines to complete.
+// FlushAllTracking waits for all tracking goroutines to complete.
 func FlushAllTracking() {
 	trackWG.Wait()
 }

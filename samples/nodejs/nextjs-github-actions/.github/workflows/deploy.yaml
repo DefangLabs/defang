@@ -5,7 +5,7 @@ on:
     branches:
       - main
 
-concurrency: 
+concurrency:
   group: deploy
   cancel-in-progress: false
 
@@ -20,7 +20,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install defang
-      run: . <(curl -s https://raw.githubusercontent.com/defang-io/defang/main/src/bin/install.sh)
+      run: . <(curl -Ls https://s.defang.io/install)
 
     - name: Login to Defang
       run: defang login

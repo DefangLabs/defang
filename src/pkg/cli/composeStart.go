@@ -19,7 +19,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	for _, svccfg := range serviceConfigs {
-		if isPrivate(&svccfg) && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
@@ -117,31 +117,46 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		// Extract environment variables
+		unsetEnvs := []string{}
 		envs := make(map[string]string)
 		for key, value := range svccfg.Environment {
 			if value == nil {
 				value = resolveEnv(key)
 			}
-			if value != nil {
-				val := *value
-				if serviceNameRegex != nil {
-					// Replace service names with their actual DNS names
-					val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-						return c.ServiceDNS(NormalizeServiceName(serviceName))
-					})
-					if val != *value {
-						warnf("service names were replaced in environment variable %q: %q", key, val)
-					}
-				}
-				envs[key] = val
+
+			// keep track of what environment variables were declared but not set in the compose environment section
+			if value == nil {
+				unsetEnvs = append(unsetEnvs, key)
+				continue
 			}
+
+			val := *value
+			if serviceNameRegex != nil {
+				// Replace service names with their actual DNS names
+				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+					return c.ServiceDNS(NormalizeServiceName(serviceName))
+				})
+				if val != *value {
+					warnf("service names were replaced in environment variable %q: %q", key, val)
+				}
+			}
+			envs[key] = val
 		}
 
 		// Extract secret references
-		var secrets []*defangv1.Secret
-		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &defangv1.Secret{
+		var configs []*defangv1.Secret
+		for i, secret := range svccfg.Secrets {
+			if i == 0 {
+				warnf("secrets will be exposed as environment variables, not files (use 'environment' to silence)")
+			}
+			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
+			})
+		}
+		// add unset environment variables as secrets
+		for _, unsetEnv := range unsetEnvs {
+			configs = append(configs, &defangv1.Secret{
+				Source: unsetEnv,
 			})
 		}
 
@@ -160,18 +175,20 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			staticFiles = staticFilesVal.(string) // already validated above
 		}
 
+		network := network(&svccfg)
 		ports := convertPorts(svccfg.Ports)
 		services = append(services, &defangv1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
-			Internal:    isPrivate(&svccfg), // TODO: support external services (w/o LB)
+			Internal:    network == defangv1.Network_PRIVATE,
+			Networks:    network,
 			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
 			Deploy:      deploy,
 			Environment: envs,
-			Secrets:     secrets,
+			Secrets:     configs,
 			Command:     svccfg.Command,
 			Domainname:  svccfg.DomainName,
 			Platform:    convertPlatform(svccfg.Platform),
@@ -183,10 +200,12 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 }
 
 // ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, project *compose.Project, force bool) (*defangv1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+	project, err := c.LoadProject()
+	if err != nil {
+		return nil, err
+	}
 
-	fakeUpload, _ := c.CreateUploadURL(ctx, &defangv1.UploadURLRequest{})
-	term.Debug("COMPOSE UPLOAD URL: %s", fakeUpload)
 	if err := validateProject(project); err != nil {
 		return nil, &ComposeError{err}
 	}
@@ -259,11 +278,11 @@ func convertPlatform(platform string) defangv1.Platform {
 	}
 }
 
-func isPrivate(svccfg *compose.ServiceConfig) bool {
-	// Hack: Use magic network name "public" to determine if the service is private
-	privateNetwork := true
+func network(svccfg *compose.ServiceConfig) defangv1.Network {
+	// HACK: Use magic network name "public" to determine if the service is public
 	if _, ok := svccfg.Networks["public"]; ok {
-		privateNetwork = false
+		return defangv1.Network_PUBLIC
 	}
-	return privateNetwork
+	// TODO: support external services (w/o LB),
+	return defangv1.Network_PRIVATE
 }
