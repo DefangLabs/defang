@@ -124,7 +124,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: service, Etag: etag, Since: timestamppb.New(since)})
+	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 	if err != nil {
 		return err
 	}
@@ -282,6 +282,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, line) {
+					cancel()
 					return nil
 				}
 			}
