@@ -1,0 +1,22 @@
+version: '3.7'
+name: hasura-rds
+services:
+  hasura:
+    build:
+      dockerfile: Dockerfile
+      context: ./hasura
+    # If you want to add your own domain name in Defang BYOC, uncomment the following line and replace the domain name with your own
+    # domainname: hasura.mycoolapp.com
+    ports:
+      - target: 8080
+        published: 8080
+        mode: ingress
+    environment:
+      - HASURA_GRAPHQL_DATABASE_URL
+      - HASURA_GRAPHQL_ADMIN_SECRET
+      - HASURA_GRAPHQL_ENABLE_CONSOLE=true
+      - HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public
+      - HASURA_GRAPHQL_EXPERIMENTAL_FEATURES=naming_convention
+      - HASURA_GRAPHQL_DEFAULT_NAMING_CONVENTION=graphql-default
+      - HASURA_GRAPHQL_MIGRATIONS_DIR=/hasura/migrations
+      - HASURA_GRAPHQL_METADATA_DIR=/hasura/metadata

@@ -236,7 +236,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}, nil
 }
 
-func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
+func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -267,7 +267,7 @@ func (b ByocAws) findZone(ctx context.Context, domain, role string) (string, err
 	}
 }
 
-func (b ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
+func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	if b.customDomain == "" {
 		return "", errors.New("custom domain not set")
 	}
@@ -305,7 +305,7 @@ func (b ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	return resp.Zone, nil
 }
 
-func (b ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
+func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func (ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b ByocAws) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx)
 	if err != nil {
 		return nil, err
@@ -395,14 +395,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
-// stack returns a stack-qualified name, like the Pulumi TS function `stack`
-func (b *ByocAws) stack(name string) string {
-	if b.pulumiProject == "" {
-		panic("pulumiProject not set")
-	}
-	return fmt.Sprintf("%s-%s-%s-%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
-}
-
+// stackDir returns a stack-qualified name, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
 	if b.pulumiProject == "" {
 		panic("pulumiProject not set")
@@ -410,15 +403,7 @@ func (b *ByocAws) stackDir(name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
-func (b *ByocAws) getClusterNames() []string {
-	// This should match the naming in pulumi/ecs/common.ts
-	return []string{
-		b.stack("cluster"),
-		b.stack("gpu-cluster"),
-	}
-}
-
-func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
@@ -456,14 +441,14 @@ func (b ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 	return &serviceInfos, nil
 }
 
-func (b ByocAws) getSecretID(name string) string {
+func (b *ByocAws) getSecretID(name string) string {
 	if b.pulumiProject == "" {
 		panic("pulumiProject not set")
 	}
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
-func (b ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
@@ -473,7 +458,7 @@ func (b ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 	return annotateAwsError(err)
 }
 
-func (b ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
 	term.Debug(" - Listing parameters with prefix", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
@@ -554,7 +539,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
 	if err := b.quota.Validate(service); err != nil {
 		return nil, err
 	}
@@ -625,7 +610,7 @@ func (b ByocAws) update(ctx context.Context, service *defangv1.Service) (*defang
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
+func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
 	if len(secrets) == 0 {
 		return nil, nil // no secrets to check
 	}
@@ -654,7 +639,7 @@ func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
+func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 	if port.Mode == defangv1.Mode_HOST {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
@@ -668,7 +653,7 @@ func (b ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) getPublicFqdn(fqn qualifiedName) string {
+func (b *ByocAws) getPublicFqdn(fqn qualifiedName) string {
 	if b.customDomain == "" {
 		return "" //b.fqdn
 	}
@@ -677,12 +662,12 @@ func (b ByocAws) getPublicFqdn(fqn qualifiedName) string {
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b ByocAws) getPrivateFqdn(fqn qualifiedName) string {
+func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 	safeFqn := dnsSafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain) // TODO: consider merging this with ServiceDNS
 }
 
-func (b ByocAws) getProjectDomain(zone string) string {
+func (b *ByocAws) getProjectDomain(zone string) string {
 	projectLabel := dnsSafeLabel(b.pulumiProject)
 	if projectLabel == dnsSafeLabel(b.tenantID) {
 		return dnsSafe(zone) // the zone will already have the tenant ID
@@ -799,7 +784,7 @@ func (b *ByocAws) LoadProjectName() (string, error) {
 	}
 	p, err := b.LoadProject()
 	if err != nil {
-		return "", err
+		return b.tenantID, err
 	}
 	return p.Name, nil
 }
