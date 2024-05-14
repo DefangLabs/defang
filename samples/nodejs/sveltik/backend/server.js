@@ -1,13 +1,14 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // Create a pool of connections
-const pool = mysql.createPool({ 
+const pool = mysql.createPool({
     host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
@@ -38,7 +39,7 @@ const ensureTasksTable = () => {
 // Call the function to ensure the table exists
 ensureTasksTable();
 
-// Routes
+// API Routes
 app.get('/tasks', (req, res) => {
     pool.query('SELECT * FROM tasks', (error, results) => {
         if (error) {
@@ -88,6 +89,14 @@ app.delete('/tasks/:id', (req, res) => {
         }
         res.send('Task deleted.');
     });
+});
+
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve the frontend from the root
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3001;
