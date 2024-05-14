@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 	"io"
 	"net"
 	"os"
@@ -59,9 +60,9 @@ func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
 		GrpcClient:    defClient,
 		cdTasks:       make(map[string]ecs.TaskArn),
 		customDomain:  "",
-		driver:        cfn.New(CdTaskPrefix, aws.Region("")), // default region
-		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),     // overrides the project name, except in the playground env
-		pulumiStack:   "beta",                                // TODO: make customizable
+		driver:        cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),          // overrides the project name, except in the playground env
+		pulumiStack:   "beta",                                     // TODO: make customizable
 		quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			Cpus:       16,
@@ -101,7 +102,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.setupDone {
 		return nil
 	}
-	cdTaskName := CdTaskPrefix
+	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:latest",
@@ -117,7 +118,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     CdImage,
+			Image:     byoc.CdImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -327,7 +328,7 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 }
 
 func (ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
+	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
@@ -355,7 +356,7 @@ func (b *ByocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":              DefangPrefix,
+		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.tenantID,
 		"DOMAIN":                     b.customDomain,
@@ -400,7 +401,7 @@ func (b *ByocAws) stackDir(name string) string {
 	if b.pulumiProject == "" {
 		panic("pulumiProject not set")
 	}
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
@@ -445,7 +446,7 @@ func (b *ByocAws) getSecretID(name string) string {
 	if b.pulumiProject == "" {
 		panic("pulumiProject not set")
 	}
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {

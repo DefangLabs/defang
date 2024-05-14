@@ -28,7 +28,7 @@ type byocServerStream struct {
 	stream   ecs.EventStream
 }
 
-func NewByocServerStream(ctx context.Context, stream ecs.EventStream, etag, service string) *byocServerStream {
+func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag, service string) *byocServerStream {
 	var errCh <-chan error
 	if errch, ok := stream.(hasErrCh); ok {
 		errCh = errch.Errs()

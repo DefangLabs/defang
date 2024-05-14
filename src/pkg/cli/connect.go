@@ -9,9 +9,6 @@ import (
 	"strings"
 
 	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/do"
-
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/defang-io/defang/src/pkg/term"
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
@@ -83,12 +80,6 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		byocClient := aws.NewByoc(tenantId, defangClient)
 		return byocClient
-	}
-
-	if provider == client.ProviderDO {
-		term.Info(" # Using DO provider")
-		doByocClient := do.NewByocDO(tenantId, projectName, defangClient)
-		return doByocClient
 	}
 
 	return defangClient
