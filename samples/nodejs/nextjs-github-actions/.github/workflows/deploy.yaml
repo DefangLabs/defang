@@ -20,7 +20,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install defang
-      run: . <(curl -Ls https://s.defang.io/install.sh)
+      run: . <(curl -Ls https://s.defang.io/install)
 
     - name: Login to Defang
       run: defang login

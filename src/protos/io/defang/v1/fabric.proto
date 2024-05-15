@@ -45,7 +45,9 @@ service FabricController {
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
-  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
@@ -85,6 +87,7 @@ message DeployResponse {
 
 message DeleteRequest {
   repeated string names = 1;
+
   // string project = 2; // defaults to tenant ID
 }
 
@@ -157,11 +160,13 @@ message TokenRequest {
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
   string anon_id = 6;
+
   // string refresh_token = 6;
 }
 
 message TokenResponse {
   string access_token = 1; // our JWT
+
   // string refresh_token = 2;
   // string token_type = 3; // "Bearer"
   // uint32 expires_in = 4; // 3600
@@ -181,6 +186,7 @@ message TailRequest {
   string service = 1; // was "name"
   google.protobuf.Timestamp since = 2;
   string etag = 3;
+
   // string host = 4;
 }
 
@@ -212,6 +218,7 @@ message Device {
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
+
   // repeated string device_ids = 4; // device IDs to reserve
   // map<string, string> options = 5;
 }
@@ -233,12 +240,14 @@ message Resource {
 
 message Resources {
   Resource reservations = 1; // requested resources
+
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
   uint32 replicas = 1;     // number of initial replicas
   Resources resources = 2; // reservations and limits
+
   // Placement placement = 3;
   // EndpointMode endpoint_mode
   // Mode mode
@@ -267,6 +276,7 @@ message Port {
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
+
   // string host_ip "127.0.0.1"
   // Range published "8080"
 }
@@ -303,6 +313,7 @@ message HealthCheck {
   uint32 interval = 2; // in seconds
   uint32 timeout = 3;  // in seconds; must be less than interval
   uint32 retries = 4;
+
   // uint32 start_period = 5;
   // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;

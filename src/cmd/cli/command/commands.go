@@ -46,8 +46,8 @@ func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
-		term.Debug(" - Server error:", err)
-		err = errors.Unwrap(err)
+		term.Debug(" - Server error:", cerr)
+		err = errors.Unwrap(cerr)
 	}
 	return err
 
@@ -259,6 +259,11 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		// Don't track the completion commands
+		if cmd.Name() == "__complete" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
+			return nil
+		}
+
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
 			trackCmd(cmd, "Invoked", P{"args", args}, P{"err", err}, P{"non-interactive", nonInteractive}, P{"provider", provider})
