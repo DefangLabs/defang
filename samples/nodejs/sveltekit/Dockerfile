@@ -14,6 +14,8 @@ RUN npm install
 COPY . .
 
 # Build the SvelteKit application
+ARG MONGODB_URI
+ENV MONGODB_URI=$MONGODB_URI
 RUN npm run build
 
 # Expose the port the app runs on
