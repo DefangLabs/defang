@@ -1,27 +1,33 @@
-# Svelte TODO app
+# Svelte, Node.js, and MySQL
 
-This is a simple todoapp that uses Svelte as a frontend library, nodejs as backend, and mysql for database.
+This sample project demonstrates how to deploy a full-stack application using Svelte for the frontend, Node.js for the backend, and MySQL for the database. The project uses Docker to containerize the services, making it easy to run in both development and production environments.
 
-## Technologies
+## NOTE
 
-Create new tasks
-View existing tasks
-Update tasks
-Delete tasks
-(CRUD operations)
+1. This sample showcases how you could deploy a full-stack application with Defang and Django. However, it deploys postgres as a defang service. Defang [services](https://12factor.net/processes) are ephemeral and should not be used to run stateful workloads in production as they will be reset on every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. In the future, Defang will help you provision and connect to managed databases.
 
-## Essential Setup Files
-
-1. A <a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Dockerfile</a>.
-2. A <a href="https://docs.defang.io/docs/concepts/compose">compose file</a> to define and run multi-container Docker applications (this is how Defang identifies services to be deployed).
-
-## Prerequisite
+## Prerequisites
 
 1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
-2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
+2. (optional) If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>.
+3. (development)<a href = "https://docs.docker.com/engine/install/">Docker CLI</a>
+4. <a href = https://nodejs.org/en/download/package-manager> NodeJS</a>
 
-## A Step-by-Step Guide
+## Development
+
+For development, we use a local container. This can be seen in the compose.yml file and the server.js file where we create a pool of connections. To run the sample locally after pulling the respository, you can choose to do 1 of following options: run docker compose up --build or run without using Docker by doing the following:
+
+1. run npm install to install the nodejs dependencies
+2. create an .env file on the svelte directory specifying the appropriate environment variables.
+3. Create the necessary todoApp database on mySQL.
+4. run npm start
+
+### Editing the database/permissions etc.
+
+If you want to edit the database, such that you can deploy them to production, you should [install the mySQL CLI](https://dev.mysql.com/doc/mysql-shell/8.0/en/mysql-shell-install-linux-quick.html) and mySQL workbench to gain access to a GUI so that you can make your changes to the database. After running defang compose up these changes will be reflected.
+
+## Deploying
 
 1. Open the terminal and type `defang login`
-2. Type `defang compose up` in the CLI
-3. Your app should be up and running with Defang in minutes!
+2. Type `defang compose up` in the CLI.
+3. Your app will be running within a few minutes.
