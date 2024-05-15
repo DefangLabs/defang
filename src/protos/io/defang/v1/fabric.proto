@@ -68,6 +68,8 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
+
+  rpc GetTargetGroupHealth(TailRequest) returns (stream TailResponse);
 }
 
 message TrackRequest {
@@ -375,4 +377,23 @@ message WhoAmIResponse {
   string account = 2;
   string region = 3;
   string user_id = 4;
+}
+
+message ServiceInfo {
+  string name = 1;
+  string status = 2;
+}
+
+message TargetGroupServicesInfo {
+  string group = 1;
+  repeated ServiceStatus services = 2;
+  string error = 3;
+}
+
+message TargetGroupMonitoringRequest {
+  repeated string group = 1;
+}
+
+message TargetGroupMonitoringResponse {
+  repeated TargetGroupServicesInfo = 1;
 }
