@@ -4,7 +4,7 @@ This sample project demonstrates how to deploy a full-stack application using Sv
 
 ## NOTE
 
-1. This sample showcases how you could deploy a full-stack application with Defang and Django. However, it deploys postgres as a defang service. Defang [services](https://12factor.net/processes) are ephemeral and should not be used to run stateful workloads in production as they will be reset on every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. In the future, Defang will help you provision and connect to managed databases.
+This sample showcases how you could deploy a full-stack application with Defang and Django. However, it deploys postgres as a defang service. Defang [services](https://12factor.net/processes) are ephemeral and should not be used to run stateful workloads in production as they will be reset on every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. In the future, Defang will help you provision and connect to managed databases.
 
 ## Prerequisites
 
@@ -15,12 +15,11 @@ This sample project demonstrates how to deploy a full-stack application using Sv
 
 ## Development
 
-For development, we use a local container. This can be seen in the compose.yml file and the server.js file where we create a pool of connections. To run the sample locally after pulling the respository, you can choose to do 1 of following options: run docker compose up --build or run without using Docker by doing the following:
+For development, we use a local container. This can be seen in the compose.yml file and the server.js file where we create a pool of connections. To run the sample locally after clonging the respository, you can run on docker by doing _docker compose up --build_ or run without using Docker by doing the following:
 
 1. run npm install to install the nodejs dependencies
 2. create an .env file on the svelte directory specifying the appropriate environment variables.
-3. Create the necessary todoApp database on mySQL.
-4. run npm start
+3. run npm start
 
 ### Editing the database/permissions etc.
 
