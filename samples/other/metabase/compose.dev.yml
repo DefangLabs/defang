@@ -1,0 +1,35 @@
+version: '3.9'
+services:
+  metabase:
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=metabase
+      - MB_DB_PORT=5432
+      - MB_DB_USER=metabase
+      - MB_DB_PASS=metabase
+      - MB_DB_HOST=postgres
+    depends_on:
+      postgres: 
+        condition: service_healthy
+
+  postgres:
+    image: "postgres:latest"
+    environment:
+      POSTGRES_DB: metabase
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: metabase
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "metabase"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 1024M
+
+volumes:
+  postgres_data:
