@@ -1,6 +1,6 @@
 # Svelte TODO app
 
-This is a simple todoapp that uses Svelte as a frontend library, nodejs as backend, and mysql for database.
+This is a simple todoapp that uses Svelte as a frontend library, nodejs as backend, and mysql for database. Note that databases should not be hosted on defang currently and should be hosted on an external source.
 
 ## Technologies
 
