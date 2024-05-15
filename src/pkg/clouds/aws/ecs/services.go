@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
 type ServiceStatus struct {
@@ -18,24 +20,27 @@ type ServiceStatus struct {
 
 type TargetGroupServicesStatus struct {
 	Services []ServiceStatus
+	Error    error
 }
 
-type CancelFunc func()
-type serviceStatusStream struct {
-	StatusStream <-chan TargetGroupServicesStatus
-	ErrorStream  <-chan error
-	Cancel       CancelFunc
+type TargetGroups struct {
+	TargetGroup []TargetGroupServicesStatus
 }
 
-func newServiceStatusStream() (*serviceStatusStream, error) {
+type TargetGroupStream struct {
+	TargetGroupStream <-chan TargetGroups
+	Cancel            context.CancelFunc
+}
+
+func newServiceStatusStream(ctx context.Context) (*TargetGroupStream, error) {
 	// Initialize a session that the SDK will use to load credentials from the shared credentials file ~/.aws/credentials
 	// and region from the shared configuration file ~/.aws/config.
 	region := "us-west-2"
-	if value, ok := os.LookupEnv("AWS_REGION"); ok == true {
+	if value, ok := os.LookupEnv("AWS_REGION"); ok {
 		region = value
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
@@ -44,77 +49,72 @@ func newServiceStatusStream() (*serviceStatusStream, error) {
 		os.Exit(1)
 	}
 
-	// Create an ELBV2 client from the session.
-	svc := elbv2.NewFromConfig(cfg)
+	ctx, cancel := context.WithCancel(ctx)
 
-	// Set up signal handling to gracefully stop the monitoring.
-	stopChan := make(chan bool, 1)
+	// Create an ELBV2 client from the session.
+	svc := elasticloadbalancingv2.NewFromConfig(cfg)
 
 	// Set up a channel to send data.
-	errorChan := make(chan error, 1)
-	groupStatusChan := make(chan TargetGroupServicesStatus, 1)
-
-	fmt.Println("Starting target group health monitoring... Press Ctrl+C to stop.")
+	targetGroupChan := make(chan TargetGroups, 1)
 
 	// Start monitoring in a loop.
 	go func() {
 		for {
 			select {
-			case <-stopChan:
-				fmt.Println("\nReceived stop signal. Exiting...")
-				close(groupStatusChan)
-				close(errorChan)
+			case <-ctx.Done():
+				close(targetGroupChan)
 				return
 			default:
-				groupHealth, err := monitorTargetGroupHealth(svc, "some service name")
+				targetGroups, err := monitorTargetGroupHealth(ctx, svc, "some service name")
 				if err != nil {
-					errorChan <- err
+					term.Warn(" !", err)
 					continue
 				}
-				groupStatusChan <- *groupHealth
-				time.Sleep(30 * time.Second) // Adjust the interval as needed
+				targetGroupChan <- *targetGroups
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
 
-	serviceStatusStream := &serviceStatusStream{
-		StatusStream: groupStatusChan,
-		ErrorStream:  errorChan,
-		Cancel: func() {
-			stopChan <- true
-		},
+	serviceStatusStream := &TargetGroupStream{
+		TargetGroupStream: targetGroupChan,
+		Cancel:            cancel,
 	}
 
 	return serviceStatusStream, nil
 }
 
-func monitorTargetGroupHealth(svc *ElasticLoadBalancingV2Client, targetGroupName string) (*TargetGroupServicesStatus, error) {
+func monitorTargetGroupHealth(ctx context.Context, svc *elasticloadbalancingv2.Client, targetGroupName string) (*TargetGroups, error) {
+	result := TargetGroups{}
+
 	// Describe target groups.
-	describeTargetGroupsInput := &elbv2.DescribeTargetGroupsInput{}
-	targetGroupsOutput, err := svc.DescribeTargetGroups(describeTargetGroupsInput)
+	describeTargetGroupsInput := &elasticloadbalancingv2.DescribeTargetGroupsInput{}
+	targetGroupsOutput, err := svc.DescribeTargetGroups(ctx, describeTargetGroupsInput)
 	if err != nil {
-		fmt.Println("Error describing target groups:", err)
 		return nil, err
 	}
 
-	result := TargetGroupServicesStatus{}
 	for _, targetGroup := range targetGroupsOutput.TargetGroups {
-		fmt.Printf("\nTarget Group ARN: %s\n", types.StringValue(targetGroup.TargetGroupArn))
-		describeTargetHealthInput := &elbv2.DescribeTargetHealthInput{
+		fmt.Printf("\nTarget Group ARN: %s\n", targetGroup.TargetGroupArn)
+		describeTargetHealthInput := &elasticloadbalancingv2.DescribeTargetHealthInput{
 			TargetGroupArn: targetGroup.TargetGroupArn,
 		}
 
-		targetHealthOutput, err := svc.DescribeTargetHealth(describeTargetHealthInput)
+		targetGroupService := TargetGroupServicesStatus{}
+
+		targetHealthOutput, err := svc.DescribeTargetHealth(ctx, describeTargetHealthInput)
 		if err != nil {
-			fmt.Println("Error describing target health:", err)
+			targetGroupService.Error = err
+			result.TargetGroup = append(result.TargetGroup, targetGroupService)
 			continue
 		}
 
 		for _, targetHealthDescription := range targetHealthOutput.TargetHealthDescriptions {
-			result.Services = append(result.Services, ServiceStatus{
-				ServiceName: types.StringValue(targetHealthDescription.Target.Id),
-				Status:      types.StringValue(targetHealthDescription.TargetHealth.State),
+			targetGroupService.Services = append(targetGroupService.Services, ServiceStatus{
+				ServiceName: *targetHealthDescription.Target.Id,
+				Status:      targetHealthDescription.TargetHealth.State,
 			})
+			result.TargetGroup = append(result.TargetGroup, targetGroupService)
 		}
 	}
 
