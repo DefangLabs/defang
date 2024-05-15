@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -10,9 +11,9 @@ import (
 )
 
 var (
-	DoVerbose = false
-	DoDebug   = false
-	DoDryRun  = false
+	DoDryRun = false
+
+	ErrDryRun = errors.New("dry run")
 )
 
 func MarshalPretty(root string, data proto.Message) ([]byte, error) {

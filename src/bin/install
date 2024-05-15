@@ -1,0 +1,236 @@
+################################################################################################
+#                                                                                              #
+# This script installs the latest release of defang from GitHub. It is designed                #
+# to be run like this:                                                                         #
+#                                                                                              #
+# . <(curl -Ls https://s.defang.io/install)                                                    #
+#                                                                                              #
+# This allows us to do some interactive stuff where we can prompt the user for input.          #
+#                                                                                              #
+################################################################################################
+
+echo "\
+       __     ____
+  ____/ /__  / __/___ _____  ____ _
+ / __  / _ \/ /_/ __ \`/ __ \/ __ \`/
+/ /_/ /  __/ __/ /_/ / / / / /_/ /
+\__,_/\___/_/  \__,_/_/ /_/\__, /
+                          /____/
+"
+
+# Check for -y flag or CI var and set the REPLY variable to "y" if it is present
+if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
+    REPLY="y" # TODO: this will fail in Fish shell
+    CI="1"
+fi
+
+# Use curl to fetch the latest release data
+echo "Fetching the latest release information..."
+RELEASE_JSON=$(curl -s -L https://api.github.com/repos/defang-io/defang/releases/latest)
+
+# Check for curl failure
+if [ $? -ne 0 ]; then
+    echo "Error fetching release information. Please check your connection or if the URL is correct."
+    return 1
+fi
+
+# Determine system architecture and operating system
+ARCH=$(uname -m)
+OS=$(uname -s)
+
+# Adjust the architecture string to match the naming convention in the download URLs
+case $ARCH in
+    x86_64) ARCH_SUFFIX="amd64" ;;
+    arm64) ARCH_SUFFIX="arm64" ;;
+    aarch64) ARCH_SUFFIX="arm64" ;;
+    *) echo "Unsupported architecture: $ARCH"; return 2 ;;
+esac
+
+# Initialize the download URL variable
+DOWNLOAD_URL=""
+
+# Based on the OS, filter the download URL
+if [ "$OS" = "Darwin" ]; then
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/defang-io/defang/releases/download/v[0-9.]*/defang_[0-9.]*_macOS.zip" | head -n 1)
+elif [ "$OS" = "Linux" ]; then
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/defang-io/defang/releases/download/v[0-9.]*/defang_[0-9.]*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
+fi
+
+# Abort if the download URL is not found
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo "Could not find a download URL for your operating system ($OS) and architecture ($ARCH_SUFFIX)."
+    return 3
+fi
+
+echo "Downloading $DOWNLOAD_URL..."
+
+# Define the output file name based on OS and ARCH_SUFFIX
+FILENAME="defang_latest"
+if [ "$OS" = "Darwin" ]; then
+    FILENAME="$FILENAME.zip"
+elif [ "$OS" = "Linux" ]; then
+    FILENAME="$FILENAME.tar.gz"
+fi
+
+# Download the file
+if ! curl -s -L "$DOWNLOAD_URL" -o "$FILENAME"; then
+    echo "Download failed. Please check your internet connection and try again."
+    return 4
+fi
+
+# Create a temporary directory for extraction
+EXTRACT_DIR=$(mktemp -d)
+
+# Extract the downloaded file to the temporary directory
+echo "Extracting the downloaded file to $EXTRACT_DIR..."
+if [ "$OS" = "Darwin" ]; then
+    if ! unzip -q "$FILENAME" -d "$EXTRACT_DIR"; then
+        echo "Failed to extract the downloaded file. The file might be corrupted."
+        return 5
+    fi
+elif [ "$OS" = "Linux" ]; then
+    if ! tar -xzf "$FILENAME" -C "$EXTRACT_DIR"; then
+        echo "Failed to extract the downloaded file. The file might be corrupted."
+        return 6
+    fi
+fi
+
+# Determine the installation directory
+if [ -z "$INSTALL_DIR" ]; then
+    INSTALL_DIR="$HOME/.local/bin"
+fi
+
+# Check if the installation directory exists and is writable
+if [ ! -d "$INSTALL_DIR" ]; then
+    echo "The installation directory ($INSTALL_DIR) does not exist. Creating it now..."
+    if ! mkdir -p "$INSTALL_DIR"; then
+        echo "Failed to create the installation directory. Please check your permissions and try again."
+        return 7
+    fi
+elif [ ! -w "$INSTALL_DIR" ]; then
+    echo "The installation directory ($INSTALL_DIR) is not writable. Please check your permissions and try again."
+    return 8
+fi
+
+# Assuming the binary or application name is predictable and consistent
+BINARY_NAME='defang' # Adjust this based on actual content
+
+# Move the binary or application to the installation directory from the temporary directory
+echo "Moving defang to $INSTALL_DIR"
+if ! mv "$EXTRACT_DIR/$BINARY_NAME" "$INSTALL_DIR"; then
+    echo "Failed to move defang. Please check your permissions and try again."
+    return 9
+fi
+
+# Make the binary executable
+if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
+    echo "Failed to make defang executable. Please check your permissions and try again."
+    return 10
+fi
+
+# Usage: _prompt_and_append_to_file "Prompt string" "path/to/.rcfile" "line to add"
+_prompt_and_append_to_file() {
+    local prompt=$1
+    local profile_file=$2
+    local line=$3
+    # Check with grep whether the line is already there
+    if grep -qF "$line" "$profile_file"; then
+        return
+    fi
+    echo "We'd like to append this line to your $profile_file:"
+    echo
+    echo "  $line"
+    echo
+    if [[ "$CI" != "1" ]]; then
+        # Prompt the user for confirmation
+        echo -n "$prompt $profile_file? (y/n) "
+        read REPLY
+        echo    # move to a new line
+    fi
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Append the line to the profile file
+        echo >> "$profile_file"
+        echo "$line # Added by Defang install" >> "$profile_file"
+    else
+        # Print the command for the user to run manually
+        echo "To manually add the required line, run the following command:"
+        echo
+        echo "  echo '$line' >> \"$profile_file\""
+        echo
+    fi
+}
+
+# Add the installation directory to PATH if not already present
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo "Adding $INSTALL_DIR to your PATH for this session."
+    export PATH="$PATH:$INSTALL_DIR"
+
+    echo "Adding $INSTALL_DIR to your PATH for future sessions."
+    EXPORT_PATH="export PATH=\"\$PATH:$INSTALL_DIR\""
+
+    # Loop over the possible profile files
+    FOUND_PROFILE_FILE=false
+    for CURRENT_SHELL in bash zsh ksh; do
+        # If the profile file exists in the user's home directory, add a line to it
+        if [[ -f "$HOME/.${CURRENT_SHELL}rc" ]]; then
+            FOUND_PROFILE_FILE=true
+            _prompt_and_append_to_file "Can we append the necessary line to" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
+        fi
+    done
+
+    # If no profile file was found
+    if [[ $FOUND_PROFILE_FILE == false ]]; then
+        # Get the name of the current shell
+        CURRENT_SHELL="$(basename "${SHELL:-$0}")"
+        # Prompt the user to create a new profile file
+        _prompt_and_append_to_file "No existing profile file found. Can we create" "$HOME/.${CURRENT_SHELL}rc" "$EXPORT_PATH"
+    fi
+fi
+
+# Usage: _generate_completion_script "shell" "path/to/completion/_script"
+_generate_completion_script() {
+    local shell=$1
+    local target=$2
+    echo "Generating completion script at $target"
+    mkdir -p "$(dirname "$target")"
+    defang completion $shell > "$target"
+}
+
+# Usage: _install_completion_script "shell"
+_install_completion_script() {
+    local shell=$(basename "$1")
+    local profile_file=".${shell}rc"
+    case $shell in
+        bash)
+            _generate_completion_script $shell "$HOME/.local/share/bash-completion.d/defang" || return 11
+            if [[ -z "$BASH_COMPLETION_VERSINFO" ]]; then
+                echo "Warning: bash completions require package bash-completion to be installed."
+                return 14
+            fi
+            _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "source \$HOME/.local/share/bash-completion.d/defang"
+            ;;
+        zsh)
+            _generate_completion_script $shell "$HOME/.local/share/zsh/site-functions/_defang" || return 12
+            if [[ ":$FPATH:" != *":$HOME/.local/share/zsh/site_functions:"* ]]; then
+                _prompt_and_append_to_file "Can we add shell completions to" "$HOME/$profile_file" "fpath=(\$HOME/.local/share/zsh/site-functions \$fpath)"
+            fi
+            ;;
+        *) return 13 ;;
+    esac
+}
+
+_install_completion_script $SHELL || true
+[[ $0 != $SHELL ]] && _install_completion_script $0 || true
+
+# Cleanup: Remove the temporary directory
+echo "Cleaning up..."
+rm -r "$EXTRACT_DIR"
+
+# Cleanup: Remove the originally downloaded file
+rm "$FILENAME"
+
+echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
+
+# Unset the variables and functions to avoid polluting the user's environment
+unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
+unset -f _prompt_and_append_to_file _generate_completion_script _install_completion_script

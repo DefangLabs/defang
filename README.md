@@ -1,24 +1,44 @@
 [![Go package](https://github.com/defang-io/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/defang-io/defang/actions/workflows/go.yml)
 
-# defang
-The Defang Opinionated Platform (DOP) is a radically simpler way to build, deploy, and optimize production-ready cloud apps.
+# Defang
+Defang is a radically simpler way for developers to create, deploy, and manage cloud applications.
+
 This repo includes:
 * Public releases of the Defang CLI; [click here](https://github.com/defang-io/defang/releases/latest/) for the latest version
 * Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
 * Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/defang-io/pulumi-defang).
 
 ## Getting started
-* Read our [Terms of Service](https://defang.io/terms-service.html)
-* Install the Defang CLI from one of the following sources:
-  * Using the [Homebrew package manager](https://brew.sh): `brew install defang-io/defang/defang`
-  * Using [Go](https://go.dev): `go install github.com/defang-io/defang/src/cmd/cli@latest`
-  * Using the [Nix package manager](https://nixos.org):
-    * with Nix-Env: `nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz`
-    * or with Flakes: `nix profile install github:defang-io/defang#defang-bin --refresh`
-  * Download the [latest binary](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
+* Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
+* Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
 * Take a look at our [Samples folder](https://github.com/defang-io/defang/tree/main/samples) for example projects in various programming languages.
 * Try the AI integration by running `defang generate`
 * Start your new service with `defang compose up`
+
+## Installing
+Install the Defang CLI from one of the following sources:
+* Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/defang-io/homebrew-defang):
+  ```
+  brew install defang-io/defang/defang
+  ```
+* Using a shell script:
+  ```
+  . <(curl -Ls https://s.defang.io/install)
+  ```
+* Using [Go](https://go.dev):
+  ```
+  go install github.com/defang-io/defang/src/cmd/cli@latest
+  ```
+* Using the [Nix package manager](https://nixos.org):
+  * with Nix-Env:
+    ```
+    nix-env -if https://github.com/defang-io/defang/archive/main.tar.gz
+    ```
+  * or with Flakes:
+    ```
+    nix profile install github:defang-io/defang#defang-bin --refresh
+    ```
+* Download the [latest binary](https://github.com/defang-io/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
 
 ## Support
 * File any issues [right here on GitHub](https://github.com/defang-io/defang/issues)
@@ -52,9 +72,16 @@ Invoke-Expression -Command (defang completion powershell | Out-String)
 
 ## Environment Variables
 The Defang CLI recognizes the following environment variables:
+* `COMPOSE_PROJECT_NAME` - The name of the project to use; overrides the name in the `compose.yaml` file
 * `DEFANG_ACCESS_TOKEN` - The access token to use for authentication; if not specified, uses token from `defang login`
+* `DEFANG_CD_BUCKET` - The S3 bucket to use for the BYOC CD pipeline; defaults to `defang-cd-bucket-…`
+* `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
+* `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
+* `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`
 * `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 * `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 * `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
+* `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, or `defang`
 * `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
+* `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 * `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`

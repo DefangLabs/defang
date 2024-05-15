@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  minimal:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - mode: ingress
+        target: 3000
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]

@@ -7,12 +7,15 @@ import (
 	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func Info(ctx context.Context, region Region, id types.TaskID) error {
-	driver := createDriver(ColorAuto, region)
+func PrintInfo(ctx context.Context, region Region, id types.TaskID) error {
+	driver, err := createDriver(region)
+	if err != nil {
+		return err
+	}
 	info, err := driver.GetInfo(ctx, id)
 	if err != nil {
 		return err
 	}
-	fmt.Println(info)
+	fmt.Println("IP:", info.IP)
 	return nil
 }

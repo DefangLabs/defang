@@ -2,32 +2,30 @@
 # vim: set ft=nix ts=2 sw=2 sts=2 et sta
 {
 system ? builtins.currentSystem
-, pkgs
 , lib
 , fetchurl
 , installShellFiles
-, makeWrapper
-, stdenv
+, stdenvNoCC
 , unzip
 }:
 let
   shaMap = {
-    x86_64-linux = "08c7ywy5n85wn9ckfg4la2khpj38nvvfgvcjd8g7q9bqwnp5m1k1";
-    aarch64-linux = "1fzv6wrzvrgs4rxjl09bplin4fhxff60yrgsrg370abkffydnhgc";
-    x86_64-darwin = "0nhfa714wq6x8xjpnmxgy5vinz6inp96hghp9kfgljxgsms99nnp";
-    aarch64-darwin = "0nhfa714wq6x8xjpnmxgy5vinz6inp96hghp9kfgljxgsms99nnp";
+    x86_64-linux = "1958pxh2jrjr9f9xdvg70a6plmzklxnrzf3fk2451wy4zrb3klkp";
+    aarch64-linux = "1krsjbfl3icrp4ppdjjmwhcvg66i7gaqpvhc65iyg4lnhvc23ln9";
+    x86_64-darwin = "1b4bmks0nq1g0ixih6k947dw11gg71y5xsihzryvam0af2z1nhnb";
+    aarch64-darwin = "1b4bmks0nq1g0ixih6k947dw11gg71y5xsihzryvam0af2z1nhnb";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.61/defang_0.4.61_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.4.61/defang_0.4.61_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.61/defang_0.4.61_macOS.zip";
-    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.4.61/defang_0.4.61_macOS.zip";
+    x86_64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_macOS.zip";
+    aarch64-darwin = "https://github.com/defang-io/defang/releases/download/v0.5.16/defang_0.5.16_macOS.zip";
   };
 in
-pkgs.stdenv.mkDerivation {
+stdenvNoCC.mkDerivation {
   pname = "defang";
-  version = "0.4.61";
+  version = "0.5.16";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -40,6 +38,12 @@ pkgs.stdenv.mkDerivation {
   installPhase = ''
     mkdir -p $out/bin
     cp -vr ./defang $out/bin/defang
+  '';
+  postInstall = ''
+    installShellCompletion --cmd defang \
+    --bash <($out/bin/defang completion bash) \
+    --zsh <($out/bin/defang completion zsh) \
+    --fish <($out/bin/defang completion fish)
   '';
 
   system = system;

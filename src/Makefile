@@ -10,6 +10,7 @@ $(BINARY_NAME): test
 	go build -o $@ $(GOFLAGS) ./cmd/cli
 
 $(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
+	cd protos && buf lint
 	buf generate protos
 
 .PHONY: install
@@ -18,7 +19,12 @@ install: $(BINARY_NAME)
 
 .PHONY: test
 test: $(PROTOS)
-	go test -test.short ./...
+	go mod tidy
+	go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
+
+.PHONY: integ
+integ: $(PROTOS)
+	go test -v -tags=integration ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: linux-amd64
 linux-amd64: test

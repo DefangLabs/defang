@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}
+Defang Todos
+{% endblock title %}
+
+{% block content %}
+<div class="container">
+    <h1 class="is-size-1 has-text-weight-bold">Defang Todos</h1>
+    <form method="post" class="box is-flex is-flex-direction-column" style="gap: 20px;">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div>
+            <button type="submit" class="button is-primary">Submit</button>
+        </div>
+    </form>
+</div>
+<div class="container mt-4">
+    <h2 class="is-size-2 has-text-weight-bold">Current Todos</h2>
+    <ul class="is-flex is-flex-direction-column" style="gap: 20px;">
+        {% for todo in todos %}
+        <li class="box">
+            <div class="is-size-4 mb-2">
+                {% if todo.completed %}
+                <span class="icon has-text-success">
+                    <i class="fas fa-check"></i>
+                </span>
+                {% else %}
+                <span class="icon has-text-danger">
+                    <i class="fas fa-times"></i>
+                </span>
+                {% endif %}
+                
+                {{ todo.title }}
+            </div>
+            <div class="columns">
+                <form method="post" action="{% url 'example_app:toggle_todo' todo.id %}" class="column is-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="todo_id" value="{{ todo.id }}">
+                    <button type="submit" class="button {% if todo.completed %}is-warning{% else %}is-success{% endif %}">
+                        {% if todo.completed %}
+                        Mark as Incomplete
+                        {% else %}
+                        Mark as Complete
+                        {% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{% url 'example_app:delete_todo' todo.id %}" class="column is-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="todo_id" value="{{ todo.id }}">
+                    <button type="submit" class="button is-danger">Delete</button>
+                </form>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock content %}

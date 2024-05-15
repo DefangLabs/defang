@@ -1,0 +1,29 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v4
+
+    - name: Install defang
+      run: . <(curl -Ls https://s.defang.io/install)
+
+    - name: Login to Defang
+      run: defang login
+
+    - name: Deploy
+      run: defang compose up -v --detach

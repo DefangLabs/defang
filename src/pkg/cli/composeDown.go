@@ -3,19 +3,21 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
-func ComposeDown(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string) (string, error) {
-	project, err := loadDockerCompose(filePath, projectName)
+func ComposeDown(ctx context.Context, client client.Client) (types.ETag, error) {
+	projectName, err := client.LoadProjectName()
 	if err != nil {
 		return "", err
 	}
+	term.Debug(" - Destroying project", projectName)
 
-	names := make([]string, 0, len(project.Services))
-	for _, service := range project.Services {
-		names = append(names, NormalizeServiceName(service.Name))
+	if DoDryRun {
+		return "", ErrDryRun
 	}
 
-	return Delete(ctx, client, names...)
+	return client.Destroy(ctx)
 }

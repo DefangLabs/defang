@@ -1,0 +1,14 @@
+version: '3.9'
+name: documentstarter
+services:
+  documentstarter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - mode: ingress
+        target: 3000
+    deploy:
+      resources:
+        reservations:
+          memory: 1GB

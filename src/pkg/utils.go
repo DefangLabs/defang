@@ -1,16 +1,15 @@
 package pkg
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -42,24 +41,6 @@ func Getenv(key, fallback string) string {
 func GetenvBool(key string) bool {
 	val, _ := strconv.ParseBool(os.Getenv(key))
 	return val
-}
-
-func PostForValues(_url, contentType string, body io.Reader) (url.Values, error) {
-	resp, err := http.Post(_url, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	// FIXME: on error, the body might not be URL-encoded
-	values, err := url.ParseQuery(string(bytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse response body %s: %w", resp.Status, err)
-	}
-	return values, nil
 }
 
 func SplitByComma(s string) []string {
@@ -112,4 +93,16 @@ func IsDirEmpty(dir string) (bool, error) {
 		return true, nil
 	}
 	return false, err
+}
+
+func SleepWithContext(ctx context.Context, d time.Duration) {
+	ctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+	<-ctx.Done()
+}
+
+var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
+
+func StripAnsi(s string) string {
+	return ansiRegex.ReplaceAllLiteralString(s, "")
 }
