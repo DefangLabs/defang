@@ -1,11 +1,15 @@
 package command
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -424,16 +428,66 @@ var generateCmd = &cobra.Command{
 			return errors.New("cannot run in non-interactive mode")
 		}
 
+		var language string
+		if err := survey.AskOne(&survey.Select{
+			Message: "Choose the language you'd like to use:",
+			Options: []string{"Nodejs", "Golang", "Python"},
+			Default: "Nodejs",
+			Help:    "The generated code will be in the language you choose here.",
+		}, &language); err != nil {
+			return err
+		}
+
+		var samples []struct {
+			Name     string `json:"name"`
+			Category string `json:"category"`
+			Readme   string `json:"readme"`
+		}
+		req, err := http.NewRequestWithContext(cmd.Context(), http.MethodGet, "https://docs.defang.io/samples.json", nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Accept-Encoding", "gzip")
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			term.Debug(resp.Header)
+			// Check that the server actually sent compressed data
+			reader := resp.Body
+			if resp.Header.Get("Content-Encoding") == "gzip" {
+				reader, err = gzip.NewReader(resp.Body)
+				if err != nil {
+					return err
+				}
+				defer reader.Close()
+			}
+			if json.NewDecoder(reader).Decode(&samples) != nil {
+				term.Debug(" - unable to decode samples.json:", err)
+			}
+		}
+
+		const generateWithAI = "Generate with AI"
+
+		language = strings.ToLower(language) // make it match the category strings
+		sampleNames := []string{generateWithAI}
+		// sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+		for _, sample := range samples {
+			if sample.Category == language {
+				sampleNames = append(sampleNames, sample.Name)
+				// sampleDescriptions = append(sampleDescriptions, sample.Readme)
+			}
+		}
+
+		var sample string
+		if err := survey.AskOne(&survey.Select{
+			Message: "Choose a sample service:",
+			Options: sampleNames,
+			Help:    "The generated code will be based on the sample you choose here.",
+		}, &sample); err != nil {
+			return err
+		}
+
 		var qs = []*survey.Question{
-			{
-				Name: "language",
-				Prompt: &survey.Select{
-					Message: "Choose the language you'd like to use:",
-					Options: []string{"Nodejs", "Golang", "Python"},
-					Default: "Nodejs",
-					Help:    "The generated code will be in the language you choose here.",
-				},
-			},
 			{
 				Name: "description",
 				Prompt: &survey.Input{
@@ -457,14 +511,17 @@ Generate will write files in the current folder. You can edit them and then depl
 			},
 		}
 
+		if sample != generateWithAI {
+			qs = qs[1:] // skip the description question
+		}
+
 		prompt := struct {
-			Language    string // or you can tag fields to match a specific name
-			Description string
+			Description string // or you can tag fields to match a specific name
 			Folder      string
 		}{}
 
-		// ask the questions
-		err := survey.Ask(qs, &prompt)
+		// ask the remaining questions
+		err = survey.Ask(qs, &prompt)
 		if err != nil {
 			return err
 		}
@@ -479,7 +536,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			}
 		}
 
-		Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// create the folder if needed
 		cd := ""
@@ -496,10 +553,51 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Warn(" ! The folder is not empty. Files may be overwritten. Press Ctrl+C to abort.")
 		}
 
-		term.Info(" * Working on it. This may take 1 or 2 minutes...")
-		_, err = cli.Generate(cmd.Context(), client, prompt.Language, prompt.Description)
-		if err != nil {
-			return err
+		if prompt.Description != "" {
+			term.Info(" * Working on it. This may take 1 or 2 minutes...")
+			_, err = cli.Generate(cmd.Context(), client, language, prompt.Description)
+			if err != nil {
+				return err
+			}
+		} else {
+			term.Info(" * Fetching sample from the Defang repository...")
+			resp, err := http.Get("https://github.com/defang-io/defang/archive/refs/heads/main.tar.gz")
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			term.Debug(resp.Header)
+			body, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				return err
+			}
+			defer body.Close()
+			tarReader := tar.NewReader(body)
+			term.Info(" * Writing files to disk...")
+			for {
+				h, err := tarReader.Next()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+
+				if base, ok := strings.CutPrefix(h.Name, "defang-main/samples/"+language+"/"+sample+"/"); ok && len(base) > 0 {
+					fmt.Println("   -", base)
+					if h.FileInfo().IsDir() {
+						os.MkdirAll(base, 0755)
+						continue
+					}
+					f, err := os.Create(base)
+					if err != nil {
+						return err
+					}
+					if _, err := io.Copy(f, tarReader); err != nil {
+						return err
+					}
+				}
+			}
 		}
 
 		term.Info(" * Code generated successfully in folder", prompt.Folder)
