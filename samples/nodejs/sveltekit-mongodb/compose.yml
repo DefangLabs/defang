@@ -20,7 +20,8 @@ services:
   mongo:
     image: mongo:latest
     ports:
-      - "27017:27017"
+      - mode: host
+        target: 27017
     volumes:
       - mongo-data:/data/db
     environment:
