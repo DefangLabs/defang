@@ -14,5 +14,10 @@ func ComposeDown(ctx context.Context, client client.Client) (types.ETag, error) 
 		return "", err
 	}
 	term.Debug(" - Destroying project", projectName)
+
+	if DoDryRun {
+		return "", ErrDryRun
+	}
+
 	return client.Destroy(ctx)
 }
