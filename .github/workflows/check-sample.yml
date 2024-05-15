@@ -1,0 +1,57 @@
+name: Check Samples
+
+on:
+  pull_request:
+    paths:
+      - 'samples/**'
+
+jobs:
+  check_samples:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Check for required files
+        run: |
+          for changed_file in $(git diff --name-only HEAD^); do
+            if [[ $changed_file == samples/* ]]; then
+              sample_dir=$(dirname $changed_file)
+              if [[ ! -f $sample_dir/README.md || ! -f $sample_dir/compose.yml ]]; then
+                echo "Missing README.md or compose.yml in $sample_dir"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Add checklist to PR description
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const pr_number = context.issue.number;
+            const checklist = `
+            - [ ] I have tested that the sample runs locally
+            - [ ] I have tested that the sample runs in Defang Playground
+            - [ ] I have tested that the sample runs in BYOC
+            - [ ] I have documented any required config in the readme
+            - [ ] I have documented how to provision any third-party services in the readme
+            - [ ] I have documented how to run the sample in the readme (locally and with Defang)
+            `;
+    
+            // Get the current PR
+            const { data: pullRequest } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number
+            });
+    
+            // Check if the checklist already exists in the PR description
+            if (!pullRequest.body.includes(checklist)) {
+            // Update the PR description with the checklist
+            await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number,
+                body: pullRequest.body + "\n" + checklist
+            });
+            }
