@@ -1,5 +1,5 @@
 version: "3.8"
-
+name: svelte
 services:
   db:
     image: mysql:latest
