@@ -873,6 +873,7 @@ var deleteCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
+	Deprecated:  "use 'compose stop' instead",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
@@ -969,7 +970,7 @@ var logoutCmd = &cobra.Command{
 var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
-	Short:   "Manually run a command with the CD task",
+	Short:   "Manually run a command with the CD task (for BYOC only)",
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
