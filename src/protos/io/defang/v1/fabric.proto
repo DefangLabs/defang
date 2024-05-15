@@ -69,7 +69,7 @@ service FabricController {
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
-  rpc GetTargetGroupHealth(TailRequest) returns (stream TailResponse);
+  rpc GetTargetGroupHealth(TargetGroupMonitoringRequest) returns (stream TargetGroupMonitoringResponse);
 }
 
 message TrackRequest {

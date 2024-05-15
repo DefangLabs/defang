@@ -140,7 +140,7 @@ type FabricControllerClient interface {
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
-	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error)
+	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TargetGroupMonitoringRequest]) (*connect_go.ServerStreamForClient[v1.TargetGroupMonitoringResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -292,7 +292,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerTrackProcedure,
 			opts...,
 		),
-		getTargetGroupHealth: connect_go.NewClient[v1.TailRequest, v1.TailResponse](
+		getTargetGroupHealth: connect_go.NewClient[v1.TargetGroupMonitoringRequest, v1.TargetGroupMonitoringResponse](
 			httpClient,
 			baseURL+FabricControllerGetTargetGroupHealthProcedure,
 			opts...,
@@ -328,7 +328,7 @@ type fabricControllerClient struct {
 	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
-	getTargetGroupHealth     *connect_go.Client[v1.TailRequest, v1.TailResponse]
+	getTargetGroupHealth     *connect_go.Client[v1.TargetGroupMonitoringRequest, v1.TargetGroupMonitoringResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -462,7 +462,7 @@ func (c *fabricControllerClient) Track(ctx context.Context, req *connect_go.Requ
 }
 
 // GetTargetGroupHealth calls io.defang.v1.FabricController.GetTargetGroupHealth.
-func (c *fabricControllerClient) GetTargetGroupHealth(ctx context.Context, req *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error) {
+func (c *fabricControllerClient) GetTargetGroupHealth(ctx context.Context, req *connect_go.Request[v1.TargetGroupMonitoringRequest]) (*connect_go.ServerStreamForClient[v1.TargetGroupMonitoringResponse], error) {
 	return c.getTargetGroupHealth.CallServerStream(ctx, req)
 }
 
@@ -495,7 +495,7 @@ type FabricControllerHandler interface {
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
-	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error
+	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TargetGroupMonitoringRequest], *connect_go.ServerStream[v1.TargetGroupMonitoringResponse]) error
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -817,6 +817,6 @@ func (UnimplementedFabricControllerHandler) Track(context.Context, *connect_go.R
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Track is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error {
+func (UnimplementedFabricControllerHandler) GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TargetGroupMonitoringRequest], *connect_go.ServerStream[v1.TargetGroupMonitoringResponse]) error {
 	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetTargetGroupHealth is not implemented"))
 }
