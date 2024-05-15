@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/defang-io/defang/src/pkg/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -15,13 +16,14 @@ func TestRun(t *testing.T) {
 
 	d := New()
 
-	err := d.SetUp(context.TODO(), "alpine:latest", 6*1024*1024, d.platform)
+	err := d.SetUp(context.Background(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
+
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.TearDown(context.TODO())
+	defer d.TearDown(context.Background())
 
-	id, err := d.Run(context.TODO(), nil, "sh", "-c", "echo hello world")
+	id, err := d.Run(context.Background(), nil, "sh", "-c", "echo hello world")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +31,7 @@ func TestRun(t *testing.T) {
 		t.Fatal("id is empty")
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	err = d.Tail(ctx, id)
 	if err != nil {

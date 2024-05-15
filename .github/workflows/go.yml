@@ -3,12 +3,13 @@ name: Go package
 on:
   push:
     tags:
-      - 'v*' # push events to tagged commits
+      - "v*" # push events to tagged commits
     branches:
-      - '**'
-    paths:
-      - '.github/workflows/go.yml'
-      - 'src/**'
+      - "**"
+
+permissions:
+  contents: read
+  id-token: write # for GitHub id-token auth
 
 jobs:
   go-test:
@@ -22,17 +23,88 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
-      - name: Download Go dependencies
-        run: go mod download
-        working-directory: src
-
       - name: Run Go unit tests
         run: go test -test.short -v ./...
         working-directory: src
 
+      - name: Verify Go modules
+        working-directory: src
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || { echo "Go modules are not up to date"; exit 1; }
+
+  nix-shell-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Check nix-shell default.nix
+        run: |
+          set -o pipefail
+          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=6::Replace the vendorHash with the correct value:|'
+
+  # go-byoc-test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Configure AWS Credentials for CI
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: us-west-2
+  #         output-credentials: true
+  #         role-to-assume: arn:aws:iam::488659951590:role/ci-role-d4fe904 # ciRoleArn from defang-io/infrastructure stack
+
+  #     - name: Configure AWS Credentials for Staging
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: us-west-2
+  #         role-duration-seconds: 1200
+  #         role-chaining: true
+  #         role-to-assume: arn:aws:iam::426819183542:role/admin # adminUserRoleArn from defang-io/bootstrap stack
+
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Go
+  #       uses: actions/setup-go@v5
+  #       with:
+  #         go-version-file: src/go.mod
+  #         cache-dependency-path: src/go.sum
+
+  #     - name: Run sanity tests
+  #       run: go run ./cmd/cli compose up -f tests/compose.yaml
+  #       working-directory: src
+
+  go-playground-test:
+    runs-on: ubuntu-latest
+    needs: go-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Login using GitHub token
+        run: go run ./cmd/cli login --debug
+        working-directory: src
+
+      - name: Add dummy secret
+        run: echo blah | go run ./cmd/cli secret set -n dummy --debug
+        working-directory: src
+
+      - name: Run sanity tests
+        run: go run ./cmd/cli compose start -f tests/testproj/compose.yaml --debug
+        working-directory: src
+
   go-release:
     if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
-    # needs: go-test
+    needs: go-test
     runs-on: macos-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
@@ -52,7 +124,7 @@ jobs:
         working-directory: src
 
       - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@v23
+        uses: cachix/install-nix-action@v26
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
@@ -76,3 +148,57 @@ jobs:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
+
+      - name: Trigger CLI Autodoc
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
+          repository: defang-io/defang-docs
+          event-type: cli-autodoc
+          client-payload: '{"version": "${{ github.ref_name }}"}'
+
+  publish-npm-binaries:
+    runs-on: ubuntu-latest
+    needs: go-release
+
+    env:
+      NODE_VERSION: "21"
+      NPM_REGISTRY_URL: "https://registry.npmjs.org"
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./pkgs/npm
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.NPM_REGISTRY_URL }}
+
+      - name: Publish to NPM
+        run: |
+          # Get version number without the 'v'
+          export version_number=`echo "${{ github.ref_name }}" | cut -c2- `
+
+          echo "Setting version number to ${version_number}"
+          # update version placeholder in package.json with version matching binary.
+          npm version ${version_number}
+
+          # install dependencies
+          npm ci --ignore-scripts
+
+          #b uild
+          npm run build
+
+          # make the cli.js executable
+          chmod u+x ./bin/cli.js
+
+          # publish the package
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_AUTH_TOKEN }}

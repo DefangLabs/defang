@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
 )
 
-func Logout(ctx context.Context, client defangv1connect.FabricControllerClient) error {
-	Debug(" - Logging out")
-	_, err := client.RevokeToken(ctx, connect.NewRequest(&emptypb.Empty{}))
+func Logout(ctx context.Context, client client.Client) error {
+	term.Debug(" - Logging out")
+	err := client.RevokeToken(ctx)
 	// Ignore unauthenticated errors, since we're logging out anyway
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return err

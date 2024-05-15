@@ -5,39 +5,40 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bufbuild/connect-go"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func Generate(ctx context.Context, client defangv1connect.FabricControllerClient, language string, description string) ([]string, error) {
+func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
-		Warn(" ! Dry run, not generating files")
-		return nil, nil
+		term.Warn(" ! Dry run, not generating files")
+		return nil, ErrDryRun
 	}
 
-	response, err := client.GenerateFiles(ctx, connect.NewRequest(&v1.GenerateFilesRequest{
+	response, err := client.GenerateFiles(ctx, &defangv1.GenerateFilesRequest{
+		AgreeTos: true, // agreement was already checked by the caller
 		Language: language,
 		Prompt:   description,
-	}))
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if DoDebug {
+	if term.DoDebug {
 		// Print the files that were generated
-		for _, file := range response.Msg.Files {
-			Debug(file.Name + "\n```")
-			Debug(file.Content)
-			Debug("```")
-			Debug("")
-			Debug("")
+		for _, file := range response.Files {
+			term.Debug(file.Name + "\n```")
+			term.Debug(file.Content)
+			term.Debug("```")
+			term.Debug("")
+			term.Debug("")
 		}
 	}
 
 	// Write each file to disk
-	Info(" * Writing files to disk...")
-	for _, file := range response.Msg.Files {
+	term.Info(" * Writing files to disk...")
+	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
@@ -48,7 +49,7 @@ func Generate(ctx context.Context, client defangv1connect.FabricControllerClient
 
 	// put the file names in an array
 	var fileNames []string
-	for _, file := range response.Msg.Files {
+	for _, file := range response.Files {
 		fileNames = append(fileNames, file.Name)
 	}
 

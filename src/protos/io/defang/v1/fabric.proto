@@ -12,32 +12,82 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 service FabricController {
-  rpc GetStatus(google.protobuf.Empty) returns (Status);   // public
-  rpc GetVersion(google.protobuf.Empty) returns (Version); // public
-  rpc Token(TokenRequest) returns (TokenResponse);         // public
+  rpc GetStatus(google.protobuf.Empty) returns (Status) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // public
+  rpc GetVersion(google.protobuf.Empty) returns (Version) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };                                               // public
+  rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
-  rpc Update(Service) returns (ServiceInfo);
-  rpc Get(ServiceID) returns (ServiceInfo); // should be GetService
-  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
+  rpc Deploy(DeployRequest) returns (DeployResponse);
+  rpc Get(ServiceID) returns (ServiceInfo) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };                                                  // should be GetService
+  rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse); // should be ListServices
+  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // should be ListServices
 
-  rpc GenerateFiles(GenerateFilesRequest) returns (GenerateFilesResponse);
+  rpc GenerateFiles(GenerateFilesRequest)
+      returns (GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
+  rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
+  rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
-  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SignEULA(google.protobuf.Empty)
+      returns (google.protobuf.Empty); // AgreeToS
+  rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc ListSecrets(google.protobuf.Empty) returns (Secrets); // no values
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
-  // rpc DeleteSecret(SecretValue) returns (google.protobuf.Empty);
+
+  rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
+      returns (DelegateSubdomainZoneResponse);
+  rpc DeleteSubdomainZone(google.protobuf.Empty)
+      returns (google.protobuf.Empty);
+  rpc GetDelegateSubdomainZone(google.protobuf.Empty)
+      returns (DelegateSubdomainZoneResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
+  rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
+  rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message TrackRequest {
+  string anon_id = 1;
+  string event = 2;
+  map<string, string> properties = 3;
+  string os = 4;
+  string arch = 5;
+}
+
+message DeployRequest { repeated Service services = 1; }
+
+message DeployResponse {
+  repeated ServiceInfo services = 1;
+  string etag = 2;
 }
 
 message DeleteRequest {
   repeated string names = 1;
+
   // string project = 2; // defaults to tenant ID
 }
 
@@ -46,6 +96,7 @@ message DeleteResponse { string etag = 1; }
 message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
+  bool agree_tos = 3;
 }
 
 message File {
@@ -54,6 +105,14 @@ message File {
 }
 
 message GenerateFilesResponse { repeated File files = 1; }
+
+message StartGenerateResponse {
+  string uuid = 1;
+}
+
+message GenerateStatusRequest {
+  string uuid = 1;
+}
 
 message UploadURLRequest { string digest = 1; }
 
@@ -66,14 +125,16 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7;  // comma-separated list of load-balancer IPs
+  repeated string lb_ips = 7;  // comma-separated list of internal CIDR for the load-balancer
   string private_fqdn = 8;     // fully qualified domain name (host)
   string public_fqdn = 9;      // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
+  string zone_id = 12; // zone ID for byod domain
+  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  string lb_dns = 14;         // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
-  // string natsJwt = 5;
 }
 
 // message Project {
@@ -98,11 +159,14 @@ message TokenRequest {
   repeated string scope = 3; // "tail", "read", etc.
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
+  string anon_id = 6;
+
   // string refresh_token = 6;
 }
 
 message TokenResponse {
   string access_token = 1; // our JWT
+
   // string refresh_token = 2;
   // string token_type = 3; // "Bearer"
   // uint32 expires_in = 4; // 3600
@@ -113,13 +177,16 @@ message Status { string version = 1; }
 
 message Version {
   string fabric = 1;
-  string nats = 2;
+  reserved 2; // was "nats"
+  string cli_min = 3; // minimum CLI version
+  string pulumi_min = 4; // minimum Pulumi provider version
 }
 
 message TailRequest {
   string service = 1; // was "name"
   google.protobuf.Timestamp since = 2;
   string etag = 3;
+
   // string host = 4;
 }
 
@@ -151,6 +218,7 @@ message Device {
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
+
   // repeated string device_ids = 4; // device IDs to reserve
   // map<string, string> options = 5;
 }
@@ -172,12 +240,14 @@ message Resource {
 
 message Resources {
   Resource reservations = 1; // requested resources
+
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
   uint32 replicas = 1;     // number of initial replicas
   Resources resources = 2; // reservations and limits
+
   // Placement placement = 3;
   // EndpointMode endpoint_mode
   // Mode mode
@@ -206,6 +276,7 @@ message Port {
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
+
   // string host_ip "127.0.0.1"
   // Range published "8080"
 }
@@ -220,6 +291,7 @@ message Build {
   string dockerfile = 2;        // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
   float shm_size = 4;           // in MiB
+  string target = 5;
 
   // string dockerfile_inline = 4; // inline Dockerfile
   // repeated string ssh = 4;
@@ -231,7 +303,6 @@ message Build {
   // map<string, string> labels = 4;
   // bool no_cache = 4;
   // bool pull = 4;
-  // string target = 4;
   // repeated Secret secrets = 4;
   // repeated string tags = 4;
   // repeated Platform platforms = 4;
@@ -240,27 +311,39 @@ message Build {
 message HealthCheck {
   repeated string test = 1;
   uint32 interval = 2; // in seconds
-  uint32 timeout = 3; // in seconds; must be less than interval
+  uint32 timeout = 3;  // in seconds; must be less than interval
   uint32 retries = 4;
+
   // uint32 start_period = 5;
   // uint32 start_interval = 5; not supported by ECS
   // bool disable = 6;
+}
+
+enum Network {
+  UNSPECIFIED = 0; // was: internal=false
+  PRIVATE = 1;     // was: internal=true
+  PUBLIC = 2;
 }
 
 message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // true if service is internal; TODO: not part of spec
+  bool internal = 4; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
   Build build = 8;
-  repeated Secret secrets = 9;
+  repeated Secret secrets = 9; // FIXME: these are actually env vars
   HealthCheck healthcheck = 10;
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
+                        // create dns records; TODO: not part of spec
+  string static_files = 15; // x-defang-static-files: folder with static files
+                            // to serve; TODO: not part of spec
+  Network networks = 16; // currently only 1 network is supported
 }
 
 message Event {
@@ -279,6 +362,17 @@ message PublishRequest { Event event = 1; }
 
 message SubscribeRequest { string service = 1; }
 
-message SubscribeResponse {
-  repeated ServiceInfo services = 1;
+message SubscribeResponse { repeated ServiceInfo services = 1; }
+
+message DelegateSubdomainZoneRequest {
+  repeated string name_server_records = 1;
+}
+
+message DelegateSubdomainZoneResponse { string zone = 1; }
+
+message WhoAmIResponse {
+  string tenant = 1;
+  string account = 2;
+  string region = 3;
+  string user_id = 4;
 }

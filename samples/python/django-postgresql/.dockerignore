@@ -1,0 +1,32 @@
+# Ignore version control directories
+.git
+.gitignore
+
+# Ignore all bytecode
+*.pyc
+__pycache__/
+
+# Ignore various log and data directories that are created while running locally
+logs/
+data/
+
+# Ignore virtual environment directories
+virt/
+
+# Ignore test, documentation, and CI configuration
+tests/
+docs/
+*.md
+.circleci/
+.travis.yml
+.gitlab-ci.yml
+
+# Ignore PostgreSQL specific files
+*.sql
+*.dump
+
+# Ignore other unnecessary files
+*.log
+*.tar.gz
+*.zip
+tmp/

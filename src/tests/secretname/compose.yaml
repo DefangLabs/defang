@@ -1,0 +1,11 @@
+services:
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+    secrets:
+      - dummy
+secrets:
+  dummy:
+    external: true
+    name: dummyx

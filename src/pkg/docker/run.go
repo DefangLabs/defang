@@ -15,7 +15,7 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		Env:   mapToSlice(env),
 		Cmd:   cmd,
 	}, &container.HostConfig{
-		AutoRemove:      true, // --rm; FIXME: this causes "No such container" if the container is exits early
+		AutoRemove:      true, // --rm; FIXME: this causes "No such container" if the container exits early
 		PublishAllPorts: true, // -P
 		Resources: container.Resources{
 			Memory: int64(d.memory),

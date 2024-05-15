@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  service1:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        reservations:
+          cpus: "1.0"
+          memory: 512M
+    ports:
+      - mode: ingress
+        target: 5000
+        published: 5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]

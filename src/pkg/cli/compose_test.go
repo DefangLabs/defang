@@ -5,17 +5,19 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/types"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/sirupsen/logrus"
 )
 
 func TestNormalizeServiceName(t *testing.T) {
@@ -43,34 +45,113 @@ func TestNormalizeServiceName(t *testing.T) {
 	}
 }
 
-func TestLoadDockerCompose(t *testing.T) {
+func TestLoadCompose(t *testing.T) {
 	DoVerbose = true
-	DoDebug = true
+	term.DoDebug = true
 
-	t.Run("no project name", func(t *testing.T) {
-		_, err := loadDockerCompose("../../tests/compose.yaml", "")
+	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
+		p, err := loader.LoadWithProjectName("tenant-id")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tenant-id" {
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
 		}
 	})
 
-	t.Run("override project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/compose.yaml", "blah")
+	t.Run("use project name", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		p, err := loader.LoadWithProjectName("tests")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
 		}
-		if p.Name != "blah" {
-			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 
 	t.Run("fancy project name", func(t *testing.T) {
-		p, err := loadDockerCompose("../../tests/compose.yaml", "Valid-Username")
+		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
+		p, err := loader.LoadWithProjectName("Valid-Username")
 		if err != nil {
-			t.Fatalf("loadDockerCompose() failed: %v", err)
+			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "valid-username" {
-			t.Errorf("loadDockerCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+		}
+	})
+
+	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
+		p, err := loader.LoadWithDefaultProjectName("tenant-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tenant-id" {
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		}
+	})
+
+	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		p, err := loader.LoadWithDefaultProjectName("tenant-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
+		}
+	})
+
+	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
+		p, err := loader.LoadWithDefaultProjectName("tenant-id")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tenant-id" {
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		}
+	})
+
+	t.Run("load starting from a sub directory", func(t *testing.T) {
+		cwd, _ := os.Getwd()
+
+		// setup
+		setup := func() {
+			os.MkdirAll("../../tests/alttestproj/subdir/subdir2", 0755)
+			os.Chdir("../../tests/alttestproj/subdir/subdir2")
+		}
+
+		//teardown
+		teardown := func() {
+			os.Chdir(cwd)
+			os.RemoveAll("../../tests/alttestproj/subdir")
+		}
+
+		setup()
+		defer teardown()
+
+		// execute test
+		loader := ComposeLoader{}
+		p, err := loader.LoadWithProjectName("tests")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+		}
+	})
+
+	t.Run("load alternative compose file", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/alttestproj/altcomp.yaml"}
+		p, err := loader.LoadWithProjectName("tests")
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "tests" {
+			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
 		}
 	})
 }
@@ -79,53 +160,118 @@ func TestConvertPort(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    types.ServicePortConfig
-		expected *v1.Port
+		expected *defangv1.Port
 		wantErr  string
 	}{
 		{
 			name:    "No target port xfail",
 			input:   types.ServicePortConfig{},
-			wantErr: "port target must be an integer between 1 and 32767",
+			wantErr: "port 'target' must be an integer between 1 and 32767",
 		},
 		{
 			name:     "Undefined mode and protocol, target only",
 			input:    types.ServicePortConfig{Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
-			name:    "Published range xfail",
-			input:   types.ServicePortConfig{Target: 1234, Published: "1111-2222"},
-			wantErr: "port published must be empty or equal to target: 1111-2222",
+			name:     "Undefined mode and protocol, published equals target",
+			input:    types.ServicePortConfig{Target: 1234, Published: "1234"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
 		},
 		{
-			name:     "Implied ingress mode, defined protocol, published equals target",
+			name:     "Undefined mode, udp protocol, target only",
+			input:    types.ServicePortConfig{Target: 1234, Protocol: "udp"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
+		},
+		{
+			name:     "Undefined mode and published range xfail",
+			input:    types.ServicePortConfig{Target: 1234, Published: "1511-2222"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
+		},
+		{
+			name:     "Undefined mode and target in published range xfail",
+			input:    types.ServicePortConfig{Target: 1234, Published: "1111-2222"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
+		},
+		{
+			name:     "Undefined mode and published not equals target; common for local development",
+			input:    types.ServicePortConfig{Target: 1234, Published: "12345"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS},
+		},
+		{
+			name:     "Host mode and undefined protocol, target only",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
+		},
+		{
+			name:     "Host mode and udp protocol, target only",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Protocol: "udp"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP},
+		},
+		{
+			name:     "Host mode and protocol, published equals target",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1234"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
+		},
+		{
+			name:    "Host mode and protocol, published range xfail",
+			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1511-2222"},
+			wantErr: "port 'published' range must include 'target': 1511-2222",
+		},
+		{
+			name:    "Host mode and protocol, published range xfail",
+			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "22222"},
+			wantErr: "port 'published' must be empty or equal to 'target': 22222",
+		},
+		{
+			name:     "Host mode and protocol, target in published range",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1111-2222"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
+		},
+		{
+			name:     "(Implied) ingress mode, defined protocol, only target", // - 1234
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
+		},
+		{
+			name:     "(Implied) ingress mode, udp protocol, only target", // - 1234/udp
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Target: 1234},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
+		},
+		{
+			name:     "(Implied) ingress mode, defined protocol, published equals target", // - 1234:1234
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Published: "1234", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_TCP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
-			name:     "Implied ingress mode, udp protocol, published equals target",
+			name:     "(Implied) ingress mode, udp protocol, published equals target", // - 1234:1234/udp
 			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "udp", Published: "1234", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_HOST, Protocol: v1.Protocol_UDP},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST, Protocol: defangv1.Protocol_UDP}, // backwards compatibility
 		},
 		{
 			name:    "Localhost IP, unsupported mode and protocol xfail",
 			input:   types.ServicePortConfig{Mode: "ingress", HostIP: "127.0.0.1", Protocol: "tcp", Published: "1234", Target: 1234},
-			wantErr: "host_ip is not supported",
+			wantErr: "port 'host_ip' is not supported",
 		},
 		{
-			name:     "Ingress mode without host IP, single target",
-			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234},
-			expected: &v1.Port{Target: 1234, Mode: v1.Mode_INGRESS, Protocol: v1.Protocol_HTTP},
+			name:     "Ingress mode without host IP, single target, published range xfail", // - 1511-2223:1234
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1511-2223"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 		{
-			name:    "Ingress mode without host IP, single target, published range xfail",
-			input:   types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1111-2223"},
-			wantErr: "port published must be empty or equal to target: 1111-2223",
+			name:     "Ingress mode without host IP, single target, target in published range", // - 1111-2223:1234
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "1111-2223"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
+		},
+		{
+			name:     "Ingress mode without host IP, published not equals target; common for local development", // - 12345:1234
+			input:    types.ServicePortConfig{Mode: "ingress", Protocol: "tcp", Target: 1234, Published: "12345"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_INGRESS, Protocol: defangv1.Protocol_HTTP},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := convertPort(tt.input)
+			err := validatePort(tt.input)
 			if err != nil {
 				if tt.wantErr == "" {
 					t.Errorf("convertPort() unexpected error: %v", err)
@@ -134,6 +280,10 @@ func TestConvertPort(t *testing.T) {
 				}
 				return
 			}
+			if tt.wantErr != "" {
+				t.Errorf("convertPort() expected error: %v", tt.wantErr)
+			}
+			got := convertPort(tt.input)
 			if got.String() != tt.expected.String() {
 				t.Errorf("convertPort() got %v, want %v", got, tt.expected.String())
 			}
@@ -160,7 +310,7 @@ func TestUploadTarball(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{url: server.URL + path}, &bytes.Buffer{}, digest)
+		url, err := uploadTarball(context.Background(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -171,7 +321,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.TODO(), mockGrpcClient{url: server.URL + path}, &bytes.Buffer{}, "")
+		url, err := uploadTarball(context.Background(), client.MockClient{UploadUrl: server.URL + path}, &bytes.Buffer{}, "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -183,7 +333,7 @@ func TestUploadTarball(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.TODO(), "../../tests", "")
+		buffer, err := createTarball(context.Background(), "../../tests/testproj", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -194,7 +344,8 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		var foundDockerfile bool
+		expected := []string{".dockerignore", "Dockerfile", "fileName.env"}
+		var actual []string
 		ar := tar.NewReader(g)
 		for {
 			h, err := ar.Next()
@@ -211,43 +362,109 @@ func TestCreateTarballReader(t *testing.T) {
 			if _, err := ar.Read(make([]byte, h.Size)); err != io.EOF {
 				t.Log(err)
 			}
-			if h.Name == "Dockerfile" {
-				foundDockerfile = true
-			}
+			actual = append(actual, h.Name)
 		}
-		if !foundDockerfile {
-			t.Error("Dockerfile not found in tarball")
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Expected files: %v, got %v", expected, actual)
 		}
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.TODO(), "../../tests", "Dockerfile.missing")
+		_, err := createTarball(context.Background(), "../../tests", "Dockerfile.missing")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.TODO(), "asdfqwer", "")
+		_, err := createTarball(context.Background(), "asdfqwer", "")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 }
 
-type mockGrpcClient struct {
-	defangv1connect.UnimplementedFabricControllerHandler
-	url string
+type MockClient struct {
+	client.Client
 }
 
-func (m mockGrpcClient) CreateUploadURL(ctx context.Context, req *connect.Request[v1.UploadURLRequest]) (*connect.Response[v1.UploadURLResponse], error) {
-	return connect.NewResponse(&v1.UploadURLResponse{Url: m.url + req.Msg.Digest}), nil
+func (m MockClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return &defangv1.DeployResponse{}, nil
 }
 
-func (mockGrpcClient) Subscribe(context.Context, *connect.Request[v1.SubscribeRequest]) (*connect.ServerStreamForClient[v1.SubscribeResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Subscribe is not implemented"))
+func TestProjectValidationServiceName(t *testing.T) {
+	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+	p, err := loader.LoadWithDefaultProjectName("tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	if err := validateProject(p); err != nil {
+		t.Fatalf("Project validation failed: %v", err)
+	}
+
+	svc := p.Services["dfnx"]
+	longName := "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError"
+	svc.Name = longName
+	p.Services[longName] = svc
+
+	if err := validateProject(p); err == nil {
+		t.Fatalf("Long project name should be an error")
+	}
+
 }
 
-func (mockGrpcClient) Tail(context.Context, *connect.Request[v1.TailRequest]) (*connect.ServerStreamForClient[v1.TailResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Tail is not implemented"))
+func TestProjectValidationNetworks(t *testing.T) {
+	var warnings bytes.Buffer
+	logrus.SetOutput(&warnings)
+
+	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+	p, err := loader.LoadWithDefaultProjectName("tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	dfnx := p.Services["dfnx"]
+	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"invalid-network-name": nil}
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("Invalid network name should not be an error: %v", err)
+	}
+	if !bytes.Contains(warnings.Bytes(), []byte("network invalid-network-name used by service dfnx is not defined")) {
+		t.Errorf("Invalid network name should trigger a warning")
+	}
+
+	warnings.Reset()
+	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"public": nil}
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("public network name should not be an error: %v", err)
+	}
+	if !bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
+		t.Errorf("missing public network in global networks section should trigger a warning")
+	}
+
+	warnings.Reset()
+	p.Networks["public"] = types.NetworkConfig{}
+	if err := validateProject(p); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
+		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
+	}
+}
+
+func TestProjectValidationNoDeploy(t *testing.T) {
+	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+	p, err := loader.LoadWithDefaultProjectName("tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	dfnx := p.Services["dfnx"]
+	dfnx.Deploy = nil
+	p.Services["dfnx"] = dfnx
+	if err := validateProject(p); err != nil {
+		t.Errorf("No deploy section should not be an error: %v", err)
+	}
 }

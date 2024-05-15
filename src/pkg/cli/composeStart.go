@@ -4,228 +4,40 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/bufbuild/connect-go"
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
-	"github.com/sirupsen/logrus"
+	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-// ComposeStart reads a docker-compose.yml file and uploads the services to the fabric controller
-func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerClient, filePath, projectName string, force bool) ([]*v1.ServiceInfo, error) {
-	project, err := loadDockerCompose(filePath, projectName)
-	if err != nil {
-		return nil, &ComposeError{err}
+func convertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force bool) ([]*defangv1.Service, error) {
+	// Create a regexp to detect private service names in environment variable values
+	var serviceNames []string
+	for _, svccfg := range serviceConfigs {
+		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+			return p.Mode == "host" // only private services with host ports get DNS names
+		}) {
+			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+		}
 	}
-
-	for _, svccfg := range project.Services {
-		normalized := NormalizeServiceName(svccfg.Name)
-		if !pkg.IsValidServiceName(normalized) {
-			// FIXME: this is too strict; we should allow more characters like underscores and dots
-			return nil, &ComposeError{fmt.Errorf("service name is invalid: %q", svccfg.Name)}
-		}
-		if normalized != svccfg.Name {
-			logrus.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
-		}
-		if svccfg.ContainerName != "" {
-			logrus.Warn("unsupported compose directive: container_name")
-		}
-		if svccfg.Hostname != "" {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: hostname; consider using domainname instead")}
-		}
-		if len(svccfg.DNSSearch) != 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: dns_search")}
-		}
-		if len(svccfg.DNSOpts) != 0 {
-			logrus.Warn("unsupported compose directive: dns_opt")
-		}
-		if len(svccfg.DNS) != 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: dns")}
-		}
-		if len(svccfg.Devices) != 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: devices")}
-		}
-		if len(svccfg.DependsOn) != 0 {
-			logrus.Warn("unsupported compose directive: depends_on")
-		}
-		if len(svccfg.DeviceCgroupRules) != 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: device_cgroup_rules")}
-		}
-		if len(svccfg.Entrypoint) > 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: entrypoint")}
-		}
-		if len(svccfg.GroupAdd) > 0 {
-			return nil, &ComposeError{fmt.Errorf("unsupported compose directive: group_add")}
-		}
-		if len(svccfg.Ipc) > 0 {
-			logrus.Warn("unsupported compose directive: ipc")
-		}
-		if len(svccfg.Uts) > 0 {
-			logrus.Warn("unsupported compose directive: uts")
-		}
-		if svccfg.Isolation != "" {
-			logrus.Warn("unsupported compose directive: isolation")
-		}
-		if svccfg.MacAddress != "" {
-			logrus.Warn("unsupported compose directive: mac_address")
-		}
-		if len(svccfg.Labels) > 0 {
-			logrus.Warn("unsupported compose directive: labels") // TODO: add support for labels
-		}
-		if len(svccfg.Links) > 0 {
-			logrus.Warn("unsupported compose directive: links")
-		}
-		if svccfg.Logging != nil {
-			logrus.Warn("unsupported compose directive: logging")
-		}
-		if _, ok := svccfg.Networks["default"]; !ok || len(svccfg.Networks) > 1 {
-			logrus.Warn("unsupported compose directive: networks")
-		}
-		if len(svccfg.Volumes) > 0 {
-			logrus.Warn("unsupported compose directive: volumes") // TODO: add support for volumes
-		}
-		if len(svccfg.VolumesFrom) > 0 {
-			logrus.Warn("unsupported compose directive: volumes_from") // TODO: add support for volumes_from
-		}
-		if svccfg.Build != nil {
-			if svccfg.Build.Dockerfile != "" {
-				if filepath.IsAbs(svccfg.Build.Dockerfile) {
-					return nil, &ComposeError{fmt.Errorf("dockerfile path must be relative to the build context: %q", svccfg.Build.Dockerfile)}
-				}
-				if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
-					return nil, &ComposeError{fmt.Errorf("dockerfile path must be inside the build context: %q", svccfg.Build.Dockerfile)}
-				}
-				// Check if the dockerfile exists
-				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
-				if _, err := os.Stat(dockerfilePath); err != nil {
-					return nil, &ComposeError{fmt.Errorf("dockerfile not found: %q", dockerfilePath)}
-				}
-			}
-			if svccfg.Build.SSH != nil {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build ssh")}
-			}
-			if len(svccfg.Build.Labels) != 0 {
-				logrus.Warn("unsupported compose directive: build labels") // TODO: add support for Kaniko --label
-			}
-			if len(svccfg.Build.CacheFrom) != 0 {
-				logrus.Warn("unsupported compose directive: build cache_from")
-			}
-			if len(svccfg.Build.CacheTo) != 0 {
-				logrus.Warn("unsupported compose directive: build cache_to")
-			}
-			if svccfg.Build.NoCache {
-				logrus.Warn("unsupported compose directive: build no_cache")
-			}
-			if len(svccfg.Build.ExtraHosts) != 0 {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build extra_hosts")}
-			}
-			if svccfg.Build.Isolation != "" {
-				logrus.Warn("unsupported compose directive: build isolation")
-			}
-			if svccfg.Build.Network != "" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build network")}
-			}
-			if svccfg.Build.Target != "" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build target")} // TODO: add support for Kaniko --target
-			}
-			if len(svccfg.Build.Secrets) != 0 {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build secrets")} // TODO: support build secrets
-			}
-			if len(svccfg.Build.Tags) != 0 {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build tags")}
-			}
-			if len(svccfg.Build.Platforms) != 0 {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build platforms")}
-			}
-			if svccfg.Build.Privileged {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build privileged")}
-			}
-			if svccfg.Build.DockerfileInline != "" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: build dockerfile_inline")}
-			}
-		}
-		for _, secret := range svccfg.Secrets {
-			if !pkg.IsValidSecretName(secret.Source) {
-				return nil, &ComposeError{fmt.Errorf("secret name is invalid: %q", secret.Source)}
-			}
-			if secret.Target != "" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: secret target")}
-			}
-		}
-		if svccfg.HealthCheck != nil && !svccfg.HealthCheck.Disable {
-			timeout := 30 // default per compose spec
-			if svccfg.HealthCheck.Timeout != nil {
-				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
-					logrus.Warn("healthcheck timeout must be a multiple of 1s")
-				}
-				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
-			}
-			interval := 30 // default per compose spec
-			if svccfg.HealthCheck.Interval != nil {
-				if *svccfg.HealthCheck.Interval%1e9 != 0 {
-					logrus.Warn("healthcheck interval must be a multiple of 1s")
-				}
-				interval = int(*svccfg.HealthCheck.Interval / 1e9)
-			}
-			// Technically this should test for <= but both interval and timeout have 30s as the default value
-			if interval < timeout || timeout <= 0 {
-				return nil, &ComposeError{fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)}
-			}
-			if svccfg.HealthCheck.StartPeriod != nil {
-				logrus.Warn("unsupported compose directive: healthcheck start_period")
-			}
-			if svccfg.HealthCheck.StartInterval != nil {
-				logrus.Warn("unsupported compose directive: healthcheck start_interval")
-			}
-		}
-		if svccfg.Deploy != nil {
-			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode)}
-			}
-			if len(svccfg.Deploy.Labels) > 0 {
-				logrus.Warn("unsupported compose directive: deploy labels")
-			}
-			if svccfg.Deploy.UpdateConfig != nil {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy update_config")}
-			}
-			if svccfg.Deploy.RollbackConfig != nil {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy rollback_config")}
-			}
-			if svccfg.Deploy.RestartPolicy != nil {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy restart_policy")}
-			}
-			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
-				logrus.Warn("unsupported compose directive: deploy placement")
-			}
-			if svccfg.Deploy.EndpointMode != "" {
-				return nil, &ComposeError{fmt.Errorf("unsupported compose directive: deploy endpoint_mode")}
-			}
-			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
-				logrus.Warn("no reservations specified; using limits as reservations")
-			}
-			reservations := getResourceReservations(svccfg.Deploy.Resources)
-			if reservations != nil && reservations.NanoCPUs != "" {
-				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
-				if err != nil || cpus < 0 { // "0" just means "as small as possible"
-					return nil, &ComposeError{fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)}
-				}
-			}
-		}
+	var serviceNameRegex *regexp.Regexp
+	if len(serviceNames) > 0 {
+		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
 	}
 
 	//
 	// Publish updates
 	//
-	var services []*v1.Service
-	for _, svccfg := range project.Services {
-		var healthcheck *v1.HealthCheck
+	var services []*defangv1.Service
+	for _, svccfg := range serviceConfigs {
+		var healthcheck *defangv1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
-			healthcheck = &v1.HealthCheck{
+			healthcheck = &defangv1.HealthCheck{
 				Test: svccfg.HealthCheck.Test,
 			}
 			if nil != svccfg.HealthCheck.Interval {
@@ -239,22 +51,9 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 		}
 
-		ports, err := convertPorts(svccfg.Ports)
-		if err != nil {
-			// TODO: move this validation up so we don't upload the build context if it's invalid
-			return nil, &ComposeError{err}
-		}
-		// Show a warning when we have ingress ports but no explicit healthcheck
-		for _, port := range ports {
-			if port.Mode == v1.Mode_INGRESS && healthcheck == nil {
-				logrus.Warn("ingress port without healthcheck defaults to GET / HTTP/1.1")
-				break
-			}
-		}
-
-		var deploy *v1.Deploy
+		var deploy *defangv1.Deploy
 		if svccfg.Deploy != nil {
-			deploy = &v1.Deploy{}
+			deploy = &defangv1.Deploy{}
 			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
@@ -263,22 +62,23 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil {
 				cpus := 0.0
+				var err error
 				if reservations.NanoCPUs != "" {
 					cpus, err = strconv.ParseFloat(reservations.NanoCPUs, 32)
 					if err != nil {
 						panic(err) // was already validated above
 					}
 				}
-				var devices []*v1.Device
+				var devices []*defangv1.Device
 				for _, d := range reservations.Devices {
-					devices = append(devices, &v1.Device{
+					devices = append(devices, &defangv1.Device{
 						Capabilities: d.Capabilities,
 						Count:        uint32(d.Count),
 						Driver:       d.Driver,
 					})
 				}
-				deploy.Resources = &v1.Resources{
-					Reservations: &v1.Resource{
+				deploy.Resources = &defangv1.Resources{
+					Reservations: &defangv1.Resource{
 						Cpus:    float32(cpus),
 						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
@@ -287,23 +87,20 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			}
 		}
 
-		if deploy == nil || deploy.Resources == nil || deploy.Resources.Reservations == nil || deploy.Resources.Reservations.Memory == 0 {
-			logrus.Warn("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
-		}
-
 		// Upload the build context, if any; TODO: parallelize
-		var build *v1.Build
+		var build *defangv1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, client, svccfg.Name, svccfg.Build, force)
+			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
 			if err != nil {
 				return nil, err
 			}
 
-			build = &v1.Build{
+			build = &defangv1.Build{
 				Context:    url,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
+				Target:     svccfg.Build.Target,
 			}
 
 			if len(svccfg.Build.Args) > 0 {
@@ -320,21 +117,46 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 		}
 
 		// Extract environment variables
+		unsetEnvs := []string{}
 		envs := make(map[string]string)
 		for key, value := range svccfg.Environment {
 			if value == nil {
 				value = resolveEnv(key)
 			}
-			if value != nil {
-				envs[key] = *value
+
+			// keep track of what environment variables were declared but not set in the compose environment section
+			if value == nil {
+				unsetEnvs = append(unsetEnvs, key)
+				continue
 			}
+
+			val := *value
+			if serviceNameRegex != nil {
+				// Replace service names with their actual DNS names
+				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
+					return c.ServiceDNS(NormalizeServiceName(serviceName))
+				})
+				if val != *value {
+					warnf("service names were replaced in environment variable %q: %q", key, val)
+				}
+			}
+			envs[key] = val
 		}
 
 		// Extract secret references
-		var secrets []*v1.Secret
-		for _, secret := range svccfg.Secrets {
-			secrets = append(secrets, &v1.Secret{
+		var configs []*defangv1.Secret
+		for i, secret := range svccfg.Secrets {
+			if i == 0 {
+				warnf("secrets will be exposed as environment variables, not files (use 'environment' to silence)")
+			}
+			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
+			})
+		}
+		// add unset environment variables as secrets
+		for _, unsetEnv := range unsetEnvs {
+			configs = append(configs, &defangv1.Secret{
+				Source: unsetEnv,
 			})
 		}
 
@@ -343,58 +165,124 @@ func ComposeStart(ctx context.Context, client defangv1connect.FabricControllerCl
 			init = *svccfg.Init
 		}
 
-		services = append(services, &v1.Service{
+		var dnsRole string
+		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
+			dnsRole = dnsRoleVal.(string) // already validated above
+		}
+
+		var staticFiles string
+		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
+			staticFiles = staticFilesVal.(string) // already validated above
+		}
+
+		network := network(&svccfg)
+		ports := convertPorts(svccfg.Ports)
+		services = append(services, &defangv1.Service{
 			Name:        NormalizeServiceName(svccfg.Name),
 			Image:       svccfg.Image,
 			Build:       build,
-			Internal:    true, // TODO: support external services (w/o LB)
+			Internal:    network == defangv1.Network_PRIVATE,
+			Networks:    network,
 			Init:        init,
 			Ports:       ports,
 			Healthcheck: healthcheck,
 			Deploy:      deploy,
 			Environment: envs,
-			Secrets:     secrets,
+			Secrets:     configs,
 			Command:     svccfg.Command,
 			Domainname:  svccfg.DomainName,
 			Platform:    convertPlatform(svccfg.Platform),
+			DnsRole:     dnsRole,
+			StaticFiles: staticFiles,
 		})
+	}
+	return services, nil
+}
+
+// ComposeStart validates a compose project and uploads the services using the client
+func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+	project, err := c.LoadProject()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateProject(project); err != nil {
+		return nil, &ComposeError{err}
+	}
+
+	services, err := convertServices(ctx, c, project.Services, force)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(services) == 0 {
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	var serviceInfos []*v1.ServiceInfo
-	for _, service := range services {
-		if DoDryRun {
+	if DoDryRun {
+		for _, service := range services {
 			PrintObject(service.Name, service)
-			continue
 		}
-
-		Info(" * Publishing service update for", service.Name)
-		serviceInfo, err := client.Update(ctx, connect.NewRequest(service))
-		if err != nil {
-			// Abort all? TODO: compose up should probably be atomic, all or nothing
-			if len(serviceInfos) == 0 {
-				return nil, err
-			}
-			Warn(" ! Failed to update service", service.Name, err)
-			continue
-		}
-
-		if DoDebug {
-			PrintObject(service.Name, serviceInfo.Msg)
-		}
-		serviceInfos = append(serviceInfos, serviceInfo.Msg)
+		return nil, ErrDryRun
 	}
 
-	return serviceInfos, nil
+	for _, service := range services {
+		term.Info(" * Deploying service", service.Name)
+	}
+
+	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
+		Services: services,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if term.DoDebug {
+		for _, service := range resp.Services {
+			PrintObject(service.Service.Name, service)
+		}
+	}
+	return resp, nil
 }
 
-func getResourceReservations(r types.Resources) *types.Resource {
+func getResourceReservations(r compose.Resources) *compose.Resource {
 	if r.Reservations == nil {
 		// TODO: we might not want to default to all the limits, maybe only memory?
 		return r.Limits
 	}
 	return r.Reservations
+}
+
+func resolveEnv(k string) *string {
+	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
+	v, ok := os.LookupEnv(k)
+	if !ok {
+		warnf("environment variable not found: %q", k)
+		// If the value could not be resolved, it should be removed
+		return nil
+	}
+	return &v
+}
+
+func convertPlatform(platform string) defangv1.Platform {
+	switch platform {
+	default:
+		warnf("Unsupported platform: %q (assuming linux)", platform)
+		fallthrough
+	case "", "linux":
+		return defangv1.Platform_LINUX_ANY
+	case "linux/amd64":
+		return defangv1.Platform_LINUX_AMD64
+	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
+		return defangv1.Platform_LINUX_ARM64
+	}
+}
+
+func network(svccfg *compose.ServiceConfig) defangv1.Network {
+	// HACK: Use magic network name "public" to determine if the service is public
+	if _, ok := svccfg.Networks["public"]; ok {
+		return defangv1.Network_PUBLIC
+	}
+	// TODO: support external services (w/o LB),
+	return defangv1.Network_PRIVATE
 }

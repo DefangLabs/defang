@@ -3,21 +3,23 @@ package cli
 import (
 	"context"
 
-	"github.com/bufbuild/connect-go"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
-func Delete(ctx context.Context, client defangv1connect.FabricControllerClient, names ...string) (string, error) {
-	Debug(" - Deleting service", names)
+// Deprecated: Use ComposeStop instead.
+func Delete(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
+	term.Debug(" - Deleting service", names)
 
 	if DoDryRun {
-		return "", nil
+		return "", ErrDryRun
 	}
 
-	resp, err := client.Delete(ctx, connect.NewRequest(&v1.DeleteRequest{Names: names}))
+	resp, err := client.Delete(ctx, &defangv1.DeleteRequest{Names: names})
 	if err != nil {
 		return "", err
 	}
-	return resp.Msg.Etag, nil
+	return resp.Etag, nil
 }

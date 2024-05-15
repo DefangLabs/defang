@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/bufbuild/connect-go"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
+	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/defang-io/defang/src/pkg/term"
+	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/google/uuid"
 )
 
-func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient, subject, _type, id string, data []byte, contenttype string) error {
+func SendMsg(ctx context.Context, client client.Client, subject, _type, id string, data []byte, contenttype string) error {
 	if subject == "" {
 		return errors.New("subject is required")
 	}
@@ -21,13 +21,13 @@ func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient,
 		id = uuid.NewString()
 	}
 
-	Debug(" - Sending message to", subject, "with type", _type, "and id", id)
+	term.Debug(" - Sending message to", subject, "with type", _type, "and id", id)
 
 	if DoDryRun {
-		return nil
+		return ErrDryRun
 	}
 
-	_, err := client.Publish(ctx, connect.NewRequest(&v1.PublishRequest{Event: &v1.Event{
+	err := client.Publish(ctx, &defangv1.PublishRequest{Event: &defangv1.Event{
 		Specversion:     "1.0",
 		Type:            _type,
 		Source:          "https://cli.defang.io",
@@ -35,6 +35,6 @@ func SendMsg(ctx context.Context, client defangv1connect.FabricControllerClient,
 		Id:              id,
 		Datacontenttype: contenttype,
 		Data:            data,
-	}}))
+	}})
 	return err
 }
