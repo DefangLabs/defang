@@ -4,14 +4,20 @@ This sample project demonstrates how to deploy a full-stack application using Sv
 
 ## NOTE
 
-This sample showcases how you could deploy a full-stack application with Defang and Django. However, it deploys postgres as a defang service. Defang [services](https://12factor.net/processes) are ephemeral and should not be used to run stateful workloads in production as they will be reset on every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. In the future, Defang will help you provision and connect to managed databases.
+This sample showcases how you could deploy a full-stack application with Defang and Svelte and NodeJS. However, it deploys mysql db as a defang service. Defang [services](https://12factor.net/processes) are ephemeral and should not be used to run stateful workloads in production as they will be reset on every deployment. For production use cases you should use a managed database like RDS, Aiven, or others. In the future, Defang will help you provision and connect to managed databases.
 
-## Prerequisites
+## Essential Setup Files
 
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
-2. (optional) If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>.
-3. (development)<a href = "https://docs.docker.com/engine/install/">Docker CLI</a>
-4. <a href = https://nodejs.org/en/download/package-manager> NodeJS</a>
+1. Download [Defang CLI] (https://github.com/defang-io/defang)
+2. (optional) If you are using [Defang BYOC] (https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) authenticated your AWS account.
+3. (optional for local development) [Docker CLI] (https://docs.docker.com/engine/install/)
+
+## Prerequisite
+
+1. Download [Defang CLI] (https://github.com/defang-io/defang)
+2. (optional) If you are using [Defang BYOC](https://docs.defang.io/docs/concepts/defang-byoc) make sure you have properly
+3. [Docker CLI] (https://docs.docker.com/engine/install/)
+4. [NodeJS] (https://nodejs.org/en/download/package-manager)
 
 ## Development
 
