@@ -1,7 +1,7 @@
 # Dockerfile for Svelte frontend and Node.js backend
 
 # Stage 1: Build Svelte frontend
-FROM node:latest as frontend
+FROM node:16-alpine as frontend
 
 WORKDIR /frontend
 
@@ -13,7 +13,7 @@ COPY frontend/ ./
 RUN npm install --legacy-peer-deps && npm run build
 
 # Stage 2: Build Node.js backend
-FROM node:latest as backend
+FROM node:16-alpine as backend
 
 WORKDIR /app
 

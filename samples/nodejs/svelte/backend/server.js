@@ -36,8 +36,23 @@ const ensureTasksTable = () => {
     });
 };
 
-// Call the function to ensure the table exists
-ensureTasksTable();
+// Ensure the tasks table is created before starting the server
+pool.getConnection((err, connection) => {
+    if (err) {
+        console.error('Error connecting to the database:', err);
+        process.exit(1);
+    } else {
+        console.log('Connected to the database.');
+        ensureTasksTable();
+        connection.release();
+
+        // Start the server only after ensuring the table exists
+        const PORT = process.env.PORT || 3001;
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+    }
+});
 
 // API Routes
 app.get('/tasks', (req, res) => {
@@ -97,9 +112,4 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve the frontend from the root
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
 });
