@@ -237,7 +237,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		checkToS: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerCheckToSProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		putSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
 			httpClient,
@@ -575,7 +576,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerCheckToSHandler := connect_go.NewUnaryHandler(
 		FabricControllerCheckToSProcedure,
 		svc.CheckToS,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerPutSecretHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutSecretProcedure,

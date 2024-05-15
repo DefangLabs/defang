@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
@@ -124,10 +125,8 @@ func (g GrpcClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) er
 func (g GrpcClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
 	var errs []error
-	for _, name := range req.Names {
-		_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: &defangv1.SecretValue{Name: name}})
-		errs = append(errs, err)
-	}
+	_, err := g.client.DeleteSecrets(ctx, &connect.Request[defangv1.Secrets]{Msg: &defangv1.Secrets{Names: req.Names}})
+	errs = append(errs, err)
 	return errors.Join(errs...)
 }
 
@@ -178,7 +177,9 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 			props[p.Name] = fmt.Sprint(p.Value)
 		}
 	}
-	_, err := g.client.Track(context.Background(), &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
+	context, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := g.client.Track(context, &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,

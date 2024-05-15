@@ -33,7 +33,7 @@ func Track(name string, props ...P) {
 	}(client)
 }
 
-// flushAllTracking waits for all tracking goroutines to complete.
+// FlushAllTracking waits for all tracking goroutines to complete.
 func FlushAllTracking() {
 	trackWG.Wait()
 }
