@@ -106,6 +106,9 @@ const (
 	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
 	// FabricControllerTrackProcedure is the fully-qualified name of the FabricController's Track RPC.
 	FabricControllerTrackProcedure = "/io.defang.v1.FabricController/Track"
+	// FabricControllerGetTargetGroupHealthProcedure is the fully-qualified name of the
+	// FabricController's GetTargetGroupHealth RPC.
+	FabricControllerGetTargetGroupHealthProcedure = "/io.defang.v1.FabricController/GetTargetGroupHealth"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -137,6 +140,7 @@ type FabricControllerClient interface {
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -288,6 +292,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerTrackProcedure,
 			opts...,
 		),
+		getTargetGroupHealth: connect_go.NewClient[v1.TailRequest, v1.TailResponse](
+			httpClient,
+			baseURL+FabricControllerGetTargetGroupHealthProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -319,6 +328,7 @@ type fabricControllerClient struct {
 	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
+	getTargetGroupHealth     *connect_go.Client[v1.TailRequest, v1.TailResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -451,6 +461,11 @@ func (c *fabricControllerClient) Track(ctx context.Context, req *connect_go.Requ
 	return c.track.CallUnary(ctx, req)
 }
 
+// GetTargetGroupHealth calls io.defang.v1.FabricController.GetTargetGroupHealth.
+func (c *fabricControllerClient) GetTargetGroupHealth(ctx context.Context, req *connect_go.Request[v1.TailRequest]) (*connect_go.ServerStreamForClient[v1.TailResponse], error) {
+	return c.getTargetGroupHealth.CallServerStream(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -480,6 +495,7 @@ type FabricControllerHandler interface {
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -627,6 +643,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.Track,
 		opts...,
 	)
+	fabricControllerGetTargetGroupHealthHandler := connect_go.NewServerStreamHandler(
+		FabricControllerGetTargetGroupHealthProcedure,
+		svc.GetTargetGroupHealth,
+		opts...,
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -681,6 +702,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
 		case FabricControllerTrackProcedure:
 			fabricControllerTrackHandler.ServeHTTP(w, r)
+		case FabricControllerGetTargetGroupHealthProcedure:
+			fabricControllerGetTargetGroupHealthHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -792,4 +815,8 @@ func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.
 
 func (UnimplementedFabricControllerHandler) Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Track is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetTargetGroupHealth(context.Context, *connect_go.Request[v1.TailRequest], *connect_go.ServerStream[v1.TailResponse]) error {
+	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetTargetGroupHealth is not implemented"))
 }

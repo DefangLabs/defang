@@ -379,14 +379,14 @@ message WhoAmIResponse {
   string user_id = 4;
 }
 
-message ServiceInfo {
+message TargetGroupServiceInfo {
   string name = 1;
   string status = 2;
 }
 
 message TargetGroupServicesInfo {
   string group = 1;
-  repeated ServiceStatus services = 2;
+  repeated TargetGroupServiceInfo services = 2;
   string error = 3;
 }
 
@@ -395,5 +395,5 @@ message TargetGroupMonitoringRequest {
 }
 
 message TargetGroupMonitoringResponse {
-  repeated TargetGroupServicesInfo = 1;
+  repeated TargetGroupServicesInfo groups = 1;
 }
