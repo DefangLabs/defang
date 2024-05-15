@@ -46,8 +46,8 @@ func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
-		term.Debug(" - Server error:", err)
-		err = errors.Unwrap(err)
+		term.Debug(" - Server error:", cerr)
+		err = errors.Unwrap(cerr)
 	}
 	return err
 
