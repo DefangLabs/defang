@@ -149,6 +149,7 @@ func SetupCommands(version string) {
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
 	bootstrapTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
+	bootstrapListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	bootstrapCmd.AddCommand(bootstrapListCmd)
 	bootstrapCmd.AddCommand(bootstrapCancelCmd)
 
@@ -1068,7 +1069,12 @@ var bootstrapListCmd = &cobra.Command{
 	Aliases: []string{"list"},
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapList(cmd.Context(), client)
+		remote, _ := cmd.Flags().GetBool("remote")
+
+		if remote {
+			return cli.BootstrapCommand(cmd.Context(), client, "list")
+		}
+		return cli.BootstrapLocalList(cmd.Context(), client)
 	},
 }
 
