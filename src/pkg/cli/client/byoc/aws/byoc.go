@@ -141,10 +141,13 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.customDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
+			term.Debug(" - Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
 			b.customDomain = b.getProjectDomain(domain.Zone)
-			b.shouldDelegateSubdomain = true
+			if b.customDomain != "" {
+				b.shouldDelegateSubdomain = true
+			}
 		}
 	}
 
@@ -326,12 +329,12 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 	}, nil
 }
 
-func (ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
+func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
 	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b *ByocAws) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx)
 	if err != nil {
 		return nil, err
@@ -349,9 +352,6 @@ func (b *ByocAws) bucketName() string {
 }
 
 func (b *ByocAws) environment() map[string]string {
-	if b.pulumiProject == "" {
-		panic("pulumiProject not set")
-	}
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
@@ -360,7 +360,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DEFANG_ORG":                 b.tenantID,
 		"DOMAIN":                     b.customDomain,
 		"PRIVATE_DOMAIN":             b.privateDomain,
-		"PROJECT":                    b.pulumiProject,
+		"PROJECT":                    b.pulumiProject, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.pulumiStack,
@@ -398,11 +398,9 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
-// stackDir returns a stack-qualified name, like the Pulumi TS function `stackDir`
+// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
-	if b.pulumiProject == "" {
-		panic("pulumiProject not set")
-	}
+	ensure(b.pulumiProject != "", "pulumiProject not set")
 	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
 }
 
@@ -422,6 +420,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	ensure(b.pulumiProject != "", "pulumiProject not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
 
 	term.Debug(" - Getting services from", bucketName, path)
@@ -445,10 +444,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 }
 
 func (b *ByocAws) getSecretID(name string) string {
-	if b.pulumiProject == "" {
-		panic("pulumiProject not set")
-	}
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as defang_service.ts
+	return b.stackDir(name) // same as defang_service.ts
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
@@ -556,6 +552,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
 	}
 
+	ensure(b.pulumiProject != "", "pulumiProject not set")
 	si := &defangv1.ServiceInfo{
 		Service: service,
 		Project: b.pulumiProject, // was: tenant
@@ -671,6 +668,9 @@ func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 }
 
 func (b *ByocAws) getProjectDomain(zone string) string {
+	if b.pulumiProject == "" {
+		return "" // no project name => no custom domain
+	}
 	projectLabel := dnsSafeLabel(b.pulumiProject)
 	if projectLabel == dnsSafeLabel(b.tenantID) {
 		return dnsSafe(zone) // the zone will already have the tenant ID
@@ -790,4 +790,10 @@ func (b *ByocAws) LoadProjectName() (string, error) {
 		return b.tenantID, err
 	}
 	return p.Name, nil
+}
+
+func ensure(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
 }
