@@ -13,7 +13,7 @@ services:
       timeout: 30s
       retries: 5
     environment:
-      - MB_DB_TYPE="postgres"
+      - MB_DB_TYPE=postgres
       - MB_DB_DBNAME
       - MB_DB_PORT
       - MB_DB_USER
