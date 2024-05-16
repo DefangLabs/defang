@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func TearDown(ctx context.Context, client client.Client, force bool) error {

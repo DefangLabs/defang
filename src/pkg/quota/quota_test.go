@@ -3,7 +3,7 @@ package quota
 import (
 	"testing"
 
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestValidate(t *testing.T) {

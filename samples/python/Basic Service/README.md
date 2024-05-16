@@ -1,6 +1,6 @@
 # Flask Request Inspector API
 
-This Flask application is designed to inspect and return detailed information about HTTP requests. It supports both GET and POST methods, providing insights into the request path, method, headers, query parameters, and body. Note that alognside your .py file, include a requirements.txt so that the Dockerfile can install the necessary packages with pip. 
+This Flask application is designed to inspect and return detailed information about HTTP requests. It supports both GET and POST methods, providing insights into the request path, method, headers, query parameters, and body. Note that alognside your .py file, include a requirements.txt so that the Dockerfile can install the necessary packages with pip.
 
 ## Features
 
@@ -12,7 +12,7 @@ This Flask application is designed to inspect and return detailed information ab
 2. A <a href="https://docs.defang.io/docs/concepts/compose">compose file</a> to define and run multi-container Docker applications (this is how Defang identifies services to be deployed). (compose.yaml file)
 
 ## Prerequisite
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+1. Download <a href="https://github.com/DefangLabs/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide

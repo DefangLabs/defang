@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/defang-io/defang/src/cmd/cli/command"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/cmd/cli/command"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func main() {

@@ -13,6 +13,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/quota"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -22,16 +32,6 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/clouds/aws"
-	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
-	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
-	"github.com/defang-io/defang/src/pkg/http"
-	"github.com/defang-io/defang/src/pkg/quota"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -419,7 +419,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	// Path to the state file, Defined at: https://github.com/defang-io/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
 	ensure(b.pulumiProject != "", "pulumiProject not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
 

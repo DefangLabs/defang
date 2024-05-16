@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/http"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type Sample struct {
@@ -45,7 +45,7 @@ func InitFromSample(ctx context.Context, category, sample string) error {
 	const branch = "main"
 
 	prefix := fmt.Sprintf("%s-%s/samples/%s/%s/", repo, branch, category, sample)
-	resp, err := http.GetWithContext(ctx, "https://github.com/defang-io/"+repo+"/archive/refs/heads/"+branch+".tar.gz")
+	resp, err := http.GetWithContext(ctx, "https://github.com/DefangLabs/"+repo+"/archive/refs/heads/"+branch+".tar.gz")
 	if err != nil {
 		return err
 	}
