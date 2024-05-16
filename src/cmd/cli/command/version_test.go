@@ -77,7 +77,7 @@ func TestGetLatestVersion(t *testing.T) {
 
 	httpClient = &http.Client{Transport: &mockRoundTripper{
 		method: http.MethodGet,
-		url:    "https://api.github.com/repos/defang-io/defang/releases/latest",
+		url:    "https://api.github.com/repos/DefangLabs/defang/releases/latest",
 		resp:   rec.Result(),
 	}}
 

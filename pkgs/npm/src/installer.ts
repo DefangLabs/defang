@@ -10,7 +10,7 @@ async function downloadAppArchive(
   archiveFilename: string,
   outputPath: string
 ): Promise<string> {
-  const repo = "defang-io/defang";
+  const repo = "DefangLabs/defang";
   const downloadUrl = `https://github.com/${repo}/releases/download/v${version}/${archiveFilename}`;
   const downloadTargetFile = path.join(outputPath, archiveFilename);
 

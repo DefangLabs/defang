@@ -22,9 +22,9 @@ This repo includes:
 
 Install the Defang CLI from one of the following sources:
 
-- Using the [Homebrew](https://brew.sh) package manager [defang-io/defang tap](https://github.com/DefangLabs/homebrew-defang):
+- Using the [Homebrew](https://brew.sh) package manager [DefangLabs/defang tap](https://github.com/DefangLabs/homebrew-defang):
   ```
-  brew install defang-io/defang/defang
+  brew install DefangLabs/defang/defang
   ```
 - Using a shell script:
   ```
@@ -41,7 +41,7 @@ Install the Defang CLI from one of the following sources:
     ```
   - or with Flakes:
     ```
-    nix profile install github:defang-io/defang#defang-bin --refresh
+    nix profile install github:DefangLabs/defang#defang-bin --refresh
     ```
 - Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
 

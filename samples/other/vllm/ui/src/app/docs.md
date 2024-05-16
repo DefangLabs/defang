@@ -99,7 +99,7 @@ We offer a few different ways to install the Defang CLI. You can use Homebrew, a
 You can easily install the Defang CLI using [Homebrew](https://brew.sh/). Just run the following command in your terminal:
 
 ```bash
-brew install defang-io/defang/defang
+brew install DefangLabs/defang/defang
 ```
 
 ## Using a Bash Script
