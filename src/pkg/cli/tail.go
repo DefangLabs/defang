@@ -98,8 +98,8 @@ func (cerr *CancelError) Unwrap() error {
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if params.Service != "" {
 		params.Service = NormalizeServiceName(params.Service)
-		// Show a warning if the service doesn't exist (yet);; TODO: could do fuzzy matching and suggest alternatives
-		if _, err := client.Get(ctx, &defangv1.ServiceID{Name: params.Service}); err != nil {
+		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+		if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: params.Service}); err != nil {
 			switch connect.CodeOf(err) {
 			case connect.CodeNotFound:
 				term.Warn(" ! Service does not exist (yet):", params.Service)
