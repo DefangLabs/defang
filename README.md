@@ -5,24 +5,21 @@
 Defang is a radically simpler way for developers to create, deploy, and manage cloud applications.
 
 This repo includes:
-
-- Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
-- Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
-- Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
+* Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
+* Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
+* Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
 
 ## Getting started
-
-- Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
-- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
-- Take a look at our [Samples folder](https://github.com/DefangLabs/defang/tree/main/samples) for example projects in various programming languages.
-- Try the AI integration by running `defang generate`
-- Start your new service with `defang compose up`
+* Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
+* Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
+* Take a look at our [Samples folder](https://github.com/DefangLabs/defang/tree/main/samples) for example projects in various programming languages.
+* Try the AI integration by running `defang generate`
+* Start your new service with `defang compose up`
 
 ## Installing
 
 Install the Defang CLI from one of the following sources:
-
-- Using the [Homebrew](https://brew.sh) package manager [DefangLabs/defang tap](https://github.com/DefangLabs/homebrew-defang):
+* Using the [Homebrew](https://brew.sh) package manager [DefangLabs/defang tap](https://github.com/DefangLabs/homebrew-defang):
   ```
   brew install DefangLabs/defang/defang
   ```
@@ -43,11 +40,10 @@ Install the Defang CLI from one of the following sources:
     ```
     nix profile install github:DefangLabs/defang#defang-bin --refresh
     ```
-- Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
+* Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
 
 ## Support
-
-- File any issues [right here on GitHub](https://github.com/DefangLabs/defang/issues)
+* File any issues [right here on GitHub](https://github.com/DefangLabs/defang/issues)
 
 ## Command completion
 

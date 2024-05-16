@@ -46,7 +46,7 @@ archives:
 
 release:
   github:
-    owner: defang-io
+    owner: DefangLabs
     name: defang
   header: |
     # Defang CLI
@@ -71,7 +71,7 @@ nix:
     description: Command-line interface for the Defang Opinionated Platform
     license: "mit"
     repository:
-      owner: defang-io
+      owner: DefangLabs
       name: defang
     post_install: |
       installShellCompletion --cmd defang \
