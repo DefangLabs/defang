@@ -1,0 +1,31 @@
+version: "3.8"
+name: sveltekit
+services:
+  sveltekit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MONGODB_URI: "mongodb://mongo:27017/musicdb"
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: 3000
+      MONGODB_URI: "mongodb://mongo:27017/musicdb"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - mode: host
+        target: 27017
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: musicdb
+
+volumes:
+  mongo-data:
