@@ -1,6 +1,6 @@
 package logs
 
-import "github.com/defang-io/defang/src/pkg"
+import "github.com/DefangLabs/defang/src/pkg"
 
 func IsLogrusError(message string) bool {
 	// Logrus's TextFormatter prefixes messages with the uppercase log level, optionally truncated and/or in color

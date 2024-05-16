@@ -10,7 +10,7 @@ import (
 	context "context"
 	errors "errors"
 	connect_go "github.com/bufbuild/connect-go"
-	v1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	v1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"

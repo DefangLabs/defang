@@ -13,15 +13,15 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/cli"
-	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/scope"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -116,7 +116,7 @@ func Execute(ctx context.Context) error {
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			fmt.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}

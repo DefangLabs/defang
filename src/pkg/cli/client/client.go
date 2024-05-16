@@ -3,9 +3,9 @@ package client
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 type ServerStream[Res any] interface {

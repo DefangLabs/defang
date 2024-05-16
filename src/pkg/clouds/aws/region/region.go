@@ -3,7 +3,7 @@ package region
 import (
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 )
 
 type Region = aws.Region

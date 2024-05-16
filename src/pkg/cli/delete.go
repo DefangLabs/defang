@@ -3,10 +3,10 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 // Deprecated: Use ComposeStop instead.

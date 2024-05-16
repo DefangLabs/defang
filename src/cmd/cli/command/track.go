@@ -4,9 +4,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/cli"
-	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

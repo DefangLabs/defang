@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/http"
 )
 
 func StartDeviceFlow(ctx context.Context, clientId string) (url.Values, error) {

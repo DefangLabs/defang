@@ -1,5 +1,5 @@
 # Go Simple Form Submission App
-This is a basic Node.js application using the Express framework to demonstrate handling a form submission. The application serves an HTML form where users can input their first name and then greets them personally upon submission. Note alongside your project, you should also include a package.json file that includes the relevant metadata such as package dependencies, scripts, project verrsions so that the Dockerfile can install necessary dependencies. 
+This is a basic Node.js application using the Express framework to demonstrate handling a form submission. The application serves an HTML form where users can input their first name and then greets them personally upon submission. Note alongside your project, you should also include a package.json file that includes the relevant metadata such as package dependencies, scripts, project verrsions so that the Dockerfile can install necessary dependencies.
 
 
 ## Essential Setup Files
@@ -7,7 +7,7 @@ This is a basic Node.js application using the Express framework to demonstrate h
 2. A <a href="https://docs.defang.io/docs/concepts/compose">compose file</a> to define and run multi-container Docker applications (this is how Defang identifies services to be deployed).
 
 ## Prerequisite
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+1. Download <a href="https://github.com/DefangLabs/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide

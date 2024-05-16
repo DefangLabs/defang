@@ -7,9 +7,9 @@ import (
 	"path"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
 )
 
 const AwsLogsStreamPrefix = ProjectName

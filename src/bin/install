@@ -26,7 +26,7 @@ fi
 
 # Use curl to fetch the latest release data
 echo "Fetching the latest release information..."
-RELEASE_JSON=$(curl -s -L https://api.github.com/repos/defang-io/defang/releases/latest)
+RELEASE_JSON=$(curl -s -L https://api.github.com/repos/DefangLabs/defang/releases/latest)
 
 # Check for curl failure
 if [ $? -ne 0 ]; then
@@ -51,9 +51,9 @@ DOWNLOAD_URL=""
 
 # Based on the OS, filter the download URL
 if [ "$OS" = "Darwin" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/defang-io/defang/releases/download/v[0-9.]*/defang_[0-9.]*_macOS.zip" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_macOS.zip" | head -n 1)
 elif [ "$OS" = "Linux" ]; then
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/defang-io/defang/releases/download/v[0-9.]*/defang_[0-9.]*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o "https://github.com/DefangLabs/defang/releases/download/v[0-9.]*/defang_[0-9.]*_linux_${ARCH_SUFFIX}.tar.gz" | head -n 1)
 fi
 
 # Abort if the download URL is not found

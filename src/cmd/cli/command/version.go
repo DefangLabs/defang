@@ -38,7 +38,7 @@ func GetCurrentVersion() string {
 }
 
 func GetLatestVersion(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/defang-io/defang/releases/latest", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/DefangLabs/defang/releases/latest", nil)
 	if err != nil {
 		return "", err
 	}
