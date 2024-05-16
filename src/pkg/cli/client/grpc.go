@@ -74,7 +74,7 @@ func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) 
 
 func (g GrpcClient) Token(ctx context.Context, req *defangv1.TokenRequest) (*defangv1.TokenResponse, error) {
 	req.AnonId = g.anonID
-	return getMsg(g.client.Token(ctx, &connect.Request[defangv1.TokenRequest]{Msg: req}))
+	return getMsg(g.client.Token(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) RevokeToken(ctx context.Context) error {
@@ -83,7 +83,7 @@ func (g GrpcClient) RevokeToken(ctx context.Context) error {
 }
 
 func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Update(ctx, &connect.Request[defangv1.Service]{Msg: req}))
+	return getMsg(g.client.Update(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -93,19 +93,19 @@ func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
 		}
 	}
-	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
+	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Get(ctx, &connect.Request[defangv1.ServiceID]{Msg: req}))
+	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return getMsg(g.client.Delete(ctx, &connect.Request[defangv1.DeleteRequest]{Msg: req}))
+	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) error {
-	_, err := g.client.Publish(ctx, &connect.Request[defangv1.PublishRequest]{Msg: req})
+	_, err := g.client.Publish(ctx, connect.NewRequest(req))
 	return err
 }
 
@@ -114,16 +114,16 @@ func (g GrpcClient) GetServices(ctx context.Context) (*defangv1.ListServicesResp
 }
 
 func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error) {
-	return getMsg(g.client.GenerateFiles(ctx, &connect.Request[defangv1.GenerateFilesRequest]{Msg: req}))
+	return getMsg(g.client.GenerateFiles(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) error {
-	_, err := g.client.PutSecret(ctx, &connect.Request[defangv1.SecretValue]{Msg: req})
+	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.client.DeleteSecrets(ctx, &connect.Request[defangv1.Secrets]{Msg: &defangv1.Secrets{Names: req.Names}})
+	_, err := g.client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
 	return err
 }
 
@@ -132,7 +132,7 @@ func (g GrpcClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 }
 
 func (g GrpcClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	return getMsg(g.client.CreateUploadURL(ctx, &connect.Request[defangv1.UploadURLRequest]{Msg: req}))
+	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
@@ -140,7 +140,7 @@ func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error
 }
 
 func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.client.DelegateSubdomainZone(ctx, &connect.Request[defangv1.DelegateSubdomainZoneRequest]{Msg: req}))
+	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
@@ -153,7 +153,7 @@ func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.Del
 }
 
 func (g *GrpcClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	return g.client.Tail(ctx, &connect.Request[defangv1.TailRequest]{Msg: req})
+	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
 func (g *GrpcClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
