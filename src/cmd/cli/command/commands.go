@@ -424,16 +424,47 @@ var generateCmd = &cobra.Command{
 			return errors.New("cannot run in non-interactive mode")
 		}
 
+		var language string
+		if err := survey.AskOne(&survey.Select{
+			Message: "Choose the language you'd like to use:",
+			Options: []string{"Nodejs", "Golang", "Python"},
+			Default: "Nodejs",
+			Help:    "The project code will be in the language you choose here.",
+		}, &language); err != nil {
+			return err
+		}
+
+		var category, sample string
+
+		// Fetch the list of samples from the Defang repository
+		if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
+			term.Debug(" - unable to fetch samples:", err)
+		} else if len(samples) > 0 {
+			const generateWithAI = "Generate with AI"
+
+			category = strings.ToLower(language)
+			sampleNames := []string{generateWithAI}
+			// sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+			for _, sample := range samples {
+				if sample.Category == category {
+					sampleNames = append(sampleNames, sample.Name)
+					// sampleDescriptions = append(sampleDescriptions, sample.Readme)
+				}
+			}
+
+			if err := survey.AskOne(&survey.Select{
+				Message: "Choose a sample service:",
+				Options: sampleNames,
+				Help:    "The project code will be based on the sample you choose here.",
+			}, &sample); err != nil {
+				return err
+			}
+			if sample == generateWithAI {
+				sample = ""
+			}
+		}
+
 		var qs = []*survey.Question{
-			{
-				Name: "language",
-				Prompt: &survey.Select{
-					Message: "Choose the language you'd like to use:",
-					Options: []string{"Nodejs", "Golang", "Python"},
-					Default: "Nodejs",
-					Help:    "The generated code will be in the language you choose here.",
-				},
-			},
 			{
 				Name: "description",
 				Prompt: &survey.Input{
@@ -457,13 +488,16 @@ Generate will write files in the current folder. You can edit them and then depl
 			},
 		}
 
+		if sample != "" {
+			qs = qs[1:] // user picked a sample, so we skip the description question
+		}
+
 		prompt := struct {
-			Language    string // or you can tag fields to match a specific name
-			Description string
+			Description string // or you can tag fields to match a specific name
 			Folder      string
 		}{}
 
-		// ask the questions
+		// ask the remaining questions
 		err := survey.Ask(qs, &prompt)
 		if err != nil {
 			return err
@@ -479,7 +513,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			}
 		}
 
-		Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// create the folder if needed
 		cd := ""
@@ -496,10 +530,18 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Warn(" ! The folder is not empty. Files may be overwritten. Press Ctrl+C to abort.")
 		}
 
-		term.Info(" * Working on it. This may take 1 or 2 minutes...")
-		_, err = cli.Generate(cmd.Context(), client, prompt.Language, prompt.Description)
-		if err != nil {
-			return err
+		if prompt.Description != "" {
+			term.Info(" * Working on it. This may take 1 or 2 minutes...")
+			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
+			if err != nil {
+				return err
+			}
+		} else {
+			term.Info(" * Fetching sample from the Defang repository...")
+			err := cli.InitFromSample(cmd.Context(), category, sample)
+			if err != nil {
+				return err
+			}
 		}
 
 		term.Info(" * Code generated successfully in folder", prompt.Folder)
