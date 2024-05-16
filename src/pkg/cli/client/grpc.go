@@ -96,7 +96,7 @@ func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 
-func (g GrpcClient) Get(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (g GrpcClient) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, &connect.Request[defangv1.ServiceID]{Msg: req}))
 }
 
@@ -123,11 +123,8 @@ func (g GrpcClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) er
 }
 
 func (g GrpcClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	// _, err := g.client.DeleteSecrets(ctx, &connect.Request[v1.Secrets]{Msg: req}); TODO: implement this in the server
-	var errs []error
 	_, err := g.client.DeleteSecrets(ctx, &connect.Request[defangv1.Secrets]{Msg: &defangv1.Secrets{Names: req.Names}})
-	errs = append(errs, err)
-	return errors.Join(errs...)
+	return err
 }
 
 func (g GrpcClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -226,7 +223,7 @@ func (g *GrpcClient) Restart(ctx context.Context, names ...string) (types.ETag, 
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
 	services := make([]*defangv1.Service, 0, len(names))
 	for _, name := range names {
-		serviceInfo, err := g.Get(ctx, &defangv1.ServiceID{Name: name})
+		serviceInfo, err := g.GetService(ctx, &defangv1.ServiceID{Name: name})
 		if err != nil {
 			return "", err
 		}
