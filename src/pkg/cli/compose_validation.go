@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg"
 )
 
 func validateProject(project *compose.Project) error {

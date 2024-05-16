@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/google/uuid"
 )
 

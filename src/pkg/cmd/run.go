@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 type RunContainerArgs struct {

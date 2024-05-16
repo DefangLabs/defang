@@ -6,7 +6,7 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          
+
           {% if user.is_authenticated %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'add_record' %}">Add Record</a>
@@ -14,26 +14,26 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'logout' %}">Logout</a>
           </li>
-  
+
           {% else %}
-  
+
           <li class="nav-item">
             <a class="nav-link" href="{% url 'home' %}">Login</a>
-          </li>     
-          
+          </li>
+
           <li class="nav-item">
             <a class="nav-link" href="{% url 'register' %}">Register</a>
-          </li>     
-          
+          </li>
+
           {% endif %}
 
           <li class="nav-item">
-            <a class="nav-link" href="https://github.com/defang-io/defang">Github</a>
+            <a class="nav-link" href="https://github.com/DefangLabs/defang">Github</a>
           </li>
-          
-          
+
+
         </ul>
-        
+
       </div>
     </div>
   </nav>

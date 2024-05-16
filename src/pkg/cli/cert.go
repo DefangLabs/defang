@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/spinner"
-	"github.com/defang-io/defang/src/pkg/term"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/spinner"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 var resolver = net.Resolver{}

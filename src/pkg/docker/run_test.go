@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
