@@ -15,7 +15,6 @@ import (
 	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/defang-io/defang/src/pkg/auth"
-	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/defang-io/defang/src/pkg/types"
 	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
@@ -87,12 +86,6 @@ func (g GrpcClient) Update(ctx context.Context, req *defangv1.Service) (*defangv
 }
 
 func (g GrpcClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// TODO: remove this when playground supports BYOD
-	for _, service := range req.Services {
-		if service.Domainname != "" {
-			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
-		}
-	}
 	return getMsg(g.client.Deploy(ctx, &connect.Request[defangv1.DeployRequest]{Msg: req}))
 }
 

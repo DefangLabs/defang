@@ -742,7 +742,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 			if serviceInfo.ZoneId != "" {
 				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
 			} else {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after ACME cert activation)")
+				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after `defang cert generate` to get a Let's Encrypt certificate)")
 			}
 		}
 	}
