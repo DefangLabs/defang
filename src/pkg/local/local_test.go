@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func TestLocal(t *testing.T) {

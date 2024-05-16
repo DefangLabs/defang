@@ -8,7 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 
-	pkgtypes "github.com/defang-io/defang/src/pkg/types"
+	pkgtypes "github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func (d *Docker) SetUp(ctx context.Context, containers []pkgtypes.Container) error {

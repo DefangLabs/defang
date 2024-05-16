@@ -1,4 +1,4 @@
-module github.com/defang-io/defang/src
+module github.com/DefangLabs/defang/src
 
 go 1.21
 

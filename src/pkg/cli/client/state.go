@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/defang-io/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func userStateDir() (string, error) {

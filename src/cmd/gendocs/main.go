@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/defang-io/defang/src/cmd/cli/command"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/cmd/cli/command"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra/doc"
 )
 

@@ -9,8 +9,7 @@ This is a sample of a basic Flask TODO app. The items are stored in memory and a
 3. A <a href="https://docs.docker.com/build/building/context/#dockerignore-files">.dockerignore</a> to ignore files that are not needed in the Docker image or will be generated during the build process.
 
 ## Prerequisite
-
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+1. Download <a href="https://github.com/DefangLabs/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide
