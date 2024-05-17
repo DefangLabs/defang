@@ -38,28 +38,28 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		}
 	}
 	if cnt == 0 {
-		term.Infof("No services found need to generate Let's Encrypt cert")
+		term.Infof(" * No services found need to generate Let's Encrypt cert")
 	}
 
 	return nil
 }
 
 func generateCert(ctx context.Context, domain, albDns string) {
-	term.Infof("Triggering Let's Encrypt cert generation for %v", domain)
+	term.Infof(" * Triggering Let's Encrypt cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, albDns); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
 
-	term.Infof("%v DNS is properly configured!", domain)
+	term.Infof(" * %v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
-		term.Infof("TLS cert for %v is already ready", domain)
+		term.Infof(" * TLS cert for %v is already ready", domain)
 		return
 	}
-	term.Infof("Triggering cert generation for %v", domain)
+	term.Infof(" * Triggering cert generation for %v", domain)
 	triggerCertGeneration(ctx, domain)
 
-	term.Infof("Waiting for TLS cert to be online for %v", domain)
+	term.Infof(" * Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
@@ -144,9 +144,9 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 			cname = strings.TrimSuffix(cname, ".")
 			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
 				if !msgShown {
-					term.Infof("Please setup CNAME record for %v", domain)
+					term.Infof(" * Please setup CNAME record for %v", domain)
 					fmt.Printf("  %v  CNAME  %v\n", domain, strings.ToLower(albDns))
-					term.Infof("Waiting for CNAME record setup and DNS propagation...")
+					term.Infof(" * Waiting for CNAME record setup and DNS propagation...")
 					msgShown = true
 				}
 				if doSpinner {
@@ -203,7 +203,7 @@ func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
 			for _, n := range ns {
 				cname, err = resolverAt(n).LookupCNAME(context.Background(), domain)
 				if err != nil {
-					cnames[""] = true
+					term.Debugf(" - Error looking up CNAME for %v at %v: %v", domain, n, err)
 				}
 				cnames[cname] = true
 			}
