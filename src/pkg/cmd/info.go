@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func PrintInfo(ctx context.Context, region Region, id types.TaskID) error {

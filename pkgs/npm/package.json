@@ -8,13 +8,13 @@
     "defang": "./bin/cli.js"
   },
   "keywords": [],
-  "homepage": "https://github.com/defang-io/defang#readme",
+  "homepage": "https://github.com/DefangLabs/defang#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/defang-io/defang.git"
+    "url": "git+https://github.com/DefangLabs/defang.git"
   },
   "bugs": {
-    "url": "https://github.com/defang-io/defang/issues"
+    "url": "https://github.com/DefangLabs/defang/issues"
   },
   "scripts": {
     "build": "tsc",

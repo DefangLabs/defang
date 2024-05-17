@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/clouds/aws/region"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func TestCloudFormation(t *testing.T) {

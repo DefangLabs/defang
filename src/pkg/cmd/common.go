@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/clouds/aws"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type Region = aws.Region

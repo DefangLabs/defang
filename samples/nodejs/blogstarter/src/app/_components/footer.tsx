@@ -16,7 +16,7 @@ export function Footer() {
               Read Documentation
             </a>
             <a
-              href={`https://github.com/defang-io/defang`}
+              href={`https://github.com/DefangLabs/defang`}
               className="mx-3 font-bold hover:underline"
             >
               View on GitHub

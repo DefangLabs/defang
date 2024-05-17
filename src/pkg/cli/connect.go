@@ -8,11 +8,11 @@ import (
 	"net"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/term"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"

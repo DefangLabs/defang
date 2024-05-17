@@ -1,0 +1,35 @@
+version: "3.8"
+name: svelte
+services:
+  db:
+    image: mysql:latest
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: true
+      MYSQL_DATABASE: todoApp
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: Defang12345
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - mode: host
+        target: 3306
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: Defang12345
+      DATABASE_NAME: todoApp
+    ports:
+      - "3001:3001"
+    depends_on:
+      - db
+
+networks:
+  default:
+    name: backend-network
+
+volumes:
+  mysql_data:

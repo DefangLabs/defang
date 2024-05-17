@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func prettyExecutable(def string) string {

@@ -46,12 +46,12 @@ archives:
 
 release:
   github:
-    owner: defang-io
+    owner: DefangLabs
     name: defang
   header: |
     # Defang CLI
     This is the Command Line Interface (CLI) for [Defang](https://defang.io). This is a beta version and is provided as-is, intended primarily for testing purposes.
-    For alternative installation methods, please check the [README](https://github.com/defang-io/defang/blob/main/README.md).
+    For alternative installation methods, please check the [README](https://github.com/DefangLabs/defang/blob/main/README.md).
     ## Manual installation Instructions
     1. Download the archive file for your Operating System.
     2. Extract the archive. This should reveal the binary file for Defang.
@@ -71,7 +71,7 @@ nix:
     description: Command-line interface for the Defang Opinionated Platform
     license: "mit"
     repository:
-      owner: defang-io
+      owner: DefangLabs
       name: defang
     post_install: |
       installShellCompletion --cmd defang \

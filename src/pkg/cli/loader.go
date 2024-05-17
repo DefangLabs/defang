@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/loader"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

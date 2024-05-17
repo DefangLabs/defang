@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestComposeStart(t *testing.T) {

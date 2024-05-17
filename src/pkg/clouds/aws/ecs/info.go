@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/smithy-go/ptr"
-	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func (a AwsEcs) Info(ctx context.Context, id TaskArn) (*types.TaskInfo, error) {
