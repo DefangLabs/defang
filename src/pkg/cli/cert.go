@@ -197,7 +197,6 @@ func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Printf("Checking CNAME for %v\n", domain)
 			cnames := make(map[string]bool)
 			var cname string
 			var err error
@@ -209,7 +208,6 @@ func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
 				cnames[cname] = true
 			}
 			if len(cnames) > 1 {
-				fmt.Printf("CNAME mismatch for %v: %v\n", domain, cnames)
 				continue
 			}
 			return cname, err
@@ -233,7 +231,7 @@ func getNSServers(ctx context.Context, domain string) ([]string, error) {
 			d = d[strings.Index(domain, ".")+1:]
 			continue
 		} else if err != nil {
-			fmt.Printf("Failed to find NS server for %v at %v: %v", domain, d, err)
+			return nil, fmt.Errorf("Failed to find NS server for %v at %v: %v", domain, d, err)
 		}
 		break
 	}
