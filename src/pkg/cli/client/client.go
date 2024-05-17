@@ -20,37 +20,40 @@ type ProjectLoader interface {
 	LoadWithProjectName(string) (*compose.Project, error)
 }
 
-type Client interface {
-	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
-	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
+type FabricClient interface {
 	AgreeToS(context.Context) error
+	CheckLoginAndToS(context.Context) error
+	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
+	DeleteSubdomainZone(context.Context) error
+	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
+	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
+	GetVersions(context.Context) (*defangv1.Version, error)
+	Publish(context.Context, *defangv1.PublishRequest) error
+	RevokeToken(context.Context) error
+	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
+	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
+	Track(string, ...Property) error
+}
+
+type Client interface {
+	FabricClient
+
 	BootstrapCommand(context.Context, string) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
-	CheckLoginAndToS(context.Context) error
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
-	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
-	DeleteSubdomainZone(context.Context) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context) (types.ETag, error)
-	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
-	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
-	GetVersions(context.Context) (*defangv1.Version, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
-	Publish(context.Context, *defangv1.PublishRequest) error
 	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
-	RevokeToken(context.Context) error
 	ServiceDNS(name string) string
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
-	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
-	Track(string, ...Property) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
 	LoadProject() (*compose.Project, error)
