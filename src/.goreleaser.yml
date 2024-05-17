@@ -86,11 +86,13 @@ changelog:
       - "^defang: v[0-9]+\\.[0-9]+\\.[0-9]+ -> v[0-9]+\\.[0-9]+\\.[0-9]+$"
       - "^Merge branch "
       - "^Merge remote-tracking branch "
+      - "^New version: DefangLabs."
 
 winget:
   - publisher: DefangLabs
+    name: Defang
     short_description: The Defang command-line interface (CLI)
-    description: Defang is easiest way for developers to create and deploy their containerized applications to the cloud
+    description: Defang is easiest way for developers to create and deploy their containerized applications to the cloud.
     license: "mit"
     publisher_url: https://defang.io/
     homepage: https://github.com/DefangLabs/defang/
