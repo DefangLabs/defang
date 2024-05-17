@@ -76,13 +76,14 @@ func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, t
 func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
 	defangClient, tenantId := Connect(cluster, loader)
 
-	if provider == client.ProviderAWS {
+	switch provider {
+	case client.ProviderAWS:
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		byocClient := aws.NewByoc(tenantId, defangClient)
 		return byocClient
+	default:
+		return &client.PlaygroundClient{*defangClient}
 	}
-
-	return defangClient
 }
 
 // Deprecated: don't rely on info in token
