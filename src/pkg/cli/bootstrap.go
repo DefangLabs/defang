@@ -7,6 +7,7 @@ import (
 
 	"github.com/defang-io/defang/src/pkg/cli/client"
 	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/defang-io/defang/src/pkg/types"
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
@@ -26,7 +27,7 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 	}
 	params := TailOptions{
 		Service: "",
-		Etag:    etag,
+		Etags:   []types.ETag{etag},
 		Since:   since,
 		Raw:     false,
 	}

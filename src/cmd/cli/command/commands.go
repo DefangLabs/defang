@@ -53,13 +53,25 @@ func prettyError(err error) error {
 
 }
 
-func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
-	result := false
-	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Destroy succeeded in ") ||
-			strings.Contains(eventLog, "Update succeeded in ")
+type EndLogConditional struct {
+	Service  string
+	Host     string
+	EventLog string
+}
+
+func createEndLogEventDetectFunc(conditionals []EndLogConditional) cli.TailDetectStopEventFunc {
+	return func(service string, host string, eventLog string) bool {
+		for _, conditional := range conditionals {
+			if service == "" || service == conditional.Service {
+				if host == "" || host == conditional.Host {
+					if strings.Contains(eventLog, conditional.EventLog) {
+						return true
+					}
+				}
+			}
+		}
+		return false
 	}
-	return result
 }
 
 func Execute(ctx context.Context) error {
@@ -620,7 +632,7 @@ var tailCmd = &cobra.Command{
 		term.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
 		tailOptions := cli.TailOptions{
 			Service: name,
-			Etag:    etag,
+			Etags:   []types.ETag{etag},
 			Since:   ts,
 			Raw:     raw,
 		}
@@ -777,12 +789,20 @@ var composeUpCmd = &cobra.Command{
 			services = "deployment ID " + etag
 		}
 
+		if len(deploy.Services) == 0 {
+			return errors.New("no services in deployment")
+		}
+
+		endLogConditions := []EndLogConditional{{Service: deploy.Services[0].Service.Name, Host: "fabric", EventLog: "status=SERVICE_DEPLOYMENT_COMPLETED"}}
+		endLogDetectFunc := createEndLogEventDetectFunc(endLogConditions)
+
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Service: "",
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
+			Service:            "",
+			Etags:              []types.ETag{etag, ""},
+			Since:              since,
+			Raw:                false,
+			EndEventDetectFunc: endLogDetectFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
@@ -877,12 +897,18 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
+		endLogConditions := []EndLogConditional{
+			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
+			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
+		}
+
+		endLogDetectFunc := createEndLogEventDetectFunc(endLogConditions)
 		tailParams := cli.TailOptions{
 			Service:            "",
-			Etag:               etag,
+			Etags:              []types.ETag{etag},
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: detectComposeDownEndLogEventFunc,
+			EndEventDetectFunc: endLogDetectFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
@@ -940,7 +966,7 @@ var deleteCmd = &cobra.Command{
 		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
 			Service: "",
-			Etag:    etag,
+			Etags:   []types.ETag{etag},
 			Since:   since,
 			Raw:     false,
 		}
