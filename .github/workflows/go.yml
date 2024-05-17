@@ -151,7 +151,7 @@ jobs:
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
-  publish-npm-binaries:
+  post-build:
     runs-on: ubuntu-latest
     needs: go-release
 
