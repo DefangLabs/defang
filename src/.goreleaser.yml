@@ -68,7 +68,7 @@ release:
 nix:
   # commit_author: defang-io
   - homepage: https://defang.io/
-    description: Command-line interface for the Defang Opinionated Platform
+    description: Defang is easiest way for developers to create and deploy their containerized applications
     license: "mit"
     repository:
       owner: DefangLabs
@@ -84,6 +84,21 @@ changelog:
     exclude:
       # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
       - "^defang: v[0-9]+\\.[0-9]+\\.[0-9]+ -> v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - "^Merge branch "
+      - "^Merge remote-tracking branch "
+
+winget:
+  - publisher: DefangLabs
+    short_description: The Defang command-line interface (CLI)
+    description: Defang is easiest way for developers to create and deploy their containerized applications to the cloud
+    license: "mit"
+    publisher_url: https://defang.io/
+    homepage: https://github.com/DefangLabs/defang/
+    publisher_support_url: https://github.com/DefangLabs/defang/issues/
+    path: pkgs/winget
+    repository:
+      owner: DefangLabs
+      name: defang
 
 announce:
   discord:
