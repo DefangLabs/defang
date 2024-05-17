@@ -134,6 +134,7 @@ jobs:
           args: release --clean
           workdir: src
         env:
+          GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
