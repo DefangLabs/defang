@@ -23,11 +23,12 @@ func Track(name string, props ...P) {
 	if disableAnalytics {
 		return
 	}
+	var client cliClient.FabricClient = client
 	if client == nil {
 		client, _ = cli.Connect(cluster, nil)
 	}
 	trackWG.Add(1)
-	go func(client cliClient.Client) {
+	go func(client cliClient.FabricClient) {
 		defer trackWG.Done()
 		_ = client.Track(name, props...)
 	}(client)
