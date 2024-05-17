@@ -129,8 +129,8 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
-          distribution: goreleaser # either 'goreleaser' (default) or 'goreleaser-pro'
-          version: latest
+          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          # version: latest
           args: release --clean
           workdir: src
         env:
@@ -166,7 +166,7 @@ jobs:
 
     steps:
       - name: Trigger CLI Autodoc
-        uses: peter-evans/repository-dispatch@v1
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/defang-docs
