@@ -3,8 +3,8 @@ package ecs
 import (
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/clouds/aws"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const (

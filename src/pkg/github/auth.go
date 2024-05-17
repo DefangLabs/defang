@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/google/uuid"
 	"github.com/pkg/browser"
 )

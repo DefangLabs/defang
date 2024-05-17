@@ -10,7 +10,7 @@ This template is a member list project developed using Ruby on Rails, offering a
 3. A <a href="https://docs.docker.com/build/building/context/#dockerignore-files">.dockerignore</a> file to comply with the size limit (10MB).
 
 ## Prerequisite
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+1. Download <a href="https://github.com/DefangLabs/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account</a>
 Plus, make sure that you have properly set your environment variables like `AWS_PROFILE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
 

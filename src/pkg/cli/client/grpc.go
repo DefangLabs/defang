@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg/auth"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"github.com/defang-io/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

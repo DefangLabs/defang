@@ -1,6 +1,6 @@
 package cmd
 
-import "github.com/defang-io/defang/src/pkg/term"
+import "github.com/DefangLabs/defang/src/pkg/term"
 
 type Color string
 

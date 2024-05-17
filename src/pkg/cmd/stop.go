@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func Stop(ctx context.Context, region Region, id types.TaskID) error {
