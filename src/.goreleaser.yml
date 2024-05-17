@@ -93,14 +93,21 @@ winget:
     name: Defang
     short_description: The Defang command-line interface (CLI)
     description: Defang is easiest way for developers to create and deploy their containerized applications to the cloud.
-    license: "mit"
+    license: MIT
     publisher_url: https://defang.io/
     homepage: https://github.com/DefangLabs/defang/
     publisher_support_url: https://github.com/DefangLabs/defang/issues/
-    path: pkgs/winget
     repository:
       owner: DefangLabs
-      name: defang
+      name: winget-pkgs
+      branch: "Defang-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
 
 announce:
   discord:
