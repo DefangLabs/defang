@@ -323,7 +323,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 	// Show a spinner if we're not in raw mode and have a TTY
 	if doSpinner {
-		go showSpinner(ctx, time.Second)
+		go showSpinner(ctx, 250*time.Millisecond)
 	}
 
 	if term.IsTerminal && !params.Raw {
@@ -393,7 +393,6 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			}
 
 			if !processLogs(e.Stderr, ts, e.Message, msg, params) {
-				fmt.Println("Exit eventlog condition found.")
 				cancel()
 				return nil
 			}
