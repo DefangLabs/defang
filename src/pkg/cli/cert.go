@@ -62,12 +62,11 @@ func generateCert(ctx context.Context, domain, albDns string) {
 	term.Infof("Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
-		// FIXME: The message below is only valid for BYOC, need to update when playground ACME cert support is added
-		term.Errorf("Please check for error messages from `/aws/lambda/acme-lambda` log group in cloudwatch for more details")
+		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
 		return
 	}
 
-	term.Infof("TLS cert for %v is ready", domain)
+	fmt.Printf("TLS cert for %v is ready\n", domain)
 }
 
 func triggerCertGeneration(ctx context.Context, domain string) {
@@ -141,12 +140,13 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			cname, err := resolver.LookupCNAME(ctx, domain)
+			cname, err := waitForCNAMEInSync(ctx, domain)
 			cname = strings.TrimSuffix(cname, ".")
 			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
 				if !msgShown {
-					term.Infof("Please setup CNAME record for %v to point to ALB %v, waiting for CNAME record setup and DNS propagation", domain, strings.ToLower(albDns))
-					term.Infof("Note: DNS propagation may take a while, we will proceed as soon as the CNAME record is ready, checking...")
+					term.Infof("Please setup CNAME record for %v", domain)
+					fmt.Printf("  %v  CNAME  %v\n", domain, strings.ToLower(albDns))
+					term.Infof("Waiting for CNAME record setup and DNS propagation...")
 					msgShown = true
 				}
 				if doSpinner {
@@ -184,4 +184,72 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
+	ns, err := getNSServers(ctx, domain)
+	if err != nil {
+		return "", err
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Printf("Checking CNAME for %v\n", domain)
+			cnames := make(map[string]bool)
+			var cname string
+			var err error
+			for _, n := range ns {
+				cname, err = resolverAt(n).LookupCNAME(context.Background(), domain)
+				if err != nil {
+					cnames[""] = true
+				}
+				cnames[cname] = true
+			}
+			if len(cnames) > 1 {
+				fmt.Printf("CNAME mismatch for %v: %v\n", domain, cnames)
+				continue
+			}
+			return cname, err
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+}
+
+func getNSServers(ctx context.Context, domain string) ([]string, error) {
+	d := domain
+	var ns []*net.NS
+	for {
+		var err error
+		ns, err = resolver.LookupNS(ctx, d)
+		var ne *net.DNSError
+		if errors.As(err, &ne) {
+			if strings.Count(d, ".") <= 1 {
+				return nil, fmt.Errorf("No DNS server found")
+			}
+			d = d[strings.Index(domain, ".")+1:]
+			continue
+		} else if err != nil {
+			fmt.Printf("Failed to find NS server for %v at %v: %v", domain, d, err)
+		}
+		break
+	}
+	servers := make([]string, len(ns))
+	for i, n := range ns {
+		servers[i] = n.Host
+	}
+	return servers, nil
+}
+
+func resolverAt(nsServer string) *net.Resolver {
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, network, nsServer+":53")
+		},
+	}
 }
