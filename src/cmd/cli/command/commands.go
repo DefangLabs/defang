@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -704,6 +705,7 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
+		term.Debug("CLIENT: ", reflect.ValueOf(client).Type())
 		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
 		if err != nil {
 			return err
