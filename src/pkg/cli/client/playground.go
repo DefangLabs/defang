@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -26,12 +25,6 @@ func (g PlaygroundClient) Update(ctx context.Context, req *defangv1.Service) (*d
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// TODO: remove this when playground supports BYOD
-	for _, service := range req.Services {
-		if service.Domainname != "" {
-			term.Warnf("Defang provider does not support the domainname field for now, service: %v, domain: %v", service.Name, service.Domainname)
-		}
-	}
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
