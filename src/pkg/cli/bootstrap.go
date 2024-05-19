@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
@@ -19,19 +19,22 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 	if DoDryRun {
 		return ErrDryRun
 	}
+
 	since := time.Now()
 	etag, err := client.BootstrapCommand(ctx, command)
 	if err != nil || etag == "" {
 		return err
 	}
-	return Tail(ctx, client, "", etag, since, false)
+
+	return Tail(ctx, client, TailOptions{Etag: etag, Since: since})
 }
 
-func BootstrapList(ctx context.Context, client client.Client) error {
+func BootstrapLocalList(ctx context.Context, client client.Client) error {
 	term.Debug(" - Running CD list")
 	if DoDryRun {
 		return ErrDryRun
 	}
+
 	stacks, err := client.BootstrapList(ctx)
 	if err != nil {
 		return err

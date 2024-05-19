@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/github"
-	"github.com/defang-io/defang/src/pkg/term"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/github"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func getTokenFile(fabric string) string {
@@ -82,7 +82,7 @@ func NonInteractiveLogin(ctx context.Context, client client.Client, fabric strin
 	term.Debug(" - Got GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
-		Scope:     []string{"admin", "read"},
+		Scope:     []string{"admin", "read"}, // no "tail" scope
 	})
 	if err != nil {
 		return err

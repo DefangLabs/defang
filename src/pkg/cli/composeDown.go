@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func ComposeDown(ctx context.Context, client client.Client) (types.ETag, error) {
@@ -14,5 +14,10 @@ func ComposeDown(ctx context.Context, client client.Client) (types.ETag, error) 
 		return "", err
 	}
 	term.Debug(" - Destroying project", projectName)
+
+	if DoDryRun {
+		return "", ErrDryRun
+	}
+
 	return client.Destroy(ctx)
 }

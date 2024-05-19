@@ -149,14 +149,6 @@ jobs:
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
-      - name: Trigger CLI Autodoc
-        uses: peter-evans/repository-dispatch@v1
-        with:
-          token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
-          repository: defang-io/defang-docs
-          event-type: cli-autodoc
-          client-payload: '{"version": "${{ github.ref_name }}"}'
-
   publish-npm-binaries:
     runs-on: ubuntu-latest
     needs: go-release
@@ -171,6 +163,14 @@ jobs:
         working-directory: ./pkgs/npm
 
     steps:
+      - name: Trigger CLI Autodoc
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
+          repository: DefangLabs/defang-docs
+          event-type: cli-autodoc
+          client-payload: '{"version": "${{ github.ref_name }}"}'
+
       - name: Checkout tag
         uses: actions/checkout@v4
 

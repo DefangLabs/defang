@@ -7,8 +7,8 @@ WORKDIR /app
 # Install required packages
 RUN apt-get update \
       && apt-get install -y --no-install-recommends \
-            build-essential \
-            python3-dev \
+      build-essential \
+      python3-dev \
       && rm -rf /var/lib/apt/lists/*
 
 # Copy the current directory contents into the container at /app

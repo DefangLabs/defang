@@ -14,15 +14,15 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/cli"
-	cliClient "github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/scope"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -47,11 +47,20 @@ func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
-		term.Debug(" - Server error:", err)
-		err = errors.Unwrap(err)
+		term.Debug(" - Server error:", cerr)
+		err = errors.Unwrap(cerr)
 	}
 	return err
 
+}
+
+func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
+	result := false
+	if service == "cd" && host == "pulumi" {
+		result = strings.Contains(eventLog, "Destroy succeeded in ") ||
+			strings.Contains(eventLog, "Update succeeded in ")
+	}
+	return result
 }
 
 func Execute(ctx context.Context) error {
@@ -108,7 +117,7 @@ func Execute(ctx context.Context) error {
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
-			fmt.Println("A newer version of the CLI is available at https://github.com/defang-io/defang/releases/latest")
+			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
@@ -141,6 +150,7 @@ func SetupCommands(version string) {
 	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
 	bootstrapTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
+	bootstrapListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	bootstrapCmd.AddCommand(bootstrapListCmd)
 	bootstrapCmd.AddCommand(bootstrapCancelCmd)
 
@@ -420,16 +430,47 @@ var generateCmd = &cobra.Command{
 			return errors.New("cannot run in non-interactive mode")
 		}
 
+		var language string
+		if err := survey.AskOne(&survey.Select{
+			Message: "Choose the language you'd like to use:",
+			Options: []string{"Nodejs", "Golang", "Python"},
+			Default: "Nodejs",
+			Help:    "The project code will be in the language you choose here.",
+		}, &language); err != nil {
+			return err
+		}
+
+		var category, sample string
+
+		// Fetch the list of samples from the Defang repository
+		if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
+			term.Debug(" - unable to fetch samples:", err)
+		} else if len(samples) > 0 {
+			const generateWithAI = "Generate with AI"
+
+			category = strings.ToLower(language)
+			sampleNames := []string{generateWithAI}
+			// sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+			for _, sample := range samples {
+				if sample.Category == category {
+					sampleNames = append(sampleNames, sample.Name)
+					// sampleDescriptions = append(sampleDescriptions, sample.Readme)
+				}
+			}
+
+			if err := survey.AskOne(&survey.Select{
+				Message: "Choose a sample service:",
+				Options: sampleNames,
+				Help:    "The project code will be based on the sample you choose here.",
+			}, &sample); err != nil {
+				return err
+			}
+			if sample == generateWithAI {
+				sample = ""
+			}
+		}
+
 		var qs = []*survey.Question{
-			{
-				Name: "language",
-				Prompt: &survey.Select{
-					Message: "Choose the language you'd like to use:",
-					Options: []string{"Nodejs", "Golang", "Python"},
-					Default: "Nodejs",
-					Help:    "The generated code will be in the language you choose here.",
-				},
-			},
 			{
 				Name: "description",
 				Prompt: &survey.Input{
@@ -453,13 +494,16 @@ Generate will write files in the current folder. You can edit them and then depl
 			},
 		}
 
+		if sample != "" {
+			qs = qs[1:] // user picked a sample, so we skip the description question
+		}
+
 		prompt := struct {
-			Language    string // or you can tag fields to match a specific name
-			Description string
+			Description string // or you can tag fields to match a specific name
 			Folder      string
 		}{}
 
-		// ask the questions
+		// ask the remaining questions
 		err := survey.Ask(qs, &prompt)
 		if err != nil {
 			return err
@@ -475,7 +519,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			}
 		}
 
-		Track("Generate Started", P{"language", prompt.Language}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// create the folder if needed
 		cd := ""
@@ -492,10 +536,18 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Warn(" ! The folder is not empty. Files may be overwritten. Press Ctrl+C to abort.")
 		}
 
-		term.Info(" * Working on it. This may take 1 or 2 minutes...")
-		_, err = cli.Generate(cmd.Context(), client, prompt.Language, prompt.Description)
-		if err != nil {
-			return err
+		if prompt.Description != "" {
+			term.Info(" * Working on it. This may take 1 or 2 minutes...")
+			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
+			if err != nil {
+				return err
+			}
+		} else {
+			term.Info(" * Fetching sample from the Defang repository...")
+			err := cli.InitFromSample(cmd.Context(), category, sample)
+			if err != nil {
+				return err
+			}
 		}
 
 		term.Info(" * Code generated successfully in folder", prompt.Folder)
@@ -572,7 +624,14 @@ var tailCmd = &cobra.Command{
 
 		ts = ts.UTC()
 		term.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
-		return cli.Tail(cmd.Context(), client, name, etag, ts, raw)
+		tailOptions := cli.TailOptions{
+			Service: name,
+			Etag:    etag,
+			Since:   ts,
+			Raw:     raw,
+		}
+
+		return cli.Tail(cmd.Context(), client, tailOptions)
 	},
 }
 
@@ -689,7 +748,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 			if serviceInfo.ZoneId != "" {
 				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
 			} else {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after ACME cert activation)")
+				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after `defang cert generate` to get a Let's Encrypt certificate)")
 			}
 		}
 	}
@@ -726,7 +785,14 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service: "",
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
+		}
+
+		err = cli.Tail(cmd.Context(), client, tailParams)
 		if err != nil {
 			return err
 		}
@@ -818,7 +884,15 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		err = cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service:            "",
+			Etag:               etag,
+			Since:              since,
+			Raw:                false,
+			EndEventDetectFunc: detectComposeDownEndLogEventFunc,
+		}
+
+		err = cli.Tail(cmd.Context(), client, tailParams)
 		if err != nil {
 			return err
 		}
@@ -848,6 +922,7 @@ var deleteCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
+	Deprecated:  "use 'compose stop' instead",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
@@ -870,7 +945,13 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
-		return cli.Tail(cmd.Context(), client, "", etag, since, false)
+		tailParams := cli.TailOptions{
+			Service: "",
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
+		}
+		return cli.Tail(cmd.Context(), client, tailParams)
 	},
 }
 
@@ -938,7 +1019,7 @@ var logoutCmd = &cobra.Command{
 var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
-	Short:   "Manually run a command with the CD task",
+	Short:   "Manually run a command with the CD task (for BYOC only)",
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
@@ -994,7 +1075,12 @@ var bootstrapListCmd = &cobra.Command{
 	Aliases: []string{"list"},
 	Short:   "List all the projects and stacks in the CD cluster",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapList(cmd.Context(), client)
+		remote, _ := cmd.Flags().GetBool("remote")
+
+		if remote {
+			return cli.BootstrapCommand(cmd.Context(), client, "list")
+		}
+		return cli.BootstrapLocalList(cmd.Context(), client)
 	},
 }
 

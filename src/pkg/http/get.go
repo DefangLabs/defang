@@ -5,11 +5,25 @@ import (
 	"net/http"
 )
 
-func GetWithAuth(ctx context.Context, url, auth string) (*http.Response, error) {
+type Header = http.Header
+
+func GetWithContext(ctx context.Context, url string) (*http.Response, error) {
 	hreq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	hreq.Header.Set("Authorization", auth)
 	return http.DefaultClient.Do(hreq)
+}
+
+func GetWithHeader(ctx context.Context, url string, header http.Header) (*http.Response, error) {
+	hreq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	hreq.Header = header
+	return http.DefaultClient.Do(hreq)
+}
+
+func GetWithAuth(ctx context.Context, url, auth string) (*http.Response, error) {
+	return GetWithHeader(ctx, url, http.Header{"Authorization": []string{auth}})
 }

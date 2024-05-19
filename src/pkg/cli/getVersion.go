@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
 func GetVersion(ctx context.Context, client client.Client) (string, error) {

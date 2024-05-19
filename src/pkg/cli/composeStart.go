@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
 )
 
 func convertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force bool) ([]*defangv1.Service, error) {
