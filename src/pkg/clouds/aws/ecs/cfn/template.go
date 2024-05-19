@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/awslabs/goformation/v7/cloudformation"
 	"github.com/awslabs/goformation/v7/cloudformation/ec2"
@@ -20,9 +23,6 @@ import (
 	"github.com/awslabs/goformation/v7/cloudformation/s3"
 	"github.com/awslabs/goformation/v7/cloudformation/secretsmanager"
 	"github.com/awslabs/goformation/v7/cloudformation/tags"
-	awsecs "github.com/defang-io/defang/src/pkg/clouds/aws/ecs"
-	"github.com/defang-io/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
-	"github.com/defang-io/defang/src/pkg/types"
 )
 
 const (

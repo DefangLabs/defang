@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
 )
 
 func Logout(ctx context.Context, client client.Client) error {

@@ -1,5 +1,5 @@
 # Music Recommendation API
-This Music Recommendation API provides artist recommendations based on collaborative filtering using the Alternating Least Squares (ALS) algorithm from the implicit library. The dataset utilized is from Last.fm. Note that alognside your .py file, include a requirements.txt so that the Dockerfile can install the necessary packages with pip. 
+This Music Recommendation API provides artist recommendations based on collaborative filtering using the Alternating Least Squares (ALS) algorithm from the implicit library. The dataset utilized is from Last.fm. Note that alognside your .py file, include a requirements.txt so that the Dockerfile can install the necessary packages with pip.
 
 
 ## Essential Setup Files
@@ -7,7 +7,7 @@ This Music Recommendation API provides artist recommendations based on collabora
 2. A <a href="https://docs.defang.io/docs/concepts/compose">compose file</a> to define and run multi-container Docker applications (this is how Defang identifies services to be deployed). (compose.yaml file)
 
 ## Prerequisite
-1. Download <a href="https://github.com/defang-io/defang">Defang CLI</a>
+1. Download <a href="https://github.com/DefangLabs/defang">Defang CLI</a>
 2. If you are using <a href="https://docs.defang.io/docs/concepts/defang-byoc">Defang BYOC</a>, make sure you have properly <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html">authenticated your AWS account (optional)</a>
 
 ## A Step-by-Step Guide

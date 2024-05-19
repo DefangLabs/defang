@@ -1,0 +1,26 @@
+version: '3.9'
+name: metabase
+services:
+  metabase:
+    image: "metabase/metabase:latest"
+    ports:
+      - mode: ingress
+        target: 3000
+        published: 3000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME
+      - MB_DB_PORT
+      - MB_DB_USER
+      - MB_DB_PASS
+      - MB_DB_HOST
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 1024M

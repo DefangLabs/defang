@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/defang-io/defang/src/pkg/cmd"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/cmd"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/pflag"
 )
 

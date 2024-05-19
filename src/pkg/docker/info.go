@@ -3,7 +3,7 @@ package docker
 import (
 	"context"
 
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func (d Docker) GetInfo(ctx context.Context, id ContainerID) (*types.TaskInfo, error) {

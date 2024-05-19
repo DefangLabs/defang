@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/term"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Generate(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
+func GenerateWithAI(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
 		term.Warn(" ! Dry run, not generating files")
 		return nil, ErrDryRun

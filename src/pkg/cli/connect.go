@@ -5,15 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/do"
 	"net"
 	"strings"
 
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/defang-io/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/term"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
@@ -77,19 +78,18 @@ func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, t
 func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
 	defangClient, tenantId := Connect(cluster, loader)
 
-	if provider == client.ProviderAWS {
+	switch provider {
+	case client.ProviderAWS:
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
 		byocClient := aws.NewByoc(tenantId, defangClient)
 		return byocClient
-	}
-
-	if provider == client.ProviderDO {
+	case client.ProviderDO:
 		term.Info("# Using DO provider")
 		byocClient := do.NewByoc(tenantId, defangClient)
 		return byocClient
+	default:
+		return &client.PlaygroundClient{*defangClient}
 	}
-
-	return defangClient
 }
 
 // Deprecated: don't rely on info in token

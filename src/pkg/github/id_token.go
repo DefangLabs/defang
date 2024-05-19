@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/defang-io/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/http"
 )
 
 // GitHub OIDC docs: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect

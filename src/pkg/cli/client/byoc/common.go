@@ -1,7 +1,7 @@
 package byoc
 
 import (
-	"github.com/defang-io/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg"
 )
 
 const (
