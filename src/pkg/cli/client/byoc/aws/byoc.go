@@ -32,74 +32,43 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
 type ByocAws struct {
-	*client.GrpcClient
+	*byoc.ByocBaseClient
 
-	cdTasks                 map[string]ecs.TaskArn
-	customDomain            string // TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
-	driver                  *cfn.AwsEcs
-	privateDomain           string
-	privateLbIps            []string
-	publicNatIps            []string
-	pulumiProject           string
-	pulumiStack             string
-	quota                   quota.Quotas
-	setupDone               bool
-	tenantID                string
-	shouldDelegateSubdomain bool
+	cdTasks      map[string]ecs.TaskArn
+	driver       *cfn.AwsEcs
+	publicNatIps []string
 }
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocAws {
+func NewByoc(defClient *byoc.ByocBaseClient) *ByocAws {
+
+	defClient.Quota = quota.Quotas{
+		// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+		Cpus:       16,
+		Gpus:       8,
+		MemoryMiB:  65536,
+		Replicas:   16,
+		Services:   40,
+		ShmSizeMiB: 30720,
+	}
+	defClient.PrivateLbIps = nil  // TODO: grab these from the AWS API or outputs
+	defClient.PrivateNatIps = nil // TODO: grab these from the AWS API or outputs
+
 	b := &ByocAws{
-		GrpcClient:    defClient,
-		cdTasks:       make(map[string]ecs.TaskArn),
-		customDomain:  "",
-		driver:        cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
-		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),          // overrides the project name, except in the playground env
-		pulumiStack:   "beta",                                     // TODO: make customizable
-		quota: quota.Quotas{
-			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
-			Cpus:       16,
-			Gpus:       8,
-			MemoryMiB:  65536,
-			Replicas:   16,
-			Services:   40,
-			ShmSizeMiB: 30720,
-		},
-		tenantID: string(tenantId),
-		// privateLbIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
-		// publicNatIps:  nil,                                                 // TODO: grab these from the AWS API or outputs
+		ByocBaseClient: defClient,
+		cdTasks:        make(map[string]ecs.TaskArn),
+		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	return b
 }
 
-func (b *ByocAws) LoadProject() (*compose.Project, error) {
-	if b.privateDomain != "" {
-		panic("LoadProject should only be called once")
-	}
-	var proj *compose.Project
-	var err error
-	if b.pulumiProject != "" {
-		proj, err = b.GrpcClient.Loader.LoadWithProjectName(b.pulumiProject)
-	} else {
-		proj, err = b.GrpcClient.Loader.LoadWithDefaultProjectName(b.tenantID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	b.privateDomain = dnsSafeLabel(proj.Name) + ".internal"
-	b.pulumiProject = proj.Name
-	return proj, nil
-}
-
 func (b *ByocAws) setUp(ctx context.Context) error {
-	if b.setupDone {
+	if b.SetupDone {
 		return nil
 	}
 	cdTaskName := byoc.CdTaskPrefix
@@ -139,20 +108,20 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 		return annotateAwsError(err)
 	}
 
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
 			term.Debug(" - Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
-			b.customDomain = b.getProjectDomain(domain.Zone)
-			if b.customDomain != "" {
-				b.shouldDelegateSubdomain = true
+			b.CustomDomain = b.getProjectDomain(domain.Zone)
+			if b.CustomDomain != "" {
+				b.ShouldDelegateSubdomain = true
 			}
 		}
 	}
 
-	b.setupDone = true
+	b.SetupDone = true
 	return nil
 }
 
@@ -162,7 +131,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	etag := pkg.RandomID()
-	if len(req.Services) > b.quota.Services {
+	if len(req.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
 	}
 	serviceInfos := []*defangv1.ServiceInfo{}
@@ -217,7 +186,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		// FIXME: this code path didn't work
 	}
 
-	if b.shouldDelegateSubdomain {
+	if b.ShouldDelegateSubdomain {
 		if _, err := b.delegateSubdomain(ctx); err != nil {
 			return nil, err
 		}
@@ -272,10 +241,10 @@ func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, er
 }
 
 func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		return "", errors.New("custom domain not set")
 	}
-	domain := b.customDomain
+	domain := b.CustomDomain
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -324,14 +293,14 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 		return nil, annotateAwsError(err)
 	}
 	return &defangv1.WhoAmIResponse{
-		Tenant:  b.tenantID,
+		Tenant:  b.TenantID,
 		Region:  cfg.Region,
 		Account: *identity.Account,
 	}, nil
 }
 
 func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
+	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
@@ -358,13 +327,13 @@ func (b *ByocAws) environment() map[string]string {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":                 b.tenantID,
-		"DOMAIN":                     b.customDomain,
-		"PRIVATE_DOMAIN":             b.privateDomain,
-		"PROJECT":                    b.pulumiProject, // may be empty
+		"DEFANG_ORG":                 b.TenantID,
+		"DOMAIN":                     b.CustomDomain,
+		"PRIVATE_DOMAIN":             b.PrivateDomain,
+		"PROJECT":                    b.PulumiProject, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
-		"STACK":                      b.pulumiStack,
+		"STACK":                      b.PulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 	}
@@ -401,8 +370,8 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
-	ensure(b.pulumiProject != "", "pulumiProject not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, b.pulumiProject, b.pulumiStack, name) // same as shared/common.ts
+	ensure(b.PulumiProject != "", "pulumiProject not set")
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.PulumiProject, b.PulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
@@ -421,8 +390,8 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
-	ensure(b.pulumiProject != "", "pulumiProject not set")
-	path := fmt.Sprintf("projects/%s/%s/project.pb", b.pulumiProject, b.pulumiStack)
+	ensure(b.PulumiProject != "", "pulumiProject not set")
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
 
 	term.Debug(" - Getting services from", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -540,7 +509,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	if err := b.quota.Validate(service); err != nil {
+	if err := b.Quota.Validate(service); err != nil {
 		return nil, err
 	}
 
@@ -553,10 +522,10 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
 	}
 
-	ensure(b.pulumiProject != "", "pulumiProject not set")
+	ensure(b.PulumiProject != "", "pulumiProject not set")
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.pulumiProject, // was: tenant
+		Project: b.PulumiProject, // was: tenant
 		Etag:    pkg.RandomID(),  // TODO: could be hash for dedup/idempotency
 	}
 
@@ -574,7 +543,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
 	}
 	if hasIngress {
-		si.LbIps = b.privateLbIps // only set LB IPs if there are ingress ports
+		si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports
 		si.PublicFqdn = b.getPublicFqdn(fqn)
 	}
 	if hasHost {
@@ -645,47 +614,38 @@ func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		return ":443" // placeholder for the public ALB/distribution
 	}
-	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.customDomain)
+	safeFqn := byoc.DnsSafeLabel(fqn)
+	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.CustomDomain)
 
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) getPublicFqdn(fqn qualifiedName) string {
-	if b.customDomain == "" {
+	if b.CustomDomain == "" {
 		return "" //b.fqdn
 	}
-	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.customDomain)
+	safeFqn := byoc.DnsSafeLabel(fqn)
+	return fmt.Sprintf("%s.%s", safeFqn, b.CustomDomain)
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
-	safeFqn := dnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.privateDomain) // TODO: consider merging this with ServiceDNS
+	safeFqn := byoc.DnsSafeLabel(fqn)
+	return fmt.Sprintf("%s.%s", safeFqn, b.PrivateDomain) // TODO: consider merging this with ServiceDNS
 }
 
 func (b *ByocAws) getProjectDomain(zone string) string {
-	if b.pulumiProject == "" {
+	if b.PulumiProject == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := dnsSafeLabel(b.pulumiProject)
-	if projectLabel == dnsSafeLabel(b.tenantID) {
-		return dnsSafe(zone) // the zone will already have the tenant ID
+	projectLabel := byoc.DnsSafeLabel(b.PulumiProject)
+	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
+		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
 	}
-	return projectLabel + "." + dnsSafe(zone)
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func dnsSafeLabel(fqn qualifiedName) string {
-	return strings.ReplaceAll(dnsSafe(fqn), ".", "-")
-}
-
-func dnsSafe(fqdn string) string {
-	return strings.ToLower(fqdn)
+	return projectLabel + "." + byoc.DnsSafe(zone)
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {
@@ -776,21 +736,6 @@ func annotateAwsError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
-}
-
-func (b *ByocAws) ServiceDNS(name string) string {
-	return dnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
-}
-
-func (b *ByocAws) LoadProjectName() (string, error) {
-	if b.pulumiProject != "" {
-		return b.pulumiProject, nil
-	}
-	p, err := b.LoadProject()
-	if err != nil {
-		return b.tenantID, err
-	}
-	return p.Name, nil
 }
 
 func ensure(cond bool, msg string) {

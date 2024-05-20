@@ -3,13 +3,13 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"

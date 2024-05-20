@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/defang-io/defang/src/pkg"
-	"github.com/defang-io/defang/src/pkg/cli/client"
-	"github.com/defang-io/defang/src/pkg/cli/client/byoc"
-
-	"github.com/defang-io/defang/src/pkg/clouds/do"
-	"github.com/defang-io/defang/src/pkg/clouds/do/appPlatform"
-	"github.com/defang-io/defang/src/pkg/http"
-	"github.com/defang-io/defang/src/pkg/quota"
-	"github.com/defang-io/defang/src/pkg/term"
-	"github.com/defang-io/defang/src/pkg/types"
-	defangv1 "github.com/defang-io/defang/src/protos/io/defang/v1"
-	"google.golang.org/protobuf/proto"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"os"
 	"strings"
+
+	"github.com/DefangLabs/defang/src/pkg/clouds/do"
+	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
+	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -26,23 +25,13 @@ const (
 )
 
 type ByocDo struct {
-	*client.GrpcClient
+	*byoc.ByocBaseClient
 
-	AppIds                  map[string]string
-	Driver                  *appPlatform.DoApp
-	CustomDomain            string
-	privateDomain           string
-	privateLBIps            []string
-	privateNatIps           []string
-	pulumiProject           string
-	pulumiStack             string
-	quota                   quota.Quotas
-	setupDone               bool
-	TenantID                string
-	shouldDelegateSubdomain bool
+	AppIds map[string]string
+	Driver *appPlatform.DoApp
 }
 
-func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocDo {
+func NewByoc(defClient *byoc.ByocBaseClient) *ByocDo {
 
 	regionString := os.Getenv("REGION")
 
@@ -51,12 +40,8 @@ func NewByoc(tenantId types.TenantID, defClient *client.GrpcClient) *ByocDo {
 	}
 
 	b := &ByocDo{
-		GrpcClient:    defClient,
-		CustomDomain:  "",
-		Driver:        appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
-		pulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
-		pulumiStack:   "beta",
-		TenantID:      tenantId.String(),
+		ByocBaseClient: defClient,
+		Driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 	}
 
 	return b
@@ -100,7 +85,7 @@ func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defan
 		return nil, err
 	}
 
-	url, err := b.Driver.CreateUploadUrl(ctx, etag)
+	url, err := b.Driver.CreateUploadURL(ctx, etag)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +126,75 @@ func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defan
 	return res, nil
 }
 
+func (b ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
+
+	return "", nil
+}
+
+func (b ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (b ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	url, err := b.Driver.CreateUploadURL(ctx, req.Digest)
+
+	if err != nil {
+		return nil, err
+	}
+	return &defangv1.UploadURLResponse{
+		Url: url,
+	}, nil
+}
+
+func (b ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	return nil, nil
+}
+
+func (b ByocDo) Destroy(ctx context.Context) (string, error) {
+	return b.BootstrapCommand(ctx, "down")
+}
+
+func (b ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+	return nil
+}
+
+func (b ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+	return nil, nil
+}
+
+func (b ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	return nil, nil
+}
+
+func (b ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+	return nil, nil
+}
+
+func (b ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+	return nil
+}
+
+func (b ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
+	return "", nil
+}
+
+func (b ByocDo) ServiceDNS(name string) string {
+	return ""
+}
+
+func (b ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	return nil, nil
+}
+
+func (b ByocDo) TearDown(ctx context.Context) error {
+	return nil
+	//return b.Driver.TearDown(ctx)
+}
+
 func (b ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
 	return nil, nil
@@ -176,11 +230,11 @@ func (b ByocDo) environment() map[string]string {
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     b.CustomDomain,
-		"PRIVATE_DOMAIN":             b.privateDomain,
-		"PROJECT":                    b.pulumiProject,
+		"PRIVATE_DOMAIN":             b.PrivateDomain,
+		"PROJECT":                    b.PulumiProject,
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.Driver.BucketName), // TODO: add a way to override bucket
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
-		"STACK":                      b.pulumiStack,
+		"STACK":                      b.PulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"DO_PAT":                     os.Getenv("DO_PAT"),
@@ -193,7 +247,7 @@ func (b ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.pulumiProject,
+		Project: b.PulumiProject,
 		Etag:    pkg.RandomID(),
 	}
 
@@ -203,7 +257,7 @@ func (b ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv
 }
 
 func (b ByocDo) setUp(ctx context.Context) error {
-	if b.setupDone {
+	if b.SetupDone {
 		return nil
 	}
 
@@ -238,7 +292,7 @@ func (b ByocDo) setUp(ctx context.Context) error {
 	//	return err
 	//}
 
-	b.setupDone = true
+	b.SetupDone = true
 
 	return nil
 }
