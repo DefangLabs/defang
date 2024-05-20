@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DefangLabs/defang/src/pkg/clouds/do"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go/ptr"
-	"github.com/defang-io/defang/src/pkg/clouds/do"
-	"github.com/defang-io/defang/src/pkg/term"
 	"github.com/digitalocean/godo"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
@@ -97,7 +97,7 @@ func (d DoApp) newClient(ctx context.Context) *godo.Client {
 
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
-func (d DoApp) CreateUploadUrl(ctx context.Context, name string) (string, error) {
+func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
 
 	term.Debug("Creating upload url for: %s", name)
 	s3Client := d.createS3Client()

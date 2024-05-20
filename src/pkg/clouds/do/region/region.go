@@ -1,6 +1,6 @@
 package region
 
-import "github.com/defang-io/defang/src/pkg/clouds/do"
+import "github.com/DefangLabs/defang/src/pkg/clouds/do"
 
 type Region = do.Region
 
