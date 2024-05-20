@@ -84,11 +84,11 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 	switch provider {
 	case client.ProviderAWS:
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		byocClient := aws.NewByoc(tenantId, defangClient)
+		byocClient := aws.NewByoc(baseClient)
 		return byocClient
 	case client.ProviderDO:
 		term.Info("# Using DO provider")
-		byocClient := do.NewByoc(tenantId, baseClient)
+		byocClient := do.NewByoc(baseClient)
 		return byocClient
 	default:
 		return &client.PlaygroundClient{*defangClient}
