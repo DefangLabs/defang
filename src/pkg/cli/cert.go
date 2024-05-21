@@ -31,45 +31,49 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	}
 
 	cnt := 0
+	var errs []error
 	for _, service := range services.Services {
 		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
 			cnt++
-			generateCert(ctx, service.Service.Domainname, service.LbDns)
+			err := generateCert(ctx, service.Service.Domainname, service.LbDns)
+			errs = append(errs, err)
 		}
 	}
 	if cnt == 0 {
-		term.Infof(" * No services found need to generate Let's Encrypt cert")
+		term.Warnf(" ! No services found that use Let's Encrypt cert")
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
-func generateCert(ctx context.Context, domain, albDns string) {
+func generateCert(ctx context.Context, domain, albDns string) error {
 	term.Infof(" * Triggering Let's Encrypt cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, albDns); err != nil {
-		term.Errorf("Error waiting for CNAME: %v", err)
-		return
+		return fmt.Errorf("Error waiting for CNAME: %w", err)
 	}
 
 	term.Infof(" * %v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
-		term.Infof(" * TLS cert for %v is already ready", domain)
-		return
+		term.Infof(" * TLS cert for %v is already installed", domain)
+		return nil
 	}
 	term.Infof(" * Triggering cert generation for %v", domain)
-	triggerCertGeneration(ctx, domain)
+	if err := triggerCertGeneration(ctx, domain); err != nil {
+		// Ignore possible tls error as cert attachment may take time
+		term.Debugf("Error triggering cert generation: %v", err)
+	}
 
 	term.Infof(" * Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
-		term.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
-		return
+		return fmt.Errorf("Error waiting for TLS to be online: %w", err)
 	}
 
 	fmt.Printf("TLS cert for %v is ready\n", domain)
+	return nil
 }
 
-func triggerCertGeneration(ctx context.Context, domain string) {
+func triggerCertGeneration(ctx context.Context, domain string) error {
 	doSpinner := term.CanColor && term.IsTerminal
 	if doSpinner {
 		spinCtx, cancel := context.WithCancel(ctx)
@@ -90,10 +94,7 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 			}
 		}()
 	}
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
-		// Ignore possible tls error as cert attachment may take time
-		term.Debugf("Error triggering cert generation: %v", err)
-	}
+	return getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3) // Retry incase of DNS error
 }
 
 func waitForTLS(ctx context.Context, domain string) error {
@@ -141,8 +142,9 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 			return ctx.Err()
 		case <-ticker.C:
 			cname, err := waitForCNAMEInSync(ctx, domain)
+			term.Debugf(" - CNAME for %v is %v: %v", domain, cname, err)
 			cname = strings.TrimSuffix(cname, ".")
-			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
+			if err != nil || !strings.EqualFold(cname, albDns) {
 				if !msgShown {
 					term.Infof(" * Please setup CNAME record for %v", domain)
 					fmt.Printf("  %v  CNAME  %v\n", domain, strings.ToLower(albDns))
@@ -199,15 +201,15 @@ func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
 		case <-ticker.C:
 			cnames := make(map[string]bool)
 			var cname string
-			var err error
 			for _, n := range ns {
-				cname, err = resolverAt(n).LookupCNAME(context.Background(), domain)
+				cname, err = resolverAt(n).LookupCNAME(ctx, domain)
 				if err != nil {
 					term.Debugf(" - Error looking up CNAME for %v at %v: %v", domain, n, err)
 				}
 				cnames[cname] = true
 			}
 			if len(cnames) > 1 {
+				term.Debugf(" - CNAMEs for %v are not in sync: %v", domain, cnames)
 				continue
 			}
 			return cname, err
@@ -226,12 +228,12 @@ func getNSServers(ctx context.Context, domain string) ([]string, error) {
 		var ne *net.DNSError
 		if errors.As(err, &ne) {
 			if strings.Count(d, ".") <= 1 {
-				return nil, fmt.Errorf("No DNS server found")
+				return nil, fmt.Errorf("no DNS server found")
 			}
 			d = d[strings.Index(domain, ".")+1:]
 			continue
 		} else if err != nil {
-			return nil, fmt.Errorf("Failed to find NS server for %v at %v: %v", domain, d, err)
+			return nil, fmt.Errorf("failed to find NS server for %v at %v: %v", domain, d, err)
 		}
 		break
 	}
