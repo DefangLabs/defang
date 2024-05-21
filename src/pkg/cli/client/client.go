@@ -22,7 +22,6 @@ type ProjectLoader interface {
 
 type Client interface {
 	// Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	// Update(context.Context, *v1.Service) (*v1.ServiceInfo, error)
 	AgreeToS(context.Context) error
 	BootstrapCommand(context.Context, string) (types.ETag, error)
@@ -47,6 +46,7 @@ type Client interface {
 	Restart(context.Context, ...string) (types.ETag, error)
 	RevokeToken(context.Context) error
 	ServiceDNS(name string) string
+	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)

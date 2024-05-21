@@ -248,3 +248,7 @@ func (g GrpcClient) ServiceDNS(name string) string {
 func (g GrpcClient) LoadProjectName() (string, error) {
 	return string(g.tenantID), nil
 }
+
+func (g GrpcClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
+	return g.client.Subscribe(ctx, &connect.Request[defangv1.SubscribeRequest]{Msg: req})
+}
