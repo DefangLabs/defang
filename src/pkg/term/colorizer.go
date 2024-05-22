@@ -3,6 +3,7 @@ package term
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
@@ -43,6 +44,19 @@ func ForceColor(color bool) {
 	}
 }
 
+var backticksRegex = regexp.MustCompile("`([^`]+)`")
+
+func markdown(msg string) string {
+	return backticksRegex.ReplaceAllString(msg, termenv.CSI+"7m$1"+termenv.CSI+"27m")
+}
+
+func MarkDown(w *termenv.Output, msg string) string {
+	if !DoColor(w) {
+		return msg
+	}
+	return markdown(msg)
+}
+
 func output(w *termenv.Output, c Color, msg string) (int, error) {
 	if len(msg) == 0 {
 		return 0, nil
@@ -50,6 +64,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	if DoColor(w) {
 		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
 		defer w.Reset()
+		msg = markdown(msg)
 	}
 	return w.WriteString(msg)
 }

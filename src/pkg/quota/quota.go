@@ -20,19 +20,19 @@ type Quotas struct {
 
 func (q Quotas) Validate(service *defangv1.Service) error {
 	if service.Name == "" {
-		return errors.New("service name is required") // CodeInvalidArgument
+		return errors.New("service `name:` is required") // CodeInvalidArgument
 	}
 
 	if service.Build != nil {
 		if service.Build.Context == "" {
-			return errors.New("build.context is required") // CodeInvalidArgument
+			return errors.New("build `context:` is required") // CodeInvalidArgument
 		}
 		if service.Build.ShmSize > q.ShmSizeMiB || service.Build.ShmSize < 0 {
-			return fmt.Errorf("build.shm_size exceeds quota (max %v MiB)", q.ShmSizeMiB) // CodeInvalidArgument
+			return fmt.Errorf("build `shm_size:` exceeds quota (max %v MiB)", q.ShmSizeMiB) // CodeInvalidArgument
 		}
 	} else {
 		if service.Image == "" {
-			return errors.New("missing image or build") // CodeInvalidArgument
+			return errors.New("each service must have either `image:` or `build:`") // CodeInvalidArgument
 		}
 	}
 
@@ -91,7 +91,7 @@ func (q Quotas) Validate(service *defangv1.Service) error {
 				return fmt.Errorf("ingress port requires a CMD healthcheck")
 			}
 		default:
-			return fmt.Errorf("unsupported healthcheck: %v", service.Healthcheck.Test)
+			return fmt.Errorf("unsupported `healthcheck:` %v", service.Healthcheck.Test)
 		}
 	}
 
