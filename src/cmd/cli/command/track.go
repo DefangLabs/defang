@@ -39,15 +39,19 @@ func FlushAllTracking() {
 	trackWG.Wait()
 }
 
+func IsCompletionCommand(cmd *cobra.Command) bool {
+	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
+}
+
 // trackCmd sends a tracking event for a Cobra command and its arguments.
 func trackCmd(cmd *cobra.Command, verb string, props ...P) {
-	command := "Unknown"
+	command := "Implicit"
 	if cmd != nil {
-		command = cmd.Name()
 		// Ignore tracking for shell completion requests
-		if command == cobra.ShellCompRequestCmd {
+		if IsCompletionCommand(cmd) {
 			return
 		}
+		command = cmd.Name()
 		calledAs := cmd.CalledAs()
 		cmd.VisitParents(func(c *cobra.Command) {
 			calledAs = c.CalledAs() + " " + calledAs
