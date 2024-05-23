@@ -49,6 +49,7 @@ type ByocBaseClient struct {
 func NewByocBaseClient(grpcClient *client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
 	return &ByocBaseClient{
 		GrpcClient:    grpcClient,
+		CustomDomain:  "",
 		TenantID:      string(tenantID),
 		PulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
 		PulumiStack:   "beta", // TODO: make customizable
