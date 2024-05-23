@@ -4,18 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-var resolver = net.Resolver{}
-var httpClient = http.Client{}
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+var resolver dns.Resolver = dns.RootResolver{}
+var httpClient HTTPClient = http.DefaultClient
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
 	projectName, err := client.LoadProjectName()
@@ -23,7 +32,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		return err
 	}
 
-	term.Debug(" - Generating Let's Encrypt cert for project", projectName)
+	term.Debug(" - Generating TLS cert for project", projectName)
 
 	services, err := client.GetServices(ctx)
 	if err != nil {
@@ -34,19 +43,26 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	for _, service := range services.Services {
 		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
 			cnt++
-			generateCert(ctx, service.Service.Domainname, service.LbDns)
+			targets := []string{service.PublicFqdn}
+			for i, endpoint := range service.Endpoints {
+				if service.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+					targets = append(targets, endpoint)
+				}
+			}
+			term.Debugf(" * Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
+			generateCert(ctx, service.Service.Domainname, targets)
 		}
 	}
 	if cnt == 0 {
-		term.Infof(" * No services found need to generate Let's Encrypt cert")
+		term.Infof(" * No services found need to generate TLS cert")
 	}
 
 	return nil
 }
 
-func generateCert(ctx context.Context, domain, albDns string) {
-	term.Infof(" * Triggering Let's Encrypt cert generation for %v", domain)
-	if err := waitForCNAME(ctx, domain, albDns); err != nil {
+func generateCert(ctx context.Context, domain string, targets []string) {
+	term.Infof(" * Triggering TLS cert generation for %v", domain)
+	if err := waitForCNAME(ctx, domain, targets); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
@@ -54,6 +70,10 @@ func generateCert(ctx context.Context, domain, albDns string) {
 	term.Infof(" * %v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
 		term.Infof(" * TLS cert for %v is already ready", domain)
+		return
+	}
+	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
+		term.Errorf("Error waiting for DNS propagation: %v", err)
 		return
 	}
 	term.Infof(" * Triggering cert generation for %v", domain)
@@ -115,6 +135,8 @@ func waitForTLS(ctx context.Context, domain string) error {
 		case <-ticker.C:
 			if err := checkTLSCert(timeout, domain); err == nil {
 				return nil
+			} else {
+				term.Debugf(" - Error checking TLS cert for %v: %v", domain, err)
 			}
 			if doSpinner {
 				fmt.Print(spin.Next())
@@ -123,11 +145,30 @@ func waitForTLS(ctx context.Context, domain string) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain, albDns string) error {
+func containsAllIPs(all []net.IP, subset []net.IP) bool {
+	for _, ip := range subset {
+		found := false
+		for _, a := range all {
+			if a.Equal(ip) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func waitForCNAME(ctx context.Context, domain string, targets []string) error {
+	for i, target := range targets {
+		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
+	}
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	albDns = strings.TrimSuffix(albDns, ".")
 	msgShown := false
 	doSpinner := term.CanColor && term.IsTerminal
 	if doSpinner {
@@ -140,23 +181,59 @@ func waitForCNAME(ctx context.Context, domain, albDns string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			cname, err := waitForCNAMEInSync(ctx, domain)
-			cname = strings.TrimSuffix(cname, ".")
-			if err != nil || strings.ToLower(cname) != strings.ToLower(albDns) {
-				if !msgShown {
-					term.Infof(" * Please setup CNAME record for %v", domain)
-					fmt.Printf("  %v  CNAME  %v\n", domain, strings.ToLower(albDns))
-					term.Infof(" * Waiting for CNAME record setup and DNS propagation...")
-					msgShown = true
-				}
-				if doSpinner {
-					fmt.Print(spin.Next())
-				}
-			} else {
+			if checkDomainDNSReady(ctx, domain, targets) {
 				return nil
+			}
+			if !msgShown {
+				term.Infof(" * Please setup CNAME record for %v", domain)
+				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
+				term.Infof(" * Waiting for CNAME record setup and DNS propagation...")
+				msgShown = true
+			}
+			if doSpinner {
+				fmt.Print(spin.Next())
 			}
 		}
 	}
+}
+
+// The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
+// OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync
+func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string) bool {
+	for i, validCNAME := range validCNAMEs {
+		validCNAMEs[i] = strings.TrimSuffix(validCNAME, ".")
+	}
+	cname, err := getCNAMEInSync(ctx, domain)
+	term.Debugf(" - CNAME for %v is :'%v', err: %v", domain, cname, err)
+	// Ignore other types of DNS errors
+	if err == errDNSNotInSync {
+		term.Debugf(" - CNAME for %v is not in sync: %v", domain, cname)
+		return false
+	}
+	cname = strings.TrimSuffix(cname, ".")
+	if slices.Contains(validCNAMEs, cname) {
+		term.Debugf(" - CNAME for %v is in sync: %v", domain, cname)
+		return true
+	}
+
+	albIPAddrs, err := resolver.LookupIPAddr(ctx, validCNAMEs[0])
+	if err != nil {
+		term.Debugf(" - Could not resolve A/AAAA record for %v: %v", domain, err)
+		return false
+	}
+	albIPs := ipAddrsToIPs(albIPAddrs)
+
+	// Check if an valid A record has been set
+	ips, err := getIPInSync(ctx, domain)
+	if err != nil {
+		term.Debugf(" - IP for %v not in sync: %v", domain, err)
+		return false
+	}
+	if containsAllIPs(albIPs, ips) {
+		term.Warnf(" * IP for %v is pointing to the same IP addresses of the load balancer %v", domain, validCNAMEs) // TODO: Better warning message
+		return true
+	}
+	return false
 }
 
 func checkTLSCert(ctx context.Context, domain string) error {
@@ -166,88 +243,114 @@ func checkTLSCert(ctx context.Context, domain string) error {
 func getWithRetries(ctx context.Context, url string, tries int) error {
 	var errs []error
 	for i := 0; i < tries; i++ {
-
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return err // No point retrying if we can't even create the request
 		}
-		if _, err := httpClient.Do(req); err != nil {
-			errs = append(errs, err)
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+			var msg []byte
+			msg, err = io.ReadAll(resp.Body)
+			if err == nil {
+				err = fmt.Errorf("HTTP %v: %v", resp.StatusCode, string(msg))
+			}
 		}
 
-		delay := (100 * time.Millisecond) >> i // Simple exponential backoff
-		select {
-		case <-time.After(delay):
-			continue
-		case <-ctx.Done():
-			return ctx.Err()
+		term.Debugf(" - Error fetching %v: %v, tries left %v", url, err, tries-i-1)
+		errs = append(errs, err)
+
+		delay := (100 * time.Millisecond) << i // Simple exponential backoff
+		if err := pkg.SleepWithContext(ctx, delay); err != nil {
+			return err
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func waitForCNAMEInSync(ctx context.Context, domain string) (string, error) {
-	ns, err := getNSServers(ctx, domain)
+var errDNSNotInSync = errors.New("DNS not in sync")
+
+func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
+	ns, err := dns.FindNSServers(ctx, domain)
 	if err != nil {
 		return "", err
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			cnames := make(map[string]bool)
-			var cname string
-			var err error
-			for _, n := range ns {
-				cname, err = resolverAt(n).LookupCNAME(context.Background(), domain)
-				if err != nil {
-					term.Debugf(" - Error looking up CNAME for %v at %v: %v", domain, n, err)
-				}
-				cnames[cname] = true
-			}
-			if len(cnames) > 1 {
-				continue
-			}
-			return cname, err
-		case <-ctx.Done():
-			return "", ctx.Err()
+	cnames := make(map[string]bool)
+	var cname string
+	var lookupErr error
+	for _, n := range ns {
+		cname, err = dns.ResolverAt(n.Host).LookupCNAME(ctx, domain)
+		if err != nil {
+			term.Debugf(" - Error looking up CNAME for %v at %v: %v", domain, n, err)
+			lookupErr = err
 		}
+		cnames[cname] = true
 	}
+	if len(cnames) > 1 {
+		term.Debugf(" - CNAMEs for %v are not in sync among NS servers %v: %v", domain, ns, cnames)
+		return "", errDNSNotInSync
+	}
+	return cname, lookupErr
 }
 
-func getNSServers(ctx context.Context, domain string) ([]string, error) {
-	d := domain
-	var ns []*net.NS
-	for {
-		var err error
-		ns, err = resolver.LookupNS(ctx, d)
-		var ne *net.DNSError
-		if errors.As(err, &ne) {
-			if strings.Count(d, ".") <= 1 {
-				return nil, fmt.Errorf("No DNS server found")
-			}
-			d = d[strings.Index(domain, ".")+1:]
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("Failed to find NS server for %v at %v: %v", domain, d, err)
-		}
-		break
+func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
+	ns, err := dns.FindNSServers(ctx, domain)
+	if err != nil {
+		return nil, err
 	}
-	servers := make([]string, len(ns))
+
+	var results []net.IP
+	var lookupErr error
 	for i, n := range ns {
-		servers[i] = n.Host
+		var ipAddrs []net.IPAddr
+		ipAddrs, err = dns.ResolverAt(n.Host).LookupIPAddr(ctx, domain)
+		if err != nil {
+			term.Debugf(" - Error looking up IP for %v at %v: %v", domain, n, err)
+			lookupErr = err
+		}
+		if i == 0 {
+			for _, ip := range ipAddrs {
+				results = append(results, ip.IP)
+			}
+		} else {
+			newFoundIPs := ipAddrsToIPs(ipAddrs)
+			if !sameIPs(results, newFoundIPs) {
+				term.Debugf(" - IP addresses for %v are not in sync among NS servers %v: %v <> %v", domain, ns, results, newFoundIPs)
+				return nil, errDNSNotInSync
+			}
+		}
 	}
-	return servers, nil
+	return results, lookupErr
 }
 
-func resolverAt(nsServer string) *net.Resolver {
-	return &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{}
-			return d.DialContext(ctx, network, nsServer+":53")
-		},
+func ipAddrsToIPs(ipAddrs []net.IPAddr) []net.IP {
+	ips := make([]net.IP, len(ipAddrs))
+	for i, ipAddr := range ipAddrs {
+		ips[i] = ipAddr.IP
 	}
+	return ips
+}
+
+func sameIPs(a, b []net.IP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	diff := make(map[string]int)
+	for _, ip := range a {
+		diff[ip.String()]++
+	}
+	for _, ip := range b {
+		diff[ip.String()]--
+	}
+
+	for _, v := range diff {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
 }
