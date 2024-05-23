@@ -47,7 +47,7 @@ func NewByoc(defClient *byoc.ByocBaseClient) *ByocDo {
 	return b
 }
 
-func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -126,16 +126,16 @@ func (b ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defan
 	return res, nil
 }
 
-func (b ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
+func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
 
 	return "", nil
 }
 
-func (b ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
+func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 	return nil, nil
 }
 
-func (b ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -150,67 +150,67 @@ func (b ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequ
 	}, nil
 }
 
-func (b ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	return nil, nil
 }
 
-func (b ByocDo) Destroy(ctx context.Context) (string, error) {
+func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
 }
 
-func (b ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	return nil
 }
 
-func (b ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	return nil, nil
 }
 
-func (b ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	return nil, nil
 }
 
-func (b ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return nil, nil
 }
 
-func (b ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
 	return nil
 }
 
-func (b ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
+func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	return "", nil
 }
 
-func (b ByocDo) ServiceDNS(name string) string {
+func (b *ByocDo) ServiceDNS(name string) string {
 	return ""
 }
 
-func (b ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	return nil, nil
 }
 
-func (b ByocDo) TearDown(ctx context.Context) error {
+func (b *ByocDo) TearDown(ctx context.Context) error {
 	return nil
 	//return b.Driver.TearDown(ctx)
 }
 
-func (b ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
+func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
 	return nil, nil
 }
 
-func (b ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
+func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 
 	return nil, nil
 }
 
-func (b ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
 	env := b.environment()
 	if term.DoDebug {
 		debugEnv := " -"
@@ -222,7 +222,7 @@ func (b ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error)
 	return b.Driver.Run(ctx, env, cmd...)
 }
 
-func (b ByocDo) environment() map[string]string {
+func (b *ByocDo) environment() map[string]string {
 	region := b.Driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
@@ -243,7 +243,7 @@ func (b ByocDo) environment() map[string]string {
 	}
 }
 
-func (b ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
@@ -256,7 +256,7 @@ func (b ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv
 	return si, nil
 }
 
-func (b ByocDo) setUp(ctx context.Context) error {
+func (b *ByocDo) setUp(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
 	}
