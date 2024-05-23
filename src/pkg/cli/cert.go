@@ -259,7 +259,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		term.Debugf(" - Error fetching %v: %v, tries left %v", url, err, tries-i-1)
 		errs = append(errs, err)
 
-		delay := (100 * time.Millisecond) >> i // Simple exponential backoff
+		delay := (100 * time.Millisecond) << i // Simple exponential backoff
 		if err := sleep(ctx, delay); err != nil {
 			return err
 		}
