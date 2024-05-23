@@ -46,7 +46,10 @@ type P = client.Property // shorthand for tracking properties
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
 // At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
-func ParseTimeOrDuration(str string) (time.Time, error) {
+func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
+	if str == "" {
+		return time.Time{}, nil
+	}
 	if strings.ContainsAny(str, "TZ") {
 		return time.Parse(time.RFC3339Nano, str)
 	}
@@ -56,7 +59,7 @@ func ParseTimeOrDuration(str string) (time.Time, error) {
 			return time.Time{}, err
 		}
 		// Replace the year, month, and day of t with today's date
-		now := time.Now().Local()
+		now := now.Local()
 		sincet := time.Date(now.Year(), now.Month(), now.Day(), local.Hour(), local.Minute(), local.Second(), local.Nanosecond(), local.Location())
 		if sincet.After(now) {
 			sincet = sincet.AddDate(0, 0, -1) // yesterday; subtract 1 day
@@ -67,7 +70,7 @@ func ParseTimeOrDuration(str string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return time.Now().Add(-dur), nil // - because we want to go back in time
+	return now.Add(-dur), nil // - because we want to go back in time
 }
 
 type CancelError struct {
@@ -124,7 +127,11 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+	var since *timestamppb.Timestamp
+	if !params.Since.IsZero() {
+		since = timestamppb.New(params.Since)
+	}
+	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
