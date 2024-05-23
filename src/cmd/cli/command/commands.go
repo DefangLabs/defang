@@ -269,8 +269,8 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-		// Don't track the completion commands
-		if cmd.Name() == "__complete" || (cmd.Parent() != nil && cmd.Parent().Name() == "completion") {
+		// Don't track/connect the completion commands
+		if IsCompletionCommand(cmd) {
 			return nil
 		}
 
@@ -338,6 +338,7 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				term.Warn(" !", prettyError(err))
 
+				defer trackCmd(nil, "Login", P{"reason", err})
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
 				}
@@ -352,6 +353,8 @@ var RootCmd = &cobra.Command{
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
 				term.Warn(" !", prettyError(err))
+
+				defer trackCmd(nil, "Terms", P{"reason", err})
 				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 					return err
 				}
