@@ -341,9 +341,26 @@ message Service {
   bool init = 13;
   string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
                         // create dns records; TODO: not part of spec
-  string static_files = 15; // x-defang-static-files: folder with static files
-                            // to serve; TODO: not part of spec
+  reserved 15;          // was: "string static_files"
   Network networks = 16; // currently only 1 network is supported
+  StaticFiles static_files = 17; // x-defang-static-files: folder with static files
+                            // to serve; TODO: not part of spec
+  RedisCache redis_cache = 18; // x-defang-redis-cache: redis cache to use; TODO: not part of spec
+}
+
+message StaticFiles {
+  string folder = 1;
+  repeated string redirects = 2;
+}
+
+// enum RedisProvider {
+//   UNSPECIFIED = 0;
+//   AWS_ELASTICACHE = 1;
+//   AWS_MEMORYDB = 2;
+// }
+
+message RedisCache {
+  // RedisProvider provider = 1; // redis provider
 }
 
 message Event {
