@@ -95,10 +95,15 @@ func IsDirEmpty(dir string) (bool, error) {
 	return false, err
 }
 
-func SleepWithContext(ctx context.Context, d time.Duration) {
-	ctx, cancel := context.WithTimeout(ctx, d)
-	defer cancel()
-	<-ctx.Done()
+func SleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")

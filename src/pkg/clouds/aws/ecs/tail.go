@@ -75,7 +75,9 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 				return nil, err
 			}
 			// continue loop, waiting for the log stream to be created; sleep to avoid throttling
-			pkg.SleepWithContext(ctx, time.Second)
+			if err := pkg.SleepWithContext(ctx, time.Second); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		// TODO: should wrap this stream so we can return io.EOF on task stop

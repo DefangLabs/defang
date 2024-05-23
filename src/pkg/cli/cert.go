@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
@@ -69,6 +70,10 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 	term.Infof(" * %v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
 		term.Infof(" * TLS cert for %v is already ready", domain)
+		return
+	}
+	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
+		term.Errorf("Error waiting for DNS propagation: %v", err)
 		return
 	}
 	term.Infof(" * Triggering cert generation for %v", domain)
@@ -177,7 +182,6 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 			return ctx.Err()
 		case <-ticker.C:
 			if checkDomainDNSReady(ctx, domain, targets) {
-				sleep(ctx, 5*time.Second) // slight delay to ensure DNS to propagate
 				return nil
 			}
 			if !msgShown {
@@ -260,7 +264,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		errs = append(errs, err)
 
 		delay := (100 * time.Millisecond) << i // Simple exponential backoff
-		if err := sleep(ctx, delay); err != nil {
+		if err := pkg.SleepWithContext(ctx, delay); err != nil {
 			return err
 		}
 	}
@@ -349,15 +353,4 @@ func sameIPs(a, b []net.IP) bool {
 		}
 	}
 	return true
-}
-
-func sleep(ctx context.Context, d time.Duration) error {
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
