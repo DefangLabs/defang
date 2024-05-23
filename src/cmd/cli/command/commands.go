@@ -138,9 +138,9 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
-	RootCmd.MarkPersistentFlagDirname("cwd")
+	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
-	RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
 	RootCmd.AddCommand(bootstrapCmd)
@@ -160,7 +160,7 @@ func SetupCommands(version string) {
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("scope of the token; one of %v (required)", scope.All())) // TODO: make it an Option
-	tokenCmd.MarkFlagRequired("scope")
+	_ = tokenCmd.MarkFlagRequired("scope")
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
@@ -185,11 +185,11 @@ func SetupCommands(version string) {
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
-	configSetCmd.Flags().MarkHidden("name")
+	_ = configSetCmd.Flags().MarkHidden("name")
 	configCmd.AddCommand(configSetCmd)
 
 	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
-	configDeleteCmd.Flags().MarkHidden("name")
+	_ = configDeleteCmd.Flags().MarkHidden("name")
 	configCmd.AddCommand(configDeleteCmd)
 
 	configCmd.AddCommand(configListCmd)
@@ -205,14 +205,14 @@ func SetupCommands(version string) {
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().MarkHidden("tail")
+	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeCmd.AddCommand(composeUpCmd)
 	composeCmd.AddCommand(composeConfigCmd)
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
-	composeDownCmd.Flags().MarkHidden("tail")
+	_ = composeDownCmd.Flags().MarkHidden("tail")
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
@@ -224,12 +224,13 @@ func SetupCommands(version string) {
 	tailCmd.Flags().StringP("name", "n", "", "name of the service")
 	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
-	tailCmd.Flags().String("since", "5s", "show logs since duration/time")
+	tailCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
+	tailCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	RootCmd.AddCommand(tailCmd)
 
 	// Delete Command
 	deleteCmd.Flags().BoolP("name", "n", false, "name of the service(s) (backwards compat)")
-	deleteCmd.Flags().MarkHidden("name")
+	_ = deleteCmd.Flags().MarkHidden("name")
 	deleteCmd.Flags().Bool("tail", false, "tail the service logs after deleting")
 	RootCmd.AddCommand(deleteCmd)
 
@@ -239,8 +240,8 @@ func SetupCommands(version string) {
 	sendCmd.Flags().String("id", "", "ID of the message")
 	sendCmd.Flags().StringP("data", "d", "", "string data to send")
 	sendCmd.Flags().StringP("content-type", "c", "", "Content-Type of the data")
-	sendCmd.MarkFlagRequired("subject")
-	sendCmd.MarkFlagRequired("type")
+	_ = sendCmd.MarkFlagRequired("subject")
+	_ = sendCmd.MarkFlagRequired("type")
 	RootCmd.AddCommand(sendCmd)
 
 	// Cert management
@@ -614,14 +615,23 @@ var tailCmd = &cobra.Command{
 		var etag, _ = cmd.Flags().GetString("etag")
 		var raw, _ = cmd.Flags().GetBool("raw")
 		var since, _ = cmd.Flags().GetString("since")
+		var utc, _ = cmd.Flags().GetBool("utc")
 
-		ts, err := cli.ParseTimeOrDuration(since)
+		if utc {
+			os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
+		}
+
+		ts, err := cli.ParseTimeOrDuration(since, time.Now())
 		if err != nil {
 			return fmt.Errorf("invalid duration or time: %w", err)
 		}
 
 		ts = ts.UTC()
-		term.Info(" * Showing logs since", ts.Format(time.RFC3339Nano), "; press Ctrl+C to stop:")
+		sinceStr := ""
+		if !ts.IsZero() {
+			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
+		}
+		term.Infof(" * Showing logs%s; press Ctrl+C to stop:", sinceStr)
 		tailOptions := cli.TailOptions{
 			Service: name,
 			Etag:    etag,
