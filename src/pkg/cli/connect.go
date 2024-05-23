@@ -91,7 +91,7 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 		byocClient := do.NewByoc(baseClient)
 		return byocClient
 	default:
-		return &client.PlaygroundClient{*defangClient}
+		return &client.PlaygroundClient{GrpcClient: *defangClient}
 	}
 }
 
