@@ -2,9 +2,13 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"net"
 	"slices"
 	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 type dnsRequest struct {
@@ -12,74 +16,30 @@ type dnsRequest struct {
 	Domain string
 }
 
-type mockResolver struct {
-	Records map[dnsRequest][]string
-}
-
-var NotFound = &net.DNSError{Err: "no such host"}
-
-func (r mockResolver) records(req dnsRequest) ([]string, error) {
-	records, ok := r.Records[req]
-	if !ok || len(records) == 0 {
-		return nil, NotFound
-	}
-	return records, nil
-}
-
-func (r mockResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	ips, err := r.records(dnsRequest{Type: "A", Domain: domain})
-	if err != nil {
-		return nil, err
-	}
-	var ipAddrs []net.IPAddr
-	for _, ip := range ips {
-		ipAddrs = append(ipAddrs, net.IPAddr{IP: net.ParseIP(ip)})
-	}
-	return ipAddrs, nil
-}
-func (r mockResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
-	cnames, err := r.records(dnsRequest{Type: "CNAME", Domain: domain})
-	if err != nil {
-		return "", err
-	}
-	return cnames[0], nil
-}
-func (r mockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
-	ns, err := r.records(dnsRequest{Type: "NS", Domain: domain})
-	if err != nil {
-		return nil, err
-	}
-	var nsRecords []*net.NS
-	for _, n := range ns {
-		nsRecords = append(nsRecords, &net.NS{Host: n})
-	}
-	return nsRecords, nil
-}
+var notFound = errors.New("not found")
 
 func TestGetCNAMEInSync(t *testing.T) {
-	nsResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "NS", Domain: "test.com"}: {"ns1.example.com", "ns2.example.com"},
+	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "web.test.com"}:    {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "CNAME", Domain: "web.test.com"}: {Records: nil, Error: notFound},
 	}}
-	notFoundResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "CNAME", Domain: "web.test.com"}: nil,
+	foundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "web.test.com"}:    {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "CNAME", Domain: "web.test.com"}: {Records: []string{"some-alb.domain.com"}, Error: nil},
 	}}
-	foundResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "CNAME", Domain: "web.test.com"}: {"some-alb.domain.com"},
-	}}
-	resolver = nsResolver
 
 	// Test when the domain is not found
 	t.Run("domain not found", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return notFoundResolver }
+		dns.ResolverAt = func(_ string) dns.Resolver { return notFoundResolver }
 		_, err := getCNAMEInSync(context.Background(), "web.test.com")
-		if err != NotFound {
+		if err != notFound {
 			t.Errorf("Expected NotFound error, got %v", err)
 		}
 	})
 
 	// Test when the domain is found but the DNS servers are not in sync
 	t.Run("DNS servers not in sync", func(t *testing.T) {
-		resolverAt = func(nsServer string) Resolver {
+		dns.ResolverAt = func(nsServer string) dns.Resolver {
 			if nsServer == "ns1.example.com" {
 				return foundResolver
 			} else {
@@ -87,14 +47,14 @@ func TestGetCNAMEInSync(t *testing.T) {
 			}
 		}
 		_, err := getCNAMEInSync(context.Background(), "web.test.com")
-		if err != DNSNotInSyncError {
-			t.Errorf("Expected NotInSyncError error, got %v", err)
+		if err != errDNSNotInSync {
+			t.Errorf("Expected NotInSync error, got %v", err)
 		}
 	})
 
 	// Test when the domain is found and the DNS servers are in sync
 	t.Run("DNS servers in sync", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return foundResolver }
+		dns.ResolverAt = func(_ string) dns.Resolver { return foundResolver }
 		cname, err := getCNAMEInSync(context.Background(), "web.test.com")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -107,32 +67,31 @@ func TestGetCNAMEInSync(t *testing.T) {
 }
 
 func TestGetIPInSync(t *testing.T) {
-	nsResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "NS", Domain: "test.com"}: {"ns1.example.com", "ns2.example.com"},
+	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "test.com"}:  {Records: nil, Error: notFound},
 	}}
-	notFoundResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "A", Domain: "test.com"}: nil,
+	partialFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "test.com"}:  {Records: []string{"1.2.3.4"}, Error: nil},
 	}}
-	partialFoundResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "A", Domain: "test.com"}: {"1.2.3.4"},
+	foundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "test.com"}:  {Records: []string{"1.2.3.4", "5.6.7.8"}, Error: nil},
 	}}
-	foundResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "A", Domain: "test.com"}: {"1.2.3.4", "5.6.7.8"},
-	}}
-	resolver = nsResolver
 
 	// Test when the domain is not found
 	t.Run("domain not found", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return notFoundResolver }
+		dns.ResolverAt = func(_ string) dns.Resolver { return notFoundResolver }
 		_, err := getIPInSync(context.Background(), "test.com")
-		if err != NotFound {
+		if err != notFound {
 			t.Errorf("Expected NotFound error, got %v", err)
 		}
 	})
 
 	// Test when the domain is found but the DNS servers are not in sync
 	t.Run("DNS servers not in sync", func(t *testing.T) {
-		resolverAt = func(nsServer string) Resolver {
+		dns.ResolverAt = func(nsServer string) dns.Resolver {
 			if nsServer == "ns1.example.com" {
 				return foundResolver
 			} else {
@@ -140,14 +99,14 @@ func TestGetIPInSync(t *testing.T) {
 			}
 		}
 		_, err := getIPInSync(context.Background(), "test.com")
-		if err != DNSNotInSyncError {
+		if err != errDNSNotInSync {
 			t.Errorf("Expected NotInSyncError error, got %v", err)
 		}
 	})
 
 	// 2nd not in sync scenario
 	t.Run("DNS servers not in sync with partial results", func(t *testing.T) {
-		resolverAt = func(nsServer string) Resolver {
+		dns.ResolverAt = func(nsServer string) dns.Resolver {
 			if nsServer == "ns1.example.com" {
 				return partialFoundResolver
 			} else {
@@ -155,14 +114,14 @@ func TestGetIPInSync(t *testing.T) {
 			}
 		}
 		_, err := getIPInSync(context.Background(), "test.com")
-		if err != DNSNotInSyncError {
+		if err != errDNSNotInSync {
 			t.Errorf("Expected NotInSyncError error, got %v", err)
 		}
 	})
 
 	// Test when the domain is found and the DNS servers are in sync
 	t.Run("DNS servers in sync", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return foundResolver }
+		dns.ResolverAt = func(_ string) dns.Resolver { return foundResolver }
 		ips, err := getIPInSync(context.Background(), "test.com")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -175,53 +134,117 @@ func TestGetIPInSync(t *testing.T) {
 }
 
 func TestCheckDomainDNSReady(t *testing.T) {
-	nsResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "NS", Domain: "test.com"}:           {"ns1.example.com", "ns2.example.com"},
-		{Type: "A", Domain: "some-alb.domain.com"}: {"1.2.3.4", "5,6,7,8"},
+	term.DoDebug = true
+	emptyResolver := dns.MockResolver{}
+	hasARecordResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "api.test.com"}:       {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "some-alb.domain.com"}: {Records: []string{"1.2.3.4", "5,6,7,8"}, Error: nil},
+		{Type: "A", Domain: "api.test.com"}:        {Records: []string{"1.2.3.4"}, Error: nil},
 	}}
-	emptyResolver := mockResolver{}
-	hasARecordResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "A", Domain: "api.test.com"}: {"1.2.3.4"},
+	hasWrongARecordResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "api.test.com"}:       {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "some-alb.domain.com"}: {Records: []string{"1.2.3.4", "5,6,7,8"}, Error: nil},
+		{Type: "A", Domain: "api.test.com"}:        {Records: []string{"1.2.3.4", "9.9.9.9"}, Error: nil},
 	}}
-	hasWrongARecordResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "A", Domain: "api.test.com"}: {"1.2.3.4", "9.9.9.9"},
+	hasCNAMEResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
+		{Type: "NS", Domain: "api.test.com"}:       {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
+		{Type: "A", Domain: "some-alb.domain.com"}: {Records: []string{"1.2.3.4", "5,6,7,8"}, Error: nil},
+		{Type: "CNAME", Domain: "api.test.com"}:    {Records: []string{"some-alb.domain.com"}, Error: nil},
 	}}
-	hasCNAMEResolver := mockResolver{Records: map[dnsRequest][]string{
-		{Type: "CNAME", Domain: "api.test.com"}: {"some-alb.domain.com"},
-	}}
-	resolver = nsResolver
+	resolver = hasARecordResolver
 
 	t.Run("CNAME and A records not found", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return emptyResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", "some-alb.domain.com") != false {
+		dns.ResolverAt = func(_ string) dns.Resolver { return emptyResolver }
+		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when both CNAME and A records are missing, got true")
 		}
 	})
 
 	t.Run("CNAME setup correctly", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return hasCNAMEResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", "some-alb.domain.com") != true {
+		dns.ResolverAt = func(_ string) dns.Resolver { return hasCNAMEResolver }
+		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when CNAME is setup correctly, got false")
 		}
 	})
 
 	t.Run("CNAME setup incorrectly", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return hasCNAMEResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", "some-other-alb.domain.com") != false {
+		dns.ResolverAt = func(_ string) dns.Resolver { return hasCNAMEResolver }
+		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-other-alb.domain.com"}) != false {
 			t.Errorf("Expected false when CNAME is setup incorrectly, got true")
 		}
 	})
 
 	t.Run("A record setup correctly", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return hasARecordResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", "some-alb.domain.com") != true {
+		dns.ResolverAt = func(_ string) dns.Resolver { return hasARecordResolver }
+		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when A record is setup correctly, got false")
 		}
 	})
 	t.Run("A record setup incorrectly", func(t *testing.T) {
-		resolverAt = func(_ string) Resolver { return hasWrongARecordResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", "some-alb.domain.com") != false {
+		dns.ResolverAt = func(_ string) dns.Resolver { return hasWrongARecordResolver }
+		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when A record is setup incorrectly, got true")
 		}
 	})
+}
+
+func TestContainsAllIPs(t *testing.T) {
+	a := net.ParseIP("1.1.1.1")
+	b := net.ParseIP("1.1.1.2")
+	c := net.ParseIP("1.1.1.3")
+	d := net.ParseIP("1.1.1.4")
+
+	tests := []struct {
+		a, b []net.IP
+		want bool
+	}{
+		{[]net.IP{}, []net.IP{}, true},
+		{[]net.IP{a, b, c, d}, []net.IP{a, b}, true},
+		{[]net.IP{d, c, b, a}, []net.IP{a, b}, true},
+		{[]net.IP{b, a}, []net.IP{a, b}, true},
+		{[]net.IP{a, b, c, d}, []net.IP{a, b, c, d}, true},
+		{[]net.IP{a, c, d, b}, []net.IP{b, d, c, a}, true},
+		{[]net.IP{a, b}, []net.IP{a, a, a, a}, true},
+		{[]net.IP{a, b, b, b}, []net.IP{a, b, c, d}, false},
+		{[]net.IP{}, []net.IP{a}, false},
+	}
+
+	for _, tt := range tests {
+		if containsAllIPs(tt.a, tt.b) != tt.want {
+			t.Errorf("%v contains all %v should be %v, but got %v", tt.a, tt.b, tt.want, !tt.want)
+		}
+	}
+}
+
+func TestSameIPs(t *testing.T) {
+	a := net.ParseIP("1.1.1.1")
+	b := net.ParseIP("1.1.1.2")
+	c := net.ParseIP("1.1.1.3")
+	d := net.ParseIP("1.1.1.4")
+
+	tests := []struct {
+		a, b []net.IP
+		want bool
+	}{
+		{[]net.IP{}, []net.IP{}, true},
+		{[]net.IP{a, b, c, d}, []net.IP{a, b, c, d}, true},
+		{[]net.IP{d, c, b, a}, []net.IP{a, b, c, d}, true},
+		{[]net.IP{b, a}, []net.IP{a, b}, true},
+		{[]net.IP{a, b, b, d}, []net.IP{a, b, d, b}, true},
+		{[]net.IP{a, a, a, b}, []net.IP{a, b, a, a}, true},
+		{[]net.IP{a, b, b, b}, []net.IP{a, b, c, d}, false},
+		{[]net.IP{a, b, b}, []net.IP{a, b, c}, false},
+		{[]net.IP{a, b, b}, []net.IP{a, b}, false},
+		{[]net.IP{a, b, b}, []net.IP{a, b, b, b}, false},
+		{[]net.IP{a, b}, []net.IP{c, d}, false},
+		{[]net.IP{}, []net.IP{a}, false},
+		{[]net.IP{a}, []net.IP{b}, false},
+		{[]net.IP{a}, []net.IP{}, false},
+	}
+
+	for _, tt := range tests {
+		if sameIPs(tt.a, tt.b) != tt.want {
+			t.Errorf("%v same IPs %v should be %v, but got %v", tt.a, tt.b, tt.want, !tt.want)
+		}
+	}
 }
