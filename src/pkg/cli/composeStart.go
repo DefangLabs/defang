@@ -170,9 +170,23 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			dnsRole = dnsRoleVal.(string) // already validated above
 		}
 
-		var staticFiles string
+		var staticFiles *defangv1.StaticFiles
 		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
-			staticFiles = staticFilesVal.(string) // already validated above
+			if str, ok := staticFilesVal.(string); ok {
+				staticFiles = &defangv1.StaticFiles{Folder: str} // already validated above
+			} else if m, ok := staticFilesVal.(map[string]interface{}); ok {
+				staticFiles = &defangv1.StaticFiles{
+					Folder:    m["folder"].(string),
+					Redirects: m["redirects"].([]string),
+				}
+			} else {
+				warnf("invalid value for x-defang-static-files: %v", staticFilesVal)
+			}
+		}
+
+		var redisCache *defangv1.RedisCache
+		if redisCacheVal := svccfg.Extensions["x-defang-redis"]; redisCacheVal != nil {
+			redisCache = &defangv1.RedisCache{}
 		}
 
 		network := network(&svccfg)
@@ -194,6 +208,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			Platform:    convertPlatform(svccfg.Platform),
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
+			RedisCache:  redisCache,
 		})
 	}
 	return services, nil

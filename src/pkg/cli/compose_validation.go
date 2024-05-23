@@ -251,8 +251,10 @@ func validateProject(project *compose.Project) error {
 		}
 
 		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
-			if _, ok := staticFilesVal.(string); !ok {
-				return fmt.Errorf("x-defang-static-files must be a string")
+			_, str := staticFilesVal.(string)
+			_, obj := staticFilesVal.(map[string]interface{})
+			if !str && !obj {
+				return fmt.Errorf("x-defang-static-files must be a string or object {folder: string, redirects: string[]}")
 			}
 		}
 	}
