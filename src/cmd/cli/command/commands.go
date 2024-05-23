@@ -298,6 +298,10 @@ var RootCmd = &cobra.Command{
 			if !awsInEnv() {
 				term.Warn(" ! AWS provider was selected, but AWS environment variables are not set")
 			}
+		case cliClient.ProviderDO:
+			if !doInEnv() {
+				term.Warn(" ! Digital Ocean provider was selected, but DO_PAT environment variable not set")
+			}
 		case cliClient.ProviderDefang:
 			if awsInEnv() {
 				term.Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
@@ -1105,4 +1109,8 @@ var tosCmd = &cobra.Command{
 
 func awsInEnv() bool {
 	return os.Getenv("AWS_PROFILE") != "" || os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+}
+
+func doInEnv() bool {
+	return os.Getenv("DO_PAT") != ""
 }

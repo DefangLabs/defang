@@ -9,6 +9,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -100,7 +101,7 @@ func (bs *byocServerStream) parseEvents(e types.StartLiveTailResponseStream) ([]
 	// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
 	event := events[0]
 	if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-		if strings.Contains(*event.LogGroupIdentifier, ":"+CdTaskPrefix) {
+		if strings.Contains(*event.LogGroupIdentifier, ":"+byoc.CdTaskPrefix) {
 			// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
 			bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
 			bs.response.Host = "pulumi"

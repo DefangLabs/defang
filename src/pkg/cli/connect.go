@@ -5,8 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"net"
 	"strings"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -76,10 +79,16 @@ func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, t
 func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
 	defangClient, tenantId := Connect(cluster, loader)
 
+	baseClient := byoc.NewByocBaseClient(defangClient, tenantId)
+
 	switch provider {
 	case client.ProviderAWS:
 		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		byocClient := aws.NewByoc(tenantId, defangClient)
+		byocClient := aws.NewByoc(baseClient)
+		return byocClient
+	case client.ProviderDO:
+		term.Info("# Using DO provider")
+		byocClient := do.NewByoc(baseClient)
 		return byocClient
 	default:
 		return &client.PlaygroundClient{*defangClient}
