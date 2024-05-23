@@ -39,7 +39,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByoc(&byoc.ByocBaseClient{GrpcClient: grpcClient})
+			baseClient := byoc.NewByocBaseClient(grpcClient, tt.TenantID)
+			b := NewByoc(baseClient)
 			if _, err := b.LoadProject(); err != nil {
 				t.Fatalf("LoadCompose() failed: %v", err)
 			}
