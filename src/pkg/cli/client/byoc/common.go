@@ -56,12 +56,12 @@ func NewByocBaseClient(grpcClient *client.GrpcClient, tenantID types.TenantID) *
 	}
 }
 
-func (b ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
+func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
 	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b ByocBaseClient) LoadProject() (*compose.Project, error) {
+func (b *ByocBaseClient) LoadProject() (*compose.Project, error) {
 	if b.PrivateDomain != "" {
 		panic("LoadProject should only be called once")
 	}
@@ -81,7 +81,7 @@ func (b ByocBaseClient) LoadProject() (*compose.Project, error) {
 	return proj, nil
 }
 
-func (b ByocBaseClient) LoadProjectName() (string, error) {
+func (b *ByocBaseClient) LoadProjectName() (string, error) {
 	if b.PulumiProject != "" {
 		return b.PulumiProject, nil
 	}

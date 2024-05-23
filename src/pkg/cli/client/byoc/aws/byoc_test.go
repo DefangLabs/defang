@@ -42,7 +42,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			baseClient := byoc.NewByocBaseClient(grpcClient, tt.TenantID)
 			b := NewByoc(baseClient)
 			if _, err := b.LoadProject(); err != nil {
-				t.Fatalf("LoadCompose() failed: %v", err)
+				t.Fatalf("LoadProject() failed: %v", err)
 			}
 			b.CustomDomain = b.getProjectDomain("example.com")
 
