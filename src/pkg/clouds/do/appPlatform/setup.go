@@ -99,7 +99,7 @@ var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
 
-	term.Debug("Creating upload url for: %s", name)
+	term.Debug("Creating upload url for: ", name)
 	s3Client := d.createS3Client()
 
 	prefix := "uploads/"
