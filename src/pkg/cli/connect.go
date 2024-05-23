@@ -82,7 +82,7 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 		byocClient := aws.NewByoc(tenantId, defangClient)
 		return byocClient
 	default:
-		return &client.PlaygroundClient{*defangClient}
+		return &client.PlaygroundClient{GrpcClient: *defangClient}
 	}
 }
 

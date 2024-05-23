@@ -509,16 +509,20 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
 		etag = "" // no need to filter by etag
+		term.Debug(" - Tailing task", taskArn)
 	} else {
 		// Tail CD, kaniko, and all services
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
+		term.Debug(" - Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
+		term.Debug(" - Tailing services logs", servicesTail.LogGroupARN)
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
-			// Only tail the logstreams for the CD task
+			// If we know the CD task ARN, only tail the logstream for the CD task
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
+		term.Debug(" - Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail)
 	}
 	if err != nil {
