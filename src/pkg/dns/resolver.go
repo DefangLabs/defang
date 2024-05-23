@@ -2,7 +2,6 @@ package dns
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"net"
 	"slices"
@@ -119,7 +118,6 @@ func (r DirectResolver) LookupCNAME(ctx context.Context, domain string) (string,
 	}
 
 	for _, rr := range res.Answer {
-		fmt.Printf("%v -> %T\n", rr, rr)
 		if ns, ok := rr.(*dns.CNAME); ok {
 			return ns.Target, nil
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"slices"
@@ -17,8 +18,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 var resolver dns.Resolver = dns.RootResolver{}
-var httpClient = http.Client{}
+var httpClient HTTPClient = http.DefaultClient
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
 	projectName, err := client.LoadProjectName()
@@ -43,6 +48,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 					targets = append(targets, endpoint)
 				}
 			}
+			term.Debugf(" * Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
 			generateCert(ctx, service.Service.Domainname, targets)
 		}
 	}
@@ -124,6 +130,8 @@ func waitForTLS(ctx context.Context, domain string) error {
 		case <-ticker.C:
 			if err := checkTLSCert(timeout, domain); err == nil {
 				return nil
+			} else {
+				term.Debugf(" - Error checking TLS cert for %v: %v", domain, err)
 			}
 			if doSpinner {
 				fmt.Print(spin.Next())
@@ -169,11 +177,12 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 			return ctx.Err()
 		case <-ticker.C:
 			if checkDomainDNSReady(ctx, domain, targets) {
+				sleep(ctx, 5*time.Second) // slight delay to ensure DNS to propagate
 				return nil
 			}
 			if !msgShown {
 				term.Infof(" * Please setup CNAME record for %v", domain)
-				fmt.Printf("  %v  CNAME or as an alias to  %v\n", domain, targets)
+				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
 				term.Infof(" * Waiting for CNAME record setup and DNS propagation...")
 				msgShown = true
 			}
@@ -234,17 +243,25 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		if err != nil {
 			return err // No point retrying if we can't even create the request
 		}
-		if _, err := httpClient.Do(req); err != nil {
-			term.Debugf(" - Error fetching %v: %v, tries left %v", url, err, tries-i-1)
-			errs = append(errs, err)
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+			var msg []byte
+			msg, err = io.ReadAll(resp.Body)
+			if err == nil {
+				err = fmt.Errorf("HTTP %v: %v", resp.StatusCode, string(msg))
+			}
 		}
 
+		term.Debugf(" - Error fetching %v: %v, tries left %v", url, err, tries-i-1)
+		errs = append(errs, err)
+
 		delay := (100 * time.Millisecond) >> i // Simple exponential backoff
-		select {
-		case <-time.After(delay):
-			continue
-		case <-ctx.Done():
-			return ctx.Err()
+		if err := sleep(ctx, delay); err != nil {
+			return err
 		}
 	}
 	return errors.Join(errs...)
@@ -332,4 +349,15 @@ func sameIPs(a, b []net.IP) bool {
 		}
 	}
 	return true
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
