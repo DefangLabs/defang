@@ -15,13 +15,18 @@ import (
 )
 
 type Sample struct {
-	Name     string `json:"name"`
-	Category string `json:"category"` // language
-	Readme   string `json:"readme"`
+	Name             string   `json:"name"`
+	Title            string   `json:"title"`
+	Category         string   `json:"category"` // Deprecated: use Languages instead
+	Readme           string   `json:"readme"`   // unused
+	DirectoryName    string   `json:"directoryName"`
+	ShortDescription string   `json:"shortDescription"`
+	Tags             []string `json:"tags"`
+	Languages        []string `json:"languages"`
 }
 
 func FetchSamples(ctx context.Context) ([]Sample, error) {
-	resp, err := http.GetWithHeader(ctx, "https://docs.defang.io/samples.json", http.Header{"Accept-Encoding": []string{"gzip"}})
+	resp, err := http.GetWithHeader(ctx, "https://docs.defang.io/samples-v2.json", http.Header{"Accept-Encoding": []string{"gzip"}})
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +45,11 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 	return samples, err
 }
 
-func InitFromSample(ctx context.Context, category, sample string) error {
-	const repo = "defang"
+func InitFromSample(ctx context.Context, name string) error {
+	const repo = "samples"
 	const branch = "main"
 
-	prefix := fmt.Sprintf("%s-%s/samples/%s/%s/", repo, branch, category, sample)
+	prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 	resp, err := http.GetWithContext(ctx, "https://github.com/DefangLabs/"+repo+"/archive/refs/heads/"+branch+".tar.gz")
 	if err != nil {
 		return err
