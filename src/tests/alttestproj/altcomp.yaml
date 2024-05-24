@@ -51,5 +51,3 @@ secrets:
   dummy:
     external: true
     name: dummy
-
-x-unsupported: unsupported
