@@ -190,9 +190,9 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			}
 		}
 
-		var redisCache *defangv1.RedisCache
+		var redis *defangv1.Redis
 		if redisCacheVal := svccfg.Extensions["x-defang-redis"]; redisCacheVal != nil {
-			redisCache = &defangv1.RedisCache{}
+			redis = &defangv1.Redis{}
 		}
 
 		network := network(&svccfg)
@@ -214,7 +214,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			Platform:    convertPlatform(svccfg.Platform),
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
-			RedisCache:  redisCache,
+			Redis:       redis,
 		})
 	}
 	return services, nil
