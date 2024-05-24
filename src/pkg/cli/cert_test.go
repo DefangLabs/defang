@@ -246,7 +246,7 @@ func TestSameIPs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if sameIPs(tt.a, tt.b) != tt.want {
+		if dns.SameIPs(tt.a, tt.b) != tt.want {
 			t.Errorf("%v same IPs %v should be %v, but got %v", tt.a, tt.b, tt.want, !tt.want)
 		}
 	}

@@ -92,7 +92,7 @@ func (r DirectResolver) query(ctx context.Context, domain string, qtype uint16) 
 }
 
 func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	res, err := r.query(ctx, domain, dns.TypeNS)
+	res, err := r.query(ctx, domain, dns.TypeA)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,16 @@ func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.
 	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.A); ok {
 			result = append(result, net.IPAddr{IP: ns.A})
-		} else if ns, ok := rr.(*dns.AAAA); ok {
+		}
+	}
+
+	res, err = r.query(ctx, domain, dns.TypeAAAA)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rr := range res.Answer {
+		if ns, ok := rr.(*dns.AAAA); ok {
 			result = append(result, net.IPAddr{IP: ns.AAAA})
 		}
 	}
@@ -138,4 +147,40 @@ func (r DirectResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 		}
 	}
 	return result, nil
+}
+
+func NSHosts(ns []*net.NS) []string {
+	hosts := make([]string, len(ns))
+	for i, n := range ns {
+		hosts[i] = n.Host
+	}
+	return hosts
+}
+
+func SameIPs(a, b []net.IP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	diff := make(map[string]int)
+	for _, ip := range a {
+		diff[ip.String()]++
+	}
+	for _, ip := range b {
+		diff[ip.String()]--
+	}
+
+	for _, v := range diff {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func IpAddrsToIPs(ipAddrs []net.IPAddr) []net.IP {
+	ips := make([]net.IP, len(ipAddrs))
+	for i, ipAddr := range ipAddrs {
+		ips[i] = ipAddr.IP
+	}
+	return ips
 }
