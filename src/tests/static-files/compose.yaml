@@ -1,0 +1,11 @@
+services:
+  x:
+    image: blah
+    x-defang-static-files: ./folder
+  y:
+    image: blah
+    x-unsupported: asdf
+    x-defang-static-files:
+      folder: ./folder
+      redirects: true
+        - www.example.com
