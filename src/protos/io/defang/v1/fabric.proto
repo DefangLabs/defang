@@ -340,7 +340,7 @@ message Service {
   string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
-  RedisCache redis_cache = 18; // x-defang-redis: use a managed redis
+  Redis redis = 18; // x-defang-redis: use a managed redis
 }
 
 message StaticFiles {
