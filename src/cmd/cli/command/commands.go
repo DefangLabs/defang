@@ -425,55 +425,62 @@ var certGenerateCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:     "generate",
-	Args:    cobra.NoArgs,
+	Use:     "generate [SAMPLE]",
+	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"gen", "new", "init"},
 	Short:   "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var sample, language string
+		if len(args) > 0 {
+			sample = args[0]
+		}
+
 		if nonInteractive {
-			return errors.New("cannot run in non-interactive mode")
-		}
-
-		var language string
-		if err := survey.AskOne(&survey.Select{
-			Message: "Choose the language you'd like to use:",
-			Options: []string{"Nodejs", "Golang", "Python"},
-			Default: "Nodejs",
-			Help:    "The project code will be in the language you choose here.",
-		}, &language); err != nil {
-			return err
-		}
-
-		var sample string
-
-		// Fetch the list of samples from the Defang repository
-		if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
-			term.Debug(" - unable to fetch samples:", err)
-		} else if len(samples) > 0 {
-			const generateWithAI = "Generate with AI"
-
-			tag := strings.ToLower(language)
-			sampleNames := []string{generateWithAI}
-			sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
-			for _, sample := range samples {
-				if slices.Contains(sample.Tags, tag) {
-					sampleNames = append(sampleNames, sample.Name)
-					sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
-				}
+			if sample == "" {
+				return errors.New("cannot run in non-interactive mode")
 			}
+			return cli.InitFromSample(cmd.Context(), sample)
+		}
 
+		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
-				Message: "Choose a sample service:",
-				Options: sampleNames,
-				Help:    "The project code will be based on the sample you choose here.",
-				Description: func(value string, i int) string {
-					return sampleDescriptions[i]
-				},
-			}, &sample); err != nil {
+				Message: "Choose the language you'd like to use:",
+				Options: []string{"Nodejs", "Golang", "Python"},
+				Default: "Nodejs",
+				Help:    "The project code will be in the language you choose here.",
+			}, &language); err != nil {
 				return err
 			}
-			if sample == generateWithAI {
-				sample = ""
+
+			// Fetch the list of samples from the Defang repository
+			if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
+				term.Debug(" - unable to fetch samples:", err)
+			} else if len(samples) > 0 {
+				const generateWithAI = "Generate with AI"
+
+				tag := strings.ToLower(language)
+				sampleNames := []string{generateWithAI}
+				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+				for _, sample := range samples {
+					if slices.Contains(sample.Tags, tag) {
+						sampleNames = append(sampleNames, sample.Name)
+						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
+					}
+				}
+
+				if err := survey.AskOne(&survey.Select{
+					Message: "Choose a sample service:",
+					Options: sampleNames,
+					Help:    "The project code will be based on the sample you choose here.",
+					Description: func(value string, i int) string {
+						return sampleDescriptions[i]
+					},
+				}, &sample); err != nil {
+					return err
+				}
+				if sample == generateWithAI {
+					sample = ""
+				}
 			}
 		}
 
@@ -540,18 +547,18 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty("."); !empty || err != nil {
-			term.Warn(" ! The folder is not empty. Files may be overwritten. Press Ctrl+C to abort.")
+			term.Warn(" ! The folder is not empty. We recommend running this command in an empty folder.")
 		}
 
-		if prompt.Description != "" {
-			term.Info(" * Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
+		if sample == "" {
+			term.Info(" * Fetching sample from the Defang repository...")
+			err := cli.InitFromSample(cmd.Context(), sample)
 			if err != nil {
 				return err
 			}
 		} else {
-			term.Info(" * Fetching sample from the Defang repository...")
-			err := cli.InitFromSample(cmd.Context(), sample)
+			term.Info(" * Working on it. This may take 1 or 2 minutes...")
+			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
 			if err != nil {
 				return err
 			}

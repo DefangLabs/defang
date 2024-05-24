@@ -81,7 +81,7 @@ func InitFromSample(ctx context.Context, name string) error {
 				continue
 			}
 			// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
-			file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_TRUNC, h.FileInfo().Mode())
+			file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
 			if err != nil {
 				return err
 			}
