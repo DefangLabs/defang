@@ -66,7 +66,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				if reservations.NanoCPUs != "" {
 					cpus, err = strconv.ParseFloat(reservations.NanoCPUs, 32)
 					if err != nil {
-						panic(err) // was already validated above
+						panic(err) // was already validated
 					}
 				}
 				var devices []*defangv1.Device
@@ -167,12 +167,32 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 		var dnsRole string
 		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
-			dnsRole = dnsRoleVal.(string) // already validated above
+			dnsRole = dnsRoleVal.(string) // already validated
 		}
 
-		var staticFiles string
+		var staticFiles *defangv1.StaticFiles
 		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
-			staticFiles = staticFilesVal.(string) // already validated above
+			if str, ok := staticFilesVal.(string); ok {
+				staticFiles = &defangv1.StaticFiles{Folder: str}
+			} else {
+				obj := staticFilesVal.(map[string]interface{}) // already validated
+				var redirects []string
+				if r, ok := obj["redirects"].([]interface{}); ok {
+					redirects = make([]string, len(r))
+					for i, v := range r {
+						redirects[i] = v.(string)
+					}
+				}
+				staticFiles = &defangv1.StaticFiles{
+					Folder:    obj["folder"].(string),
+					Redirects: redirects,
+				}
+			}
+		}
+
+		var redis *defangv1.Redis
+		if redisCacheVal := svccfg.Extensions["x-defang-redis"]; redisCacheVal != nil {
+			redis = &defangv1.Redis{}
 		}
 
 		network := network(&svccfg)
@@ -194,6 +214,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			Platform:    convertPlatform(svccfg.Platform),
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
+			Redis:       redis,
 		})
 	}
 	return services, nil

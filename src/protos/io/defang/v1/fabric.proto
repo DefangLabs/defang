@@ -36,8 +36,8 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
-  rpc GenerateFiles(GenerateFilesRequest)
-      returns (GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
+  rpc GenerateFiles(GenerateFilesRequest) returns (
+      GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
   rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -106,13 +106,9 @@ message File {
 
 message GenerateFilesResponse { repeated File files = 1; }
 
-message StartGenerateResponse {
-  string uuid = 1;
-}
+message StartGenerateResponse { string uuid = 1; }
 
-message GenerateStatusRequest {
-  string uuid = 1;
-}
+message GenerateStatusRequest { string uuid = 1; }
 
 message UploadURLRequest { string digest = 1; }
 
@@ -125,14 +121,16 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7;  // comma-separated list of internal CIDR for the load-balancer
-  string private_fqdn = 8;     // fully qualified domain name (host)
-  string public_fqdn = 9;      // fully qualified domain name (ingress)
+  repeated string lb_ips =
+      7; // comma-separated list of internal CIDR for the load-balancer
+  string private_fqdn = 8; // fully qualified domain name (host)
+  string public_fqdn = 9;  // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
-  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
-  string lb_dns = 14;         // public load-balancer DNS name
+  bool use_acme_cert =
+      13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  string lb_dns = 14; // public load-balancer DNS name
 
   // bool is_function = 5; // true if service is a function
 }
@@ -177,8 +175,8 @@ message Status { string version = 1; }
 
 message Version {
   string fabric = 1;
-  reserved 2; // was "nats"
-  string cli_min = 3; // minimum CLI version
+  reserved 2;            // was "nats"
+  string cli_min = 3;    // minimum CLI version
   string pulumi_min = 4; // minimum Pulumi provider version
 }
 
@@ -339,12 +337,18 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
-                        // create dns records; TODO: not part of spec
-  string static_files = 15; // x-defang-static-files: folder with static files
-                            // to serve; TODO: not part of spec
-  Network networks = 16; // currently only 1 network is supported
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records
+  StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
+  Network networks = 16;         // currently only 1 network is supported
+  Redis redis = 18; // x-defang-redis: use a managed redis
 }
+
+message StaticFiles {
+  string folder = 1;
+  repeated string redirects = 2;
+}
+
+message Redis {}
 
 message Event {
   string specversion = 1; // required (but we don't care)

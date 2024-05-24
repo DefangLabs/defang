@@ -112,8 +112,7 @@ func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.
 }
 
 func (g PlaygroundClient) ServiceDNS(name string) string {
-	whoami, _ := g.WhoAmI(context.TODO())
-	return whoami.Tenant + "-" + name
+	return string(g.tenantID) + "-" + name
 }
 
 func (g PlaygroundClient) LoadProjectName() (string, error) {
