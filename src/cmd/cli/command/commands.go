@@ -458,11 +458,11 @@ var generateCmd = &cobra.Command{
 			} else if len(samples) > 0 {
 				const generateWithAI = "Generate with AI"
 
-				tag := strings.ToLower(language)
+				lang := strings.ToLower(language)
 				sampleNames := []string{generateWithAI}
 				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
 				for _, sample := range samples {
-					if slices.Contains(sample.Tags, tag) {
+					if slices.Contains(sample.Languages, lang) {
 						sampleNames = append(sampleNames, sample.Name)
 						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
 					}
@@ -550,7 +550,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Warn(" ! The folder is not empty. We recommend running this command in an empty folder.")
 		}
 
-		if sample == "" {
+		if sample != "" {
 			term.Info(" * Fetching sample from the Defang repository...")
 			err := cli.InitFromSample(cmd.Context(), sample)
 			if err != nil {
