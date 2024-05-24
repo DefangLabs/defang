@@ -66,7 +66,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				if reservations.NanoCPUs != "" {
 					cpus, err = strconv.ParseFloat(reservations.NanoCPUs, 32)
 					if err != nil {
-						panic(err) // was already validated above
+						panic(err) // was already validated
 					}
 				}
 				var devices []*defangv1.Device
@@ -167,20 +167,26 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 		var dnsRole string
 		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
-			dnsRole = dnsRoleVal.(string) // already validated above
+			dnsRole = dnsRoleVal.(string) // already validated
 		}
 
 		var staticFiles *defangv1.StaticFiles
 		if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
 			if str, ok := staticFilesVal.(string); ok {
-				staticFiles = &defangv1.StaticFiles{Folder: str} // already validated above
-			} else if m, ok := staticFilesVal.(map[string]interface{}); ok {
-				staticFiles = &defangv1.StaticFiles{
-					Folder:    m["folder"].(string),
-					Redirects: m["redirects"].([]string),
-				}
+				staticFiles = &defangv1.StaticFiles{Folder: str}
 			} else {
-				warnf("invalid value for x-defang-static-files: %v", staticFilesVal)
+				obj := staticFilesVal.(map[string]interface{}) // already validated
+				var redirects []string
+				if r, ok := obj["redirects"].([]interface{}); ok {
+					redirects = make([]string, len(r))
+					for i, v := range r {
+						redirects[i] = v.(string)
+					}
+				}
+				staticFiles = &defangv1.StaticFiles{
+					Folder:    obj["folder"].(string),
+					Redirects: redirects,
+				}
 			}
 		}
 

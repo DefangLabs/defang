@@ -257,6 +257,19 @@ func validateProject(project *compose.Project) error {
 				return fmt.Errorf("x-defang-static-files must be a string or object {folder: string, redirects: string[]}")
 			}
 		}
+
+		for k := range svccfg.Extensions {
+			switch k {
+			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis":
+				continue
+			default:
+				warnf("unsupported compose extension: %s", k)
+			}
+		}
+	}
+
+	for k := range project.Extensions {
+		warnf("unsupported compose extension: %s", k)
 	}
 	return nil
 }
