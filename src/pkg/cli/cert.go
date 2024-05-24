@@ -224,16 +224,16 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	albIPs := dns.IpAddrsToIPs(albIPAddrs)
 
 	// In sync CNAME may be pointing to the same IP addresses of the load balancer, considered as valid
-	term.Debugf("Checking CNAME %v", cname)
+	term.Debugf(" - Checking CNAME %v", cname)
 	if cname != "" {
 		cnameIPAddrs, err := resolver.LookupIPAddr(ctx, cname)
-		term.Debugf(" - IP for %v is %v : %v", cname, cnameIPAddrs, err)
 		if err != nil {
 			term.Debugf(" - Could not resolve A/AAAA record for %v: %v", cname, err)
 		} else {
+			term.Debugf(" - IP for %v is %v", cname, cnameIPAddrs)
 			cnameIPs := dns.IpAddrsToIPs(cnameIPAddrs)
 			if containsAllIPs(albIPs, cnameIPs) {
-				term.Warnf(" * CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
+				term.Warnf(" ! CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
 				return true
 			}
 		}
@@ -246,7 +246,7 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 		return false
 	}
 	if containsAllIPs(albIPs, ips) {
-		term.Warnf(" * IP for %v is pointing to the same IP addresses of the load balancer %v", domain, validCNAMEs) // TODO: Better warning message
+		term.Warnf(" ! IP for %v is pointing to the same IP addresses of the load balancer %v", domain, validCNAMEs) // TODO: Better warning message
 		return true
 	}
 	return false
