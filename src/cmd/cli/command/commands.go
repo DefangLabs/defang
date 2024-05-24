@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -443,7 +444,7 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 
-		var category, sample string
+		var sample string
 
 		// Fetch the list of samples from the Defang repository
 		if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
@@ -451,13 +452,13 @@ var generateCmd = &cobra.Command{
 		} else if len(samples) > 0 {
 			const generateWithAI = "Generate with AI"
 
-			category = strings.ToLower(language)
+			tag := strings.ToLower(language)
 			sampleNames := []string{generateWithAI}
-			// sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+			sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
 			for _, sample := range samples {
-				if sample.Category == category {
+				if slices.Contains(sample.Tags, tag) {
 					sampleNames = append(sampleNames, sample.Name)
-					// sampleDescriptions = append(sampleDescriptions, sample.Readme)
+					sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
 				}
 			}
 
@@ -465,6 +466,9 @@ var generateCmd = &cobra.Command{
 				Message: "Choose a sample service:",
 				Options: sampleNames,
 				Help:    "The project code will be based on the sample you choose here.",
+				Description: func(value string, i int) string {
+					return sampleDescriptions[i]
+				},
 			}, &sample); err != nil {
 				return err
 			}
@@ -547,7 +551,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			}
 		} else {
 			term.Info(" * Fetching sample from the Defang repository...")
-			err := cli.InitFromSample(cmd.Context(), category, sample)
+			err := cli.InitFromSample(cmd.Context(), sample)
 			if err != nil {
 				return err
 			}
