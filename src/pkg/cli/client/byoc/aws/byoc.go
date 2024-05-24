@@ -199,7 +199,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate let's encrypt SSL certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Service.Domainname)
 		}
 	}
 
