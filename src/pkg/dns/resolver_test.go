@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"log"
+	"net"
 	"strings"
 	"testing"
 )
@@ -70,6 +72,53 @@ func TestFindNSServer(t *testing.T) {
 		}
 		if ns[0].Host != "1.delegated-servers.com" || ns[1].Host != "2.delegated-servers.com" {
 			t.Errorf("Wrong ns servers returned, got %v", ns)
+		}
+	})
+}
+
+func TestRootResolver(t *testing.T) {
+	t.Run("LookupIPAddr on google return both IPv4 and IPv6", func(t *testing.T) {
+		r := RootResolver{}
+		ResolverAt = func(nsServer string) Resolver {
+			return DirectResolver{NSServer: nsServer}
+		}
+		ips, err := r.LookupIPAddr(context.Background(), "www.google.com")
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if len(ips) == 0 {
+			t.Errorf("Expected some IP addresses, got %v", ips)
+		}
+		hasIPv4 := false
+		hasIPv6 := false
+		for _, ip := range ips {
+			if ip.IP.To4() != nil {
+				hasIPv4 = true
+			} else if ip.IP.To16() != nil {
+				hasIPv6 = true
+			}
+			log.Println(ip)
+		}
+		if !hasIPv4 || !hasIPv6 {
+			t.Errorf("Expected both IPv4 and IPv6 addresses, got %v", ips)
+		}
+	})
+
+	t.Run("LookupIPAddr on defang.io return same set of IPs", func(t *testing.T) {
+		r := RootResolver{}
+		ResolverAt = func(nsServer string) Resolver {
+			return DirectResolver{NSServer: nsServer}
+		}
+		ips, err := r.LookupIPAddr(context.Background(), "defang.io")
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		nIPs, err := net.LookupIP("defang.io")
+		for _, nIP := range nIPs {
+			log.Println("N", nIP)
+		}
+		if !SameIPs(IpAddrsToIPs(ips), nIPs) {
+			t.Errorf("Expected same IP addresses, got %v <> %v", ips, nIPs)
 		}
 	})
 }

@@ -218,10 +218,26 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 
 	albIPAddrs, err := resolver.LookupIPAddr(ctx, validCNAMEs[0])
 	if err != nil {
-		term.Debugf(" - Could not resolve A/AAAA record for %v: %v", domain, err)
+		term.Debugf(" - Could not resolve A/AAAA record for load balancer %v: %v", validCNAMEs[0], err)
 		return false
 	}
-	albIPs := ipAddrsToIPs(albIPAddrs)
+	albIPs := dns.IpAddrsToIPs(albIPAddrs)
+
+	// In sync CNAME may be pointing to the same IP addresses of the load balancer, considered as valid
+	term.Debugf("Checking CNAME %v", cname)
+	if cname != "" {
+		cnameIPAddrs, err := resolver.LookupIPAddr(ctx, cname)
+		term.Debugf(" - IP for %v is %v : %v", cname, cnameIPAddrs, err)
+		if err != nil {
+			term.Debugf(" - Could not resolve A/AAAA record for %v: %v", cname, err)
+		} else {
+			cnameIPs := dns.IpAddrsToIPs(cnameIPAddrs)
+			if containsAllIPs(albIPs, cnameIPs) {
+				term.Warnf(" * CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
+				return true
+			}
+		}
+	}
 
 	// Check if an valid A record has been set
 	ips, err := getIPInSync(ctx, domain)
@@ -291,7 +307,7 @@ func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
 		cnames[cname] = true
 	}
 	if len(cnames) > 1 {
-		term.Debugf(" - CNAMEs for %v are not in sync among NS servers %v: %v", domain, ns, cnames)
+		term.Debugf(" - CNAMEs for %v are not in sync among NS servers %v: %v", domain, dns.NSHosts(ns), cnames)
 		return "", errDNSNotInSync
 	}
 	return cname, lookupErr
@@ -317,40 +333,12 @@ func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
 				results = append(results, ip.IP)
 			}
 		} else {
-			newFoundIPs := ipAddrsToIPs(ipAddrs)
-			if !sameIPs(results, newFoundIPs) {
-				term.Debugf(" - IP addresses for %v are not in sync among NS servers %v: %v <> %v", domain, ns, results, newFoundIPs)
+			newFoundIPs := dns.IpAddrsToIPs(ipAddrs)
+			if !dns.SameIPs(results, newFoundIPs) {
+				term.Debugf(" - IP addresses for %v are not in sync among NS servers %v: %v <> %v", domain, dns.NSHosts(ns), results, newFoundIPs)
 				return nil, errDNSNotInSync
 			}
 		}
 	}
 	return results, lookupErr
-}
-
-func ipAddrsToIPs(ipAddrs []net.IPAddr) []net.IP {
-	ips := make([]net.IP, len(ipAddrs))
-	for i, ipAddr := range ipAddrs {
-		ips[i] = ipAddr.IP
-	}
-	return ips
-}
-
-func sameIPs(a, b []net.IP) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	diff := make(map[string]int)
-	for _, ip := range a {
-		diff[ip.String()]++
-	}
-	for _, ip := range b {
-		diff[ip.String()]--
-	}
-
-	for _, v := range diff {
-		if v != 0 {
-			return false
-		}
-	}
-	return true
 }
