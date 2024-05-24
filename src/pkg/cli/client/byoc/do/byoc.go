@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	"os"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
@@ -25,14 +26,13 @@ const (
 )
 
 type ByocDo struct {
-	*byoc.ByocBaseClient
+	byoc.ByocBaseClient
 
-	AppIds map[string]string
-	Driver *appPlatform.DoApp
+	appIds map[string]string
+	driver *appPlatform.DoApp
 }
 
-func NewByoc(defClient *byoc.ByocBaseClient) *ByocDo {
-
+func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	regionString := os.Getenv("REGION")
 
 	if regionString == "" {
@@ -40,8 +40,8 @@ func NewByoc(defClient *byoc.ByocBaseClient) *ByocDo {
 	}
 
 	b := &ByocDo{
-		ByocBaseClient: defClient,
-		Driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
+		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 	}
 
 	return b
@@ -85,7 +85,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	url, err := b.Driver.CreateUploadURL(ctx, etag)
+	url, err := b.driver.CreateUploadURL(ctx, etag)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 	payloadFileName := payloadUrl[len(payloadUrl)-1]
 
-	payloadString, err := b.Driver.CreateS3DownloadUrl(ctx, fmt.Sprintf("uploads/%s", payloadFileName))
+	payloadString, err := b.driver.CreateS3DownloadUrl(ctx, fmt.Sprintf("uploads/%s", payloadFileName))
 
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 		return nil, err
 	}
 
-	url, err := b.Driver.CreateUploadURL(ctx, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 
 	if err != nil {
 		return nil, err
@@ -219,20 +219,20 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
 	}
-	return b.Driver.Run(ctx, env, cmd...)
+	return b.driver.Run(ctx, env, cmd...)
 }
 
 func (b *ByocDo) environment() map[string]string {
-	region := b.Driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantID,
-		"DOMAIN":                     b.CustomDomain,
+		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
 		"PROJECT":                    b.PulumiProject,
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.Driver.BucketName), // TODO: add a way to override bucket
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName), // TODO: add a way to override bucket
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
 		"STACK":                      b.PulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",

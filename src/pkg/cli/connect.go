@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"net"
 	"strings"
 
@@ -55,7 +54,7 @@ func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
 	return accessToken, tenantId
 }
 
-func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, types.TenantID) {
+func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, types.TenantID) {
 	accessToken, tenantId := getExistingTokenAndTenant(cluster)
 
 	tenant, host := SplitTenantHost(cluster)
@@ -77,21 +76,19 @@ func Connect(cluster string, loader client.ProjectLoader) (*client.GrpcClient, t
 }
 
 func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
-	defangClient, tenantId := Connect(cluster, loader)
-
-	baseClient := byoc.NewByocBaseClient(defangClient, tenantId)
+	grpcClient, tenantId := Connect(cluster, loader)
 
 	switch provider {
 	case client.ProviderAWS:
-		term.Info(" # Using AWS provider") // HACK: # prevents errors when evaluating the shell completion script
-		byocClient := aws.NewByoc(baseClient)
+		term.Info(" # Using AWS provider")
+		byocClient := aws.NewByoc(grpcClient, tenantId)
 		return byocClient
 	case client.ProviderDO:
 		term.Info("# Using DO provider")
-		byocClient := do.NewByoc(baseClient)
+		byocClient := do.NewByoc(grpcClient, tenantId)
 		return byocClient
 	default:
-		return &client.PlaygroundClient{GrpcClient: *defangClient}
+		return &client.PlaygroundClient{GrpcClient: grpcClient}
 	}
 }
 
