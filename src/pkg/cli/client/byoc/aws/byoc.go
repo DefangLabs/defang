@@ -536,7 +536,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if service.StaticFiles == "" {
+	if service.StaticFiles == nil {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
 			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
@@ -555,7 +555,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 	}
 
 	if service.Domainname != "" {
-		if !hasIngress && service.StaticFiles == "" {
+		if !hasIngress && service.StaticFiles == nil {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
 		}
 		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
