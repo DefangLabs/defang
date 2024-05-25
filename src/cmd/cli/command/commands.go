@@ -414,7 +414,7 @@ var certGenerateCmd = &cobra.Command{
 	Use:     "generate",
 	Aliases: []string{"gen"},
 	Args:    cobra.NoArgs,
-	Short:   "Generate an letsencrypt certificate",
+	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := cli.GenerateLetsEncryptCert(cmd.Context(), client)
 		if err != nil {
