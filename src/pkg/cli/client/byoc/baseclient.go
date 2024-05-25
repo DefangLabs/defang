@@ -2,14 +2,15 @@ package byoc
 
 import (
 	"context"
+	"os"
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"os"
-	"strings"
 )
 
 const (
@@ -32,27 +33,35 @@ func DnsSafe(fqdn string) string {
 }
 
 type ByocBaseClient struct {
-	*client.GrpcClient
+	client.GrpcClient
 
-	CustomDomain            string //TODO: Not BYOD domain which is per service, should rename to something like delegated defang domain
 	PrivateDomain           string
-	PrivateLbIps            []string
-	PrivateNatIps           []string
+	PrivateLbIps            []string // TODO: use API to get these
+	PrivateNatIps           []string // TODO: use API to get these
+	ProjectDomain           string
 	PulumiProject           string
 	PulumiStack             string
 	Quota                   quota.Quotas
 	SetupDone               bool
-	TenantID                string
 	ShouldDelegateSubdomain bool
+	TenantID                string
 }
 
-func NewByocBaseClient(grpcClient *client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
+func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
 	return &ByocBaseClient{
 		GrpcClient:    grpcClient,
-		CustomDomain:  "",
 		TenantID:      string(tenantID),
 		PulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
 		PulumiStack:   "beta", // TODO: make customizable
+		Quota: quota.Quotas{
+			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+			Cpus:       16,
+			Gpus:       8,
+			MemoryMiB:  65536,
+			Replicas:   16,
+			Services:   40,
+			ShmSizeMiB: 30720,
+		},
 	}
 }
 

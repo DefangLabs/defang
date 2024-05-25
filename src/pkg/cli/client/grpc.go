@@ -28,9 +28,7 @@ type GrpcClient struct {
 	Loader   ProjectLoader
 }
 
-var _ FabricClient = &GrpcClient{}
-
-func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader ProjectLoader) *GrpcClient {
+func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader ProjectLoader) GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
@@ -52,7 +50,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 		}
 	}
 
-	return &GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
+	return GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -102,12 +100,12 @@ func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.Del
 	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g *GrpcClient) AgreeToS(ctx context.Context) error {
+func (g GrpcClient) AgreeToS(ctx context.Context) error {
 	_, err := g.client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
-func (g *GrpcClient) Track(event string, properties ...Property) error {
+func (g GrpcClient) Track(event string, properties ...Property) error {
 	// Convert map[string]any to map[string]string
 	var props map[string]string
 	if len(properties) > 0 {
@@ -128,7 +126,7 @@ func (g *GrpcClient) Track(event string, properties ...Property) error {
 	return err
 }
 
-func (g *GrpcClient) CheckLoginAndToS(ctx context.Context) error {
+func (g GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }

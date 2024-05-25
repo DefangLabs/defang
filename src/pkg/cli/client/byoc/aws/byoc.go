@@ -20,7 +20,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -36,7 +35,7 @@ import (
 )
 
 type ByocAws struct {
-	*byoc.ByocBaseClient
+	byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
@@ -45,22 +44,9 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByoc(defClient *byoc.ByocBaseClient) *ByocAws {
-
-	defClient.Quota = quota.Quotas{
-		// These serve mostly to pevent fat-finger errors in the CLI or Compose files
-		Cpus:       16,
-		Gpus:       8,
-		MemoryMiB:  65536,
-		Replicas:   16,
-		Services:   40,
-		ShmSizeMiB: 30720,
-	}
-	defClient.PrivateLbIps = nil  // TODO: grab these from the AWS API or outputs
-	defClient.PrivateNatIps = nil // TODO: grab these from the AWS API or outputs
-
+func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		ByocBaseClient: defClient,
+		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
 		cdTasks:        make(map[string]ecs.TaskArn),
 		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
@@ -108,14 +94,14 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 		return annotateAwsError(err)
 	}
 
-	if b.CustomDomain == "" {
+	if b.ProjectDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
 			term.Debug(" - Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
-			b.CustomDomain = b.getProjectDomain(domain.Zone)
-			if b.CustomDomain != "" {
+			b.ProjectDomain = b.getProjectDomain(domain.Zone)
+			if b.ProjectDomain != "" {
 				b.ShouldDelegateSubdomain = true
 			}
 		}
@@ -241,10 +227,10 @@ func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, er
 }
 
 func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
-	if b.CustomDomain == "" {
+	if b.ProjectDomain == "" {
 		return "", errors.New("custom domain not set")
 	}
-	domain := b.CustomDomain
+	domain := b.ProjectDomain
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", annotateAwsError(err)
@@ -328,7 +314,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantID,
-		"DOMAIN":                     b.CustomDomain,
+		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
 		"PROJECT":                    b.PulumiProject, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
@@ -398,7 +384,12 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 		Bucket: &bucketName,
 		Key:    &path,
 	})
+	var serviceInfos defangv1.ListServicesResponse
 	if err != nil {
+		if aws.IsS3NoSuchKeyError(err) {
+			term.Debug(" - s3.GetObject:", err)
+			return &serviceInfos, nil // no services yet
+		}
 		return nil, annotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
@@ -406,7 +397,6 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	if err != nil {
 		return nil, err
 	}
-	var serviceInfos defangv1.ListServicesResponse
 	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
 		return nil, err
 	}
@@ -618,21 +608,21 @@ func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
-	if b.CustomDomain == "" {
+	if b.ProjectDomain == "" {
 		return ":443" // placeholder for the public ALB/distribution
 	}
 	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.CustomDomain)
+	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.ProjectDomain)
 
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) getPublicFqdn(fqn qualifiedName) string {
-	if b.CustomDomain == "" {
+	if b.ProjectDomain == "" {
 		return "" //b.fqdn
 	}
 	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.CustomDomain)
+	return fmt.Sprintf("%s.%s", safeFqn, b.ProjectDomain)
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
