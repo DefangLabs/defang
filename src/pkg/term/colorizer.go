@@ -3,6 +3,7 @@ package term
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
@@ -134,4 +135,10 @@ func Fatal(msg any) {
 func Fatalf(format string, v ...any) {
 	Errorf("Error: "+format, v...)
 	os.Exit(1)
+}
+
+var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
+
+func StripAnsi(s string) string {
+	return ansiRegex.ReplaceAllLiteralString(s, "")
 }

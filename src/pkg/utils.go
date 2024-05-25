@@ -105,9 +105,3 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 		return ctx.Err()
 	}
 }
-
-var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
-
-func StripAnsi(s string) string {
-	return ansiRegex.ReplaceAllLiteralString(s, "")
-}

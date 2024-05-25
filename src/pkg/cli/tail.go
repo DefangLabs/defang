@@ -193,17 +193,18 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
 				term.Debug(" - Disconnected:", serverStream.Err())
+				var spaces int
 				if !params.Raw {
-					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
+					spaces, _ = term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
 				}
-				time.Sleep(time.Second)
+				pkg.SleepWithContext(ctx, 1*time.Second)
 				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 				if err != nil {
 					term.Debug(" - Reconnect failed:", err)
 					return err
 				}
 				if !params.Raw {
-					term.Fprint(term.Stderr, term.WarnColor, " ! Reconnected!   \r") // overwritten with logs
+					fmt.Fprintf(term.Stderr, "%*s", spaces, "\r") // clear the "reconnecting" message
 				}
 				skipDuplicate = true
 				continue
@@ -283,7 +284,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 					}
 					term.Stdout.Reset()
 				} else {
-					line = pkg.StripAnsi(line)
+					line = term.StripAnsi(line)
 				}
 				fmt.Println(line)
 
@@ -298,14 +299,9 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 }
 
 func isProgressDot(line string) bool {
-	if len(line) <= 1 {
+	if line == "" || line == "." {
 		return true
 	}
-	stripped := pkg.StripAnsi(line)
-	for _, r := range stripped {
-		if r != '.' {
-			return false
-		}
-	}
-	return true
+	stripped := term.StripAnsi(line)
+	return strings.TrimLeft(stripped, ".") == ""
 }
