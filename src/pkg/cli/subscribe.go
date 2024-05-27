@@ -7,26 +7,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func handleUserExit(cancel context.CancelFunc) {
-	input := term.NewNonBlockingStdin()
-	defer input.Close() // abort the read loop
-
-	var b [1]byte
-	for {
-		if _, err := input.Read(b[:]); err != nil {
-			return // exit goroutine
-		}
-		switch b[0] {
-		case 3: // Ctrl-C
-			cancel() // cancel the tail context
-			return
-		}
-	}
-}
-
-func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan *map[string]string, error) {
+func Subscribe(ctx context.Context, client client.Client, since *timestamppb.Timestamp, services []string) (<-chan *map[string]string, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
 	}
@@ -40,22 +24,20 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		serviceStatus[service] = "UNKNOWN"
 	}
 
-	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
+	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Since: since, Services: services})
 	if err != nil {
 		return nil, err
 	}
-	defer serverStream.Close()
-
 	statusChan := make(chan *map[string]string, len(services))
-	defer close(statusChan)
-
 	if DoDryRun {
+		defer close(statusChan)
 		statusChan <- &serviceStatus
 		return statusChan, ErrDryRun
 	}
 
 	go func() {
-		retryCount := 5
+		defer serverStream.Close()
+		defer close(statusChan)
 		for {
 
 			// handle cancel from caller
@@ -66,20 +48,10 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			default:
 			}
 
-			if retryCount == 0 {
-				statusChan <- &serviceStatus
-				term.Errorf("Subscribe failed - error on receive")
+			if !serverStream.Receive() {
+				term.Warn("Subscribe Stream failed - stopping\n")
 				return
 			}
-
-			if !serverStream.Receive() {
-				term.Warnf("Subscribe Stream failed - will retry %d more times\n", retryCount)
-				retryCount--
-				continue
-			}
-
-			// reset the retry count after a successful receive
-			retryCount = 5
 
 			msg := serverStream.Msg()
 			for _, servInfo := range msg.GetServices() {
