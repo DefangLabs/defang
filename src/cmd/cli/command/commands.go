@@ -24,6 +24,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -815,22 +816,48 @@ var composeUpCmd = &cobra.Command{
 			return err
 		}
 
+		if len(deploy.Services) == 0 {
+			return errors.New("no services being deployed")
+		}
+
 		printPlaygroundPortalServiceURLs(deploy.Services)
-		printEndpoints(deploy.Services) // TODO: do this at the end
 
 		if detach {
 			term.Info(" * Done.")
 			return nil
 		}
 
+		serviceList := []string{}
+		for _, serviceInfo := range deploy.Services {
+			serviceList = append(serviceList, serviceInfo.Service.Name)
+		}
+
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
+		// set up service status subscription (non-blocking)
+		serviceStatusChan, err := cli.Subscribe(ctx, client, timestamppb.New(since), serviceList)
+		if err != nil {
+			return err
+		}
+
+		// monitor for when all services are completed to end this command
+		go func() {
+			for serviceStatus := range serviceStatusChan {
+				if isAllServicesCompleted(*serviceStatus) {
+					printEndpoints(deploy.Services)
+					break
+				}
+			}
+
+			cancel()
+		}()
+
+		// set up tailing
 		etag := deploy.Etag
 		services := "all services"
 		if etag != "" {
 			services = "deployment ID " + etag
-		}
-
-		if len(deploy.Services) == 0 {
-			return errors.New("no services in deployment")
 		}
 
 		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
@@ -841,29 +868,10 @@ var composeUpCmd = &cobra.Command{
 			Raw:     false,
 		}
 
-		serviceList := []string{}
-		for _, serviceInfo := range deploy.Services {
-			serviceList = append(serviceList, serviceInfo.Service.Name)
-		}
-
-		ctx := cmd.Context()
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		serviceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
-		if err != nil {
-			return err
-		}
-
+		// blocking call to tail
 		err = cli.Tail(ctx, client, tailParams)
 		if err != nil {
 			return err
-		}
-
-		for serviceStatus := range serviceStatusChan {
-			if isAllServicesCompleted(*serviceStatus) {
-				break
-			}
 		}
 
 		term.Info(" * Done.")
