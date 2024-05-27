@@ -737,3 +737,7 @@ func ensure(cond bool, msg string) {
 		panic(msg)
 	}
 }
+
+func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+}

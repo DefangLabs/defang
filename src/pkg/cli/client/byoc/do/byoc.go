@@ -186,6 +186,10 @@ func (b *ByocDo) ServiceDNS(name string) string {
 	return ""
 }
 
+func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, nil
+}
+
 func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	return nil, nil
 }
