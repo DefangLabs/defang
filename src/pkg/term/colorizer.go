@@ -137,7 +137,12 @@ func Fatalf(format string, v ...any) {
 	os.Exit(1)
 }
 
-var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
+/* ANSI escape codes https://en.wikipedia.org/wiki/ANSI_escape_code
+ * Fp/Fe/Fs: ESC [0-WYZ\`-~] 						 				(0x30-0x7E except 'X', '[', ']', '^', '_')
+ * CSI:      ESC '[' [0-?]* [ -/]* [@-~]  							(common commands like color, cursor movement, etc.)
+ * OSC:      ESC ('X' | ']' | '^' | '_') .*? (BEL | ESC '\' | $)	(commands that set window title, etc.)
+ */
+var ansiRegex = regexp.MustCompile("\x1b(?:[@-WYZ\\\\`-~]|\\[[0-?]*[ -/]*[@-~]|[X\\]^_].*?(?:\x1b\\\\|\x07|$))")
 
 func StripAnsi(s string) string {
 	return ansiRegex.ReplaceAllLiteralString(s, "")
