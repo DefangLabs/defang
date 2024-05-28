@@ -13,9 +13,12 @@ func TestIsProgressDot(t *testing.T) {
 	}{
 		{"empty", "", true},
 		{"dot", ".", true},
-		{"empty line", "\n", true},
+		{"curly", "}", false},
+		{"empty line", "\n", false},
 		{"ansi dot", "\x1b[1m.\x1b[0m", true},
+		{"ansi empty", "\x1b[1m\x1b[0m", true},
 		{"pulumi dot", "\033[38;5;3m.\033[0m", true},
+		{"pulumi dots", "\033[38;5;3m.\033[0m\033[38;5;3m.\033[0m", true},
 		{"not a progress msg", "blah", false},
 	}
 	for _, tt := range tests {
