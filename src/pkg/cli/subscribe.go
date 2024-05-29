@@ -6,6 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -21,7 +22,7 @@ func Subscribe(ctx context.Context, client client.Client, since *timestamppb.Tim
 	for i, service := range services {
 		services[i] = NormalizeServiceName(service)
 		noarmalizedServiceNameToServiceName[services[i]] = service
-		serviceStatus[service] = "UNKNOWN"
+		serviceStatus[service] = string(types.ServiceUnknown)
 	}
 
 	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Since: since, Services: services})
