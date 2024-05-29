@@ -99,6 +99,12 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
+	projectName, err := client.LoadProjectName()
+	if err != nil {
+		return err
+	}
+	term.Debug(" - Tailing logs in project", projectName)
+
 	if params.Service != "" {
 		params.Service = NormalizeServiceName(params.Service)
 		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
@@ -113,12 +119,6 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			}
 		}
 	}
-
-	projectName, err := client.LoadProjectName()
-	if err != nil {
-		return err
-	}
-	term.Debug(" - Tailing logs in project", projectName)
 
 	if DoDryRun {
 		return ErrDryRun
