@@ -58,7 +58,7 @@ func Subscribe(ctx context.Context, client client.Client, since *timestamppb.Tim
 				serviceName := noarmalizedServiceNameToServiceName[servInfo.Service.Name]
 				serviceStatus[serviceName] = servInfo.Status
 				statusChan <- &serviceStatus
-				term.Debugf("Service(%s): %s with status %s\n", servInfo.Service, serviceName, servInfo.Status)
+				term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
 			}
 		}
 	}()
