@@ -790,15 +790,70 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 	}
 }
 
-func isAllServicesCompleted(statuses map[string]string) bool {
+func isAllServicesAtSameStatus(targetStatus types.ServiceStatus, serviceStatuses map[string]string) bool {
 	allDone := true
-	for _, status := range statuses {
-		if status != "COMPLETED" {
+	for _, status := range serviceStatuses {
+		if status != string(targetStatus) {
 			allDone = false
 			break
 		}
 	}
 	return allDone
+}
+
+func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo, since time.Time) (context.Context, error) {
+	serviceList := []string{}
+	for _, serviceInfo := range serviceInfos {
+		serviceList = append(serviceList, serviceInfo.Service.Name)
+	}
+
+	// set up service status subscription (non-blocking)
+	serviceStatusChan, err := cli.Subscribe(ctx, client, timestamppb.New(since), serviceList)
+	if err != nil {
+		return ctx, err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	// monitor for when all services are completed to end this command
+	go func() {
+		defer cancel()
+
+		for serviceStatus := range serviceStatusChan {
+			if isAllServicesAtSameStatus(targetStatus, *serviceStatus) {
+				for _, serviceInfo := range serviceInfos {
+					serviceInfo.Status = (*serviceStatus)[serviceInfo.Service.Name]
+				}
+				printEndpoints(serviceInfos)
+				break
+			}
+		}
+	}()
+
+	return ctx, nil
+}
+
+func startTailing(ctx context.Context, etag string, since time.Time) error {
+	// set up tailing
+	services := "all services"
+	if etag != "" {
+		services = "deployment ID " + etag
+	}
+
+	term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
+	tailParams := cli.TailOptions{
+		Service: "",
+		Etag:    etag,
+		Since:   since,
+		Raw:     false,
+	}
+
+	// blocking call to tail
+	if err := cli.Tail(ctx, client, tailParams); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 var composeUpCmd = &cobra.Command{
@@ -811,7 +866,8 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
+		ctx := cmd.Context()
+		deploy, err := cli.ComposeStart(ctx, client, force)
 		if err != nil {
 			return err
 		}
@@ -820,58 +876,28 @@ var composeUpCmd = &cobra.Command{
 			return errors.New("no services being deployed")
 		}
 
-		printPlaygroundPortalServiceURLs(deploy.Services)
+		serviceInfos := deploy.GetServices()
+		printPlaygroundPortalServiceURLs(serviceInfos)
 
 		if detach {
 			term.Info(" * Done.")
 			return nil
 		}
 
-		serviceList := []string{}
-		for _, serviceInfo := range deploy.Services {
-			serviceList = append(serviceList, serviceInfo.Service.Name)
-		}
-
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		// set up service status subscription (non-blocking)
-		serviceStatusChan, err := cli.Subscribe(ctx, client, timestamppb.New(since), serviceList)
-		if err != nil {
-			return err
-		}
-
-		// monitor for when all services are completed to end this command
-		go func() {
-			for serviceStatus := range serviceStatusChan {
-				if isAllServicesCompleted(*serviceStatus) {
-					printEndpoints(deploy.Services)
-					break
-				}
+		if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
+			// monitor only defang lab deploys
+			ctx, err = monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
+			if err != nil {
+				term.Warnf("failed to start service status monitoring: %v", err)
+				printEndpoints(serviceInfos)
 			}
-
-			cancel()
-		}()
-
-		// set up tailing
-		etag := deploy.Etag
-		services := "all services"
-		if etag != "" {
-			services = "deployment ID " + etag
 		}
 
-		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		tailParams := cli.TailOptions{
-			Service: "",
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
-		}
-
-		// blocking call to tail
-		err = cli.Tail(ctx, client, tailParams)
-		if err != nil {
-			return err
+		if err := startTailing(ctx, deploy.Etag, since); err != nil {
+			var cerr *cli.CancelError
+			if !errors.As(err, &cerr) {
+				term.Warnf("failed to start tailing: %v", err)
+			}
 		}
 
 		term.Info(" * Done.")
