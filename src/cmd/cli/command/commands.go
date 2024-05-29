@@ -302,11 +302,11 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn(" ! Digital Ocean provider was selected, but DO_PAT environment variable not set")
+				term.Warn(" ! Digital Ocean provider was selected, but DO_PAT environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			if awsInEnv() {
-				term.Warn(" ! Using Defang provider, but AWS environment variables were detected; use --provider")
+				term.Warn(" ! Using Defang playground, but AWS environment variables were detected; did you forget --provider?")
 			}
 		}
 

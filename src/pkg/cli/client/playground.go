@@ -63,7 +63,7 @@ func (g *PlaygroundClient) Tail(ctx context.Context, req *defangv1.TailRequest) 
 }
 
 func (g *PlaygroundClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
-	return "", errors.New("the bootstrap command is not valid for the Defang provider")
+	return "", errors.New("the bootstrap command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
@@ -86,11 +86,11 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 }
 
 func (g *PlaygroundClient) TearDown(ctx context.Context) error {
-	return errors.New("the teardown command is not valid for the Defang provider")
+	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
 }
 
 func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
-	return nil, errors.New("this command is not valid for the Defang provider")
+	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
 func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
