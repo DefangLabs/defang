@@ -3,6 +3,7 @@ package term
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
@@ -134,4 +135,15 @@ func Fatal(msg any) {
 func Fatalf(format string, v ...any) {
 	Errorf("Error: "+format, v...)
 	os.Exit(1)
+}
+
+/* ANSI escape codes https://en.wikipedia.org/wiki/ANSI_escape_code
+ * Fp/Fe/Fs: ESC [0-WYZ\`-~] 						 				(0x30-0x7E except 'X', '[', ']', '^', '_')
+ * CSI:      ESC '[' [0-?]* [ -/]* [@-~]  							(common commands like color, cursor movement, etc.)
+ * OSC:      ESC ('X' | ']' | '^' | '_') .*? (BEL | ESC '\' | $)	(commands that set window title, etc.)
+ */
+var ansiRegex = regexp.MustCompile("\x1b(?:[@-WYZ\\\\`-~]|\\[[0-?]*[ -/]*[@-~]|[X\\]^_].*?(?:\x1b\\\\|\x07|$))")
+
+func StripAnsi(s string) string {
+	return ansiRegex.ReplaceAllLiteralString(s, "")
 }
