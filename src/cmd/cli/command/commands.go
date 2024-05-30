@@ -801,7 +801,8 @@ func isAllServicesAtSameStatus(targetStatus types.ServiceStatus, serviceStatuses
 	return allDone
 }
 
-func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo, since time.Time) (context.Context, error) {
+func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo, since time.Time) (<-chan bool, error) {
+	completed := make(chan bool)
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
 		serviceList = append(serviceList, serviceInfo.Service.Name)
@@ -810,27 +811,23 @@ func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus,
 	// set up service status subscription (non-blocking)
 	serviceStatusChan, err := cli.Subscribe(ctx, client, timestamppb.New(since), serviceList)
 	if err != nil {
-		return ctx, err
+		return completed, err
 	}
-
-	ctx, cancel := context.WithCancel(ctx)
 
 	// monitor for when all services are completed to end this command
 	go func() {
-		defer cancel()
-
 		for serviceStatus := range serviceStatusChan {
 			if isAllServicesAtSameStatus(targetStatus, *serviceStatus) {
-				for _, serviceInfo := range serviceInfos {
-					serviceInfo.Status = (*serviceStatus)[serviceInfo.Service.Name]
-				}
-				printEndpoints(serviceInfos)
-				break
+				completed <- true
+				return
 			}
 		}
+
+		// server channel closed without having all services completed
+		completed <- false
 	}()
 
-	return ctx, nil
+	return completed, nil
 }
 
 func startTailing(ctx context.Context, etag string, since time.Time) error {
@@ -884,13 +881,26 @@ var composeUpCmd = &cobra.Command{
 			return nil
 		}
 
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
 			// monitor only defang lab deploys
-			ctx, err = monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
+			completed, err := monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
 			if err != nil {
 				term.Warnf("failed to start service status monitoring: %v", err)
 				printEndpoints(serviceInfos)
 			}
+
+			go func() {
+				if <-completed {
+					cancel()
+					for _, sInfo := range serviceInfos {
+						sInfo.Status = string(types.ServiceStarted)
+					}
+					printEndpoints(serviceInfos)
+				}
+			}()
 		}
 
 		if err := startTailing(ctx, deploy.Etag, since); err != nil {
