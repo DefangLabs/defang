@@ -365,8 +365,7 @@ message Event {
 message PublishRequest { Event event = 1; }
 
 message SubscribeRequest { 
-  google.protobuf.Timestamp since = 1;
-  repeated string services = 2; 
+  repeated string services = 1; 
 }
 
 message SubscribeResponse { repeated ServiceInfo services = 1; }
