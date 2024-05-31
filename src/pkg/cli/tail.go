@@ -223,6 +223,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric" || msg.Host == "kaniko" || msg.Host == "fabric"
 		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
+			fmt.Printf("Service: %s, Host: %s, Message: %s\n", msg.Service, msg.Host, e.Message)
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, e.Message) {
 					return nil

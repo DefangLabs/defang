@@ -3,7 +3,11 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -125,6 +129,43 @@ func (bs *byocServerStream) parseEvents(e types.StartLiveTailResponseStream) ([]
 			bs.response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
 			bs.response.Service = record.ContainerName // TODO: could be service_etag
 			parseFirelensRecords = true
+		}
+	} else if strings.HasSuffix(*event.LogGroupIdentifier, "/ecs") || strings.HasSuffix(*event.LogGroupIdentifier, "/ecs:*") {
+		fmt.Printf("ECS: LogGroupIdentifier: %s\n", *event.LogGroupIdentifier)
+		var ecsEvt ecs.Event
+		if err := json.Unmarshal([]byte(*event.Message), &ecsEvt); err != nil {
+			return nil, err
+		}
+
+		switch ecsEvt.DetailType {
+		case "ECS Task State Change":
+			var detail ecs.ECSTaskStateChange
+			if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
+				return nil, fmt.Errorf("error unmarshaling ECS task state change: %w", err)
+			}
+
+		case "ECS Service Action", "ECS Deployment State Change": // pretty much the same JSON structure for both
+			// Parse the service ARN to extract the ECS service name.
+			ecsService := path.Base(ecsEvt.Resources[0])
+
+			var detail ecs.ECSDeploymentStateChange
+			if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
+				return nil, fmt.Errorf("error unmarshaling ECS service/deployment event: %v", err)
+			}
+
+			status := detail.EventName // eg. SERVICE_TASK_PLACEMENT_FAILURE or SERVICE_STEADY_STATE
+			if detail.Reason != "" && status != "SERVICE_DEPLOYMENT_COMPLETED" {
+				status += " " + detail.Reason // eg. "RESOURCE:FARGATE" or "ECS deployment ecs-svc/77495883616404538 completed."
+			}
+
+			fqn := getQualifiedNameFromEcsName(ecsService)
+			// Don't return an error if the status update fails, or ECS will resend the event overwriting newer status; TODO: get etag from service/deployment
+			if err := f.updateServiceStatus(fqn, status, ""); err != nil {
+				log.Printf("dropped service status update: %v\n", err)
+			}
+		default:
+			rw.WriteHeader(http.StatusBadRequest) // no retry; EventBridge only retries on 5xx/429
+			return
 		}
 	}
 	if bs.etag != "" && bs.etag != bs.response.Etag {
