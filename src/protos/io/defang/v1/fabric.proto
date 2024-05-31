@@ -364,7 +364,9 @@ message Event {
 
 message PublishRequest { Event event = 1; }
 
-message SubscribeRequest { string service = 1; }
+message SubscribeRequest { 
+  repeated string services = 1; 
+}
 
 message SubscribeResponse { repeated ServiceInfo services = 1; }
 
