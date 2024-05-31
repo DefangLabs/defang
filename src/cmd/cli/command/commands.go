@@ -24,7 +24,6 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -809,7 +808,7 @@ func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus,
 	}
 
 	// set up service status subscription (non-blocking)
-	serviceStatusChan, err := cli.Subscribe(ctx, client, timestamppb.New(since), serviceList)
+	serviceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
 	if err != nil {
 		return completed, err
 	}
@@ -884,24 +883,21 @@ var composeUpCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
-			// monitor only defang lab deploys
-			completed, err := monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
-			if err != nil {
-				term.Warnf("failed to start service status monitoring: %v", err)
+		completed, err := monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
+		if err != nil {
+			term.Warnf("failed to start service status monitoring: %v", err)
+			printEndpoints(serviceInfos)
+		}
+
+		go func() {
+			if <-completed {
+				cancel()
+				for _, sInfo := range serviceInfos {
+					sInfo.Status = string(types.ServiceStarted)
+				}
 				printEndpoints(serviceInfos)
 			}
-
-			go func() {
-				if <-completed {
-					cancel()
-					for _, sInfo := range serviceInfos {
-						sInfo.Status = string(types.ServiceStarted)
-					}
-					printEndpoints(serviceInfos)
-				}
-			}()
-		}
+		}()
 
 		if err := startTailing(ctx, deploy.Etag, since); err != nil {
 			var cerr *cli.CancelError
