@@ -278,7 +278,7 @@ func resolveEnv(k string) *string {
 	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
 	v, ok := os.LookupEnv(k)
 	if !ok {
-		warnf("environment variable not found: %q", k)
+		warnf("environment variable not found: %q; using config", k)
 		// If the value could not be resolved, it should be removed
 		return nil
 	}
