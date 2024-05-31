@@ -70,9 +70,9 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
+		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		StackName:    ptr.String(a.stackName),
 		TemplateBody: ptr.String(templateBody),
-		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 	})
 	if err != nil {
 		// Go SDK doesn't have --no-fail-on-empty-changeset; ignore ValidationError: No updates are to be performed.
@@ -84,7 +84,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		return err // might call createStackAndWait depending on the error
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be updated...") // TODO: verbose only
+	fmt.Println("Waiting for CloudFormation stack", a.stackName, "to be updated...") // TODO: verbose only
 	o, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
@@ -106,10 +106,11 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	_, err = cfn.CreateStack(ctx, &cloudformation.CreateStackInput{
-		StackName:    ptr.String(a.stackName),
-		TemplateBody: ptr.String(templateBody),
-		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
-		OnFailure:    cfnTypes.OnFailureDelete,
+		Capabilities:                []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
+		EnableTerminationProtection: ptr.Bool(true),
+		OnFailure:                   cfnTypes.OnFailureDelete,
+		StackName:                   ptr.String(a.stackName),
+		TemplateBody:                ptr.String(templateBody),
 	})
 	if err != nil {
 		// Ignore AlreadyExistsException; return all other errors
@@ -119,7 +120,7 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 		}
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be created...") // TODO: verbose only
+	fmt.Println("Waiting for CloudFormation stack", a.stackName, "to be created...") // TODO: verbose only
 	dso, err := cloudformation.NewStackCreateCompleteWaiter(cfn, create1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
@@ -228,6 +229,13 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 		return err
 	}
 
+	// Disable termination protection before deleting the stack
+	if _, err := cfn.UpdateTerminationProtection(ctx, &cloudformation.UpdateTerminationProtectionInput{
+		StackName:                   ptr.String(a.stackName),
+		EnableTerminationProtection: ptr.Bool(false),
+	}); err != nil {
+		fmt.Printf("Failed to disable termination protection for CloudFormation stack %s: %v\n", a.stackName, err)
+	}
 	_, err = cfn.DeleteStack(ctx, &cloudformation.DeleteStackInput{
 		StackName: ptr.String(a.stackName),
 		// RetainResources: []string{"Bucket"}, only when the stack is in the DELETE_FAILED state
@@ -236,7 +244,7 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	fmt.Println("Waiting for stack", a.stackName, "to be deleted...") // TODO: verbose only
+	fmt.Println("Waiting for CloudFormation stack", a.stackName, "to be deleted...") // TODO: verbose only
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
