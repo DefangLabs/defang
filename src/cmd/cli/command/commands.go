@@ -666,16 +666,41 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG", // like Docker
+	Use:         "create CONFIG [file]", // like Docker
 	Annotations: authNeededAnnotation,
-	Args:        cobra.ExactArgs(1),
+	Args:        cobra.RangeArgs(1, 2),
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
+		parts := strings.SplitN(args[0], "=", 2)
+		name := parts[0]
+
+		if !pkg.IsValidSecretName(name) {
+			return fmt.Errorf("invalid config name: %q", name)
+		}
 
 		var value string
-		if !nonInteractive {
+		if len(parts) == 2 {
+			// Handle name=value; can't also specify a file in this case
+			if len(args) == 2 {
+				return errors.New("cannot specify both config value and input file")
+			}
+			value = parts[1]
+		} else if nonInteractive || len(args) == 2 {
+			// Read the value from a file or stdin
+			var err error
+			var bytes []byte
+			if len(args) == 2 && args[1] != "-" {
+				bytes, err = os.ReadFile(args[1])
+			} else {
+				bytes, err = io.ReadAll(os.Stdin)
+			}
+			if err != nil && err != io.EOF {
+				return fmt.Errorf("failed reading the config value: %w", err)
+			}
+			// Trim the newline at the end because single line values are common
+			value = strings.TrimSuffix(string(bytes), "\n")
+		} else {
 			// Prompt for sensitive value
 			var sensitivePrompt = &survey.Password{
 				Message: fmt.Sprintf("Enter value for %q:", name),
@@ -686,12 +711,6 @@ var configSetCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-		} else {
-			bytes, err := io.ReadAll(os.Stdin)
-			if err != nil && err != io.EOF {
-				return fmt.Errorf("failed reading the value from non-terminal: %w", err)
-			}
-			value = strings.TrimSuffix(string(bytes), "\n")
 		}
 
 		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
