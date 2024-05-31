@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -153,9 +152,7 @@ func validateProject(project *compose.Project) error {
 			if !pkg.IsValidSecretName(secret.Source) {
 				return fmt.Errorf("secret name is invalid: %q", secret.Source)
 			}
-			if secret.Target != "" {
-				return fmt.Errorf("unsupported compose directive: secret target")
-			}
+			// secret.Target will always be automatically constructed by compose-go to "/run/secrets/<source>"
 			if s, ok := project.Secrets[secret.Source]; !ok {
 				warnf("secret %q is not defined in the top-level secrets section", secret.Source)
 			} else if s.Name != "" && s.Name != secret.Source {
@@ -228,11 +225,8 @@ func validateProject(project *compose.Project) error {
 				warnf("no reservations specified; using limits as reservations")
 			}
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
-			if reservations != nil && reservations.NanoCPUs != "" {
-				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
-				if err != nil || cpus < 0 { // "0" just means "as small as possible"
-					return fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)
-				}
+			if reservations.NanoCPUs < 0 { // "0" just means "as small as possible"
+				return fmt.Errorf("invalid value for cpus: %v", reservations.NanoCPUs)
 			}
 		}
 		var reservations *compose.Resource
