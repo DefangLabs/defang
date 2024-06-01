@@ -889,6 +889,7 @@ var composeUpCmd = &cobra.Command{
 			printEndpoints(serviceInfos)
 		}
 
+		// handle monitoring service events
 		go func() {
 			if <-completed {
 				cancel()
@@ -896,9 +897,12 @@ var composeUpCmd = &cobra.Command{
 					sInfo.Status = string(types.ServiceStarted)
 				}
 				printEndpoints(serviceInfos)
+			} else {
+				term.Warnf("service state monitoring terminated without all services reaching desired state: %s", types.ServiceStarted)
 			}
 		}()
 
+		// show users the current streaming logs
 		if err := startTailing(ctx, deploy.Etag, since); err != nil {
 			var cerr *cli.CancelError
 			if !errors.As(err, &cerr) {
