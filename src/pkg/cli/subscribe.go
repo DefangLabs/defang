@@ -16,11 +16,11 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 	}
 
 	serviceStatus := make(map[string]string, len(services))
-	noarmalizedServiceNameToServiceName := make(map[string]string, len(services))
+	normalizedServiceNameToServiceName := make(map[string]string, len(services))
 
 	for i, service := range services {
 		services[i] = NormalizeServiceName(service)
-		noarmalizedServiceNameToServiceName[services[i]] = service
+		normalizedServiceNameToServiceName[services[i]] = service
 		serviceStatus[service] = string(types.ServiceUnknown)
 	}
 
@@ -49,13 +49,17 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			if !serverStream.Receive() {
-				term.Warn("Subscribe Stream failed - stopping\n")
+				term.Debug("Subscribe Stream closed")
 				return
 			}
 
 			msg := serverStream.Msg()
 			for _, servInfo := range msg.GetServices() {
-				serviceName := noarmalizedServiceNameToServiceName[servInfo.Service.Name]
+				serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
+				if !ok {
+					term.Warnf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
+					continue
+				}
 				serviceStatus[serviceName] = servInfo.Status
 				statusChan <- &serviceStatus
 				term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
