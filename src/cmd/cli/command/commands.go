@@ -337,11 +337,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
-			if nonInteractive {
-				return err
-			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
+				if nonInteractive {
+					return err
+				}
 				term.Warn(" !", prettyError(err))
 
 				defer trackCmd(nil, "Login", P{"reason", err})
@@ -356,13 +356,13 @@ var RootCmd = &cobra.Command{
 				}
 			}
 
-			// terms command requires login but does not need the user to have agreed to the terms
-			if cmd.Name() == "terms" {
-				return nil
-			}
-
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
+				// terms command requires login but does not need the user to have agreed to the terms
+				if cmd.Name() == "terms" {
+					return nil
+				}
+
 				term.Warn(" !", prettyError(err))
 
 				defer trackCmd(nil, "Terms", P{"reason", err})
