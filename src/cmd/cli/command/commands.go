@@ -337,11 +337,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
+			if nonInteractive {
+				return err
+			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				if nonInteractive {
-					return err
-				}
 				term.Warn(" !", prettyError(err))
 
 				defer trackCmd(nil, "Login", P{"reason", err})
@@ -358,11 +358,6 @@ var RootCmd = &cobra.Command{
 
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				// terms command requires login but does not need the user to have agreed to the terms
-				if cmd.Name() == "terms" {
-					return nil
-				}
-
 				term.Warn(" !", prettyError(err))
 
 				defer trackCmd(nil, "Terms", P{"reason", err})
@@ -1131,12 +1126,16 @@ var bootstrapListCmd = &cobra.Command{
 }
 
 var tosCmd = &cobra.Command{
-	Use:         "terms",
-	Aliases:     []string{"tos", "eula", "tac", "tou"},
-	Annotations: authNeededAnnotation, // TODO: only need auth when agreeing to the terms
-	Args:        cobra.NoArgs,
-	Short:       "Read and/or agree the Defang terms of service",
+	Use:     "terms",
+	Aliases: []string{"tos", "eula", "tac", "tou"},
+	Args:    cobra.NoArgs,
+	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if we are correctly logged in
+		if _, err := client.WhoAmI(cmd.Context()); err != nil {
+			return err
+		}
+
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
 		if agree {
