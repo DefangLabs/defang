@@ -449,7 +449,7 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err := validateProject(p); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if bytes.Contains(warnings.Bytes(), []byte(`network "public" used by service dfnx is not defined`)) {
+	if bytes.Contains(warnings.Bytes(), []byte(`network \"public\" is not defined`)) {
 		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
 	}
 }
