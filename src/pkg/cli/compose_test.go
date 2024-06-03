@@ -430,8 +430,8 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err := validateProject(p); err != nil {
 		t.Errorf("Invalid network name should not be an error: %v", err)
 	}
-	if !bytes.Contains(warnings.Bytes(), []byte("network invalid-network-name used by service dfnx is not defined")) {
-		t.Errorf("Invalid network name should trigger a warning")
+	if !bytes.Contains(warnings.Bytes(), []byte(`network \"invalid-network-name\" is not defined`)) {
+		t.Errorf("Invalid network name should trigger a warning: %v", warnings.String())
 	}
 
 	warnings.Reset()
@@ -440,8 +440,8 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err := validateProject(p); err != nil {
 		t.Errorf("public network name should not be an error: %v", err)
 	}
-	if !bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
-		t.Errorf("missing public network in global networks section should trigger a warning")
+	if !bytes.Contains(warnings.Bytes(), []byte(`network \"public\" is not defined`)) {
+		t.Errorf("missing public network in global networks section should trigger a warning: %v", warnings.String())
 	}
 
 	warnings.Reset()
@@ -449,7 +449,7 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err := validateProject(p); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
+	if bytes.Contains(warnings.Bytes(), []byte(`network "public" used by service dfnx is not defined`)) {
 		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
 	}
 }
@@ -466,5 +466,46 @@ func TestProjectValidationNoDeploy(t *testing.T) {
 	p.Services["dfnx"] = dfnx
 	if err := validateProject(p); err != nil {
 		t.Errorf("No deploy section should not be an error: %v", err)
+	}
+}
+
+func TestIsStatefulImage(t *testing.T) {
+	tests := []struct {
+		name     string
+		image    string
+		expected bool
+	}{
+		{
+			name:     "Stateful image",
+			image:    "redis",
+			expected: true,
+		},
+		{
+			name:     "Stateful image with repo",
+			image:    "library/redis",
+			expected: true,
+		},
+		{
+			name:     "Stateful image with tag",
+			image:    "redis:6.0",
+			expected: true,
+		},
+		{
+			name:     "Stateful image with registry",
+			image:    "docker.io/redis",
+			expected: true,
+		},
+		{
+			name:     "Stateless image",
+			image:    "alpine:latest",
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isStatefulImage(tt.image); got != tt.expected {
+				t.Errorf("isStatefulImage() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }

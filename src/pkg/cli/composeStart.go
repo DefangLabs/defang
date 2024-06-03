@@ -191,8 +191,12 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		var redis *defangv1.Redis
-		if redisCacheVal := svccfg.Extensions["x-defang-redis"]; redisCacheVal != nil {
+		if _, ok := svccfg.Extensions["x-defang-redis"]; ok {
 			redis = &defangv1.Redis{}
+		}
+
+		if redis == nil && isStatefulImage(svccfg.Image) {
+			warnf("stateful service %q will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
 		network := network(&svccfg)
