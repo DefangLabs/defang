@@ -423,11 +423,7 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
-	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
-		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
-	}
 
-	warnings.Reset()
 	dfnx := p.Services["dfnx"]
 	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"invalid-network-name": nil}
 	p.Services["dfnx"] = dfnx
@@ -455,6 +451,21 @@ func TestProjectValidationNetworks(t *testing.T) {
 	}
 	if bytes.Contains(warnings.Bytes(), []byte("network public used by service dfnx is not defined")) {
 		t.Errorf("When public network is defined globally should not trigger a warning when public network is used")
+	}
+}
+
+func TestComposeGoNoDoubleWarningLog(t *testing.T) {
+	var warnings bytes.Buffer
+	logrus.SetOutput(&warnings)
+
+	loader := ComposeLoader{"../../tests/compose-go-warn/compose.yaml"}
+	_, err := loader.LoadWithDefaultProjectName("tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
+		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
 	}
 }
 

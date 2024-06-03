@@ -56,10 +56,10 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	currentOutput := logrus.StandardLogger().Out
 	logrus.SetOutput(io.Discard)
 	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
+	logrus.SetOutput(currentOutput)
 	if err != nil {
 		return nil, err
 	}
-	logrus.SetOutput(currentOutput) // logrus defaut output is stderr
 
 	loadOpts := []func(*loader.Options){
 		loader.WithDiscardEnvFiles,
