@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,10 +52,14 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		},
 	}
 
+	// Disable logrus output to prevent double warnings from compose-go
+	currentOutput := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
 	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
 	if err != nil {
 		return nil, err
 	}
+	logrus.SetOutput(currentOutput) // logrus defaut output is stderr
 
 	loadOpts := []func(*loader.Options){
 		loader.WithDiscardEnvFiles,

@@ -51,7 +51,7 @@ services:
 
 secrets:
   dummy:
-    external: true
+    external: yes
     name: dummy
 
 x-unsupported: unsupported
