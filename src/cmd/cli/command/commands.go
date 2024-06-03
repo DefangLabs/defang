@@ -356,8 +356,8 @@ var RootCmd = &cobra.Command{
 				}
 			}
 
-			// terms command requires login but does not require the user to have agreed to the terms
-			if cmd.Name() == tosCmd.Name() {
+			// terms command requires login but does not need the user to have agreed to the terms
+			if cmd.Name() == "terms" {
 				return nil
 			}
 
