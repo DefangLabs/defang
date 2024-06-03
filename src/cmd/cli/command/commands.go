@@ -356,6 +356,11 @@ var RootCmd = &cobra.Command{
 				}
 			}
 
+			// terms command requires login but does not require the user to have agreed to the terms
+			if cmd.Name() == tosCmd.Name() {
+				return nil
+			}
+
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
 				term.Warn(" !", prettyError(err))
