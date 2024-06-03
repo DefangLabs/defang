@@ -17,7 +17,7 @@ require (
 	github.com/aws/smithy-go v1.20.2
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
-	github.com/compose-spec/compose-go/v2 v2.0.0-rc.2
+	github.com/compose-spec/compose-go/v2 v2.1.1
 	github.com/digitalocean/godo v1.111.0
 	github.com/docker/docker v25.0.5+incompatible
 	github.com/google/uuid v1.6.0
@@ -100,7 +100,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.22.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.22.0 // indirect
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect; compose-go is using the older slices.sortFunc API
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect; compose-go is using the older slices.sortFunc API
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect

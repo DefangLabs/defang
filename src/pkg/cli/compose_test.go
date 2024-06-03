@@ -454,6 +454,21 @@ func TestProjectValidationNetworks(t *testing.T) {
 	}
 }
 
+func TestComposeGoNoDoubleWarningLog(t *testing.T) {
+	var warnings bytes.Buffer
+	logrus.SetOutput(&warnings)
+
+	loader := ComposeLoader{"../../tests/compose-go-warn/compose.yaml"}
+	_, err := loader.LoadWithDefaultProjectName("tests")
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
+		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
+	}
+}
+
 func TestProjectValidationNoDeploy(t *testing.T) {
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
 	p, err := loader.LoadWithDefaultProjectName("tests")

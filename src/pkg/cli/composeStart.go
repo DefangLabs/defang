@@ -6,7 +6,6 @@ import (
 	"os"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -61,14 +60,6 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil {
-				cpus := 0.0
-				var err error
-				if reservations.NanoCPUs != "" {
-					cpus, err = strconv.ParseFloat(reservations.NanoCPUs, 32)
-					if err != nil {
-						panic(err) // was already validated
-					}
-				}
 				var devices []*defangv1.Device
 				for _, d := range reservations.Devices {
 					devices = append(devices, &defangv1.Device{
@@ -79,7 +70,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				}
 				deploy.Resources = &defangv1.Resources{
 					Reservations: &defangv1.Resource{
-						Cpus:    float32(cpus),
+						Cpus:    float32(reservations.NanoCPUs),
 						Memory:  float32(reservations.MemoryBytes) / MiB,
 						Devices: devices,
 					},

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,24 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}
 
+	skipNormalizationOpts := []func(*loader.Options){
+		loader.WithDiscardEnvFiles,
+		func(o *loader.Options) {
+			o.SkipConsistencyCheck = true
+			o.SetProjectName(strings.ToLower(projectName), overrideProjectName)
+			o.SkipNormalization = true // Normalization strips environment variables keys that does not have an value
+		},
+	}
+
+	// Disable logrus output to prevent double warnings from compose-go
+	currentOutput := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
+	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
+	logrus.SetOutput(currentOutput)
+	if err != nil {
+		return nil, err
+	}
+
 	loadOpts := []func(*loader.Options){
 		loader.WithDiscardEnvFiles,
 		func(o *loader.Options) {
@@ -53,6 +72,21 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	project, err := loader.Load(loadCfg, loadOpts...)
 	if err != nil {
 		return nil, err
+	}
+
+	// Hack: Fill in the missing environment variables that were stripped by the normalization process
+	// TODO: file a PR to compose-go to add option to keep unset environment variables
+	for i, service := range rawProj.Services {
+		for key, value := range service.Environment {
+			svc := project.Services[i]
+			if svc.Environment[key] == nil {
+				if svc.Environment == nil {
+					svc.Environment = make(map[string]*string)
+				}
+				svc.Environment[key] = value
+				project.Services[i] = svc
+			}
+		}
 	}
 
 	if term.DoDebug {
