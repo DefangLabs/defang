@@ -423,7 +423,11 @@ func TestProjectValidationNetworks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
+	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
+		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
+	}
 
+	warnings.Reset()
 	dfnx := p.Services["dfnx"]
 	dfnx.Networks = map[string]*types.ServiceNetworkConfig{"invalid-network-name": nil}
 	p.Services["dfnx"] = dfnx
