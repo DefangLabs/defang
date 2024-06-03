@@ -26,135 +26,135 @@ func validateProject(project *compose.Project) error {
 			warnf("service name %q was normalized to %q", svccfg.Name, normalized)
 		}
 		if svccfg.ReadOnly {
-			warnf("unsupported compose directive: read_only")
+			warnf("service %q: unsupported compose directive: read_only", svccfg.Name)
 		}
 		if svccfg.Restart == "" {
-			warnf("missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
+			warnf("service %q: missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name)
 		} else if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
-			warnf("unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
+			warnf("service %q: unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name)
 		}
 		if svccfg.ContainerName != "" {
-			warnf("unsupported compose directive: container_name")
+			warnf("service %q: unsupported compose directive: container_name", svccfg.Name)
 		}
 		if svccfg.Hostname != "" {
-			return fmt.Errorf("unsupported compose directive: hostname; consider using 'domainname' instead")
+			return fmt.Errorf("service %q: unsupported compose directive: hostname; consider using 'domainname' instead", svccfg.Name)
 		}
 		if len(svccfg.DNSSearch) != 0 {
-			return fmt.Errorf("unsupported compose directive: dns_search")
+			return fmt.Errorf("service %q: unsupported compose directive: dns_search", svccfg.Name)
 		}
 		if len(svccfg.DNSOpts) != 0 {
-			warnf("unsupported compose directive: dns_opt")
+			warnf("service %q: unsupported compose directive: dns_opt", svccfg.Name)
 		}
 		if len(svccfg.DNS) != 0 {
-			return fmt.Errorf("unsupported compose directive: dns")
+			return fmt.Errorf("service %q: unsupported compose directive: dns", svccfg.Name)
 		}
 		if len(svccfg.Devices) != 0 {
-			return fmt.Errorf("unsupported compose directive: devices")
+			return fmt.Errorf("service %q: unsupported compose directive: devices", svccfg.Name)
 		}
 		if len(svccfg.DependsOn) != 0 {
-			warnf("unsupported compose directive: depends_on")
+			warnf("service %q: unsupported compose directive: depends_on", svccfg.Name)
 		}
 		if len(svccfg.DeviceCgroupRules) != 0 {
-			return fmt.Errorf("unsupported compose directive: device_cgroup_rules")
+			return fmt.Errorf("service %q: unsupported compose directive: device_cgroup_rules", svccfg.Name)
 		}
 		if len(svccfg.Entrypoint) > 0 {
-			return fmt.Errorf("unsupported compose directive: entrypoint")
+			return fmt.Errorf("service %q: unsupported compose directive: entrypoint", svccfg.Name)
 		}
 		if len(svccfg.GroupAdd) > 0 {
-			return fmt.Errorf("unsupported compose directive: group_add")
+			return fmt.Errorf("service %q: unsupported compose directive: group_add", svccfg.Name)
 		}
 		if len(svccfg.Ipc) > 0 {
-			warnf("unsupported compose directive: ipc")
+			warnf("service %q: unsupported compose directive: ipc", svccfg.Name)
 		}
 		if len(svccfg.Uts) > 0 {
-			warnf("unsupported compose directive: uts")
+			warnf("service %q: unsupported compose directive: uts", svccfg.Name)
 		}
 		if svccfg.Isolation != "" {
-			warnf("unsupported compose directive: isolation")
+			warnf("service %q: unsupported compose directive: isolation", svccfg.Name)
 		}
 		if svccfg.MacAddress != "" {
-			warnf("unsupported compose directive: mac_address")
+			warnf("service %q: unsupported compose directive: mac_address", svccfg.Name)
 		}
 		if len(svccfg.Labels) > 0 {
-			warnf("unsupported compose directive: labels") // TODO: add support for labels
+			warnf("service %q: unsupported compose directive: labels", svccfg.Name) // TODO: add support for labels
 		}
 		if len(svccfg.Links) > 0 {
-			warnf("unsupported compose directive: links")
+			warnf("service %q: unsupported compose directive: links", svccfg.Name)
 		}
 		if svccfg.Logging != nil {
-			warnf("unsupported compose directive: logging")
+			warnf("service %q: unsupported compose directive: logging", svccfg.Name)
 		}
 		for name := range svccfg.Networks {
 			if _, ok := project.Networks[name]; !ok {
-				warnf("network %v used by service %v is not defined in the top-level networks section", name, svccfg.Name)
+				warnf("service %q: network %q is not defined in the top-level networks section", svccfg.Name, name)
 			}
 		}
 		if len(svccfg.Volumes) > 0 {
-			warnf("unsupported compose directive: volumes") // TODO: add support for volumes
+			warnf("service %q: unsupported compose directive: volumes", svccfg.Name) // TODO: add support for volumes
 		}
 		if len(svccfg.VolumesFrom) > 0 {
-			warnf("unsupported compose directive: volumes_from") // TODO: add support for volumes_from
+			warnf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
 		}
 		if svccfg.Build != nil {
 			if svccfg.Build.Dockerfile != "" {
 				if filepath.IsAbs(svccfg.Build.Dockerfile) {
-					return fmt.Errorf("dockerfile path must be relative to the build context: %q", svccfg.Build.Dockerfile)
+					return fmt.Errorf("service %q: dockerfile path must be relative to the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
 				}
 				if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
-					return fmt.Errorf("dockerfile path must be inside the build context: %q", svccfg.Build.Dockerfile)
+					return fmt.Errorf("service %q: dockerfile path must be inside the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
 				}
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					return fmt.Errorf("dockerfile not found: %q", dockerfilePath)
+					return fmt.Errorf("service %q: dockerfile not found: %q", svccfg.Name, dockerfilePath)
 				}
 			}
 			if svccfg.Build.SSH != nil {
-				return fmt.Errorf("unsupported compose directive: build ssh")
+				return fmt.Errorf("service %q: unsupported compose directive: build ssh", svccfg.Name)
 			}
 			if len(svccfg.Build.Labels) != 0 {
-				warnf("unsupported compose directive: build labels") // TODO: add support for Kaniko --label
+				warnf("service %q: unsupported compose directive: build labels", svccfg.Name) // TODO: add support for Kaniko --label
 			}
 			if len(svccfg.Build.CacheFrom) != 0 {
-				warnf("unsupported compose directive: build cache_from")
+				warnf("service %q: unsupported compose directive: build cache_from", svccfg.Name)
 			}
 			if len(svccfg.Build.CacheTo) != 0 {
-				warnf("unsupported compose directive: build cache_to")
+				warnf("service %q: unsupported compose directive: build cache_to", svccfg.Name)
 			}
 			if svccfg.Build.NoCache {
-				warnf("unsupported compose directive: build no_cache")
+				warnf("service %q: unsupported compose directive: build no_cache", svccfg.Name)
 			}
 			if len(svccfg.Build.ExtraHosts) != 0 {
-				return fmt.Errorf("unsupported compose directive: build extra_hosts")
+				return fmt.Errorf("service %q: unsupported compose directive: build extra_hosts", svccfg.Name)
 			}
 			if svccfg.Build.Isolation != "" {
-				warnf("unsupported compose directive: build isolation")
+				warnf("service %q: unsupported compose directive: build isolation", svccfg.Name)
 			}
 			if svccfg.Build.Network != "" {
-				return fmt.Errorf("unsupported compose directive: build network")
+				return fmt.Errorf("service %q: unsupported compose directive: build network", svccfg.Name)
 			}
 			if len(svccfg.Build.Secrets) != 0 {
-				return fmt.Errorf("unsupported compose directive: build secrets") // TODO: support build secrets
+				return fmt.Errorf("service %q: unsupported compose directive: build secrets", svccfg.Name) // TODO: support build secrets
 			}
 			if len(svccfg.Build.Tags) != 0 {
-				return fmt.Errorf("unsupported compose directive: build tags")
+				return fmt.Errorf("service %q: unsupported compose directive: build tags", svccfg.Name)
 			}
 			if len(svccfg.Build.Platforms) != 0 {
-				return fmt.Errorf("unsupported compose directive: build platforms")
+				return fmt.Errorf("service %q: unsupported compose directive: build platforms", svccfg.Name)
 			}
 			if svccfg.Build.Privileged {
-				return fmt.Errorf("unsupported compose directive: build privileged")
+				return fmt.Errorf("service %q: unsupported compose directive: build privileged", svccfg.Name)
 			}
 			if svccfg.Build.DockerfileInline != "" {
-				return fmt.Errorf("unsupported compose directive: build dockerfile_inline")
+				return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline", svccfg.Name)
 			}
 		}
 		for _, secret := range svccfg.Secrets {
 			if !pkg.IsValidSecretName(secret.Source) {
-				return fmt.Errorf("secret name is invalid: %q", secret.Source)
+				return fmt.Errorf("service %q: secret name is invalid: %q", svccfg.Name, secret.Source)
 			}
 			if secret.Target != "" {
-				return fmt.Errorf("unsupported compose directive: secret target")
+				return fmt.Errorf("service %q: unsupported compose directive: secret target", svccfg.Name)
 			}
 			if s, ok := project.Secrets[secret.Source]; !ok {
 				warnf("secret %q is not defined in the top-level secrets section", secret.Source)
@@ -172,7 +172,7 @@ func validateProject(project *compose.Project) error {
 			// Show a warning when we have ingress ports but no explicit healthcheck
 			for _, port := range svccfg.Ports {
 				if port.Mode == "ingress" {
-					warnf("ingress port without healthcheck defaults to GET / HTTP/1.1")
+					warnf("service %q: ingress port without healthcheck defaults to GET / HTTP/1.1", svccfg.Name)
 					break
 				}
 			}
@@ -180,58 +180,58 @@ func validateProject(project *compose.Project) error {
 			timeout := 30 // default per compose spec
 			if svccfg.HealthCheck.Timeout != nil {
 				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
-					warnf("healthcheck timeout must be a multiple of 1s")
+					warnf("service %q: healthcheck timeout must be a multiple of 1s", svccfg.Name)
 				}
 				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
 			interval := 30 // default per compose spec
 			if svccfg.HealthCheck.Interval != nil {
 				if *svccfg.HealthCheck.Interval%1e9 != 0 {
-					warnf("healthcheck interval must be a multiple of 1s")
+					warnf("service %q: healthcheck interval must be a multiple of 1s", svccfg.Name)
 				}
 				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
 			// Technically this should test for <= but both interval and timeout have 30s as the default value
 			if interval < timeout || timeout <= 0 {
-				return fmt.Errorf("healthcheck timeout %ds must be positive and smaller than the interval %ds", timeout, interval)
+				return fmt.Errorf("service %q: healthcheck timeout %ds must be positive and smaller than the interval %ds", svccfg.Name, timeout, interval)
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
-				warnf("unsupported compose directive: healthcheck start_period")
+				warnf("service %q: unsupported compose directive: healthcheck start_period", svccfg.Name)
 			}
 			if svccfg.HealthCheck.StartInterval != nil {
-				warnf("unsupported compose directive: healthcheck start_interval")
+				warnf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 			}
 		}
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
-				return fmt.Errorf("unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode)
+				return fmt.Errorf("service %q: unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode, svccfg.Name)
 			}
 			if len(svccfg.Deploy.Labels) > 0 {
-				warnf("unsupported compose directive: deploy labels")
+				warnf("service %q: unsupported compose directive: deploy labels", svccfg.Name)
 			}
 			if svccfg.Deploy.UpdateConfig != nil {
-				return fmt.Errorf("unsupported compose directive: deploy update_config")
+				return fmt.Errorf("service %q: unsupported compose directive: deploy update_config", svccfg.Name)
 			}
 			if svccfg.Deploy.RollbackConfig != nil {
-				return fmt.Errorf("unsupported compose directive: deploy rollback_config")
+				return fmt.Errorf("service %q: unsupported compose directive: deploy rollback_config", svccfg.Name)
 			}
 			if svccfg.Deploy.RestartPolicy != nil {
-				return fmt.Errorf("unsupported compose directive: deploy restart_policy")
+				return fmt.Errorf("service %q: unsupported compose directive: deploy restart_policy", svccfg.Name)
 			}
 			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
-				warnf("unsupported compose directive: deploy placement")
+				warnf("service %q: unsupported compose directive: deploy placement", svccfg.Name)
 			}
 			if svccfg.Deploy.EndpointMode != "" {
-				return fmt.Errorf("unsupported compose directive: deploy endpoint_mode")
+				return fmt.Errorf("service %q: unsupported compose directive: deploy endpoint_mode", svccfg.Name)
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
-				warnf("no reservations specified; using limits as reservations")
+				warnf("service %q: no reservations specified; using limits as reservations", svccfg.Name)
 			}
 			reservations := getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil && reservations.NanoCPUs != "" {
 				cpus, err := strconv.ParseFloat(reservations.NanoCPUs, 32)
 				if err != nil || cpus < 0 { // "0" just means "as small as possible"
-					return fmt.Errorf("invalid value for cpus: %q", reservations.NanoCPUs)
+					return fmt.Errorf("service %q: invalid value for cpus: %q", svccfg.Name, reservations.NanoCPUs)
 				}
 			}
 		}
@@ -241,12 +241,12 @@ func validateProject(project *compose.Project) error {
 		}
 
 		if svccfg.Deploy == nil || reservations == nil || reservations.MemoryBytes == 0 {
-			warnf("missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors")
+			warnf("service %q: missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 
 		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
 			if _, ok := dnsRoleVal.(string); !ok {
-				return fmt.Errorf("x-defang-dns-role must be a string")
+				return fmt.Errorf("service %q: x-defang-dns-role must be a string", svccfg.Name)
 			}
 		}
 
@@ -254,7 +254,15 @@ func validateProject(project *compose.Project) error {
 			_, str := staticFilesVal.(string)
 			_, obj := staticFilesVal.(map[string]interface{})
 			if !str && !obj {
-				return fmt.Errorf("x-defang-static-files must be a string or object {folder: string, redirects: string[]}")
+				return fmt.Errorf("service %q: x-defang-static-files must be a string or object {folder: string, redirects: string[]}", svccfg.Name)
+			}
+		}
+
+		if _, ok := svccfg.Extensions["x-defang-redis"]; ok {
+			// Ensure the image is a valid Redis image
+			repo := strings.SplitN(svccfg.Image, ":", 2)[0]
+			if !strings.HasSuffix(repo, "redis") {
+				warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 			}
 		}
 
@@ -263,13 +271,13 @@ func validateProject(project *compose.Project) error {
 			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis":
 				continue
 			default:
-				warnf("unsupported compose extension: %s", k)
+				warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
 			}
 		}
 	}
 
 	for k := range project.Extensions {
-		warnf("unsupported compose extension: %s", k)
+		warnf("unsupported compose extension: %q", k)
 	}
 	return nil
 }
