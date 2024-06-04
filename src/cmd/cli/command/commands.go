@@ -1126,12 +1126,16 @@ var bootstrapListCmd = &cobra.Command{
 }
 
 var tosCmd = &cobra.Command{
-	Use:         "terms",
-	Aliases:     []string{"tos", "eula", "tac", "tou"},
-	Annotations: authNeededAnnotation, // TODO: only need auth when agreeing to the terms
-	Args:        cobra.NoArgs,
-	Short:       "Read and/or agree the Defang terms of service",
+	Use:     "terms",
+	Aliases: []string{"tos", "eula", "tac", "tou"},
+	Args:    cobra.NoArgs,
+	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if we are correctly logged in
+		if _, err := client.WhoAmI(cmd.Context()); err != nil {
+			return err
+		}
+
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
 		if agree {
