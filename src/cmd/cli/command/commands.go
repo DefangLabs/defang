@@ -500,8 +500,8 @@ Generate will write files in the current folder. You can edit them and then depl
 			{
 				Name: "folder",
 				Prompt: &survey.Input{
-					Message: "What folder would you like to create the service in?",
-					Default: "service1",
+					Message: "What folder would you like to create the project in?",
+					Default: "project1",
 					Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
 				},
 				Validate: survey.Required,
