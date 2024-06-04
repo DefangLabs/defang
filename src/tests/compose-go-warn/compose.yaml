@@ -1,0 +1,11 @@
+name: compose-go-warning
+services:
+  echo:
+    image: ealen/echo-server
+    ports:
+      - target: 80
+        mode: ingress
+secrets:
+  dummy:
+    external: yes # compose-go gives warning for using `yes` for boolean values
+    name: dummy
