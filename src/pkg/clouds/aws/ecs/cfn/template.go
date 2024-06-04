@@ -28,6 +28,9 @@ import (
 const (
 	createVpcResources   = true // TODO: make this configurable, add an option to use the default VPC
 	maxCachePrefixLength = 20   // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
+
+	CreatedByTagKey   = "CreatedBy"
+	CreatedByTagValue = awsecs.ProjectName
 )
 
 var (
@@ -47,34 +50,38 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 }
 
 type TemplateOverrides struct {
-	VpcID string
+	SkipBucket bool // skip creating the bucket
+	Spot       bool
+	VpcID      string // existing VPC ID
 }
 
-func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides, spot bool) *cloudformation.Template {
+func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides) *cloudformation.Template {
 	prefix := stack + "-"
 
 	defaultTags := []tags.Tag{
 		{
-			Key:   "CreatedBy",
-			Value: awsecs.ProjectName,
+			Key:   CreatedByTagKey,
+			Value: CreatedByTagValue,
 		},
 	}
 
 	template := cloudformation.NewTemplate()
 
-	// 1. bucket (for deployment state)
+	// 1. bucket (for deployment state; only created if not skipped)
 	const _bucket = "Bucket"
-	var bucketDeletionPolicy policies.DeletionPolicy
-	if retainBucket {
-		bucketDeletionPolicy = "RetainExceptOnCreate"
-	}
-	template.Resources[_bucket] = &s3.Bucket{
-		Tags: defaultTags,
-		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
-		AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
-		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
-			Status: "Enabled",
-		},
+	if !overrides.SkipBucket {
+		var bucketDeletionPolicy policies.DeletionPolicy
+		if retainBucket {
+			bucketDeletionPolicy = "RetainExceptOnCreate"
+		}
+		template.Resources[_bucket] = &s3.Bucket{
+			Tags: defaultTags,
+			// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
+			AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
+			VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
+				Status: "Enabled",
+			},
+		}
 	}
 
 	// 2. ECS cluster
@@ -86,7 +93,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 
 	// 3. ECS capacity provider
 	capacityProvider := "FARGATE"
-	if spot {
+	if overrides.Spot {
 		capacityProvider = "FARGATE_SPOT"
 	}
 	const _capacityProvider = "CapacityProvider"
@@ -522,9 +529,11 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		Value:       cloudformation.Ref(_securityGroup),
 		Description: ptr.String("ID of the security group"),
 	}
-	template.Outputs[outputs.BucketName] = cloudformation.Output{
-		Value:       cloudformation.Ref(_bucket),
-		Description: ptr.String("Name of the S3 bucket"),
+	if !overrides.SkipBucket {
+		template.Outputs[outputs.BucketName] = cloudformation.Output{
+			Value:       cloudformation.Ref(_bucket),
+			Description: ptr.String("Name of the S3 bucket"),
+		}
 	}
 
 	return template
