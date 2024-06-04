@@ -199,12 +199,10 @@ func validateProject(project *compose.Project) error {
 				warnf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 			}
 		}
+		var reservations *compose.Resource
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
-				return fmt.Errorf("service %q: unsupported compose directive: deploy mode: %q", svccfg.Deploy.Mode, svccfg.Name)
-			}
-			if len(svccfg.Deploy.Labels) > 0 {
-				warnf("service %q: unsupported compose directive: deploy labels", svccfg.Name)
+				return fmt.Errorf("service %q: unsupported compose directive: deploy mode: %q", svccfg.Name, svccfg.Deploy.Mode)
 			}
 			if svccfg.Deploy.UpdateConfig != nil {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy update_config", svccfg.Name)
@@ -215,26 +213,24 @@ func validateProject(project *compose.Project) error {
 			if svccfg.Deploy.RestartPolicy != nil {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy restart_policy", svccfg.Name)
 			}
-			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
-				warnf("service %q: unsupported compose directive: deploy placement", svccfg.Name)
-			}
 			if svccfg.Deploy.EndpointMode != "" {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy endpoint_mode", svccfg.Name)
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
 				warnf("service %q: no reservations specified; using limits as reservations", svccfg.Name)
 			}
-			reservations := getResourceReservations(svccfg.Deploy.Resources)
-			if reservations.NanoCPUs < 0 { // "0" just means "as small as possible"
+			reservations = getResourceReservations(svccfg.Deploy.Resources)
+			if reservations != nil && reservations.NanoCPUs < 0 { // "0" just means "as small as possible"
 				return fmt.Errorf("service %q: invalid value for cpus: %v", svccfg.Name, reservations.NanoCPUs)
 			}
+			if len(svccfg.Deploy.Labels) > 0 {
+				warnf("service %q: unsupported compose directive: deploy labels", svccfg.Name)
+			}
+			if len(svccfg.Deploy.Placement.Constraints) != 0 || len(svccfg.Deploy.Placement.Preferences) != 0 || svccfg.Deploy.Placement.MaxReplicas != 0 {
+				warnf("service %q: unsupported compose directive: deploy placement", svccfg.Name)
+			}
 		}
-		var reservations *compose.Resource
-		if svccfg.Deploy != nil {
-			reservations = getResourceReservations(svccfg.Deploy.Resources)
-		}
-
-		if svccfg.Deploy == nil || reservations == nil || reservations.MemoryBytes == 0 {
+		if reservations == nil || reservations.MemoryBytes == 0 {
 			warnf("service %q: missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 
