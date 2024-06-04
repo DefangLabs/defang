@@ -70,7 +70,8 @@ func NormalizeServiceName(s string) string {
 }
 
 func warnf(format string, args ...interface{}) {
-	logrus.Warnf(format, args...)
+	// By default, the logrus StandardLogger writes to os.Stderr
+	logrus.Warnf(term.MarkDown(term.Stderr, format), args...)
 	term.HadWarnings = true
 }
 

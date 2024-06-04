@@ -28,7 +28,7 @@ func validateProject(project *compose.Project) error {
 			warnf("unsupported compose directive: read_only")
 		}
 		if svccfg.Restart == "" {
-			warnf("missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
+			warnf("missing compose directive: `restart`; assuming 'unless-stopped' (add 'restart' to silence)")
 		} else if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
 			warnf("unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)")
 		}

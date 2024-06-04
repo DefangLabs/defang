@@ -15,22 +15,22 @@ func TestValidate(t *testing.T) {
 		{
 			name:    "empty service",
 			service: &defangv1.Service{},
-			wantErr: "service name is required",
+			wantErr: "service `name:` is required",
 		},
 		{
 			name:    "no image, no build",
 			service: &defangv1.Service{Name: "test"},
-			wantErr: "missing image or build",
+			wantErr: "each service must have either `image:` or `build:`",
 		},
 		{
 			name:    "empty build",
 			service: &defangv1.Service{Name: "test", Build: &defangv1.Build{}},
-			wantErr: "build.context is required",
+			wantErr: "build `context:` is required",
 		},
 		{
 			name:    "shm size exceeds quota",
 			service: &defangv1.Service{Name: "test", Build: &defangv1.Build{Context: ".", ShmSize: 30721}},
-			wantErr: "build.shm_size exceeds quota (max 30720 MiB)",
+			wantErr: "build `shm_size:` exceeds quota (max 30720 MiB)",
 		},
 		{
 			name:    "port 0 out of range",
@@ -145,7 +145,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"BLAH"},
 				},
 			},
-			wantErr: "unsupported healthcheck: [BLAH]",
+			wantErr: "unsupported `healthcheck:` [BLAH]",
 		},
 		{
 			name: "too many replicas",
