@@ -50,6 +50,7 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 		cdTasks:        make(map[string]ecs.TaskArn),
 		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
+	b.driver.BucketName = os.Getenv("DEFANG_CD_BUCKET")
 	return b
 }
 
@@ -303,10 +304,6 @@ func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defan
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
-func (b *ByocAws) bucketName() string {
-	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
-}
-
 func (b *ByocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
@@ -317,7 +314,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
 		"PROJECT":                    b.PulumiProject, // may be empty
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.PulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
@@ -361,12 +358,12 @@ func (b *ByocAws) stackDir(name string) string {
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	bucketName := b.bucketName()
+	bucketName := b.driver.BucketName
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
 			return nil, annotateAwsError(err)
 		}
-		bucketName = b.bucketName()
+		bucketName = b.driver.BucketName
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -379,7 +376,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	ensure(b.PulumiProject != "", "pulumiProject not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
 
-	term.Debug(" - Getting services from", bucketName, path)
+	term.Debug(" - Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
@@ -412,14 +409,14 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
-	term.Debug(" - Putting parameter", fqn)
+	term.Debugf(" - Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
-	term.Debug(" - Listing parameters with prefix", prefix)
+	term.Debugf(" - Listing parameters with prefix %q", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -468,8 +465,8 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
+		term.Debug(" - Tailing task", etag)
 		etag = "" // no need to filter by etag
-		term.Debug(" - Tailing task", taskArn)
 	} else {
 		// Tail CD, kaniko, and all services
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
@@ -513,7 +510,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, err
 	}
 	if missing != nil {
-		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
+		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
 	ensure(b.PulumiProject != "", "pulumiProject not set")
@@ -678,12 +675,12 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, err
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
-	bucketName := b.bucketName()
+	bucketName := b.driver.BucketName
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
 			return nil, annotateAwsError(err)
 		}
-		bucketName = b.bucketName()
+		bucketName = b.driver.BucketName
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -691,10 +688,10 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		return nil, annotateAwsError(err)
 	}
 
-	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 	s3client := s3.NewFromConfig(cfg)
+	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	term.Debug(" - Listing stacks in bucket", bucketName)
+	term.Debug(" - Listing stacks in bucket:", bucketName)
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &bucketName,
 		Prefix: &prefix,
