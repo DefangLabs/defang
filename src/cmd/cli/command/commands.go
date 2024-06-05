@@ -800,7 +800,7 @@ var composeUpCmd = &cobra.Command{
 				}
 			}
 		}()
-		if err := waitServiceStatus(ctx, types.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if !errors.Is(err, cli.ErrDryRun) {
 				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
 			}
