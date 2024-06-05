@@ -32,7 +32,38 @@ var (
 	DoVerbose     = false
 )
 
+type EndLogConditional struct {
+	Service  string
+	Host     string
+	EventLog string
+}
+
+type TailDetectStopEventFunc func(service string, host string, eventlog string) bool
+
+type TailOptions struct {
+	Service            string
+	Etag               types.ETag
+	Since              time.Time
+	Raw                bool
+	EndEventDetectFunc TailDetectStopEventFunc
+}
+
 type P = client.Property // shorthand for tracking properties
+
+func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
+	return func(service string, host string, eventLog string) bool {
+		for _, conditional := range conditionals {
+			if service == "" || service == conditional.Service {
+				if host == "" || host == conditional.Host {
+					if strings.Contains(eventLog, conditional.EventLog) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+}
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
 // At a minimum, this function supports RFC3339Nano, Go durations, and our own TimestampFormat (local).
@@ -88,7 +119,7 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client client.Client, params types.TailOptions) error {
+func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	projectName, err := client.LoadProjectName()
 	if err != nil {
 		return err

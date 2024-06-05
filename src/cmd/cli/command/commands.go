@@ -637,7 +637,7 @@ var tailCmd = &cobra.Command{
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
 		term.Infof(" * Showing logs%s; press Ctrl+C to stop:", sinceStr)
-		tailOptions := types.TailOptions{
+		tailOptions := cli.TailOptions{
 			Service: name,
 			Etag:    etag,
 			Since:   ts,
@@ -742,7 +742,7 @@ func startTailing(ctx context.Context, etag string, since time.Time) error {
 	}
 
 	term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-	tailParams := types.TailOptions{
+	tailParams := cli.TailOptions{
 		Service: "",
 		Etag:    etag,
 		Since:   since,
@@ -886,13 +886,13 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		endLogConditions := []types.EndLogConditional{
+		endLogConditions := []cli.EndLogConditional{
 			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
 			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 		}
 
-		endLogDetectFunc := pkg.CreateEndLogEventDetectFunc(endLogConditions)
-		tailParams := types.TailOptions{
+		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
+		tailParams := cli.TailOptions{
 			Service:            "",
 			Etag:               etag,
 			Since:              since,
@@ -953,7 +953,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
-		tailParams := types.TailOptions{
+		tailParams := cli.TailOptions{
 			Service: "",
 			Etag:    etag,
 			Since:   since,
