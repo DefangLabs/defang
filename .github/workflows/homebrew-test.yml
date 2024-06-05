@@ -11,7 +11,7 @@ permissions:
 
 jobs:
 
-  publish-npm-binaries:
+  trigger-test:
     runs-on: ubuntu-latest
 
     steps:
