@@ -173,6 +173,14 @@ jobs:
           event-type: cli-autodoc
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
+      - name: Trigger Homebrew Formula Update
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
+          repository: DefangLabs/homebrew-defang
+          event-type: update-homebrew-formula
+          client-payload: '{"version": "${{ github.ref_name }}"}'
+
       - name: Checkout tag
         uses: actions/checkout@v4
 
