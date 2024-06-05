@@ -788,7 +788,7 @@ var composeUpCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		go monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, cancel)
+		go monitorServiceStatus(ctx, cli.ServiceStarted, serviceInfos, cancel)
 
 		// show users the current streaming logs
 		if err := startTailing(ctx, deploy.Etag, since); err != nil {
