@@ -1,0 +1,13 @@
+services:
+  always:
+    image: alpine
+
+  never:
+    image: alpine
+    profiles:
+      - never
+
+  defangonly:
+    image: alpine
+    profiles:
+      - defang

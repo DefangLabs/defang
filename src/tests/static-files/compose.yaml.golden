@@ -1,0 +1,18 @@
+name: test
+services:
+  x:
+    image: blah
+    networks:
+      default: null
+    x-defang-static-files: ./folder
+  "y":
+    image: blah
+    networks:
+      default: null
+    x-defang-static-files:
+      folder: ./folder
+      redirects: true - www.example.com
+    x-unsupported: asdf
+networks:
+  default:
+    name: test_default

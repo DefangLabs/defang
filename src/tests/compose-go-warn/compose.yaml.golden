@@ -1,0 +1,16 @@
+name: test
+services:
+  echo:
+    image: ealen/echo-server
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+networks:
+  default:
+    name: test_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

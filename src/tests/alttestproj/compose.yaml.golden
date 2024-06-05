@@ -1,0 +1,33 @@
+name: test
+services:
+  dfnx:
+    build:
+      context: ../../tests/alttestproj
+      dockerfile: Dockerfile
+      args:
+        DNS: dfnx
+      target: alttestproj
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "536870912"
+        reservations:
+          cpus: 0.25
+          memory: "268435456"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost/
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+      - target: 1234
+    restart: unless-stopped
+networks:
+  default:
+    name: test_default
