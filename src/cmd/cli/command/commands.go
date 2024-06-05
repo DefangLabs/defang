@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -785,19 +786,30 @@ var composeUpCmd = &cobra.Command{
 			return nil
 		}
 
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		tailCtx, cancelTail := context.WithCancel(ctx)
 
-		go monitorServiceStatus(ctx, cli.ServiceStarted, serviceInfos, cancel)
-
-		// show users the current streaming logs
-		if err := startTailing(ctx, deploy.Etag, since); err != nil {
-			var cerr *cli.CancelError
-			if !errors.As(err, &cerr) {
-				term.Warnf("failed to start tailing: %v", err)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// show users the current streaming logs
+			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
+				var cerr *cli.CancelError
+				if !errors.As(err, &cerr) {
+					term.Warnf("failed to start tailing: %v", err)
+				}
 			}
+		}()
+		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, cli.ErrDryRun) {
+				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
+			}
+			wg.Wait() // Wait until ctrl+c is pressed
 		}
+		cancelTail()
+		wg.Wait() // Wait for tail to finish
 
+		printEndpoints(serviceInfos)
 		term.Info(" * Done.")
 		return nil
 	},
