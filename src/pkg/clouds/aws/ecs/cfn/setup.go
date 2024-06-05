@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,19 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		return err
 	}
 
+	// Check the template version first, to avoid updating to an outdated template; TODO: can we use StackPolicy/Conditions instead?
+	if dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{StackName: &a.stackName}); err == nil && len(dso.Stacks) == 1 {
+		for _, output := range dso.Stacks[0].Outputs {
+			if *output.OutputKey == outputs.TemplateVersion {
+				deployedRev, _ := strconv.Atoi(*output.OutputValue)
+				if deployedRev > TemplateRevision {
+					fmt.Println("CloudFormation stack", a.stackName, "is newer than the current template; skipping update")
+					return nil
+				}
+			}
+		}
+	}
+
 	uso, err := cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
 		Capabilities: []cfnTypes.Capability{cfnTypes.CapabilityCapabilityNamedIam},
 		StackName:    ptr.String(a.stackName),
@@ -86,13 +100,13 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 	}
 
 	fmt.Println("Waiting for CloudFormation stack", a.stackName, "to be updated...") // TODO: verbose only
-	o, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
+	dso, err := cloudformation.NewStackUpdateCompleteWaiter(cfn, update1s).WaitForOutput(ctx, &cloudformation.DescribeStacksInput{
 		StackName: uso.StackId,
 	}, stackTimeout)
 	if err != nil {
 		return err
 	}
-	return a.fillWithOutputs(o)
+	return a.fillWithOutputs(dso)
 }
 
 // create1s is a functional option for cloudformation.StackCreateCompleteWaiter that sets the MinDelay to 1
@@ -199,45 +213,46 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 }
 
 func (a *AwsEcs) FillOutputs(ctx context.Context) error {
-	// println("Filling outputs for stack", stackId)
 	cfn, err := a.newClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	// FIXME: this always returns the latest outputs, not the ones from the recent update
+	// NOTE: this always returns the latest outputs, not the ones from the recent update
 	dso, err := cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
-		StackName: &a.stackName,
+		StackName: ptr.String(a.stackName),
 	})
 	if err != nil {
 		return err
 	}
+
 	return a.fillWithOutputs(dso)
 }
 
 func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error {
-	for _, stack := range dso.Stacks {
-		for _, output := range stack.Outputs {
-			switch *output.OutputKey {
-			case outputs.SubnetID:
-				if a.SubNetID == "" {
-					a.SubNetID = *output.OutputValue
-				}
-			case outputs.TaskDefArn:
-				if a.TaskDefARN == "" {
-					a.TaskDefARN = *output.OutputValue
-				}
-			case outputs.ClusterName:
-				a.ClusterName = *output.OutputValue
-			case outputs.LogGroupARN:
-				a.LogGroupARN = *output.OutputValue
-			case outputs.SecurityGroupID:
-				a.SecurityGroupID = *output.OutputValue
-			case outputs.BucketName:
-				a.BucketName = *output.OutputValue
-				// default:; TODO: should do this but only for stack the driver created
-				// 	return fmt.Errorf("unknown output key %q", *output.OutputKey)
+	if len(dso.Stacks) != 1 {
+		return fmt.Errorf("expected 1 CloudFormation stack, got %d", len(dso.Stacks))
+	}
+	for _, output := range dso.Stacks[0].Outputs {
+		switch *output.OutputKey {
+		case outputs.SubnetID:
+			if a.SubNetID == "" {
+				a.SubNetID = *output.OutputValue
 			}
+		case outputs.TaskDefArn:
+			if a.TaskDefARN == "" {
+				a.TaskDefARN = *output.OutputValue
+			}
+		case outputs.ClusterName:
+			a.ClusterName = *output.OutputValue
+		case outputs.LogGroupARN:
+			a.LogGroupARN = *output.OutputValue
+		case outputs.SecurityGroupID:
+			a.SecurityGroupID = *output.OutputValue
+		case outputs.BucketName:
+			a.BucketName = *output.OutputValue
+			// default:; TODO: should do this but only for stack the driver created
+			// 	return fmt.Errorf("unknown output key %q", *output.OutputKey)
 		}
 	}
 
