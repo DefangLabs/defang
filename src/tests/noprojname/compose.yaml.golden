@@ -1,0 +1,9 @@
+name: test
+services: {}
+networks:
+  default:
+    name: test_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

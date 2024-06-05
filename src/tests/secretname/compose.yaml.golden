@@ -1,0 +1,19 @@
+name: test
+services:
+  app:
+    build:
+      context: ../../tests/secretname
+      dockerfile: Dockerfile
+    networks:
+      default: null
+    restart: unless-stopped
+    secrets:
+      - source: dummy
+        target: /run/secrets/dummy
+networks:
+  default:
+    name: test_default
+secrets:
+  dummy:
+    name: dummyx
+    external: true

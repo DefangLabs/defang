@@ -1,0 +1,19 @@
+name: test
+services:
+  Mistral:
+    image: mistral:latest
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 8000
+  ui:
+    environment:
+      API_URL: http://Mistral:8000
+      SENSITIVE_DATA: null
+    image: ui:latest
+    networks:
+      default: null
+networks:
+  default:
+    name: test_default

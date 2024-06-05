@@ -1,0 +1,15 @@
+name: test
+services:
+  always:
+    image: alpine
+    networks:
+      default: null
+  defangonly:
+    profiles:
+      - defang
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: test_default
