@@ -6,11 +6,10 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func waitServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
+func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
 		serviceList = append(serviceList, serviceInfo.Service.Name)
@@ -33,10 +32,10 @@ func waitServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, se
 		}
 	}
 
-	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", types.ServiceStarted)
+	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", cli.ServiceStarted)
 }
 
-func allInStatus(targetStatus types.ServiceStatus, serviceStatuses map[string]string) bool {
+func allInStatus(targetStatus cli.ServiceStatus, serviceStatuses map[string]string) bool {
 	for _, status := range serviceStatuses {
 		if status != string(targetStatus) {
 			return false
