@@ -3,6 +3,7 @@ package do
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -187,7 +188,7 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, nil
+	return nil, errors.New("not implemented for ByocDo")
 }
 
 func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
