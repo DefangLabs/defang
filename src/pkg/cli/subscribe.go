@@ -6,7 +6,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -21,7 +20,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 	for i, service := range services {
 		services[i] = NormalizeServiceName(service)
 		normalizedServiceNameToServiceName[services[i]] = service
-		serviceStatus[service] = string(types.ServiceUnknown)
+		serviceStatus[service] = string(ServiceUnknown)
 	}
 
 	statusChan := make(chan *map[string]string, len(services))
