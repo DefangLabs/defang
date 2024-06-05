@@ -50,7 +50,6 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 		cdTasks:        make(map[string]ecs.TaskArn),
 		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.driver.BucketName = os.Getenv("DEFANG_CD_BUCKET")
 	return b
 }
 
@@ -304,6 +303,10 @@ func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defan
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
+func (b *ByocAws) bucketName() string {
+	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
+}
+
 func (b *ByocAws) environment() map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
@@ -314,7 +317,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
 		"PROJECT":                    b.PulumiProject, // may be empty
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.driver.BucketName, region),
+		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.PulumiStack,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
@@ -358,12 +361,12 @@ func (b *ByocAws) stackDir(name string) string {
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	bucketName := b.driver.BucketName
+	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
 			return nil, annotateAwsError(err)
 		}
-		bucketName = b.driver.BucketName
+		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -675,12 +678,12 @@ func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, err
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
-	bucketName := b.driver.BucketName
+	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
 			return nil, annotateAwsError(err)
 		}
-		bucketName = b.driver.BucketName
+		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
