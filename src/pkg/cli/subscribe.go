@@ -24,15 +24,16 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		serviceStatus[service] = string(types.ServiceUnknown)
 	}
 
-	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
-	if err != nil {
-		return nil, err
-	}
 	statusChan := make(chan *map[string]string, len(services))
 	if DoDryRun {
 		defer close(statusChan)
 		statusChan <- &serviceStatus
 		return statusChan, ErrDryRun
+	}
+
+	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
+	if err != nil {
+		return nil, err
 	}
 
 	go func() {

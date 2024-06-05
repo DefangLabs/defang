@@ -7,7 +7,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
@@ -27,7 +26,7 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 		return err
 	}
 
-	return Tail(ctx, client, types.TailOptions{Etag: etag, Since: since})
+	return Tail(ctx, client, TailOptions{Etag: etag, Since: since})
 }
 
 func BootstrapLocalList(ctx context.Context, client client.Client) error {
