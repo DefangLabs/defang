@@ -1,0 +1,24 @@
+name: Go package
+
+on:
+  push:
+    branches:
+      - 415-run-homebrew-action-post-release
+
+permissions:
+  contents: read
+  id-token: write # for GitHub id-token auth
+
+jobs:
+
+  publish-npm-binaries:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Homebrew Formula Update
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
+          repository: DefangLabs/homebrew-defang
+          event-type: test-update-homebrew-formula
+          client-payload: '{"version": "${{ github.ref_name }}"}'
