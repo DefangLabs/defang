@@ -32,7 +32,7 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 		}
 	}
 
-	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", cli.ServiceStarted)
+	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", targetStatus)
 }
 
 func allInStatus(targetStatus cli.ServiceStatus, serviceStatuses map[string]string) bool {
