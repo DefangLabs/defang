@@ -1,6 +1,7 @@
 name: Trigger Test
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 415-run-homebrew-action-post-release
