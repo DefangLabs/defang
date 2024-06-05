@@ -25,6 +25,10 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 	}
 
 	statusChan := make(chan *map[string]string, len(services))
+	if DoDryRun {
+		defer close(statusChan)
+		return statusChan, ErrDryRun
+	}
 
 	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
 	if err != nil {
