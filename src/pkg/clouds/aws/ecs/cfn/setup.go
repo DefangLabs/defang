@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfnTypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 )
@@ -144,57 +143,8 @@ func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) er
 	return a.fillWithOutputs(dso)
 }
 
-func (a *AwsEcs) findExistingBucket(ctx context.Context) (string, error) {
-	cfg, err := a.LoadConfig(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	s3Client := s3.NewFromConfig(cfg)
-	lbo, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
-	if err != nil {
-		return "", err
-	}
-
-	// Find the bucket with the correct prefix and tags
-	var bucketNames []string
-	bucketPrefix := a.stackName + "-bucket-"
-	for _, b := range lbo.Buckets {
-		if !strings.HasPrefix(*b.Name, bucketPrefix) {
-			continue
-		}
-		gbto, err := s3Client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: b.Name})
-		if err != nil {
-			return "", err
-		}
-		for _, tag := range gbto.TagSet {
-			if *tag.Key == CreatedByTagKey && *tag.Value == CreatedByTagValue {
-				bucketNames = append(bucketNames, *b.Name)
-				break
-			}
-		}
-	}
-	if len(bucketNames) > 1 {
-		return "", fmt.Errorf("found multiple defang-cd buckets: %v", bucketNames)
-	}
-	if len(bucketNames) == 1 {
-		return bucketNames[1], nil
-	}
-	return "", nil // no existing bucket: create a new one
-}
-
 func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error {
-	if a.BucketName == "" {
-		// Before we create the stack, check if a previous deployment bucket already exists
-		bucketName, err := a.findExistingBucket(ctx)
-		if err != nil {
-			return err
-		}
-		a.BucketName = bucketName
-	}
-
-	overrides := TemplateOverrides{VpcID: a.VpcID, SkipBucket: a.BucketName != "", Spot: a.Spot}
-	template, err := createTemplate(a.stackName, containers, overrides).YAML()
+	template, err := createTemplate(a.stackName, containers, TemplateOverrides{VpcID: a.VpcID, Spot: a.Spot}).YAML()
 	if err != nil {
 		return err
 	}
