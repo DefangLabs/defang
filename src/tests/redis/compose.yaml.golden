@@ -1,0 +1,19 @@
+name: test
+services:
+  x:
+    image: redis
+    networks:
+      default: null
+    x-defang-redis: null
+  "y":
+    image: nginx
+    networks:
+      default: null
+    x-defang-redis: null
+  z:
+    image: redis
+    networks:
+      default: null
+networks:
+  default:
+    name: test_default

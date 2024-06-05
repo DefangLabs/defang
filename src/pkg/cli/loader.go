@@ -43,26 +43,9 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		Environment: map[string]string{}, // TODO: support environment variables?
 	}
 
-	skipNormalizationOpts := []func(*loader.Options){
-		loader.WithDiscardEnvFiles,
-		func(o *loader.Options) {
-			o.SkipConsistencyCheck = true
-			o.SetProjectName(strings.ToLower(projectName), overrideProjectName)
-			o.SkipNormalization = true // Normalization strips environment variables keys that does not have an value
-		},
-	}
-
-	// Disable logrus output to prevent double warnings from compose-go
-	currentOutput := logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
-	logrus.SetOutput(currentOutput)
-	if err != nil {
-		return nil, err
-	}
-
 	loadOpts := []func(*loader.Options){
 		loader.WithDiscardEnvFiles,
+		loader.WithProfiles([]string{"defang"}), // TODO: add stage-specific profiles once we have them
 		func(o *loader.Options) {
 			o.SkipConsistencyCheck = true // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 			o.SetProjectName(strings.ToLower(projectName), overrideProjectName)
@@ -75,16 +58,29 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	}
 
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
+	skipNormalizationOpts := append(loadOpts, func(o *loader.Options) {
+		o.SkipNormalization = true // Normalization strips environment variables keys that does not have an value
+	})
+
+	// Disable logrus output to prevent double warnings from compose-go
+	currentOutput := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
+	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
+	logrus.SetOutput(currentOutput)
+	if err != nil {
+		return nil, err // there's no good reason this should fail, since we've already loaded the project
+	}
+
 	// TODO: file a PR to compose-go to add option to keep unset environment variables
-	for i, service := range rawProj.Services {
-		for key, value := range service.Environment {
-			svc := project.Services[i]
-			if svc.Environment[key] == nil {
-				if svc.Environment == nil {
-					svc.Environment = make(map[string]*string)
+	for name, rawService := range rawProj.Services {
+		for key, value := range rawService.Environment {
+			service := project.Services[name]
+			if service.Environment[key] == nil {
+				if service.Environment == nil {
+					service.Environment = make(map[string]*string)
 				}
-				svc.Environment[key] = value
-				project.Services[i] = svc
+				service.Environment[key] = value
+				project.Services[name] = service
 			}
 		}
 	}
