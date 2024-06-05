@@ -20,7 +20,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -52,27 +51,6 @@ func prettyError(err error) error {
 	}
 	return err
 
-}
-
-type EndLogConditional struct {
-	Service  string
-	Host     string
-	EventLog string
-}
-
-func createEndLogEventDetectFunc(conditionals []EndLogConditional) cli.TailDetectStopEventFunc {
-	return func(service string, host string, eventLog string) bool {
-		for _, conditional := range conditionals {
-			if service == "" || service == conditional.Service {
-				if host == "" || host == conditional.Host {
-					if strings.Contains(eventLog, conditional.EventLog) {
-						return true
-					}
-				}
-			}
-		}
-		return false
-	}
 }
 
 func Execute(ctx context.Context) error {
@@ -659,7 +637,7 @@ var tailCmd = &cobra.Command{
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
 		term.Infof(" * Showing logs%s; press Ctrl+C to stop:", sinceStr)
-		tailOptions := cli.TailOptions{
+		tailOptions := types.TailOptions{
 			Service: name,
 			Etag:    etag,
 			Since:   ts,
@@ -756,79 +734,6 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
-	// We can only show services deployed to the prod1 defang SaaS environment.
-	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
-		term.Info(" * Monitor your services' status in the defang portal")
-		for _, serviceInfo := range serviceInfos {
-			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
-		}
-	}
-}
-
-func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
-	for _, serviceInfo := range serviceInfos {
-		andEndpoints := ""
-		if len(serviceInfo.Endpoints) > 0 {
-			andEndpoints = "and will be available at:"
-		}
-		term.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
-		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
-				endpoint = "https://" + endpoint
-			}
-			fmt.Println("   -", endpoint)
-		}
-		if serviceInfo.Service.Domainname != "" {
-			if serviceInfo.ZoneId != "" {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
-			} else {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after `defang cert generate` to get a TLS certificate)")
-			}
-		}
-	}
-}
-
-func isAllServicesAtSameStatus(targetStatus types.ServiceStatus, serviceStatuses map[string]string) bool {
-	allDone := true
-	for _, status := range serviceStatuses {
-		if status != string(targetStatus) {
-			allDone = false
-			break
-		}
-	}
-	return allDone
-}
-
-func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo, since time.Time) (<-chan bool, error) {
-	completed := make(chan bool)
-	serviceList := []string{}
-	for _, serviceInfo := range serviceInfos {
-		serviceList = append(serviceList, serviceInfo.Service.Name)
-	}
-
-	// set up service status subscription (non-blocking)
-	serviceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
-	if err != nil {
-		return completed, err
-	}
-
-	// monitor for when all services are completed to end this command
-	go func() {
-		for serviceStatus := range serviceStatusChan {
-			if isAllServicesAtSameStatus(targetStatus, *serviceStatus) {
-				completed <- true
-				return
-			}
-		}
-
-		// server channel closed without having all services completed
-		completed <- false
-	}()
-
-	return completed, nil
-}
-
 func startTailing(ctx context.Context, etag string, since time.Time) error {
 	// set up tailing
 	services := "all services"
@@ -837,7 +742,7 @@ func startTailing(ctx context.Context, etag string, since time.Time) error {
 	}
 
 	term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-	tailParams := cli.TailOptions{
+	tailParams := types.TailOptions{
 		Service: "",
 		Etag:    etag,
 		Since:   since,
@@ -883,24 +788,7 @@ var composeUpCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		completed, err := monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, since)
-		if err != nil {
-			term.Warnf("failed to start service status monitoring: %v", err)
-			printEndpoints(serviceInfos)
-		}
-
-		// handle monitoring service events
-		go func() {
-			if <-completed {
-				cancel()
-				for _, sInfo := range serviceInfos {
-					sInfo.Status = string(types.ServiceStarted)
-				}
-				printEndpoints(serviceInfos)
-			} else {
-				term.Warnf("service state monitoring terminated without all services reaching desired state: %s", types.ServiceStarted)
-			}
-		}()
+		go monitorServiceStatus(ctx, types.ServiceStarted, serviceInfos, cancel)
 
 		// show users the current streaming logs
 		if err := startTailing(ctx, deploy.Etag, since); err != nil {
@@ -998,13 +886,13 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		endLogConditions := []EndLogConditional{
+		endLogConditions := []types.EndLogConditional{
 			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
 			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 		}
 
-		endLogDetectFunc := createEndLogEventDetectFunc(endLogConditions)
-		tailParams := cli.TailOptions{
+		endLogDetectFunc := pkg.CreateEndLogEventDetectFunc(endLogConditions)
+		tailParams := types.TailOptions{
 			Service:            "",
 			Etag:               etag,
 			Since:              since,
@@ -1065,7 +953,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
-		tailParams := cli.TailOptions{
+		tailParams := types.TailOptions{
 			Service: "",
 			Etag:    etag,
 			Since:   since,

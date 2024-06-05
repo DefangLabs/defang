@@ -32,16 +32,6 @@ var (
 	DoVerbose     = false
 )
 
-type TailDetectStopEventFunc func(service string, host string, eventlog string) bool
-
-type TailOptions struct {
-	Service            string
-	Etag               types.ETag
-	Since              time.Time
-	Raw                bool
-	EndEventDetectFunc TailDetectStopEventFunc
-}
-
 type P = client.Property // shorthand for tracking properties
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -98,7 +88,7 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client client.Client, params TailOptions) error {
+func Tail(ctx context.Context, client client.Client, params types.TailOptions) error {
 	projectName, err := client.LoadProjectName()
 	if err != nil {
 		return err

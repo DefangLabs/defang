@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 var (
@@ -103,5 +104,20 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+func CreateEndLogEventDetectFunc(conditionals []types.EndLogConditional) types.TailDetectStopEventFunc {
+	return func(service string, host string, eventLog string) bool {
+		for _, conditional := range conditionals {
+			if service == "" || service == conditional.Service {
+				if host == "" || host == conditional.Host {
+					if strings.Contains(eventLog, conditional.EventLog) {
+						return true
+					}
+				}
+			}
+		}
+		return false
 	}
 }
