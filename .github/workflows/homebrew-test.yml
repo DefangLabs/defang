@@ -1,4 +1,4 @@
-name: Trigger Test
+name: Homebrew Trigger Test
 
 on:
   workflow_dispatch:
