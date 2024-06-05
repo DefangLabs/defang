@@ -2,13 +2,15 @@ package command
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo, cancel context.CancelFunc) {
+func waitServiceStatus(ctx context.Context, targetStatus types.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
 		serviceList = append(serviceList, serviceInfo.Service.Name)
@@ -17,34 +19,28 @@ func monitorServiceStatus(ctx context.Context, targetStatus types.ServiceStatus,
 	// set up service status subscription (non-blocking)
 	serviceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
 	if err != nil {
-		printEndpoints(serviceInfos)
 		term.Debugf("error subscribing to service status: %v", err)
-		return
+		return err
 	}
 
 	// monitor for when all services are completed to end this command
 	for serviceStatus := range serviceStatusChan {
-		if isAllServicesAtSameStatus(targetStatus, *serviceStatus) {
-			cancel()
+		if allInStatus(targetStatus, *serviceStatus) {
 			for _, sInfo := range serviceInfos {
-				sInfo.Status = string(types.ServiceStarted)
+				sInfo.Status = string(targetStatus)
 			}
-			printEndpoints(serviceInfos)
-			return
+			return nil
 		}
 	}
 
-	// server channel closed without having all services completed
-	term.Warnf("service state monitoring terminated without all services reaching desired state: %s", types.ServiceStarted)
+	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", types.ServiceStarted)
 }
 
-func isAllServicesAtSameStatus(targetStatus types.ServiceStatus, serviceStatuses map[string]string) bool {
-	allDone := true
+func allInStatus(targetStatus types.ServiceStatus, serviceStatuses map[string]string) bool {
 	for _, status := range serviceStatuses {
 		if status != string(targetStatus) {
-			allDone = false
-			break
+			return false
 		}
 	}
-	return allDone
+	return true
 }
