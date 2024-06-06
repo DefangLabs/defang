@@ -58,6 +58,10 @@ func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.Upl
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
+func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
+	return g.client.Subscribe(ctx, connect.NewRequest(req))
+}
+
 func (g *PlaygroundClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.client.Tail(ctx, connect.NewRequest(req))
 }

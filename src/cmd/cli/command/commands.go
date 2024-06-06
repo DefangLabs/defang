@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -20,7 +21,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -52,15 +52,6 @@ func prettyError(err error) error {
 	}
 	return err
 
-}
-
-func detectComposeDownEndLogEventFunc(service string, host string, eventLog string) bool {
-	result := false
-	if service == "cd" && host == "pulumi" {
-		result = strings.Contains(eventLog, "Destroy succeeded in ") ||
-			strings.Contains(eventLog, "Update succeeded in ")
-	}
-	return result
 }
 
 func Execute(ctx context.Context) error {
@@ -763,37 +754,27 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
-	// We can only show services deployed to the prod1 defang SaaS environment.
-	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
-		term.Info(" * Monitor your services' status in the defang portal")
-		for _, serviceInfo := range serviceInfos {
-			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
-		}
+func startTailing(ctx context.Context, etag string, since time.Time) error {
+	// set up tailing
+	services := "all services"
+	if etag != "" {
+		services = "deployment ID " + etag
 	}
-}
 
-func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
-	for _, serviceInfo := range serviceInfos {
-		andEndpoints := ""
-		if len(serviceInfo.Endpoints) > 0 {
-			andEndpoints = "and will be available at:"
-		}
-		term.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
-		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
-				endpoint = "https://" + endpoint
-			}
-			fmt.Println("   -", endpoint)
-		}
-		if serviceInfo.Service.Domainname != "" {
-			if serviceInfo.ZoneId != "" {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
-			} else {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after `defang cert generate` to get a TLS certificate)")
-			}
-		}
+	term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
+	tailParams := cli.TailOptions{
+		Service: "",
+		Etag:    etag,
+		Since:   since,
+		Raw:     false,
 	}
+
+	// blocking call to tail
+	if err := cli.Tail(ctx, client, tailParams); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 var composeUpCmd = &cobra.Command{
@@ -806,37 +787,48 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
+		ctx := cmd.Context()
+		deploy, err := cli.ComposeStart(ctx, client, force)
 		if err != nil {
 			return err
 		}
 
-		printPlaygroundPortalServiceURLs(deploy.Services)
-		printEndpoints(deploy.Services) // TODO: do this at the end
+		if len(deploy.Services) == 0 {
+			return errors.New("no services being deployed")
+		}
+
+		serviceInfos := deploy.GetServices()
+		printPlaygroundPortalServiceURLs(serviceInfos)
 
 		if detach {
 			term.Info(" * Done.")
 			return nil
 		}
 
-		etag := deploy.Etag
-		services := "all services"
-		if etag != "" {
-			services = "deployment ID " + etag
-		}
+		tailCtx, cancelTail := context.WithCancel(ctx)
 
-		term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
-		tailParams := cli.TailOptions{
-			Service: "",
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// show users the current streaming logs
+			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
+				var cerr *cli.CancelError
+				if !errors.As(err, &cerr) {
+					term.Warnf("failed to start tailing: %v", err)
+				}
+			}
+		}()
+		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+			if !errors.Is(err, cli.ErrDryRun) {
+				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
+			}
+			wg.Wait() // Wait until ctrl+c is pressed
 		}
+		cancelTail()
+		wg.Wait() // Wait for tail to finish
 
-		err = cli.Tail(cmd.Context(), client, tailParams)
-		if err != nil {
-			return err
-		}
+		printEndpoints(serviceInfos)
 		term.Info(" * Done.")
 		return nil
 	},
@@ -925,12 +917,18 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
+		endLogConditions := []cli.EndLogConditional{
+			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
+			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
+		}
+
+		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
 		tailParams := cli.TailOptions{
 			Service:            "",
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
-			EndEventDetectFunc: detectComposeDownEndLogEventFunc,
+			EndEventDetectFunc: endLogDetectFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
