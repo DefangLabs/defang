@@ -476,6 +476,8 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		term.Debug(" - Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
 		term.Debug(" - Tailing services logs", servicesTail.LogGroupARN)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
+		term.Debug(" - Tailing ecs events logs", ecsTail.LogGroupARN)
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
@@ -483,7 +485,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
 		term.Debug(" - Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
