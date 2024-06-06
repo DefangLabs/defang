@@ -2,11 +2,8 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -16,7 +13,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
-	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -37,20 +33,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
 
-	state := State{AnonID: uuid.NewString()}
-
-	// Restore anonID from config file
-	statePath := filepath.Join(StateDir, "state.json")
-	if bytes, err := os.ReadFile(statePath); err == nil {
-		json.Unmarshal(bytes, &state)
-	} else { // could be not found or path error
-		if bytes, err := json.MarshalIndent(state, "", "  "); err == nil {
-			os.MkdirAll(StateDir, 0700)
-			os.WriteFile(statePath, bytes, 0644)
-		}
-	}
-
-	return GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
+	return GrpcClient{client: fabricClient, anonID: GetAnonID(), tenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
