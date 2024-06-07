@@ -290,7 +290,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 			tsString := ts.Local().Format(RFC3339Micro)
 			tsColor := termenv.ANSIBrightBlack
-			if term.Stdout.HasDarkBackground() {
+			if term.HasDarkBackground {
 				tsColor = termenv.ANSIWhite
 			}
 			if e.Stderr {
