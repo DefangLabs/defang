@@ -168,7 +168,9 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	defer cancel()
 
 	var since *timestamppb.Timestamp
-	if !params.Since.IsZero() {
+	if params.Since.IsZero() {
+		params.Since = time.Now() // this is used to continue from the last timestamp
+	} else {
 		since = timestamppb.New(params.Since)
 	}
 	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
@@ -297,7 +299,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 			tsString := ts.Local().Format(RFC3339Micro)
 			tsColor := termenv.ANSIBrightBlack
-			if term.Stdout.HasDarkBackground() {
+			if term.HasDarkBackground {
 				tsColor = termenv.ANSIWhite
 			}
 			if e.Stderr {

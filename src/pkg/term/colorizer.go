@@ -10,13 +10,14 @@ import (
 )
 
 var (
-	IsTerminal  = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && isTerminal()
-	Stdout      = termenv.NewOutput(os.Stdout)
-	Stderr      = termenv.NewOutput(os.Stderr)
-	CanColor    = DoColor(Stdout)
-	CanColorErr = DoColor(Stderr)
-	DoDebug     bool
-	HadWarnings bool
+	IsTerminal        = term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stdin.Fd())) && isTerminal()
+	Stdout            = termenv.NewOutput(os.Stdout)
+	HasDarkBackground = Stdout.HasDarkBackground()
+	Stderr            = termenv.NewOutput(os.Stderr)
+	CanColor          = DoColor(Stdout)
+	CanColorErr       = DoColor(Stderr)
+	DoDebug           bool
+	HadWarnings       bool
 )
 
 type Color = termenv.ANSIColor
