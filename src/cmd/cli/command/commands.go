@@ -638,8 +638,12 @@ var tailCmd = &cobra.Command{
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
 		term.Infof(" * Showing logs%s; press Ctrl+C to stop:", sinceStr)
+		services := []string{}
+		if len(name) > 0 {
+			services = append(services, name)
+		}
 		tailOptions := cli.TailOptions{
-			Services: []string{name},
+			Services: services,
 			Etag:     etag,
 			Since:    ts,
 			Raw:      raw,
@@ -815,13 +819,14 @@ var composeUpCmd = &cobra.Command{
 			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
 				var cerr *cli.CancelError
 				if !errors.As(err, &cerr) {
-					term.Warnf("failed to start tailing: %v", err)
+					term.Debugf(" - failed to start tailing: %v", err)
 				}
 			}
 		}()
 		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if !errors.Is(err, cli.ErrDryRun) {
-				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
+				term.Debug(" - failed to wait for service status")
+				term.Warnf(" ! command will continue to tail until detached, press ctrl+c to detach: %v", err)
 			}
 			wg.Wait() // Wait until ctrl+c is pressed
 		}

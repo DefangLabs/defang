@@ -42,13 +42,13 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			// handle cancel from caller
 			select {
 			case <-ctx.Done():
-				term.Debug("Context Done - exiting Subscribe goroutine")
+				term.Debug("- Context Done - exiting Subscribe goroutine")
 				return
 			default:
 			}
 
 			if !serverStream.Receive() {
-				term.Debug("Subscribe Stream closed")
+				term.Debug("- Subscribe Stream closed")
 				return
 			}
 
@@ -56,12 +56,12 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			for _, servInfo := range msg.GetServices() {
 				serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
 				if !ok {
-					term.Warnf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
+					term.Warnf(" ! Unknown service %s in subscribe response\n", servInfo.Service.Name)
 					continue
 				}
 				serviceStatus[serviceName] = servInfo.Status
 				statusChan <- &serviceStatus
-				term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
+				term.Debugf(" - service %s with status %s\n", serviceName, servInfo.Status)
 			}
 		}
 	}()
