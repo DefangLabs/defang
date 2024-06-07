@@ -202,6 +202,7 @@ message TailResponse {
   string service = 3;
   string etag = 4;
   string host = 5;
+  string project = 6;
 }
 
 message ListServicesResponse {
@@ -352,6 +353,7 @@ message Service {
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
+  string project = 19; // name of the project the service belongs to
 }
 
 message StaticFiles {
