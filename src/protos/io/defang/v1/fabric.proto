@@ -32,7 +32,7 @@ service FabricController {
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
+  rpc GetServices(ServicesRequest) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
@@ -51,7 +51,7 @@ service FabricController {
 
   rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
-  rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
+  rpc ListSecrets(EntityIdentity) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
@@ -70,6 +70,18 @@ service FabricController {
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 }
 
+message EntityIdentity {
+  string application = 1;
+  string environment = 2;
+  repeated string services = 4;
+}
+
+message JobIdentity {
+  string job = 1;
+  string etag = 2;
+  EntityIdentity entity = 3;
+}
+
 message TrackRequest {
   string anon_id = 1;
   string event = 2;
@@ -81,20 +93,24 @@ message TrackRequest {
 message DeployRequest {
   repeated Service services = 1;
   string project = 2;
+  EntityIdentity entity_id = 3;
 }
 
 message DeployResponse {
-  repeated ServiceInfo services = 1;
-  string etag = 2;
+  repeated ServiceInfo services = 1 [deprecated = true];
+  string etag = 2 [deprecated = true];
+  JobIdentity job_id = 3; 
 }
 
 message DeleteRequest {
-  repeated string names = 1;
-
-  // string project = 2; // defaults to tenant ID
+  repeated string names = 1 [deprecated = true];
+  EntityIdentity entity_id = 2;
 }
 
-message DeleteResponse { string etag = 1; }
+message DeleteResponse { 
+  string etag = 1 [deprecated = true]; 
+  JobIdentity job_id = 2;
+}
 
 message GenerateFilesRequest {
   string prompt = 1;
@@ -136,6 +152,13 @@ message ServiceInfo {
   // bool is_function = 5; // true if service is a function
 }
 
+message ServicesRequest {
+  oneOf {
+    emptypb.Empty empty = 1;
+    EntityIdenfity entity_id = 2;
+  }
+}
+
 // message Project {
 //   repeated Service services = 1;
 //   repeated SecretValue secrets = 2;
@@ -143,13 +166,23 @@ message ServiceInfo {
 
 message Secrets {
   repeated string names = 1;
-  string project = 2; // defaults to tenant ID
+  string project = 2 [deprecated]; // defaults to tenant ID
+  EntityIdentity entity_id = 3;
 }
 
 message SecretValue {
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
+  EntityIdentity entity_id = 4;
+}
+
+message ConfigValue {
+  string name = 1;
+  string value = 2;
+  boolean is_sensitive = 3;
+
+  EntityIdentity entity_id = 4;
 }
 
 message TokenRequest {
@@ -208,6 +241,7 @@ message TailResponse {
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
+  EntityIdentity entity_id = 3;
 }
 
 // TODO: internal message; move to a separate proto file
@@ -338,7 +372,7 @@ enum Network {
 message Service {
   string name = 1;
   string image = 2;
-  Platform platform = 3;
+  Platform platform = 3 [deprecated = true];
   bool internal = 4; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
@@ -353,7 +387,8 @@ message Service {
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
-  string project = 19; // name of the project the service belongs to
+
+  EntityIdentity entity_id = 20;
 }
 
 message StaticFiles {

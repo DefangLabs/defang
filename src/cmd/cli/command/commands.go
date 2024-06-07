@@ -652,7 +652,7 @@ var tailCmd = &cobra.Command{
 			services = strings.Split(name, ",")
 		}
 		tailOptions := cli.TailOptions{
-			Services: services,
+			Services: []string{name},
 			Etag:     etag,
 			Since:    ts,
 			Raw:      raw,
