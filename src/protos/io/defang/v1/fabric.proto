@@ -181,11 +181,9 @@ message Version {
 }
 
 message TailRequest {
-  string service = 1; // was "name"
+  repeated string services = 1;
   google.protobuf.Timestamp since = 2;
   string etag = 3;
-
-  // string host = 4;
 }
 
 message LogEntry {
@@ -197,7 +195,7 @@ message LogEntry {
 message TailResponse {
   reserved 1; // was "string raw"
   repeated LogEntry entries = 2;
-  string service = 3;
+  repeated string services = 3;
   string etag = 4;
   string host = 5;
 }
@@ -365,10 +363,12 @@ message Event {
 message PublishRequest { Event event = 1; }
 
 message SubscribeRequest { 
-  repeated string services = 1; 
+  repeated string services = 1;
 }
 
-message SubscribeResponse { repeated ServiceInfo services = 1; }
+message SubscribeResponse { 
+  repeated ServiceInfo services = 1; 
+}
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
