@@ -28,7 +28,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant ty
 		return err
 	}
 
-	term.Print(term.BrightCyan, "Scoped access token: ")
+	term.Printc(term.BrightCyan, "Scoped access token: ")
 	fmt.Println(at)
 	return nil
 }
