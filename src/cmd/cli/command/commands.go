@@ -135,8 +135,6 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	term.SetDebug(doDebug)
-
 	// Bootstrap command
 	RootCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
@@ -265,6 +263,9 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI manages services on the Defang cluster",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+
+		term.SetDebug(doDebug)
+
 		// Don't track/connect the completion commands
 		if IsCompletionCommand(cmd) {
 			return nil
