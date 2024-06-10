@@ -147,7 +147,7 @@ func (t *Term) Printc(c Color, v ...any) (int, error) {
 }
 
 func (t *Term) Printlnc(c Color, v ...any) (int, error) {
-	return output(t.stdout, c, ensureNewline(fmt.Sprint(v...)))
+	return output(t.stdout, c, ensureNewline(fmt.Sprintln(v...)))
 }
 
 func (t *Term) Printfc(c Color, format string, v ...any) (int, error) {
@@ -159,7 +159,7 @@ func (t *Term) Print(v ...any) (int, error) {
 }
 
 func (t *Term) Println(v ...any) (int, error) {
-	return fmt.Fprint(t.stdout, ensureNewline(fmt.Sprint(v...)))
+	return fmt.Fprint(t.stdout, ensureNewline(fmt.Sprintln(v...)))
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
