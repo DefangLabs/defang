@@ -327,7 +327,7 @@ func (b *ByocAws) environment() map[string]string {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
-	if term.DoDebug {
+	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
 			debugEnv += fmt.Sprintf(" AWS_PROFILE=%q", awsProfile)

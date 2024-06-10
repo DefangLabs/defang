@@ -217,7 +217,7 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
 	env := b.environment()
-	if term.DoDebug {
+	if term.DoDebug() {
 		debugEnv := " -"
 		for k, v := range env {
 			debugEnv += " " + k + "=" + v

@@ -35,7 +35,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 	term.Debug(" - Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
-	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.CanColorErr, DisableLevelTruncation: true})
+	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
 
 	loadCfg := compose.ConfigDetails{
 		WorkingDir:  filepath.Dir(filePath),
@@ -85,7 +85,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		}
 	}
 
-	if term.DoDebug {
+	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
 	}

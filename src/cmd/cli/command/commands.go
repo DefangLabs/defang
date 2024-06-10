@@ -37,8 +37,9 @@ var (
 	client         cliClient.Client
 	cluster        string
 	colorMode      = ColorAuto
+	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
-	hasTty         = term.IsTerminal && !pkg.GetenvBool("CI")
+	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 )
@@ -55,7 +56,7 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
-	if term.CanColor { // TODO: should use DoColor(…) instead
+	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
 		defer restore()
 	}
@@ -101,7 +102,7 @@ func Execute(ctx context.Context) error {
 		return ExitCode(code)
 	}
 
-	if hasTty && term.HadWarnings {
+	if hasTty && term.HadWarnings() {
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
@@ -126,13 +127,15 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", defangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use; use "aws" for bring-your-own-cloud`)
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
-	RootCmd.PersistentFlags().BoolVar(&term.DoDebug, "debug", false, "debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", false, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
+
+	term.SetDebug(doDebug)
 
 	// Bootstrap command
 	RootCmd.AddCommand(bootstrapCmd)
@@ -241,7 +244,7 @@ func SetupCommands(version string) {
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
 
-	if term.CanColor { // TODO: should use DoColor(…) instead
+	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
 		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
@@ -597,14 +600,14 @@ var getVersionCmd = &cobra.Command{
 	Aliases: []string{"ver", "stat", "status"}, // for backwards compatibility
 	Short:   "Get version information for the CLI and Fabric service",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		term.Print(term.BrightCyan, "Defang CLI:    ")
+		term.Printc(term.BrightCyan, "Defang CLI:    ")
 		fmt.Println(GetCurrentVersion())
 
-		term.Print(term.BrightCyan, "Latest CLI:    ")
+		term.Printc(term.BrightCyan, "Latest CLI:    ")
 		ver, err := GetLatestVersion(cmd.Context())
 		fmt.Println(ver)
 
-		term.Print(term.BrightCyan, "Defang Fabric: ")
+		term.Printc(term.BrightCyan, "Defang Fabric: ")
 		ver, err2 := cli.GetVersion(cmd.Context(), client)
 		fmt.Println(ver)
 		return errors.Join(err, err2)

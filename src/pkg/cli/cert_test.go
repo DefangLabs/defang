@@ -137,7 +137,7 @@ func TestGetIPInSync(t *testing.T) {
 }
 
 func TestCheckDomainDNSReady(t *testing.T) {
-	term.DoDebug = true
+	term.SetDebug(true)
 	emptyResolver := dns.MockResolver{}
 	hasARecordResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "api.test.com"}:       {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
