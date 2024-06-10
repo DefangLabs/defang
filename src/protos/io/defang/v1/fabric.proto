@@ -207,6 +207,12 @@ message TailResponse {
 
 message ListServicesResponse { repeated ServiceInfo services = 1; }
 
+// TODO: internal message; move to a separate proto file
+message ProjectUpdate {
+  repeated ServiceInfo services = 1;
+  string alb_arn = 2;
+}
+
 enum Platform {
   LINUX_AMD64 = 0;
   LINUX_ARM64 = 1;
