@@ -1,6 +1,7 @@
 package term
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 	"testing"
@@ -63,5 +64,55 @@ func TestStripAnsi(t *testing.T) {
 				t.Errorf("StripAnsi(%q) = %q, want %q", test.msg, got, test.stripped)
 			}
 		})
+	}
+}
+
+func TestAddingPrefix(t *testing.T) {
+	currentTerm := DefaultTerm
+	defer func() {
+		DefaultTerm = currentTerm
+	}()
+	var stdout, stderr bytes.Buffer
+	DefaultTerm = NewTerm(&stdout, &stderr)
+	DefaultTerm.SetDebug(true)
+
+	Debug("Hello, World!")
+	Debugf("Hello, %s!", "World")
+	Debug(" - Hello, World!")
+	Debugf(" - Hello, %s!", "World")
+
+	Info("Hello, World!")
+	Infof("Hello, %s!", "World")
+	Info(" * Hello, World!")
+	Infof(" * Hello, %s!", "World")
+
+	Warn("Hello, World!")
+	Warnf("Hello, %s!", "World")
+	Warn(" ! Hello, World!")
+	Warnf(" ! Hello, %s!", "World")
+
+	expected := []string{
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+		" - Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" * Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+		" ! Hello, World!",
+	}
+	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
+	for i, line := range got {
+		if line != expected[i] {
+			t.Errorf("Expected line %v in stdout to be %q, got %q", i, expected[i], line)
+		}
+	}
+
+	if stderr.String() != "" {
+		t.Errorf("Expected stderr to be empty, got %q", stderr.String())
 	}
 }

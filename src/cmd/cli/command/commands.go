@@ -824,7 +824,7 @@ var composeUpCmd = &cobra.Command{
 			}
 		}()
 		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
-			if !errors.Is(err, cli.ErrDryRun) {
+			if !errors.Is(err, cli.ErrDryRun) && !errors.As(err, new(cliClient.ErrNotImplemented)) {
 				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
 			}
 			wg.Wait() // Wait until ctrl+c is pressed

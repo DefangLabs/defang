@@ -676,7 +676,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 }
 
 func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+	return "", client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
@@ -741,5 +741,5 @@ func ensure(cond bool, msg string) {
 }
 
 func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
