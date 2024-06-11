@@ -106,10 +106,22 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-func Contains[T comparable](s []T, v T) bool {
+func EqualSets[T comparable](s []T, v []T) bool {
+	if len(s) != len(v) {
+		return false
+	}
+
+	// Convert both arrays to maps for efficient lookup
+	map1 := make(map[T]bool)
+
 	for _, val := range s {
-		if val == v {
-			return true
+		map1[val] = true
+	}
+
+	// Check if each element of v is in map1
+	for _, val := range v {
+		if !map1[val] {
+			return false
 		}
 	}
 	return false

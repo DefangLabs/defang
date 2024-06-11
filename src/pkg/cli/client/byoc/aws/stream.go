@@ -139,8 +139,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
-	if len(bs.services) > 0 && !pkg.Contains(bs.services, bs.response.GetService()) {
-		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
+	if len(bs.services) > 0 && !pkg.EqualSets(bs.services, bs.response.GetServices()) {
+		return nil, nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
 	entries := make([]*defangv1.LogEntry, len(events))
