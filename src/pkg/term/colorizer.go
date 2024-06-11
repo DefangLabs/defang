@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
@@ -142,6 +143,14 @@ func ensureNewline(s string) string {
 	return s
 }
 
+func ensurePrefix(s string, prefix string) string {
+	// Don't add prefix to empty strings or strings that already have it
+	if len(s) == 0 || strings.HasPrefix(s, prefix) {
+		return s
+	}
+	return prefix + s
+}
+
 func (t *Term) Printc(c Color, v ...any) (int, error) {
 	return output(t.stdout, c, fmt.Sprint(v...))
 }
@@ -170,32 +179,32 @@ func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return t.Printlnc(DebugColor, v...)
+	return output(t.stdout, DebugColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " - ")))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return t.Printfc(DebugColor, format, v...)
+	return output(t.stdout, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
 }
 
 func (t *Term) Info(v ...any) (int, error) {
-	return t.Printlnc(InfoColor, v...)
+	return output(t.stdout, InfoColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " * ")))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
-	return t.Printfc(InfoColor, format, v...)
+	return output(t.stdout, InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
 	t.hadWarnings = true
-	return t.Printlnc(WarnColor, v...)
+	return output(t.stdout, WarnColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " ! ")))
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
 	t.hadWarnings = true
-	return t.Printfc(WarnColor, format, v...)
+	return output(t.stdout, WarnColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! ")))
 }
 
 func (t *Term) Error(v ...any) (int, error) {

@@ -256,6 +256,10 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			fmt.Print(spin.Next())
 		}
 
+		if msg == nil {
+			continue
+		}
+
 		for _, e := range msg.Entries {
 			service := valueOrDefault(e.Service, msg.Service)
 			host := valueOrDefault(e.Host, msg.Host)
