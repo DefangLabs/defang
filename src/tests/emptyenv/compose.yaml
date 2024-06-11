@@ -1,0 +1,9 @@
+services:
+  emptyenv:
+    build:
+      args:
+        - ARG1
+        - ARG2=
+    environment:
+      - ENV1
+      - ENV2=
