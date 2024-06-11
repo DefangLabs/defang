@@ -175,12 +175,12 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	defer serverStream.Close() // this works because it takes a pointer receiver
 
 	spin := spinner.New()
-	doSpinner := !params.Raw && term.CanColor && term.IsTerminal
+	doSpinner := !params.Raw && term.StdoutCanColor() && term.IsTerminal()
 
-	if term.IsTerminal && !params.Raw {
+	if term.IsTerminal() && !params.Raw {
 		if doSpinner {
-			term.Stdout.HideCursor()
-			defer term.Stdout.ShowCursor()
+			term.HideCursor()
+			defer term.ShowCursor()
 		}
 
 		if !DoVerbose {
@@ -232,7 +232,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 				term.Debug(" - Disconnected:", serverStream.Err())
 				var spaces int
 				if !params.Raw {
-					spaces, _ = term.Fprint(term.Stderr, term.WarnColor, " ! Reconnecting...\r") // overwritten below
+					spaces, _ = term.Warn(" ! Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
 				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
@@ -241,7 +241,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 					return err
 				}
 				if !params.Raw {
-					fmt.Fprintf(term.Stderr, "%*s", spaces, "\r") // clear the "reconnecting" message
+					term.Warnf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}
 				skipDuplicate = true
 				continue
@@ -256,12 +256,20 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			fmt.Print(spin.Next())
 		}
 
-		// HACK: skip noisy CI/CD logs (except errors)
-		isInternal := msg.Service == "cd" || msg.Service == "ci" || msg.Service == "kaniko" || msg.Service == "fabric" || msg.Host == "kaniko" || msg.Host == "fabric"
-		onlyErrors := !DoVerbose && isInternal
+		if msg == nil {
+			continue
+		}
+
 		for _, e := range msg.Entries {
+			service := valueOrDefault(e.Service, msg.Service)
+			host := valueOrDefault(e.Host, msg.Host)
+			etag := valueOrDefault(e.Etag, msg.Etag)
+
+			// HACK: skip noisy CI/CD logs (except errors)
+			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
+			onlyErrors := !DoVerbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, e.Message) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(service, host, e.Message) {
 					return nil
 				}
 				continue
@@ -277,11 +285,11 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			}
 
 			if params.Raw {
-				out := term.Stdout
 				if e.Stderr {
-					out = term.Stderr
+					term.Error(e.Message)
+				} else {
+					term.Info(e.Message)
 				}
-				fmt.Fprintln(out, e.Message) // TODO: trim trailing newline because we're already printing one?
 				continue
 			}
 
@@ -292,7 +300,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 			tsString := ts.Local().Format(RFC3339Micro)
 			tsColor := termenv.ANSIBrightBlack
-			if term.HasDarkBackground {
+			if term.HasDarkBackground() {
 				tsColor = termenv.ANSIWhite
 			}
 			if e.Stderr {
@@ -302,40 +310,47 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = term.Print(tsColor, tsString, " ")
+					prefixLen, _ = term.Printc(tsColor, tsString, " ")
 					if params.Etag == "" {
-						l, _ := term.Print(termenv.ANSIYellow, msg.Etag, " ")
+						l, _ := term.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
 					if params.Service == "" {
-						l, _ := term.Print(termenv.ANSIGreen, msg.Service, " ")
+						l, _ := term.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := term.Print(termenv.ANSIMagenta, msg.Host, " ")
+						l, _ := term.Printc(termenv.ANSIMagenta, host, " ")
 						prefixLen += l
 					}
 				} else {
-					fmt.Print(strings.Repeat(" ", prefixLen))
+					term.Print(strings.Repeat(" ", prefixLen))
 				}
-				if term.CanColor {
+				if term.StdoutCanColor() {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
-					term.Stdout.Reset()
+					term.Reset()
 				} else {
 					line = term.StripAnsi(line)
 				}
-				fmt.Println(line)
+				term.Println(line)
 
 				// Detect end logging event
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Service, msg.Host, line) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(service, host, line) {
 					cancel()
 					return nil
 				}
 			}
 		}
 	}
+}
+
+func valueOrDefault(value, def string) string {
+	if value != "" {
+		return value
+	}
+	return def
 }
 
 func isProgressDot(line string) bool {
