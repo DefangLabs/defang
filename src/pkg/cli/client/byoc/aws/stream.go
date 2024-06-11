@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -115,7 +114,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 			// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
 			bs.response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
 			bs.response.Host = "pulumi"
-			bs.response.Services = []string{"cd"}
+			bs.response.Service = "cd"
 		} else {
 			// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
 			bs.response.Host = parts[2] // TODO: figure out actual hostname/IP
@@ -126,14 +125,14 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 			}
 			service, etag := parts[0], parts[1]
 			bs.response.Etag = etag
-			bs.response.Services = []string{service}
+			bs.response.Service = service
 		}
 	} else if strings.Contains(*event.LogStreamName, "-firelens-") {
 		// These events are from the Firelens sidecar; try to parse the JSON
 		if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
 			bs.response.Etag = record.Etag
-			bs.response.Host = record.Host                        // TODO: use "kaniko" for kaniko logs
-			bs.response.Services = []string{record.ContainerName} // TODO: could be service_etag
+			bs.response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
+			bs.response.Service = record.ContainerName // TODO: could be service_etag
 			parseFirelensRecords = true
 		}
 	} else if strings.HasSuffix(*event.LogGroupIdentifier, "/ecs") || strings.HasSuffix(*event.LogGroupIdentifier, "/ecs:*") {
@@ -156,7 +155,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 				return nil, events[1:], fmt.Errorf("error parsing ECS task state change: invalid container name %q", detail.Containers[0].Name)
 			}
 			bs.response.Etag = detail.Containers[0].Name[i+1:]
-			bs.response.Services = []string{detail.Containers[0].Name[:i]}
+			bs.response.Service = detail.Containers[0].Name[:i]
 			bs.response.Host = path.Base(ecsEvt.Resources[0])
 		case "ECS Service Action", "ECS Deployment State Change": // pretty much the same JSON structure for both
 			var detail ecs.ECSDeploymentStateChange
@@ -171,12 +170,12 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 			if snStart < 0 || snEnd < 0 {
 				return nil, events[1:], fmt.Errorf("error parsing ECS service action: invalid service name %q", ecsEvt.Resources[0])
 			}
-			bs.response.Services = []string{ecsSvcName[snStart+1 : snEnd]}
+			bs.response.Service = ecsSvcName[snStart+1 : snEnd]
 			bs.response.Host = detail.DeploymentId
 
 		default:
 			bs.response.Etag = bs.etag // TODO: Is it possible to filter by etag?
-			bs.response.Services = []string{"ecs"}
+			bs.response.Service = "ecs"
 			bs.response.Host = path.Base(ecsEvt.Resources[0]) // TODO: Verify this is the service name
 		}
 	}
@@ -185,7 +184,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 		return nil, nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
-	if len(bs.services) > 0 && !pkg.Contains(bs.services, bs.response.GetServices()) {
+	if len(bs.services) > 0 && pkg.Contains(bs.services, bs.response.GetService()) {
 		return nil, nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 	entries := make([]*defangv1.LogEntry, len(events))
@@ -211,7 +210,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) ([]*defangv1.LogE
 				Stderr:    stderr,
 				Timestamp: timestamppb.New(time.UnixMilli(*event.Timestamp)),
 			}}, events[1:], nil
-		} else if slices.Contains(bs.response.Services, "cd") && strings.HasPrefix(message, " ** ") {
+		} else if bs.response.Service == "cd" && strings.HasPrefix(message, " ** ") {
 			stderr = true
 		}
 		entries[i] = &defangv1.LogEntry{
