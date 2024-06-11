@@ -195,7 +195,7 @@ message LogEntry {
 message TailResponse {
   reserved 1; // was "string raw"
   repeated LogEntry entries = 2;
-  repeated string services = 3;
+  string service = 3;
   string etag = 4;
   string host = 5;
 }
@@ -372,9 +372,7 @@ message SubscribeRequest {
   repeated string services = 1;
 }
 
-message SubscribeResponse { 
-  repeated ServiceInfo services = 1; 
-}
+message SubscribeResponse { repeated ServiceInfo services = 1; }
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;

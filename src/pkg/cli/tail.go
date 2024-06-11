@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -262,13 +261,13 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		}
 
 		// HACK: skip noisy CI/CD logs (except errors)
-		services := msg.Services[:]
-		isInternal := slices.Contains(services, "cd") || slices.Contains(services, "ci") || slices.Contains(services, "kaniko") || slices.Contains(services, "fabric")
+		service := msg.Service
+		isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric"
 		isInternal = isInternal || msg.Host == "kaniko" || msg.Host == "fabric"
 		onlyErrors := !DoVerbose && isInternal
 		for _, e := range msg.Entries {
 			if onlyErrors && !e.Stderr {
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Services, msg.Host, e.Message) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{msg.Service}, msg.Host, e.Message) {
 					return nil
 				}
 				continue
@@ -315,7 +314,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 						prefixLen += l
 					}
 					if len(params.Services) > 0 {
-						l, _ := term.Print(termenv.ANSIGreen, strings.Join(msg.Services, ","), " ")
+						l, _ := term.Print(termenv.ANSIGreen, msg.Service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
@@ -336,7 +335,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 				fmt.Println(line)
 
 				// Detect end logging event
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(msg.Services, msg.Host, line) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{msg.Service}, msg.Host, line) {
 					cancel()
 					return nil
 				}
