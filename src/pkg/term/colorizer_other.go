@@ -9,6 +9,6 @@ func EnableANSI() func() {
 	return func() {}
 }
 
-func isTerminal() bool {
+func hasTermInEnv() bool {
 	return os.Getenv("TERM") != ""
 }

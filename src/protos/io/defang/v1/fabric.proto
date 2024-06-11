@@ -190,6 +190,9 @@ message LogEntry {
   string message = 1;
   google.protobuf.Timestamp timestamp = 2;
   bool stderr = 3;
+  string service = 4;
+  string etag = 5;
+  string host = 6;
 }
 
 message TailResponse {

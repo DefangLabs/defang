@@ -65,3 +65,9 @@ type Property struct {
 	Name  string
 	Value any
 }
+
+type ErrNotImplemented string
+
+func (n ErrNotImplemented) Error() string {
+	return string(n)
+}

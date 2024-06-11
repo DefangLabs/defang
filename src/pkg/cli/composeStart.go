@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -95,26 +94,25 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			}
 
 			if len(svccfg.Build.Args) > 0 {
-				build.Args = make(map[string]string)
+				build.Args = make(map[string]string, len(svccfg.Build.Args))
 				for key, value := range svccfg.Build.Args {
-					if value == nil {
-						value = resolveEnv(key)
+					if key == "" || value == nil {
+						warnf("service %q: skipping unset build argument %q", svccfg.Name, key)
+						continue
 					}
-					if value != nil {
-						build.Args[key] = *value
-					}
+					build.Args[key] = *value
 				}
 			}
 		}
 
 		// Extract environment variables
-		unsetEnvs := []string{}
-		envs := make(map[string]string)
+		var unsetEnvs []string
+		envs := make(map[string]string, len(svccfg.Environment))
 		for key, value := range svccfg.Environment {
-			if value == nil {
-				value = resolveEnv(key)
+			if key == "" {
+				warnf("service %q: skipping unset environment variable key", svccfg.Name)
+				continue
 			}
-
 			// keep track of what environment variables were declared but not set in the compose environment section
 			if value == nil {
 				unsetEnvs = append(unsetEnvs, key)
@@ -123,12 +121,12 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			val := *value
 			if serviceNameRegex != nil {
-				// Replace service names with their actual DNS names
+				// Replace service names with their actual DNS names; TODO: support public names too
 				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
 					return c.ServiceDNS(NormalizeServiceName(serviceName))
 				})
 				if val != *value {
-					warnf("service names were replaced in environment variable %q: %q", key, val)
+					warnf("service %q: service names were replaced in environment variable %q: %q", svccfg.Name, key, val)
 				}
 			}
 			envs[key] = val
@@ -137,8 +135,8 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		// Extract secret references
 		var configs []*defangv1.Secret
 		for i, secret := range svccfg.Secrets {
-			if i == 0 {
-				warnf("secrets will be exposed as environment variables, not files (use 'environment' to silence)")
+			if i == 0 { // only warn once
+				warnf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name)
 			}
 			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
@@ -187,7 +185,7 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		if redis == nil && isStatefulImage(svccfg.Image) {
-			warnf("stateful service %q will lose data on restart; use a managed service instead", svccfg.Name)
+			warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
 		network := network(&svccfg)
@@ -253,7 +251,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, err
 	}
 
-	if term.DoDebug {
+	if term.DoDebug() {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}
@@ -269,21 +267,10 @@ func getResourceReservations(r compose.Resources) *compose.Resource {
 	return r.Reservations
 }
 
-func resolveEnv(k string) *string {
-	// TODO: per spec, if the value is nil, then the value is taken from an interactive prompt
-	v, ok := os.LookupEnv(k)
-	if !ok {
-		warnf("environment variable not found: %q; using config", k)
-		// If the value could not be resolved, it should be removed
-		return nil
-	}
-	return &v
-}
-
 func convertPlatform(platform string) defangv1.Platform {
 	switch platform {
 	default:
-		warnf("Unsupported platform: %q (assuming linux)", platform)
+		warnf("unsupported platform: %q (assuming linux)", platform)
 		fallthrough
 	case "", "linux":
 		return defangv1.Platform_LINUX_ANY

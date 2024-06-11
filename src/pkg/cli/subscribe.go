@@ -48,7 +48,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			if !serverStream.Receive() {
-				term.Debug("- Subscribe Stream closed")
+				term.Debug("Subscribe Stream closed", serverStream.Err())
 				return
 			}
 
