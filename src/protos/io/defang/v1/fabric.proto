@@ -372,7 +372,7 @@ message SubscribeRequest {
   repeated string services = 1;
 }
 
-message SubscribeResponse { repeated ServiceInfo services = 1; }
+message SubscribeResponse { ServiceInfo service = 1; }
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
