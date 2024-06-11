@@ -1,0 +1,16 @@
+name: test
+services:
+  emptyenv:
+    build:
+      context: ../../tests/emptyenv
+      dockerfile: Dockerfile
+      args:
+        ARG2: ""
+    environment:
+      ENV1: null
+      ENV2: ""
+    networks:
+      default: null
+networks:
+  default:
+    name: test_default
