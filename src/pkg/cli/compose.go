@@ -71,7 +71,7 @@ func NormalizeServiceName(s string) string {
 
 func warnf(format string, args ...interface{}) {
 	logrus.Warnf(format, args...)
-	term.HadWarnings = true
+	term.SetHadWarnings(true)
 }
 
 func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *compose.BuildConfig, force bool) (string, error) {
@@ -298,7 +298,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	doProgress := term.DoColor(term.Stdout) && term.IsTerminal
+	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err = filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -337,11 +337,11 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			}
 		}
 
-		if term.DoDebug {
+		if term.DoDebug() {
 			term.Debug(" - Adding", baseName)
 		} else if doProgress {
 			fmt.Printf("%4d %s\r", fileCount, baseName)
-			defer term.Stdout.ClearLine()
+			defer term.ClearLine()
 		}
 
 		info, err := de.Info()

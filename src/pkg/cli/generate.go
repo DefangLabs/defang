@@ -25,7 +25,7 @@ func GenerateWithAI(ctx context.Context, client client.Client, language string, 
 		return nil, err
 	}
 
-	if term.DoDebug {
+	if term.DoDebug() {
 		// Print the files that were generated
 		for _, file := range response.Files {
 			term.Debug(file.Name + "\n```")

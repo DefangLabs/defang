@@ -251,7 +251,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, err
 	}
 
-	if term.DoDebug {
+	if term.DoDebug() {
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}

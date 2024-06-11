@@ -47,7 +47,7 @@ func TestNormalizeServiceName(t *testing.T) {
 
 func TestLoadCompose(t *testing.T) {
 	DoVerbose = true
-	term.DoDebug = true
+	term.SetDebug(true)
 
 	t.Run("no project name defaults to tenantID", func(t *testing.T) {
 		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
@@ -382,14 +382,6 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
-}
-
-type MockClient struct {
-	client.Client
-}
-
-func (m MockClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return &defangv1.DeployResponse{}, nil
 }
 
 func TestProjectValidationServiceName(t *testing.T) {

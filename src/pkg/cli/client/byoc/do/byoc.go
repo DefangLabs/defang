@@ -3,7 +3,6 @@ package do
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -188,7 +187,7 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, errors.New("not implemented for ByocDo")
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
@@ -217,7 +216,7 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
 	env := b.environment()
-	if term.DoDebug {
+	if term.DoDebug() {
 		debugEnv := " -"
 		for k, v := range env {
 			debugEnv += " " + k + "=" + v
