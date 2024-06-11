@@ -1,0 +1,5 @@
+FROM alpine
+ARG ARG1
+ENV ARG1=$ARG1
+RUN echo $ARG1
+CMD echo $ARG1 $ENV1 $ENV2

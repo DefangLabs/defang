@@ -90,13 +90,13 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 }
 
 func triggerCertGeneration(ctx context.Context, domain string) {
-	doSpinner := term.CanColor && term.IsTerminal
+	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		spinCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		go func() {
-			term.Stdout.HideCursor()
-			defer term.Stdout.ShowCursor()
+			term.HideCursor()
+			defer term.ShowCursor()
 			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
 			spin := spinner.New()
@@ -122,10 +122,10 @@ func waitForTLS(ctx context.Context, domain string) error {
 	timeout, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	doSpinner := term.CanColor && term.IsTerminal
+	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
-		term.Stdout.HideCursor()
-		defer term.Stdout.ShowCursor()
+		term.HideCursor()
+		defer term.ShowCursor()
 	}
 	spin := spinner.New()
 	for {
@@ -170,10 +170,10 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 	defer ticker.Stop()
 
 	msgShown := false
-	doSpinner := term.CanColor && term.IsTerminal
+	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
-		term.Stdout.HideCursor()
-		defer term.Stdout.ShowCursor()
+		term.HideCursor()
+		defer term.ShowCursor()
 	}
 	spin := spinner.New()
 	for {
