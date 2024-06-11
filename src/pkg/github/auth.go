@@ -65,6 +65,7 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 
 	// Create a channel to wait for the server to finish
 	ch := make(chan string)
+	defer close(ch)
 
 	var authorizeUrl string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,17 +77,17 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 			http.NotFound(w, r)
 			return
 		}
-		defer close(ch)
+		var msg string
 		query := r.URL.Query()
 		if query.Get("state") != state {
-			http.Error(w, "invalid state", http.StatusBadRequest)
-			return
+			msg = "Authentication error: wrong state"
+		} else {
+			msg = "Authentication successful"
+			if query.Get("error") != "" {
+				msg = "Authentication failed: " + query.Get("error_description")
+			}
+			ch <- query.Get("code")
 		}
-		msg := "Authentication successful"
-		if query.Get("error") != "" {
-			msg = "Authentication failed: " + query.Get("error_description")
-		}
-		ch <- query.Get("code")
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})
 
