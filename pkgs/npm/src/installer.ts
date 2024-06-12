@@ -5,7 +5,7 @@ import * as AdmZip from "adm-zip";
 import axios from "axios";
 import { promises as fsPromise } from "fs";
 
-async function downloadAppArchive(
+export async function downloadAppArchive(
   version: string,
   archiveFilename: string,
   outputPath: string
