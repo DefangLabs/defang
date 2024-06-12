@@ -12,7 +12,7 @@ import (
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
 	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
-		term.Info(" * Monitor your services' status in the defang portal")
+		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
 			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
 		}
@@ -25,7 +25,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 		if len(serviceInfo.Endpoints) > 0 {
 			andEndpoints = "and will be available at:"
 		}
-		term.Info(" * Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
+		term.Info("Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
 		for i, endpoint := range serviceInfo.Endpoints {
 			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
 				endpoint = "https://" + endpoint

@@ -32,7 +32,7 @@ func loadCompose(filePath string, projectName string, overrideProjectName bool) 
 		return nil, err
 	}
 
-	term.Debug(" - Loading compose file", filePath)
+	term.Debug("Loading compose file", filePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
@@ -112,7 +112,7 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	// iterate through this loop at least once to find the compose file.
 	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
 	// then walk the tree up to the root directory looking for a compose file.
-	term.Debug(" - Looking for compose file - searching for", searchPattern)
+	term.Debug("Looking for compose file - searching for", searchPattern)
 	for {
 		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
 			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)

@@ -48,7 +48,7 @@ func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
 	if errors.As(err, &cerr) {
-		term.Debug(" - Server error:", cerr)
+		term.Debug("Server error:", cerr)
 		err = errors.Unwrap(cerr)
 	}
 	return err
@@ -108,7 +108,7 @@ func Execute(ctx context.Context) error {
 
 	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
-			term.Debug(" - Latest Version:", latest, "Current Version:", GetCurrentVersion())
+			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
 			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
@@ -293,15 +293,15 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderAWS:
 			if !awsInEnv() {
-				term.Warn(" ! AWS provider was selected, but AWS environment variables are not set")
+				term.Warn("AWS provider was selected, but AWS environment variables are not set")
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn(" ! Digital Ocean provider was selected, but DO_PAT environment variable is not set")
+				term.Warn("Digital Ocean provider was selected, but DO_PAT environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			if awsInEnv() {
-				term.Warn(" ! Using Defang playground, but AWS environment variables were detected; did you forget --provider?")
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider?")
 			}
 		}
 
@@ -319,9 +319,9 @@ var RootCmd = &cobra.Command{
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
-			term.Debug(" - Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
+			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
-				term.Warn(" ! Your CLI version is outdated. Please update to the latest version.")
+				term.Warn("Your CLI version is outdated. Please update to the latest version.")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
 			}
 		}
@@ -337,7 +337,7 @@ var RootCmd = &cobra.Command{
 			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				term.Warn(" !", prettyError(err))
+				term.Warn(prettyError(err))
 
 				defer trackCmd(nil, "Login", P{"reason", err})
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
@@ -353,7 +353,7 @@ var RootCmd = &cobra.Command{
 
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				term.Warn(" !", prettyError(err))
+				term.Warn(prettyError(err))
 
 				defer trackCmd(nil, "Terms", P{"reason", err})
 				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
@@ -449,7 +449,7 @@ var generateCmd = &cobra.Command{
 
 			// Fetch the list of samples from the Defang repository
 			if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
-				term.Debug(" - unable to fetch samples:", err)
+				term.Debug("unable to fetch samples:", err)
 			} else if len(samples) > 0 {
 				const generateWithAI = "Generate with AI"
 
@@ -542,30 +542,30 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty("."); !empty || err != nil {
-			term.Warn(" ! The folder is not empty. We recommend running this command in an empty folder.")
+			term.Warn("The folder is not empty. We recommend running this command in an empty folder.")
 		}
 
 		if sample != "" {
-			term.Info(" * Fetching sample from the Defang repository...")
+			term.Info("Fetching sample from the Defang repository...")
 			err := cli.InitFromSample(cmd.Context(), sample)
 			if err != nil {
 				return err
 			}
 		} else {
-			term.Info(" * Working on it. This may take 1 or 2 minutes...")
+			term.Info("Working on it. This may take 1 or 2 minutes...")
 			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
 			if err != nil {
 				return err
 			}
 		}
 
-		term.Info(" * Code generated successfully in folder", prompt.Folder)
+		term.Info("Code generated successfully in folder", prompt.Folder)
 
 		// TODO: should we use EDITOR env var instead?
 		cmdd := exec.Command("code", ".")
 		err = cmdd.Start()
 		if err != nil {
-			term.Debug(" - unable to launch VS Code:", err)
+			term.Debug("unable to launch VS Code:", err)
 		}
 
 		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
@@ -641,7 +641,7 @@ var tailCmd = &cobra.Command{
 		if !ts.IsZero() {
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
-		term.Infof(" * Showing logs%s; press Ctrl+C to stop:", sinceStr)
+		term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
 		services := []string{}
 		if len(name) > 0 {
 			services = strings.Split(name, ",")
@@ -715,7 +715,7 @@ var configSetCmd = &cobra.Command{
 		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
 			return err
 		}
-		term.Info(" * Updated value for", name)
+		term.Info("Updated value for", name)
 
 		printDefangHint("To update the deployed values, do:", "compose start")
 		return nil
@@ -732,12 +732,12 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), client, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(" !", prettyError(err))
+				term.Warn(prettyError(err))
 				return nil
 			}
 			return err
 		}
-		term.Info(" * Deleted", names)
+		term.Info("Deleted", names)
 
 		printDefangHint("To list the configs (but not their values), do:", "config ls")
 		return nil
@@ -769,7 +769,7 @@ func startTailing(ctx context.Context, etag string, since time.Time) error {
 		services = "deployment ID " + etag
 	}
 
-	term.Info(" * Tailing logs for", services, "; press Ctrl+C to detach:")
+	term.Info("Tailing logs for", services, "; press Ctrl+C to detach:")
 	tailParams := cli.TailOptions{
 		Services: []string{},
 		Etag:     etag,
@@ -809,7 +809,7 @@ var composeUpCmd = &cobra.Command{
 		printPlaygroundPortalServiceURLs(serviceInfos)
 
 		if detach {
-			term.Info(" * Done.")
+			term.Info("Done.")
 			return nil
 		}
 
@@ -837,7 +837,7 @@ var composeUpCmd = &cobra.Command{
 		wg.Wait() // Wait for tail to finish
 
 		printEndpoints(serviceInfos)
-		term.Info(" * Done.")
+		term.Info("Done.")
 		return nil
 	},
 }
@@ -878,7 +878,7 @@ var composeRestartCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		term.Info(" * Restarted services with deployment ID", etag)
+		term.Info("Restarted services with deployment ID", etag)
 		return nil
 	},
 }
@@ -893,7 +893,7 @@ var composeStopCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		term.Info(" * Stopped services with deployment ID", etag)
+		term.Info("Stopped services with deployment ID", etag)
 		return nil
 	},
 }
@@ -912,13 +912,13 @@ var composeDownCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(" !", prettyError(err))
+				term.Warn(prettyError(err))
 				return nil
 			}
 			return err
 		}
 
-		term.Info(" * Deleted services, deployment ID", etag)
+		term.Info("Deleted services, deployment ID", etag)
 
 		if detach {
 			printDefangHint("To track the update, do:", "tail --etag "+etag)
@@ -943,7 +943,7 @@ var composeDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		term.Info(" * Done.")
+		term.Info("Done.")
 		return nil
 
 	},
@@ -978,20 +978,20 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(" !", prettyError(err))
+				term.Warn(prettyError(err))
 				return nil
 			}
 			return err
 		}
 
-		term.Info(" * Deleted service", names, "with deployment ID", etag)
+		term.Info("Deleted service", names, "with deployment ID", etag)
 
 		if !tail {
 			printDefangHint("To track the update, do:", "tail --etag "+etag)
 			return nil
 		}
 
-		term.Info(" * Tailing logs for update; press Ctrl+C to detach:")
+		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
 			Services: []string{},
 			Etag:     etag,
@@ -1012,7 +1012,7 @@ var restartCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		term.Info(" * Restarted service", args, "with deployment ID", etag)
+		term.Info("Restarted service", args, "with deployment ID", etag)
 		return nil
 	},
 }
@@ -1058,7 +1058,7 @@ var logoutCmd = &cobra.Command{
 		if err := cli.Logout(cmd.Context(), client); err != nil {
 			return err
 		}
-		term.Info(" * Successfully logged out")
+		term.Info("Successfully logged out")
 		return nil
 	},
 }

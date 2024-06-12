@@ -172,14 +172,14 @@ func (t *Term) Println(v ...any) (int, error) {
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
-	return fmt.Fprintf(t.stdout, format, ensureNewline(fmt.Sprint(v...)))
+	return fmt.Fprint(t.stdout, ensureNewline(fmt.Sprintf(format, v...)))
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
-	return output(t.stdout, DebugColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " - ")))
+	return output(t.stdout, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
 }
 
 func (t *Term) Debugf(format string, v ...any) (int, error) {
@@ -190,7 +190,7 @@ func (t *Term) Debugf(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Info(v ...any) (int, error) {
-	return output(t.stdout, InfoColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " * ")))
+	return output(t.stdout, InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
@@ -199,7 +199,7 @@ func (t *Term) Infof(format string, v ...any) (int, error) {
 
 func (t *Term) Warn(v ...any) (int, error) {
 	t.hadWarnings = true
-	return output(t.stdout, WarnColor, ensureNewline(ensurePrefix(fmt.Sprint(v...), " ! ")))
+	return output(t.stdout, WarnColor, ensurePrefix(fmt.Sprintln(v...), " ! "))
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
