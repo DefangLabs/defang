@@ -206,7 +206,10 @@ message TailResponse {
   string host = 5;
 }
 
-message ListServicesResponse { repeated ServiceInfo services = 1; }
+message ListServicesResponse {
+  repeated ServiceInfo services = 1;
+  string project = 2;
+}
 
 // TODO: internal message; move to a separate proto file
 message ProjectUpdate {
