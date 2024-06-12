@@ -925,18 +925,18 @@ var composeDownCmd = &cobra.Command{
 			return nil
 		}
 
-		//		endLogConditions := []cli.EndLogConditional{
-		//			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
-		//			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
-		//		}
+		endLogConditions := []cli.EndLogConditional{
+			{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
+			{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
+		}
 
-		//		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
+		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
 		tailParams := cli.TailOptions{
-			Services: []string{},
-			Etag:     etag,
-			Since:    since,
-			Raw:      false,
-			//			EndEventDetectFunc: endLogDetectFunc,
+			Services:           []string{},
+			Etag:               etag,
+			Since:              since,
+			Raw:                false,
+			EndEventDetectFunc: endLogDetectFunc,
 		}
 
 		err = cli.Tail(cmd.Context(), client, tailParams)
