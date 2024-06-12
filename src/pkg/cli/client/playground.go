@@ -20,10 +20,6 @@ func (g PlaygroundClient) LoadProject() (*compose.Project, error) {
 	return g.Loader.LoadWithDefaultProjectName(projectName)
 }
 
-func (g PlaygroundClient) Update(ctx context.Context, req *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Update(ctx, connect.NewRequest(req)))
-}
-
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
