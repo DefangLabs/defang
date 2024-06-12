@@ -130,11 +130,14 @@ func TestInfoAddSpaceBetweenStrings(t *testing.T) {
 	Info("Hello", "World!")
 	Info("Hello", 1, "World!")
 	Info("Hello", errors.New("SomeErr"), "World!")
+	domain := "api.domain.com"
+	Printf("TLS cert for %v is ready", domain)
 
 	expected := []string{
 		" * Hello World!",
 		" * Hello 1 World!",
 		" * Hello SomeErr World!",
+		"TLS cert for api.domain.com is ready",
 	}
 	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
 	for i, line := range got {

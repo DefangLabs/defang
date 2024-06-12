@@ -172,7 +172,7 @@ func (t *Term) Println(v ...any) (int, error) {
 }
 
 func (t *Term) Printf(format string, v ...any) (int, error) {
-	return fmt.Fprintf(t.stdout, format, ensureNewline(fmt.Sprint(v...)))
+	return fmt.Fprint(t.stdout, ensureNewline(fmt.Sprintf(format, v...)))
 }
 
 func (t *Term) Debug(v ...any) (int, error) {
