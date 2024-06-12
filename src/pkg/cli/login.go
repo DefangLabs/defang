@@ -65,7 +65,7 @@ func InteractiveLogin(ctx context.Context, client client.Client, gitHubClientId,
 	}
 
 	tenant, host := SplitTenantHost(fabric)
-	term.Info(" * Successfully logged in to", host, "("+tenant.String()+" tenant)")
+	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
 	if err := saveAccessToken(fabric, at); err != nil {
 		term.Warn(" ! Failed to save access token:", err)

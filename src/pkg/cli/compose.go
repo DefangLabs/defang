@@ -80,7 +80,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		return "", fmt.Errorf("invalid build context: %w", err)
 	}
 
-	term.Info(" * Compressing build context for", name, "at", root)
+	term.Info("Compressing build context for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
@@ -91,14 +91,14 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
-		term.Debug(" - Digest:", digest)
+		term.Debug("Digest:", digest)
 	}
 
 	if DoDryRun {
 		return root, nil
 	}
 
-	term.Info(" * Uploading build context for", name)
+	term.Info("Uploading build context for", name)
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
@@ -259,7 +259,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	term.Debug(" - Reading .dockerignore file from", ignorefile)
+	term.Debug("Reading .dockerignore file from", ignorefile)
 	return reader
 }
 
@@ -278,7 +278,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		dockerignore = ".dockerignore"
 		reader = tryReadIgnoreFile(root, dockerignore)
 		if reader == nil {
-			term.Debug(" - No .dockerignore file found; using defaults")
+			term.Debug("No .dockerignore file found; using defaults")
 			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
 		}
 	}
@@ -329,7 +329,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 				return err
 			}
 			if ignore {
-				term.Debug(" - Ignoring", relPath)
+				term.Debug("Ignoring", relPath)
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -338,9 +338,9 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 
 		if term.DoDebug() {
-			term.Debug(" - Adding", baseName)
+			term.Debug("Adding", baseName)
 		} else if doProgress {
-			fmt.Printf("%4d %s\r", fileCount, baseName)
+			term.Printf("%4d %s\r", fileCount, baseName)
 			defer term.ClearLine()
 		}
 
@@ -376,7 +376,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			term.Warnf(" ! The build context contains more than %d files; use --debug or create .dockerignore", ContextFileLimit)
+			term.Warnf("The build context contains more than %d files; use --debug or create .dockerignore", ContextFileLimit)
 		}
 
 		_, err = io.Copy(tarWriter, file)
