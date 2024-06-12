@@ -4,8 +4,8 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { promisify } from "util";
 import { downloadAppArchive } from "./install";
-const exec = promisify(child_process.exec);
 
+const exec = promisify(child_process.exec);
 const EXECUTABLE = "defang";
 
 function getPathToExecutable(): string {
@@ -60,6 +60,11 @@ async function getVersionInfo(): Promise<{ current: string; latest: string }> {
 async function run(): Promise<void> {
   try {
     const { current, latest } = await getVersionInfo();
+
+    if (current != latest) {
+      // download and install the latest version of defang cli
+      downloadAppArchive();
+    }
 
     const args = process.argv.slice(2);
     const processResult = child_process.spawnSync(getPathToExecutable(), args, {
