@@ -149,11 +149,11 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warn(" ! Service does not exist (yet):", service)
+					term.Warn("Service does not exist (yet):", service)
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					term.Warn(" !", err)
+					term.Warn(err)
 				}
 			}
 		}
