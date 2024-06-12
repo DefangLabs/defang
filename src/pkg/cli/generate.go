@@ -12,7 +12,7 @@ import (
 
 func GenerateWithAI(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
-		term.Warn(" ! Dry run, not generating files")
+		term.Warn("Dry run, not generating files")
 		return nil, ErrDryRun
 	}
 
@@ -28,16 +28,16 @@ func GenerateWithAI(ctx context.Context, client client.Client, language string, 
 	if term.DoDebug() {
 		// Print the files that were generated
 		for _, file := range response.Files {
-			term.Debug(file.Name + "\n```")
-			term.Debug(file.Content)
-			term.Debug("```")
-			term.Debug("")
-			term.Debug("")
+			term.Printc(term.DebugColor, file.Name+"\n```")
+			term.Printc(term.DebugColor, file.Content)
+			term.Printc(term.DebugColor, "```")
+			term.Println("")
+			term.Println("")
 		}
 	}
 
 	// Write each file to disk
-	term.Info(" * Writing files to disk...")
+	term.Info("Writing files to disk...")
 	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)

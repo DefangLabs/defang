@@ -9,7 +9,7 @@ import (
 )
 
 func Logout(ctx context.Context, client client.Client) error {
-	term.Debug(" - Logging out")
+	term.Debug("Logging out")
 	err := client.RevokeToken(ctx)
 	// Ignore unauthenticated errors, since we're logging out anyway
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {

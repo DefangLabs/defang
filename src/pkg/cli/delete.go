@@ -11,7 +11,7 @@ import (
 
 // Deprecated: Use ComposeStop instead.
 func Delete(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
-	term.Debug(" - Deleting service", names)
+	term.Debug("Deleting service", names)
 
 	if DoDryRun {
 		return "", ErrDryRun

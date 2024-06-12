@@ -97,7 +97,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.ProjectDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
-			term.Debug(" - Failed to get subdomain zone:", err)
+			term.Debug("Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
 			b.ProjectDomain = b.getProjectDomain(domain.Zone)
@@ -379,7 +379,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	ensure(b.PulumiProject != "", "pulumiProject not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
 
-	term.Debug(" - Getting services from bucket:", bucketName, path)
+	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
@@ -387,7 +387,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	var serviceInfos defangv1.ListServicesResponse
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			term.Debug(" - s3.GetObject:", err)
+			term.Debug("s3.GetObject:", err)
 			return &serviceInfos, nil // no services yet
 		}
 		return nil, annotateAwsError(err)
@@ -412,14 +412,14 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
-	term.Debugf(" - Putting parameter %q", fqn)
+	term.Debugf("Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
-	term.Debugf(" - Listing parameters with prefix %q", prefix)
+	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -468,23 +468,23 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debug(" - Tailing task", etag)
+		term.Debug("Tailing task", etag)
 		etag = "" // no need to filter by etag
 	} else {
 		// Tail CD, kaniko, and all services
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
-		term.Debug(" - Tailing kaniko logs", kanikoTail.LogGroupARN)
+		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
-		term.Debug(" - Tailing services logs", servicesTail.LogGroupARN)
+		term.Debug("Tailing services logs", servicesTail.LogGroupARN)
 		ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
-		term.Debug(" - Tailing ecs events logs", ecsTail.LogGroupARN)
+		term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
 			// If we know the CD task ARN, only tail the logstream for the CD task
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
-		term.Debug(" - Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+		term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
 	}
 	if err != nil {
@@ -668,7 +668,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(name)
 	}
-	term.Debug(" - Deleting parameters", ids)
+	term.Debug("Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return annotateAwsError(err)
 	}
@@ -696,7 +696,7 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	s3client := s3.NewFromConfig(cfg)
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	term.Debug(" - Listing stacks in bucket:", bucketName)
+	term.Debug("Listing stacks in bucket:", bucketName)
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &bucketName,
 		Prefix: &prefix,

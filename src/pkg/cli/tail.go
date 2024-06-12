@@ -140,7 +140,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if err != nil {
 		return err
 	}
-	term.Debug(" - Tailing logs in project", projectName)
+	term.Debug("Tailing logs in project", projectName)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
@@ -192,7 +192,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-				term.Info(" * Press V to toggle verbose mode")
+				term.Info("Press V to toggle verbose mode")
 				input := term.NewNonBlockingStdin()
 				defer input.Close() // abort the read loop
 				go func() {
@@ -213,7 +213,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 							if verbose {
 								modeStr = "ON"
 							}
-							term.Info(" * Verbose mode", modeStr)
+							term.Info("Verbose mode", modeStr)
 							go client.Track("Verbose Toggled", P{"verbose", verbose})
 						}
 					}
@@ -233,19 +233,19 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			code := connect.CodeOf(serverStream.Err())
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
-				term.Debug(" - Disconnected:", serverStream.Err())
+				term.Debug("Disconnected:", serverStream.Err())
 				var spaces int
 				if !params.Raw {
-					spaces, _ = term.Warn(" ! Reconnecting...\r") // overwritten below
+					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
 				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 				if err != nil {
-					term.Debug(" - Reconnect failed:", err)
+					term.Debug("Reconnect failed:", err)
 					return err
 				}
 				if !params.Raw {
-					term.Warnf("%*s", spaces, "\r") // clear the "reconnecting" message
+					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}
 				skipDuplicate = true
 				continue
@@ -292,7 +292,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 				if e.Stderr {
 					term.Error(e.Message)
 				} else {
-					term.Info(e.Message)
+					term.Printlnc(term.InfoColor, e.Message)
 				}
 				continue
 			}
