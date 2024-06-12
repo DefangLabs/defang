@@ -62,7 +62,7 @@ func InitFromSample(ctx context.Context, name string) error {
 	}
 	defer body.Close()
 	tarReader := tar.NewReader(body)
-	term.Info(" * Writing files to disk...")
+	term.Info("Writing files to disk...")
 	for {
 		h, err := tarReader.Next()
 		if err != nil {

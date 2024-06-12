@@ -12,6 +12,6 @@ func Whoami(ctx context.Context, client client.Client) error {
 	if err != nil {
 		return err
 	}
-	term.Infof(" * You are logged into tenant %q in %q region %q", resp.Tenant, resp.Account, resp.Region)
+	term.Infof("You are logged into tenant %q in %q region %q", resp.Tenant, resp.Account, resp.Region)
 	return nil
 }

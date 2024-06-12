@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -103,8 +102,8 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 	}
 	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
 
-	n, _ := fmt.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
-	defer fmt.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
+	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
+	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	input := term.NewNonBlockingStdin()
 	defer input.Close() // abort the read
