@@ -12,7 +12,7 @@ import (
 
 func GenerateWithAI(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
 	if DoDryRun {
-		term.Warn(" ! Dry run, not generating files")
+		term.Warn("Dry run, not generating files")
 		return nil, ErrDryRun
 	}
 

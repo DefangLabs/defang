@@ -13,7 +13,7 @@ func ConfigSet(ctx context.Context, client client.Client, name string, value str
 	if err != nil {
 		return err
 	}
-	term.Debug(" - Setting config", name, "in project", projectName)
+	term.Debug("Setting config", name, "in project", projectName)
 
 	if DoDryRun {
 		return ErrDryRun

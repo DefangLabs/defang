@@ -9,7 +9,7 @@ import (
 )
 
 func Restart(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
-	term.Debug(" - Restarting service", names)
+	term.Debug("Restarting service", names)
 
 	if DoDryRun {
 		return "", ErrDryRun

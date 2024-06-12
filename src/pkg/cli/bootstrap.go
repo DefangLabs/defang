@@ -15,7 +15,7 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 		return err
 	}
 
-	term.Debug(" - Running CD command", command, "in project", projectName)
+	term.Debug("Running CD command", command, "in project", projectName)
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -30,7 +30,7 @@ func BootstrapCommand(ctx context.Context, client client.Client, command string)
 }
 
 func BootstrapLocalList(ctx context.Context, client client.Client) error {
-	term.Debug(" - Running CD list")
+	term.Debug("Running CD list")
 	if DoDryRun {
 		return ErrDryRun
 	}
