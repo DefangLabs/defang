@@ -823,7 +823,7 @@ var composeUpCmd = &cobra.Command{
 			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
 				var cerr *cli.CancelError
 				if !errors.As(err, &cerr) {
-					term.Debugf(" - failed to start tailing: %v", err)
+					term.Debugf("failed to start tailing: %v", err)
 				}
 			}
 		}()
