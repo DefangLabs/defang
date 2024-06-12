@@ -56,7 +56,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			servInfo := msg.GetService()
 			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
 			if !ok {
-				term.Warnf(" ! Unknown service %s in subscribe response\n", servInfo.Service.Name)
+				term.Debugf(" ! Unknown service %s in subscribe response\n", servInfo.Service.Name)
 				continue
 			}
 			serviceStatus[serviceName] = servInfo.Status
