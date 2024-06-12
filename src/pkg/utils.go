@@ -105,3 +105,12 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 		return ctx.Err()
 	}
 }
+
+func Contains[T comparable](s []T, v T) bool {
+	for _, val := range s {
+		if val == v {
+			return true
+		}
+	}
+	return false
+}
