@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -95,16 +96,25 @@ func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
 
 func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
-	services := make([]*defangv1.Service, 0, len(names))
-	for _, name := range names {
-		serviceInfo, err := g.GetService(ctx, &defangv1.ServiceID{Name: name})
-		if err != nil {
-			return "", err
-		}
-		services = append(services, serviceInfo.Service)
+	resp, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	existingServices := make(map[string]*defangv1.Service)
+	for _, serviceInfo := range resp.Services {
+		existingServices[serviceInfo.Service.Name] = serviceInfo.Service
 	}
 
-	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	servicesToUpdate := make([]*defangv1.Service, 0, len(names))
+	for _, name := range names {
+		service, ok := existingServices[name]
+		if !ok {
+			return "", fmt.Errorf("service %s not found", name)
+		}
+		servicesToUpdate = append(servicesToUpdate, service)
+	}
+
+	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Project: resp.Project, Services: servicesToUpdate})
 	if err != nil {
 		return "", err
 	}
