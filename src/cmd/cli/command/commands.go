@@ -642,11 +642,15 @@ var tailCmd = &cobra.Command{
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
 		term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
+		services := []string{}
+		if len(name) > 0 {
+			services = strings.Split(name, ",")
+		}
 		tailOptions := cli.TailOptions{
-			Service: name,
-			Etag:    etag,
-			Since:   ts,
-			Raw:     raw,
+			Services: services,
+			Etag:     etag,
+			Since:    ts,
+			Raw:      raw,
 		}
 
 		return cli.Tail(cmd.Context(), client, tailOptions)
@@ -767,10 +771,10 @@ func startTailing(ctx context.Context, etag string, since time.Time) error {
 
 	term.Info("Tailing logs for", services, "; press Ctrl+C to detach:")
 	tailParams := cli.TailOptions{
-		Service: "",
-		Etag:    etag,
-		Since:   since,
-		Raw:     false,
+		Services: []string{},
+		Etag:     etag,
+		Since:    since,
+		Raw:      false,
 	}
 
 	// blocking call to tail
@@ -819,13 +823,13 @@ var composeUpCmd = &cobra.Command{
 			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
 				var cerr *cli.CancelError
 				if !errors.As(err, &cerr) {
-					term.Warnf("failed to start tailing: %v", err)
+					term.Debugf("failed to start tailing: %v", err)
 				}
 			}
 		}()
 		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if !errors.Is(err, cli.ErrDryRun) && !errors.As(err, new(cliClient.ErrNotImplemented)) {
-				term.Warnf("failed to wait for service status, command will continue to tail forever, press ctrl+c to stop: %v", err)
+				term.Warnf("failed to wait for service status: %v", err)
 			}
 			wg.Wait() // Wait until ctrl+c is pressed
 		}
@@ -928,7 +932,7 @@ var composeDownCmd = &cobra.Command{
 
 		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
 		tailParams := cli.TailOptions{
-			Service:            "",
+			Services:           []string{},
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
@@ -989,10 +993,10 @@ var deleteCmd = &cobra.Command{
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Service: "",
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
+			Services: []string{},
+			Etag:     etag,
+			Since:    since,
+			Raw:      false,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},

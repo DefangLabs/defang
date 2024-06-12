@@ -135,3 +135,25 @@ func TestRandomID(t *testing.T) {
 		}
 	}
 }
+
+func TestContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		slice    []int
+		value    int
+		expected bool
+	}{
+		{"Empty slice", []int{}, 1, false},
+		{"Single element", []int{1}, 1, true},
+		{"Multiple elements", []int{1, 2, 3, 4, 5}, 3, true},
+		{"Non-existent element", []int{1, 2, 3, 4, 5}, 6, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Contains(tt.slice, tt.value); got != tt.expected {
+				t.Errorf("Contains() returned %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}

@@ -112,7 +112,7 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 	}
 	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
-		term.Debugf("Error triggering cert generation: %v", err)
+		term.Debugf(" - Error triggering cert generation: %v", err)
 	}
 }
 

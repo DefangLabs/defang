@@ -26,22 +26,22 @@ type byocServerStream struct {
 	errCh    <-chan error
 	etag     string
 	response *defangv1.TailResponse
-	service  string
+	services []string
 	stream   ecs.EventStream
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag, service string) *byocServerStream {
+func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string) *byocServerStream {
 	var errCh <-chan error
 	if errch, ok := stream.(hasErrCh); ok {
 		errCh = errch.Errs()
 	}
 
 	return &byocServerStream{
-		ctx:     ctx,
-		errCh:   errCh,
-		etag:    etag,
-		stream:  stream,
-		service: service,
+		ctx:      ctx,
+		errCh:    errCh,
+		etag:     etag,
+		stream:   stream,
+		services: services,
 	}
 }
 
@@ -138,7 +138,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 	if bs.etag != "" && bs.etag != response.Etag {
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
-	if bs.service != "" && bs.service != response.Service {
+
+	if len(bs.services) > 0 && !pkg.Contains(bs.services, bs.response.GetService()) {
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
