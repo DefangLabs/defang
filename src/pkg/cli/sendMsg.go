@@ -21,7 +21,7 @@ func SendMsg(ctx context.Context, client client.Client, subject, _type, id strin
 		id = uuid.NewString()
 	}
 
-	term.Debug(" - Sending message to", subject, "with type", _type, "and id", id)
+	term.Debug("Sending message to", subject, "with type", _type, "and id", id)
 
 	if DoDryRun {
 		return ErrDryRun
