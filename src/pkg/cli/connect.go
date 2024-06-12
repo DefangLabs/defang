@@ -61,15 +61,15 @@ func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, ty
 	if tenant != types.DEFAULT_TENANT {
 		tenantId = tenant
 	}
-	term.Debug(" - Using tenant", tenantId, "for cluster", host)
+	term.Debug("Using tenant", tenantId, "for cluster", host)
 
 	defangClient := client.NewGrpcClient(host, accessToken, tenantId, loader)
 	resp, err := defangClient.WhoAmI(context.TODO()) // TODO: Should we pass in the command context?
 	if err != nil {
-		term.Debug(" - Unable to validate tenant ID with server:", err)
+		term.Debug("Unable to validate tenant ID with server:", err)
 	}
 	if resp != nil && tenantId != types.TenantID(resp.Tenant) {
-		term.Warnf(" ! Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
+		term.Warnf("Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
 		tenantId = types.TenantID(resp.Tenant)
 	}
 	return defangClient, tenantId
@@ -80,11 +80,11 @@ func NewClient(cluster string, provider client.Provider, loader client.ProjectLo
 
 	switch provider {
 	case client.ProviderAWS:
-		term.Info(" # Using AWS provider")
+		term.Info("Using AWS provider") // '#' hack no logner needed as root command skips new client for competion command now
 		byocClient := aws.NewByoc(grpcClient, tenantId)
 		return byocClient
 	case client.ProviderDO:
-		term.Info("# Using DO provider")
+		term.Info("Using DO provider")
 		byocClient := do.NewByoc(grpcClient, tenantId)
 		return byocClient
 	default:

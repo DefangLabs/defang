@@ -2,6 +2,7 @@ package term
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -104,6 +105,36 @@ func TestAddingPrefix(t *testing.T) {
 		" ! Hello, World!",
 		" ! Hello, World!",
 		" ! Hello, World!",
+	}
+	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
+	for i, line := range got {
+		if line != expected[i] {
+			t.Errorf("Expected line %v in stdout to be %q, got %q", i, expected[i], line)
+		}
+	}
+
+	if stderr.String() != "" {
+		t.Errorf("Expected stderr to be empty, got %q", stderr.String())
+	}
+}
+
+func TestInfoAddSpaceBetweenStrings(t *testing.T) {
+	currentTerm := DefaultTerm
+	defer func() {
+		DefaultTerm = currentTerm
+	}()
+	var stdout, stderr bytes.Buffer
+	DefaultTerm = NewTerm(&stdout, &stderr)
+	DefaultTerm.SetDebug(true)
+
+	Info("Hello", "World!")
+	Info("Hello", 1, "World!")
+	Info("Hello", errors.New("SomeErr"), "World!")
+
+	expected := []string{
+		" * Hello World!",
+		" * Hello 1 World!",
+		" * Hello SomeErr World!",
 	}
 	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
 	for i, line := range got {
