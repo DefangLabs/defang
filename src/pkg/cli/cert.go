@@ -79,7 +79,7 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 	term.Infof("Triggering cert generation for %v", domain)
 	triggerCertGeneration(ctx, domain)
 
-	term.Infof("Waiting for TLS cert to be online for %v", domain)
+	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
@@ -119,7 +119,7 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 func waitForTLS(ctx context.Context, domain string) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	timeout, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	timeout, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
@@ -266,11 +266,12 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		resp, err := httpClient.Do(req)
 		if err == nil {
 			defer resp.Body.Close()
+			var msg []byte
+			msg, err = io.ReadAll(resp.Body)
+			term.Debugf(" - Response from %v: %v", url, string(msg))
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
-			var msg []byte
-			msg, err = io.ReadAll(resp.Body)
 			if err == nil {
 				err = fmt.Errorf("HTTP %v: %v", resp.StatusCode, string(msg))
 			}
