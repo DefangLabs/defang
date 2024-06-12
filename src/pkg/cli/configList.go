@@ -12,7 +12,7 @@ func ConfigList(ctx context.Context, client client.Client) error {
 	if err != nil {
 		return err
 	}
-	term.Debug(" - Listing config in project", projectName)
+	term.Debug("Listing config in project", projectName)
 
 	config, err := client.ListConfig(ctx)
 	if err != nil {
