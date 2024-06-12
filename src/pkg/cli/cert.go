@@ -54,39 +54,39 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		}
 	}
 	if cnt == 0 {
-		term.Infof(" * No services found need to generate TLS cert")
+		term.Infof("No services found need to generate TLS cert")
 	}
 
 	return nil
 }
 
 func generateCert(ctx context.Context, domain string, targets []string) {
-	term.Infof(" * Triggering TLS cert generation for %v", domain)
+	term.Infof("Triggering TLS cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
 
-	term.Infof(" * %v DNS is properly configured!", domain)
+	term.Infof("%v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
-		term.Infof(" * TLS cert for %v is already ready", domain)
+		term.Infof("TLS cert for %v is already ready", domain)
 		return
 	}
 	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
 		term.Errorf("Error waiting for DNS propagation: %v", err)
 		return
 	}
-	term.Infof(" * Triggering cert generation for %v", domain)
+	term.Infof("Triggering cert generation for %v", domain)
 	triggerCertGeneration(ctx, domain)
 
-	term.Infof(" * Waiting for TLS cert to be online for %v", domain)
+	term.Infof("Waiting for TLS cert to be online for %v", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
 		term.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
 		return
 	}
 
-	fmt.Printf("TLS cert for %v is ready\n", domain)
+	term.Printf("TLS cert for %v is ready\n", domain)
 }
 
 func triggerCertGeneration(ctx context.Context, domain string) {
@@ -185,9 +185,9 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 				return nil
 			}
 			if !msgShown {
-				term.Infof(" * Please setup CNAME record for %v", domain)
+				term.Infof("Please setup CNAME record for %v", domain)
 				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
-				term.Infof(" * Waiting for CNAME record setup and DNS propagation...")
+				term.Infof("Waiting for CNAME record setup and DNS propagation...")
 				msgShown = true
 			}
 			if doSpinner {

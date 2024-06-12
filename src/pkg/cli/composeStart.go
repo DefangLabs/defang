@@ -241,7 +241,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 	}
 
 	for _, service := range services {
-		term.Info(" * Deploying service", service.Name)
+		term.Info("Deploying service", service.Name)
 	}
 
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
