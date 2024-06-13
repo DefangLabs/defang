@@ -425,7 +425,7 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen", "new", "init"},
 	Short:   "Generate a sample Defang project in the current folder",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var sample, language string
+		var sample, language, defaultFolder string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -475,6 +475,9 @@ var generateCmd = &cobra.Command{
 				}
 				if sample == generateWithAI {
 					sample = ""
+					defaultFolder = "project1"
+				} else {
+					defaultFolder = sample
 				}
 			}
 		}
@@ -496,7 +499,7 @@ Generate will write files in the current folder. You can edit them and then depl
 				Name: "folder",
 				Prompt: &survey.Input{
 					Message: "What folder would you like to create the project in?",
-					Default: "project1",
+					Default: defaultFolder, // dynamically set based on chosen sample
 					Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
 				},
 				Validate: survey.Required,
