@@ -208,7 +208,7 @@ func (t *Term) Warnf(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Error(v ...any) (int, error) {
-	return output(t.stderr, ErrorColor, ensureNewline(fmt.Sprint(v...)))
+	return output(t.stderr, ErrorColor, fmt.Sprintln(v...))
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
