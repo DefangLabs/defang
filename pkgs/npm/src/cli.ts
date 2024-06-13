@@ -9,13 +9,15 @@ import * as tar from "tar";
 import { promisify } from "util";
 
 const EXECUTABLE = "defang";
+const URL_LATEST_RELEASE =
+  "https://api.github.com/repos/DefangLabs/defang/releases/latest";
+const HTTP_STATUS_OK = 200;
 
 const exec = promisify(child_process.exec);
 
 async function getLatestVersion(): Promise<string> {
-  const url = "https://api.github.com/repos/DefangLabs/defang/releases/latest";
-  const response = await axios.get(url);
-  if (response.status !== 200) {
+  const response = await axios.get(URL_LATEST_RELEASE);
+  if (response.status !== HTTP_STATUS_OK) {
     throw new Error(
       `Failed to get latest version from GitHub. Status code: ${response.status}`
     );
@@ -28,18 +30,18 @@ async function downloadAppArchive(
   version: string,
   archiveFilename: string,
   outputPath: string
-): Promise<string> {
+): Promise<string | null> {
   const repo = "DefangLabs/defang";
   const downloadUrl = `https://github.com/${repo}/releases/download/v${version}/${archiveFilename}`;
   const downloadTargetFile = path.join(outputPath, archiveFilename);
 
-  return downloadFile(downloadUrl, downloadTargetFile);
+  return await downloadFile(downloadUrl, downloadTargetFile);
 }
 
 async function downloadFile(
   downloadUrl: string,
   downloadTargetFile: string
-): Promise<string> {
+): Promise<string | null> {
   try {
     console.log(`Downloading ${downloadUrl}`);
     const response = await axios.get(downloadUrl, {
@@ -55,13 +57,16 @@ async function downloadFile(
       );
     }
 
+    // write data to file, will overwrite if file already exists
     await fsPromise.writeFile(downloadTargetFile, response.data);
 
     return downloadTargetFile;
   } catch (error) {
     console.error(error);
+
+    // something went wrong, clean up by deleting the downloaded file if it exists
     await fsPromise.unlink(downloadTargetFile);
-    return "";
+    return null;
   }
 }
 
@@ -165,6 +170,7 @@ async function install(version: string, saveDirectory: string) {
   try {
     console.log(`Starting install of defang cli`);
 
+    // download the latest version of defang cli
     const filename = getAppArchiveFilename(version, os.platform(), os.arch());
     const archiveFile = await downloadAppArchive(
       version,
@@ -172,7 +178,7 @@ async function install(version: string, saveDirectory: string) {
       saveDirectory
     );
 
-    if (archiveFile.length === 0) {
+    if (archiveFile == null || archiveFile.length === 0) {
       throw new Error(`Failed to download ${filename}`);
     }
 
@@ -182,6 +188,7 @@ async function install(version: string, saveDirectory: string) {
     if (result === false) {
       throw new Error(`Failed to install binaries!`);
     }
+
     console.log(`Successfully installed defang cli!`);
     // Delete the downloaded archive since we have successfully downloaded
     // and uncompressed it.
@@ -209,13 +216,20 @@ function extractCLIVersions(versionInfo: string): {
   defangCLI: string;
   latestCLI: string;
 } {
+  // parse the CLI version info
+  // e.g.
+  // Defang CLI:    v0.5.24
+  // Latest CLI:    v0.5.24
+  // Defang Fabric: v0.5.0-643-abcdef012
+  //
+
   const versionRegex = /\d+\.\d+\.\d+/g;
   const matches = versionInfo.match(versionRegex);
 
   if (matches != null && matches.length >= 2) {
     return {
       defangCLI: matches[0],
-      latestCLI: matches[0],
+      latestCLI: matches[1],
     };
   } else {
     throw new Error("Could not extract CLI versions from the output.");
