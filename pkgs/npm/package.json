@@ -20,7 +20,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "adm-zip": "^0.5.12",
+    "adm-zip": "^0.5.14",
     "axios": "^1.6.8",
     "https": "^1.0.0",
     "os": "^0.1.2",
