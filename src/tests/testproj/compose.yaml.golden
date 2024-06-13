@@ -1,4 +1,4 @@
-name: test
+name: tests
 services:
   dfnx:
     build:
@@ -35,7 +35,7 @@ services:
         target: /run/secrets/dummy
 networks:
   default:
-    name: test_default
+    name: tests_default
 secrets:
   dummy:
     name: dummy

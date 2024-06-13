@@ -1,4 +1,4 @@
-name: test
+name: compose-go-warning
 services:
   echo:
     image: ealen/echo-server
@@ -9,7 +9,7 @@ services:
         target: 80
 networks:
   default:
-    name: test_default
+    name: compose-go-warning_default
 secrets:
   dummy:
     name: dummy

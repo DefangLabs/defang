@@ -35,7 +35,7 @@ import (
 )
 
 type ByocAws struct {
-	byoc.ByocBaseClient
+	*byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
@@ -46,7 +46,7 @@ var _ client.Client = (*ByocAws)(nil)
 
 func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
+		ByocBaseClient: byoc.NewByocBaseClient(grpcClient, tenantId),
 		cdTasks:        make(map[string]ecs.TaskArn),
 		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}

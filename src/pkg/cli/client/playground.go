@@ -17,8 +17,7 @@ type PlaygroundClient struct {
 }
 
 func (g PlaygroundClient) LoadProject() (*compose.Project, error) {
-	projectName, _ := g.LoadProjectName()
-	return g.Loader.LoadWithDefaultProjectName(projectName)
+	return g.Loader.LoadCompose()
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -123,8 +122,4 @@ func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.
 
 func (g PlaygroundClient) ServiceDNS(name string) string {
 	return string(g.tenantID) + "-" + name
-}
-
-func (g PlaygroundClient) LoadProjectName() (string, error) {
-	return string(g.tenantID), nil
 }
