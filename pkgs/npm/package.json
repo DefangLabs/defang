@@ -17,8 +17,7 @@
     "url": "https://github.com/DefangLabs/defang/issues"
   },
   "scripts": {
-    "build": "tsc",
-    "postinstall": "node ./bin/installer.js"
+    "build": "tsc"
   },
   "dependencies": {
     "adm-zip": "^0.5.12",
