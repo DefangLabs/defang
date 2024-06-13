@@ -270,21 +270,59 @@ async function getVersionInfo(): Promise<VersionInfo> {
   return result;
 }
 
+type CLIParams = {
+  uselatest: boolean;
+};
+
+function extractCLIWrapperArgs(args: string[]): {
+  cliParams: CLIParams;
+  outArgs: string[];
+} {
+  // set defaults
+  const cliParams: CLIParams = {
+    uselatest: true, //default to use the latest version of defang cli
+  };
+
+  const outArgs: string[] = [];
+
+  // extract out the CLI wrapper parameters
+  for (const arg of args) {
+    const argLower = arg.toLowerCase().replaceAll(" ", "");
+    if (argLower.startsWith("--use-latest")) {
+      const startOfValue = argLower.indexOf("=");
+      if (startOfValue >= 0) {
+        if (argLower.slice(startOfValue + 1) == "false") {
+          cliParams.uselatest = false;
+        }
+      }
+    } else {
+      outArgs.push(arg);
+    }
+  }
+
+  return { cliParams, outArgs };
+}
+
 // js wrapper to use by npx or npm exec, this will call the defang binary with
 // the arguments passed to the npx line. NPM installer will create a symlink
 // in the user PATH to the cli.js to execute. The symlink will name the same as
 // the package name i.e. defang.
 async function run(): Promise<void> {
   try {
-    const { current, latest }: VersionInfo = await getVersionInfo();
+    const { cliParams, outArgs: args } = extractCLIWrapperArgs(
+      process.argv.slice(2)
+    );
 
-    // get the latest version of defang cli if not already installed
-    if (latest != null && (current == null || current != latest)) {
-      await install(latest, __dirname);
+    if (cliParams.uselatest) {
+      const { current, latest }: VersionInfo = await getVersionInfo();
+
+      // get the latest version of defang cli if not already installed
+      if (latest != null && (current == null || current != latest)) {
+        await install(latest, __dirname);
+      }
     }
 
     // execute the defang binary with the arguments passed to the npx line.
-    const args = process.argv.slice(2);
     const pathToExec = getPathToExecutable();
     if (!pathToExec) {
       throw new Error("Could not find the defang executable.");
