@@ -43,7 +43,6 @@ async function downloadFile(
   downloadTargetFile: string
 ): Promise<string | null> {
   try {
-    console.log(`Downloading ${downloadUrl}`);
     const response = await axios.get(downloadUrl, {
       responseType: "arraybuffer",
       headers: {
@@ -70,14 +69,16 @@ async function downloadFile(
   }
 }
 
-function extractArchive(archiveFilePath: string, outputPath: string): boolean {
+async function extractArchive(
+  archiveFilePath: string,
+  outputPath: string
+): Promise<boolean> {
   let result = false;
 
-  console.log(`Extracting ${archiveFilePath}`);
   const ext = path.extname(archiveFilePath).toLocaleLowerCase();
   switch (ext) {
     case ".zip":
-      result = extractZip(archiveFilePath, outputPath);
+      result = await extractZip(archiveFilePath, outputPath);
       break;
     case ".gz":
       result = extractTarGz(archiveFilePath, outputPath);
@@ -89,11 +90,15 @@ function extractArchive(archiveFilePath: string, outputPath: string): boolean {
   return result;
 }
 
-function extractZip(zipPath: string, outputPath: string): boolean {
+async function extractZip(
+  zipPath: string,
+  outputPath: string
+): Promise<boolean> {
   try {
     const zip = new AdmZip(zipPath);
-    zip.extractAllTo(outputPath, true, true);
-    return true;
+    const result = zip.extractEntryTo(EXECUTABLE, outputPath, true, true);
+    await fsPromise.chmod(path.join(outputPath, EXECUTABLE), 755);
+    return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
     return false;
@@ -168,7 +173,7 @@ function getAppArchiveFilename(
 
 async function install(version: string, saveDirectory: string) {
   try {
-    console.log(`Starting install of defang cli`);
+    console.log(`Getting latest defang cli`);
 
     // download the latest version of defang cli
     const filename = getAppArchiveFilename(version, os.platform(), os.arch());
@@ -184,12 +189,11 @@ async function install(version: string, saveDirectory: string) {
 
     // Because the releases are compressed tar.gz or .zip we need to
     // uncompress them to the ./bin directory in the package in node_modules.
-    const result = extractArchive(archiveFile, saveDirectory);
+    const result = await extractArchive(archiveFile, saveDirectory);
     if (result === false) {
       throw new Error(`Failed to install binaries!`);
     }
 
-    console.log(`Successfully installed defang cli!`);
     // Delete the downloaded archive since we have successfully downloaded
     // and uncompressed it.
     await deleteArchive(archiveFile);
