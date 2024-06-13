@@ -136,11 +136,11 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
-	projectName, err := client.LoadProjectName()
+	project, err := client.LoadProject()
 	if err != nil {
 		return err
 	}
-	term.Debug("Tailing logs in project", projectName)
+	term.Debug("Tailing logs in project", project.Name)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {

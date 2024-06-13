@@ -8,11 +8,11 @@ import (
 )
 
 func ConfigList(ctx context.Context, client client.Client) error {
-	projectName, err := client.LoadProjectName()
+	project, err := client.LoadProject()
 	if err != nil {
 		return err
 	}
-	term.Debug("Listing config in project", projectName)
+	term.Debug("Listing config in project", project.Name)
 
 	config, err := client.ListConfig(ctx)
 	if err != nil {

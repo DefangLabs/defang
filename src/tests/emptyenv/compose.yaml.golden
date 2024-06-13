@@ -1,4 +1,4 @@
-name: test
+name: emptyenv
 services:
   emptyenv:
     build:
@@ -13,4 +13,4 @@ services:
       default: null
 networks:
   default:
-    name: test_default
+    name: emptyenv_default

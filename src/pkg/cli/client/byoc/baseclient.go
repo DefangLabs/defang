@@ -2,8 +2,8 @@ package byoc
 
 import (
 	"context"
-	"os"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -45,13 +45,15 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantID                string
+
+	loadProjOnce func() (*compose.Project, error)
 }
 
 func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
-	return &ByocBaseClient{
+	b := &ByocBaseClient{
 		GrpcClient:    grpcClient,
 		TenantID:      string(tenantID),
-		PulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
+		PulumiProject: "",     // To be overwritten by LoadProject
 		PulumiStack:   "beta", // TODO: make customizable
 		Quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
@@ -63,6 +65,16 @@ func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *B
 			ShmSizeMiB: 30720,
 		},
 	}
+	b.loadProjOnce = sync.OnceValues(func() (*compose.Project, error) {
+		proj, err := b.GrpcClient.Loader.LoadCompose()
+		if err != nil {
+			return nil, err
+		}
+		b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
+		b.PulumiProject = proj.Name
+		return proj, nil
+	})
+	return b
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
@@ -71,23 +83,7 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 }
 
 func (b *ByocBaseClient) LoadProject() (*compose.Project, error) {
-	if b.PrivateDomain != "" {
-		panic("LoadProject should only be called once")
-	}
-	var proj *compose.Project
-	var err error
-
-	if b.PulumiProject != "" {
-		proj, err = b.GrpcClient.Loader.LoadWithProjectName(b.PulumiProject)
-	} else {
-		proj, err = b.GrpcClient.Loader.LoadWithDefaultProjectName(b.TenantID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
-	b.PulumiProject = proj.Name
-	return proj, nil
+	return b.loadProjOnce()
 }
 
 func (b *ByocBaseClient) LoadProjectName() (string, error) {

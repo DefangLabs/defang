@@ -1,4 +1,4 @@
-name: test
+name: tests
 services:
   dfnx:
     build:
@@ -30,4 +30,4 @@ services:
     restart: unless-stopped
 networks:
   default:
-    name: test_default
+    name: tests_default

@@ -1,4 +1,4 @@
-name: test
+name: secretname
 services:
   app:
     build:
@@ -12,7 +12,7 @@ services:
         target: /run/secrets/dummy
 networks:
   default:
-    name: test_default
+    name: secretname_default
 secrets:
   dummy:
     name: dummyx
