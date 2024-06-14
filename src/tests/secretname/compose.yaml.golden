@@ -2,7 +2,7 @@ name: secretname
 services:
   app:
     build:
-      context: /home/edw/defang/defang/src/tests/secretname
+      context: TESTPATH
       dockerfile: Dockerfile
     networks:
       default: null

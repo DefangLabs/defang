@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -21,16 +22,21 @@ func TestLoader(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			bytes, err := proj.MarshalYAML()
+			yaml, err := proj.MarshalYAML()
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			// Replace the absolute path in context to make the .golden file portable
+			absPath, _ := filepath.Abs(path)
+			yaml = bytes.ReplaceAll(yaml, []byte(filepath.Dir(absPath)), []byte("TESTPATH"))
+
 			golden, err := os.ReadFile(path + ".golden")
 			if err != nil {
-				os.WriteFile(path+".golden", bytes, 0644)
-			} else if string(bytes) != string(golden) {
+				os.WriteFile(path+".golden", yaml, 0644)
+			} else if string(yaml) != string(golden) {
 				t.Errorf("Result mismatch, written as %s.mismatch", path)
-				os.WriteFile(path+".mismatch", bytes, 0644)
+				os.WriteFile(path+".mismatch", yaml, 0644)
 			}
 		})
 		return nil
