@@ -98,6 +98,7 @@ func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptions
 		cli.WithDefaultConfigPath,
 		// cli.WithName(o.ProjectName)
 
+		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
 		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		cli.WithDotEnv,
