@@ -132,7 +132,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
