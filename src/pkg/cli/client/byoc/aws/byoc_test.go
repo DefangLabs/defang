@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -38,8 +39,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByoc(*grpcClient, tt.TenantID)
-			if _, err := b.LoadProject(); err != nil {
+			b := NewByoc(context.Background(), *grpcClient, tt.TenantID)
+			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}
 			b.ProjectDomain = b.getProjectDomain("example.com")
@@ -66,6 +67,6 @@ type FakeLoader struct {
 	ProjectName string
 }
 
-func (f FakeLoader) LoadCompose() (*compose.Project, error) {
+func (f FakeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	return &compose.Project{Name: f.ProjectName}, nil
 }

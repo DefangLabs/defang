@@ -9,7 +9,7 @@ import (
 )
 
 func ConfigDelete(ctx context.Context, client client.Client, names ...string) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}

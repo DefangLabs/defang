@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/cli"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -19,16 +20,7 @@ type ComposeLoader struct {
 	ComposeFilePath string
 }
 
-// LoadCompose will determine the project name using behavior consistent with docker-compose
-// https://docs.docker.com/compose/project-name/
-//  1. -p flag (currently not implemented)
-//  2. COMPOSE_PROJECT_NAME environment variable
-//  3. top level 'name' attribute in the Compose file, ** handled by compose-go **
-//  4. The base name of the project directory:
-//     a. directory containing your Compose file.
-//     b. the base name of the first Compose file if you specify multiple Compose files in the command line with the -f flag. ** TODO: support multiple Compose files **
-//  5. The base name of the current directory if no Compose file is specified. ** Irrelevant for us **
-func (c ComposeLoader) LoadCompose() (*compose.Project, error) {
+func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	filePath, err := getComposeFilePath(c.ComposeFilePath)
 	if err != nil {
 		return nil, err
@@ -39,59 +31,54 @@ func (c ComposeLoader) LoadCompose() (*compose.Project, error) {
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
 
-	loadCfg := compose.ConfigDetails{
-		WorkingDir:  filepath.Dir(filePath),
-		ConfigFiles: []compose.ConfigFile{{Filename: filePath}},
-		Environment: map[string]string{}, // TODO: support environment variables?
+	projOpts, err := cli.NewProjectOptions(nil,
+		cli.WithWorkingDirectory(filepath.Dir(filePath)),
+		// First apply os.Environment, always win
+		cli.WithOsEnv,
+		// Load PWD/.env if present and no explicit --env-file has been set
+		// cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		// read dot env file to populate project environment
+		cli.WithDotEnv,
+		// get compose file path set by COMPOSE_FILE
+		cli.WithConfigFileEnv,
+		// if none was selected, get default compose.yaml file from current dir or parent folder
+		cli.WithDefaultConfigPath,
+		// .. and then, a project directory != PWD maybe has been set so let's load .env file
+		// cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		// cli.WithDotEnv,
+		// eventually COMPOSE_PROFILES should have been set
+		cli.WithDefaultProfiles("defang"),
+		// cli.WithName(o.ProjectName)
+		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	overrideProjName := false
-	//  2. COMPOSE_PROJECT_NAME environment variable
-	projName := os.Getenv("COMPOSE_PROJECT_NAME")
-	if projName != "" {
-		term.Debugf("using COMPOSE_PROJECT_NAME environment variable %q as project name", projName)
-		overrideProjName = true
-	} else {
-		// 4a. Use directory containing your Compose file as the default project name
-		fullPath, err := filepath.Abs(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get parent directory name of compose file %q: %w", filePath, err)
-		}
-		projName = filepath.Base(filepath.Dir(fullPath))
-		term.Debugf("using directory name %q of compose file %q as default project name", projName, filePath)
-		// TODO: 4b. the base name of the first Compose file if you specify multiple Compose files in the command line with the -f flag.
-		// TODO: Support multiple Compose files
-	}
-
-	// Normalize project name
-	if projName != ProjectNameSafe(projName) {
-		term.Warnf("project name %q does not conform to docker-compose naming rules; using %q instead", projName, ProjectNameSafe(projName))
-		projName = ProjectNameSafe(projName)
-	}
-
-	loadOpts := []func(*loader.Options){
-		loader.WithDiscardEnvFiles,
-		loader.WithProfiles([]string{"defang"}), // TODO: add stage-specific profiles once we have them
-		func(o *loader.Options) {
-			o.SkipConsistencyCheck = true // TODO: check fails if secrets are used but top-level 'secrets:' is missing
-			o.SetProjectName(projName, overrideProjName)
-		},
-	}
-
-	project, err := loader.Load(loadCfg, loadOpts...)
+	project, err := projOpts.LoadProject(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
-	skipNormalizationOpts := append(loadOpts, func(o *loader.Options) {
-		o.SkipNormalization = true // Normalization strips environment variables keys that does not have an value
-	})
+	projOpts, err = cli.NewProjectOptions(nil,
+		cli.WithWorkingDirectory(filepath.Dir(filePath)),
+		cli.WithOsEnv,
+		cli.WithDotEnv,
+		cli.WithConfigFileEnv,
+		cli.WithDefaultConfigPath,
+		cli.WithDefaultProfiles("defang"),
+		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		cli.WithNormalization(false),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Disable logrus output to prevent double warnings from compose-go
 	currentOutput := logrus.StandardLogger().Out
 	logrus.SetOutput(io.Discard)
-	rawProj, err := loader.Load(loadCfg, skipNormalizationOpts...)
+	rawProj, err := projOpts.LoadProject(ctx)
 	logrus.SetOutput(currentOutput)
 	if err != nil {
 		return nil, err // there's no good reason this should fail, since we've already loaded the project

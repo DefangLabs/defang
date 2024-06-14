@@ -52,10 +52,10 @@ type EndLogConditional struct {
 	EventLog string
 }
 
-type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
+type TailDetectStopEventFunc func(service string, host string, eventlog string) bool
 
 type TailOptions struct {
-	Services           []string
+	Service            string
 	Etag               types.ETag
 	Since              time.Time
 	Raw                bool
@@ -65,14 +65,12 @@ type TailOptions struct {
 type P = client.Property // shorthand for tracking properties
 
 func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
-	return func(services []string, host string, eventLog string) bool {
+	return func(service string, host string, eventLog string) bool {
 		for _, conditional := range conditionals {
-			for _, service := range services {
-				if service == "" || service == conditional.Service {
-					if host == "" || host == conditional.Host {
-						if strings.Contains(eventLog, conditional.EventLog) {
-							return true
-						}
+			if service == "" || service == conditional.Service {
+				if host == "" || host == conditional.Host {
+					if strings.Contains(eventLog, conditional.EventLog) {
+						return true
 					}
 				}
 			}
@@ -111,16 +109,16 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 }
 
 type CancelError struct {
-	Services []string
-	Etag     string
-	Last     time.Time
+	Service string
+	Etag    string
+	Last    time.Time
 	error
 }
 
 func (cerr *CancelError) Error() string {
 	cmd := "tail --since " + cerr.Last.UTC().Format(time.RFC3339Nano)
-	if len(cerr.Services) > 0 {
-		cmd += " --name " + strings.Join(cerr.Services, ",")
+	if cerr.Service != "" {
+		cmd += " --name " + cerr.Service
 	}
 	if cerr.Etag != "" {
 		cmd += " --etag " + cerr.Etag
@@ -136,25 +134,23 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
 	term.Debug("Tailing logs in project", project.Name)
 
-	if len(params.Services) > 0 {
-		for _, service := range params.Services {
-			service = NormalizeServiceName(service)
-			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
-				switch connect.CodeOf(err) {
-				case connect.CodeNotFound:
-					term.Warn("Service does not exist (yet):", service)
-				case connect.CodeUnknown:
-					// Ignore unknown (nil) errors
-				default:
-					term.Warn(err)
-				}
+	if params.Service != "" {
+		params.Service = NormalizeServiceName(params.Service)
+		// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
+		if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: params.Service}); err != nil {
+			switch connect.CodeOf(err) {
+			case connect.CodeNotFound:
+				term.Warn("Service does not exist (yet):", params.Service)
+			case connect.CodeUnknown:
+				// Ignore unknown (nil) errors
+			default:
+				term.Warn(err)
 			}
 		}
 	}
@@ -172,7 +168,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
@@ -226,7 +222,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) {
-				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
+				return &CancelError{Service: params.Service, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
 			}
 
 			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
@@ -239,7 +235,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Service: params.Service, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
@@ -273,7 +269,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
 			onlyErrors := !DoVerbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(service, host, e.Message) {
 					return nil
 				}
 				continue
@@ -319,7 +315,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 						l, _ := term.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
-					if len(params.Services) == 0 {
+					if params.Service == "" {
 						l, _ := term.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
@@ -341,7 +337,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 				term.Println(line)
 
 				// Detect end logging event
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
+				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc(service, host, line) {
 					cancel()
 					return nil
 				}

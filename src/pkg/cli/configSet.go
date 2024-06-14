@@ -9,7 +9,7 @@ import (
 )
 
 func ConfigSet(ctx context.Context, client client.Client, name string, value string) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}

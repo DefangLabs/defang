@@ -49,7 +49,7 @@ type ByocBaseClient struct {
 	loadProjOnce func() (*compose.Project, error)
 }
 
-func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
 	b := &ByocBaseClient{
 		GrpcClient:    grpcClient,
 		TenantID:      string(tenantID),
@@ -66,7 +66,7 @@ func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *B
 		},
 	}
 	b.loadProjOnce = sync.OnceValues(func() (*compose.Project, error) {
-		proj, err := b.GrpcClient.Loader.LoadCompose()
+		proj, err := b.GrpcClient.Loader.LoadCompose(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -82,19 +82,8 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b *ByocBaseClient) LoadProject() (*compose.Project, error) {
+func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
 	return b.loadProjOnce()
-}
-
-func (b *ByocBaseClient) LoadProjectName() (string, error) {
-	if b.PulumiProject != "" {
-		return b.PulumiProject, nil
-	}
-	p, err := b.LoadProject()
-	if err != nil {
-		return b.TenantID, err
-	}
-	return p.Name, nil
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
