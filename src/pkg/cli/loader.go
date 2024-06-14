@@ -6,8 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
-	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -34,9 +32,9 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 	projOpts, err := cli.NewProjectOptions(nil,
 		cli.WithWorkingDirectory(filepath.Dir(filePath)),
 		// First apply os.Environment, always win
-		cli.WithOsEnv,
+		// -- DISABLED -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
-		// cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		// -- DISABLED -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -44,15 +42,19 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		// cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
-		// cli.WithDotEnv,
 		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles("defang"),
+		cli.WithDiscardEnvFile,
 		// cli.WithName(o.ProjectName)
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
+	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
+		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
 	project, err := projOpts.LoadProject(ctx)
@@ -103,33 +105,6 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 		fmt.Println(string(b))
 	}
 	return project, nil
-}
-
-// Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.
-// https://github.com/compose-spec/compose-spec/blob/master/spec.md#the-compose-application-model
-func ProjectNameSafe(name string) string {
-	var result strings.Builder
-	result.Grow(len(name))
-	for i, c := range name {
-		// Convert all non-alphanumeric and non '-' characters to underscores
-		if !isAlphaNumeric(c) && c != '-' {
-			c = '_'
-		}
-		// First character must be a letter or number
-		if i == 0 && !isAlphaNumeric(c) {
-			result.WriteRune('0')
-		}
-
-		c = unicode.ToLower(c)
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
-func isAlphaNumeric(c rune) bool {
-	return ('a' <= c && c <= 'z') ||
-		('A' <= c && c <= 'Z') ||
-		('0' <= c && c <= '9')
 }
 
 func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {

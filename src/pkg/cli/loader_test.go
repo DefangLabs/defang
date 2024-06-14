@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,7 +17,7 @@ func TestLoader(t *testing.T) {
 
 		t.Run(path, func(t *testing.T) {
 			loader := ComposeLoader{path}
-			proj, err := loader.LoadCompose()
+			proj, err := loader.LoadCompose(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -36,32 +37,5 @@ func TestLoader(t *testing.T) {
 	})
 	if err != nil {
 		t.Error(err)
-	}
-}
-
-func TestProjectNameSafe(t *testing.T) {
-	tests := []struct {
-		name, safe string
-	}{
-		{"", ""},
-		{"abc123", "abc123"},
-		{"abc-123_456", "abc-123_456"},
-		{"01234", "01234"},
-		{"01234-abc-789", "01234-abc-789"},
-		{"a b", "a_b"},
-		{"ABC123DeF", "abc123def"},
-		{"_abc", "0_abc"},
-		{"統一碼", "0___"},
-		{"Party🎉", "party_"},
-		{"👍Project!!!👍", "0_project____"},
-		{"Fancy_Project-Name/With/Slashes", "fancy_project-name_with_slashes"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ProjectNameSafe(tt.name); got != tt.safe {
-				t.Errorf("ProjectNameSafe() = %v, want %v", got, tt.safe)
-			}
-		})
 	}
 }

@@ -2,7 +2,7 @@ name: emptyenv
 services:
   emptyenv:
     build:
-      context: ../../tests/emptyenv
+      context: /home/edw/defang/defang/src/tests/emptyenv
       dockerfile: Dockerfile
       args:
         ARG2: ""
