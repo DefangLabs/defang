@@ -65,13 +65,13 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
 	projOpts, err = cli.NewProjectOptions(nil,
 		cli.WithWorkingDirectory(filepath.Dir(filePath)),
-		cli.WithOsEnv,
 		cli.WithDotEnv,
 		cli.WithConfigFileEnv,
 		cli.WithDefaultConfigPath,
 		cli.WithDefaultProfiles("defang"),
-		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
-		cli.WithNormalization(false),
+		cli.WithDiscardEnvFile,
+		cli.WithConsistency(false),
+		cli.WithNormalization(false), // Disable normalization to keep unset environment variables
 	)
 	if err != nil {
 		return nil, err
