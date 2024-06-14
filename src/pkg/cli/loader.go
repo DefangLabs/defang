@@ -19,35 +19,17 @@ type ComposeLoader struct {
 }
 
 func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
-	filePath, err := getComposeFilePath(c.ComposeFilePath)
+	composeFilePath, err := getComposeFilePath(c.ComposeFilePath)
 	if err != nil {
 		return nil, err
 	}
-
-	term.Debug("Loading compose file", filePath)
+	term.Debug("Loading compose file", composeFilePath)
+	workDir := filepath.Dir(composeFilePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
 
-	projOpts, err := cli.NewProjectOptions(nil,
-		cli.WithWorkingDirectory(filepath.Dir(filePath)),
-		// First apply os.Environment, always win
-		// -- DISABLED -- cli.WithOsEnv,
-		// Load PWD/.env if present and no explicit --env-file has been set
-		// -- NO SUCH PARAM YET -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
-		// read dot env file to populate project environment
-		// -- DISABLED -- cli.WithDotEnv,
-		// get compose file path set by COMPOSE_FILE
-		cli.WithConfigFileEnv,
-		// if none was selected, get default compose.yaml file from current dir or parent folder
-		cli.WithDefaultConfigPath,
-		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		// eventually COMPOSE_PROFILES should have been set
-		cli.WithDefaultProfiles("defang"),
-		cli.WithDiscardEnvFile,
-		// cli.WithName(o.ProjectName)
-		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
-	)
+	projOpts, err := getDefaultProjectOptions(workDir)
 	if err != nil {
 		return nil, err
 	}
@@ -63,15 +45,7 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 	}
 
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
-	projOpts, err = cli.NewProjectOptions(nil,
-		cli.WithWorkingDirectory(filepath.Dir(filePath)),
-		cli.WithConfigFileEnv,
-		cli.WithDefaultConfigPath,
-		cli.WithDefaultProfiles("defang"),
-		cli.WithDiscardEnvFile,
-		cli.WithConsistency(false),
-		cli.WithNormalization(false), // Disable normalization to keep unset environment variables
-	)
+	projOpts, err = getDefaultProjectOptions(workDir, cli.WithNormalization(false)) // Disable normalization to keep unset environment variables
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +59,8 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 		return nil, err // there's no good reason this should fail, since we've already loaded the project
 	}
 
-	// TODO: file a PR to compose-go to add option to keep unset environment variables
+	// TODO: Remove this hack once the PR is merged
+	// PR Filed: https://github.com/compose-spec/compose-go/pull/634
 	for name, rawService := range rawProj.Services {
 		for key, value := range rawService.Environment {
 			service := project.Services[name]
@@ -104,6 +79,37 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 		fmt.Println(string(b))
 	}
 	return project, nil
+}
+
+func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
+	// Based on how docker compose setup its own project options
+	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
+	opts := []cli.ProjectOptionsFn{
+		cli.WithWorkingDirectory(workingDir),
+		// First apply os.Environment, always win
+		// -- DISABLED -- cli.WithOsEnv,
+		// Load PWD/.env if present and no explicit --env-file has been set
+		// -- NO SUCH PARAM YET -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		// read dot env file to populate project environment
+		// -- DISABLED -- cli.WithDotEnv,
+		// get compose file path set by COMPOSE_FILE
+		cli.WithConfigFileEnv,
+		// if none was selected, get default compose.yaml file from current dir or parent folder
+		cli.WithDefaultConfigPath,
+		// cli.WithName(o.ProjectName)
+
+		// DEFANG SPECIFIC OPTIONS
+		cli.WithDefaultProfiles("defang"),
+		cli.WithDiscardEnvFile,
+		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+	}
+	opts = append(opts, extraOpts...)
+	projOpts, err := cli.NewProjectOptions(nil, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return projOpts, nil
 }
 
 func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
