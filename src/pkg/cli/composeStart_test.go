@@ -17,7 +17,7 @@ func TestComposeStart(t *testing.T) {
 	defer func() { DoDryRun = false }()
 
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-	proj, err := loader.LoadCompose()
+	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestComposeStart(t *testing.T) {
 
 func TestComposeFixupEnv(t *testing.T) {
 	loader := ComposeLoader{"../../tests/fixupenv/compose.yaml"}
-	proj, err := loader.LoadCompose()
+	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
