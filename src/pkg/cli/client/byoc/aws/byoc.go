@@ -46,10 +46,10 @@ var _ client.Client = (*ByocAws)(nil)
 
 func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		ByocBaseClient: byoc.NewByocBaseClient(ctx, grpcClient, tenantId),
-		cdTasks:        make(map[string]ecs.TaskArn),
-		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		cdTasks: make(map[string]ecs.TaskArn),
+		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	return b
 }
 

@@ -10,12 +10,12 @@ import (
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
-	project, err := client.LoadProject(ctx)
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
 
-	term.Debug("Running CD command", command, "in project", project.Name)
+	term.Debug("Running CD command", command, "in project", projectName)
 	if DoDryRun {
 		return ErrDryRun
 	}

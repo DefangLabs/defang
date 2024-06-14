@@ -40,9 +40,9 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 	}
 
 	b := &ByocDo{
-		ByocBaseClient: byoc.NewByocBaseClient(ctx, grpcClient, tenantId),
-		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
 	return b
 }
