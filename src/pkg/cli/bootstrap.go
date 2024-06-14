@@ -10,7 +10,7 @@ import (
 )
 
 func BootstrapCommand(ctx context.Context, client client.Client, command string) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}

@@ -26,13 +26,13 @@ const (
 )
 
 type ByocDo struct {
-	byoc.ByocBaseClient
+	*byoc.ByocBaseClient
 
 	appIds map[string]string
 	driver *appPlatform.DoApp
 }
 
-func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
+func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	regionString := os.Getenv("REGION")
 
 	if regionString == "" {
@@ -40,7 +40,7 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	}
 
 	b := &ByocDo{
-		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
+		ByocBaseClient: byoc.NewByocBaseClient(ctx, grpcClient, tenantId),
 		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 	}
 

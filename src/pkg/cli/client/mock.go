@@ -26,12 +26,8 @@ func (m MockClient) ServiceDNS(service string) string {
 	return service
 }
 
-func (m MockClient) LoadProject() (*compose.Project, error) {
+func (m MockClient) LoadProject(ctx context.Context) (*compose.Project, error) {
 	return m.Project, nil
-}
-
-func (m MockClient) LoadProjectName() (string, error) {
-	return m.Project.Name, nil
 }
 
 func (m MockClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {

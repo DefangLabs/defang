@@ -16,8 +16,8 @@ type PlaygroundClient struct {
 	GrpcClient
 }
 
-func (g PlaygroundClient) LoadProject() (*compose.Project, error) {
-	return g.Loader.LoadCompose()
+func (g PlaygroundClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+	return g.Loader.LoadCompose(ctx)
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {

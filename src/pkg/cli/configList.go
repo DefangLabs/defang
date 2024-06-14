@@ -8,7 +8,7 @@ import (
 )
 
 func ConfigList(ctx context.Context, client client.Client) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}

@@ -315,7 +315,7 @@ var RootCmd = &cobra.Command{
 
 		composeFilePath, _ := cmd.Flags().GetString("file")
 		loader := cli.ComposeLoader{ComposeFilePath: composeFilePath}
-		client = cli.NewClient(cluster, provider, loader)
+		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -345,8 +345,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client = cli.NewClient(cluster, provider, loader)             // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
+				client = cli.NewClient(cmd.Context(), cluster, provider, loader) // reconnect with the new token
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil {    // recheck (new token = new user)
 					return nil // success
 				}
 			}

@@ -16,7 +16,7 @@ type ServerStream[Res any] interface {
 }
 
 type ProjectLoader interface {
-	LoadCompose() (*compose.Project, error)
+	LoadCompose(context.Context) (*compose.Project, error)
 }
 
 type FabricClient interface {
@@ -56,7 +56,7 @@ type Client interface {
 	TearDown(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
-	LoadProject() (*compose.Project, error)
+	LoadProject(context.Context) (*compose.Project, error)
 }
 
 type Property struct {

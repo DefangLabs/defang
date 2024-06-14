@@ -44,9 +44,9 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
+func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		ByocBaseClient: byoc.NewByocBaseClient(grpcClient, tenantId),
+		ByocBaseClient: byoc.NewByocBaseClient(ctx, grpcClient, tenantId),
 		cdTasks:        make(map[string]ecs.TaskArn),
 		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}

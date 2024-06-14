@@ -9,7 +9,7 @@ import (
 )
 
 func GetServices(ctx context.Context, client client.Client, long bool) error {
-	project, err := client.LoadProject()
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
