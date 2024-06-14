@@ -674,6 +674,13 @@ var configSetCmd = &cobra.Command{
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		// Make sure we have a project to set config for before asking for a value
+		_, err := client.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
