@@ -34,9 +34,9 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 		// First apply os.Environment, always win
 		// -- DISABLED -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
-		// -- DISABLED -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		// -- NO SUCH PARAM YET -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
 		// read dot env file to populate project environment
-		cli.WithDotEnv,
+		// -- DISABLED -- cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
@@ -65,7 +65,6 @@ func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
 	projOpts, err = cli.NewProjectOptions(nil,
 		cli.WithWorkingDirectory(filepath.Dir(filePath)),
-		cli.WithDotEnv,
 		cli.WithConfigFileEnv,
 		cli.WithDefaultConfigPath,
 		cli.WithDefaultProfiles("defang"),
