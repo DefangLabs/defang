@@ -334,7 +334,7 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		expected := []string{".dockerignore", "Dockerfile", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
 		var actual []string
 		ar := tar.NewReader(g)
 		for {

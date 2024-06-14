@@ -89,14 +89,18 @@ func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptions
 		// First apply os.Environment, always win
 		// -- DISABLED -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
-		// -- NO SUCH PARAM YET -- cli.WithEnvFiles(o.EnvFiles...), TODO: Do we support env files?
+		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		// read dot env file to populate project environment
-		// -- DISABLED -- cli.WithDotEnv,
+		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// cli.WithName(o.ProjectName)
+
+		// .. and then, a project directory != PWD maybe has been set so let's load .env file
+		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
+		cli.WithDotEnv,
 
 		// DEFANG SPECIFIC OPTIONS
 		cli.WithDefaultProfiles("defang"),
