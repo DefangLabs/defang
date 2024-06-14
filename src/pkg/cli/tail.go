@@ -136,11 +136,11 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
-	project, err := client.LoadProject(ctx) // TODO: Do we need to load the projects here if it is not used at all?
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debug("Tailing logs in project", project.Name)
+	term.Debug("Tailing logs in project", projectName)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {

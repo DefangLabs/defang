@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
@@ -157,7 +158,7 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 		nextPath := filepath.Dir(path)
 		if nextPath == path {
 			// previous search was of root, we're done
-			err = fmt.Errorf("no Compose file found")
+			err = types.ErrComposeFileNotFound
 			break
 		}
 

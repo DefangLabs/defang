@@ -27,12 +27,11 @@ var resolver dns.Resolver = dns.RootResolver{}
 var httpClient HTTPClient = http.DefaultClient
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
-	project, err := client.LoadProject(ctx)
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-
-	term.Debug("Generating TLS cert for project", project.Name)
+	term.Debug("Generating TLS cert for project", projectName)
 
 	services, err := client.GetServices(ctx)
 	if err != nil {

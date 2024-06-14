@@ -9,11 +9,11 @@ import (
 )
 
 func GetServices(ctx context.Context, client client.Client, long bool) error {
-	project, err := client.LoadProject(ctx)
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debug("Listing services in project", project.Name)
+	term.Debug("Listing services in project", projectName)
 
 	serviceList, err := client.GetServices(ctx)
 	if err != nil {
