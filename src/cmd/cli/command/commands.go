@@ -337,7 +337,8 @@ var RootCmd = &cobra.Command{
 			}
 			// Login interactively now; only do this for authorization-related errors
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				term.Warn(prettyError(err))
+				term.Debug("Server error:", err)
+				term.Warn("Please log in to continue.")
 
 				defer trackCmd(nil, "Login", P{"reason", err})
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
@@ -528,6 +529,7 @@ Generate will write files in the current folder. You can edit them and then depl
 				if connect.CodeOf(err) != connect.CodeUnauthenticated {
 					return err
 				}
+				// TODO: persist the terms agreement in the state file
 			}
 		}
 

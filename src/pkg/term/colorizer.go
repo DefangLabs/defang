@@ -31,7 +31,7 @@ const (
 	BrightCyan = termenv.ANSIBrightCyan
 	InfoColor  = termenv.ANSIBrightMagenta
 	ErrorColor = termenv.ANSIBrightRed
-	WarnColor  = termenv.ANSIBrightYellow
+	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
 	DebugColor = termenv.ANSIBrightBlack // Gray
 )
 
