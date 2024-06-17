@@ -153,7 +153,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					term.Warn(err)
+					term.Warn(err) // TODO: use prettyError(…)
 				}
 			}
 		}
