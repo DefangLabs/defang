@@ -68,7 +68,7 @@ release:
 nix:
   # commit_author: defang-io
   - homepage: https://defang.io/
-    description: Defang is easiest way for developers to create and deploy their containerized applications
+    description: Defang is the easiest way for developers to create and deploy their containerized applications
     license: "mit"
     repository:
       owner: DefangLabs
@@ -92,7 +92,7 @@ winget:
   - publisher: DefangLabs
     name: Defang
     short_description: The Defang command-line interface (CLI)
-    description: Defang is easiest way for developers to create and deploy their containerized applications to the cloud.
+    description: Defang is the easiest way for developers to create and deploy their containerized applications to the cloud.
     license: MIT
     publisher_url: https://defang.io/
     homepage: https://github.com/DefangLabs/defang/
