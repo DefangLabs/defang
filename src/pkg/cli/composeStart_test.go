@@ -17,9 +17,9 @@ func TestComposeStart(t *testing.T) {
 	defer func() { DoDryRun = false }()
 
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-	proj, err := loader.LoadWithProjectName("tenant-id")
+	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
-		t.Fatalf("LoadComposeWithProjectName() failed: %v", err)
+		t.Fatalf("LoadCompose() failed: %v", err)
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +35,9 @@ func TestComposeStart(t *testing.T) {
 
 func TestComposeFixupEnv(t *testing.T) {
 	loader := ComposeLoader{"../../tests/fixupenv/compose.yaml"}
-	proj, err := loader.LoadWithProjectName("tenant-id")
+	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
-		t.Fatalf("LoadComposeWithProjectName() failed: %v", err)
+		t.Fatalf("LoadCompose() failed: %v", err)
 	}
 
 	services, err := convertServices(context.Background(), client.MockClient{}, proj.Services, false)

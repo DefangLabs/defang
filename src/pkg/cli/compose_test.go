@@ -49,20 +49,31 @@ func TestLoadCompose(t *testing.T) {
 	DoVerbose = true
 	term.SetDebug(true)
 
-	t.Run("no project name defaults to tenantID", func(t *testing.T) {
+	t.Run("no project name defaults to parent directory name", func(t *testing.T) {
 		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
-		p, err := loader.LoadWithProjectName("tenant-id")
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
-		if p.Name != "tenant-id" {
+		if p.Name != "noprojname" { // Use the parent directory name as project name
 			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
 		}
 	})
 
-	t.Run("use project name", func(t *testing.T) {
+	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
+		loader := ComposeLoader{"../../tests/Fancy-Proj_Dir/compose.yaml"}
+		p, err := loader.LoadCompose(context.Background())
+		if err != nil {
+			t.Fatalf("LoadCompose() failed: %v", err)
+		}
+		if p.Name != "fancy-proj_dir" { // Use the parent directory name as project name
+			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		}
+	})
+
+	t.Run("use project name in compose file", func(t *testing.T) {
 		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-		p, err := loader.LoadWithProjectName("tests")
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -71,47 +82,26 @@ func TestLoadCompose(t *testing.T) {
 		}
 	})
 
-	t.Run("fancy project name", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
-		p, err := loader.LoadWithProjectName("Valid-Username")
+	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
+		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
+		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
-		if p.Name != "valid-username" {
-			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
-		}
-	})
-
-	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
-		p, err := loader.LoadWithDefaultProjectName("tenant-id")
-		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
-		}
-		if p.Name != "tenant-id" {
-			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+		if p.Name != "overridename" {
+			t.Errorf("LoadCompose() failed: expected project name to be overwritten by env var, got %q", p.Name)
 		}
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
 		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-		p, err := loader.LoadWithDefaultProjectName("tenant-id")
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "tests" {
 			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
-		}
-	})
-
-	t.Run("no project name defaults to tenantID", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
-		p, err := loader.LoadWithDefaultProjectName("tenant-id")
-		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
-		}
-		if p.Name != "tenant-id" {
-			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
 		}
 	})
 
@@ -135,7 +125,7 @@ func TestLoadCompose(t *testing.T) {
 
 		// execute test
 		loader := ComposeLoader{}
-		p, err := loader.LoadWithProjectName("tests")
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -146,7 +136,7 @@ func TestLoadCompose(t *testing.T) {
 
 	t.Run("load alternative compose file", func(t *testing.T) {
 		loader := ComposeLoader{"../../tests/alttestproj/altcomp.yaml"}
-		p, err := loader.LoadWithProjectName("tests")
+		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
@@ -344,7 +334,7 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		expected := []string{".dockerignore", "Dockerfile", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
 		var actual []string
 		ar := tar.NewReader(g)
 		for {
@@ -386,7 +376,7 @@ func TestCreateTarballReader(t *testing.T) {
 
 func TestProjectValidationServiceName(t *testing.T) {
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-	p, err := loader.LoadWithDefaultProjectName("tests")
+	p, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -411,7 +401,7 @@ func TestProjectValidationNetworks(t *testing.T) {
 	logrus.SetOutput(&warnings)
 
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-	p, err := loader.LoadWithDefaultProjectName("tests")
+	p, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -451,7 +441,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	logrus.SetOutput(&warnings)
 
 	loader := ComposeLoader{"../../tests/compose-go-warn/compose.yaml"}
-	_, err := loader.LoadWithDefaultProjectName("tests")
+	_, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
@@ -463,7 +453,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 
 func TestProjectValidationNoDeploy(t *testing.T) {
 	loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
-	p, err := loader.LoadWithDefaultProjectName("tests")
+	p, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}

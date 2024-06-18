@@ -78,9 +78,9 @@ func TestTail(t *testing.T) {
 		term.DefaultTerm = defaultTerm
 	}()
 
-	proj, err := ComposeLoader{"../../tests/testproj/compose.yaml"}.LoadWithProjectName("tenant-id")
+	proj, err := ComposeLoader{"../../tests/testproj/compose.yaml"}.LoadCompose(context.Background())
 	if err != nil {
-		t.Fatalf("LoadComposeWithProjectName() failed: %v", err)
+		t.Fatalf("LoadCompose() failed: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

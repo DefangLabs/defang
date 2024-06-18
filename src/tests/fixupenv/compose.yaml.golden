@@ -1,4 +1,4 @@
-name: test
+name: fixupenv
 services:
   Mistral:
     image: mistral:latest
@@ -16,4 +16,4 @@ services:
       default: null
 networks:
   default:
-    name: test_default
+    name: fixupenv_default

@@ -27,6 +27,9 @@ services:
       - dummy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
+    environment:
+      - DOTENV
+      - DOT_ENV_INTERPOLATION=${DOTENV}
       # disable: true
 
   # dfnx:

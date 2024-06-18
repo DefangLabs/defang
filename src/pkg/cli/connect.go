@@ -75,17 +75,17 @@ func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, ty
 	return defangClient, tenantId
 }
 
-func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
+func NewClient(ctx context.Context, cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
 	grpcClient, tenantId := Connect(cluster, loader)
 
 	switch provider {
 	case client.ProviderAWS:
 		term.Info("Using AWS provider") // '#' hack no logner needed as root command skips new client for competion command now
-		byocClient := aws.NewByoc(grpcClient, tenantId)
+		byocClient := aws.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	case client.ProviderDO:
 		term.Info("Using DO provider")
-		byocClient := do.NewByoc(grpcClient, tenantId)
+		byocClient := do.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	default:
 		return &client.PlaygroundClient{GrpcClient: grpcClient}

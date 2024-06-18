@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -16,9 +17,8 @@ type PlaygroundClient struct {
 	GrpcClient
 }
 
-func (g PlaygroundClient) LoadProject() (*compose.Project, error) {
-	projectName, _ := g.LoadProjectName()
-	return g.Loader.LoadWithDefaultProjectName(projectName)
+func (g PlaygroundClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+	return g.Loader.LoadCompose(ctx)
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -125,6 +125,21 @@ func (g PlaygroundClient) ServiceDNS(name string) string {
 	return string(g.tenantID) + "-" + name
 }
 
-func (g PlaygroundClient) LoadProjectName() (string, error) {
-	return string(g.tenantID), nil
+func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
+	proj, err := g.Loader.LoadCompose(ctx)
+	if err == nil {
+		return proj.Name, nil
+	}
+	if !errors.Is(err, types.ErrComposeFileNotFound) {
+		return "", err
+	}
+
+	// Hack: Use GetServices to get the current project name
+	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
+	resp, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	term.Debug("Using default playground project: ", resp.Project)
+	return resp.Project, nil
 }
