@@ -2,7 +2,7 @@ name: emptyenv
 services:
   emptyenv:
     build:
-      context: TESTPATH
+      context: ../../tests/emptyenv/compose.yaml
       dockerfile: Dockerfile
       args:
         ARG2: ""

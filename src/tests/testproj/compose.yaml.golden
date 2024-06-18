@@ -2,7 +2,7 @@ name: tests
 services:
   dfnx:
     build:
-      context: TESTPATH
+      context: ../../tests/testproj/compose.yaml
       dockerfile: Dockerfile
       args:
         DNS: dfnx

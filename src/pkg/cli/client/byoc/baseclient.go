@@ -100,7 +100,7 @@ func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, err
 
 func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 
-	proj, err := b.Loader.LoadCompose(ctx)
+	proj, err := b.loadProjOnce()
 	if err == nil {
 		b.PulumiProject = proj.Name
 		return proj.Name, nil
