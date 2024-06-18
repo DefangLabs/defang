@@ -1,8 +1,8 @@
-name: noprojname
+name: fancy-proj_dir
 services: {}
 networks:
   default:
-    name: noprojname_default
+    name: fancy-proj_dir_default
 secrets:
   dummy:
     name: dummy

@@ -1,4 +1,4 @@
-name: test
+name: static-files
 services:
   x:
     image: blah
@@ -15,4 +15,4 @@ services:
     x-unsupported: asdf
 networks:
   default:
-    name: test_default
+    name: static-files_default

@@ -1,8 +1,8 @@
-name: test
+name: tests
 services:
   dfnx:
     build:
-      context: ../../tests/alttestproj
+      context: .
       dockerfile: Dockerfile
       args:
         DNS: dfnx
@@ -30,4 +30,4 @@ services:
     restart: unless-stopped
 networks:
   default:
-    name: test_default
+    name: tests_default

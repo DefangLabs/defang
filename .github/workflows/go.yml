@@ -95,7 +95,7 @@ jobs:
         working-directory: src
 
       - name: Add dummy secret
-        run: echo blah | go run ./cmd/cli secret set -n dummy --debug
+        run: echo blah | go run ./cmd/cli secret set -n dummy -f tests/testproj/compose.yaml --debug
         working-directory: src
 
       - name: Run sanity tests

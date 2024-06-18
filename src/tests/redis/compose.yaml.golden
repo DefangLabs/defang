@@ -1,4 +1,4 @@
-name: test
+name: redis
 services:
   x:
     image: redis
@@ -16,4 +16,4 @@ services:
       default: null
 networks:
   default:
-    name: test_default
+    name: redis_default

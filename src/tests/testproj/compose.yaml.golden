@@ -1,8 +1,8 @@
-name: test
+name: tests
 services:
   dfnx:
     build:
-      context: ../../tests/testproj
+      context: .
       dockerfile: Dockerfile
       args:
         DNS: dfnx
@@ -16,6 +16,8 @@ services:
           cpus: 0.25
           memory: "268435456"
     environment:
+      DOT_ENV_INTERPOLATION: enabled
+      DOTENV: enabled
       FOO: bar
     healthcheck:
       test:
@@ -35,7 +37,7 @@ services:
         target: /run/secrets/dummy
 networks:
   default:
-    name: test_default
+    name: tests_default
 secrets:
   dummy:
     name: dummy

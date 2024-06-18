@@ -26,11 +26,11 @@ func (m MockClient) ServiceDNS(service string) string {
 	return service
 }
 
-func (m MockClient) LoadProject() (*compose.Project, error) {
+func (m MockClient) LoadProject(ctx context.Context) (*compose.Project, error) {
 	return m.Project, nil
 }
 
-func (m MockClient) LoadProjectName() (string, error) {
+func (m MockClient) LoadProjectName(ctx context.Context) (string, error) {
 	return m.Project.Name, nil
 }
 

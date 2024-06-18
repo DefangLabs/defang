@@ -315,7 +315,7 @@ var RootCmd = &cobra.Command{
 
 		composeFilePath, _ := cmd.Flags().GetString("file")
 		loader := cli.ComposeLoader{ComposeFilePath: composeFilePath}
-		client = cli.NewClient(cluster, provider, loader)
+		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -346,8 +346,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client = cli.NewClient(cluster, provider, loader)             // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
+				client = cli.NewClient(cmd.Context(), cluster, provider, loader) // reconnect with the new token
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil {    // recheck (new token = new user)
 					return nil // success
 				}
 			}
@@ -676,6 +676,13 @@ var configSetCmd = &cobra.Command{
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		// Make sure we have a project to set config for before asking for a value
+		_, err := client.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 

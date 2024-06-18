@@ -16,8 +16,7 @@ type ServerStream[Res any] interface {
 }
 
 type ProjectLoader interface {
-	LoadWithDefaultProjectName(string) (*compose.Project, error)
-	LoadWithProjectName(string) (*compose.Project, error)
+	LoadCompose(context.Context) (*compose.Project, error)
 }
 
 type FabricClient interface {
@@ -57,8 +56,8 @@ type Client interface {
 	TearDown(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
-	LoadProject() (*compose.Project, error)
-	LoadProjectName() (string, error) // TODO: should probably be a private method
+	LoadProject(context.Context) (*compose.Project, error)
+	LoadProjectName(context.Context) (string, error)
 }
 
 type Property struct {

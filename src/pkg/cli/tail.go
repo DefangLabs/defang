@@ -136,7 +136,7 @@ func (cerr *CancelError) Unwrap() error {
 }
 
 func Tail(ctx context.Context, client client.Client, params TailOptions) error {
-	projectName, err := client.LoadProjectName()
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
