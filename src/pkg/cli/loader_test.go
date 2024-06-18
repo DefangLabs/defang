@@ -29,7 +29,7 @@ func TestLoader(t *testing.T) {
 
 			// Replace the absolute path in context to make the .golden file portable
 			absPath, _ := filepath.Abs(path)
-			yaml = bytes.ReplaceAll(yaml, []byte(filepath.Dir(absPath)), []byte(path))
+			yaml = bytes.ReplaceAll(yaml, []byte(filepath.Dir(absPath)), []byte{'.'})
 
 			golden, err := os.ReadFile(path + ".golden")
 			if err != nil {
