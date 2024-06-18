@@ -15,7 +15,9 @@
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "forceConsistentCasingInFileNames": true,
-        "removeComments": true
+        "removeComments": true,
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true
       },
     "include": [
         "src/**/*"  // Specify files to be included in compilation
