@@ -2,7 +2,7 @@ name: secretname
 services:
   app:
     build:
-      context: ../../tests/secretname/compose.yaml
+      context: .
       dockerfile: Dockerfile
     networks:
       default: null
