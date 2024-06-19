@@ -9,7 +9,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan *map[string]string, error) {
+func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan map[string]string, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
 	}
@@ -23,7 +23,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		serviceStatus[service] = string(ServiceUnknown)
 	}
 
-	statusChan := make(chan *map[string]string, len(services))
+	statusChan := make(chan map[string]string, len(services))
 	if DoDryRun {
 		defer close(statusChan)
 		return statusChan, ErrDryRun
@@ -72,7 +72,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			//make a copy to be put into channel
 			serviceStatusCopy := cloneServiceStatus(serviceStatus)
 
-			statusChan <- &serviceStatusCopy
+			statusChan <- serviceStatusCopy
 			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
 		}
 	}()

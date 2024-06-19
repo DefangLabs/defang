@@ -24,7 +24,7 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 
 	// monitor for when all services are completed to end this command
 	for serviceStatus := range serviceStatusChan {
-		if allInStatus(targetStatus, *serviceStatus) {
+		if allInStatus(targetStatus, serviceStatus) {
 			for _, sInfo := range serviceInfos {
 				sInfo.Status = string(targetStatus)
 			}
