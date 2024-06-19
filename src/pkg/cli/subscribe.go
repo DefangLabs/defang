@@ -53,17 +53,37 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			msg := serverStream.Msg()
+			if msg == nil {
+				continue
+			}
+
 			servInfo := msg.GetService()
+			if servInfo == nil || servInfo.Service == nil {
+				continue
+			}
+
 			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
 			if !ok {
 				term.Debugf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
 				continue
 			}
 			serviceStatus[serviceName] = servInfo.Status
-			statusChan <- &serviceStatus
+
+			//make a copy to be put into channel
+			serviceStatusCopy := cloneServiceStatus(serviceStatus)
+
+			statusChan <- &serviceStatusCopy
 			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
 		}
 	}()
 
 	return statusChan, nil
+}
+
+func cloneServiceStatus(serviceStatus map[string]string) map[string]string {
+	serviceStatusCopy := make(map[string]string, len(serviceStatus))
+	for k, v := range serviceStatus {
+		serviceStatusCopy[k] = v
+	}
+	return serviceStatusCopy
 }
