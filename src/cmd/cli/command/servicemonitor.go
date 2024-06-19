@@ -16,14 +16,26 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 	}
 
 	// set up service status subscription (non-blocking)
-	serviceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
+	subscribeServiceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
 	if err != nil {
 		term.Debugf("error subscribing to service status: %v", err)
 		return err
 	}
 
+	serviceStatus := make(map[string]string, len(serviceList))
+	for _, name := range serviceList {
+		serviceStatus[name] = string(cli.ServiceUnknown)
+	}
+
 	// monitor for when all services are completed to end this command
-	for serviceStatus := range serviceStatusChan {
+	for newStatus := range subscribeServiceStatusChan {
+		if _, ok := serviceStatus[newStatus.Name]; !ok {
+			term.Debugf("unexpected service %s update", newStatus.Name)
+			continue
+		}
+
+		serviceStatus[newStatus.Name] = newStatus.Status
+
 		if allInStatus(targetStatus, serviceStatus) {
 			for _, sInfo := range serviceInfos {
 				sInfo.Status = string(targetStatus)
