@@ -9,21 +9,24 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan *map[string]string, error) {
+type SubscribeServiceStatus struct {
+	Name   string
+	Status string
+}
+
+func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
 	}
 
-	serviceStatus := make(map[string]string, len(services))
 	normalizedServiceNameToServiceName := make(map[string]string, len(services))
 
 	for i, service := range services {
 		services[i] = NormalizeServiceName(service)
 		normalizedServiceNameToServiceName[services[i]] = service
-		serviceStatus[service] = string(ServiceUnknown)
 	}
 
-	statusChan := make(chan *map[string]string, len(services))
+	statusChan := make(chan SubscribeServiceStatus, len(services))
 	if DoDryRun {
 		defer close(statusChan)
 		return statusChan, ErrDryRun
@@ -53,14 +56,26 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			msg := serverStream.Msg()
+			if msg == nil {
+				continue
+			}
+
 			servInfo := msg.GetService()
+			if servInfo == nil || servInfo.Service == nil {
+				continue
+			}
+
 			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
 			if !ok {
 				term.Debugf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
 				continue
 			}
-			serviceStatus[serviceName] = servInfo.Status
-			statusChan <- &serviceStatus
+			status := SubscribeServiceStatus{
+				Name:   serviceName,
+				Status: servInfo.Status,
+			}
+
+			statusChan <- status
 			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
 		}
 	}()
