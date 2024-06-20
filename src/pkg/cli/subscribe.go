@@ -19,13 +19,6 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		return nil, fmt.Errorf("no services specified")
 	}
 
-	normalizedServiceNameToServiceName := make(map[string]string, len(services))
-
-	for i, service := range services {
-		services[i] = NormalizeServiceName(service)
-		normalizedServiceNameToServiceName[services[i]] = service
-	}
-
 	statusChan := make(chan SubscribeServiceStatus, len(services))
 	if DoDryRun {
 		defer close(statusChan)
@@ -65,18 +58,13 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				continue
 			}
 
-			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
-			if !ok {
-				term.Debugf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
-				continue
-			}
 			status := SubscribeServiceStatus{
-				Name:   serviceName,
+				Name:   servInfo.Service.Name,
 				Status: servInfo.Status,
 			}
 
 			statusChan <- status
-			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
+			term.Debugf("service %s with status %s\n", servInfo.Service.Name, servInfo.Status)
 		}
 	}()
 

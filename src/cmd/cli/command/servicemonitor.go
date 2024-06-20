@@ -12,7 +12,7 @@ import (
 func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
-		serviceList = append(serviceList, serviceInfo.Service.Name)
+		serviceList = append(serviceList, cli.NormalizeServiceName(serviceInfo.Service.Name))
 	}
 
 	// set up service status subscription (non-blocking)
