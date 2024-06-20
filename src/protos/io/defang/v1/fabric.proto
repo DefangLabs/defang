@@ -73,13 +73,9 @@ service FabricController {
 message EntityIdentity {
   string application = 1;
   string environment = 2;
-  repeated string services = 4;
-}
-
-message JobIdentity {
-  string job = 1;
-  string etag = 2;
-  EntityIdentity entity = 3;
+  string job = 3;
+  string etag = 4;
+  repeated string services = 5;
 }
 
 message TrackRequest {
@@ -93,23 +89,19 @@ message TrackRequest {
 message DeployRequest {
   repeated Service services = 1;
   string project = 2;
-  EntityIdentity entity_id = 3;
 }
 
 message DeployResponse {
-  repeated ServiceInfo services = 1 [deprecated = true];
-  string etag = 2 [deprecated = true];
-  JobIdentity job_id = 3; 
+  repeated ServiceInfo services = 1;
+  string etag = 2;
 }
 
 message DeleteRequest {
-  repeated string names = 1 [deprecated = true];
-  EntityIdentity entity_id = 2;
+  repeated string names = 1;
 }
 
 message DeleteResponse { 
-  string etag = 1 [deprecated = true]; 
-  JobIdentity job_id = 2;
+  string etag = 1; 
 }
 
 message GenerateFilesRequest {
@@ -149,14 +141,13 @@ message ServiceInfo {
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
   reserved 14; // was: string lb_dns
 
+  EntityIdentity id = 15;
   // bool is_function = 5; // true if service is a function
 }
 
 message ServicesRequest {
-  oneOf {
-    emptypb.Empty empty = 1;
-    EntityIdenfity entity_id = 2;
-  }
+  google.protobuf.Empty empty = 1;
+  EntityIdentity id = 2;
 }
 
 // message Project {
@@ -166,23 +157,19 @@ message ServicesRequest {
 
 message Secrets {
   repeated string names = 1;
-  string project = 2 [deprecated]; // defaults to tenant ID
-  EntityIdentity entity_id = 3;
+  string project = 2; // defaults to tenant ID
 }
 
 message SecretValue {
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
-  EntityIdentity entity_id = 4;
 }
 
 message ConfigValue {
   string name = 1;
   string value = 2;
-  boolean is_sensitive = 3;
-
-  EntityIdentity entity_id = 4;
+  bool is_sensitive = 3;
 }
 
 message TokenRequest {
@@ -215,9 +202,10 @@ message Version {
 }
 
 message TailRequest {
-  repeated string services = 1;
+  repeated string services = 1 [deprecated = true];
   google.protobuf.Timestamp since = 2;
-  string etag = 3;
+  string etag = 3 [deprecated = true];
+  EntityIdentity id = 4;
 }
 
 message LogEntry {
@@ -227,21 +215,23 @@ message LogEntry {
   string service = 4;
   string etag = 5;
   string host = 6;
+  EntityIdentity id = 7;
 }
 
 message TailResponse {
   reserved 1; // was "string raw"
   repeated LogEntry entries = 2;
-  string service = 3;
-  string etag = 4;
-  string host = 5;
-  string project = 6;
+  string service = 3 [deprecated = true];
+  string etag = 4 [deprecated = true];
+  string host = 5 [deprecated = true];
+  string project = 6 [deprecated = true];
+  EntityIdentity id = 7;
 }
 
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
-  EntityIdentity entity_id = 3;
+  EntityIdentity id = 3;
 }
 
 // TODO: internal message; move to a separate proto file
@@ -388,7 +378,7 @@ message Service {
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
 
-  EntityIdentity entity_id = 20;
+  EntityIdentity id = 20;
 }
 
 message StaticFiles {
@@ -413,10 +403,13 @@ message Event {
 message PublishRequest { Event event = 1; }
 
 message SubscribeRequest { 
-  repeated string services = 1;
+  repeated string services = 1 [deprecated = true];
+  EntityIdentity id = 2;
 }
 
-message SubscribeResponse { ServiceInfo service = 1; }
+message SubscribeResponse { 
+  ServiceInfo service = 1; 
+}
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
