@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
@@ -45,7 +46,7 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 	return samples, err
 }
 
-func InitFromSamples(ctx context.Context, names []string) error {
+func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	const repo = "samples"
 	const branch = "main"
 
@@ -75,13 +76,14 @@ func InitFromSamples(ctx context.Context, names []string) error {
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
 				fmt.Println("   -", base)
+				path := filepath.Join(dir, base)
 				if h.FileInfo().IsDir() {
-					if err := os.MkdirAll(base, 0755); err != nil {
+					if err := os.MkdirAll(path, 0755); err != nil {
 						return err
 					}
 					continue
 				}
-				if err := createFile(base, h, tarReader); err != nil {
+				if err := createFile(path, h, tarReader); err != nil {
 					return err
 				}
 			}
