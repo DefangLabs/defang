@@ -45,11 +45,10 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 	return samples, err
 }
 
-func InitFromSample(ctx context.Context, name string) error {
+func InitFromSamples(ctx context.Context, names []string) error {
 	const repo = "samples"
 	const branch = "main"
 
-	prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 	resp, err := http.GetWithContext(ctx, "https://github.com/DefangLabs/"+repo+"/archive/refs/heads/"+branch+".tar.gz")
 	if err != nil {
 		return err
@@ -72,16 +71,19 @@ func InitFromSample(ctx context.Context, name string) error {
 			return err
 		}
 
-		if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
-			fmt.Println("   -", base)
-			if h.FileInfo().IsDir() {
-				if err := os.MkdirAll(base, 0755); err != nil {
+		for _, name := range names {
+			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
+			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				fmt.Println("   -", base)
+				if h.FileInfo().IsDir() {
+					if err := os.MkdirAll(base, 0755); err != nil {
+						return err
+					}
+					continue
+				}
+				if err := createFile(base, h, tarReader); err != nil {
 					return err
 				}
-				continue
-			}
-			if err := createFile(base, h, tarReader); err != nil {
-				return err
 			}
 		}
 	}
