@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
@@ -45,23 +46,22 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 	return samples, err
 }
 
-func InitFromSample(ctx context.Context, name string) error {
+func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	const repo = "samples"
 	const branch = "main"
 
-	prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 	resp, err := http.GetWithContext(ctx, "https://github.com/DefangLabs/"+repo+"/archive/refs/heads/"+branch+".tar.gz")
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	term.Debug(resp.Header)
-	body, err := gzip.NewReader(resp.Body)
+	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return err
 	}
-	defer body.Close()
-	tarReader := tar.NewReader(body)
+	defer tarball.Close()
+	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
 	for {
 		h, err := tarReader.Next()
@@ -72,23 +72,35 @@ func InitFromSample(ctx context.Context, name string) error {
 			return err
 		}
 
-		if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
-			fmt.Println("   -", base)
-			if h.FileInfo().IsDir() {
-				if err := os.MkdirAll(base, 0755); err != nil {
+		for _, name := range names {
+			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
+			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				fmt.Println("   -", base)
+				path := filepath.Join(dir, base)
+				if h.FileInfo().IsDir() {
+					if err := os.MkdirAll(path, 0755); err != nil {
+						return err
+					}
+					continue
+				}
+				if err := createFile(path, h, tarReader); err != nil {
 					return err
 				}
-				continue
-			}
-			// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
-			file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(file, tarReader); err != nil {
-				return err
 			}
 		}
+	}
+	return nil
+}
+
+func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
+	// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
+	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := io.Copy(file, tarReader); err != nil {
+		return err
 	}
 	return nil
 }
