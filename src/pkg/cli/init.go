@@ -56,12 +56,12 @@ func InitFromSample(ctx context.Context, name string) error {
 	}
 	defer resp.Body.Close()
 	term.Debug(resp.Header)
-	body, err := gzip.NewReader(resp.Body)
+	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return err
 	}
-	defer body.Close()
-	tarReader := tar.NewReader(body)
+	defer tarball.Close()
+	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
 	for {
 		h, err := tarReader.Next()
@@ -80,15 +80,23 @@ func InitFromSample(ctx context.Context, name string) error {
 				}
 				continue
 			}
-			// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
-			file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(file, tarReader); err != nil {
+			if err := createFile(base, h, tarReader); err != nil {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
+	// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
+	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := io.Copy(file, tarReader); err != nil {
+		return err
 	}
 	return nil
 }
