@@ -647,12 +647,12 @@ var tailCmd = &cobra.Command{
 			sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 		}
 		term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
-		services := []string{}
+		services := []string{name}
 		if len(name) > 0 {
 			services = strings.Split(name, ",")
 		}
 		tailOptions := cli.TailOptions{
-			Services: []string{name},
+			Services: services,
 			Etag:     etag,
 			Since:    ts,
 			Raw:      raw,

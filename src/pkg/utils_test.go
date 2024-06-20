@@ -136,29 +136,24 @@ func TestRandomID(t *testing.T) {
 	}
 }
 
-func TestEqualSets(t *testing.T) {
+func TestContains(t *testing.T) {
 	tests := []struct {
-		data1      []interface{}
-		data2      []interface{}
-		isMatching bool
+		name     string
+		slice    []int
+		value    int
+		expected bool
 	}{
-		{[]interface{}{}, []interface{}{}, true},
-		{[]interface{}{1, 2, 3}, []interface{}{1, 2, 3}, true},
-		{[]interface{}{1, 2, 3}, []interface{}{2, 3, 1}, true},
-		{[]interface{}{1, 2, 3}, []interface{}{2.0, 3.0, 1.0}, false},
-		{[]interface{}{1, 2, 3}, []interface{}{"1", "2", "3"}, false},
-		{[]interface{}{1, 2, 3}, []interface{}{}, false},
-		{[]interface{}{}, []interface{}{1, 2, 3}, false},
-		{[]interface{}{1, 2}, []interface{}{2, 3}, false},
-		{[]interface{}{"a", "b", "c"}, []interface{}{"a", "b", "c"}, true},
+		{"Empty slice", []int{}, 1, false},
+		{"Single element", []int{1}, 1, true},
+		{"Multiple elements", []int{1, 2, 3, 4, 5}, 3, true},
+		{"Non-existent element", []int{1, 2, 3, 4, 5}, 6, false},
 	}
 
 	for _, tt := range tests {
-		t.Run("EqualSets", func(t *testing.T) {
-			if got := EqualSets(tt.data1, tt.data2); got != tt.isMatching {
-				t.Errorf("EqualSets(%v, %v) = %v, want %v", tt.data1, tt.data2, got, tt.isMatching)
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Contains(tt.slice, tt.value); got != tt.expected {
+				t.Errorf("Contains() returned %v, expected %v", got, tt.expected)
 			}
 		})
 	}
-
 }
