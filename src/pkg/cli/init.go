@@ -73,10 +73,15 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		}
 
 		for _, name := range names {
+			// Create a subdirectory for each sample when there is more than one sample requested
+			subdir := ""
+			if len(names) > 1 {
+				subdir = name
+			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
 				fmt.Println("   -", base)
-				path := filepath.Join(dir, base)
+				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
 					if err := os.MkdirAll(path, 0755); err != nil {
 						return err
