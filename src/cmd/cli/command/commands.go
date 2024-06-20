@@ -434,7 +434,7 @@ var generateCmd = &cobra.Command{
 			if sample == "" {
 				return errors.New("cannot run in non-interactive mode")
 			}
-			return cli.InitFromSamples(cmd.Context(), []string{sample})
+			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
 
 		if sample == "" {
@@ -550,7 +550,7 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		if sample != "" {
 			term.Info("Fetching sample from the Defang repository...")
-			err := cli.InitFromSamples(cmd.Context(), []string{sample})
+			err := cli.InitFromSamples(cmd.Context(), "", []string{sample})
 			if err != nil {
 				return err
 			}
