@@ -73,3 +73,20 @@ func TestComposeFixupEnv(t *testing.T) {
 		t.Errorf("convertServices() failed: unable to find sensitive config variable %s", sensitiveKey)
 	}
 }
+
+func TestComposeConfigOverride(t *testing.T) {
+	loader := ComposeLoader{"../../tests/configoverride/compose.yaml"}
+	proj, err := loader.LoadCompose(context.Background())
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	services, err := convertServices(context.Background(), client.MockClient{}, proj.Services, false)
+	if err != nil {
+		t.Fatalf("convertServices() failed: %v", err)
+	}
+
+	if len(services[0].Secrets) != 1 || services[0].Secrets[0].Source != "VAR1" {
+		t.Fatalf("convertServices() failed: expected 1 secret VAR1, got %v", services[0].Secrets)
+	}
+}

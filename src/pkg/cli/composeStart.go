@@ -28,6 +28,13 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
 	}
 
+	// Preload the current config so we can detect which environment variables should be passed as "secrets"
+	config, err := c.ListConfig(ctx)
+	if err != nil {
+		term.Debugf("failed to load config: %v", err)
+	}
+	slices.Sort(config.Names) // sort for binary search
+
 	//
 	// Publish updates
 	//
@@ -106,16 +113,24 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		// Extract environment variables
-		var unsetEnvs []string
+		var envFromConfig []string
 		envs := make(map[string]string, len(svccfg.Environment))
 		for key, value := range svccfg.Environment {
+			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
 				warnf("service %q: skipping unset environment variable key", svccfg.Name)
 				continue
 			}
 			// keep track of what environment variables were declared but not set in the compose environment section
 			if value == nil {
-				unsetEnvs = append(unsetEnvs, key)
+				envFromConfig = append(envFromConfig, key)
+				continue
+			}
+
+			// Check if the environment variable is an existing config; if so, mark it as such
+			if _, ok := slices.BinarySearch(config.Names, key); ok {
+				term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				envFromConfig = append(envFromConfig, key)
 				continue
 			}
 
@@ -132,20 +147,20 @@ func convertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			envs[key] = val
 		}
 
-		// Extract secret references
+		// Add unset environment variables as "secrets"
 		var configs []*defangv1.Secret
+		for _, name := range envFromConfig {
+			configs = append(configs, &defangv1.Secret{
+				Source: name,
+			})
+		}
+		// Extract secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
 			if i == 0 { // only warn once
 				warnf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name)
 			}
 			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
-			})
-		}
-		// add unset environment variables as secrets
-		for _, unsetEnv := range unsetEnvs {
-			configs = append(configs, &defangv1.Secret{
-				Source: unsetEnv,
 			})
 		}
 
