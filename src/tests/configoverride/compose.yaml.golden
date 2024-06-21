@@ -1,0 +1,11 @@
+name: configoverride
+services:
+  service1:
+    environment:
+      VAR1: service1
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: configoverride_default
