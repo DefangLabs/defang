@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -144,7 +145,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
-			service = NormalizeServiceName(service)
+			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
 			if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 				switch connect.CodeOf(err) {
