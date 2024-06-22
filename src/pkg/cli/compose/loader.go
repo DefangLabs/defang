@@ -1,4 +1,4 @@
-package cli
+package compose
 
 import (
 	"context"
@@ -15,11 +15,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ComposeLoader struct {
+type Loader struct {
 	ComposeFilePath string
 }
 
-func (c ComposeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	composeFilePath, err := getComposeFilePath(c.ComposeFilePath)
 	if err != nil {
 		return nil, err

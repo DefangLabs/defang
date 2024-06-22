@@ -1,17 +1,20 @@
-package cli
+package compose
 
 import (
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/sirupsen/logrus"
 )
 
-func validateProject(project *compose.Project) error {
+func ValidateProject(project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -269,5 +272,64 @@ func validateProject(project *compose.Project) error {
 	for k := range project.Extensions {
 		warnf("unsupported compose extension: %q", k)
 	}
+	return nil
+}
+
+func warnf(format string, args ...interface{}) {
+	logrus.Warnf(format, args...)
+	term.SetHadWarnings(true)
+}
+
+func validatePorts(ports []compose.ServicePortConfig) error {
+	for _, port := range ports {
+		err := validatePort(port)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// We can changed to slices.contains when we upgrade to go 1.21 or above
+var validProtocols = map[string]bool{"": true, "tcp": true, "udp": true, "http": true, "http2": true, "grpc": true}
+var validModes = map[string]bool{"": true, "host": true, "ingress": true}
+
+func validatePort(port compose.ServicePortConfig) error {
+	if port.Target < 1 || port.Target > 32767 {
+		return fmt.Errorf("port 'target' must be an integer between 1 and 32767: %v", port.Target)
+	}
+	if port.HostIP != "" {
+		return errors.New("port 'host_ip' is not supported")
+	}
+	if !validProtocols[port.Protocol] {
+		return fmt.Errorf("port 'protocol' not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+	}
+	if !validModes[port.Mode] {
+		return fmt.Errorf("port 'mode' not one of [host ingress]: %v", port.Mode)
+	}
+	if port.Published != "" && (port.Mode == "host" || port.Protocol == "udp") {
+		portRange := strings.SplitN(port.Published, "-", 2)
+		start, err := strconv.ParseUint(portRange[0], 10, 16)
+		if err != nil {
+			return fmt.Errorf("port 'published' start must be an integer: %v", portRange[0])
+		}
+		if len(portRange) == 2 {
+			end, err := strconv.ParseUint(portRange[1], 10, 16)
+			if err != nil {
+				return fmt.Errorf("port 'published' end must be an integer: %v", portRange[1])
+			}
+			if start > end {
+				return fmt.Errorf("port 'published' start must be less than end: %v", port.Published)
+			}
+			if port.Target < uint32(start) || port.Target > uint32(end) {
+				return fmt.Errorf("port 'published' range must include 'target': %v", port.Published)
+			}
+		} else {
+			if start != uint64(port.Target) {
+				return fmt.Errorf("port 'published' must be empty or equal to 'target': %v", port.Published)
+			}
+		}
+	}
+
 	return nil
 }

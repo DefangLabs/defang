@@ -1,4 +1,4 @@
-package cli
+package compose
 
 import (
 	"bytes"
@@ -11,13 +11,13 @@ import (
 
 func TestLoader(t *testing.T) {
 	composeRegex := regexp.MustCompile(`^(docker-)?compose.ya?ml$`)
-	err := filepath.WalkDir("../../tests", func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir("../../../tests", func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !composeRegex.MatchString(d.Name()) {
 			return err
 		}
 
 		t.Run(path, func(t *testing.T) {
-			loader := ComposeLoader{path}
+			loader := Loader{path}
 			proj, err := loader.LoadCompose(context.Background())
 			if err != nil {
 				t.Fatal(err)

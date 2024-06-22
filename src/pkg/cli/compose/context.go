@@ -1,4 +1,4 @@
-package cli
+package compose
 
 import (
 	"archive/tar"
@@ -7,13 +7,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,10 +18,17 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
-	"github.com/sirupsen/logrus"
+)
+
+type BuildContext int
+
+const (
+	BuildContextDigest BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
+	BuildContextForce  BuildContext = iota // force: always upload the tarball, even if it's the same as a previous one
+	BuildContextIgnore BuildContext = iota // dry-run: don't upload the tarball, just return the path
 )
 
 const (
@@ -53,28 +57,7 @@ const (
 defang`
 )
 
-var (
-	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
-)
-
-type ComposeError struct {
-	error
-}
-
-func (e ComposeError) Unwrap() error {
-	return e.error
-}
-
-func NormalizeServiceName(s string) string {
-	return nonAlphanumeric.ReplaceAllLiteralString(strings.ToLower(s), "-")
-}
-
-func warnf(format string, args ...interface{}) {
-	logrus.Warnf(format, args...)
-	term.SetHadWarnings(true)
-}
-
-func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *compose.BuildConfig, force bool) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force BuildContext) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err)
@@ -87,135 +70,19 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	}
 
 	var digest string
-	if !force {
+	if force == BuildContextDigest {
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
 		term.Debug("Digest:", digest)
 	}
 
-	if DoDryRun {
+	if force == BuildContextIgnore {
 		return root, nil
 	}
 
 	term.Info("Uploading build context for", name)
 	return uploadTarball(ctx, client, buffer, digest)
-}
-
-// We can changed to slices.contains when we upgrade to go 1.21 or above
-var validProtocols = map[string]bool{"": true, "tcp": true, "udp": true, "http": true, "http2": true, "grpc": true}
-var validModes = map[string]bool{"": true, "host": true, "ingress": true}
-
-func validatePort(port compose.ServicePortConfig) error {
-	if port.Target < 1 || port.Target > 32767 {
-		return fmt.Errorf("port 'target' must be an integer between 1 and 32767: %v", port.Target)
-	}
-	if port.HostIP != "" {
-		return errors.New("port 'host_ip' is not supported")
-	}
-	if !validProtocols[port.Protocol] {
-		return fmt.Errorf("port 'protocol' not one of [tcp udp http http2 grpc]: %v", port.Protocol)
-	}
-	if !validModes[port.Mode] {
-		return fmt.Errorf("port 'mode' not one of [host ingress]: %v", port.Mode)
-	}
-	if port.Published != "" && (port.Mode == "host" || port.Protocol == "udp") {
-		portRange := strings.SplitN(port.Published, "-", 2)
-		start, err := strconv.ParseUint(portRange[0], 10, 16)
-		if err != nil {
-			return fmt.Errorf("port 'published' start must be an integer: %v", portRange[0])
-		}
-		if len(portRange) == 2 {
-			end, err := strconv.ParseUint(portRange[1], 10, 16)
-			if err != nil {
-				return fmt.Errorf("port 'published' end must be an integer: %v", portRange[1])
-			}
-			if start > end {
-				return fmt.Errorf("port 'published' start must be less than end: %v", port.Published)
-			}
-			if port.Target < uint32(start) || port.Target > uint32(end) {
-				return fmt.Errorf("port 'published' range must include 'target': %v", port.Published)
-			}
-		} else {
-			if start != uint64(port.Target) {
-				return fmt.Errorf("port 'published' must be empty or equal to 'target': %v", port.Published)
-			}
-		}
-	}
-
-	return nil
-}
-
-func validatePorts(ports []compose.ServicePortConfig) error {
-	for _, port := range ports {
-		err := validatePort(port)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func convertPort(port compose.ServicePortConfig) *defangv1.Port {
-	pbPort := &defangv1.Port{
-		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
-		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
-		// Published string `yaml:",omitempty" json:"published,omitempty"`
-		// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
-		Target: port.Target,
-	}
-
-	switch port.Protocol {
-	case "":
-		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
-	case "tcp":
-		pbPort.Protocol = defangv1.Protocol_TCP
-	case "udp":
-		pbPort.Protocol = defangv1.Protocol_UDP
-	case "http": // TODO: not per spec
-		pbPort.Protocol = defangv1.Protocol_HTTP
-	case "http2": // TODO: not per spec
-		pbPort.Protocol = defangv1.Protocol_HTTP2
-	case "grpc": // TODO: not per spec
-		pbPort.Protocol = defangv1.Protocol_GRPC
-	default:
-		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
-	}
-
-	switch port.Mode {
-	case "":
-		warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
-		fallthrough
-	case "ingress":
-		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
-		if port.Protocol != "udp" {
-			if port.Published != "" {
-				warnf("Published ports are ignored in ingress mode")
-			}
-			pbPort.Mode = defangv1.Mode_INGRESS
-			if pbPort.Protocol == defangv1.Protocol_TCP || pbPort.Protocol == defangv1.Protocol_UDP {
-				warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
-				pbPort.Protocol = defangv1.Protocol_HTTP
-			}
-			break
-		}
-		warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
-		fallthrough
-	case "host":
-		pbPort.Mode = defangv1.Mode_HOST
-	default:
-		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
-	}
-	return pbPort
-}
-
-func convertPorts(ports []compose.ServicePortConfig) []*defangv1.Port {
-	var pbports []*defangv1.Port
-	for _, port := range ports {
-		pbPort := convertPort(port)
-		pbports = append(pbports, pbPort)
-	}
-	return pbports
 }
 
 func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
@@ -404,39 +271,4 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	}
 
 	return &buf, nil
-}
-
-var statefulImages = []string{
-	"cassandra",
-	"couchdb",
-	"elasticsearch",
-	"etcd",
-	"influxdb",
-	"mariadb",
-	"minio", // could be stateless
-	"mongo",
-	"mssql/server",
-	"mysql",
-	"nats",
-	"neo4j",
-	"oracle/database",
-	"percona",
-	"postgres",
-	"rabbitmq",
-	"redis",
-	"rethinkdb",
-	"scylla",
-	"timescaledb",
-	"vault",
-	"zookeeper",
-}
-
-func isStatefulImage(image string) bool {
-	repo := strings.ToLower(strings.SplitN(image, ":", 2)[0])
-	for _, statefulImage := range statefulImages {
-		if strings.HasSuffix(repo, statefulImage) {
-			return true
-		}
-	}
-	return false
 }
