@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -146,60 +147,29 @@ func TestConvertPort(t *testing.T) {
 	}
 }
 
-func TestComposeFixupEnv(t *testing.T) {
-	loader := Loader{"../../../tests/fixupenv/compose.yaml"}
-	proj, err := loader.LoadCompose(context.Background())
-	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
-	}
-
-	services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextDigest)
-	if err != nil {
-		t.Fatalf("ConvertServices() failed: %v", err)
-	}
-	ui := slices.IndexFunc(services, func(s *defangv1.Service) bool { return s.Name == "ui" })
-	if ui < 0 {
-		t.Fatalf("ConvertServices() failed: expected service named 'ui'")
-	}
-
-	const expected = "http://mistral:8000"
-	got := services[ui].Environment["API_URL"]
-	if got != expected {
-		t.Errorf("ConvertServices() failed: expected API_URL=%s, got %s", expected, got)
-	}
-
-	const sensitiveKey = "SENSITIVE_DATA"
-	_, ok := services[ui].Environment[sensitiveKey]
-	if ok {
-		t.Errorf("ConvertServices() failed: , %s found in environment map but should not be.", sensitiveKey)
-	}
-
-	found := false
-	for _, value := range services[ui].Secrets {
-		if value.Source == sensitiveKey {
-			found = true
-			break
+func TestConvert(t *testing.T) {
+	testRunCompose(t, func(t *testing.T, path string) {
+		loader := Loader{path}
+		proj, err := loader.LoadCompose(context.Background())
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextIgnore)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if !found {
-		t.Errorf("ConvertServices() failed: unable to find sensitive config variable %s", sensitiveKey)
-	}
-}
+		// The order of the services is not guaranteed, so we sort the services before comparing
+		slices.SortFunc(services, func(i, j *defangv1.Service) int { return strings.Compare(i.Name, j.Name) })
 
-func TestComposeConfigOverride(t *testing.T) {
-	loader := Loader{"../../../tests/configoverride/compose.yaml"}
-	proj, err := loader.LoadCompose(context.Background())
-	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
-	}
+		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
+		actual, err := json.MarshalIndent(services, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextDigest)
-	if err != nil {
-		t.Fatalf("ConvertServices() failed: %v", err)
-	}
-
-	if len(services[0].Secrets) != 1 || services[0].Secrets[0].Source != "VAR1" {
-		t.Fatalf("ConvertServices() failed: expected 1 secret VAR1, got %v", services[0].Secrets)
-	}
+		if err := compare(actual, path+".convert"); err != nil {
+			t.Error(err)
+		}
+	})
 }

@@ -98,6 +98,10 @@ func ValidateProject(project *compose.Project) error {
 			warnf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
 		}
 		if svccfg.Build != nil {
+			_, err := filepath.Abs(svccfg.Build.Context)
+			if err != nil {
+				return fmt.Errorf("service %q: invalid build context: %w", svccfg.Name, err)
+			}
 			if svccfg.Build.Dockerfile != "" {
 				if filepath.IsAbs(svccfg.Build.Dockerfile) {
 					return fmt.Errorf("service %q: dockerfile path must be relative to the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
