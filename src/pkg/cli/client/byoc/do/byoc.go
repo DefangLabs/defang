@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/digitalocean/godo"
 	"os"
 	"strings"
 
@@ -21,8 +22,10 @@ import (
 )
 
 const (
-	DockerHub = "DOCKER_HUB"
-	Docr      = "DOCR"
+	DockerHub     = "DOCKER_HUB"
+	Docr          = "DOCR"
+	Secret        = "SECRET"
+	CommandPrefix = "node lib/index.js"
 )
 
 type ByocDo struct {
@@ -111,19 +114,16 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
 
-	//appID, err := b.runCdCommand(ctx, "up", payloadString)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//b.AppIds[etag] = appID
+	appID, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s %s", CommandPrefix, "up", payloadString))
+	if err != nil {
+		return nil, err
+	}
+	b.appIds[etag] = appID
 
-	//return &defangv1.DeployResponse{
-	//	Services: serviceInfos,
-	//	Etag:     etag,
-	//}, nil
-
-	res := &defangv1.DeployResponse{}
-	return res, nil
+	return &defangv1.DeployResponse{
+		Services: serviceInfos,
+		Etag:     etag,
+	}, nil
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
@@ -210,36 +210,86 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 	return nil, nil
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd string) (string, error) {
 	env := b.environment()
-	if term.DoDebug {
-		debugEnv := " -"
-		for k, v := range env {
-			debugEnv += " " + k + "=" + v
-		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
-	}
-	return b.driver.Run(ctx, env, cmd...)
+	//if term.DoDebug {
+	//	debugEnv := " -"
+	//	for k, v := range env {
+	//		debugEnv += " " + k + "=" + v
+	//	}
+	//	term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+	//}
+	return b.driver.Run(ctx, env, cmd)
 }
 
-func (b *ByocDo) environment() map[string]string {
+func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return map[string]string{
-		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":              byoc.DefangPrefix,
-		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":                 b.TenantID,
-		"DOMAIN":                     b.ProjectDomain,
-		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject,
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName), // TODO: add a way to override bucket
-		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
-		"STACK":                      b.PulumiStack,
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"DO_PAT":                     os.Getenv("DO_PAT"),
-		"DO_SPACES_ID":               os.Getenv("DO_SPACES_ID"),
-		"DO_SPACES_KEY":              os.Getenv("DO_SPACES_KEY"),
+	return []*godo.AppVariableDefinition{
+		{
+			Key:   "DEFANG_PREFIX",
+			Value: byoc.DefangPrefix,
+		},
+		{
+			Key:   "DEFANG_DEBUG",
+			Value: pkg.Getenv("DEFANG_DEBUG", "false"),
+		},
+		{
+			Key:   "DEFANG_ORG",
+			Value: b.TenantID,
+		},
+		{
+			Key:   "DEFANG_CLOUD",
+			Value: "do",
+		},
+		{
+			Key:   "DOMAIN",
+			Value: b.ProjectDomain,
+		},
+		{
+			Key:   "PRIVATE_DOMAIN",
+			Value: b.PrivateDomain,
+		},
+		{
+			Key:   "PROJECT",
+			Value: b.PulumiProject,
+		},
+		{
+			Key:   "PULUMI_BACKEND_URL",
+			Value: fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName),
+		},
+		{
+			Key:   "PULUMI_CONFIG_PASSPHRASE",
+			Value: pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),
+		},
+		{
+			Key:   "STACK",
+			Value: b.PulumiStack,
+		},
+		{
+			Key:   "NPM_CONFIG_UPDATE_NOTIFIER",
+			Value: "false",
+		},
+		{
+			Key:   "PULUMI_SKIP_UPDATE_CHECK",
+			Value: "true",
+		},
+		{
+			Key:   "DIGITALOCEAN_TOKEN",
+			Value: os.Getenv("DO_PAT"),
+		},
+		{
+			Key:   "SPACES_ACCESS_KEY_ID",
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Type:  Secret,
+		},
+		{
+			Key:   "SPACES_SECRET_ACCESS_KEY",
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+		},
+		{
+			Key:   "REGION",
+			Value: "sfo3",
+		},
 	}
 }
 
@@ -287,8 +337,8 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	//		Kind:             godo.AppJobSpecKind_PreDeploy,
 	//	},
 	//}
-
-	//if err := b.Driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
+	//
+	//if err := b.driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
 	//	return err
 	//}
 

@@ -17,6 +17,11 @@ import (
 	"regexp"
 )
 
+const (
+	DockerHub = "DOCKER_HUB"
+	Docr      = "DOCR"
+)
+
 type DoAppPlatform struct {
 	DoApp
 	appName string
@@ -69,20 +74,27 @@ func (d DoApp) SetUp(ctx context.Context, services []*godo.AppServiceSpec, jobs 
 	return nil
 }
 
-func (d DoApp) Run(ctx context.Context, env map[string]string, cmd ...string) (string, error) {
-	//client := d.newClient(ctx)
+func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd string) (string, error) {
+	client := d.newClient(ctx)
 
-	//app, _, err := client.Apps.Get(ctx, d.AppID)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//appInfo, _, err := client.Apps.Update(ctx, d.AppID, &godo.AppUpdateRequest{
-	//	Spec: app.Spec,
-	//})
+	app, _, err := client.Apps.Create(ctx, &godo.AppCreateRequest{
+		Spec: &godo.AppSpec{
+			Name: "defang-cd",
+			Services: []*godo.AppServiceSpec{{
+				Name: fmt.Sprintf("defang-cd-%s", d.ProjectName),
+				Envs: env,
+				Image: &godo.ImageSourceSpec{
+					RegistryType: Docr,
+					Repository:   "defangmvp/do-cd",
+				},
+				InstanceCount:    1,
+				InstanceSizeSlug: "basic-xs",
+				RunCommand:       cmd,
+			}},
+		},
+	})
 
-	//return appInfo.ID, err
-	return "foo", nil
+	return app.ID, err
 }
 
 func (d DoApp) newClient(ctx context.Context) *godo.Client {
