@@ -1,0 +1,15 @@
+[
+  {
+    "name": "echo",
+    "image": "ealen/echo-server",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 80,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  }
+]

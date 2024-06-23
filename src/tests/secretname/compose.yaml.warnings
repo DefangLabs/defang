@@ -1,0 +1,1 @@
+level=warning msg="service \"app\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"

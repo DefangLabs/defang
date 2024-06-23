@@ -39,8 +39,6 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, &ComposeError{err}
 	}
 
-	if DoDryRun {
-	}
 	services, err := compose.ConvertServices(ctx, c, project.Services, buildContext(force))
 	if err != nil {
 		return nil, err

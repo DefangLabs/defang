@@ -1,0 +1,2 @@
+level=warning msg="service \"emptyenv\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"emptyenv\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"

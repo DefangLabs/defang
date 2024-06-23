@@ -27,8 +27,8 @@ type BuildContext int
 
 const (
 	BuildContextDigest BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
-	BuildContextForce  BuildContext = iota // force: always upload the tarball, even if it's the same as a previous one
-	BuildContextIgnore BuildContext = iota // dry-run: don't upload the tarball, just return the path
+	BuildContextForce                      // force: always upload the tarball, even if it's the same as a previous one
+	BuildContextIgnore                     // dry-run: don't upload the tarball, just return the path
 )
 
 const (
@@ -60,7 +60,7 @@ defang`
 func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force BuildContext) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
-		return "", fmt.Errorf("invalid build context: %w", err)
+		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
 	}
 
 	term.Info("Compressing build context for", name, "at", root)

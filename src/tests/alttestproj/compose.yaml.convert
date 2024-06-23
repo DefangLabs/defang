@@ -1,0 +1,43 @@
+[
+  {
+    "name": "dfnx",
+    "platform": 2,
+    "internal": true,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "reservations": {
+          "memory": 256,
+          "cpus": 0.25
+        }
+      }
+    },
+    "ports": [
+      {
+        "target": 80,
+        "mode": 1
+      },
+      {
+        "target": 1234,
+        "mode": 1
+      }
+    ],
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "DNS": "dfnx"
+      },
+      "target": "alttestproj"
+    },
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "curl",
+        "-f",
+        "http://localhost/"
+      ]
+    },
+    "networks": 1
+  }
+]

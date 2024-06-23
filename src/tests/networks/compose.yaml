@@ -1,0 +1,16 @@
+services:
+  service1:
+    networks:
+      invalid-network-name: {}
+  service2:
+    networks:
+      public: {}
+  service3:
+    networks:
+      - public
+  service4:
+    networks:
+      - private
+networks:
+  public:
+    external: true

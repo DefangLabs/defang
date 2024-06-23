@@ -1,0 +1,5 @@
+level=warning msg="service \"Mistral\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"Mistral\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+level=warning msg="service \"ui\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"ui\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+level=warning msg="service name \"Mistral\" was normalized to \"mistral\""

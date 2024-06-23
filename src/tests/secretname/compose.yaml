@@ -8,4 +8,4 @@ services:
 secrets:
   dummy:
     external: true
-    name: dummyx
+    # name: dummyx  ## this causes a validation error in compose-go
