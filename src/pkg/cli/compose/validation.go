@@ -91,8 +91,14 @@ func ValidateProject(project *compose.Project) error {
 				warnf("service %q: network %q is not defined in the top-level networks section", svccfg.Name, name)
 			}
 		}
-		if len(svccfg.Volumes) > 0 {
-			warnf("service %q: unsupported compose directive: volumes", svccfg.Name) // TODO: add support for volumes
+		for _, v := range svccfg.Volumes {
+			if v.Type != "volume" {
+				warnf("service %q: unsupported volume type: %q", svccfg.Name, v.Type)
+				continue
+			}
+			if _, ok := project.Volumes[v.Source]; !ok {
+				warnf("service %q: volume %q is not defined in the top-level volumes section", svccfg.Name, v.Source)
+			}
 		}
 		if len(svccfg.VolumesFrom) > 0 {
 			warnf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
