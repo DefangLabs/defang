@@ -10,22 +10,22 @@ system ? builtins.currentSystem
 }:
 let
   shaMap = {
-    x86_64-linux = "0cga1qx46bpdqjczgcakci9jdpa6zlsshiwyb8791380icd9wdn3";
-    aarch64-linux = "01mchw46qrxj61wqcmx0qniw6fh9455xadr9sy6160aamzwxyy2i";
-    x86_64-darwin = "1s7105rx2scv1wfhvqlxxi7fvbjrs99aa1fwilyvi6z4qcqgn595";
-    aarch64-darwin = "1s7105rx2scv1wfhvqlxxi7fvbjrs99aa1fwilyvi6z4qcqgn595";
+    x86_64-linux = "056a0bw4q696difyygn8rdh5mrna2y7j1qrk2qqws48mf4ig0i64";
+    aarch64-linux = "0fb0vmykqimirb2prh5srix1zjdpn9n2ks06c9sl2d7k9z83x5f4";
+    x86_64-darwin = "0liscvab9clmfvn0vavbdbg52cyg5cpm3k2mmjgghxsbbbapb1cl";
+    aarch64-darwin = "0liscvab9clmfvn0vavbdbg52cyg5cpm3k2mmjgghxsbbbapb1cl";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.25/defang_0.5.25_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.25/defang_0.5.25_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.25/defang_0.5.25_macOS.zip";
-    aarch64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.25/defang_0.5.25_macOS.zip";
+    x86_64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.26/defang_0.5.26_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.26/defang_0.5.26_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.26/defang_0.5.26_macOS.zip";
+    aarch64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.26/defang_0.5.26_macOS.zip";
   };
 in
 stdenvNoCC.mkDerivation {
   pname = "defang";
-  version = "0.5.25";
+  version = "0.5.26";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
