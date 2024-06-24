@@ -102,13 +102,13 @@ winget:
       owner: DefangLabs
       name: winget-pkgs
       branch: "Defang-{{.Version}}"
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+      # pull_request:
+      #   enabled: true
+      #   draft: true
+      #   base:
+      #     owner: microsoft
+      #     name: winget-pkgs
+      #     branch: master
 
 announce:
   discord:
