@@ -27,6 +27,14 @@ jobs:
         run: go test -test.short -v ./...
         working-directory: src
 
+      - name: Build MacOS binary
+        run: GOOS=darwin go build ./cmd/cli
+        working-directory: src
+
+      - name: Build Windows binary
+        run: GOOS=windows go build ./cmd/cli
+        working-directory: src
+
       - name: Verify Go modules
         working-directory: src
         run: |
