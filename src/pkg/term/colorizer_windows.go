@@ -17,6 +17,6 @@ func EnableANSI() func() {
 	}
 }
 
-func isTerminal() bool {
+func hasTermInEnv() bool {
 	return true
 }

@@ -22,6 +22,10 @@ type dnsRequest struct {
 var notFound = errors.New("not found")
 
 func TestGetCNAMEInSync(t *testing.T) {
+	t.Cleanup(func() {
+		dns.ResolverAt = dns.DirectResolverAt
+	})
+
 	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "web.test.com"}:    {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
 		{Type: "CNAME", Domain: "web.test.com"}: {Records: nil, Error: notFound},
@@ -70,6 +74,10 @@ func TestGetCNAMEInSync(t *testing.T) {
 }
 
 func TestGetIPInSync(t *testing.T) {
+	t.Cleanup(func() {
+		dns.ResolverAt = dns.DirectResolverAt
+	})
+
 	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
 		{Type: "A", Domain: "test.com"}:  {Records: nil, Error: notFound},
@@ -155,6 +163,10 @@ func TestCheckDomainDNSReady(t *testing.T) {
 		{Type: "CNAME", Domain: "api.test.com"}:    {Records: []string{"some-alb.domain.com"}, Error: nil},
 	}}
 	resolver = hasARecordResolver
+
+	t.Cleanup(func() {
+		dns.ResolverAt = dns.DirectResolverAt
+	})
 
 	t.Run("CNAME and A records not found", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return emptyResolver }
