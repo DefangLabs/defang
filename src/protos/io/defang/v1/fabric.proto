@@ -356,7 +356,7 @@ message Service {
 }
 
 message Volume {
-  string source = 1; // name of the volume
+  string source = 1; // name of the volume; empty for anonymous volumes
   string target = 2; // path in the container
   bool read_only = 3;
 }

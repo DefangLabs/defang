@@ -94,9 +94,10 @@ func ValidateProject(project *compose.Project) error {
 		for _, v := range svccfg.Volumes {
 			if v.Type != "volume" {
 				warnf("service %q: unsupported volume type: %q", svccfg.Name, v.Type)
-				continue
+				continue // TODO: ignore or error?
 			}
-			if _, ok := project.Volumes[v.Source]; !ok {
+			// Source=="" is allowed for anonymous volumes (will generate a random name)
+			if _, ok := project.Volumes[v.Source]; !ok && v.Source != "" {
 				warnf("service %q: volume %q is not defined in the top-level volumes section", svccfg.Name, v.Source)
 			}
 		}

@@ -1,0 +1,25 @@
+name: volumes
+services:
+  volume1:
+    image: busybox
+    networks:
+      default: null
+    volumes:
+      - type: volume
+        source: tmp
+        target: /tmp
+        volume: {}
+  volume2:
+    image: busybox
+    networks:
+      default: null
+    volumes:
+      - type: volume
+        target: /tmp
+        read_only: true
+networks:
+  default:
+    name: volumes_default
+volumes:
+  tmp:
+    name: volumes_tmp

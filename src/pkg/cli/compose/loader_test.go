@@ -49,16 +49,18 @@ func compare(actual []byte, goldenFile string) error {
 func diff(actualRaw, goldenRaw string) error {
 	linesActual := strings.Split(actualRaw, "\n")
 	linesGolden := strings.Split(goldenRaw, "\n")
+	var prev string
 	for i, actual := range linesActual {
 		if i >= len(linesGolden) {
-			return fmt.Errorf("+ expected - actual\n+EOF\n-%s", actual)
+			return fmt.Errorf("+ expected - actual\n%s+EOF\n-%s", prev, actual)
 		}
 		if actual != linesGolden[i] {
-			return fmt.Errorf("+ expected - actual\n+%s\n-%s", linesGolden[i], actual)
+			return fmt.Errorf("+ expected - actual\n%s+%s\n-%s", prev, linesGolden[i], actual)
 		}
+		prev = " " + actual + "\n"
 	}
 	if len(linesActual) < len(linesGolden) {
-		return fmt.Errorf("+ expected - actual\n+%s\n-EOF", linesGolden[len(linesActual)])
+		return fmt.Errorf("+ expected - actual\n%s+%s\n-EOF", prev, linesGolden[len(linesActual)])
 	}
 	return nil
 }

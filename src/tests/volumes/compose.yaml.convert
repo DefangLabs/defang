@@ -1,0 +1,28 @@
+[
+  {
+    "name": "volume1",
+    "image": "busybox",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "volumes": [
+      {
+        "source": "tmp",
+        "target": "/tmp"
+      }
+    ]
+  },
+  {
+    "name": "volume2",
+    "image": "busybox",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "volumes": [
+      {
+        "target": "/tmp",
+        "read_only": true
+      }
+    ]
+  }
+]

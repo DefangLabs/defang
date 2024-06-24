@@ -1,0 +1,14 @@
+services:
+  volume1:
+    image: busybox
+    volumes:
+      - tmp:/tmp
+  volume2:
+    image: busybox
+    volumes:
+      - target: /tmp
+        read_only: true
+        type: volume
+
+volumes:
+  tmp:
