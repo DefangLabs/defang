@@ -1,0 +1,25 @@
+[
+  {
+    "name": "x",
+    "image": "redis",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "redis": {}
+  },
+  {
+    "name": "y",
+    "image": "nginx",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "redis": {}
+  },
+  {
+    "name": "z",
+    "image": "redis",
+    "platform": 2,
+    "internal": true,
+    "networks": 1
+  }
+]

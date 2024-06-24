@@ -1,0 +1,24 @@
+[
+  {
+    "name": "service1",
+    "platform": 2,
+    "internal": true,
+    "networks": 1
+  },
+  {
+    "name": "service2",
+    "platform": 2,
+    "networks": 2
+  },
+  {
+    "name": "service3",
+    "platform": 2,
+    "networks": 2
+  },
+  {
+    "name": "service4",
+    "platform": 2,
+    "internal": true,
+    "networks": 1
+  }
+]

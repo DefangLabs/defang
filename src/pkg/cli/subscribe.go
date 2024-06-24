@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -22,7 +23,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 	normalizedServiceNameToServiceName := make(map[string]string, len(services))
 
 	for i, service := range services {
-		services[i] = NormalizeServiceName(service)
+		services[i] = compose.NormalizeServiceName(service)
 		normalizedServiceNameToServiceName[services[i]] = service
 	}
 

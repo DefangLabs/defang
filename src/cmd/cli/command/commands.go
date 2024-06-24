@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -314,7 +315,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		composeFilePath, _ := cmd.Flags().GetString("file")
-		loader := cli.ComposeLoader{ComposeFilePath: composeFilePath}
+		loader := compose.Loader{ComposeFilePath: composeFilePath}
 		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {

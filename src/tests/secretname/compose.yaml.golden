@@ -15,5 +15,5 @@ networks:
     name: secretname_default
 secrets:
   dummy:
-    name: dummyx
+    name: dummy
     external: true
