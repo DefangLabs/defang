@@ -21,3 +21,5 @@ Dockerfile
 .dockerignore
 
 **/compose.yaml.golden
+**/compose.yaml.warnings
+**/compose.yaml.convert

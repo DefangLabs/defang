@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
@@ -14,7 +15,7 @@ func ComposeRestart(ctx context.Context, client client.Client) (types.ETag, erro
 	}
 	names := make([]string, 0, len(project.Services))
 	for _, service := range project.Services {
-		names = append(names, NormalizeServiceName(service.Name))
+		names = append(names, compose.NormalizeServiceName(service.Name))
 	}
 
 	return Restart(ctx, client, names...)

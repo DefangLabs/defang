@@ -1,0 +1,2 @@
+level=warning msg="service \"service1\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"service1\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
