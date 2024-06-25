@@ -107,7 +107,7 @@ jobs:
         working-directory: src
 
       - name: Run sanity tests
-        run: go run ./cmd/cli compose start -f tests/testproj/compose.yaml --debug
+        run: go run ./cmd/cli compose up -f tests/testproj/compose.yaml --debug
         working-directory: src
 
   go-release:
