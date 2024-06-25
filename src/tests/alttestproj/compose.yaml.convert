@@ -7,36 +7,13 @@
       "replicas": 1,
       "resources": {
         "reservations": {
-          "memory": 256,
-          "cpus": 0.25
+          "memory": 256
         }
       }
     },
-    "ports": [
-      {
-        "target": 80,
-        "mode": 1
-      },
-      {
-        "target": 1234,
-        "mode": 1
-      }
-    ],
     "build": {
       "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "DNS": "dfnx"
-      },
-      "target": "alttestproj"
-    },
-    "healthcheck": {
-      "test": [
-        "CMD",
-        "curl",
-        "-f",
-        "http://localhost/"
-      ]
+      "dockerfile": "Dockerfile"
     },
     "networks": 1
   }

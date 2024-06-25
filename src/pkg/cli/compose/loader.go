@@ -25,12 +25,11 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		return nil, err
 	}
 	term.Debug("Loading compose file", composeFilePath)
-	workDir := filepath.Dir(composeFilePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
 
-	projOpts, err := getDefaultProjectOptions(workDir)
+	projOpts, err := getDefaultProjectOptions(composeFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +45,7 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	}
 
 	// Hack: Fill in the missing environment variables that were stripped by the normalization process
-	projOpts, err = getDefaultProjectOptions(workDir, cli.WithNormalization(false)) // Disable normalization to keep unset environment variables
+	projOpts, err = getDefaultProjectOptions(composeFilePath, cli.WithNormalization(false)) // Disable normalization to keep unset environment variables
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +56,7 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	rawProj, err := projOpts.LoadProject(ctx)
 	logrus.SetOutput(currentOutput)
 	if err != nil {
-		return nil, err // there's no good reason this should fail, since we've already loaded the project
+		panic(err) // there's no good reason this should fail, since we've already loaded the project before
 	}
 
 	// TODO: Remove this hack once the PR is merged
@@ -82,7 +81,9 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	return project, nil
 }
 
-func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
+func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
+	workingDir := filepath.Dir(composeFilePath)
+
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	opts := []cli.ProjectOptionsFn{
@@ -96,7 +97,7 @@ func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptions
 		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
-		cli.WithDefaultConfigPath,
+		// cli.WithDefaultConfigPath, NO: this ends up picking the "first" when more than one file is found
 		// cli.WithName(o.ProjectName)
 
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
@@ -110,7 +111,7 @@ func getDefaultProjectOptions(workingDir string, extraOpts ...cli.ProjectOptions
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	}
 	opts = append(opts, extraOpts...)
-	projOpts, err := cli.NewProjectOptions(nil, opts...)
+	projOpts, err := cli.NewProjectOptions([]string{composeFilePath}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,29 +142,23 @@ func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
 	term.Debug("Looking for compose file - searching for", searchPattern)
 	for {
 		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
-			err = fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-			break
+			return "", fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
 		} else if len(files) == 1 {
 			// found compose file, we're done
-			path = files[0]
-			break
+			return files[0], nil
 		}
 
 		if len(userSpecifiedComposeFile) > 0 {
-			err = fmt.Errorf("no Compose file found at %q: %w", userSpecifiedComposeFile, os.ErrNotExist)
-			break
+			return "", fmt.Errorf("no Compose file found at %q: %w", userSpecifiedComposeFile, os.ErrNotExist)
 		}
 
 		// compose file not found, try parent directory
 		nextPath := filepath.Dir(path)
 		if nextPath == path {
 			// previous search was of root, we're done
-			err = types.ErrComposeFileNotFound
-			break
+			return "", types.ErrComposeFileNotFound
 		}
 
 		path = nextPath
 	}
-
-	return path, err
 }

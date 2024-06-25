@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -78,7 +79,7 @@ func TestTail(t *testing.T) {
 		term.DefaultTerm = defaultTerm
 	})
 
-	proj, err := ComposeLoader{"../../tests/testproj/compose.yaml"}.LoadCompose(context.Background())
+	proj, err := compose.Loader{"../../tests/testproj/compose.yaml"}.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
