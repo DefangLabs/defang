@@ -1,24 +1,21 @@
-package cli
+package compose
 
 import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/sirupsen/logrus"
 )
 
-type ComposeLoader = compose.Loader
-
 func TestLoadCompose(t *testing.T) {
-	DoVerbose = true
-	term.SetDebug(true)
+	term.SetDebug(testing.Verbose())
 
 	t.Run("no project name defaults to parent directory name", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/noprojname/compose.yaml"}
+		loader := Loader{"../../../tests/noprojname/compose.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -29,7 +26,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/Fancy-Proj_Dir/compose.yaml"}
+		loader := Loader{"../../../tests/Fancy-Proj_Dir/compose.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -40,7 +37,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name in compose file", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		loader := Loader{"../../../tests/testproj/compose.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -52,7 +49,7 @@ func TestLoadCompose(t *testing.T) {
 
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
-		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		loader := Loader{"../../../tests/testproj/compose.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -63,7 +60,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/testproj/compose.yaml"}
+		loader := Loader{"../../../tests/testproj/compose.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -78,38 +75,38 @@ func TestLoadCompose(t *testing.T) {
 
 		// setup
 		setup := func() {
-			os.MkdirAll("../../tests/alttestproj/subdir/subdir2", 0755)
-			os.Chdir("../../tests/alttestproj/subdir/subdir2")
+			os.MkdirAll("../../../tests/alttestproj/subdir/subdir2", 0755)
+			os.Chdir("../../../tests/alttestproj/subdir/subdir2")
 		}
 
 		//teardown
 		teardown := func() {
 			os.Chdir(cwd)
-			os.RemoveAll("../../tests/alttestproj/subdir")
+			os.RemoveAll("../../../tests/alttestproj/subdir")
 		}
 
 		setup()
-		defer teardown()
+		t.Cleanup(teardown)
 
 		// execute test
-		loader := ComposeLoader{}
+		loader := Loader{}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
 		}
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
-		loader := ComposeLoader{"../../tests/alttestproj/altcomp.yaml"}
+		loader := Loader{"../../../tests/alttestproj/altcomp.yaml"}
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
 		}
-		if p.Name != "tests" {
-			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+		if p.Name != "altcomp" {
+			t.Errorf("LoadCompose() failed: expected project name altcomp, got %q", p.Name)
 		}
 	})
 }
@@ -118,7 +115,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	var warnings bytes.Buffer
 	logrus.SetOutput(&warnings)
 
-	loader := compose.Loader{"../../tests/compose-go-warn/compose.yaml"}
+	loader := Loader{"../../../tests/compose-go-warn/compose.yaml"}
 	_, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
@@ -126,5 +123,25 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 
 	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
 		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
+	}
+}
+
+func TestComposeOnlyOneFile(t *testing.T) {
+	cwd, _ := os.Getwd()
+	t.Cleanup(func() {
+		os.Chdir(cwd)
+	})
+	os.Chdir("../../../tests/toomany")
+
+	loader := Loader{}
+	_, err := loader.LoadCompose(context.Background())
+	if err == nil {
+		t.Fatalf("LoadCompose() failed: expected error, got nil")
+	}
+
+	const expected = `multiple Compose files found: ["./compose.yaml" "./docker-compose.yml"]; use -f to specify which one to use`
+	newCwd, _ := os.Getwd() // make the error message independent of the current working directory
+	if got := strings.ReplaceAll(err.Error(), newCwd, "."); got != expected {
+		t.Errorf("LoadCompose() failed: expected error %q, got: %s", expected, got)
 	}
 }

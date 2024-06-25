@@ -1,0 +1,9 @@
+[
+  {
+    "name": "service1",
+    "image": "example",
+    "platform": 2,
+    "internal": true,
+    "networks": 1
+  }
+]
