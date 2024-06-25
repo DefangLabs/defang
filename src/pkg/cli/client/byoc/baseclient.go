@@ -3,9 +3,7 @@ package byoc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/consts"
+	"github.com/compose-spec/compose-go/v2/loader"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -99,14 +98,21 @@ func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, err
 }
 
 func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
-
 	proj, err := b.loadProjOnce()
 	if err == nil {
-		b.PulumiProject = proj.Name
 		return proj.Name, nil
 	}
 	if !errors.Is(err, types.ErrComposeFileNotFound) {
 		return "", err
+	}
+
+	// Get the project name from the environment (since it overrides the compose file anyway)
+	if projectName, ok := os.LookupEnv(consts.ComposeProjectName); ok {
+		if projectName != loader.NormalizeProjectName(projectName) {
+			return "", loader.InvalidProjectNameErr(projectName)
+		}
+		b.PulumiProject = projectName
+		return projectName, nil
 	}
 
 	// Get the list of projects from remote
@@ -119,22 +125,12 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 	}
 
 	if len(projectNames) == 0 {
-		return "", errors.New("no projects found")
+		return "", types.ErrComposeFileNotFound
 	}
 	if len(projectNames) == 1 {
 		term.Debug("Using default project: ", projectNames[0])
 		b.PulumiProject = projectNames[0]
 		return projectNames[0], nil
-	}
-
-	// When there are multiple projects, take a hint from COMPOSE_PROJECT_NAME environment variable if set
-	if projectName, ok := os.LookupEnv(consts.ComposeProjectName); ok {
-		if !slices.Contains(projectNames, projectName) {
-			return "", fmt.Errorf("project %q specified by COMPOSE_PROJECT_NAME not found", projectName)
-		}
-		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectNames[0])
-		b.PulumiProject = projectName
-		return projectName, nil
 	}
 
 	return "", errors.New("multiple projects found; please go to the correct project directory where the compose file is or set COMPOSE_PROJECT_NAME")

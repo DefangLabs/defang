@@ -1,5 +1,7 @@
 package types
 
-import "errors"
+import (
+	"github.com/compose-spec/compose-go/v2/errdefs"
+)
 
-var ErrComposeFileNotFound = errors.New("no compose file found")
+var ErrComposeFileNotFound = errdefs.ErrNotFound

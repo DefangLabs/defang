@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -24,7 +25,7 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	term.Debug("Loading compose file", composeFilePath)
+	term.Debugf("Loading compose file %q", composeFilePath)
 
 	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
 	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
@@ -32,11 +33,6 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	projOpts, err := getDefaultProjectOptions(composeFilePath)
 	if err != nil {
 		return nil, err
-	}
-
-	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
-	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
 	project, err := projOpts.LoadProject(ctx)
@@ -95,10 +91,10 @@ func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOp
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
-		cli.WithConfigFileEnv,
+		// cli.WithConfigFileEnv, not used as we ignore os.Environment
 		// if none was selected, get default compose.yaml file from current dir or parent folder
-		// cli.WithDefaultConfigPath, NO: this ends up picking the "first" when more than one file is found
-		// cli.WithName(o.ProjectName)
+		// // cli.WithDefaultConfigPath, NO: this ends up picking the "first" when more than one file is found NO: this ends up picking the "first" when more than one file is found
+		cli.WithName(os.Getenv(consts.ComposeProjectName)), // HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
 
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
