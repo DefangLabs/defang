@@ -1,0 +1,4 @@
+services:
+  intel2:
+    platform: LINUX/X86_64
+    image: busybox

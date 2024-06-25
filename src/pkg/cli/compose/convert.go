@@ -238,13 +238,13 @@ func getResourceReservations(r compose.Resources) *compose.Resource {
 }
 
 func convertPlatform(platform string) defangv1.Platform {
-	switch platform {
+	switch strings.ToLower(platform) {
 	default:
-		warnf("unsupported platform: %q (assuming linux)", platform)
+		warnf("unsupported platform: %q; assuming linux", platform)
 		fallthrough
 	case "", "linux":
 		return defangv1.Platform_LINUX_ANY
-	case "linux/amd64":
+	case "linux/amd64", "linux/x86_64": // Docker accepts both
 		return defangv1.Platform_LINUX_AMD64
 	case "linux/arm64", "linux/arm64/v8", "linux/arm64/v7", "linux/arm64/v6":
 		return defangv1.Platform_LINUX_ARM64
