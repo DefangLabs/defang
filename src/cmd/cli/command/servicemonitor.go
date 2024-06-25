@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -34,6 +33,11 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 			continue
 		}
 
+		// exit on detecting a FAILED state
+		if newStatus.Status == string(cli.ServiceFailed) {
+			return ErrorDeploymentFailed
+		}
+
 		serviceStatus[newStatus.Name] = newStatus.Status
 
 		if allInStatus(targetStatus, serviceStatus) {
@@ -44,7 +48,7 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 		}
 	}
 
-	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", targetStatus)
+	return ErrorFailedToReachRunningState
 }
 
 func allInStatus(targetStatus cli.ServiceStatus, serviceStatuses map[string]string) bool {
