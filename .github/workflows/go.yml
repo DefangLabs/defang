@@ -102,12 +102,16 @@ jobs:
         run: go run ./cmd/cli login --debug
         working-directory: src
 
-      - name: Add dummy secret
-        run: echo blah | go run ./cmd/cli secret set -n dummy -f tests/testproj/compose.yaml --debug
+      - name: Add dummy config
+        run: echo blah | go run ./cmd/cli config set -n dummy -f tests/sanity/compose.yaml --debug
         working-directory: src
 
-      - name: Run sanity tests
-        run: go run ./cmd/cli compose up -f tests/testproj/compose.yaml --debug
+      - name: Run sanity tests UP
+        run: go run ./cmd/cli compose up -f tests/sanity/compose.yaml --debug
+        working-directory: src
+
+      - name: Run sanity tests DOWN
+        run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
         working-directory: src
 
   go-release:
