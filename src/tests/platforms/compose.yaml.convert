@@ -1,0 +1,8 @@
+[
+  {
+    "name": "intel2",
+    "image": "busybox",
+    "internal": true,
+    "networks": 1
+  }
+]
