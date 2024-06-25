@@ -44,10 +44,8 @@ func NewTerm(stdout, stderr io.Writer) *Term {
 	}
 	t.hasDarkBg = t.stdout.HasDarkBackground()
 	if hasTermInEnv() {
-		fout, outIsFile := stdout.(interface{ Fd() uintptr })
-		ferr, errIsFile := stderr.(interface{ Fd() uintptr })
-		if outIsFile && errIsFile {
-			t.isTerminal = term.IsTerminal(int(fout.Fd())) && term.IsTerminal(int(ferr.Fd()))
+		if fout, ok := stdout.(interface{ Fd() uintptr }); ok {
+			t.isTerminal = term.IsTerminal(int(fout.Fd())) && term.IsTerminal(int(os.Stdin.Fd()))
 		}
 	}
 	t.outCanColor = doColor(t.stdout)
