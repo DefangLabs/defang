@@ -74,9 +74,9 @@ func TestTail(t *testing.T) {
 	DoVerbose = true // Output host
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
-	defer func() {
+	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm
-	}()
+	})
 
 	proj, err := ComposeLoader{"../../tests/testproj/compose.yaml"}.LoadCompose(context.Background())
 	if err != nil {
