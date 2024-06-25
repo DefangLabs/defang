@@ -69,10 +69,10 @@ func TestStripAnsi(t *testing.T) {
 }
 
 func TestAddingPrefix(t *testing.T) {
-	currentTerm := DefaultTerm
-	defer func() {
-		DefaultTerm = currentTerm
-	}()
+	defaultTerm := DefaultTerm
+	t.Cleanup(func() {
+		DefaultTerm = defaultTerm
+	})
 	var stdout, stderr bytes.Buffer
 	DefaultTerm = NewTerm(&stdout, &stderr)
 	DefaultTerm.SetDebug(true)
@@ -119,10 +119,10 @@ func TestAddingPrefix(t *testing.T) {
 }
 
 func TestInfoAddSpaceBetweenStrings(t *testing.T) {
-	currentTerm := DefaultTerm
-	defer func() {
-		DefaultTerm = currentTerm
-	}()
+	defaultTerm := DefaultTerm
+	t.Cleanup(func() {
+		DefaultTerm = defaultTerm
+	})
 	var stdout, stderr bytes.Buffer
 	DefaultTerm = NewTerm(&stdout, &stderr)
 	DefaultTerm.SetDebug(true)
@@ -148,5 +148,11 @@ func TestInfoAddSpaceBetweenStrings(t *testing.T) {
 
 	if stderr.String() != "" {
 		t.Errorf("Expected stderr to be empty, got %q", stderr.String())
+	}
+}
+
+func TestIsTerminal(t *testing.T) {
+	if IsTerminal() {
+		t.Error("Expected IsTerminal() to return false")
 	}
 }
