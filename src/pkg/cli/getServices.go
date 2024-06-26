@@ -13,7 +13,7 @@ func GetServices(ctx context.Context, client client.Client, long bool) error {
 	if err != nil {
 		return err
 	}
-	term.Debug("Listing services in project", projectName)
+	term.Debugf("Listing services in project %q", projectName)
 
 	serviceList, err := client.GetServices(ctx)
 	if err != nil {

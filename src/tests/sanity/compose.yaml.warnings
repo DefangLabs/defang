@@ -1,0 +1,1 @@
+level=warning msg="service \"nginx\": ingress port without healthcheck defaults to GET / HTTP/1.1"

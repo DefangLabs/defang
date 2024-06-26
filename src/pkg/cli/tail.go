@@ -141,7 +141,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if err != nil {
 		return err
 	}
-	term.Debug("Tailing logs in project", projectName)
+	term.Debugf("Tailing logs in project %q", projectName)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
@@ -164,6 +164,10 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		return ErrDryRun
 	}
 
+	return tail(ctx, client, params)
+}
+
+func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
