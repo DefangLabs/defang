@@ -1,0 +1,19 @@
+name: sanity
+services:
+  nginx:
+    deploy:
+      resources:
+        reservations:
+          memory: "268435456"
+    environment:
+      dummy: null
+    image: nginx
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+    restart: unless-stopped
+networks:
+  default:
+    name: sanity_default

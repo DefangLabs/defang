@@ -1,0 +1,28 @@
+[
+  {
+    "name": "nginx",
+    "image": "nginx",
+    "platform": 2,
+    "internal": true,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "reservations": {
+          "memory": 256
+        }
+      }
+    },
+    "ports": [
+      {
+        "target": 80,
+        "mode": 1
+      }
+    ],
+    "secrets": [
+      {
+        "source": "dummy"
+      }
+    ],
+    "networks": 1
+  }
+]
