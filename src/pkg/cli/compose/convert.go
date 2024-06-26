@@ -32,7 +32,10 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	config, err := c.ListConfig(ctx)
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
-		config = &defangv1.Secrets{}
+		return nil, err
+	}
+	if config == nil || config.Names == nil {
+		return nil, fmt.Errorf("config or config.Names is nil")
 	}
 	slices.Sort(config.Names) // sort for binary search
 
