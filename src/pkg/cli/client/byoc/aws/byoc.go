@@ -471,7 +471,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		term.Debug("Tailing task", etag)
 		etag = "" // no need to filter by etag
 	} else {
-		// Tail CD, kaniko, and all services
+		// Tail CD, kaniko, and all services (this requires PulumiProject to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
 		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
