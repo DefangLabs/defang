@@ -13,7 +13,7 @@ func ConfigDelete(ctx context.Context, client client.Client, names ...string) er
 	if err != nil {
 		return err
 	}
-	term.Debug("Deleting config", names, "in project", projectName)
+	term.Debugf("Deleting config %v in project %q", names, projectName)
 
 	if DoDryRun {
 		return ErrDryRun

@@ -31,7 +31,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	if err != nil {
 		return err
 	}
-	term.Debug("Generating TLS cert for project", projectName)
+	term.Debugf("Generating TLS cert for project %q", projectName)
 
 	services, err := client.GetServices(ctx)
 	if err != nil {
