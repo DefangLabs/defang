@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -844,7 +845,7 @@ var composeUpCmd = &cobra.Command{
 			}
 		}()
 
-		if err := waitServiceState(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+		if err := waitServiceState(ctx, defangv1.ServiceState_STARTED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 				cancelTail()
