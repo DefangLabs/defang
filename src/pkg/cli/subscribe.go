@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -19,13 +18,6 @@ type SubscribeServiceStatus struct {
 func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
-	}
-
-	normalizedServiceNameToServiceName := make(map[string]string, len(services))
-
-	for i, service := range services {
-		services[i] = compose.NormalizeServiceName(service)
-		normalizedServiceNameToServiceName[services[i]] = service
 	}
 
 	statusChan := make(chan SubscribeServiceStatus, len(services))
@@ -67,18 +59,13 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				continue
 			}
 
-			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
-			if !ok {
-				term.Debugf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
-				continue
-			}
 			status := SubscribeServiceStatus{
-				Name:   serviceName,
+				Name:   servInfo.Service.Name,
 				Status: servInfo.Status,
 			}
 
 			statusChan <- status
-			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
+			term.Debugf("service %s with status %s\n", servInfo.Service.Name, servInfo.Status)
 		}
 	}()
 

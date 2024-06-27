@@ -327,7 +327,7 @@ func convertServiceState(state string) defangv1.ServiceState {
 	default:
 		return defangv1.ServiceState_UNKNOWN
 	case "building_pending":
-		return defangv1.ServiceState_BUILDING_PENDING
+		return defangv1.ServiceState_BUILD_PENDING
 	case "building":
 		return defangv1.ServiceState_BUILDING
 	case "created":

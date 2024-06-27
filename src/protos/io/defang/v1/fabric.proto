@@ -122,7 +122,7 @@ enum ServiceState {
   UNKNOWN = 0;
 
   // Build states (initial state for build)
-  BUILDING_PENDING = 1; // BUILD_QUEUED -> BUILD_ACTIVATING
+  BUILD_PENDING = 1; // BUILD_QUEUED -> BUILD_ACTIVATING
   BUILDING = 2; // BUILD_RUNNING
   CREATED = 3; // BUILD_DEACTIVATING (done = true)
  
