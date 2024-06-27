@@ -49,7 +49,7 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 		}
 	}
 
-	return ErrFailedToReachRunningState
+	return ErrFailedToReachStartedState
 }
 
 func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
