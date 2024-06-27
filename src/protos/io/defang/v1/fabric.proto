@@ -130,9 +130,9 @@ enum ServiceState {
   UPDATE_PENDING = 4; //  UPDATE_QUEUE
 
   // Deployment states
-  SERVICE_DEPLOYING = 5;
-  SERVICE_STARTED = 6;
-  SERVICE_FAILED = 7;
+  DEPLOYING = 5;
+  STARTED = 6;
+  FAILED = 7;
 }
 
 message ServiceInfo {

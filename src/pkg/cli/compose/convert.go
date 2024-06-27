@@ -335,10 +335,10 @@ func convertServiceState(state string) defangv1.ServiceState {
 	case "update_pending":
 		return defangv1.ServiceState_UPDATE_PENDING
 	case "service_deploying":
-		return defangv1.ServiceState_SERVICE_DEPLOYING
+		return defangv1.ServiceState_DEPLOYING
 	case "service_started":
-		return defangv1.ServiceState_SERVICE_STARTED
+		return defangv1.ServiceState_STARTED
 	case "service_failed":
-		return defangv1.ServiceState_SERVICE_FAILED
+		return defangv1.ServiceState_FAILED
 	}
 }
