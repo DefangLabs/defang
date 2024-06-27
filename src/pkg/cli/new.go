@@ -63,6 +63,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
 	for {
 		h, err := tarReader.Next()
 		if err != nil {
