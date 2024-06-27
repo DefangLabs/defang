@@ -63,6 +63,12 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
+
+	found := make(map[string]bool)
+	for _, name := range names {
+		found[name] = false
+	}
+
 	for {
 		h, err := tarReader.Next()
 		if err != nil {
@@ -73,13 +79,14 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		}
 
 		for _, name := range names {
-			// Create a subdirectory for each sample when there is more than one sample requested
-			subdir := ""
-			if len(names) > 1 {
-				subdir = name
-			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				found[name] = true
+				// Create a subdirectory for each sample when there is more than one sample requested
+				subdir := ""
+				if len(names) > 1 {
+					subdir = name
+				}
 				fmt.Println("   -", base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
@@ -94,9 +101,15 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 			}
 		}
 	}
+
+	for _, name := range names {
+		if !found[name] {
+			return fmt.Errorf("sample not found")
+		}
+	}
+
 	return nil
 }
-
 func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
 	// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
 	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
