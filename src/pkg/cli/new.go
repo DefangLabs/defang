@@ -24,6 +24,7 @@ type Sample struct {
 	ShortDescription string   `json:"shortDescription"`
 	Tags             []string `json:"tags"`
 	Languages        []string `json:"languages"`
+	Configs          []string `json:"configs"`
 }
 
 func FetchSamples(ctx context.Context) ([]Sample, error) {
