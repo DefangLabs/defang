@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -11,7 +12,7 @@ import (
 func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
-		serviceList = append(serviceList, serviceInfo.Service.Name)
+		serviceList = append(serviceList, compose.NormalizeServiceName(serviceInfo.Service.Name))
 	}
 
 	// set up service status subscription (non-blocking)
