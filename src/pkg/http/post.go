@@ -3,13 +3,12 @@ package http
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 )
 
 // PostForValues issues a POST to the specified URL and returns the response body as url.Values.
 func PostForValues(_url, contentType string, body io.Reader) (url.Values, error) {
-	resp, err := http.Post(_url, contentType, body)
+	resp, err := DefaultClient.Post(_url, contentType, body)
 	if err != nil {
 		return nil, err
 	}
