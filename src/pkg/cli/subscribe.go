@@ -12,7 +12,7 @@ import (
 type SubscribeServiceStatus struct {
 	Name   string
 	Status string
-	State  string
+	State  defangv1.ServiceState
 }
 
 func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
@@ -62,10 +62,11 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			status := SubscribeServiceStatus{
 				Name:   servInfo.Service.Name,
 				Status: servInfo.Status,
+				State:  servInfo.State,
 			}
 
 			statusChan <- status
-			term.Debugf("service %s with status %s\n", servInfo.Service.Name, servInfo.Status)
+			term.Debugf("service %s with state %s\n", servInfo.Service.Name, string(servInfo.State))
 		}
 	}()
 

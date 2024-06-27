@@ -843,7 +843,8 @@ var composeUpCmd = &cobra.Command{
 				}
 			}
 		}()
-		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+
+		if err := waitServiceState(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 				cancelTail()
