@@ -9,7 +9,7 @@
   },
   {
     "name": "y",
-    "image": "nginx",
+    "image": "example",
     "platform": 2,
     "internal": true,
     "networks": 1,
