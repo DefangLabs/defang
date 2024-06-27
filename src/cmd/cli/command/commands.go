@@ -31,7 +31,7 @@ import (
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
-var ErrFailedToReachRunningState = errors.New("failed to reach running state")
+var ErrFailedToReachStartedState = errors.New("failed to reach STARTED state")
 var ErrDeploymentFailed = errors.New("deployment failed")
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization

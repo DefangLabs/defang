@@ -26,12 +26,12 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 			andEndpoints = "and will be available at:"
 		}
 
-		serviceConditionText := " status " + serviceInfo.Status
+		serviceConditionText := "has status " + serviceInfo.Status
 		if serviceInfo.State != defangv1.ServiceState_UNKNOWN {
-			serviceConditionText = " state " + string(serviceInfo.State)
+			serviceConditionText = "is in state " + serviceInfo.State.String()
 		}
 
-		term.Info("Service ", serviceInfo.Service.Name, " is ", serviceConditionText, andEndpoints)
+		term.Info("Service", serviceInfo.Service.Name, serviceConditionText, andEndpoints)
 		for i, endpoint := range serviceInfo.Endpoints {
 			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
 				endpoint = "https://" + endpoint
