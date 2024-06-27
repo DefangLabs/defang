@@ -99,7 +99,6 @@ func Execute(ctx context.Context) error {
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
-
 		return ExitCode(code)
 	}
 
