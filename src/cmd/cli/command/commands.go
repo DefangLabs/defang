@@ -438,7 +438,7 @@ var generateCmd = &cobra.Command{
 			}
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
-		sampleList, cachedErr := cli.FetchSamples(cmd.Context())
+		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
@@ -449,8 +449,8 @@ var generateCmd = &cobra.Command{
 				return err
 			}
 			// Fetch the list of samples from the Defang repository
-			if cachedErr != nil {
-				term.Debug("unable to fetch samples:", cachedErr)
+			if fetchSamplesErr != nil {
+				term.Debug("unable to fetch samples:", fetchSamplesErr)
 			} else if len(sampleList) > 0 {
 				const generateWithAI = "Generate with AI"
 
