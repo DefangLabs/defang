@@ -438,7 +438,7 @@ var generateCmd = &cobra.Command{
 			}
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
-
+		sampleList, cachedErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
@@ -448,17 +448,16 @@ var generateCmd = &cobra.Command{
 			}, &language); err != nil {
 				return err
 			}
-
 			// Fetch the list of samples from the Defang repository
-			if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
-				term.Debug("unable to fetch samples:", err)
-			} else if len(samples) > 0 {
+			if cachedErr != nil {
+				term.Debug("unable to fetch samples:", cachedErr)
+			} else if len(sampleList) > 0 {
 				const generateWithAI = "Generate with AI"
 
 				lang := strings.ToLower(language)
 				sampleNames := []string{generateWithAI}
 				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
-				for _, sample := range samples {
+				for _, sample := range sampleList {
 					if slices.Contains(sample.Languages, lang) {
 						sampleNames = append(sampleNames, sample.Name)
 						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
@@ -510,6 +509,17 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		if sample != "" {
 			qs = qs[1:] // user picked a sample, so we skip the description question
+			sampleExists := false
+			for _, s := range sampleList {
+				if s.Name == sample {
+					sampleExists = true
+					break
+				}
+			}
+
+			if !sampleExists {
+				return errors.New("sample not found")
+			}
 		}
 
 		prompt := struct {
