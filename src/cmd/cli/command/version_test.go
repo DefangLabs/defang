@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	ourHttp "github.com/DefangLabs/defang/src/pkg/http"
 )
 
 func TestIsNewer(t *testing.T) {
@@ -75,7 +77,9 @@ func TestGetLatestVersion(t *testing.T) {
 	rec.Header().Add("Content-Type", "application/json")
 	rec.WriteString(fmt.Sprintf(`{"tag_name":"%v"}`, version))
 
-	httpClient = &http.Client{Transport: &mockRoundTripper{
+	client := ourHttp.DefaultClient
+	t.Cleanup(func() { ourHttp.DefaultClient = client })
+	ourHttp.DefaultClient = &http.Client{Transport: &mockRoundTripper{
 		method: http.MethodGet,
 		url:    "https://api.github.com/repos/DefangLabs/defang/releases/latest",
 		resp:   rec.Result(),
