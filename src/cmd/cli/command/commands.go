@@ -30,8 +30,8 @@ import (
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
-var ErrorFailedToReachRunningState = errors.New("failed to reach running state")
-var ErrorDeploymentFailed = errors.New("deployment failed")
+var ErrFailedToReachRunningState = errors.New("failed to reach running state")
+var ErrDeploymentFailed = errors.New("deployment failed")
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -831,7 +831,6 @@ var composeUpCmd = &cobra.Command{
 
 		tailCtx, cancelTail := context.WithCancel(ctx)
 
-		deploymentFailed := false
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -845,9 +844,10 @@ var composeUpCmd = &cobra.Command{
 			}
 		}()
 		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
-			if errors.Is(err, ErrorDeploymentFailed) {
+			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
-				deploymentFailed = true
+				cancelTail()
+				return err
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
@@ -855,9 +855,7 @@ var composeUpCmd = &cobra.Command{
 		cancelTail()
 		wg.Wait() // Wait for tail to finish
 
-		if !deploymentFailed {
-			printEndpoints(serviceInfos)
-		}
+		printEndpoints(serviceInfos)
 
 		term.Info("Done.")
 		return nil

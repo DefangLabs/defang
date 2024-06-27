@@ -13,6 +13,7 @@ import (
 type SubscribeServiceStatus struct {
 	Name   string
 	Status string
+	State  string
 }
 
 func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
