@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/http"
 	"golang.org/x/mod/semver"
 )
-
-var httpClient = http.DefaultClient
 
 func isNewer(current, comparand string) bool {
 	version, ok := normalizeVersion(current)
@@ -38,16 +36,12 @@ func GetCurrentVersion() string {
 }
 
 func GetLatestVersion(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/DefangLabs/defang/releases/latest", nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := httpClient.Do(req)
+	resp, err := http.GetWithContext(ctx, "https://api.github.com/repos/DefangLabs/defang/releases/latest")
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != 200 {
 		// The primary rate limit for unauthenticated requests is 60 requests per hour, per IP.
 		return "", errors.New(resp.Status)
 	}
