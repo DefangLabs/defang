@@ -64,10 +64,7 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
 
-	found := make(map[string]bool)
-	for _, name := range names {
-		found[name] = false
-	}
+	sampleFound := false
 
 	for {
 		h, err := tarReader.Next()
@@ -89,6 +86,7 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				sampleFound = true
 				fmt.Println("   -", base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
@@ -103,13 +101,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 			}
 		}
 	}
-
-	for _, name := range names {
-		if !found[name] {
-			return fmt.Errorf("sample not found")
-		}
+	if !sampleFound {
+		return fmt.Errorf("sample not found")
 	}
-
 	return nil
 }
 func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
