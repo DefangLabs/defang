@@ -509,16 +509,12 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		if sample != "" {
 			qs = qs[1:] // user picked a sample, so we skip the description question
-			sampleExists := false
-			for _, s := range sampleList {
-				if s.Name == sample {
-					sampleExists = true
-					break
-				}
-			}
+			sampleExists := slices.ContainsFunc(sampleList, func(s cli.Sample) bool {
+				return s.Name == sample
+			})
 
 			if !sampleExists {
-				return errors.New("sample not found")
+				return cli.ErrSampleNotFound
 			}
 		}
 

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
+
+var ErrSampleNotFound = errors.New("sample not found")
 
 type Sample struct {
 	Name             string   `json:"name"`
@@ -102,7 +105,7 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		}
 	}
 	if !sampleFound {
-		return fmt.Errorf("sample not found")
+		return ErrSampleNotFound
 	}
 	return nil
 }
