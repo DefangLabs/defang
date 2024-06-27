@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestInitFromSamples(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected test to fail")
 	}
-	if err.Error() != "sample not found" {
-		t.Error("Expected 'sample not found' error")
+	if !errors.Is(err, ErrSampleNotFound) {
+		t.Errorf("Expected error to be %v, got %v", ErrSampleNotFound, err)
 	}
 }
