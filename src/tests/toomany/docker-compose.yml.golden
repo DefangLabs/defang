@@ -1,0 +1,9 @@
+name: toomany
+services:
+  service1:
+    image: example
+    networks:
+      default: null
+networks:
+  default:
+    name: toomany_default

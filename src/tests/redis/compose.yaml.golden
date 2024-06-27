@@ -6,7 +6,7 @@ services:
       default: null
     x-defang-redis: null
   "y":
-    image: nginx
+    image: example
     networks:
       default: null
     x-defang-redis: null
