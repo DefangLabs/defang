@@ -141,11 +141,12 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
-          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
           args: release --clean
           workdir: src
         env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
@@ -158,7 +159,7 @@ jobs:
       - name: Notarize macOS app
         shell: bash
         run: |
-          xcrun notarytool submit src/dist/defang_*_macOS.zip --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_APP_PW"
+          bin/notarize.sh src/dist/defang_*_macOS.zip
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
@@ -187,7 +188,7 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger Homebrew Formula Update
-        uses: peter-evans/repository-dispatch@v1
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/homebrew-defang
@@ -215,7 +216,7 @@ jobs:
           # install dependencies
           npm ci --ignore-scripts
 
-          #b uild
+          # build
           npm run build
 
           # make the cli.js executable
