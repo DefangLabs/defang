@@ -569,8 +569,10 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	si.Status = "UPDATE_QUEUED"
+	si.State = defangv1.ServiceState_UPDATE_PENDING
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+		si.State = defangv1.ServiceState_BUILD_PENDING
 	}
 	return si, nil
 }
