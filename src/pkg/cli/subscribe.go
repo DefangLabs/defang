@@ -66,7 +66,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			statusChan <- status
-			term.Debugf("service %s with state %s\n", servInfo.Service.Name, string(servInfo.State))
+			term.Debugf("service %s with state ( %s ) and status: %s\n", servInfo.Service.Name, servInfo.State.String(), servInfo.Status)
 		}
 	}()
 
