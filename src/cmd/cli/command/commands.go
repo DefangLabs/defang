@@ -537,7 +537,7 @@ Generate will write files in the current folder. You can edit them and then depl
 		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// Check if the current folder is empty
-		if empty, err := pkg.IsDirEmpty(prompt.Folder); !empty || err != nil {
+		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
 			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
 		}
 
