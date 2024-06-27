@@ -117,6 +117,24 @@ message UploadURLRequest { string digest = 1; }
 
 message UploadURLResponse { string url = 1; }
 
+
+enum ServiceState {
+  UNKNOWN = 0;
+
+  // Build states (initial state for build)
+  BUILDING_PENDING = 1; // BUILD_QUEUED -> BUILD_ACTIVATING
+  BUILDING = 2; // BUILD_RUNNING
+  CREATED = 3; // BUILD_DEACTIVATING (done = true)
+ 
+  // Update states (initial state for existing image)
+  UPDATE_PENDING = 4; //  UPDATE_QUEUE
+
+  // Deployment states
+  SERVICE_DEPLOYING = 5;
+  SERVICE_STARTED = 6;
+  SERVICE_FAILED = 7;
+}
+
 message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
@@ -132,6 +150,7 @@ message ServiceInfo {
   string zone_id = 12; // zone ID for byod domain
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
   reserved 14; // was: string lb_dns
+  ServiceState state = 15; // enumerated status of the service
 
   // bool is_function = 5; // true if service is a function
 }

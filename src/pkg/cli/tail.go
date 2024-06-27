@@ -36,15 +36,24 @@ var (
 type ServiceStatus string
 
 const (
-	ServiceDeploymentStarting   ServiceStatus = "STARTING"
-	ServiceDeploymentInProgress ServiceStatus = "IN_PROGRESS"
-	ServiceStarted              ServiceStatus = "COMPLETED"
-	ServiceStopping             ServiceStatus = "STOPPING"
-	ServiceStopped              ServiceStatus = "STOPPED"
-	ServiceDeactivating         ServiceStatus = "DEACTIVATING"
-	ServiceDeprovisioning       ServiceStatus = "DEPROVISIONING"
-	ServiceFailed               ServiceStatus = "FAILED"
-	ServiceUnknown              ServiceStatus = "UNKNOWN"
+	ServiceUnknown       ServiceStatus = "UNKNOWN"
+	ServiceBuildPending  ServiceStatus = "BUILD_PENDING"
+	ServiceBuilding      ServiceStatus = "BUILDING"
+	ServiceCreated       ServiceStatus = "CREATED"
+	ServiceUpdatePending ServiceStatus = "UPDATE_PENDING"
+	ServiceDeploying     ServiceStatus = "DEPLOYING"
+	ServiceStarted       ServiceStatus = "STARTED"
+	ServiceFailed        ServiceStatus = "FAILED"
+
+	// ServiceDeploymentStarting   ServiceStatus = "STARTING"
+	// ServiceDeploymentInProgress ServiceStatus = "IN_PROGRESS"
+	// ServiceStarted              ServiceStatus = "COMPLETED"
+	// ServiceStopping             ServiceStatus = "STOPPING"
+	// ServiceStopped              ServiceStatus = "STOPPED"
+	// ServiceDeactivating         ServiceStatus = "DEACTIVATING"
+	// ServiceDeprovisioning       ServiceStatus = "DEPROVISIONING"
+	// ServiceFailed               ServiceStatus = "FAILED"
+	// ServiceUnknown              ServiceStatus = "UNKNOWN"
 )
 
 type EndLogConditional struct {

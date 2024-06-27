@@ -35,7 +35,7 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 
 		// exit on detecting a FAILED state
 		if newStatus.Status == string(cli.ServiceFailed) {
-			return ErrorDeploymentFailed
+			return ErrDeploymentFailed
 		}
 
 		serviceStatus[newStatus.Name] = newStatus.Status
@@ -48,7 +48,7 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 		}
 	}
 
-	return ErrorFailedToReachRunningState
+	return ErrFailedToReachRunningState
 }
 
 func allInStatus(targetStatus cli.ServiceStatus, serviceStatuses map[string]string) bool {
