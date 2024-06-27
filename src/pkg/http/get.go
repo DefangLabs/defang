@@ -8,20 +8,20 @@ import (
 type Header = http.Header
 
 func GetWithContext(ctx context.Context, url string) (*http.Response, error) {
-	hreq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	return http.DefaultClient.Do(hreq)
+	return DefaultClient.Do(hreq)
 }
 
 func GetWithHeader(ctx context.Context, url string, header http.Header) (*http.Response, error) {
-	hreq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	hreq.Header = header
-	return http.DefaultClient.Do(hreq)
+	return DefaultClient.Do(hreq)
 }
 
 func GetWithAuth(ctx context.Context, url, auth string) (*http.Response, error) {
