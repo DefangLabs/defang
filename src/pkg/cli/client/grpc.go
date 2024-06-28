@@ -20,7 +20,7 @@ type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
 
-	tenantID types.TenantID
+	TenantID types.TenantID
 	Loader   ProjectLoader
 }
 
@@ -33,7 +33,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
 
-	return GrpcClient{client: fabricClient, anonID: GetAnonID(), tenantID: tenantID, Loader: loader}
+	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
