@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+project_name: defang
+builds:
+  - builder: prebuilt
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      # - 386
+    goamd64:
+      - v1
+    prebuilt:
+      path: dist-{{ .Os }}/defang_{{ .Os }}_{{ .Arch }}{{ with .Amd64 }}_{{ . }}{{ end }}/defang{{ .Ext }}
+    binary: defang
+
+source:
+  enabled: false
+
+archives:
+  - format_overrides:
+      - goos: darwin
+        format: zip
+      - goos: windows
+        format: zip
+    # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    hooks:
+      after:
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ .Path }}"{{ else }}true{{ end }}'
+
+release:
+  github:
+    owner: DefangLabs
+    name: defang
+  header: |
+    # Defang CLI
+    This is the Command Line Interface (CLI) for [Defang](https://defang.io). This is a beta version and is provided as-is, intended primarily for testing purposes.
+    For alternative installation methods, please check the [README](https://github.com/DefangLabs/defang/blob/main/README.md).
+    ## Manual installation Instructions
+    1. Download the archive file for your Operating System.
+    2. Extract the archive. This should reveal the binary file for Defang.
+    3. Manually place the binary file in a directory that's included in your system's `PATH` environment variable.
+    ### Additional Step for MacOS Users
+    If you're having trouble running the binary on MacOS, please check our [FAQs](https://docs.defang.io/docs/faq#im-having-trouble-running-the-binary-on-my-mac-what-should-i-do).
+
+    Please remember this software is in beta, so please report any issues or feedback through our GitHub page. Your help in improving Defang is greatly appreciated!
+  # mode: keep-existing
+  # draft: true
+  # replace_existing_draft: true
+  # prerelease: "true"
+
+nix:
+  # commit_author: defang-io
+  - homepage: https://defang.io/
+    description: Defang is the easiest way for developers to create and deploy their containerized applications
+    license: "mit"
+    repository:
+      owner: DefangLabs
+      name: defang
+    post_install: |
+      installShellCompletion --cmd defang \
+        --bash <($out/bin/defang completion bash) \
+        --zsh <($out/bin/defang completion zsh) \
+        --fish <($out/bin/defang completion fish)
+
+changelog:
+  filters:
+    exclude:
+      # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
+      - "^defang: v[0-9]+\\.[0-9]+\\.[0-9]+ -> v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - "^Merge branch "
+      - "^Merge remote-tracking branch "
+      - "^New version: DefangLabs."
+
+winget:
+  - publisher: DefangLabs
+    name: Defang
+    short_description: The Defang command-line interface (CLI)
+    description: Defang is the easiest way for developers to create and deploy their containerized applications to the cloud.
+    license: MIT
+    publisher_url: https://defang.io/
+    homepage: https://github.com/DefangLabs/defang/
+    publisher_support_url: https://github.com/DefangLabs/defang/issues/
+    repository:
+      token: "{{ .Env.GH_PAT_WINGET }}"
+      owner: DefangLabs
+      name: winget-pkgs
+      branch: "Defang-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+announce:
+  discord:
+    enabled: true
