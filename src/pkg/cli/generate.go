@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func GenerateWithAI(ctx context.Context, client client.Client, language string, description string) ([]string, error) {
+func GenerateWithAI(ctx context.Context, client client.Client, language, dir, description string) ([]string, error) {
 	if DoDryRun {
 		term.Warn("Dry run, not generating files")
 		return nil, ErrDryRun
@@ -38,11 +39,14 @@ func GenerateWithAI(ctx context.Context, client client.Client, language string, 
 
 	// Write each file to disk
 	term.Info("Writing files to disk...")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
 	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
-		if err = os.WriteFile(file.Name, []byte(file.Content), 0644); err != nil {
+		if err = os.WriteFile(filepath.Join(dir, file.Name), []byte(file.Content), 0644); err != nil {
 			return nil, err
 		}
 	}
