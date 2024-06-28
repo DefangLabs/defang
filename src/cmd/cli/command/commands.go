@@ -541,30 +541,20 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
-		// create the folder if needed
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` and "
-			os.MkdirAll(prompt.Folder, 0755)
-			if err := os.Chdir(prompt.Folder); err != nil {
-				return err
-			}
-		}
-
 		// Check if the current folder is empty
-		if empty, err := pkg.IsDirEmpty("."); !empty || err != nil {
-			term.Warn("The folder is not empty. We recommend running this command in an empty folder.")
+		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
+			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
 		}
 
 		if sample != "" {
 			term.Info("Fetching sample from the Defang repository...")
-			err := cli.InitFromSamples(cmd.Context(), "", []string{sample})
+			err := cli.InitFromSamples(cmd.Context(), prompt.Folder, []string{sample})
 			if err != nil {
 				return err
 			}
 		} else {
 			term.Info("Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
+			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Folder, prompt.Description)
 			if err != nil {
 				return err
 			}
@@ -579,6 +569,10 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Debug("unable to launch VS Code:", err)
 		}
 
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` and "
+		}
 		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
 		return nil
 	},
