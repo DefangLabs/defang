@@ -122,7 +122,7 @@ func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.
 }
 
 func (g PlaygroundClient) ServiceDNS(name string) string {
-	return string(g.tenantID) + "-" + name
+	return string(g.TenantID) + "-" + name
 }
 
 func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {

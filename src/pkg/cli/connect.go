@@ -54,7 +54,7 @@ func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
 	return accessToken, tenantId
 }
 
-func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, types.TenantID) {
+func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
 	accessToken, tenantId := getExistingTokenAndTenant(cluster)
 
 	tenant, host := SplitTenantHost(cluster)
@@ -63,20 +63,22 @@ func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, ty
 	}
 	term.Debug("Using tenant", tenantId, "for cluster", host)
 
-	defangClient := client.NewGrpcClient(host, accessToken, tenantId, loader)
-	resp, err := defangClient.WhoAmI(context.TODO()) // TODO: Should we pass in the command context?
-	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
-	}
-	if resp != nil && tenantId != types.TenantID(resp.Tenant) {
-		term.Warnf("Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
-		tenantId = types.TenantID(resp.Tenant)
-	}
-	return defangClient, tenantId
+	return client.NewGrpcClient(host, accessToken, tenantId, loader)
 }
 
 func NewClient(ctx context.Context, cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
-	grpcClient, tenantId := Connect(cluster, loader)
+	grpcClient := Connect(cluster, loader)
+
+	// Determine the current tenant ID
+	resp, err := grpcClient.WhoAmI(ctx)
+	if err != nil {
+		term.Debug("Unable to validate tenant ID with server:", err)
+	}
+	tenantId := grpcClient.TenantID
+	if resp != nil && string(tenantId) != resp.Tenant {
+		term.Warnf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
+		tenantId = types.TenantID(resp.Tenant)
+	}
 
 	switch provider {
 	case client.ProviderAWS:
