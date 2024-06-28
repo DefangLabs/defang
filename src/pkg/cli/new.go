@@ -64,9 +64,6 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
 	for {
 		h, err := tarReader.Next()
 		if err != nil {
@@ -77,13 +74,13 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		}
 
 		for _, name := range names {
-			// Create a subdirectory for each sample when there is more than one sample requested
+			// Create the sample directory or subdirectory for each sample when there is more than one sample requested
 			subdir := ""
 			if len(names) > 1 {
 				subdir = name
-				if err := os.MkdirAll(filepath.Join(dir, subdir), 0755); err != nil {
-					return err
-				}
+			}
+			if err := os.MkdirAll(filepath.Join(dir, subdir), 0755); err != nil {
+				return err
 			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
