@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -488,10 +490,9 @@ var generateCmd = &cobra.Command{
 				Prompt: &survey.Input{
 					Message: "Please describe the service you'd like to build:",
 					Help: `Here are some example prompts you can use:
-	"A simple 'hello world' function"
-	"A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-	"A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button\"
-Generate will write files in the current folder. You can edit them and then deploy using 'defang compose up --tail' when ready.`,
+    "A simple 'hello world' function"
+    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
+    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
 				},
 				Validate: survey.MinLength(5),
 			},
@@ -562,6 +563,40 @@ Generate will write files in the current folder. You can edit them and then depl
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` and "
+		}
+
+		// Check the compose.yaml for environment variables
+		envInstructions := ""
+		data, err := os.ReadFile(filepath.Join(prompt.Folder, "compose.yaml"))
+		if err != nil {
+			term.Debug("unable to read compose.yaml:", err)
+		} else {
+			var compose struct {
+				Services map[string]struct {
+					Environment []string `yaml:"environment"`
+				} `yaml:"services"`
+			}
+
+			err = yaml.Unmarshal(data, &compose)
+			if err != nil {
+				term.Debug("unable to parse compose.yaml:", err)
+			} else {
+				for _, service := range compose.Services {
+					if len(service.Environment) > 0 {
+						envVars := make([]string, 0, len(service.Environment))
+						for _, envVar := range service.Environment {
+							key := strings.Split(envVar, "=")[0]
+							envVars = append(envVars, key)
+						}
+						envInstructions = strings.Join(envVars, " ")
+					}
+				}
+			}
+		}
+
 		// TODO: should we use EDITOR env var instead?
 		cmdd := exec.Command("code", ".")
 		err = cmdd.Start()
@@ -569,11 +604,7 @@ Generate will write files in the current folder. You can edit them and then depl
 			term.Debug("unable to launch VS Code:", err)
 		}
 
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` and "
-		}
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
+		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "config set "+envInstructions)
 		return nil
 	},
 }
