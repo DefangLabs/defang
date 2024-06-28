@@ -109,6 +109,7 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	}
 	return nil
 }
+
 func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
 	// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
 	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
