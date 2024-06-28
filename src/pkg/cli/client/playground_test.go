@@ -5,7 +5,7 @@ import (
 )
 
 func TestServiceDNS(t *testing.T) {
-	p := PlaygroundClient{GrpcClient: GrpcClient{tenantID: "proj1"}}
+	p := PlaygroundClient{GrpcClient: GrpcClient{TenantID: "proj1"}}
 
 	const expected = "proj1-service1"
 	if got := p.ServiceDNS("service1"); got != expected {
