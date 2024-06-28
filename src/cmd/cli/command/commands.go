@@ -603,6 +603,7 @@ var generateCmd = &cobra.Command{
 			term.Debug("unable to launch VS Code:", err)
 		}
 
+		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
 		return nil
 	},
 }
