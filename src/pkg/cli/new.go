@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
+
+var ErrSampleNotFound = errors.New("sample not found")
 
 type Sample struct {
 	Name             string   `json:"name"`
@@ -63,6 +66,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
+
+	sampleFound := false
+
 	for {
 		h, err := tarReader.Next()
 		if err != nil {
@@ -83,6 +89,7 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				sampleFound = true
 				fmt.Println("   -", base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
@@ -96,6 +103,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 				}
 			}
 		}
+	}
+	if !sampleFound {
+		return ErrSampleNotFound
 	}
 	return nil
 }
