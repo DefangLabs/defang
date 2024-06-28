@@ -535,7 +535,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
-
 		// create the folder if needed
 		cd := ""
 		if prompt.Folder != "." {
@@ -585,10 +584,8 @@ var generateCmd = &cobra.Command{
 				for _, service := range compose.Services {
 					if len(service.Environment) > 0 {
 						envVars := make([]string, 0, len(service.Environment))
-						for _, envVar := range service.Environment {
-							envVars = append(envVars, envVar)
-						}
-						printDefangHint("To deploy the service, run:", "cd "+prompt.Folder+"\ndefang config set "+strings.Join(envVars, " ")+"\ndefang compose up")
+						envVars = append(envVars, service.Environment...)
+						fmt.Printf("To deploy the service, run:\n%s\n  defang config set %s\n  defang compose up\n", "  "+cd, strings.Join(envVars, " "))
 					}
 				}
 			}

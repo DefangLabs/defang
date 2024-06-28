@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -64,12 +63,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		Services: services,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "missing configs") {
-			// Extract the list of missing configs
-			formattedMissingConfigs := strings.Join(strings.Fields(err.Error()[strings.Index(err.Error(), "[")+1:strings.Index(err.Error(), "]")]), ", ")
-			return nil, fmt.Errorf("missing configs: run defang config set on %s", formattedMissingConfigs)
-		}
-		return nil, fmt.Errorf("deployment failed: %w", err) // Wrap the original error with a new message
+		return nil, err
 	}
 
 	if term.DoDebug() {
