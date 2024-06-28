@@ -114,8 +114,41 @@ jobs:
         run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
         working-directory: src
 
-  go-build:
-    # if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
+  go-build-win:
+    needs: go-test
+    runs-on: windows-latest # for signtool
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      # - name: Download Go dependencies
+      #   run: go mod download
+      #   working-directory: src
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          # version: latest
+          args: build --id defang-cli ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
+          workdir: src
+
+      - name: Sign Windows app
+        shell: bash
+        run: echo TODO
+
+      - name: Upload dist-win folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-win
+          path: src/dist
+
+  go-build-mac:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
@@ -131,42 +164,40 @@ jobs:
         run: go mod download
         working-directory: src
 
-      - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@v26
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: build --clean ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
+          args: build --id defang-mac ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
           workdir: src
         env:
-          # GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      - name: Notarize macOS app
+      - name: Notarize macOS app # TODO: move to goreleaser.yml
         shell: bash
         run: |
-          bin/notarize.sh src/dist/defang_*_macOS.zip
+          bin/notarize.sh dist/defang_*_macOS.zip
+        working-directory: src
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
-      - name: Upload dist folder
+      - name: Upload dist-mac folder
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-mac
           path: src/dist
 
   go-release:
-    needs: go-build
-    runs-on: windows-latest # for signtool
+    needs:
+      - go-build-mac
+      - go-build-win
+    runs-on: ubuntu-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
@@ -174,10 +205,18 @@ jobs:
         with:
           fetch-depth: 0 # for release notes
 
-      - name: Download dist folder
+      - name: Install Nix (for nix-prefetch-url)
+        uses: cachix/install-nix-action@v26
+
+      - name: Download dist-mac folder
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: dist-mac
+
+      - name: Download dist-win folder
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-win
 
       - name: Run GoReleaser
         if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
@@ -191,21 +230,8 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
-          # MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
-          # MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
-          # MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
-          # KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
-
-      - name: Notarize macOS app
-        shell: bash
-        run: |
-          bin/notarize.sh src/dist/defang_*_macOS.zip
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
   post-release:
     runs-on: ubuntu-latest
