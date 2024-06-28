@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -489,9 +490,9 @@ var generateCmd = &cobra.Command{
 				Prompt: &survey.Input{
 					Message: "Please describe the service you'd like to build:",
 					Help: `Here are some example prompts you can use:
-	"A simple 'hello world' function"
-	"A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-	"A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
+    "A simple 'hello world' function"
+    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
+    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
 				},
 				Validate: survey.MinLength(5),
 			},
@@ -540,15 +541,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
-		// create the folder if needed
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "cd " + prompt.Folder
-			os.MkdirAll(prompt.Folder, 0755)
-			if err := os.Chdir(prompt.Folder); err != nil {
-				return err
-			}
-		}
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
@@ -571,8 +563,14 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` and "
+		}
+
 		// Check the compose.yaml for environment variables
-		data, err := os.ReadFile("compose.yaml")
+		envInstructions := ""
+		data, err := os.ReadFile(filepath.Join(prompt.Folder, "compose.yaml"))
 		if err != nil {
 			term.Debug("unable to read compose.yaml:", err)
 		} else {
@@ -589,8 +587,11 @@ var generateCmd = &cobra.Command{
 				for _, service := range compose.Services {
 					if len(service.Environment) > 0 {
 						envVars := make([]string, 0, len(service.Environment))
-						envVars = append(envVars, service.Environment...)
-						fmt.Printf("To deploy the service, run:\n%s\n  defang config set %s\n  defang compose up\n", "  "+cd, strings.Join(envVars, " "))
+						for _, envVar := range service.Environment {
+							key := strings.Split(envVar, "=")[0]
+							envVars = append(envVars, key)
+						}
+						envInstructions = strings.Join(envVars, " ")
 					}
 				}
 			}
@@ -603,7 +604,7 @@ var generateCmd = &cobra.Command{
 			term.Debug("unable to launch VS Code:", err)
 		}
 
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
+		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "config set "+envInstructions)
 		return nil
 	},
 }
