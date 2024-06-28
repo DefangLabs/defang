@@ -100,7 +100,6 @@ func Execute(ctx context.Context) error {
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
-
 		return ExitCode(code)
 	}
 
@@ -439,7 +438,7 @@ var generateCmd = &cobra.Command{
 			}
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
-
+		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
@@ -449,17 +448,16 @@ var generateCmd = &cobra.Command{
 			}, &language); err != nil {
 				return err
 			}
-
 			// Fetch the list of samples from the Defang repository
-			if samples, err := cli.FetchSamples(cmd.Context()); err != nil {
-				term.Debug("unable to fetch samples:", err)
-			} else if len(samples) > 0 {
+			if fetchSamplesErr != nil {
+				term.Debug("unable to fetch samples:", fetchSamplesErr)
+			} else if len(sampleList) > 0 {
 				const generateWithAI = "Generate with AI"
 
 				lang := strings.ToLower(language)
 				sampleNames := []string{generateWithAI}
 				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
-				for _, sample := range samples {
+				for _, sample := range sampleList {
 					if slices.Contains(sample.Languages, lang) {
 						sampleNames = append(sampleNames, sample.Name)
 						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
@@ -510,6 +508,13 @@ var generateCmd = &cobra.Command{
 
 		if sample != "" {
 			qs = qs[1:] // user picked a sample, so we skip the description question
+			sampleExists := slices.ContainsFunc(sampleList, func(s cli.Sample) bool {
+				return s.Name == sample
+			})
+
+			if !sampleExists {
+				return cli.ErrSampleNotFound
+			}
 		}
 
 		prompt := struct {
@@ -546,19 +551,19 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Check if the current folder is empty
-		if empty, err := pkg.IsDirEmpty("."); !empty || err != nil {
-			term.Warn("The folder is not empty. We recommend running this command in an empty folder.")
+		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
+			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
 		}
 
 		if sample != "" {
 			term.Info("Fetching sample from the Defang repository...")
-			err := cli.InitFromSamples(cmd.Context(), "", []string{sample})
+			err := cli.InitFromSamples(cmd.Context(), prompt.Folder, []string{sample})
 			if err != nil {
 				return err
 			}
 		} else {
 			term.Info("Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Description)
+			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Folder, prompt.Description)
 			if err != nil {
 				return err
 			}

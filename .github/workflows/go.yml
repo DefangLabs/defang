@@ -178,6 +178,19 @@ jobs:
         working-directory: ./pkgs/npm
 
     steps:
+      - name: Update Windows s.defang.io/defang_win_amd64.zip short link
+        run: |
+          curl --request POST \
+            --url https://api.short.io/links/$DEFANG_WIN_AMD64_LNK \
+            --header "Authorization: $SHORTIO_PK" \
+            --header 'accept: application/json' \
+            --header 'content-type: application/json' \
+            --data "{\"originalURL\":\"https://github.com/DefangLabs/defang/releases/download/${TAG}/defang_${TAG#v}_windows_amd64.zip\"}"
+        env:
+          SHORTIO_PK: ${{ secrets.SHORTIO_PK }}
+          TAG: ${{ github.ref_name }}
+          DEFANG_WIN_AMD64_LNK: "lnk_4vSQ_CDukZ5POEE4o0mMDysr2U"
+
       - name: Trigger CLI Autodoc
         uses: peter-evans/repository-dispatch@v3
         with:
