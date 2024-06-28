@@ -25,7 +25,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
