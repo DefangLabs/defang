@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
+var ErrSampleNotFound = errors.New("sample not found")
+
 type Sample struct {
 	Name             string   `json:"name"`
 	Title            string   `json:"title"`
@@ -24,6 +27,7 @@ type Sample struct {
 	ShortDescription string   `json:"shortDescription"`
 	Tags             []string `json:"tags"`
 	Languages        []string `json:"languages"`
+	Configs          []string `json:"configs"`
 }
 
 func FetchSamples(ctx context.Context) ([]Sample, error) {
@@ -63,6 +67,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
 	term.Info("Writing files to disk...")
+
+	sampleFound := false
+
 	for {
 		h, err := tarReader.Next()
 		if err != nil {
@@ -73,13 +80,17 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		}
 
 		for _, name := range names {
-			// Create a subdirectory for each sample when there is more than one sample requested
+			// Create the sample directory or subdirectory for each sample when there is more than one sample requested
 			subdir := ""
 			if len(names) > 1 {
 				subdir = name
 			}
+			if err := os.MkdirAll(filepath.Join(dir, subdir), 0755); err != nil {
+				return err
+			}
 			prefix := fmt.Sprintf("%s-%s/samples/%s/", repo, branch, name)
 			if base, ok := strings.CutPrefix(h.Name, prefix); ok && len(base) > 0 {
+				sampleFound = true
 				fmt.Println("   -", base)
 				path := filepath.Join(dir, subdir, base)
 				if h.FileInfo().IsDir() {
@@ -93,6 +104,9 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 				}
 			}
 		}
+	}
+	if !sampleFound {
+		return ErrSampleNotFound
 	}
 	return nil
 }
