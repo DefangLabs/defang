@@ -59,13 +59,10 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return ErrSampleNotFound
-	}
 	term.Debug(resp.Header)
 	tarball, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read tarball: %w", err)
 	}
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
