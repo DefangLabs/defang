@@ -9,9 +9,9 @@ builds:
     goarch:
       - amd64
       - arm64
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
+    # hooks:
+    #   post:
+    #     - ./bin/codesign.sh "{{ .Path }}"
 
   - id: defang-cli
     main: ./cmd/cli
@@ -31,12 +31,13 @@ universal_binaries:
     ids:
       - defang-mac
     replace: true
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
+    # hooks:
+    #   post:
+    #     - ./bin/codesign.sh "{{ .Path }}"
 
 archives:
-  - format_overrides:
+  - id: defang-archive
+    format_overrides:
       - goos: darwin
         format: zip
       - goos: windows
