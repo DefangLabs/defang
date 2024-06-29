@@ -43,6 +43,7 @@ jobs:
 
   nix-shell-test:
     runs-on: ubuntu-latest
+    needs: go-test
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +55,7 @@ jobs:
       - name: Check nix-shell default.nix
         run: |
           set -o pipefail
-          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=6::Replace the vendorHash with the correct value:|'
+          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=9::Replace the vendorHash with the correct value:|'
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
@@ -114,9 +115,14 @@ jobs:
         run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
         working-directory: src
 
-  go-build-win:
+  build-and-sign:
+    name: Build app and sign files with Trusted Signing
+    environment: release
     needs: go-test
     runs-on: windows-latest # for signtool
+    # permissions:
+    #   contents: read
+    #   id-token: write # for GitHub id-token auth
     steps:
       - uses: actions/checkout@v4
 
@@ -130,7 +136,7 @@ jobs:
       #   run: go mod download
       #   working-directory: src
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser (Windows and Linux)
         uses: goreleaser/goreleaser-action@v5
         with:
           # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
@@ -138,9 +144,31 @@ jobs:
           args: build --id defang-cli ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
           workdir: src
 
-      - name: Sign Windows app
-        shell: bash
-        run: echo TODO
+      - name: Trusted Signing
+        uses: Azure/trusted-signing-action@v0.3.20
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }} # FIXME: replace with OIDC
+          # azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }} TODO
+          endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
+          trusted-signing-account-name: DefangLabs # from Azure portal
+          certificate-profile-name: signed-binary-test # from Azure portal
+          files-folder: ${{ github.workspace }}\src\dist
+          files-folder-filter: exe # no dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          # exclude-environment-credential: false
+          # exclude-workload-identity-credential: true
+          # exclude-managed-identity-credential: true
+          # exclude-shared-token-cache-credential: true
+          # exclude-visual-studio-credential: true
+          # exclude-visual-studio-code-credential: true
+          # exclude-azure-cli-credential: true
+          # exclude-azure-powershell-credential: true
+          # exclude-azure-developer-cli-credential: true
+          # exclude-interactive-browser-credential: true
 
       - name: Upload dist-win folder
         uses: actions/upload-artifact@v4
@@ -148,7 +176,7 @@ jobs:
           name: dist-win
           path: src/dist
 
-  go-build-mac:
+  build-and-sign-mac:
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
@@ -164,7 +192,7 @@ jobs:
         run: go mod download
         working-directory: src
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser (macOS)
         uses: goreleaser/goreleaser-action@v5
         with:
           # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
@@ -177,16 +205,6 @@ jobs:
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      - name: Notarize macOS app # TODO: move to goreleaser.yml
-        shell: bash
-        run: |
-          bin/notarize.sh dist/defang_*_macOS.zip
-        working-directory: src
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
-
       - name: Upload dist-mac folder
         uses: actions/upload-artifact@v4
         with:
@@ -194,9 +212,10 @@ jobs:
           path: src/dist
 
   go-release:
+    # environment: release
     needs:
-      - go-build-mac
-      - go-build-win
+      - build-and-sign-mac
+      - build-and-sign
     runs-on: ubuntu-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
@@ -232,6 +251,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
+
+      # - name: Notarize macOS app # TODO: move to goreleaser.yml
+      #   shell: bash
+      #   run: |
+      #     bin/notarize.sh dist/defang_*_macOS.zip
+      #   working-directory: src
+      #   env:
+      #     MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      #     MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      #     MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
   post-release:
     runs-on: ubuntu-latest
