@@ -156,6 +156,7 @@ jobs:
           certificate-profile-name: signed-binary-test # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
+          files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
