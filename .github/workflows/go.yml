@@ -120,9 +120,10 @@ jobs:
     environment: release
     needs: go-test
     runs-on: windows-latest # for signtool
-    # permissions:
-    #   contents: read
-    #   id-token: write # for GitHub id-token auth
+    env: # from https://github.com/spiffe/spire/pull/5158
+      GOPATH: 'D:\golang\go'
+      GOCACHE: 'D:\golang\cache'
+      GOMODCACHE: 'D:\golang\modcache'
     steps:
       - uses: actions/checkout@v4
 
