@@ -144,13 +144,17 @@ jobs:
           args: build --id defang-cli ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
           workdir: src
 
+      # From https://github.com/Azure/trusted-signing-action/pull/37
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Trusted Signing
         uses: Azure/trusted-signing-action@v0.3.20
         with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }} # FIXME: replace with OIDC
-          # azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }} TODO
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
           trusted-signing-account-name: DefangLabs # from Azure portal
           certificate-profile-name: signed-binary-test # from Azure portal
@@ -160,16 +164,16 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
-          # exclude-environment-credential: false
-          # exclude-workload-identity-credential: true
-          # exclude-managed-identity-credential: true
-          # exclude-shared-token-cache-credential: true
-          # exclude-visual-studio-credential: true
-          # exclude-visual-studio-code-credential: true
-          # exclude-azure-cli-credential: true
-          # exclude-azure-powershell-credential: true
-          # exclude-azure-developer-cli-credential: true
-          # exclude-interactive-browser-credential: true
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
 
       - name: Upload dist-win folder
         uses: actions/upload-artifact@v4
@@ -232,11 +236,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist-mac
+          path: src/dist
 
       - name: Download dist-win folder
         uses: actions/download-artifact@v4
         with:
           name: dist-win
+          path: src/dist
+
+      - name: List files
+        run: ls -l src/dist
 
       - name: Run GoReleaser
         if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
