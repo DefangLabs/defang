@@ -133,6 +133,10 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
+      - name: Download Go dependencies
+        run: go mod download
+        working-directory: src
+
       - name: Run GoReleaser (Windows and Linux)
         uses: goreleaser/goreleaser-action@v5
         with:
