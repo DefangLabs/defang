@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -827,26 +826,28 @@ var composeUpCmd = &cobra.Command{
 
 		tailCtx, cancelTail := context.WithCancel(ctx)
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			// show users the current streaming logs
-			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
-				var cerr *cli.CancelError
-				if !errors.As(err, &cerr) {
-					term.Debugf("failed to start tailing: %v", err)
+		go func() { // Cancel the tailing if the service is ready
+			if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil {
+				if !errors.Is(err, context.Canceled) &&
+					!errors.Is(err, cli.ErrDryRun) &&
+					!errors.As(err, new(cliClient.ErrNotImplemented)) {
+					term.Warnf("failed to wait for service status: %v", err)
+				} else {
+					term.Debugf("failed to wait for service status: %v", err)
 				}
+				term.Info("Service status monitoring failed, we will continue tailing the logs. Press Ctrl+C to detach.")
+				return // Do not cancel the tailing if we are unable to wait for the service status
 			}
+			cancelTail()
 		}()
-		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
-			if !errors.Is(err, cli.ErrDryRun) && !errors.As(err, new(cliClient.ErrNotImplemented)) {
-				term.Warnf("failed to wait for service status: %v", err)
+
+		// show users the current streaming logs
+		if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
+			var cerr *cli.CancelError
+			if !errors.As(err, &cerr) {
+				term.Debugf("failed to start tailing: %v", err)
 			}
-			wg.Wait() // Wait until ctrl+c is pressed
 		}
-		cancelTail()
-		wg.Wait() // Wait for tail to finish
 
 		printEndpoints(serviceInfos)
 		term.Info("Done.")

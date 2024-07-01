@@ -11,6 +11,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -140,7 +141,13 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
+func (l LogGroupInput) String() string {
+	return fmt.Sprintf("LogGroupARN: %s, LogStreamNames: %v, LogStreamNamePrefix: %s, LogEventFilterPattern: %s",
+		l.LogGroupARN, l.LogStreamNames, l.LogStreamNamePrefix, l.LogEventFilterPattern)
+}
+
 func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error) {
+	term.Debug("Trying to tail log, getting event stream for:", input)
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -318,6 +325,7 @@ type collectionStream struct {
 }
 
 func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGroupInput) {
+	term.Debug("Started to tail log event stream:", lgi)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.streams = append(c.streams, s)
