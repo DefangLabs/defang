@@ -149,7 +149,7 @@ jobs:
 
       # From https://github.com/Azure/trusted-signing-action/pull/37
       - name: Azure login
-        uses: azure/login@v1
+        uses: azure/login@v2
         if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
