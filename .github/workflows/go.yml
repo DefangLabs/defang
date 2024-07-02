@@ -119,6 +119,7 @@ jobs:
 
   build-and-sign:
     name: Build app and sign files with Trusted Signing
+    environment: release
     needs: go-test
     runs-on: windows-latest # for signtool
     env: # from https://github.com/spiffe/spire/pull/5158
@@ -244,13 +245,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist-mac
-          path: src/dist
+          path: src/distx
 
       - name: Download dist-win folder
         uses: actions/download-artifact@v4
         with:
           name: dist-win
-          path: src/dist
+          path: src/distx
 
       - name: List files
         run: ls -lR src/dist
