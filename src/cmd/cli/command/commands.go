@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -826,6 +827,8 @@ var composeUpCmd = &cobra.Command{
 
 		tailCtx, cancelTail := context.WithCancel(ctx)
 
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() { // Cancel the tailing if the service is ready
 			if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil {
 				if !errors.Is(err, context.Canceled) &&
@@ -845,10 +848,13 @@ var composeUpCmd = &cobra.Command{
 		if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
 			var cerr *cli.CancelError
 			if !errors.As(err, &cerr) {
-				term.Debugf("failed to start tailing: %v", err)
+				term.Warnf("failed to start tailing, you will not be able to see logs: %v", err)
+			} else {
+				term.Debugf("tailing cancelled: %v", err)
 			}
 		}
 
+		wg.Wait() // Wait for the service status monitoring to finish
 		printEndpoints(serviceInfos)
 		term.Info("Done.")
 		return nil
