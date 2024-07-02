@@ -291,15 +291,15 @@ jobs:
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
 
-      # - name: Notarize macOS app # TODO: move to goreleaser.yml
-      #   shell: bash
-      #   run: |
-      #     bin/notarize.sh dist/defang_*_macOS.zip
-      #   working-directory: src
-      #   env:
-      #     MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-      #     MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-      #     MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
+      - name: Notarize macOS app # TODO: move to goreleaser.yml
+        shell: bash
+        run: |
+          bin/notarize.sh dist/defang_*_macOS.zip
+        working-directory: src
+        env:
+          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
   post-release:
     runs-on: ubuntu-latest
