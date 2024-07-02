@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Check for required files
         run: |
@@ -37,14 +37,14 @@ jobs:
             - [ ] I have documented how to provision any third-party services in the readme
             - [ ] I have documented how to run the sample in the readme (locally and with Defang)
             `;
-    
+
             // Get the current PR
             const { data: pullRequest } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pr_number
             });
-    
+
             // Check if the checklist already exists in the PR description
             if (!pullRequest.body.includes(checklist)) {
             // Update the PR description with the checklist
