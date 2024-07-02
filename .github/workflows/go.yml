@@ -27,13 +27,13 @@ jobs:
         run: go test -test.short -v ./...
         working-directory: src
 
-      - name: Build MacOS binary
-        run: GOOS=darwin go build ./cmd/cli
-        working-directory: src
+      # - name: Build MacOS binary
+      #   run: GOOS=darwin go build ./cmd/cli
+      #   working-directory: src
 
-      - name: Build Windows binary
-        run: GOOS=windows go build ./cmd/cli
-        working-directory: src
+      # - name: Build Windows binary
+      #   run: GOOS=windows go build ./cmd/cli
+      #   working-directory: src
 
       - name: Verify Go modules
         working-directory: src
@@ -43,6 +43,7 @@ jobs:
 
   nix-shell-test:
     runs-on: ubuntu-latest
+    needs: go-test
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +55,7 @@ jobs:
       - name: Check nix-shell default.nix
         run: |
           set -o pipefail
-          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=6::Replace the vendorHash with the correct value:|'
+          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=9::Replace the vendorHash with the correct value:|'
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
@@ -114,16 +115,17 @@ jobs:
         run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
         working-directory: src
 
-  go-release:
-    if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
+  build-and-sign:
+    name: Build app and sign files with Trusted Signing
+    environment: release
     needs: go-test
-    runs-on: macos-latest
-    permissions:
-      contents: write # to upload archives as GitHub Releases
+    runs-on: windows-latest # for signtool
+    env: # from https://github.com/spiffe/spire/pull/5158
+      GOPATH: 'D:\golang\go'
+      GOCACHE: 'D:\golang\cache'
+      GOMODCACHE: 'D:\golang\modcache'
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # for release notes
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -135,36 +137,148 @@ jobs:
         run: go mod download
         working-directory: src
 
-      - name: Install Nix (for nix-prefetch-url)
-        uses: cachix/install-nix-action@v26
-
-      - name: Run GoReleaser
+      - name: Run GoReleaser (Windows and Linux)
         uses: goreleaser/goreleaser-action@v5
         with:
           # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --clean
+          args: build --id defang-cli ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
+          workdir: src
+
+      # From https://github.com/Azure/trusted-signing-action/pull/37
+      - name: Azure login
+        uses: azure/login@v1
+        if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Trusted Signing
+        uses: Azure/trusted-signing-action@v0.3.20
+        if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
+        with:
+          endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
+          trusted-signing-account-name: DefangLabs # from Azure portal
+          certificate-profile-name: signed-binary-test # from Azure portal
+          files-folder: ${{ github.workspace }}\src\dist
+          files-folder-filter: exe # no dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Upload dist-win folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-win
+          path: src/dist
+          if-no-files-found: error
+
+  build-and-sign-mac:
+    name: Build app and sign MacOS
+    needs: go-test
+    runs-on: macos-latest # for codesign and notarytool
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      # - name: Download Go dependencies
+      #   run: go mod download
+      #   working-directory: src
+
+      - name: Run GoReleaser (macOS)
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          # version: latest
+          args: build --id defang-mac ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' }}
           workdir: src
         env:
-          GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Upload dist-mac folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-mac
+          path: src/dist
+          if-no-files-found: error
+
+  go-release:
+    # environment: release
+    if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
+    needs:
+      - build-and-sign-mac
+      - build-and-sign
+    runs-on: macos-latest # for notarization
+    permissions:
+      contents: write # to upload archives as GitHub Releases
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # for release notes
+
+      - name: Install Nix (for nix-prefetch-url)
+        uses: cachix/install-nix-action@v26
+
+      - name: Download dist-mac folder
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-mac
+          path: src/dist
+
+      - name: Download dist-win folder
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-win
+          path: src/dist
+
+      - name: List files
+        run: ls -lR src/dist
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          # version: latest
+          args: release --config .goreleaser-prebuilt.yml
+          workdir: src
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          GH_PAT_WINGET: ${{ secrets.GH_PAT_WINGET }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
 
-      - name: Notarize macOS app
+      - name: Notarize macOS app # TODO: move to goreleaser.yml
         shell: bash
         run: |
-          xcrun notarytool submit src/dist/defang_*_macOS.zip --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_APP_PW"
+          bin/notarize.sh dist/defang_*_macOS.zip
+        working-directory: src
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
           MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
-  post-build:
+  post-release:
     runs-on: ubuntu-latest
     needs: go-release
 
@@ -200,7 +314,7 @@ jobs:
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger Homebrew Formula Update
-        uses: peter-evans/repository-dispatch@v1
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.HOMEBREW_ACTION_TRIGGER_TOKEN }}
           repository: DefangLabs/homebrew-defang
@@ -228,7 +342,7 @@ jobs:
           # install dependencies
           npm ci --ignore-scripts
 
-          #b uild
+          # build
           npm run build
 
           # make the cli.js executable
