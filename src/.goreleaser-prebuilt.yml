@@ -13,7 +13,7 @@ builds:
     goamd64:
       - v1
     prebuilt:
-      path: dist-{{ .Os }}/defang_{{ .Os }}_{{ .Arch }}{{ with .Amd64 }}_{{ . }}{{ end }}/defang{{ .Ext }}
+      path: distx/defang-{{ if eq .Os "darwin" }}mac{{ else }}cli{{ end }}_{{ .Os }}_{{ .Arch }}{{ with .Amd64 }}_{{ . }}{{ end }}/defang{{ .Ext }}
     binary: defang
 
 source:
@@ -27,9 +27,9 @@ archives:
         format: zip
     # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
-    hooks:
-      after:
-        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ .Path }}"{{ else }}true{{ end }}'
+    # hooks:
+    #   after:
+    #     - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ .Path }}"{{ else }}true{{ end }}'
 
 release:
   github:
@@ -89,13 +89,13 @@ winget:
       owner: DefangLabs
       name: winget-pkgs
       branch: "Defang-{{.Version}}"
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+      # pull_request:
+      #   enabled: true
+      #   draft: true
+      #   base:
+      #     owner: microsoft
+      #     name: winget-pkgs
+      #     branch: master
 
 announce:
   discord:
