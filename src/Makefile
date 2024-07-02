@@ -48,3 +48,16 @@ defang_darwin.zip: defang-arm64 defang-amd64
 
 .PHONY: zips
 zips: defang_linux_amd64.zip defang_darwin.zip
+
+.PHONY: no-diff
+no-diff:
+	git diff-index --quiet HEAD --       # check that there are no uncommitted changes
+
+.PHONY: pull
+pull:
+	git pull
+
+.PHONY: version
+version: no-diff pull test
+	git tag $$(git tag -l 'v*' --sort=-v:refname | head -n1 | awk -F. '{$$NF = $$NF + 1;} 1' OFS=.)
+	git push --follow-tags
