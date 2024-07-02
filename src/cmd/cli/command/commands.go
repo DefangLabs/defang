@@ -563,11 +563,6 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` and "
-		}
-
 		// Check the compose.yaml for environment variables
 		envInstructions := ""
 		data, err := os.ReadFile(filepath.Join(prompt.Folder, "compose.yaml"))
@@ -576,7 +571,7 @@ var generateCmd = &cobra.Command{
 		} else {
 			var compose struct {
 				Services map[string]struct {
-					Environment []string `yaml:"environment"`
+					Environment interface{} `yaml:"environment"`
 				} `yaml:"services"`
 			}
 
@@ -585,16 +580,32 @@ var generateCmd = &cobra.Command{
 				term.Debug("unable to parse compose.yaml:", err)
 			} else {
 				for _, service := range compose.Services {
-					if len(service.Environment) > 0 {
-						envVars := make([]string, 0, len(service.Environment))
-						for _, envVar := range service.Environment {
-							key := strings.Split(envVar, "=")[0]
-							envVars = append(envVars, key)
+					envVars := make([]string, 0)
+					switch env := service.Environment.(type) {
+					case []interface{}:
+						for _, envVar := range env {
+							if !strings.Contains(envVar.(string), "=") { // Check if the env var is not set
+								envVars = append(envVars, envVar.(string))
+							}
 						}
-						envInstructions = strings.Join(envVars, " ")
+					case map[string]interface{}:
+						for key, value := range env {
+							if value == nil || value == "" { // Check if the env var is either nil or not set
+								envVars = append(envVars, key)
+							}
+						}
+					default:
+						fmt.Printf("Unexpected type: %T\n", env) // unexpected types
+					}
+					if len(envVars) > 0 {
+						envInstructions = strings.Join(envVars, " ") + "\n"
 					}
 				}
 			}
+		}
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` "
 		}
 
 		// TODO: should we use EDITOR env var instead?
@@ -603,8 +614,12 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			term.Debug("unable to launch VS Code:", err)
 		}
+		if envInstructions != "" { // check if any envars need to be set
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "config set "+envInstructions)
+		} else {
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
+		}
 
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "config set "+envInstructions)
 		return nil
 	},
 }
