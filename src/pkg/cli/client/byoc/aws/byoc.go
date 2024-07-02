@@ -64,6 +64,7 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {
+	// note: the CD image is tagged with the major release number, use that for setup
 	projectCdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return err
@@ -158,7 +159,14 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// note: the CD image is tagged with the major release number, use that for setup
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
+}
+
+func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -224,7 +232,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdCommand(ctx, req.Mode, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, req.Mode, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
