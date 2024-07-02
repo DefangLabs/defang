@@ -402,7 +402,12 @@ message SubscribeRequest {
   repeated string services = 1;
 }
 
-message SubscribeResponse { ServiceInfo service = 1; }
+message SubscribeResponse { 
+  ServiceInfo service = 1 [deprecated = true]; 
+  string name = 2;
+  string status = 3;
+  ServiceState state = 4;
+}
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
