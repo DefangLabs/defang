@@ -254,7 +254,7 @@ jobs:
           path: src/distx
 
       - name: List files
-        run: ls -lR src/dist
+        run: ls -lR src/distx
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
