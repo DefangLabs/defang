@@ -119,20 +119,24 @@ message UploadURLResponse { string url = 1; }
 
 
 enum ServiceState {
-  UNKNOWN = 0;
+  SERVICE_STATE_UNSPECIFIED = 0;
 
   // Build states (initial state for build)
-  BUILD_PENDING = 1; // BUILD_QUEUED -> BUILD_ACTIVATING
-  BUILDING = 2; // BUILD_RUNNING
-  CREATED = 3; // BUILD_DEACTIVATING (done = true)
+  BUILD_QUEUED = 1;
+  BUILD_PROVISIONING = 2;
+  BUILD_PENDING = 3;
+  BUILD_ACTIVATING = 4;
+  BUILD_RUNNING = 5;
+
+  BUILD_DEACTIVATING = 6;
  
   // Update states (initial state for existing image)
-  UPDATE_PENDING = 4; //  UPDATE_QUEUE
+  UPDATE_QUEUED = 7;
 
   // Deployment states
-  DEPLOYING = 5;
-  STARTED = 6;
-  FAILED = 7;
+  SERVICE_PENDING = 8;
+  SERVICE_COMPLETED = 9;
+  SERVICE_FAILED = 10;
 }
 
 message ServiceInfo {

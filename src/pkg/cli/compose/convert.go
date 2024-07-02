@@ -321,24 +321,3 @@ func convertPorts(ports []compose.ServicePortConfig) []*defangv1.Port {
 	}
 	return pbports
 }
-
-func convertServiceState(state string) defangv1.ServiceState {
-	switch strings.ToLower(state) {
-	default:
-		return defangv1.ServiceState_UNKNOWN
-	case "building_pending":
-		return defangv1.ServiceState_BUILD_PENDING
-	case "building":
-		return defangv1.ServiceState_BUILDING
-	case "created":
-		return defangv1.ServiceState_CREATED
-	case "update_pending":
-		return defangv1.ServiceState_UPDATE_PENDING
-	case "service_deploying":
-		return defangv1.ServiceState_DEPLOYING
-	case "service_started":
-		return defangv1.ServiceState_STARTED
-	case "service_failed":
-		return defangv1.ServiceState_FAILED
-	}
-}
