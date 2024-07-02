@@ -1,49 +1,35 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 project_name: defang
 builds:
-  - id: defang-mac
-    main: ./cmd/cli
-    binary: defang
+  - builder: prebuilt
     goos:
+      - linux
+      - windows
       - darwin
     goarch:
       - amd64
       - arm64
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
-
-  - id: defang-cli
-    main: ./cmd/cli
+      # - 386
+    goamd64:
+      - v1
+    prebuilt:
+      path: dist-{{ .Os }}/defang_{{ .Os }}_{{ .Arch }}{{ with .Amd64 }}_{{ . }}{{ end }}/defang{{ .Ext }}
     binary: defang
-    goos:
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
 
 source:
   enabled: false
 
-universal_binaries:
-  - id: defang-macfat
-    ids:
-      - defang-mac
-    replace: true
-    hooks:
-      post:
-        - ./bin/codesign.sh "{{ .Path }}"
-
 archives:
-  - id: defang-archive
-    format_overrides:
+  - format_overrides:
       - goos: darwin
         format: zip
       - goos: windows
         format: zip
     # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    hooks:
+      after:
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ .Path }}"{{ else }}true{{ end }}'
 
 release:
   github:
@@ -103,13 +89,13 @@ winget:
       owner: DefangLabs
       name: winget-pkgs
       branch: "Defang-{{.Version}}"
-      # pull_request:
-      #   enabled: true
-      #   draft: true
-      #   base:
-      #     owner: microsoft
-      #     name: winget-pkgs
-      #     branch: master
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
 
 announce:
   discord:
