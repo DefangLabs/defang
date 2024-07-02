@@ -57,7 +57,7 @@ no-diff:
 pull:
 	git pull
 
-.PHONY: version
-version: no-diff pull test
+.PHONY: release
+release: pull test no-diff
 	git tag $$(git tag -l 'v*' --sort=-v:refname | head -n1 | awk -F. '{$$NF = $$NF + 1;} 1' OFS=.)
-	git push --follow-tags
+	git push --follow-tags --tags
