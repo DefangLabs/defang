@@ -18,18 +18,8 @@ func (e ComposeError) Unwrap() error {
 	return e.error
 }
 
-func buildContext(force bool) compose.BuildContext {
-	if DoDryRun {
-		return compose.BuildContextIgnore
-	}
-	if force {
-		return compose.BuildContextForce
-	}
-	return compose.BuildContextDigest
-}
-
 // ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+func ComposeStart(ctx context.Context, c client.Client, force compose.BuildContext) (*defangv1.DeployResponse, error) {
 	project, err := c.LoadProject(ctx)
 	if err != nil {
 		return nil, err
@@ -39,7 +29,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, &ComposeError{err}
 	}
 
-	services, err := compose.ConvertServices(ctx, c, project.Services, buildContext(force))
+	services, err := compose.ConvertServices(ctx, c, project.Services, force)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +38,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	if DoDryRun {
+	if force == compose.BuildContextIgnore {
 		for _, service := range services {
 			PrintObject(service.Name, service)
 		}
@@ -59,9 +49,12 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		term.Info("Deploying service", service.Name)
 	}
 
-	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
-		Services: services,
-	})
+	var resp *defangv1.DeployResponse
+	if force == compose.BuildContextPreview {
+		resp, err = c.Preview(ctx, &defangv1.DeployRequest{Services: services})
+	} else {
+		resp, err = c.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	}
 	if err != nil {
 		return nil, err
 	}
