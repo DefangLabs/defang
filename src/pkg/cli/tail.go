@@ -3,21 +3,17 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	"github.com/muesli/termenv"
+	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -167,9 +163,140 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	return tail(ctx, client, params)
 }
 
+type model struct {
+	// client         client.Client
+	serverStream   client.ServerStream[defangv1.TailResponse]
+	logs           []*defangv1.LogEntry
+	showTimestamps bool
+	verbose        bool
+	// skipDuplicate  bool
+	err         error
+	showEtag    bool
+	showService bool
+	// height         int
+}
+
+func (m model) Init() tea.Cmd {
+	return m.waitForEvents()
+}
+
+func (m model) waitForEvents() tea.Cmd {
+	return func() tea.Msg {
+		if !m.serverStream.Receive() {
+			if errors.Is(m.serverStream.Err(), context.Canceled) {
+				m.err = &CancelError{error: m.serverStream.Err()}
+				return tea.Quit
+			}
+			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
+			// code := connect.CodeOf(m.serverStream.Err())
+			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+			// if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(m.serverStream.Err())) {
+			// 	term.Debug("Disconnected:", m.serverStream.Err())
+			// 	serverStream, err := m.client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+			// 	if err != nil {
+			// 		term.Debug("Reconnect failed:", err)
+			// 		return tea.Quit
+			// 	}
+			// 	m.serverStream = serverStream
+			// }
+			return tea.Quit
+		}
+		return tailResponse(m.serverStream.Msg())
+	}
+}
+
+type tailResponse *defangv1.TailResponse
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "t":
+			m.showTimestamps = !m.showTimestamps
+		case "v":
+			m.verbose = !m.verbose
+		case "e":
+			m.showEtag = !m.showEtag
+		case "s":
+			m.showService = !m.showService
+		case "q", "esc":
+			return m, tea.Quit
+		default:
+			if msg.Type == tea.KeyCtrlC {
+				return m, tea.Quit
+			}
+		}
+	case tailResponse:
+		if msg == nil {
+			return m, m.waitForEvents()
+		}
+		for _, pe := range msg.Entries {
+			if pe.Service == "" {
+				pe.Service = msg.Service
+			}
+			if pe.Host == "" {
+				pe.Host = msg.Host
+			}
+			if pe.Etag == "" {
+				pe.Etag = msg.Etag
+			}
+		}
+		m.logs = append(m.logs, msg.Entries...)
+		return m, m.waitForEvents()
+	}
+	return m, nil
+}
+
+func (m model) View() string {
+	var b strings.Builder
+	for _, e := range m.logs {
+		prefixLen := 0
+		trimmed := strings.TrimRight(e.Message, "\t\r\n ")
+		for i, line := range strings.Split(trimmed, "\n") {
+			if i == 0 {
+				if m.showTimestamps {
+					prefixLen, _ = b.WriteString(e.Timestamp.AsTime().Local().Format(RFC3339Micro))
+					b.WriteByte(' ')
+					prefixLen++ // space
+				}
+				if m.showEtag {
+					b.WriteString(e.Etag)
+					b.WriteByte(' ')
+					prefixLen += len(e.Etag) + 1
+				}
+				if m.showService {
+					b.WriteString(e.Service)
+					b.WriteByte(' ')
+					prefixLen += len(e.Service) + 1
+				}
+				if m.verbose {
+					b.WriteString(e.Host)
+					b.WriteByte(' ')
+					prefixLen += len(e.Host) + 1
+				}
+			} else {
+				b.WriteString(strings.Repeat(" ", prefixLen))
+			}
+			// if term.StdoutCanColor() {
+			// 	if !strings.Contains(line, "\033[") {
+			// 		line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
+			// 	}
+			// 	term.Reset()
+			// } else {
+			// 	line = term.StripAnsi(line)
+			// }
+			b.WriteString(line)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
 func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
+	// defer println("canceled")
 	defer cancel()
+	// defer println("canceling")
 
 	var since *timestamppb.Timestamp
 	if params.Since.IsZero() {
@@ -181,178 +308,153 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if err != nil {
 		return err
 	}
+	defer println("closed")
 	defer serverStream.Close() // this works because it takes a pointer receiver
-
-	spin := spinner.New()
-	doSpinner := !params.Raw && term.StdoutCanColor() && term.IsTerminal()
+	defer println("closing")
 
 	if term.IsTerminal() && !params.Raw {
-		if doSpinner {
-			term.HideCursor()
-			defer term.ShowCursor()
-		}
-
 		if !DoVerbose {
 			// Allow the user to toggle verbose mode with the V key
-			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
-				defer term.Restore(int(os.Stdin.Fd()), oldState)
-
-				term.Info("Press V to toggle verbose mode")
-				input := term.NewNonBlockingStdin()
-				defer input.Close() // abort the read loop
-				go func() {
-					var b [1]byte
-					for {
-						if _, err := input.Read(b[:]); err != nil {
-							return // exit goroutine
-						}
-						switch b[0] {
-						case 3: // Ctrl-C
-							cancel() // cancel the tail context
-						case 10, 13: // Enter or Return
-							fmt.Println(" ") // empty line, but overwrite the spinner
-						case 'v', 'V':
-							verbose := !DoVerbose
-							DoVerbose = verbose
-							modeStr := "OFF"
-							if verbose {
-								modeStr = "ON"
-							}
-							term.Info("Verbose mode", modeStr)
-							go client.Track("Verbose Toggled", P{"verbose", verbose})
-						}
-					}
-				}()
-			}
+			term.Info("Press V to toggle verbose mode")
 		}
 	}
 
-	skipDuplicate := false
-	for {
-		if !serverStream.Receive() {
-			if errors.Is(serverStream.Err(), context.Canceled) {
-				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
-			}
-
-			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
-			code := connect.CodeOf(serverStream.Err())
-			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
-				term.Debug("Disconnected:", serverStream.Err())
-				var spaces int
-				if !params.Raw {
-					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
-				}
-				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
-				if err != nil {
-					term.Debug("Reconnect failed:", err)
-					return err
-				}
-				if !params.Raw {
-					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
-				}
-				skipDuplicate = true
-				continue
-			}
-
-			return serverStream.Err() // returns nil on EOF
-		}
-		msg := serverStream.Msg()
-
-		// Show a spinner if we're not in raw mode and have a TTY
-		if doSpinner {
-			fmt.Print(spin.Next())
-		}
-
-		if msg == nil {
-			continue
-		}
-
-		for _, e := range msg.Entries {
-			service := valueOrDefault(e.Service, msg.Service)
-			host := valueOrDefault(e.Host, msg.Host)
-			etag := valueOrDefault(e.Etag, msg.Etag)
-
-			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
-			onlyErrors := !DoVerbose && isInternal
-			if onlyErrors && !e.Stderr {
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
-					return nil
-				}
-				continue
-			}
-
-			ts := e.Timestamp.AsTime()
-			if skipDuplicate && ts.Equal(params.Since) {
-				skipDuplicate = false
-				continue
-			}
-			if ts.After(params.Since) {
-				params.Since = ts
-			}
-
-			if params.Raw {
-				if e.Stderr {
-					term.Error(e.Message)
-				} else {
-					term.Printlnc(term.InfoColor, e.Message)
-				}
-				continue
-			}
-
-			// Replace service progress messages with our own spinner
-			if doSpinner && isProgressDot(e.Message) {
-				continue
-			}
-
-			tsString := ts.Local().Format(RFC3339Micro)
-			tsColor := termenv.ANSIBrightBlack
-			if term.HasDarkBackground() {
-				tsColor = termenv.ANSIWhite
-			}
-			if e.Stderr {
-				tsColor = termenv.ANSIBrightRed
-			}
-			var prefixLen int
-			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
-			for i, line := range strings.Split(trimmed, "\n") {
-				if i == 0 {
-					prefixLen, _ = term.Printc(tsColor, tsString, " ")
-					if params.Etag == "" {
-						l, _ := term.Printc(termenv.ANSIYellow, etag, " ")
-						prefixLen += l
-					}
-					if len(params.Services) == 0 {
-						l, _ := term.Printc(termenv.ANSIGreen, service, " ")
-						prefixLen += l
-					}
-					if DoVerbose {
-						l, _ := term.Printc(termenv.ANSIMagenta, host, " ")
-						prefixLen += l
-					}
-				} else {
-					term.Print(strings.Repeat(" ", prefixLen))
-				}
-				if term.StdoutCanColor() {
-					if !strings.Contains(line, "\033[") {
-						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
-					}
-					term.Reset()
-				} else {
-					line = term.StripAnsi(line)
-				}
-				term.Println(line)
-
-				// Detect end logging event
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
-					cancel()
-					return nil
-				}
-			}
-		}
+	initialModel := model{
+		serverStream:   serverStream,
+		logs:           []*defangv1.LogEntry{},
+		showTimestamps: true,
+		verbose:        DoVerbose,
+		showEtag:       params.Etag == "",
+		showService:    len(params.Services) != 1,
 	}
+	p := tea.NewProgram(initialModel, tea.WithContext(ctx))
+	_, err = p.Run()
+	cancel()
+	println("asdf")
+	return err
+	/*
+	   skipDuplicate := false
+
+	   	for {
+	   		if !serverStream.Receive() {
+	   			if errors.Is(serverStream.Err(), context.Canceled) {
+	   				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
+	   			}
+
+	   			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
+	   			code := connect.CodeOf(serverStream.Err())
+	   			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+	   			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
+	   				term.Debug("Disconnected:", serverStream.Err())
+	   				var spaces int
+	   				if !params.Raw {
+	   					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
+	   				}
+	   				pkg.SleepWithContext(ctx, 1*time.Second)
+	   				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+	   				if err != nil {
+	   					term.Debug("Reconnect failed:", err)
+	   					return err
+	   				}
+	   				if !params.Raw {
+	   					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
+	   				}
+	   				skipDuplicate = true
+	   				continue
+	   			}
+
+	   			return serverStream.Err() // returns nil on EOF
+	   		}
+	   		msg := serverStream.Msg()
+	   		if msg == nil {
+	   			continue
+	   		}
+
+	   		for _, e := range msg.Entries {
+	   			service := valueOrDefault(e.Service, msg.Service)
+	   			host := valueOrDefault(e.Host, msg.Host)
+	   			etag := valueOrDefault(e.Etag, msg.Etag)
+
+	   			// HACK: skip noisy CI/CD logs (except errors)
+	   			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
+	   			onlyErrors := !DoVerbose && isInternal
+	   			if onlyErrors && !e.Stderr {
+	   				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
+	   					return nil
+	   				}
+	   				continue
+	   			}
+
+	   			ts := e.Timestamp.AsTime()
+	   			if skipDuplicate && ts.Equal(params.Since) {
+	   				skipDuplicate = false
+	   				continue
+	   			}
+	   			if ts.After(params.Since) {
+	   				params.Since = ts
+	   			}
+
+	   			if params.Raw {
+	   				if e.Stderr {
+	   					term.Error(e.Message)
+	   				} else {
+	   					term.Printlnc(term.InfoColor, e.Message)
+	   				}
+	   				continue
+	   			}
+
+	   			// Replace service progress messages with our own spinner
+	   			if doSpinner && isProgressDot(e.Message) {
+	   				continue
+	   			}
+
+	   			var prefixLen int
+	   			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
+	   			for i, line := range strings.Split(trimmed, "\n") {
+	   				if i == 0 {
+	   					tsString := ts.Local().Format(RFC3339Micro)
+	   					tsColor := termenv.ANSIBrightBlack
+	   					if term.HasDarkBackground() {
+	   						tsColor = termenv.ANSIWhite
+	   					}
+	   					if e.Stderr {
+	   						tsColor = termenv.ANSIBrightRed
+	   					}
+	   					prefixLen, _ = term.Printc(tsColor, tsString, " ")
+	   					if params.Etag == "" {
+	   						l, _ := term.Printc(termenv.ANSIYellow, etag, " ")
+	   						prefixLen += l
+	   					}
+	   					if len(params.Services) != 1 {
+	   						l, _ := term.Printc(termenv.ANSIGreen, service, " ")
+	   						prefixLen += l
+	   					}
+	   					if DoVerbose {
+	   						l, _ := term.Printc(termenv.ANSIMagenta, host, " ")
+	   						prefixLen += l
+	   					}
+	   				} else {
+	   					term.Print(strings.Repeat(" ", prefixLen))
+	   				}
+	   				if term.StdoutCanColor() {
+	   					if !strings.Contains(line, "\033[") {
+	   						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
+	   					}
+	   					term.Reset()
+	   				} else {
+	   					line = term.StripAnsi(line)
+	   				}
+	   				term.Println(line)
+
+	   				// Detect end logging event
+	   				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
+	   					cancel()
+	   					return nil
+	   				}
+	   			}
+	   		}
+	   	}
+	*/
 }
 
 func valueOrDefault(value, def string) string {
