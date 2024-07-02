@@ -31,9 +31,9 @@ jobs:
       #   run: GOOS=darwin go build ./cmd/cli
       #   working-directory: src
 
-      # - name: Build Windows binary
-      #   run: GOOS=windows go build ./cmd/cli
-      #   working-directory: src
+      - name: Build Windows binary
+        run: GOOS=windows go build ./cmd/cli
+        working-directory: src
 
       - name: Verify Go modules
         working-directory: src
@@ -118,10 +118,10 @@ jobs:
         working-directory: src
 
   build-and-sign:
-    name: Build app and sign files with Trusted Signing
-    environment: release
+    name: Build app and sign files (with Trusted Signing)
+    environment: release # must use environment to be able to authenticate with Azure Federated Identity for Trusted Signing
     needs: go-test
-    runs-on: windows-latest # for signtool
+    runs-on: windows-latest
     env: # from https://github.com/spiffe/spire/pull/5158
       GOPATH: 'D:\golang\go'
       GOCACHE: 'D:\golang\cache'
@@ -201,7 +201,7 @@ jobs:
           if-no-files-found: error
 
   build-and-sign-mac:
-    name: Build app and sign MacOS
+    name: Build app and sign (MacOS)
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
