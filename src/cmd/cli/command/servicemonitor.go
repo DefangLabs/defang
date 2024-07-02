@@ -24,7 +24,7 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 
 	serviceState := make(map[string]defangv1.ServiceState, len(serviceList))
 	for _, name := range serviceList {
-		serviceState[name] = defangv1.ServiceState_UNKNOWN
+		serviceState[name] = defangv1.ServiceState_SERVICE_STATE_UNSPECIFIED
 	}
 
 	// monitor for when all services are completed to end this command
@@ -35,7 +35,7 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 		}
 
 		// exit on detecting a FAILED state
-		if newStatus.State == defangv1.ServiceState_FAILED {
+		if newStatus.State == defangv1.ServiceState_SERVICE_FAILED {
 			return ErrDeploymentFailed
 		}
 
