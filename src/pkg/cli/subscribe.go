@@ -54,15 +54,17 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				continue
 			}
 
-			servInfo := msg.GetService()
-			if servInfo == nil || servInfo.Service == nil {
-				continue
+			status := SubscribeServiceStatus{
+				Name:   msg.Name,
+				Status: msg.Status,
+				State:  msg.State,
 			}
 
-			status := SubscribeServiceStatus{
-				Name:   servInfo.Service.Name,
-				Status: servInfo.Status,
-				State:  servInfo.State,
+			servInfo := msg.GetService()
+			if servInfo == nil || servInfo.Service == nil {
+				status.Name = servInfo.Service.Name
+				status.Status = servInfo.Status
+				status.State = servInfo.State
 			}
 
 			statusChan <- status
