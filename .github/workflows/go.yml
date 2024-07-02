@@ -139,13 +139,27 @@ jobs:
         run: go mod download
         working-directory: src
 
-      - name: Run GoReleaser (Windows and Linux)
+      - name: Run GoReleaser (Linux)
         uses: goreleaser/goreleaser-action@v5
         with:
-          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
           args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
           workdir: src
+        env:
+          GGOOS: linux
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+      - name: Run GoReleaser (Windows)
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          # version: latest
+          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
+          workdir: src
+        env:
+          GGOOS: windows
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       # From https://github.com/Azure/trusted-signing-action/pull/37
       - name: Azure login
@@ -206,11 +220,13 @@ jobs:
       - name: Run GoReleaser (macOS)
         uses: goreleaser/goreleaser-action@v5
         with:
-          # distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: build --id defang-mac ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
+          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
           workdir: src
         env:
+          GGOOS: darwin
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
@@ -244,16 +260,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist-mac
-          path: src/distx
+          path: src/dist
 
       - name: Download dist-win folder
         uses: actions/download-artifact@v4
         with:
           name: dist-win
-          path: src/distx
+          path: src/dist
 
       - name: List files
-        run: ls -lR src/distx
+        run: ls -lR src/dist
 
       - name: Set up Go # not sure why this is needed for release
         uses: actions/setup-go@v5
@@ -266,7 +282,7 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --config .goreleaser-prebuilt.yml
+          args: continue --merge
           workdir: src
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
@@ -275,15 +291,15 @@ jobs:
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
 
-      - name: Notarize macOS app # TODO: move to goreleaser.yml
-        shell: bash
-        run: |
-          bin/notarize.sh dist/defang_*_macOS.zip
-        working-directory: src
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
+      # - name: Notarize macOS app # TODO: move to goreleaser.yml
+      #   shell: bash
+      #   run: |
+      #     bin/notarize.sh dist/defang_*_macOS.zip
+      #   working-directory: src
+      #   env:
+      #     MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      #     MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      #     MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
   post-release:
     runs-on: ubuntu-latest
