@@ -61,7 +61,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			servInfo := msg.GetService()
-			if subStatus.Name != "" && (servInfo != nil && servInfo.Service != nil) {
+			if subStatus.Name == "" && (servInfo != nil && servInfo.Service != nil) {
 				subStatus.Name = servInfo.Service.Name
 				subStatus.Status = servInfo.Status
 				subStatus.State = servInfo.State
