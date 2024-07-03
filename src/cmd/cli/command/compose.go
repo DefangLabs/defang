@@ -15,22 +15,23 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
-func isManagedService(service *defangv1.Service) bool {
-	if service == nil {
+func isManagedService(service compose.ServiceConfig) bool {
+	if service.Extensions == nil {
 		return false
 	}
 
-	return service.StaticFiles != nil || service.Redis != nil || service.Postgres != nil
+	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []string {
+func GetUnreferencedManagedResources(serviceInfos compose.Services) []string {
 	managedResources := make([]string, 0)
 	for _, service := range serviceInfos {
-		if isManagedService(service.Service) {
-			managedResources = append(managedResources, service.Service.Name)
+		if isManagedService(service) {
+			managedResources = append(managedResources, service.Name)
 		}
 	}
 
@@ -64,7 +65,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = GetUnreferencedManagedResources(deploy.Services)
+			var managedResources = GetUnreferencedManagedResources(project.Services)
 			if len(managedResources) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
 			}
@@ -217,11 +218,11 @@ func makeComposeRestartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			etag, err := cli.ComposeRestart(cmd.Context(), client)
+			err := cli.ComposeRestart(cmd.Context(), client)
 			if err != nil {
 				return err
 			}
-			term.Info("Restarted services with deployment ID", etag)
+			term.Info("Restarted services")
 			return nil
 		},
 	}
