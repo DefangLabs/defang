@@ -15,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cert"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/dns"
+	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -76,11 +77,11 @@ var (
 )
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
-	projectName, err := client.LoadProjectName(ctx)
+	project, err := client.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debugf("Generating TLS cert for project %q", projectName)
+	term.Debugf("Generating TLS cert for project %q", project.Name)
 
 	services, err := client.GetServices(ctx)
 	if err != nil {
@@ -88,17 +89,17 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	}
 
 	cnt := 0
-	for _, service := range services.Services {
-		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
+	for _, serviceInfo := range services.Services {
+		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
 			cnt++
-			targets := []string{service.PublicFqdn}
-			for i, endpoint := range service.Endpoints {
-				if service.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+			targets := []string{serviceInfo.PublicFqdn}
+			for i, endpoint := range serviceInfo.Endpoints {
+				if service.Ports[i].Mode == quota.Mode_INGRESS {
 					targets = append(targets, endpoint)
 				}
 			}
-			term.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
-			generateCert(ctx, service.Service.Domainname, targets, client)
+			term.Debugf("Found service %v with domain %v and targets %v", service.Name, service.DomainName, targets)
+			generateCert(ctx, service.DomainName, targets, client)
 		}
 	}
 	if cnt == 0 {

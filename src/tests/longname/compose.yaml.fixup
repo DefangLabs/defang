@@ -1,0 +1,10 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "alpine",
+    "networks": {
+      "default": null
+    }
+  }
+]

@@ -29,9 +29,7 @@ func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[e
 		Project: "tenantx",
 		Services: []*defangv1.ServiceInfo{
 			{
-				Service: &defangv1.Service{
-					Name: "test-service",
-				},
+				Service: &defangv1.Service{Name: "test-service"},
 			},
 		},
 	}), nil
