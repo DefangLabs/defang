@@ -562,17 +562,13 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` "
-		}
-
 		// Load the project and check for empty environment variables
 		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
 		project, err := loader.LoadCompose(cmd.Context())
 		if err != nil {
 			return err
 		}
+
 		envInstructions := ""
 		for _, service := range project.Services {
 			envVars := make([]string, 0)
@@ -584,6 +580,11 @@ var generateCmd = &cobra.Command{
 			if len(envVars) > 0 {
 				envInstructions = strings.Join(envVars, " ") + "\n"
 			}
+		}
+
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` "
 		}
 
 		// TODO: should we use EDITOR env var instead?
