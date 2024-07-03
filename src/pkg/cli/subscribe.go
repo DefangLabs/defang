@@ -54,21 +54,21 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				continue
 			}
 
-			status := SubscribeServiceStatus{
-				Name:   msg.Name,
-				Status: msg.Status,
-				State:  msg.State,
+			subStatus := SubscribeServiceStatus{
+				Name:   msg.GetName(),
+				Status: msg.GetStatus(),
+				State:  msg.GetState(),
 			}
 
 			servInfo := msg.GetService()
-			if servInfo == nil || servInfo.Service == nil {
-				status.Name = servInfo.Service.Name
-				status.Status = servInfo.Status
-				status.State = servInfo.State
+			if subStatus.Name != "" && (servInfo != nil && servInfo.Service != nil) {
+				subStatus.Name = servInfo.Service.Name
+				subStatus.Status = servInfo.Status
+				subStatus.State = servInfo.State
 			}
 
-			statusChan <- status
-			term.Debugf("service %s with state ( %s ) and status: %s\n", servInfo.Service.Name, servInfo.State.String(), servInfo.Status)
+			statusChan <- subStatus
+			term.Debugf("service %s with state ( %s ) and status: %s\n", subStatus.Name, subStatus.State.String(), subStatus.Status)
 		}
 	}()
 
