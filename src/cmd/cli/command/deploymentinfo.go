@@ -1,7 +1,7 @@
 package command
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -9,12 +9,15 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+const DEFANG_PORTAL_HOST = "portal.defang.dev"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	// We can only show services deployed to the prod1 defang SaaS environment.
 	if provider == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
 		term.Info("Monitor your services' status in the defang portal")
 		for _, serviceInfo := range serviceInfos {
-			fmt.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
 		}
 	}
 }
@@ -26,17 +29,17 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 			andEndpoints = "and will be available at:"
 		}
 		term.Info("Service", serviceInfo.Service.Name, "is in state", serviceInfo.Status, andEndpoints)
-		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
-				endpoint = "https://" + endpoint
+		for _, endpoint := range serviceInfo.Endpoints {
+			if url, ok := strings.CutSuffix(endpoint, ":443"); ok {
+				endpoint = "https://" + url
 			}
-			fmt.Println("   -", endpoint)
+			term.Println("   -", endpoint)
 		}
-		if serviceInfo.Service.Domainname != "" {
+		if serviceInfo.Domainname != "" {
 			if serviceInfo.ZoneId != "" {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname)
+				term.Println("   -", "https://"+serviceInfo.Domainname)
 			} else {
-				fmt.Println("   -", "https://"+serviceInfo.Service.Domainname+" (after `defang cert generate` to get a TLS certificate)")
+				term.Println("   -", "https://"+serviceInfo.Domainname+" (after `defang cert generate` to get a TLS certificate)")
 			}
 		}
 	}

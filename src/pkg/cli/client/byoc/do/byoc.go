@@ -128,7 +128,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
 
-	return "", nil
+	return "", client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
@@ -151,7 +151,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -159,27 +159,27 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	return nil
+	return client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
-	return nil
+	return client.ErrNotImplemented("not implemented for ByocDo")
 }
 
-func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", nil
+func (b *ByocDo) Restart(ctx context.Context, names ...string) error {
+	return client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
@@ -191,17 +191,16 @@ func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) 
 }
 
 func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	return nil
+	return client.ErrNotImplemented("not implemented for ByocDo")
 	//return b.Driver.TearDown(ctx)
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
-
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
@@ -210,8 +209,7 @@ func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 }
 
 func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
@@ -250,7 +248,7 @@ func (b *ByocDo) environment() map[string]string {
 func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
 
 	si := &defangv1.ServiceInfo{
-		Service: service,
+		Service: &defangv1.ServiceID{Name: service.Name},
 		Project: b.PulumiProject,
 		Etag:    pkg.RandomID(),
 	}

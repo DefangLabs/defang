@@ -23,18 +23,26 @@ service FabricController {
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
-  rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
+  rpc Update(Service) returns (ServiceInfo) {
+    option deprecated = true;
+  }; // deprecated; use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(ServiceID) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };                                                  // should be GetService
-  rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
+  rpc Delete(DeleteRequest) returns (DeleteResponse){
+    option deprecated = true;
+  }; // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
+
+  rpc Restart(RestartRequest) returns (google.protobuf.Empty);
+  // rpc Start(ServiceID) returns (google.protobuf.Empty);
+  // rpc Stop(ServiceID) returns (google.protobuf.Empty);
 
   rpc GenerateFiles(GenerateFilesRequest) returns (
       GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
@@ -70,6 +78,11 @@ service FabricController {
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 }
 
+message RestartRequest {
+  repeated string services = 1;
+  string project = 2; // defaults to tenant ID
+}
+
 message TrackRequest {
   string anon_id = 1;
   string event = 2;
@@ -79,8 +92,9 @@ message TrackRequest {
 }
 
 message DeployRequest {
-  repeated Service services = 1;
+  repeated Service services = 1 [deprecated = true]; // deprecated; use compose
   string project = 2;
+  string compose = 3;
 }
 
 message DeployResponse {
@@ -118,13 +132,13 @@ message UploadURLRequest { string digest = 1; }
 message UploadURLResponse { string url = 1; }
 
 message ServiceInfo {
-  Service service = 1;
+  ServiceID service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
   string project = 3;            // was: tenant; defaults to tenant ID
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7; // comma-separated list of internal CIDR for the load-balancer
+  repeated string lb_ips = 7; // comma-separated list of internal CIDRs for the load-balancer
   string private_fqdn = 8; // fully qualified domain name (host)
   string public_fqdn = 9;  // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
@@ -132,6 +146,7 @@ message ServiceInfo {
   string zone_id = 12; // zone ID for byod domain
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
   reserved 14; // was: string lb_dns
+  string domainname = 15; // domain name for the service
 
   // bool is_function = 5; // true if service is a function
 }
@@ -207,12 +222,14 @@ message TailResponse {
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
+  string compose = 3;
 }
 
 // TODO: internal message; move to a separate proto file
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
+  string compose = 3;
 }
 
 enum Platform {
@@ -227,19 +244,7 @@ message Device {
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
-
-  // repeated string device_ids = 4; // device IDs to reserve
-  // map<string, string> options = 5;
 }
-
-/* placement specifies constraints and preferences for platform to select a
- * physical node to run service containers. */
-// message Placement {
-//   /* constraints defines a REQUIRED property the platform's node MUST fulfill
-//   to run service container. */ map<string, string> constraints = 1;
-//   /* preferences defines a property the platform's node SHOULD fulfill to run
-//   service container. */ map<string, string> preferences = 2;
-// }
 
 message Resource {
   float memory = 1;            // in MiB
@@ -338,7 +343,7 @@ message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // deprecated: use networks
+  bool internal = 4 [deprecated = true]; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -375,7 +380,7 @@ message Event {
 
 message PublishRequest { Event event = 1; }
 
-message SubscribeRequest { 
+message SubscribeRequest {
   repeated string services = 1;
 }
 

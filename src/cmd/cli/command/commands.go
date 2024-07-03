@@ -29,9 +29,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const DEFANG_PORTAL_HOST = "portal.defang.dev"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
-
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
@@ -916,11 +913,11 @@ var composeRestartCmd = &cobra.Command{
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
 	Short:       "Reads a Compose file and restarts its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		etag, err := cli.ComposeRestart(cmd.Context(), client)
+		err := cli.ComposeRestart(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
-		term.Info("Restarted services with deployment ID", etag)
+		term.Info("Restarted services")
 		return nil
 	},
 }
@@ -1050,11 +1047,11 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		etag, err := cli.Restart(cmd.Context(), client, args...)
+		err := cli.Restart(cmd.Context(), client, args...)
 		if err != nil {
 			return err
 		}
-		term.Info("Restarted service", args, "with deployment ID", etag)
+		term.Info("Restarted service", args)
 		return nil
 	},
 }

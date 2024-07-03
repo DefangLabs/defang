@@ -22,7 +22,7 @@ func GetServices(ctx context.Context, client client.Client, long bool) error {
 
 	if !long {
 		for _, si := range serviceList.Services {
-			*si = defangv1.ServiceInfo{Service: &defangv1.Service{Name: si.Service.Name}}
+			*si = defangv1.ServiceInfo{Service: &defangv1.ServiceID{Name: si.Service.Name}}
 		}
 	}
 

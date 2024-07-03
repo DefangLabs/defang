@@ -5,20 +5,20 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
-	port80 := &defangv1.Port{Mode: defangv1.Mode_INGRESS, Target: 80}
-	port8080 := &defangv1.Port{Mode: defangv1.Mode_INGRESS, Target: 8080}
-	hostModePort := &defangv1.Port{Mode: defangv1.Mode_HOST, Target: 80}
+	port80 := &compose.ServicePortConfig{Mode: quota.Mode_INGRESS, Target: 80}
+	port8080 := &compose.ServicePortConfig{Mode: quota.Mode_INGRESS, Target: 8080}
+	hostModePort := &compose.ServicePortConfig{Mode: quota.Mode_HOST, Target: 80}
 	tests := []struct {
 		ProjectName string
 		TenantID    types.TenantID
 		Fqn         string
-		Port        *defangv1.Port
+		Port        *compose.ServicePortConfig
 		EndPoint    string
 		PublicFqdn  string
 		PrivateFqdn string
