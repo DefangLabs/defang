@@ -26,7 +26,6 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
@@ -563,49 +562,28 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		// Check the compose.yaml for environment variables
-		envInstructions := ""
-		data, err := os.ReadFile(filepath.Join(prompt.Folder, "compose.yaml"))
-		if err != nil {
-			term.Debug("unable to read compose.yaml:", err)
-		} else {
-			var compose struct {
-				Services map[string]struct {
-					Environment interface{} `yaml:"environment"`
-				} `yaml:"services"`
-			}
-
-			err = yaml.Unmarshal(data, &compose)
-			if err != nil {
-				term.Debug("unable to parse compose.yaml:", err)
-			} else {
-				for _, service := range compose.Services {
-					envVars := make([]string, 0)
-					switch env := service.Environment.(type) {
-					case []interface{}:
-						for _, envVar := range env {
-							if !strings.Contains(envVar.(string), "=") { // Check if the env var is not set
-								envVars = append(envVars, envVar.(string))
-							}
-						}
-					case map[string]interface{}:
-						for key, value := range env {
-							if value == nil || value == "" { // Check if the env var is either nil or not set
-								envVars = append(envVars, key)
-							}
-						}
-					default:
-						fmt.Printf("Unexpected type: %T\n", env) // unexpected types
-					}
-					if len(envVars) > 0 {
-						envInstructions = strings.Join(envVars, " ") + "\n"
-					}
-				}
-			}
-		}
 		cd := ""
 		if prompt.Folder != "." {
 			cd = "`cd " + prompt.Folder + "` "
+		}
+
+		// Load the project and check for empty environment variables
+		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
+		project, err := loader.LoadCompose(cmd.Context())
+		if err != nil {
+			return err
+		}
+		envInstructions := ""
+		for _, service := range project.Services {
+			envVars := make([]string, 0)
+			for key, value := range service.Environment {
+				if value == nil || *value == "" {
+					envVars = append(envVars, key)
+				}
+			}
+			if len(envVars) > 0 {
+				envInstructions = strings.Join(envVars, " ") + "\n"
+			}
 		}
 
 		// TODO: should we use EDITOR env var instead?
