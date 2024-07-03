@@ -5,13 +5,12 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
-func ComposeRestart(ctx context.Context, client client.Client) (types.ETag, error) {
+func ComposeRestart(ctx context.Context, client client.Client) error {
 	project, err := client.LoadProject(ctx)
 	if err != nil {
-		return "", err
+		return err
 	}
 	names := make([]string, 0, len(project.Services))
 	for _, service := range project.Services {
