@@ -572,7 +572,7 @@ var generateCmd = &cobra.Command{
 
 		cd := ""
 		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` "
+			cd = "`cd " + prompt.Folder + "` and "
 		}
 
 		// Load the project and check for empty environment variables
@@ -580,13 +580,13 @@ var generateCmd = &cobra.Command{
 		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
 		project, _ := loader.LoadCompose(cmd.Context())
 
-		envVars := collectUnsetEnvVars(project) // ir err != nil -> proj == nil, which is handled in the collectUnsetEnvVars function
+		envVars := collectUnsetEnvVars(project) // if err != nil -> proj == nil, which is handled in the collectUnsetEnvVars function
 		envInstructions = strings.Join(envVars, " ")
 
 		if envInstructions != "" { // logic needs to be duplicated in case where no env vars in yaml file.
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "config set "+envInstructions)
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "config set "+envInstructions)
 		} else {
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
 		}
 
 		return nil
