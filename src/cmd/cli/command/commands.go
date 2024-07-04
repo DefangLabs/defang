@@ -562,20 +562,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` "
-		}
-		// Load the project and check for empty environment variables
-		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
-		project, err := loader.LoadCompose(cmd.Context())
-		if err != nil {
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
-			return nil
-		}
-
-		envVars := collectUnsetEnvVars(project)
-		envInstructions := strings.Join(envVars, " ") // last line doesnt get \n
 
 		// TODO: should we use EDITOR env var instead?
 		cmdd := exec.Command("code", ".")
@@ -583,7 +569,21 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			term.Debug("unable to launch VS Code:", err)
 		}
-		if envInstructions != "" { // check if any envars need to be set
+
+		cd := ""
+		if prompt.Folder != "." {
+			cd = "`cd " + prompt.Folder + "` "
+		}
+
+		// Load the project and check for empty environment variables
+		var envInstructions = ""
+		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
+		project, _ := loader.LoadCompose(cmd.Context())
+
+		envVars := collectUnsetEnvVars(project) // ir err != nil -> proj == nil, which is handled in the collectUnsetEnvVars function
+		envInstructions = strings.Join(envVars, " ")
+
+		if envInstructions != "" { // logic needs to be duplicated in case where no env vars in yaml file.
 			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "config set "+envInstructions)
 		} else {
 			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
@@ -595,10 +595,12 @@ var generateCmd = &cobra.Command{
 
 func collectUnsetEnvVars(project *proj.Project) []string {
 	var envVars []string
-	for _, service := range project.Services {
-		for key, value := range service.Environment {
-			if value == nil || *value == "" {
-				envVars = append(envVars, key)
+	if project != nil {
+		for _, service := range project.Services {
+			for key, value := range service.Environment {
+				if value == nil {
+					envVars = append(envVars, key)
+				}
 			}
 		}
 	}
