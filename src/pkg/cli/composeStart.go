@@ -45,20 +45,10 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, err
 	}
 
-	services := compose.ConvertServices(project.Services)
-	if len(services) == 0 {
-		return nil, &ComposeError{fmt.Errorf("no services found")}
-	}
-
 	if DoDryRun {
-		for _, service := range services {
-			PrintObject(service.Name, service)
-		}
+		yaml, _ := project.MarshalYAML()
+		fmt.Println(string(yaml))
 		return nil, ErrDryRun
-	}
-
-	for _, service := range services {
-		term.Info("Deploying service", service.Name)
 	}
 
 	bytes, err := project.MarshalYAML()
@@ -76,9 +66,12 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, err
 	}
 
+	for _, service := range project.Services {
+		term.Info("Deploying service", service.Name)
+	}
+
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
-		Services: services,
-		Compose:  str,
+		Compose: str,
 	})
 	if err != nil {
 		return nil, err
