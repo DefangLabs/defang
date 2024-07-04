@@ -19,8 +19,8 @@ type deployMock struct {
 }
 
 func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	if req.Compose == nil || req.Services == nil {
-		return nil, errors.New("invalid request")
+	if req.Compose == nil && req.Services == nil {
+		return nil, errors.New("DeployRequest needs Compose or Services")
 	}
 
 	asMap := req.Compose.AsMap()
