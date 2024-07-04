@@ -1,48 +1,17 @@
 package compose
 
 import (
-	"context"
 	"fmt"
-	"regexp"
-	"slices"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
-func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force BuildContext) ([]*defangv1.Service, error) {
-	// Create a regexp to detect private service names in environment variable values
-	var serviceNames []string
-	var nonReplaceServiceNames []string
-	for _, svccfg := range serviceConfigs {
-		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
-			return p.Mode == "host" // only private services with host ports get DNS names
-		}) {
-			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
-		} else {
-			nonReplaceServiceNames = append(nonReplaceServiceNames, regexp.QuoteMeta(svccfg.Name))
-		}
-	}
-	var serviceNameRegex *regexp.Regexp
-	if len(serviceNames) > 0 {
-		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
-	}
-	var nonReplaceServiceNameRegex *regexp.Regexp
-	if len(nonReplaceServiceNames) > 0 {
-		nonReplaceServiceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(nonReplaceServiceNames, "|") + `)\b`)
-	}
-
-	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := c.ListConfig(ctx)
-	if err != nil {
-		term.Debugf("failed to load config: %v", err)
-		config = &defangv1.Secrets{}
-	}
-	slices.Sort(config.Names) // sort for binary search
-
+// Deprecated: keep compose as-is
+func ConvertServices(serviceConfigs compose.Services) []*defangv1.Service {
 	//
 	// Publish updates
 	//
@@ -67,7 +36,6 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		var deploy *defangv1.Deploy
 		if svccfg.Deploy != nil {
 			deploy = &defangv1.Deploy{}
-			deploy.Replicas = 1 // default to one replica per service; allow the user to override this to 0
 			if svccfg.Deploy.Replicas != nil {
 				deploy.Replicas = uint32(*svccfg.Deploy.Replicas)
 			}
@@ -92,17 +60,10 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			}
 		}
 
-		// Upload the build context, if any; TODO: parallelize
 		var build *defangv1.Build
 		if svccfg.Build != nil {
-			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
-			if err != nil {
-				return nil, err
-			}
-
 			build = &defangv1.Build{
-				Context:    url,
+				Context:    svccfg.Build.Context,
 				Dockerfile: svccfg.Build.Dockerfile,
 				ShmSize:    float32(svccfg.Build.ShmSize) / MiB,
 				Target:     svccfg.Build.Target,
@@ -121,53 +82,19 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		// Extract environment variables
-		var envFromConfig []string
+		var configs []*defangv1.Secret
 		envs := make(map[string]string, len(svccfg.Environment))
 		for key, value := range svccfg.Environment {
-			// A bug in Compose-go env file parsing can cause empty keys
-			if key == "" {
-				term.Warnf("service %q: skipping unset environment variable key", svccfg.Name)
-				continue
-			}
-			// keep track of what environment variables were declared but not set in the compose environment section
 			if value == nil {
-				envFromConfig = append(envFromConfig, key)
-				continue
-			}
-
-			// Check if the environment variable is an existing config; if so, mark it as such
-			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: environment variable %q needs service name fix-up, but is overridden by config, which will not be fixed up.", svccfg.Name, key)
-				} else {
-					term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
-				}
-				envFromConfig = append(envFromConfig, key)
-				continue
-			}
-
-			val := *value
-			if serviceNameRegex != nil {
-				// Replace service names with their actual DNS names; TODO: support public names too
-				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-					return c.ServiceDNS(NormalizeServiceName(serviceName))
+				// Add unset environment variables as "secrets"
+				configs = append(configs, &defangv1.Secret{
+					Source: key,
 				})
-				if val != *value {
-					term.Warnf("service %q: service names were fixed up in environment variable %q: %q", svccfg.Name, key, val)
-				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: service names in the environment variable %q were not fixed up, only services with port mode set to host will be fixed up.", svccfg.Name, key)
-				}
+			} else {
+				envs[key] = *value
 			}
-			envs[key] = val
 		}
 
-		// Add unset environment variables as "secrets"
-		var configs []*defangv1.Secret
-		for _, name := range envFromConfig {
-			configs = append(configs, &defangv1.Secret{
-				Source: name,
-			})
-		}
 		// Extract secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
 			if i == 0 { // only warn once
@@ -218,14 +145,10 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			postgres = &defangv1.Postgres{}
 		}
 
-		if redis == nil && postgres == nil && isStatefulImage(svccfg.Image) {
-			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
-		}
-
 		network := network(&svccfg)
 		ports := convertPorts(svccfg.Ports)
 		services = append(services, &defangv1.Service{
-			Name:        NormalizeServiceName(svccfg.Name),
+			Name:        svccfg.Name,
 			Image:       svccfg.Image,
 			Build:       build,
 			Internal:    network == defangv1.Network_PRIVATE,
@@ -245,7 +168,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			Postgres:    postgres,
 		})
 	}
-	return services, nil
+	return services
 }
 
 func getResourceReservations(r compose.Resources) *compose.Resource {
@@ -279,6 +202,33 @@ func network(svccfg *compose.ServiceConfig) defangv1.Network {
 	return defangv1.Network_PRIVATE
 }
 
+func fixupPort(port *compose.ServicePortConfig) {
+	switch port.Mode {
+	case "":
+		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
+		fallthrough
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
+		if port.Protocol != "udp" {
+			if port.Published != "" {
+				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
+			}
+			port.Mode = quota.Mode_INGRESS
+			if (port.Protocol == "tcp" || port.Protocol == "udp") && port.AppProtocol != "http" {
+				// term.Warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+				port.AppProtocol = "http"
+			}
+			break
+		}
+		term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+		fallthrough
+	case "host":
+		port.Mode = quota.Mode_HOST
+	default:
+		panic(fmt.Sprintf("port %d: 'mode' should have been validated to be one of [host ingress] but got: %v", port.Target, port.Mode))
+	}
+}
+
 func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 	pbPort := &defangv1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
@@ -297,14 +247,23 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 		pbPort.Protocol = defangv1.Protocol_TCP
 	case "udp":
 		pbPort.Protocol = defangv1.Protocol_UDP
-	case "http": // TODO: not per spec
+	case "http": // TODO: not per spec; should use AppProtocol
 		pbPort.Protocol = defangv1.Protocol_HTTP
-	case "http2": // TODO: not per spec
+	case "http2": // TODO: not per spec; should use AppProtocol
 		pbPort.Protocol = defangv1.Protocol_HTTP2
-	case "grpc": // TODO: not per spec
+	case "grpc": // TODO: not per spec; should use AppProtocol
 		pbPort.Protocol = defangv1.Protocol_GRPC
 	default:
-		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %v", port.Protocol))
+		panic(fmt.Sprintf("port %d: 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %q", port.Target, port.Protocol))
+	}
+
+	switch port.AppProtocol {
+	case "http":
+		pbPort.Protocol = defangv1.Protocol_HTTP
+	case "http2":
+		pbPort.Protocol = defangv1.Protocol_HTTP2
+	case "grpc":
+		pbPort.Protocol = defangv1.Protocol_GRPC
 	}
 
 	switch port.Mode {
@@ -329,7 +288,7 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 	case "host":
 		pbPort.Mode = defangv1.Mode_HOST
 	default:
-		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %v", port.Mode))
+		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %q", port.Mode))
 	}
 	return pbPort
 }
