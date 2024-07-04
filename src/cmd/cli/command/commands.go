@@ -571,7 +571,7 @@ var generateCmd = &cobra.Command{
 		project, err := loader.LoadCompose(cmd.Context())
 		if err != nil {
 			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
-			return err
+			return nil
 		}
 
 		envVars := collectUnsetEnvVars(project)
