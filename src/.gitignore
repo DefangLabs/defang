@@ -7,4 +7,5 @@ generateEngine_test.log
 defang-amd64
 defang-arm64
 dist/
+distx/
 defang.exe
