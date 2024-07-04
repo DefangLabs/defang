@@ -25,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
+	proj "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
@@ -561,31 +562,21 @@ var generateCmd = &cobra.Command{
 		}
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
-
-		// Load the project and check for empty environment variables
-		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
-		project, err := loader.LoadCompose(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		envInstructions := ""
-		for _, service := range project.Services {
-			envVars := make([]string, 0)
-			for key, value := range service.Environment {
-				if value == nil || *value == "" {
-					envVars = append(envVars, key)
-				}
-			}
-			if len(envVars) > 0 {
-				envInstructions = strings.Join(envVars, " ") + "\n"
-			}
-		}
-
 		cd := ""
 		if prompt.Folder != "." {
 			cd = "`cd " + prompt.Folder + "` "
 		}
+		// Load the project and check for empty environment variables
+		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
+		project, err := loader.LoadCompose(cmd.Context())
+		if err != nil {
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd+"and ", "compose up")
+			return err
+		}
+
+		envVars := collectUnsetEnvVars(project)
+
+		envInstructions := strings.Join(envVars, " ") // last line doesnt get \n
 
 		// TODO: should we use EDITOR env var instead?
 		cmdd := exec.Command("code", ".")
@@ -601,6 +592,18 @@ var generateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func collectUnsetEnvVars(project *proj.Project) []string {
+	var envVars []string
+	for _, service := range project.Services {
+		for key, value := range service.Environment {
+			if value == nil || *value == "" {
+				envVars = append(envVars, key)
+			}
+		}
+	}
+	return envVars
 }
 
 var getServicesCmd = &cobra.Command{
