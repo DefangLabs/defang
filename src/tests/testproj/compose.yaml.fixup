@@ -1,0 +1,56 @@
+[
+  {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "DNS": "dfnx"
+      },
+      "target": "testproj"
+    },
+    "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpus": 0.5,
+          "memory": "536870912"
+        },
+        "reservations": {
+          "cpus": 0.25,
+          "memory": "268435456"
+        }
+      },
+      "placement": {}
+    },
+    "entrypoint": null,
+    "environment": {
+      "DOTENV": "enabled",
+      "DOT_ENV_INTERPOLATION": "enabled",
+      "FOO": "bar",
+      "dummy": null
+    },
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "curl",
+        "-f",
+        "http://localhost/"
+      ]
+    },
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 80
+      },
+      {
+        "mode": "ingress",
+        "target": 1234
+      }
+    ],
+    "restart": "unless-stopped"
+  }
+]

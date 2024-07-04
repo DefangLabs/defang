@@ -10,3 +10,8 @@ plugins:
   - plugin: buf.build/bufbuild/connect-go
     out: protos
     opt: paths=source_relative
+  - plugin: buf.build/connectrpc/es:v1.4.0
+    out: gen
+  # dependencies
+  - plugin: buf.build/bufbuild/es
+    out: gen

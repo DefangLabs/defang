@@ -9,6 +9,7 @@ option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
 package io.defang.v1;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 service FabricController {
@@ -94,7 +95,7 @@ message TrackRequest {
 message DeployRequest {
   repeated Service services = 1 [deprecated = true]; // deprecated; use compose
   string project = 2;
-  string compose = 3;
+  google.protobuf.Struct compose = 3;
 }
 
 message DeployResponse {
@@ -222,14 +223,14 @@ message TailResponse {
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
-  string compose = 3;
+  google.protobuf.Struct compose = 3;
 }
 
 // TODO: internal message; move to a separate proto file
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string compose = 3;
+  google.protobuf.Struct compose = 3;
 }
 
 enum Platform {

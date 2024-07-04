@@ -8,6 +8,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/structpb"
+	"gopkg.in/yaml.v3"
 )
 
 type ComposeError struct {
@@ -39,11 +41,11 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		return nil, &ComposeError{err}
 	}
 
-	services, err := compose.ConvertServices(ctx, c, project.Services, buildContext(force))
-	if err != nil {
+	if err := compose.FixupServices(ctx, c, project.Services, buildContext(force)); err != nil {
 		return nil, err
 	}
 
+	services := compose.ConvertServices(project.Services)
 	if len(services) == 0 {
 		return nil, &ComposeError{fmt.Errorf("no services found")}
 	}
@@ -59,8 +61,24 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		term.Info("Deploying service", service.Name)
 	}
 
+	bytes, err := project.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+
+	var asMap map[string]any
+	if err := yaml.Unmarshal(bytes, &asMap); err != nil {
+		return nil, err
+	}
+
+	str, err := structpb.NewStruct(asMap)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
 		Services: services,
+		Compose:  str,
 	})
 	if err != nil {
 		return nil, err

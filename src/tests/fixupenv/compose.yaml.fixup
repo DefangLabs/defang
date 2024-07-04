@@ -1,0 +1,28 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "mistral:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 8000
+      }
+    ]
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "API_URL": "http://mistral:8000",
+      "SENSITIVE_DATA": null
+    },
+    "image": "ui:latest",
+    "networks": {
+      "default": null
+    }
+  }
+]

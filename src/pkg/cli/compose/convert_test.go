@@ -9,7 +9,10 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestConvertPort(t *testing.T) {
@@ -139,11 +142,38 @@ func TestConvertPort(t *testing.T) {
 			if tt.wantErr != "" {
 				t.Errorf("convertPort() expected error: %v", tt.wantErr)
 			}
+			fixupPort(&tt.input)
 			got := convertPort(tt.input)
 			if got.String() != tt.expected.String() {
 				t.Errorf("convertPort() got %v, want %v", got, tt.expected.String())
 			}
 		})
+	}
+}
+
+func TestComposeBlob(t *testing.T) {
+	var compose structpb.Struct
+	if err := json.Unmarshal([]byte(`{"name":"test","services":{"test":{"image":"nginx"}}}`), &compose); err != nil {
+		t.Fatal(err)
+	}
+
+	asmap := compose.AsMap()
+	t.Log(asmap)
+
+	p, err := loader.LoadWithContext(context.Background(), types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: compose.AsMap()}}}, func(o *loader.Options) {
+		o.SetProjectName(compose.Fields["name"].GetStringValue(), true) // HACK: workaround for a bug in compose-go where it insists on loading the project name from the first file
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(p)
+
+	blob, err := proto.Marshal(&compose)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blob) != 62 {
+		t.Errorf("expected empty blob, got %v", blob)
 	}
 }
 
@@ -154,11 +184,11 @@ func TestConvert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextIgnore)
-		if err != nil {
+		if err := FixupServices(context.Background(), client.MockClient{}, proj.Services, BuildContextIgnore); err != nil {
 			t.Fatal(err)
 		}
 
+		services := ConvertServices(proj.Services)
 		// The order of the services is not guaranteed, so we sort the services before comparing
 		slices.SortFunc(services, func(i, j *defangv1.Service) int { return strings.Compare(i.Name, j.Name) })
 
