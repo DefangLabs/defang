@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
+	proj "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
@@ -488,10 +490,9 @@ var generateCmd = &cobra.Command{
 				Prompt: &survey.Input{
 					Message: "Please describe the service you'd like to build:",
 					Help: `Here are some example prompts you can use:
-	"A simple 'hello world' function"
-	"A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-	"A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button\"
-Generate will write files in the current folder. You can edit them and then deploy using 'defang compose up --tail' when ready.`,
+    "A simple 'hello world' function"
+    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
+    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
 				},
 				Validate: survey.MinLength(5),
 			},
@@ -573,9 +574,37 @@ Generate will write files in the current folder. You can edit them and then depl
 		if prompt.Folder != "." {
 			cd = "`cd " + prompt.Folder + "` and "
 		}
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, "+cd+"do:", "compose up")
+
+		// Load the project and check for empty environment variables
+		var envInstructions = ""
+		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
+		project, _ := loader.LoadCompose(cmd.Context())
+
+		envVars := collectUnsetEnvVars(project) // if err != nil -> proj == nil, which is handled in the collectUnsetEnvVars function
+		envInstructions = strings.Join(envVars, " ")
+
+		if envInstructions != "" { // logic needs to be duplicated in case where no env vars in yaml file.
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "config set "+envInstructions)
+		} else {
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
+		}
+
 		return nil
 	},
+}
+
+func collectUnsetEnvVars(project *proj.Project) []string {
+	var envVars []string
+	if project != nil {
+		for _, service := range project.Services {
+			for key, value := range service.Environment {
+				if value == nil {
+					envVars = append(envVars, key)
+				}
+			}
+		}
+	}
+	return envVars
 }
 
 var getServicesCmd = &cobra.Command{
