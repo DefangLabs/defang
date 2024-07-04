@@ -37,6 +37,11 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 		expected []string
 	}{
 		{
+			name:     "Nil project",
+			project:  nil,
+			expected: []string{},
+		},
+		{
 			name: "No unset environment variables (map structure)",
 			project: &types.Project{
 				Services: map[string]types.ServiceConfig{
@@ -65,7 +70,7 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"ENV2", "ENV3"},
+			expected: []string{"ENV2"},
 		},
 		{
 			name: "All unset environment variables (map structure)",
@@ -75,7 +80,7 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 						Name: "service1",
 						Environment: types.MappingWithEquals{
 							"ENV1": nil,
-							"ENV2": stringPtr(""),
+							"ENV2": nil,
 						},
 					},
 				},
@@ -118,7 +123,31 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"ENV2", "ENV3", "ENV5"},
+			expected: []string{"ENV2", "ENV5"},
+		},
+		{
+			name: "Services with map and array structure",
+			project: &types.Project{
+				Services: map[string]types.ServiceConfig{
+					"x": {
+						Name: "x",
+						Environment: types.MappingWithEquals{
+							"regular": stringPtr("value"),
+							"empty":   stringPtr(""),
+							"config":  nil,
+						},
+					},
+					"y": {
+						Name: "y",
+						Environment: types.MappingWithEquals{
+							"REDIS_HOST": stringPtr("x"),
+							"EMPTY":      stringPtr(""),
+							"CONFIG":     nil,
+						},
+					},
+				},
+			},
+			expected: []string{"config", "CONFIG"},
 		},
 	}
 
