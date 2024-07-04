@@ -830,6 +830,7 @@ var composeUpCmd = &cobra.Command{
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() { // Cancel the tailing if the service is ready
+			defer wg.Done()
 			if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil {
 				if !errors.Is(err, context.Canceled) &&
 					!errors.Is(err, cli.ErrDryRun) &&
