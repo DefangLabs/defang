@@ -575,7 +575,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		envVars := collectUnsetEnvVars(project)
-
 		envInstructions := strings.Join(envVars, " ") // last line doesnt get \n
 
 		// TODO: should we use EDITOR env var instead?
