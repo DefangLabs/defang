@@ -81,6 +81,7 @@ nix:
         --fish <($out/bin/defang completion fish)
 
 changelog:
+  use: github
   filters:
     exclude:
       # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
