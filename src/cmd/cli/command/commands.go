@@ -563,11 +563,11 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		// TODO: should we use EDITOR env var instead?
-		cmdd := exec.Command("code", ".")
+		cmdd := exec.Command("code", prompt.Folder)
 		err = cmdd.Start()
 		if err != nil {
 			term.Debug("unable to launch VS Code:", err)
+			// TODO: should we use EDITOR env var instead?
 		}
 
 		cd := ""
@@ -576,15 +576,16 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		var envInstructions = ""
 		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
 		project, _ := loader.LoadCompose(cmd.Context())
 
-		envVars := collectUnsetEnvVars(project) // if err != nil -> proj == nil, which is handled in the collectUnsetEnvVars function
-		envInstructions = strings.Join(envVars, " ")
+		var envInstructions []string
+		for _, envVar := range collectUnsetEnvVars(project) {
+			envInstructions = append(envInstructions, "config create "+envVar)
+		}
 
-		if envInstructions != "" { // logic needs to be duplicated in case where no env vars in yaml file.
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "config set "+envInstructions)
+		if len(envInstructions) > 0 {
+			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, envInstructions...)
 		} else {
 			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
 		}
