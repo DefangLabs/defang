@@ -119,7 +119,7 @@ message UploadURLResponse { string url = 1; }
 
 
 enum ServiceState {
-  SERVICE_STATE_UNSPECIFIED = 0;
+  NOT_SPECIFIED = 0;
 
   // Build states (initial state for build)
   BUILD_QUEUED = 1;

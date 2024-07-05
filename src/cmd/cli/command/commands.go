@@ -848,11 +848,12 @@ var composeUpCmd = &cobra.Command{
 		if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
-				cancelTail()
 				return err
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
+
+			wg.Wait() // Wait for tail ctrl + c
 		}
 		cancelTail()
 		wg.Wait() // Wait for tail to finish

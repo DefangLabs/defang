@@ -27,7 +27,7 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 		}
 
 		serviceConditionText := "has status " + serviceInfo.Status
-		if serviceInfo.State != defangv1.ServiceState_SERVICE_STATE_UNSPECIFIED {
+		if serviceInfo.State != defangv1.ServiceState_NOT_SPECIFIED {
 			serviceConditionText = "is in state " + serviceInfo.State.String()
 		}
 
