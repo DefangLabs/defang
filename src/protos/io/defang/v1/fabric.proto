@@ -352,6 +352,13 @@ message Service {
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
+  repeated Volume volumes = 19;
+}
+
+message Volume {
+  string source = 1; // name of the volume; empty for anonymous volumes
+  string target = 2; // path in the container
+  bool read_only = 3;
 }
 
 message StaticFiles {
@@ -375,7 +382,7 @@ message Event {
 
 message PublishRequest { Event event = 1; }
 
-message SubscribeRequest { 
+message SubscribeRequest {
   repeated string services = 1;
 }
 

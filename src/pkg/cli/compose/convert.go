@@ -204,6 +204,18 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
+		var volumes []*defangv1.Volume
+		for _, volume := range svccfg.Volumes {
+			if volume.Type != "volume" {
+				continue
+			}
+			volumes = append(volumes, &defangv1.Volume{
+				Source:   volume.Source,
+				Target:   volume.Target,
+				ReadOnly: volume.ReadOnly,
+			})
+		}
+
 		network := network(&svccfg)
 		ports := convertPorts(svccfg.Ports)
 		services = append(services, &defangv1.Service{
@@ -224,6 +236,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
 			Redis:       redis,
+			Volumes:     volumes,
 		})
 	}
 	return services, nil
