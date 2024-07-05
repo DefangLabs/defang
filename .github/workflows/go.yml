@@ -296,7 +296,7 @@ jobs:
       - name: Notarize macOS app # TODO: move to goreleaser.yml
         shell: bash
         run: |
-          bin/notarize.sh dist/defang_*_macOS.zip
+          bin/notarize.sh dist/darwin/defang_*_macOS.zip
         working-directory: src
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
