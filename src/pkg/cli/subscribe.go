@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -64,7 +65,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			if subStatus.Name == "" && (servInfo != nil && servInfo.Service != nil) {
 				subStatus.Name = servInfo.Service.Name
 				subStatus.Status = servInfo.Status
-				subStatus.State = servInfo.State
+				subStatus.State = compose.ConvertServiceState(servInfo.Status)
 			}
 
 			statusChan <- subStatus

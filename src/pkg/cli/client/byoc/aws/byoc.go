@@ -572,7 +572,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
-		si.State = defangv1.ServiceState_BUILD_PENDING
+		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
 	return si, nil
 }
