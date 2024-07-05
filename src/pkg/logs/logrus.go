@@ -1,6 +1,9 @@
 package logs
 
-import "github.com/DefangLabs/defang/src/pkg"
+import (
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/sirupsen/logrus"
+)
 
 func IsLogrusError(message string) bool {
 	// Logrus's TextFormatter prefixes messages with the uppercase log level, optionally truncated and/or in color
@@ -16,4 +19,10 @@ func IsLogrusError(message string) bool {
 	default:
 		return true // show by default (likely Dockerfile errors)
 	}
+}
+
+type InterceptingLogrusFormatter struct{}
+
+func (f *InterceptingLogrusFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return nil, nil
 }
