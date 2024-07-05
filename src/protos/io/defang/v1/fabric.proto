@@ -21,9 +21,13 @@ service FabricController {
   };                                               // public
   rpc Token(TokenRequest) returns (TokenResponse); // public
 
-  rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
-  rpc Tail(TailRequest) returns (stream TailResponse);
+  rpc Tail(TailRequest) returns (stream TailResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   rpc Update(Service) returns (ServiceInfo) {
     option deprecated = true;
   }; // deprecated; use Deploy
@@ -32,10 +36,13 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };                                                  // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse){
+    option idempotency_level = IDEMPOTENT;
     option deprecated = true;
   }; // deprecated; use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
-  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -52,14 +59,19 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc SignEULA(google.protobuf.Empty)
-      returns (google.protobuf.Empty); // AgreeToS
+  rpc SignEULA(google.protobuf.Empty) returns (google.protobuf.Empty) {
+      option idempotency_level = IDEMPOTENT;
+  } // AgreeToS
   rpc CheckToS(google.protobuf.Empty) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  rpc PutSecret(SecretValue) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
@@ -95,7 +107,7 @@ message TrackRequest {
 message DeployRequest {
   repeated Service services = 1 [deprecated = true]; // deprecated; use compose
   string project = 2;
-  google.protobuf.Struct compose = 3;
+  string compose_yaml = 3;
 }
 
 message DeployResponse {

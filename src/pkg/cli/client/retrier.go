@@ -13,7 +13,7 @@ type Retrier struct{}
 func (Retrier) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		res, err := next(ctx, req)
-		if connect.CodeOf(err) == connect.CodeUnavailable {
+		if connect.CodeOf(err) == connect.CodeUnavailable || req.Spec().IdempotencyLevel == connect.IdempotencyNoSideEffects {
 			// Retry once after a 1 second sleep
 			pkg.SleepWithContext(ctx, 1*time.Second)
 			res, err = next(ctx, req)

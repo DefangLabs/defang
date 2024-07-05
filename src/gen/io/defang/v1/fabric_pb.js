@@ -90,7 +90,7 @@ export const DeployRequest = /*@__PURE__*/ proto3.makeMessageType(
   () => [
     { no: 1, name: "services", kind: "message", T: Service, repeated: true },
     { no: 2, name: "project", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 3, name: "compose", kind: "message", T: Struct },
+    { no: 3, name: "compose_yaml", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ],
 );
 

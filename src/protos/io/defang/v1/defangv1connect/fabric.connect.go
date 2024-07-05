@@ -175,12 +175,14 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		revokeToken: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerRevokeTokenProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		tail: connect_go.NewClient[v1.TailRequest, v1.TailResponse](
 			httpClient,
 			baseURL+FabricControllerTailProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		update: connect_go.NewClient[v1.Service, v1.ServiceInfo](
 			httpClient,
@@ -211,7 +213,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		subscribe: connect_go.NewClient[v1.SubscribeRequest, v1.SubscribeResponse](
 			httpClient,
 			baseURL+FabricControllerSubscribeProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		getServices: connect_go.NewClient[emptypb.Empty, v1.ListServicesResponse](
 			httpClient,
@@ -532,12 +535,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerRevokeTokenHandler := connect_go.NewUnaryHandler(
 		FabricControllerRevokeTokenProcedure,
 		svc.RevokeToken,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerTailHandler := connect_go.NewServerStreamHandler(
 		FabricControllerTailProcedure,
 		svc.Tail,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerUpdateHandler := connect_go.NewUnaryHandler(
 		FabricControllerUpdateProcedure,
@@ -568,7 +573,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerSubscribeHandler := connect_go.NewServerStreamHandler(
 		FabricControllerSubscribeProcedure,
 		svc.Subscribe,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerGetServicesHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetServicesProcedure,

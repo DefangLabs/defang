@@ -53,6 +53,7 @@ export declare const FabricController: {
       readonly I: typeof Empty,
       readonly O: typeof Empty,
       readonly kind: MethodKind.Unary,
+      readonly idempotency: MethodIdempotency.Idempotent,
     },
     /**
      * @generated from rpc io.defang.v1.FabricController.Tail
@@ -62,6 +63,7 @@ export declare const FabricController: {
       readonly I: typeof TailRequest,
       readonly O: typeof TailResponse,
       readonly kind: MethodKind.ServerStreaming,
+      readonly idempotency: MethodIdempotency.NoSideEffects,
     },
     /**
      * @generated from rpc io.defang.v1.FabricController.Update
@@ -119,6 +121,7 @@ export declare const FabricController: {
       readonly I: typeof SubscribeRequest,
       readonly O: typeof SubscribeResponse,
       readonly kind: MethodKind.ServerStreaming,
+      readonly idempotency: MethodIdempotency.NoSideEffects,
     },
     /**
      * rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);

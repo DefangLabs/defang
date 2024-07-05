@@ -203,9 +203,9 @@ export declare class DeployRequest extends Message<DeployRequest> {
   project: string;
 
   /**
-   * @generated from field: google.protobuf.Struct compose = 3;
+   * @generated from field: string compose_yaml = 3;
    */
-  compose?: Struct;
+  composeYaml: string;
 
   constructor(data?: PartialMessage<DeployRequest>);
 
