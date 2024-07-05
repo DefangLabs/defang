@@ -13,18 +13,12 @@ import (
 type SubscribeServiceStatus struct {
 	Name   string
 	Status string
+	State  defangv1.ServiceState
 }
 
 func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
-	}
-
-	normalizedServiceNameToServiceName := make(map[string]string, len(services))
-
-	for i, service := range services {
-		services[i] = compose.NormalizeServiceName(service)
-		normalizedServiceNameToServiceName[services[i]] = service
 	}
 
 	statusChan := make(chan SubscribeServiceStatus, len(services))
@@ -61,23 +55,21 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				continue
 			}
 
+			subStatus := SubscribeServiceStatus{
+				Name:   msg.GetName(),
+				Status: msg.GetStatus(),
+				State:  msg.GetState(),
+			}
+
 			servInfo := msg.GetService()
-			if servInfo == nil || servInfo.Service == nil {
-				continue
+			if subStatus.Name == "" && (servInfo != nil && servInfo.Service != nil) {
+				subStatus.Name = servInfo.Service.Name
+				subStatus.Status = servInfo.Status
+				subStatus.State = compose.ConvertServiceState(servInfo.Status)
 			}
 
-			serviceName, ok := normalizedServiceNameToServiceName[servInfo.Service.Name]
-			if !ok {
-				term.Debugf("Unknown service %s in subscribe response\n", servInfo.Service.Name)
-				continue
-			}
-			status := SubscribeServiceStatus{
-				Name:   serviceName,
-				Status: servInfo.Status,
-			}
-
-			statusChan <- status
-			term.Debugf("service %s with status %s\n", serviceName, servInfo.Status)
+			statusChan <- subStatus
+			term.Debugf("service %s with state ( %s ) and status: %s\n", subStatus.Name, subStatus.State.String(), subStatus.Status)
 		}
 	}()
 

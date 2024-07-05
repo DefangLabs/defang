@@ -2,17 +2,17 @@ package command
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serviceInfos []*defangv1.ServiceInfo) error {
+func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
-		serviceList = append(serviceList, serviceInfo.Service.Name)
+		serviceList = append(serviceList, compose.NormalizeServiceName(serviceInfo.Service.Name))
 	}
 
 	// set up service status subscription (non-blocking)
@@ -22,34 +22,39 @@ func waitServiceStatus(ctx context.Context, targetStatus cli.ServiceStatus, serv
 		return err
 	}
 
-	serviceStatus := make(map[string]string, len(serviceList))
+	serviceState := make(map[string]defangv1.ServiceState, len(serviceList))
 	for _, name := range serviceList {
-		serviceStatus[name] = string(cli.ServiceUnknown)
+		serviceState[name] = defangv1.ServiceState_NOT_SPECIFIED
 	}
 
 	// monitor for when all services are completed to end this command
 	for newStatus := range subscribeServiceStatusChan {
-		if _, ok := serviceStatus[newStatus.Name]; !ok {
+		if _, ok := serviceState[newStatus.Name]; !ok {
 			term.Debugf("unexpected service %s update", newStatus.Name)
 			continue
 		}
 
-		serviceStatus[newStatus.Name] = newStatus.Status
+		// exit on detecting a FAILED state
+		if newStatus.State == defangv1.ServiceState_SERVICE_FAILED {
+			return ErrDeploymentFailed
+		}
 
-		if allInStatus(targetStatus, serviceStatus) {
+		serviceState[newStatus.Name] = newStatus.State
+
+		if allInState(targetState, serviceState) {
 			for _, sInfo := range serviceInfos {
-				sInfo.Status = string(targetStatus)
+				sInfo.State = targetState
 			}
 			return nil
 		}
 	}
 
-	return fmt.Errorf("service state monitoring terminated without all services reaching desired state: %s", targetStatus)
+	return ErrFailedToReachStartedState
 }
 
-func allInStatus(targetStatus cli.ServiceStatus, serviceStatuses map[string]string) bool {
-	for _, status := range serviceStatuses {
-		if status != string(targetStatus) {
+func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
+	for _, state := range serviceStates {
+		if state != targetState {
 			return false
 		}
 	}

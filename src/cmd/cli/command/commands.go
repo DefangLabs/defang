@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	proj "github.com/compose-spec/compose-go/v2/types"
@@ -31,6 +32,9 @@ import (
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
+var ErrFailedToReachStartedState = errors.New("failed to reach STARTED state")
+var ErrDeploymentFailed = errors.New("deployment failed")
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -869,16 +873,22 @@ var composeUpCmd = &cobra.Command{
 				}
 			}
 		}()
-		if err := waitServiceStatus(ctx, cli.ServiceStarted, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
-			if !errors.Is(err, cli.ErrDryRun) && !errors.As(err, new(cliClient.ErrNotImplemented)) {
+
+		if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
+			if errors.Is(err, ErrDeploymentFailed) {
+				term.Warn("Deployment FAILED. Service(s) not running.")
+				return err
+			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
-			wg.Wait() // Wait until ctrl+c is pressed
+
+			wg.Wait() // Wait for tail ctrl + c
 		}
 		cancelTail()
 		wg.Wait() // Wait for tail to finish
 
 		printEndpoints(serviceInfos)
+
 		term.Info("Done.")
 		return nil
 	},
