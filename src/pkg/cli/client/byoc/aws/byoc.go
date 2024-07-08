@@ -418,16 +418,16 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 }
 
 func (b *ByocAws) GetConfig(ctx context.Context, secret *defangv1.Configs) (types.ConfigData, error) {
-	fqns := make([]string, len(secret.Names))
+	names := make([]string, len(secret.Names))
 	for _, name := range secret.Names {
 		if !pkg.IsValidSecretName(name) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", name))
 		}
-		fqns = append(fqns, b.getSecretID(name))
+		names = append(names, b.getSecretID(name))
 	}
 
-	term.Debugf("Show parameters %q", fqns)
-	results, err := b.driver.GetConfig(ctx, fqns)
+	term.Debugf("Show parameters %q", names)
+	results, err := b.driver.GetConfig(ctx, names)
 	if err != nil {
 		term.Errorf("error getting config: %v", err)
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve environment configs"))

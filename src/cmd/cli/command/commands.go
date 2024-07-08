@@ -190,6 +190,7 @@ func SetupCommands(version string) {
 	configCmd.AddCommand(configDeleteCmd)
 
 	configCmd.AddCommand(configListCmd)
+	configCmd.AddCommand(configGetCmd)
 
 	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(restartCmd)
@@ -708,7 +709,7 @@ var configCmd = &cobra.Command{
 	Use:     "config", // like Docker
 	Args:    cobra.NoArgs,
 	Aliases: []string{"secrets", "secret"},
-	Short:   "Add, update, or delete service config",
+	Short:   "Add, update, get, or delete service config",
 }
 
 var configSetCmd = &cobra.Command{
@@ -806,6 +807,17 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.ConfigList(cmd.Context(), client)
+	},
+}
+
+var configGetCmd = &cobra.Command{
+	Use:         "get CONFIG...", // like Docker
+	Annotations: authNeededAnnotation,
+	Args:        cobra.MinimumNArgs(0),
+	Aliases:     []string{"show", "inspect"},
+	Short:       "Show configs",
+	RunE: func(cmd *cobra.Command, names []string) error {
+		return cli.ConfigGet(cmd.Context(), client, names...)
 	},
 }
 

@@ -8,6 +8,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
+
+	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 var (
@@ -40,4 +42,11 @@ func PrintObject(root string, data proto.Message) error {
 	// TODO: add color
 	fmt.Println(string(bytes))
 	return nil
+}
+
+func PrintConfigData(config types.ConfigData) {
+
+	for key, value := range config {
+		fmt.Printf("%s: %s\n", key, value)
+	}
 }
