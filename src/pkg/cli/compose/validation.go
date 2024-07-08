@@ -11,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/sirupsen/logrus"
 )
 
 func ValidateProject(project *compose.Project) error {
@@ -280,8 +279,7 @@ func ValidateProject(project *compose.Project) error {
 }
 
 func warnf(format string, args ...interface{}) {
-	logrus.Warnf(format, args...)
-	term.SetHadWarnings(true)
+	term.Warnf(format, args...)
 }
 
 func validatePorts(ports []compose.ServicePortConfig) error {
