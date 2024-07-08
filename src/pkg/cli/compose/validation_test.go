@@ -7,18 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func TestValidation(t *testing.T) {
-	oldOut := logrus.StandardLogger().Out
+	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
-		logrus.SetOutput(oldOut)
+		term.DefaultTerm = oldTerm
 	})
 
 	testRunCompose(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
-		logrus.SetOutput(logs)
+		term.DefaultTerm = term.NewTerm(logs, logs)
 
 		loader := Loader{path}
 		proj, err := loader.LoadCompose(context.Background())

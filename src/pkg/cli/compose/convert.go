@@ -130,7 +130,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
 				envFromConfig = append(envFromConfig, key)
 				continue
 			}
