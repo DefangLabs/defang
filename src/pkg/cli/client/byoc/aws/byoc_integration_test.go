@@ -45,7 +45,7 @@ func TestTail(t *testing.T) {
 	b.PulumiProject = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
 
-	ss, err := b.Tail(context.Background(), &defangv1.TailRequest{})
+	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
 		if connect.CodeOf(err) != connect.CodeUnauthenticated {
