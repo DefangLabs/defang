@@ -3,8 +3,7 @@ package quota
 import (
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
+	"regexp"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -17,6 +16,8 @@ type Quotas struct {
 	Services   int
 	ShmSizeMiB float32
 }
+
+var urlRegex = regexp.MustCompile(`(?i)(http://)?(localhost|127.0.0.1)(:\d{1,5})?(/(?:[?a-z0-9._~!$&'()*+,;=:@-]|%[a-f0-9]{2})*)*`)
 
 func (q Quotas) Validate(service *defangv1.Service) error {
 	if service.Name == "" {
@@ -67,12 +68,9 @@ func (q Quotas) Validate(service *defangv1.Service) error {
 				if len(service.Healthcheck.Test) < 3 {
 					return errors.New("invalid CMD healthcheck: expected a command and URL")
 				}
-				if !strings.HasSuffix(service.Healthcheck.Test[1], "curl") && !strings.HasSuffix(service.Healthcheck.Test[1], "wget") {
-					return errors.New("invalid CMD healthcheck: expected curl or wget")
-				}
 				hasHttpUrl := false
 				for _, arg := range service.Healthcheck.Test[2:] {
-					if u, err := url.Parse(arg); err == nil && u.Scheme == "http" {
+					if urlRegex.MatchString(arg) {
 						hasHttpUrl = true
 						break
 					}

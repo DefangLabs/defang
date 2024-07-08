@@ -1,0 +1,8 @@
+level=warning msg="service \"curl\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"curl\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+level=warning msg="service \"flask1\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"flask1\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+level=warning msg="service \"flask2\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"flask2\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+level=warning msg="service \"wget\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
+level=warning msg="service \"wget\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"

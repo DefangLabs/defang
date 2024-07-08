@@ -87,7 +87,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "echo", "1"},
 				},
 			},
-			wantErr: "invalid CMD healthcheck: expected curl or wget",
+			wantErr: "invalid CMD healthcheck; missing HTTP URL",
 		},
 		{
 			name: "CMD without HTTP URL",
@@ -309,9 +309,9 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := byoc.Validate(tt.service); err != nil && err.Error() != tt.wantErr {
-				t.Errorf("Byoc.Validate() = %v, want %v", err, tt.wantErr)
+				t.Errorf("Byoc.Validate() = %q, want %q", err, tt.wantErr)
 			} else if err == nil && tt.wantErr != "" {
-				t.Errorf("Byoc.Validate() = nil, want %v", tt.wantErr)
+				t.Errorf("Byoc.Validate() = nil, want %q", tt.wantErr)
 			}
 		})
 	}

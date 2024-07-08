@@ -1,0 +1,17 @@
+services:
+  flask1:
+    image: flask
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()", "http://localhost/"]
+  flask2:
+    image: flask
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1/').read()"]
+  wget:
+    image: alpine
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "localhost:5000"]
+  curl:
+    image: curl
+    healthcheck:
+      test: ["CMD", "curl", "-f", "localhost"]
