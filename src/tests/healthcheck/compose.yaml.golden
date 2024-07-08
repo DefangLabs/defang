@@ -27,7 +27,7 @@ services:
         - CMD
         - python
         - -c
-        - import urllib.request;urllib.request.urlopen('http://127.0.0.1/').read()
+        - import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()
     image: flask
     networks:
       default: null

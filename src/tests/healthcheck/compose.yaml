@@ -6,7 +6,7 @@ services:
   flask2:
     image: flask
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1/').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()"]
   wget:
     image: alpine
     healthcheck:

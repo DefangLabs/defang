@@ -17,7 +17,14 @@ type Quotas struct {
 	ShmSizeMiB float32
 }
 
-var urlRegex = regexp.MustCompile(`(?i)(http://)?(localhost|127.0.0.1)(:\d{1,5})?(/(?:[?a-z0-9._~!$&'()*+,;=:@-]|%[a-f0-9]{2})*)*`)
+// Based on https://www.ietf.org/rfc/rfc3986.txt, using pattern for query (which is a superset of path's pchar) but removing the single quote
+//
+//	query       = *( pchar / "/" / "?" )
+//	pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
+//	unreserved    = ALPHA / DIGIT / "-" / "." / "_" / "~"
+//	pct-encoded   = "%" HEXDIG HEXDIG
+//	sub-delims    = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+var healthcheckUrlRegex = regexp.MustCompile(`(?i)(http://)?(localhost|127.0.0.1)(:\d{1,5})?(/(?:[?a-z0-9._~!$&()*+,;=:@-]|%[a-f0-9]{2})*)*`)
 
 func (q Quotas) Validate(service *defangv1.Service) error {
 	if service.Name == "" {
@@ -70,7 +77,7 @@ func (q Quotas) Validate(service *defangv1.Service) error {
 				}
 				hasHttpUrl := false
 				for _, arg := range service.Healthcheck.Test[2:] {
-					if urlRegex.MatchString(arg) {
+					if healthcheckUrlRegex.MatchString(arg) {
 						hasHttpUrl = true
 						break
 					}
