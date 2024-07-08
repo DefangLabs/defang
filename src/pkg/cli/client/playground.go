@@ -59,7 +59,7 @@ func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.Subscrib
 	return g.client.Subscribe(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (g *PlaygroundClient) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
