@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	linediff "github.com/andreyvit/diff"
 )
 
 func TestLoader(t *testing.T) {
@@ -47,20 +49,35 @@ func compare(actual []byte, goldenFile string) error {
 }
 
 func diff(actualRaw, goldenRaw string) error {
-	linesActual := strings.Split(actualRaw, "\n")
-	linesGolden := strings.Split(goldenRaw, "\n")
-	for i, actual := range linesActual {
-		if i >= len(linesGolden) {
-			return fmt.Errorf("+ expected - actual\n+EOF\n-%s", actual)
+
+	if actualRaw == goldenRaw {
+		return nil
+	}
+
+	var buf strings.Builder
+	const contextSize = 3
+
+	diffs := linediff.LineDiffAsLines(goldenRaw, actualRaw)
+	show := make([]bool, len(diffs))
+
+	for i, diff := range diffs {
+		if diff[0] == ' ' {
+			continue
 		}
-		if actual != linesGolden[i] {
-			return fmt.Errorf("+ expected - actual\n+%s\n-%s", linesGolden[i], actual)
+		for j := i - contextSize; j < i+contextSize; j++ {
+			if j >= 0 && j < len(diffs) {
+				show[j] = true
+			}
 		}
 	}
-	if len(linesActual) < len(linesGolden) {
-		return fmt.Errorf("+ expected - actual\n+%s\n-EOF", linesGolden[len(linesActual)])
+
+	w := len(fmt.Sprint(len(diffs)))
+	for i, s := range show {
+		if s {
+			fmt.Fprintf(&buf, "%*v: %s\n", w, i, diffs[i])
+		}
 	}
-	return nil
+	return fmt.Errorf("diff:\n%s", buf.String())
 }
 
 func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {
