@@ -1,0 +1,64 @@
+[
+  {
+    "name": "curl",
+    "image": "curl",
+    "platform": 2,
+    "internal": true,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "curl",
+        "-f",
+        "localhost"
+      ]
+    },
+    "networks": 1
+  },
+  {
+    "name": "flask1",
+    "image": "flask",
+    "platform": 2,
+    "internal": true,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "python",
+        "-c",
+        "import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()",
+        "http://localhost/"
+      ]
+    },
+    "networks": 1
+  },
+  {
+    "name": "flask2",
+    "image": "flask",
+    "platform": 2,
+    "internal": true,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request;urllib.request.urlopen('http://127.0.0.1/').read()"
+      ]
+    },
+    "networks": 1
+  },
+  {
+    "name": "wget",
+    "image": "alpine",
+    "platform": 2,
+    "internal": true,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "wget",
+        "-q",
+        "--spider",
+        "localhost:5000"
+      ]
+    },
+    "networks": 1
+  }
+]
