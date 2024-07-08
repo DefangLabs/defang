@@ -190,7 +190,7 @@ func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) 
 	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
-func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	return nil, nil
 }
 

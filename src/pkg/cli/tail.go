@@ -185,7 +185,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = client.Tail(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+				serverStream, err = client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
