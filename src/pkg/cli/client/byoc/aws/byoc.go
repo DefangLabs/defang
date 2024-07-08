@@ -445,7 +445,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}

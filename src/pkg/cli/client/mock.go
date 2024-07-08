@@ -36,7 +36,7 @@ func (m MockClient) LoadProjectName(ctx context.Context) (string, error) {
 	return m.Project.Name, nil
 }
 
-func (m MockClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (m MockClient) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	if m.ServerStream != nil {
 		return m.ServerStream, nil
 	}
