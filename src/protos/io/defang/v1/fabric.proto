@@ -73,6 +73,8 @@ service FabricController {
 
 message DebugRequest {
   repeated File files = 1;
+  string etag = 2;
+  string project = 3;
 }
 
 message DebugResponse {
