@@ -10,7 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 )
 
-func prettyExecutable(def string, cmds []string) string {
+func prettyExecutable(def string) string {
 	if os.Args[0] == def {
 		return def
 	}
@@ -47,7 +47,7 @@ func printDefangHint(hint string, cmds ...string) {
 		return
 	}
 
-	executable := prettyExecutable("defang", cmds)
+	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n", hint)
 	providerFlag := RootCmd.Flag("provider")
