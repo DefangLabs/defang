@@ -303,6 +303,13 @@ function extractCLIWrapperArgs(args: string[]): {
   return { cliParams, outArgs };
 }
 
+function getEndNameFromPath(pathLine: string): string {
+  const pathParts = pathLine.split(path.sep);
+  const executableName = pathParts[pathParts.length - 1];
+
+  return executableName.split(".")[0];
+}
+
 // js wrapper to use by npx or npm exec, this will call the defang binary with
 // the arguments passed to the npx line. NPM installer will create a symlink
 // in the user PATH to the cli.js to execute. The symlink will name the same as
@@ -328,8 +335,13 @@ async function run(): Promise<void> {
       throw new Error("Could not find the defang executable.");
     }
 
+    const commandline = ["npx", getEndNameFromPath(pathToExec)]
+      .join(" ")
+      .trim();
+
     const processResult = child_process.spawnSync(pathToExec, args, {
       stdio: "inherit",
+      env: { ...process.env, DEFANG_COMMAND_EXECUTOR: commandline },
     });
 
     // if there was an error, print it to the console.

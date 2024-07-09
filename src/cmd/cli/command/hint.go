@@ -10,7 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 )
 
-func prettyExecutable(def string) string {
+func prettyExecutable(def string, cmds []string) string {
 	if os.Args[0] == def {
 		return def
 	}
@@ -23,10 +23,19 @@ func prettyExecutable(def string) string {
 	if err != nil {
 		return def
 	}
+
+	// for npm/npx defang is executed within a child process,
+	// but we want to use parent process command line
+	execLine := os.Getenv("DEFANG_COMMAND_EXECUTOR")
+	if execLine != "" {
+		return execLine
+	}
+
 	executable, _ = filepath.Rel(wd, executable)
 	if executable == def {
 		executable = "./" + def // to ensure it's executable
 	}
+
 	if executable == "" {
 		return def
 	}
@@ -38,7 +47,7 @@ func printDefangHint(hint string, cmds ...string) {
 		return
 	}
 
-	executable := prettyExecutable("defang")
+	executable := prettyExecutable("defang", cmds)
 
 	fmt.Printf("\n%s\n", hint)
 	providerFlag := RootCmd.Flag("provider")
