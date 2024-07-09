@@ -42,6 +42,7 @@ service FabricController {
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  rpc Debug(DebugRequest) returns (DebugResponse); // TEST
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
@@ -68,6 +69,27 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
+}
+
+message DebugRequest {
+}
+
+message DebugResponse {
+  string general = 1;
+  repeated Issue issues = 2;
+  repeated string requests = 3;
+}
+
+message Issue {
+  string type = 1;
+  string severity = 2;
+  string details = 3;
+  repeated CodeChange code_changes = 4;
+}
+
+message CodeChange {
+  string file = 1;
+  string change = 2;
 }
 
 message TrackRequest {
