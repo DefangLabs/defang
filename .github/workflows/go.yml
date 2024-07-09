@@ -365,6 +365,9 @@ jobs:
           # make the cli.js executable
           chmod u+x ./bin/cli.js
 
+          # copy the README
+          cp ${{ github.workspace }}/README.md ./README.md
+
           # publish the package
           npm publish --access public
         env:
