@@ -22,6 +22,7 @@ type ProjectLoader interface {
 type FabricClient interface {
 	AgreeToS(context.Context) error
 	CheckLoginAndToS(context.Context) error
+	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context) error
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)

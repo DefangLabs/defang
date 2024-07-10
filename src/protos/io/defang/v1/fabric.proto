@@ -75,6 +75,7 @@ message DebugRequest {
   repeated File files = 1;
   string etag = 2;
   string project = 3;
+  string logs = 4;
 }
 
 message DebugResponse {
@@ -154,7 +155,7 @@ enum ServiceState {
   BUILD_RUNNING = 5;
 
   BUILD_DEACTIVATING = 6;
- 
+
   // Update states (initial state for existing image)
   UPDATE_QUEUED = 7;
 
@@ -423,12 +424,12 @@ message Event {
 
 message PublishRequest { Event event = 1; }
 
-message SubscribeRequest { 
+message SubscribeRequest {
   repeated string services = 1;
 }
 
-message SubscribeResponse { 
-  ServiceInfo service = 1 [deprecated = true]; 
+message SubscribeResponse {
+  ServiceInfo service = 1 [deprecated = true];
   string name = 2;
   string status = 3;
   ServiceState state = 4;
