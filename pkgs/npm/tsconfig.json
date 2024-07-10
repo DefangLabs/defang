@@ -8,7 +8,7 @@
         "declaration": false,
         "skipLibCheck": true,
         "stripInternal": true,
-        "sourceMap": false,
+        "sourceMap": true,
         "experimentalDecorators": true,
         "pretty": true,
         "noFallthroughCasesInSwitch": true,
@@ -20,10 +20,10 @@
         "esModuleInterop": true
       },
     "include": [
-        "src/**/*"  // Specify files to be included in compilation
+        "src/**/*",  // Specify files to be included in compilation
     ],
     "exclude": [
         "node_modules",  // Exclude the node_modules directory
-        "**/*.spec.ts"   // Exclude test files
-    ]
+        "src/*.test.ts"  // Specify TypeScript declaration files to be included in compilation
+]
 }
