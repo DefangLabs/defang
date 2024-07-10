@@ -2,7 +2,7 @@
 
 # Defang
 
-Defang is a radically simpler way for developers to create, deploy, and manage cloud applications.
+Defang is a radically simpler way for developers to develop, deploy, and debug cloud applications.
 
 This repo includes:
 
