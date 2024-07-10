@@ -219,6 +219,10 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
 
+	// Debug Command
+	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	RootCmd.AddCommand(debugCmd)
+
 	// Tail Command
 	tailCmd.Flags().StringP("name", "n", "", "name of the service")
 	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -877,7 +881,8 @@ var composeUpCmd = &cobra.Command{
 		if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
-				return err
+
+				return cli.Debug(ctx, client, deploy.Etag, ".")
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
@@ -917,6 +922,19 @@ var composeStartCmd = &cobra.Command{
 		}
 		printDefangHint("To track the update, do:", command)
 		return nil
+	},
+}
+
+var debugCmd = &cobra.Command{
+	Use:         "debug",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Hidden:      true,
+	Short:       "Debug a build, deployment, or service failure",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		etag, _ := cmd.Flags().GetString("etag")
+
+		return cli.Debug(cmd.Context(), client, etag, ".")
 	},
 }
 
