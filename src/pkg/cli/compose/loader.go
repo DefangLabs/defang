@@ -3,10 +3,10 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -26,8 +26,9 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	}
 	term.Debug("Loading compose file", composeFilePath)
 
-	// Compose-go uses the logrus logger, so we need to configure it to be more like our own logger
-	logrus.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: !term.StderrCanColor(), DisableLevelTruncation: true})
+	// Set logrus send logs via the term package
+	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
+	logrus.SetFormatter(termLogger)
 
 	projOpts, err := getDefaultProjectOptions(composeFilePath)
 	if err != nil {
@@ -51,10 +52,9 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	}
 
 	// Disable logrus output to prevent double warnings from compose-go
-	currentOutput := logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
+	logrus.SetFormatter(logs.DiscardFormatter{})
 	rawProj, err := projOpts.LoadProject(ctx)
-	logrus.SetOutput(currentOutput)
+	logrus.SetFormatter(termLogger)
 	if err != nil {
 		panic(err) // there's no good reason this should fail, since we've already loaded the project before
 	}

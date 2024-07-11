@@ -1,4 +1,4 @@
-level=warning msg="\"yes\" for boolean is not supported by YAML 1.2, please use `true`"
-level=warning msg="service \"echo\": ingress port without healthcheck defaults to GET / HTTP/1.1"
-level=warning msg="service \"echo\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"echo\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+ ! "yes" for boolean is not supported by YAML 1.2, please use `true`
+ ! service "echo": ingress port without healthcheck defaults to GET / HTTP/1.1
+ ! service "echo": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "echo": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
