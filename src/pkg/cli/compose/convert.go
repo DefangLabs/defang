@@ -105,7 +105,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				build.Args = make(map[string]string, len(svccfg.Build.Args))
 				for key, value := range svccfg.Build.Args {
 					if key == "" || value == nil {
-						warnf("service %q: skipping unset build argument %q", svccfg.Name, key)
+						term.Warnf("service %q: skipping unset build argument %q", svccfg.Name, key)
 						continue
 					}
 					build.Args[key] = *value
@@ -119,7 +119,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		for key, value := range svccfg.Environment {
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
-				warnf("service %q: skipping unset environment variable key", svccfg.Name)
+				term.Warnf("service %q: skipping unset environment variable key", svccfg.Name)
 				continue
 			}
 			// keep track of what environment variables were declared but not set in the compose environment section
@@ -130,7 +130,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
 				envFromConfig = append(envFromConfig, key)
 				continue
 			}
@@ -142,7 +142,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 					return c.ServiceDNS(NormalizeServiceName(serviceName))
 				})
 				if val != *value {
-					warnf("service %q: service names were replaced in environment variable %q: %q", svccfg.Name, key, val)
+					term.Warnf("service %q: service names were replaced in environment variable %q: %q", svccfg.Name, key, val)
 				}
 			}
 			envs[key] = val
@@ -158,7 +158,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		// Extract secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
 			if i == 0 { // only warn once
-				warnf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name)
+				term.Warnf("service %q: secrets will be exposed as environment variables, not files (use 'environment' instead)", svccfg.Name)
 			}
 			configs = append(configs, &defangv1.Secret{
 				Source: secret.Source,
@@ -201,7 +201,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		}
 
 		if redis == nil && isStatefulImage(svccfg.Image) {
-			warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
+			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
 		network := network(&svccfg)
@@ -240,7 +240,7 @@ func getResourceReservations(r compose.Resources) *compose.Resource {
 func convertPlatform(platform string) defangv1.Platform {
 	switch strings.ToLower(platform) {
 	default:
-		warnf("unsupported platform: %q; assuming linux", platform)
+		term.Warnf("unsupported platform: %q; assuming linux", platform)
 		fallthrough
 	case "", "linux":
 		return defangv1.Platform_LINUX_ANY
@@ -288,22 +288,22 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 
 	switch port.Mode {
 	case "":
-		warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
 		fallthrough
 	case "ingress":
 		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
 		if port.Protocol != "udp" {
 			if port.Published != "" {
-				warnf("Published ports are ignored in ingress mode")
+				term.Warnf("Published ports are ignored in ingress mode")
 			}
 			pbPort.Mode = defangv1.Mode_INGRESS
 			if pbPort.Protocol == defangv1.Protocol_TCP || pbPort.Protocol == defangv1.Protocol_UDP {
-				warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+				term.Warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
 				pbPort.Protocol = defangv1.Protocol_HTTP
 			}
 			break
 		}
-		warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
+		term.Warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
 		fallthrough
 	case "host":
 		pbPort.Mode = defangv1.Mode_HOST
