@@ -45,8 +45,11 @@ func compare(actual []byte, goldenFile string) error {
 		}
 		return os.WriteFile(goldenFile, actual, 0644)
 	} else {
-		return diff(string(actual), string(golden))
+		if err := diff(string(actual), string(golden)); err != nil {
+			return fmt.Errorf("%s %w", goldenFile, err)
+		}
 	}
+	return nil
 }
 
 func diff(actualRaw, goldenRaw string) error {

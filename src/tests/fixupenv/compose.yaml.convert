@@ -1,5 +1,28 @@
 [
   {
+    "name": "bad-service",
+    "image": "somedb:latest",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 5432,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "env-in-config",
+    "image": "service:latest",
+    "platform": 2,
+    "internal": true,
+    "environment": {
+      "CONFIG1": "http://mistral:8000"
+    },
+    "networks": 1
+  },
+  {
     "name": "mistral",
     "image": "mistral:latest",
     "platform": 2,
@@ -24,6 +47,16 @@
         "source": "SENSITIVE_DATA"
       }
     ],
+    "networks": 1
+  },
+  {
+    "name": "use-bad-service",
+    "image": "service:latest",
+    "platform": 2,
+    "internal": true,
+    "environment": {
+      "DB_URL": "bad-service:5432"
+    },
     "networks": 1
   }
 ]
