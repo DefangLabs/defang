@@ -176,8 +176,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') # only run this step on tagged commits
         with:
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
-          trusted-signing-account-name: DefangLabs # from Azure portal
-          certificate-profile-name: signed-binary-test # from Azure portal
+          trusted-signing-account-name: DefangLabs      # from Azure portal
+          certificate-profile-name: signed-binary       # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
           files-folder-recurse: true
@@ -194,6 +194,15 @@ jobs:
           exclude-azure-powershell-credential: true
           exclude-azure-developer-cli-credential: true
           exclude-interactive-browser-credential: true
+
+      - name: Zip signed files
+        run: |
+          $refName = '${{ github.ref_name }}'
+          $cleanRefName = $refName -replace '^v', ''
+          Compress-Archive -Path defang-cli_windows_amd64_v1\* -DestinationPath dist\windows\defang_${{ github.ref_name }}_windows_amd64.zip
+          Compress-Archive -Path defang-cli_windows_arm64\* -DestinationPath dist\windows\defang_${{ github.ref_name }}_windows_arm64.zip
+        shell: pwsh
+        working-directory: src\dist\windows
 
       - name: Upload dist-win folder
         uses: actions/upload-artifact@v4
@@ -233,6 +242,9 @@ jobs:
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
       - name: Upload dist-mac folder
         uses: actions/upload-artifact@v4
@@ -247,7 +259,7 @@ jobs:
     needs:
       - build-and-sign-mac
       - build-and-sign
-    runs-on: macos-latest # for notarization
+    runs-on: ubuntu-latest # for notarization
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:
@@ -292,16 +304,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
-
-      - name: Notarize macOS app # TODO: move to goreleaser.yml
-        shell: bash
-        run: |
-          bin/notarize.sh dist/darwin/defang_*_macOS.zip
-        working-directory: src
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-          MACOS_NOTARIZATION_APP_PW: ${{ secrets.MACOS_NOTARIZATION_APP_PW }}
 
   post-release:
     runs-on: ubuntu-latest
