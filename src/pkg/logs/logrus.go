@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -29,31 +30,23 @@ type TermLogFormatter struct {
 }
 
 func (f TermLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	getMessage := func() string {
-		var buf strings.Builder
-		buf.WriteString(entry.Message)
-		for k, v := range entry.Data {
-			buf.WriteString(" ")
-			buf.WriteString(k)
-			buf.WriteString("=")
-			buf.WriteString(v.(string))
-		}
-		return buf.String()
+	var buf strings.Builder
+	buf.WriteString(entry.Message)
+	for k, v := range entry.Data {
+		fmt.Fprintf(&buf, " %s=%v", k, v)
 	}
 
 	switch entry.Level {
 	case logrus.PanicLevel, logrus.FatalLevel:
-		f.Term.Fatal(getMessage())
+		f.Term.Fatal(buf.String())
 	case logrus.ErrorLevel:
-		f.Term.Error(getMessage())
+		f.Term.Error(buf.String())
 	case logrus.WarnLevel:
-		f.Term.Warn(getMessage())
+		f.Term.Warn(buf.String())
 	case logrus.InfoLevel:
-		f.Term.Info(getMessage())
+		f.Term.Info(buf.String())
 	case logrus.DebugLevel, logrus.TraceLevel:
-		if f.Term.DoDebug() {
-			f.Term.Debug(getMessage())
-		}
+		f.Term.Debug(buf.String())
 	}
 
 	return nil, nil
