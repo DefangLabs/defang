@@ -882,7 +882,10 @@ var composeUpCmd = &cobra.Command{
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 
-				return cli.Debug(ctx, client, deploy.Etag, ".")
+				if err := cli.Debug(ctx, client, deploy.Etag, "."); err != nil {
+					term.Debugf("failed to debug deployment: %v", err)
+				}
+				return err
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
@@ -1039,7 +1042,7 @@ var deleteCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
-	Deprecated:  "use 'compose stop' instead",
+	Deprecated:  "use 'compose down' instead",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
