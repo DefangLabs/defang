@@ -48,6 +48,7 @@ type Client interface {
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
+	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string

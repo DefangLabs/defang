@@ -3,6 +3,7 @@ package do
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -45,6 +46,10 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
 	return b
+}
+
+func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return nil, errors.ErrUnsupported
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {

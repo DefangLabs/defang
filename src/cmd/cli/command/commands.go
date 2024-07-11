@@ -143,14 +143,15 @@ func SetupCommands(version string) {
 
 	// Bootstrap command
 	RootCmd.AddCommand(bootstrapCmd)
-	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
-	bootstrapCmd.AddCommand(bootstrapDownCmd)
-	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
-	bootstrapTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
-	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
-	bootstrapListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
-	bootstrapCmd.AddCommand(bootstrapListCmd)
-	bootstrapCmd.AddCommand(bootstrapCancelCmd)
+	bootstrapCmd.AddCommand(cdDestroyCmd)
+	bootstrapCmd.AddCommand(cdDownCmd)
+	bootstrapCmd.AddCommand(cdRefreshCmd)
+	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
+	bootstrapCmd.AddCommand(cdTearDownCmd)
+	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
+	bootstrapCmd.AddCommand(cdListCmd)
+	bootstrapCmd.AddCommand(cdCancelCmd)
+	bootstrapCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
@@ -840,9 +841,13 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
+		buildContext := compose.BuildContextDigest
+		if force {
+			buildContext = compose.BuildContextForce
+		}
 		since := time.Now()
 		ctx := cmd.Context()
-		deploy, err := cli.ComposeStart(ctx, client, force)
+		deploy, err := cli.ComposeStart(ctx, client, buildContext)
 		if err != nil {
 			return err
 		}
@@ -903,7 +908,11 @@ var composeStartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
+		buildContext := compose.BuildContextDigest
+		if force {
+			buildContext = compose.BuildContextForce
+		}
+		deploy, err := cli.ComposeStart(cmd.Context(), client, buildContext)
 		if err != nil {
 			return err
 		}
@@ -1008,7 +1017,7 @@ var composeConfigCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true // config is like start in a dry run
 		// force=false to calculate the digest
-		if _, err := cli.ComposeStart(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
+		if _, err := cli.ComposeStart(cmd.Context(), client, compose.BuildContextIgnore); !errors.Is(err, cli.ErrDryRun) {
 			return err
 		}
 		return nil
@@ -1121,7 +1130,7 @@ var bootstrapCmd = &cobra.Command{
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 }
 
-var bootstrapDestroyCmd = &cobra.Command{
+var cdDestroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
@@ -1130,7 +1139,7 @@ var bootstrapDestroyCmd = &cobra.Command{
 	},
 }
 
-var bootstrapDownCmd = &cobra.Command{
+var cdDownCmd = &cobra.Command{
 	Use:   "down",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
@@ -1139,7 +1148,7 @@ var bootstrapDownCmd = &cobra.Command{
 	},
 }
 
-var bootstrapRefreshCmd = &cobra.Command{
+var cdRefreshCmd = &cobra.Command{
 	Use:   "refresh",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
@@ -1148,7 +1157,7 @@ var bootstrapRefreshCmd = &cobra.Command{
 	},
 }
 
-var bootstrapCancelCmd = &cobra.Command{
+var cdCancelCmd = &cobra.Command{
 	Use:   "cancel",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Cancel the current CD operation",
@@ -1157,7 +1166,7 @@ var bootstrapCancelCmd = &cobra.Command{
 	},
 }
 
-var bootstrapTearDownCmd = &cobra.Command{
+var cdTearDownCmd = &cobra.Command{
 	Use:   "teardown",
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
@@ -1168,7 +1177,7 @@ var bootstrapTearDownCmd = &cobra.Command{
 	},
 }
 
-var bootstrapListCmd = &cobra.Command{
+var cdListCmd = &cobra.Command{
 	Use:     "ls",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"list"},
@@ -1180,6 +1189,16 @@ var bootstrapListCmd = &cobra.Command{
 			return cli.BootstrapCommand(cmd.Context(), client, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), client)
+	},
+}
+
+var cdPreviewCmd = &cobra.Command{
+	Use:   "preview",
+	Args:  cobra.NoArgs,
+	Short: "Preview the changes that will be made by the CD task",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_, err := cli.ComposeStart(cmd.Context(), client, compose.BuildContextPreview)
+		return err
 	},
 }
 

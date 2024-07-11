@@ -112,6 +112,14 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
+}
+
+func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -169,7 +177,6 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
 		payloadString = http.RemoveQueryParam(url)
-		// FIXME: this code path didn't work
 	}
 
 	if b.ShouldDelegateSubdomain {
@@ -177,7 +184,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdCommand(ctx, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
