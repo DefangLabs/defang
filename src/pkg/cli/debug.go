@@ -11,6 +11,8 @@ import (
 )
 
 func Debug(ctx context.Context, c client.Client, etag, folder string) error {
+	term.Debug("Invoking AI debugger for deployment", etag)
+
 	patterns := []string{"Dockerfile", "*compose.yaml", "*compose.yml", "*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"}
 	var files []*defangv1.File
 	for _, pattern := range patterns {
