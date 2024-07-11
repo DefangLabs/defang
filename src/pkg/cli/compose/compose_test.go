@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/sirupsen/logrus"
 )
 
 func TestLoadCompose(t *testing.T) {
@@ -112,8 +111,14 @@ func TestLoadCompose(t *testing.T) {
 }
 
 func TestComposeGoNoDoubleWarningLog(t *testing.T) {
+
+	oldTerm := term.DefaultTerm
+	t.Cleanup(func() {
+		term.DefaultTerm = oldTerm
+	})
+
 	var warnings bytes.Buffer
-	logrus.SetOutput(&warnings)
+	term.DefaultTerm = term.NewTerm(&warnings, &warnings)
 
 	loader := Loader{"../../../tests/compose-go-warn/compose.yaml"}
 	_, err := loader.LoadCompose(context.Background())
@@ -121,7 +126,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}
 
-	if bytes.Count(warnings.Bytes(), []byte(`\"yes\" for boolean is not supported by YAML 1.2`)) != 1 {
+	if bytes.Count(warnings.Bytes(), []byte(`"yes" for boolean is not supported by YAML 1.2`)) != 1 {
 		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
 	}
 }

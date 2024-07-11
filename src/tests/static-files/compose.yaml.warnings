@@ -1,5 +1,5 @@
-level=warning msg="service \"x\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"x\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
-level=warning msg="service \"y\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"y\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
-level=warning msg="service \"y\": unsupported compose extension: \"x-unsupported\""
+ ! service "x": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "x": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "y": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "y": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "y": unsupported compose extension: "x-unsupported"

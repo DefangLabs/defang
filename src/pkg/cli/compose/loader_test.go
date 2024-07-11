@@ -7,10 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
-	linediff "github.com/andreyvit/diff"
+	"github.com/hexops/gotextdiff"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 )
 
 func TestLoader(t *testing.T) {
@@ -54,30 +55,9 @@ func diff(actualRaw, goldenRaw string) error {
 		return nil
 	}
 
-	var buf strings.Builder
-	const contextSize = 3
-
-	diffs := linediff.LineDiffAsLines(goldenRaw, actualRaw)
-	show := make([]bool, len(diffs))
-
-	for i, diff := range diffs {
-		if diff[0] == ' ' {
-			continue
-		}
-		for j := i - contextSize; j < i+contextSize; j++ {
-			if j >= 0 && j < len(diffs) {
-				show[j] = true
-			}
-		}
-	}
-
-	w := len(fmt.Sprint(len(diffs)))
-	for i, s := range show {
-		if s {
-			fmt.Fprintf(&buf, "%*v: %s\n", w, i, diffs[i])
-		}
-	}
-	return fmt.Errorf("diff:\n%s", buf.String())
+	edits := myers.ComputeEdits(span.URIFromPath("expected"), goldenRaw, actualRaw)
+	diff := fmt.Sprint(gotextdiff.ToUnified("expected", "actual", goldenRaw, edits))
+	return fmt.Errorf("mismatch:\n%s", diff)
 }
 
 func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {

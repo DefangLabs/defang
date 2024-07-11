@@ -1,7 +1,7 @@
-level=warning msg="service \"x\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"x\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
-level=warning msg="service \"y\": managed Redis service should use a redis image"
-level=warning msg="service \"y\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"y\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
-level=warning msg="service \"z\": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)"
-level=warning msg="service \"z\": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors"
+ ! service "x": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "x": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "y": managed Redis service should use a redis image
+ ! service "y": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "y": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "z": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "z": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors

@@ -1,1 +1,1 @@
-level=warning msg="unsupported compose extension: \"x-unsupported\""
+ ! unsupported compose extension: "x-unsupported"
