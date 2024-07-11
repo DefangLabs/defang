@@ -16,16 +16,23 @@ import (
 func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force BuildContext) ([]*defangv1.Service, error) {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
+	var nonReplaceServiceNames []string
 	for _, svccfg := range serviceConfigs {
 		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+		} else {
+			nonReplaceServiceNames = append(nonReplaceServiceNames, regexp.QuoteMeta(svccfg.Name))
 		}
 	}
 	var serviceNameRegex *regexp.Regexp
 	if len(serviceNames) > 0 {
 		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
+	}
+	var nonReplaceServiceNameRegex *regexp.Regexp
+	if len(nonReplaceServiceNames) > 0 {
+		nonReplaceServiceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(nonReplaceServiceNames, "|") + `)\b`)
 	}
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
@@ -131,6 +138,9 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
 				term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
+					term.Warnf("service %q: environment variable %q with value %q contains a service name needs to be normalized, but it will be repalced by an existing config. service names in a config will not be normalized.", svccfg.Name, key, *value)
+				}
 				envFromConfig = append(envFromConfig, key)
 				continue
 			}
@@ -143,6 +153,8 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				})
 				if val != *value {
 					term.Warnf("service %q: service names were replaced in environment variable %q: %q", svccfg.Name, key, val)
+				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
+					term.Warnf("service %q: service names were NOT replaced in environment variable %q: %q, only service with port mode host will be replaced", svccfg.Name, key, val)
 				}
 			}
 			envs[key] = val
