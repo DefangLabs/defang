@@ -2,7 +2,7 @@
 import AdmZip from "adm-zip";
 import axios from "axios";
 import * as child_process from "child_process";
-import { promises as fsPromise } from "fs";
+import * as fsPromises from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import * as tar from "tar";
@@ -57,14 +57,14 @@ export async function downloadFile(
     }
 
     // write data to file, will overwrite if file already exists
-    await fsPromise.writeFile(downloadTargetFile, response.data);
+    await fsPromises.writeFile(downloadTargetFile, response.data);
 
     return downloadTargetFile;
   } catch (error) {
     console.error(error);
 
     // something went wrong, clean up by deleting the downloaded file if it exists
-    await fsPromise.unlink(downloadTargetFile);
+    await fsPromises.unlink(downloadTargetFile);
     return null;
   }
 }
@@ -97,7 +97,7 @@ async function extractZip(
   try {
     const zip = new AdmZip(zipPath);
     const result = zip.extractEntryTo(EXECUTABLE, outputPath, true, true);
-    await fsPromise.chmod(path.join(outputPath, EXECUTABLE), 755);
+    await fsPromises.chmod(path.join(outputPath, EXECUTABLE), 755);
     return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
@@ -124,7 +124,7 @@ function extractTarGz(tarGzFilePath: string, outputPath: string): boolean {
 }
 
 async function deleteArchive(archiveFilePath: string): Promise<void> {
-  await fsPromise.unlink(archiveFilePath);
+  await fsPromises.unlink(archiveFilePath);
 }
 
 export function getAppArchiveFilename(
@@ -210,7 +210,7 @@ function getPathToExecutable(): string | null {
   }
 }
 
-function extractCLIVersions(versionInfo: string): {
+export function extractCLIVersions(versionInfo: string): {
   defangCLI: string;
   latestCLI: string;
 } {
