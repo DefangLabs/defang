@@ -846,7 +846,7 @@ var composeUpCmd = &cobra.Command{
 
 		since := time.Now()
 		ctx := cmd.Context()
-		deploy, err := cli.ComposeStart(ctx, client, force)
+		deploy, project, err := cli.ComposeUp(ctx, client, force)
 		if err != nil {
 			return err
 		}
@@ -882,10 +882,21 @@ var composeUpCmd = &cobra.Command{
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 
-				if err := cli.Debug(ctx, client, deploy.Etag, "."); err != nil {
-					term.Debugf("failed to debug deployment: %v", err)
+				if !nonInteractive {
+					var aiDebug bool
+					if err := survey.AskOne(&survey.Confirm{
+						Message: "Would you like to debug the deployment with AI?",
+						Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
+					}, &aiDebug); err != nil {
+						term.Debugf("failed to ask for AI debug: %v", err)
+					} else if aiDebug {
+						if err := cli.Debug(ctx, client, deploy.Etag, project.WorkingDir); err != nil {
+							term.Debugf("failed to debug deployment: %v", err)
+						}
+					}
 				}
-				return err
+
+				return err // return the error from waitServiceState
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
@@ -911,7 +922,7 @@ var composeStartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
+		deploy, _, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
 			return err
 		}
@@ -1029,7 +1040,7 @@ var composeConfigCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true // config is like start in a dry run
 		// force=false to calculate the digest
-		if _, err := cli.ComposeStart(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
+		if _, _, err := cli.ComposeUp(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
 			return err
 		}
 		return nil
