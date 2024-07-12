@@ -46,7 +46,7 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     hooks:
       after:
-        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ .Path }}"{{ else }}true{{ end }}'
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ (index .Artifacts 0).Path }}"{{ else }}true{{ end }}'
 
 # notarize:
 #   macos:
