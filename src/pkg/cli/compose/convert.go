@@ -16,16 +16,23 @@ import (
 func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force BuildContext) ([]*defangv1.Service, error) {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
+	var nonReplaceServiceNames []string
 	for _, svccfg := range serviceConfigs {
 		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
+		} else {
+			nonReplaceServiceNames = append(nonReplaceServiceNames, regexp.QuoteMeta(svccfg.Name))
 		}
 	}
 	var serviceNameRegex *regexp.Regexp
 	if len(serviceNames) > 0 {
 		serviceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(serviceNames, "|") + `)\b`)
+	}
+	var nonReplaceServiceNameRegex *regexp.Regexp
+	if len(nonReplaceServiceNames) > 0 {
+		nonReplaceServiceNameRegex = regexp.MustCompile(`\b(?:` + strings.Join(nonReplaceServiceNames, "|") + `)\b`)
 	}
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
@@ -130,7 +137,11 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
+					term.Warnf("service %q: environment variable %q needs service name fix-up, but is overridden by config, which will not be fixed up.", svccfg.Name, key)
+				} else {
+					term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+				}
 				envFromConfig = append(envFromConfig, key)
 				continue
 			}
@@ -142,7 +153,9 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 					return c.ServiceDNS(NormalizeServiceName(serviceName))
 				})
 				if val != *value {
-					term.Warnf("service %q: service names were replaced in environment variable %q: %q", svccfg.Name, key, val)
+					term.Warnf("service %q: service names were fixed up in environment variable %q: %q", svccfg.Name, key, val)
+				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
+					term.Warnf("service %q: service names in the environment variable %q were not fixed up, only services with port mode set to host will be fixed up.", svccfg.Name, key)
 				}
 			}
 			envs[key] = val
