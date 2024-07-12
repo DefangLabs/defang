@@ -3,8 +3,7 @@
  ! service "bad-service": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "bad-service": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "bad-service": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "env-in-config": environment variable "CONFIG1" overridden by config
- ! service "env-in-config": environment variable "CONFIG1" with value "http://Mistral:8000" contains a service name needs to be normalized, but it will be repalced by an existing config. service names in a config will not be normalized.
+ ! service "env-in-config": The environment variable "CONFIG1", with the value "http://Mistral:8000", contains a service name that needs to be normalized. however, it will be replaced by an existing configuration. service names within a configuration will not be normalized.
  ! service "env-in-config": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "env-in-config": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "ui": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
@@ -12,5 +11,5 @@
  ! service "ui": service names were replaced in environment variable "API_URL": "http://mock-mistral:8000"
  ! service "use-bad-service": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "use-bad-service": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "use-bad-service": service names were NOT replaced in environment variable "DB_URL": "bad-service:5432", only service with port mode host will be replaced
+ ! service "use-bad-service": service names in the environment variable "DB_URL" ("bad-service:5432") were not replaced. only services with port mode set to host will be replaced.
  ! service name "Mistral" was normalized to "mistral"
