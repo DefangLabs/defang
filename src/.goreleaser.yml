@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 project_name: defang
 builds:
   - id: defang-mac
@@ -44,6 +44,21 @@ archives:
         format: zip
     # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    hooks:
+      after:
+        - echo '{{ printf "%#v" (index .Artifacts 1) }}'
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "dist/darwin/defang_{{ .Version }}_macOS.zip"{{ else }}true{{ end }}'
+
+# notarize:
+#   macos:
+#     - enabled: true
+#       sign:
+#         certificate: "{{ .Env.MACOS_P12_BASE64 }}"
+#         password: "{{ .Env.MACOS_P12_PASSWORD }}"
+#       notarize:
+#         issuer_id: "{{ .Env.MACOS_NOTARIZATION_APPLE_ID }}"
+#         key: "{{ .Env.MACOS_NOTARIZATION_APP_PW }}" TODO: this should be a base64 .p8 key file
+#         key_id: "{{ .Env.MACOS_NOTARIZATION_TEAM_ID }}"
 
 release:
   github:
@@ -67,8 +82,8 @@ release:
   # prerelease: "true"
 
 nix:
-  # commit_author: defang-io
   - homepage: https://defang.io/
+    # commit_author: defang-io
     description: Defang is the easiest way for developers to create and deploy their containerized applications
     license: "mit"
     repository:
@@ -81,7 +96,7 @@ nix:
         --fish <($out/bin/defang completion fish)
 
 changelog:
-  use: github
+  use: github-native
   filters:
     exclude:
       # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
