@@ -11,7 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 )
 
-func TestComposeStart(t *testing.T) {
+func TestComposeUp(t *testing.T) {
 	DoDryRun = true
 	defer func() { DoDryRun = false }()
 
@@ -26,8 +26,11 @@ func TestComposeStart(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err = ComposeStart(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false)
+	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false)
 	if !errors.Is(err, ErrDryRun) {
-		t.Fatalf("ComposeStart() failed: %v", err)
+		t.Fatalf("ComposeUp() failed: %v", err)
+	}
+	if project == nil {
+		t.Fatalf("ComposeUp() failed: project is nil")
 	}
 }
