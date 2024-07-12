@@ -27,9 +27,9 @@ jobs:
         run: go test -test.short -v ./...
         working-directory: src
 
-      # - name: Build MacOS binary
-      #   run: GOOS=darwin go build ./cmd/cli
-      #   working-directory: src
+      - name: Build MacOS binary
+        run: GOOS=darwin go build ./cmd/cli
+        working-directory: src
 
       - name: Build Windows binary
         run: GOOS=windows go build ./cmd/cli
@@ -145,7 +145,7 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
+          args: release --split ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot' }}
           workdir: src
         env:
           GGOOS: linux
@@ -156,7 +156,7 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
+          args: release --split ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot' }}
           workdir: src
         env:
           GGOOS: windows
@@ -173,9 +173,9 @@ jobs:
       - name: Trusted Signing
         uses: Azure/trusted-signing-action@v0.3.20
         with:
-          endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
-          trusted-signing-account-name: DefangLabs      # from Azure portal
-          certificate-profile-name: signed-binary       # from Azure portal; TODO use -test profile for testing
+          endpoint: https://wus2.codesigning.azure.net/                                                        # from Azure portal
+          trusted-signing-account-name: DefangLabs                                                             # from Azure portal
+          certificate-profile-name: signed-binary${{ startsWith(github.ref, 'refs/tags/v') && '' || '-test' }} # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
           files-folder-recurse: true
@@ -194,12 +194,15 @@ jobs:
           exclude-interactive-browser-credential: true
 
       - name: Update archives
+        if: startsWith(github.ref, 'refs/tags/v') # skip this step for snapshots because we don't know the name of the archive
         run: |
-          $version = '${{ github.ref_name }}' -replace '^v', ''
-          Compress-Archive -Path defang-cli_windows_amd64_v1\* -DestinationPath "dist\windows\defang_${version}_windows_amd64.zip" -Update
-          Compress-Archive -Path defang-cli_windows_arm64\* -DestinationPath "dist\windows\defang_${version}_windows_arm64.zip" -Update
+          $version = '${GITHUB_REF_NAME}' -replace '^v', ''
+          Compress-Archive -Path defang-cli_windows_amd64_v1\* -DestinationPath "defang_${version}_windows_amd64.zip" -Update
+          Compress-Archive -Path defang-cli_windows_arm64\* -DestinationPath "defang_${version}_windows_arm64.zip" -Update
         shell: pwsh
         working-directory: src\dist\windows
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
       - name: Upload dist-win folder
         uses: actions/upload-artifact@v4
@@ -230,7 +233,7 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }}
+          args: release --split ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot' }}
           workdir: src
         env:
           GGOOS: darwin
@@ -256,7 +259,7 @@ jobs:
     needs:
       - build-and-sign-mac
       - build-and-sign
-    runs-on: ubuntu-latest # for notarization
+    runs-on: ubuntu-latest
     permissions:
       contents: write # to upload archives as GitHub Releases
     steps:

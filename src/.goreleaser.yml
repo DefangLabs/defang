@@ -46,7 +46,8 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     hooks:
       after:
-        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "{{ (index .Artifacts 0).Path }}"{{ else }}true{{ end }}'
+        - echo '{{ printf "%#v" (index .Artifacts 1) }}'
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "dist/darwin/defang_{{ .Version }}_macOS.zip"{{ else }}true{{ end }}'
 
 # notarize:
 #   macos:
