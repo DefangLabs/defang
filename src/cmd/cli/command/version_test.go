@@ -70,6 +70,10 @@ func (rt *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func TestGetLatestVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping GitHub HTTP test in short mode to avoid rate limits.")
+	}
+
 	ctx := context.Background()
 
 	const version = "v1.2.3"
