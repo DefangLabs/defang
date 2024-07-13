@@ -219,6 +219,10 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
 
+	// Debug Command
+	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	RootCmd.AddCommand(debugCmd)
+
 	// Tail Command
 	tailCmd.Flags().StringP("name", "n", "", "name of the service")
 	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -842,7 +846,7 @@ var composeUpCmd = &cobra.Command{
 
 		since := time.Now()
 		ctx := cmd.Context()
-		deploy, err := cli.ComposeStart(ctx, client, force)
+		deploy, project, err := cli.ComposeUp(ctx, client, force)
 		if err != nil {
 			return err
 		}
@@ -877,7 +881,22 @@ var composeUpCmd = &cobra.Command{
 		if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
 			if errors.Is(err, ErrDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
-				return err
+
+				if !nonInteractive {
+					var aiDebug bool
+					if err := survey.AskOne(&survey.Confirm{
+						Message: "Would you like to debug the deployment with AI?",
+						Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
+					}, &aiDebug); err != nil {
+						term.Debugf("failed to ask for AI debug: %v", err)
+					} else if aiDebug {
+						if err := cli.Debug(ctx, client, deploy.Etag, project.WorkingDir); err != nil {
+							term.Debugf("failed to debug deployment: %v", err)
+						}
+					}
+				}
+
+				return err // return the error from waitServiceState
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)
 			}
@@ -903,7 +922,7 @@ var composeStartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 
-		deploy, err := cli.ComposeStart(cmd.Context(), client, force)
+		deploy, _, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
 			return err
 		}
@@ -917,6 +936,19 @@ var composeStartCmd = &cobra.Command{
 		}
 		printDefangHint("To track the update, do:", command)
 		return nil
+	},
+}
+
+var debugCmd = &cobra.Command{
+	Use:         "debug",
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Hidden:      true,
+	Short:       "Debug a build, deployment, or service failure",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		etag, _ := cmd.Flags().GetString("etag")
+
+		return cli.Debug(cmd.Context(), client, etag, ".")
 	},
 }
 
@@ -1008,7 +1040,7 @@ var composeConfigCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cli.DoDryRun = true // config is like start in a dry run
 		// force=false to calculate the digest
-		if _, err := cli.ComposeStart(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
+		if _, _, err := cli.ComposeUp(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
 			return err
 		}
 		return nil
@@ -1021,7 +1053,7 @@ var deleteCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
 	Short:       "Delete a service from the cluster",
-	Deprecated:  "use 'compose stop' instead",
+	Deprecated:  "use 'compose down' instead",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 

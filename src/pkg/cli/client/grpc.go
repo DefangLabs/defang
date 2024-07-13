@@ -88,6 +88,10 @@ func (g GrpcClient) AgreeToS(ctx context.Context) error {
 	return err
 }
 
+func (g GrpcClient) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	return getMsg(g.client.Debug(ctx, connect.NewRequest(req)))
+}
+
 func (g GrpcClient) Track(event string, properties ...Property) error {
 	// Convert map[string]any to map[string]string
 	var props map[string]string

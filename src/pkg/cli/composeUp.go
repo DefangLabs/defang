@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 type ComposeError struct {
@@ -28,31 +29,31 @@ func buildContext(force bool) compose.BuildContext {
 	return compose.BuildContextDigest
 }
 
-// ComposeStart validates a compose project and uploads the services using the client
-func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, error) {
+// ComposeUp validates a compose project and uploads the services using the client
+func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, *types.Project, error) {
 	project, err := c.LoadProject(ctx)
 	if err != nil {
-		return nil, err
+		return nil, project, err
 	}
 
 	if err := compose.ValidateProject(project); err != nil {
-		return nil, &ComposeError{err}
+		return nil, project, &ComposeError{err}
 	}
 
 	services, err := compose.ConvertServices(ctx, c, project.Services, buildContext(force))
 	if err != nil {
-		return nil, err
+		return nil, project, err
 	}
 
 	if len(services) == 0 {
-		return nil, &ComposeError{fmt.Errorf("no services found")}
+		return nil, project, &ComposeError{fmt.Errorf("no services found")}
 	}
 
 	if DoDryRun {
 		for _, service := range services {
 			PrintObject(service.Name, service)
 		}
-		return nil, ErrDryRun
+		return nil, project, ErrDryRun
 	}
 
 	for _, service := range services {
@@ -63,7 +64,7 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 		Services: services,
 	})
 	if err != nil {
-		return nil, err
+		return nil, project, err
 	}
 
 	if term.DoDebug() {
@@ -71,5 +72,5 @@ func ComposeStart(ctx context.Context, c client.Client, force bool) (*defangv1.D
 			PrintObject(service.Service.Name, service)
 		}
 	}
-	return resp, nil
+	return resp, project, nil
 }
