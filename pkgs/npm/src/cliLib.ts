@@ -14,8 +14,7 @@ const URL_LATEST_RELEASE =
 const HTTP_STATUS_OK = 200;
 
 const exec = promisify(child_process.exec);
-
-export async function getLatestVersion(): Promise<string> {
+async function getLatestVersion(): Promise<string> {
   const response = await axios.get(URL_LATEST_RELEASE);
   if (response?.status !== HTTP_STATUS_OK) {
     throw new Error(
@@ -37,8 +36,7 @@ async function downloadAppArchive(
 
   return await downloadFile(downloadUrl, downloadTargetFile);
 }
-
-export async function downloadFile(
+async function downloadFile(
   downloadUrl: string,
   downloadTargetFile: string
 ): Promise<string | null> {
@@ -68,7 +66,6 @@ export async function downloadFile(
     return null;
   }
 }
-
 async function extractArchive(
   archiveFilePath: string,
   outputPath: string
@@ -127,7 +124,7 @@ async function deleteArchive(archiveFilePath: string): Promise<void> {
   await fsPromises.unlink(archiveFilePath);
 }
 
-export function getAppArchiveFilename(
+function getAppArchiveFilename(
   version: string,
   platform: string,
   arch: string
@@ -307,7 +304,7 @@ function getEndNameFromPath(pathLine: string): string {
 // the arguments passed to the npx line. NPM installer will create a symlink
 // in the user PATH to the cli.js to execute. The symlink will name the same as
 // the package name i.e. defang.
-export async function run(): Promise<void> {
+async function run(): Promise<void> {
   try {
     const { cliParams, outArgs: args } = extractCLIWrapperArgs(
       process.argv.slice(2)
@@ -345,3 +342,14 @@ export async function run(): Promise<void> {
     process.exitCode = 2;
   }
 }
+
+const clilibs = {
+  getLatestVersion,
+  extractArchive,
+  downloadFile,
+  getAppArchiveFilename,
+  install,
+  run,
+};
+
+export default clilibs;
