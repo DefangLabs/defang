@@ -1,75 +1,71 @@
-// import {
-//   expect,
-//   jest,
-//   it,
-//   describe,
-//   beforeEach,
-//   afterEach,
-// } from "@jest/globals";
-// import axios, { AxiosResponse } from "axios";
-// import * as fs from "fs/promises";
-// jest.mock("axios");
-// jest.mock("fs/promises");
+// Import the functions you want to test from cli.ts
+import "mocha";
+import sinon from "sinon";
+import { expect } from "chai";
 
-// // Import the functions you want to test from cli.ts
-// import * as clilib from "./clilib";
+import axios, { AxiosResponse } from "axios";
+import clilib from "../src/clilib.ts";
 
-// const mockedAxios = axios as jest.Mocked<typeof axios>;
+describe("Testing getLatestVersion()", () => {
+  var sandbox: sinon.SinonSandbox;
 
-// describe("Testing getLatestVersion()", () => {
-//   afterEach(() => {
-//     jest.resetAllMocks();
-//   });
+  beforeEach(() => {
+    sandbox = sinon.createSandbox();
+  });
 
-//   it("sanity", async () => {
-//     const mockResponse: AxiosResponse = {
-//       status: 200,
-//       data: {
-//         tag_name: "v0.5.32",
-//       },
-//     } as AxiosResponse;
-//     mockedAxios.get.mockResolvedValue(mockResponse);
+  afterEach(() => {
+    sandbox.restore();
+  });
 
-//     const latestVersion = await clilib.getLatestVersion();
-//     expect(latestVersion).toBe("0.5.32");
-//   });
+  it("sanity", async () => {
+    const mockResponse: AxiosResponse = {
+      status: 200,
+      data: {
+        tag_name: "v0.5.32",
+      },
+    } as AxiosResponse;
+    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
 
-//   it("bad HTTP Status", async () => {
-//     const mockResponse: AxiosResponse = {
-//       status: 500,
-//     } as AxiosResponse;
-//     mockedAxios.get.mockResolvedValue(mockResponse);
+    const latestVersion = await clilib.getLatestVersion();
+    expect(latestVersion).to.equal("0.5.32");
+  });
 
-//     const t = async () => {
-//       await clilib.getLatestVersion();
-//     };
-//     expect(t).rejects.toThrow();
-//   });
+  it("bad HTTP Status", async () => {
+    const mockResponse: AxiosResponse = {
+      status: 500,
+    } as AxiosResponse;
+    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
 
-//   it("empty tag_name", async () => {
-//     const mockResponse: AxiosResponse = {
-//       status: 200,
-//       data: {
-//         tag_name: "",
-//       },
-//     } as AxiosResponse;
-//     mockedAxios.get.mockResolvedValue(mockResponse);
+    const t = async () => {
+      await clilib.getLatestVersion();
+    };
+    expect(t).to.throw();
+  });
 
-//     const latestVersion = await clilib.getLatestVersion();
-//     expect(latestVersion).toBe("");
-//   });
+  // it("empty tag_name", async () => {
+  //   const mockResponse: AxiosResponse = {
+  //     status: 200,
+  //     data: {
+  //       tag_name: "",
+  //     },
+  //   } as AxiosResponse;
+  //   mockedAxios.get.mockResolvedValue(mockResponse);
 
-//   it("ill-formed tag_name", async () => {
-//     const mockResponse: AxiosResponse = {
-//       status: 200,
-//       data: {},
-//     } as AxiosResponse;
-//     mockedAxios.get.mockResolvedValue(mockResponse);
+  //   const latestVersion = await clilib.getLatestVersion();
+  //   expect(latestVersion).toBe("");
+  // });
 
-//     const latestVersion = await clilib.getLatestVersion();
-//     expect(latestVersion).toBeUndefined();
-//   });
-// });
+  // it("ill-formed tag_name", async () => {
+  //   const mockResponse: AxiosResponse = {
+  //     status: 200,
+  //     data: {},
+  //   } as AxiosResponse;
+  //   mockedAxios.get.mockResolvedValue(mockResponse);
+
+  //   const latestVersion = await clilib.getLatestVersion();
+  //   expect(latestVersion).toBeUndefined();
+  // });
+});
 
 // describe("Testing downloadFile()", () => {
 //   let downloadFileName = "target";
