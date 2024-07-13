@@ -8,16 +8,17 @@ import (
 	"net"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
-
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/DefangLabs/defang/src/pkg/term"
-
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
+
+var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
 // Deprecated: should use grpc to get the tenant ID
 func GetTenantID(cluster string) types.TenantID {
@@ -36,7 +37,7 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 		tenant, cluster = types.TenantID(parts[0]), parts[1]
 	}
 	if cluster == "" {
-		cluster = DefaultCluster
+		cluster = DefangFabric
 	}
 	if _, _, err := net.SplitHostPort(cluster); err != nil {
 		cluster = cluster + ":443" // default to https
