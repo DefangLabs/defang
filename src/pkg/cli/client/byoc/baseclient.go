@@ -89,6 +89,10 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 	return b
 }
 
+func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
+}
+
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
 	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
