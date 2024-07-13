@@ -9,6 +9,22 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+func applyTransitionEvent(serviceState map[string]defangv1.ServiceState, serviceName string, newState defangv1.ServiceState) bool {
+	currentState, ok := serviceState[serviceName]
+	if !ok {
+		term.Debugf("trying to update unexpected service (%s)", serviceName)
+		return false
+	}
+
+	// we only allow tranitions to next progressive states never backwards.
+	if currentState.Number() < newState.Number() {
+		serviceState[serviceName] = newState
+		return true
+	}
+
+	return false
+}
+
 func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, serviceInfos []*defangv1.ServiceInfo) error {
 	serviceList := []string{}
 	for _, serviceInfo := range serviceInfos {
@@ -39,9 +55,13 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 			return ErrDeploymentFailed
 		}
 
-		serviceState[newStatus.Name] = newStatus.State
+		applied := applyTransitionEvent(serviceState, newStatus.Name, newStatus.State)
 
-		if allInState(targetState, serviceState) {
+		if applied {
+			term.Debugf("service %s transitioned to state %s", newStatus.Name, newStatus.State.String())
+		}
+
+		if applied && allInState(targetState, serviceState) {
 			for _, sInfo := range serviceInfos {
 				sInfo.State = targetState
 			}
