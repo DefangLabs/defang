@@ -175,6 +175,13 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 	return tail(ctx, client, params)
 }
 
+func isTransientError(err error) bool {
+	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
+	code := connect.CodeOf(err)
+	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+	return code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(err))
+}
+
 func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -242,10 +249,8 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
 			}
 
-			// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
-			code := connect.CodeOf(serverStream.Err())
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-			if code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(serverStream.Err())) {
+			if isTransientError(serverStream.Err()) {
 				term.Debug("Disconnected:", serverStream.Err())
 				var spaces int
 				if !params.Raw {
