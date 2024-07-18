@@ -4,7 +4,6 @@
   "author": "Defang Software Labs Inc.",
   "description": "CLI for the Defang Opinionated Platform",
   "license": "MIT",
-  "type": "module",
   "bin": {
     "defang": "./bin/cli.js"
   },
@@ -16,10 +15,6 @@
   },
   "bugs": {
     "url": "https://github.com/DefangLabs/defang/issues"
-  },
-  "compilerOptions": {
-    "esModuleInterop": true,
-    "outDir": "./bin"
   },
   "mocha": {
     "require": [
@@ -33,8 +28,8 @@
     "recursive": true
   },
   "scripts": {
-    "build": "tsc -outFile cli-build.ts ./src/*.ts",
-    "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm --trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
+    "build": "tsc",
+    "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm -trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
   },
   "dependencies": {
     "adm-zip": "^0.5.14",
