@@ -1,14 +1,19 @@
 // Import the functions you want to test from cli.ts
 import "mocha";
 import sinon from "sinon";
-import { expect } from "chai";
+import * as chai from "chai";
+import chaiAsPromised from "chai-as-promised";
 
 import axios, { AxiosResponse } from "axios";
+import fs from "fs";
 import clilib from "../src/clilib.ts";
 
-describe("Testing getLatestVersion()", () => {
-  var sandbox: sinon.SinonSandbox;
+chai.use(chaiAsPromised);
+const { assert, expect } = chai;
 
+var sandbox: sinon.SinonSandbox;
+
+describe("Testing getLatestVersion()", () => {
   beforeEach(() => {
     sandbox = sinon.createSandbox();
   });
@@ -26,188 +31,180 @@ describe("Testing getLatestVersion()", () => {
     } as AxiosResponse;
     sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
 
-    const latestVersion = await clilib.getLatestVersion();
-    expect(latestVersion).to.equal("0.5.32");
+    await expect(clilib.getLatestVersion()).to.eventually.equal("0.5.32");
   });
 
   it("bad HTTP Status", async () => {
     const mockResponse: AxiosResponse = {
       status: 500,
     } as AxiosResponse;
-    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
+    sandbox.stub(axios, "get").returns(Promise.reject(mockResponse));
 
-    const t = async () => {
-      await clilib.getLatestVersion();
-    };
-    expect(t).to.throw();
+    await expect(clilib.getLatestVersion()).to.be.rejected;
   });
 
-  // it("empty tag_name", async () => {
-  //   const mockResponse: AxiosResponse = {
-  //     status: 200,
-  //     data: {
-  //       tag_name: "",
-  //     },
-  //   } as AxiosResponse;
-  //   mockedAxios.get.mockResolvedValue(mockResponse);
+  it("empty tag_name", async () => {
+    const mockResponse: AxiosResponse = {
+      status: 200,
+      data: {
+        tag_name: "",
+      },
+    } as AxiosResponse;
+    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
 
-  //   const latestVersion = await clilib.getLatestVersion();
-  //   expect(latestVersion).toBe("");
-  // });
+    await expect(clilib.getLatestVersion()).to.eventually.equal("");
+  });
 
-  // it("ill-formed tag_name", async () => {
-  //   const mockResponse: AxiosResponse = {
-  //     status: 200,
-  //     data: {},
-  //   } as AxiosResponse;
-  //   mockedAxios.get.mockResolvedValue(mockResponse);
+  it("ill-formed tag_name", async () => {
+    const mockResponse: AxiosResponse = {
+      status: 200,
+      data: {},
+    } as AxiosResponse;
+    sandbox.stub(axios, "get").returns(Promise.resolve(mockResponse));
 
-  //   const latestVersion = await clilib.getLatestVersion();
-  //   expect(latestVersion).toBeUndefined();
-  // });
+    await expect(clilib.getLatestVersion()).to.eventually.be.undefined;
+  });
 });
 
-// describe("Testing downloadFile()", () => {
-//   let downloadFileName = "target";
-//   const url = "url";
-//   const header = {
-//     responseType: "arraybuffer",
-//     headers: {
-//       "Content-Type": "application/octet-stream",
-//     },
-//   };
+describe("Testing downloadFile()", () => {
+  let axiosGetStub: sinon.SinonStub;
+  let writeStub: sinon.SinonStub;
+  let unlinkStub: sinon.SinonStub;
 
-//   beforeEach(() => {
-//     downloadFileName = "target";
-//     const mockResponse: AxiosResponse = {
-//       status: 200,
-//       data: {},
-//     } as AxiosResponse;
+  let downloadFileName = "target";
+  const url = "url";
+  const header = {
+    responseType: "arraybuffer",
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+  };
+  let mockResponse: AxiosResponse;
 
-//     mockedAxios.get.mockResolvedValue(mockResponse);
-//     const writeFileMock = fs.writeFile as jest.MockedFunction<
-//       typeof fs.writeFile
-//     >;
-//     const unlinkMock = fs.unlink as jest.MockedFunction<typeof fs.unlink>;
+  beforeEach(() => {
+    sandbox = sinon.createSandbox();
 
-//     writeFileMock.mockResolvedValue();
-//     unlinkMock.mockResolvedValue();
-//   });
+    downloadFileName = "target";
+    mockResponse = {
+      status: 200,
+      data: {},
+    } as AxiosResponse;
 
-//   afterEach(() => {
-//     jest.resetAllMocks();
-//   });
+    axiosGetStub = sandbox
+      .stub(axios, "get")
+      .returns(Promise.resolve(mockResponse));
+    writeStub = sandbox
+      .stub(fs.promises, "writeFile")
+      .callsFake(() => Promise.resolve());
+    unlinkStub = sandbox
+      .stub(fs.promises, "unlink")
+      .callsFake(() => Promise.resolve());
+  });
 
-//   it("sanity", async () => {
-//     const targetFile = await clilib.downloadFile(url, downloadFileName);
+  afterEach(() => {
+    sandbox.restore();
+  });
 
-//     expect(targetFile).toBe(downloadFileName);
-//     expect(mockedAxios.get).toBeCalledWith(
-//       "url",
-//       expect.objectContaining({ responseType: "arraybuffer" })
-//     );
-//     expect(fs.writeFile).toBeCalledWith(targetFile, {});
-//     expect(fs.unlink).not.toHaveBeenCalled();
-//   });
+  it("sanity", async () => {
+    await expect(
+      clilib.downloadFile(url, downloadFileName)
+    ).to.eventually.equal(downloadFileName);
 
-//   it("download fails path", async () => {
-//     mockedAxios.get.mockRejectedValue("failed");
-//     const targetFile = await clilib.downloadFile(url, downloadFileName);
+    sinon.assert.calledWith(axiosGetStub, url, header);
+    sinon.assert.calledWith(writeStub, downloadFileName, mockResponse.data);
+    sinon.assert.notCalled(unlinkStub);
+  });
 
-//     expect(targetFile).toBeNull();
-//     expect(mockedAxios.get).toBeCalledWith(
-//       url,
-//       expect.objectContaining(header)
-//     );
-//     expect(fs.writeFile).not.toHaveBeenCalled();
-//     expect(fs.unlink).toBeCalledWith(downloadFileName);
-//   });
+  it("download fails path", async () => {
+    axiosGetStub.returns(Promise.reject("failed"));
+    const targetFile = await clilib.downloadFile(url, downloadFileName);
+    await expect(
+      clilib.downloadFile(url, downloadFileName)
+    ).to.eventually.equal(targetFile);
 
-//   it("write failed", async () => {
-//     const writeFileMock = fs.writeFile as jest.MockedFunction<
-//       typeof fs.writeFile
-//     >;
+    sinon.assert.calledWith(axiosGetStub, url, header);
+    sinon.assert.notCalled(writeStub);
+    sinon.assert.calledWith(unlinkStub, downloadFileName);
+  });
 
-//     writeFileMock.mockRejectedValue(new Error("failed"));
-//     const targetFile = await clilib.downloadFile(url, downloadFileName);
+  it("write failed", async () => {
+    writeStub.returns(Promise.reject("failed"));
+    await expect(clilib.downloadFile(url, downloadFileName)).to.eventually.null;
+    sinon.assert.calledWith(axiosGetStub, url, header);
+    sinon.assert.calledWith(unlinkStub, downloadFileName);
+  });
+});
 
-//     expect(targetFile).toBeNull();
-//     expect(mockedAxios.get).toBeCalledWith(
-//       url,
-//       expect.objectContaining(header)
-//     );
-//     expect(fs.unlink).toHaveBeenCalled();
-//   });
-// });
+describe("Testing getAppArchiveFilename()", () => {
+  it("returns expected filename", () => {
+    const iterationData = [
+      ["0.0.0", "win32", "x64", "defang_0.0.0_windows_amd64.zip"],
+      ["0.1.0", "windows", "x64", "defang_0.1.0_windows_amd64.zip"],
+      ["0.2.9", "windows", "arm64", "defang_0.2.9_windows_arm64.zip"],
+      ["0.3.10", "linux", "x64", "defang_0.3.10_linux_amd64.tar.gz"],
+      ["0.4.21", "linux", "arm64", "defang_0.4.21_linux_arm64.tar.gz"],
+      ["0.5.45", "darwin", "arm64", "defang_0.5.45_macOS.zip"],
+      ["0.5.45", "darwin", "x64", "defang_0.5.45_macOS.zip"],
+    ] as const;
+    const testFunc = (
+      version: string,
+      platform: string,
+      arch: string,
+      expected: string
+    ) =>
+      expect(clilib.getAppArchiveFilename(version, platform, arch)).to.be.equal(
+        expected
+      );
+    iterationData.forEach((testData) => testFunc.call(null, ...testData));
+  });
 
-// describe("Testing getAppArchiveFilename()", () => {
-//   it.each([
-//     ["0.1.0", "windows", "x64", "defang_0.1.0_windows_amd64.zip"],
-//     ["0.2.9", "windows", "arm64", "defang_0.2.9_windows_arm64.zip"],
-//     ["0.3.10", "linux", "x64", "defang_0.3.10_linux_amd64.tar.gz"],
-//     ["0.4.21", "linux", "arm64", "defang_0.4.21_linux_arm64.tar.gz"],
-//     ["0.5.45", "darwin", "arm64", "defang_0.5.45_macOS.zip"],
-//     ["0.5.45", "darwin", "x64", "defang_0.5.45_macOS.zip"],
-//   ])("sanity", (version, platform, arch, expected) =>
-//     expect(clilib.getAppArchiveFilename(version, platform, arch)).toBe(expected)
-//   );
+  it("check error cases", () => {
+    const iterationData = [
+      ["", "windows", "x64"],
+      ["0.2.9", "windows", "risc64"],
+      ["0.5.45", "darwin", "powerpc"],
+    ] as const;
+    const testFunc = (version: string, platform: string, arch: string) =>
+      expect(() =>
+        clilib.getAppArchiveFilename(version, platform, arch)
+      ).to.throw();
+    iterationData.forEach((testData) => testFunc.call(null, ...testData));
+  });
+});
 
-//   it.failing.each([
-//     ["", "windows", "x64"],
-//     ["0.2.9", "windows", "risc64"],
-//     ["0.5.45", "darwin", "powerpc"],
-//   ])("unknown types", (version, platform, arch) =>
-//     expect(clilib.getAppArchiveFilename(version, platform, arch)).toThrowError()
-//   );
-// });
+describe("Testing extractCLIVersions()", () => {
+  it("sanity", async () => {
+    const versionInfo =
+      "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
+    const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
 
-// describe("Testing extractCLIVersions()", () => {
-//   it("sanity", async () => {
-//     const versionInfo =
-//       "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
-//     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
+  });
 
-//     expect(clilib.extractCLIVersions(versionInfo)).toStrictEqual(expected);
-//   });
+  it("missing v in version text", async () => {
+    const versionInfo =
+      "Defang CLI: 0.5.24\nLatest CLI: 0.5.32\nDefang Fabric: v0.5.0-643";
+    const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
 
-//   it("missing v in version text", async () => {
-//     const versionInfo =
-//       "Defang CLI: 0.5.24\nLatest CLI: 0.5.32\nDefang Fabric: v0.5.0-643";
-//     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
+  });
 
-//     expect(clilib.extractCLIVersions(versionInfo)).toStrictEqual(expected);
-//   });
+  it("missing Defang CLI", () => {
+    const versionInfo =
+      "Defang CLI: \nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
+    assert.doesNotThrow(() => clilib.extractCLIVersions(versionInfo));
+  });
 
-//   it.failing("missing Defang CLI", () => {
-//     const versionInfo =
-//       "Defang CLI: \nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
-//     expect(clilib.extractCLIVersions(versionInfo)).toThrowError();
-//   });
+  it("missing Latest CLI", () => {
+    const versionInfo =
+      "Defang CLI: v0.5.24\nLatest CLI: \nDefang Fabric: v0.5.0-643";
+    assert.doesNotThrow(() => clilib.extractCLIVersions(versionInfo));
+  });
 
-//   it.failing("missing Latest CLI", () => {
-//     const versionInfo =
-//       "Defang CLI: v0.5.24\nLatest CLI: \nDefang Fabric: v0.5.0-643";
-//     expect(clilib.extractCLIVersions(versionInfo)).toThrowError();
-//   });
+  it("no fabric version in input", async () => {
+    const versionInfo = "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\n";
+    const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
 
-//   it("no fabric version in input", async () => {
-//     const versionInfo = "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\n";
-//     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
-
-//     expect(clilib.extractCLIVersions(versionInfo)).toStrictEqual(expected);
-//   });
-// });
-
-// describe("Testing install", () => {
-//   const mockedCli = clilib as jest.Mocked<typeof clilib>;
-
-//   it("sanity", async () => {
-//     jest.mock("./clilib");
-//     jest.spyOn(clilib, "downloadFile").mockResolvedValue("targetFile");
-//     jest.spyOn(clilib, "extractArchive").mockResolvedValue(true);
-
-//     const unlinkMock = fs.unlink as jest.MockedFunction<typeof fs.unlink>;
-//     unlinkMock.mockResolvedValue();
-//     expect(clilib.install("0.5.32", "somedir")).not.toThrow();
-//   });
-// });
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
+  });
+});
