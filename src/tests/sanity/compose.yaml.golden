@@ -13,6 +13,7 @@ services:
     ports:
       - mode: ingress
         target: 80
+        protocol: tcp
     restart: unless-stopped
 networks:
   default:

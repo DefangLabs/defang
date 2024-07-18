@@ -282,6 +282,8 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 		Target: port.Target,
 	}
 
+	// TODO: Use AppProtocol as hint for application protocol
+	// https://github.com/compose-spec/compose-spec/blob/main/05-services.md#long-syntax-3
 	switch port.Protocol {
 	case "":
 		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
@@ -301,6 +303,7 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 
 	switch port.Mode {
 	case "":
+		// TODO: This never happens now as compose-go set default to "ingress"
 		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
 		fallthrough
 	case "ingress":
@@ -310,8 +313,10 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 				term.Warnf("Published ports are ignored in ingress mode")
 			}
 			pbPort.Mode = defangv1.Mode_INGRESS
-			if pbPort.Protocol == defangv1.Protocol_TCP || pbPort.Protocol == defangv1.Protocol_UDP {
-				term.Warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+			if pbPort.Protocol == defangv1.Protocol_TCP {
+				if pbPort.Protocol == defangv1.Protocol_UDP {
+					term.Warnf("UDP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+				}
 				pbPort.Protocol = defangv1.Protocol_HTTP
 			}
 			break

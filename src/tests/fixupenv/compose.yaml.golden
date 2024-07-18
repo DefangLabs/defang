@@ -7,6 +7,7 @@ services:
     ports:
       - mode: host
         target: 8000
+        protocol: tcp
   bad-service:
     image: somedb:latest
     networks:
@@ -14,6 +15,7 @@ services:
     ports:
       - mode: ingress
         target: 5432
+        protocol: tcp
   env-in-config:
     environment:
       CONFIG1: http://Mistral:8000
