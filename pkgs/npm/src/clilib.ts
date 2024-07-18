@@ -1,12 +1,14 @@
-#!/usr/bin/env node
 import AdmZip from "adm-zip";
 import axios from "axios";
 import * as child_process from "child_process";
-import * as fsPromises from "fs/promises";
-import * as os from "os";
+import * as fs from "fs";
 import * as path from "path";
 import * as tar from "tar";
 import { promisify } from "util";
+
+// regex to match semantic version (from semver.org)
+const SEMVER_REGEX =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 const EXECUTABLE = "defang";
 const URL_LATEST_RELEASE =
@@ -36,6 +38,7 @@ async function downloadAppArchive(
 
   return await downloadFile(downloadUrl, downloadTargetFile);
 }
+
 async function downloadFile(
   downloadUrl: string,
   downloadTargetFile: string
@@ -55,17 +58,18 @@ async function downloadFile(
     }
 
     // write data to file, will overwrite if file already exists
-    await fsPromises.writeFile(downloadTargetFile, response.data);
+    await fs.promises.writeFile(downloadTargetFile, response.data);
 
     return downloadTargetFile;
   } catch (error) {
     console.error(error);
 
     // something went wrong, clean up by deleting the downloaded file if it exists
-    await fsPromises.unlink(downloadTargetFile);
+    await fs.promises.unlink(downloadTargetFile);
     return null;
   }
 }
+
 async function extractArchive(
   archiveFilePath: string,
   outputPath: string
@@ -81,7 +85,7 @@ async function extractArchive(
       result = extractTarGz(archiveFilePath, outputPath);
       break;
     default:
-      throw new Error(`Unsupported archive extension: ${ext}`);
+      return false; // unsupported archive extension
   }
 
   return result;
@@ -94,7 +98,7 @@ async function extractZip(
   try {
     const zip = new AdmZip(zipPath);
     const result = zip.extractEntryTo(EXECUTABLE, outputPath, true, true);
-    await fsPromises.chmod(path.join(outputPath, EXECUTABLE), 755);
+    await fs.promises.chmod(path.join(outputPath, EXECUTABLE), 755);
     return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
@@ -121,7 +125,7 @@ function extractTarGz(tarGzFilePath: string, outputPath: string): boolean {
 }
 
 async function deleteArchive(archiveFilePath: string): Promise<void> {
-  await fsPromises.unlink(archiveFilePath);
+  await fs.promises.unlink(archiveFilePath);
 }
 
 function getAppArchiveFilename(
@@ -130,7 +134,13 @@ function getAppArchiveFilename(
   arch: string
 ): string {
   let compression = "zip";
+
+  if (!SEMVER_REGEX.test(version)) {
+    throw new Error(`Unsupported version: ${version}`);
+  }
+
   switch (platform) {
+    case "win32":
     case "windows":
       platform = "windows";
       break;
@@ -162,37 +172,6 @@ function getAppArchiveFilename(
   return `defang_${version}_${platform}_${arch}.${compression}`;
 }
 
-async function install(version: string, saveDirectory: string) {
-  try {
-    console.log(`Getting latest defang cli`);
-
-    // download the latest version of defang cli
-    const filename = getAppArchiveFilename(version, os.platform(), os.arch());
-    const archiveFile = await downloadAppArchive(
-      version,
-      filename,
-      saveDirectory
-    );
-
-    if (archiveFile == null || archiveFile.length === 0) {
-      throw new Error(`Failed to download ${filename}`);
-    }
-
-    // Because the releases are compressed tar.gz or .zip we need to
-    // uncompress them to the ./bin directory in the package in node_modules.
-    const result = await extractArchive(archiveFile, saveDirectory);
-    if (result === false) {
-      throw new Error(`Failed to install binaries!`);
-    }
-
-    // Delete the downloaded archive since we have successfully downloaded
-    // and uncompressed it.
-    await deleteArchive(archiveFile);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
 function getPathToExecutable(): string | null {
   let extension = "";
   if (["win32", "cygwin"].includes(process.platform)) {
@@ -207,7 +186,7 @@ function getPathToExecutable(): string | null {
   }
 }
 
-export function extractCLIVersions(versionInfo: string): {
+function extractCLIVersions(versionInfo: string): {
   defangCLI: string;
   latestCLI: string;
 } {
@@ -231,12 +210,12 @@ export function extractCLIVersions(versionInfo: string): {
   }
 }
 
-type VersionInfo = {
+export type VersionInfo = {
   current: string | null;
   latest: string | null;
 };
 
-export async function getVersionInfo(): Promise<VersionInfo> {
+async function getVersionInfo(): Promise<VersionInfo> {
   let result: VersionInfo = { current: null, latest: null };
   try {
     const execPath = getPathToExecutable();
@@ -300,56 +279,18 @@ function getEndNameFromPath(pathLine: string): string {
   return executableName.split(".")[0];
 }
 
-// js wrapper to use by npx or npm exec, this will call the defang binary with
-// the arguments passed to the npx line. NPM installer will create a symlink
-// in the user PATH to the cli.js to execute. The symlink will name the same as
-// the package name i.e. defang.
-async function run(): Promise<void> {
-  try {
-    const { cliParams, outArgs: args } = extractCLIWrapperArgs(
-      process.argv.slice(2)
-    );
-
-    if (cliParams.uselatest) {
-      const { current, latest }: VersionInfo = await getVersionInfo();
-
-      // get the latest version of defang cli if not already installed
-      if (latest != null && (current == null || current != latest)) {
-        await install(latest, __dirname);
-      }
-    }
-
-    // execute the defang binary with the arguments passed to the npx line.
-    const pathToExec = getPathToExecutable();
-    if (!pathToExec) {
-      throw new Error("Could not find the defang executable.");
-    }
-
-    const commandline = ["npx", getEndNameFromPath(pathToExec)]
-      .join(" ")
-      .trim();
-
-    const processResult = child_process.spawnSync(pathToExec, args, {
-      stdio: "inherit",
-      env: { ...process.env, DEFANG_COMMAND_EXECUTOR: commandline },
-    });
-
-    // if there was an error, print it to the console.
-    processResult.error && console.error(processResult.error);
-    process.exitCode = processResult.status ?? 1;
-  } catch (error) {
-    console.error(error);
-    process.exitCode = 2;
-  }
-}
-
-const clilibs = {
-  getLatestVersion,
-  extractArchive,
+const clilib = {
+  deleteArchive,
+  downloadAppArchive,
   downloadFile,
+  extractArchive,
+  extractCLIVersions,
+  extractCLIWrapperArgs,
   getAppArchiveFilename,
-  install,
-  run,
+  getEndNameFromPath,
+  getLatestVersion,
+  getVersionInfo,
+  getPathToExecutable,
 };
 
-export default clilibs;
+export default clilib;

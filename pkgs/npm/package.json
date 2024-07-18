@@ -1,6 +1,6 @@
 {
   "name": "defang",
-  "version": "0.5.32",
+  "version": "<PLACEHOLDER>",
   "author": "Defang Software Labs Inc.",
   "description": "CLI for the Defang Opinionated Platform",
   "license": "MIT",
@@ -18,21 +18,8 @@
     "url": "https://github.com/DefangLabs/defang/issues"
   },
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "module",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true
+    "outDir": "./bin"
   },
   "mocha": {
     "require": [
@@ -42,12 +29,12 @@
       "ts",
       "js"
     ],
-    "spec": "./test/**/*.ts",
+    "spec": ["test/**/*.spec.ts"],
     "recursive": true
   },
   "scripts": {
-    "build": "tsc",
-    "test": "cross-env NODE_OPTIONS=\"-r ts-node/register --loader=ts-node/esm --trace-warnings --no-warnings=ExperimentalWarning\" TS_NODE_COMPILER_OPTIONS='{\"module\": \"ESNext\" }' mocha './test/**/*.ts'"
+    "build": "tsc -outFile cli-build.ts ./src/*.ts",
+    "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm --trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
   },
   "dependencies": {
     "adm-zip": "^0.5.14",
@@ -64,12 +51,14 @@
     "@types/adm-zip": "^0.5.5",
     "@types/axios": "^0.14.0",
     "@types/chai": "^4.3.16",
+    "@types/chai-as-promised": "^7.1.8",
     "@types/mocha": "^10.0.7",
     "@types/node": "^20.12.7",
     "@types/sinon": "^17.0.3",
     "@types/source-map-support": "^0.5.10",
     "@types/tar": "^6.1.13",
     "chai": "^5.1.1",
+    "chai-as-promised": "^8.0.0",
     "cross-env": "^7.0.3",
     "mocha": "^10.6.0",
     "nyc": "^17.0.0",

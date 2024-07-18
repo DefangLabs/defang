@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "allowJs": true,
         "strict": true,
         "outDir": "bin",
         "target": "ESNext",
@@ -18,17 +17,18 @@
         "forceConsistentCasingInFileNames": true,
         "removeComments": true,
         "allowSyntheticDefaultImports": true,
-        "esModuleInterop": true,
+        "lib": ["es2021"],
         "noEmit": true,
-        "allowImportingTsExtensions": true,
-        "types": ["mocha"]
-      },
-    "include": [
-        "src/**/*",  // Specify files to be included in compilation
-    ],
-    "exclude": [
-        "node_modules",  // Exclude the node_modules directory
-        //"src/*.test.ts",  // Specify TypeScript declaration files to be included in compilation
-        "test/*.spec.ts"  // Specify TypeScript declaration files to be included in compilation
-]
+        "typeRoots" : [
+            "../node_modules/@types"
+        ],
+        "allowJs": true,
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "allowImportingTsExtensions": true
+    
+    },
+    "include": ["src/**/*.ts", "test/cliexec.spec.ts"],
+    "exclude": ["node_modules", "**/*.spec.ts"]
 }

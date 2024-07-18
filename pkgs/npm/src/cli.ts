@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-import clilib from "./clilib";
+import { run } from "./cliexec";
 
-clilib.run();
+run();
