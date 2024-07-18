@@ -1,6 +1,10 @@
-// Import the functions you want to test from cli.ts
-import "mocha";
-import sinon from "sinon";
+//********************************
+// To run these tests do the following:
+//    1. In package.json set/add the field "type": "module"
+//    2. Run `npm test`
+//********************************
+import * as mocha from "mocha";
+import * as sinon from "sinon";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
 

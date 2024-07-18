@@ -2,8 +2,7 @@
     "compilerOptions": {
         "strict": true,
         "outDir": "bin",
-        "target": "ESNext",
-        "module": "ESNext",
+        "module": "CommonJS",
         "moduleResolution": "node",
         "declaration": false,
         "skipLibCheck": true,
@@ -18,7 +17,7 @@
         "removeComments": true,
         "allowSyntheticDefaultImports": true,
         "lib": ["es2021"],
-        "noEmit": true,
+        "noEmit": false,
         "typeRoots" : [
             "../node_modules/@types"
         ],
@@ -26,9 +25,9 @@
         "esModuleInterop": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": false
     
     },
-    "include": ["src/**/*.ts", "test/cliexec.spec.ts"],
+    "include": ["src/**/*.ts"],
     "exclude": ["node_modules", "**/*.spec.ts"]
 }
