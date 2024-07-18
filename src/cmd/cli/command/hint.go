@@ -23,10 +23,19 @@ func prettyExecutable(def string) string {
 	if err != nil {
 		return def
 	}
+
+	// for npm/npx defang is executed within a child process,
+	// but we want to use parent process command line
+	execLine := os.Getenv("DEFANG_COMMAND_EXECUTOR")
+	if execLine != "" {
+		return execLine
+	}
+
 	executable, _ = filepath.Rel(wd, executable)
 	if executable == def {
 		executable = "./" + def // to ensure it's executable
 	}
+
 	if executable == "" {
 		return def
 	}
