@@ -625,13 +625,19 @@ var getServicesCmd = &cobra.Command{
 
 		err := cli.GetServices(cmd.Context(), client, long)
 		if err != nil {
-			return err
+			if !errors.Is(err, cli.ErrNoServices) {
+				return err
+			}
+
+			term.Warn("No services found")
+
+			printDefangHint("To start a new project, do:", "new")
+			return nil
 		}
 
 		if !long {
 			printDefangHint("To see more information about your services, do:", cmd.CalledAs()+" -l")
 		}
-
 		return nil
 	},
 }
