@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -32,9 +31,6 @@ import (
 
 const DEFANG_PORTAL_HOST = "portal.defang.dev"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
-
-var ErrFailedToReachStartedState = errors.New("failed to reach STARTED state")
-var ErrDeploymentFailed = errors.New("deployment failed")
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -816,29 +812,6 @@ var composeCmd = &cobra.Command{
 	Short:   "Work with local Compose files",
 }
 
-func startTailing(ctx context.Context, etag string, since time.Time) error {
-	// set up tailing
-	services := "all services"
-	if etag != "" {
-		services = "deployment ID " + etag
-	}
-
-	term.Info("Tailing logs for", services, "; press Ctrl+C to detach:")
-	tailParams := cli.TailOptions{
-		Services: []string{},
-		Etag:     etag,
-		Since:    since,
-		Raw:      false,
-	}
-
-	// blocking call to tail
-	if err := cli.Tail(ctx, client, tailParams); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
@@ -849,8 +822,7 @@ var composeUpCmd = &cobra.Command{
 		var detach, _ = cmd.Flags().GetBool("detach")
 
 		since := time.Now()
-		ctx := cmd.Context()
-		deploy, project, err := cli.ComposeUp(ctx, client, force)
+		deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
 			return err
 		}
@@ -859,31 +831,51 @@ var composeUpCmd = &cobra.Command{
 			return errors.New("no services being deployed")
 		}
 
-		serviceInfos := deploy.GetServices()
-		printPlaygroundPortalServiceURLs(serviceInfos)
+		printPlaygroundPortalServiceURLs(deploy.Services)
 
 		if detach {
-			term.Info("Done.")
+			term.Info("Detached.")
 			return nil
 		}
 
-		tailCtx, cancelTail := context.WithCancel(ctx)
+		ctx, cancelTail := context.WithCancelCause(cmd.Context())
+		defer cancelTail(nil) // to cancel waitServiceState
 
-		var wg sync.WaitGroup
-		wg.Add(1)
+		errSuccess := errors.New("deployment succeeded")
+
 		go func() {
-			defer wg.Done()
-			// show users the current streaming logs
-			if err := startTailing(tailCtx, deploy.Etag, since); err != nil {
-				var cerr *cli.CancelError
-				if !errors.As(err, &cerr) {
-					term.Debugf("failed to start tailing: %v", err)
+			services := make([]string, len(deploy.Services))
+			for i, serviceInfo := range deploy.Services {
+				services[i] = serviceInfo.Service.Name
+			}
+
+			if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, services); err != nil {
+				if errors.Is(err, errDeploymentFailed) {
+					cancelTail(err)
+				} else if !errors.Is(err, context.Canceled) {
+					term.Warnf("failed to wait for service status: %v", err)
 				}
+			} else {
+				cancelTail(errSuccess)
 			}
 		}()
 
-		if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, serviceInfos); err != nil && !errors.Is(err, context.Canceled) {
-			if errors.Is(err, ErrDeploymentFailed) {
+		// show users the current streaming logs
+		services := "all services"
+		if deploy.Etag != "" {
+			services = "deployment ID " + deploy.Etag
+		}
+
+		term.Info("Tailing logs for", services, "; press Ctrl+C to detach:")
+		tailParams := cli.TailOptions{
+			Etag:  deploy.Etag,
+			Since: since,
+			Raw:   false,
+		}
+
+		// blocking call to tail
+		if err := cli.Tail(ctx, client, tailParams); err != nil {
+			if errors.Is(context.Cause(ctx), errDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 
 				if !nonInteractive {
@@ -899,18 +891,16 @@ var composeUpCmd = &cobra.Command{
 						}
 					}
 				}
-
-				return err // return the error from waitServiceState
-			} else {
-				term.Warnf("failed to wait for service status: %v", err)
+			} else if connect.CodeOf(err) == connect.CodePermissionDenied {
+				// If tail fails because of missing permission, we wait for the deployment to finish
+				term.Warn("Failed to tail logs. Waiting for the deployment to finish.")
+				<-ctx.Done()
+			} else if !errors.Is(context.Cause(ctx), errSuccess) {
+				return err
 			}
-
-			wg.Wait() // Wait for tail ctrl + c
 		}
-		cancelTail()
-		wg.Wait() // Wait for tail to finish
 
-		printEndpoints(serviceInfos)
+		printEndpoints(deploy.Services)
 
 		term.Info("Done.")
 		return nil
@@ -1020,7 +1010,6 @@ var composeDownCmd = &cobra.Command{
 
 		endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
 		tailParams := cli.TailOptions{
-			Services:           []string{},
 			Etag:               etag,
 			Since:              since,
 			Raw:                false,
@@ -1081,10 +1070,9 @@ var deleteCmd = &cobra.Command{
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Services: []string{},
-			Etag:     etag,
-			Since:    since,
-			Raw:      false,
+			Etag:  etag,
+			Since: since,
+			Raw:   false,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},
