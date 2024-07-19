@@ -314,9 +314,6 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 			}
 			pbPort.Mode = defangv1.Mode_INGRESS
 			if pbPort.Protocol == defangv1.Protocol_TCP {
-				if pbPort.Protocol == defangv1.Protocol_UDP {
-					term.Warnf("UDP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
-				}
 				pbPort.Protocol = defangv1.Protocol_HTTP
 			}
 			break

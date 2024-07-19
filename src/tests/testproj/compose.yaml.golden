@@ -34,6 +34,9 @@ services:
       - mode: ingress
         target: 1234
         protocol: tcp
+      - mode: ingress
+        target: 4567
+        protocol: udp
     restart: unless-stopped
     secrets:
       - source: dummy
