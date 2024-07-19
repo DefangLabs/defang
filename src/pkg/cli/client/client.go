@@ -52,7 +52,7 @@ type Client interface {
 	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
-	ShowConfig(context.Context, *defangv1.Secrets) error
+	GetConfig(context.Context, *defangv1.Configs) (types.ConfigData, error)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error

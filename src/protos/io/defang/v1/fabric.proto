@@ -55,7 +55,8 @@ service FabricController {
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-  rpc ShowSecrets(Secrets) returns (Secrets) {
+
+  rpc GetConfig(Configs) returns (ConfigValues) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   
@@ -199,10 +200,25 @@ message Secrets {
   string project = 2; // defaults to tenant ID
 }
 
+message Configs {
+  repeated string names = 1;
+  string project = 2; // defaults to tenant ID
+}
+
 message SecretValue {
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
+}
+
+message ConfigValue {
+  string name = 1;
+  string value = 2;
+}
+
+message ConfigValues {
+  repeated ConfigValue values = 1;
+  string project = 2; // defaults to tenant ID
 }
 
 message TokenRequest {

@@ -35,6 +35,10 @@ func (Docker) PutSecret(ctx context.Context, name, value string) error {
 	return errors.New("docker does not support secrets")
 }
 
+func (Docker) GetConfig(ctx context.Context, name []string) (types.ConfigData, error) {
+	return nil, errors.New("docker does not support secrets")
+}
+
 func (Docker) ListSecrets(ctx context.Context) ([]string, error) {
 	return nil, errors.New("docker does not support secrets")
 }

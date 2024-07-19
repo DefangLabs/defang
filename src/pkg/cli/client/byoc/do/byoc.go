@@ -178,6 +178,10 @@ func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 	return nil
 }
 
+func (b *ByocDo) GetConfig(ctx context.Context, secret *defangv1.Configs) (types.ConfigData, error) {
+	return nil, nil
+}
+
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	return "", nil
 }

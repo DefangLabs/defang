@@ -417,6 +417,24 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 	return annotateAwsError(err)
 }
 
+func (b *ByocAws) GetConfig(ctx context.Context, secret *defangv1.Configs) (types.ConfigData, error) {
+	fqns := make([]string, len(secret.Names))
+	for _, name := range secret.Names {
+		if !pkg.IsValidSecretName(name) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", name))
+		}
+		fqns = append(fqns, b.getSecretID(name))
+	}
+
+	term.Debugf("Show parameters %q", fqns)
+	results, err := b.driver.GetConfig(ctx, fqns)
+	if err != nil {
+		term.Errorf("error getting config: %v", err)
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve environment configs"))
+	}
+	return results, nil
+}
+
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
 	term.Debugf("Listing parameters with prefix %q", prefix)
@@ -744,23 +762,4 @@ func ensure(cond bool, msg string) {
 
 func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
-}
-
-func (b *ByocAws) ShowConfig(ctx context.Context, secret *defangv1.Secrets) error {
-	if secret.Names != nil && len(secret.Names) > 0 {
-		invalidNames := []string{}
-		for _, name := range secret.Names {
-			if !pkg.IsValidSecretName(name) {
-				invalidNames = append(invalidNames, name)
-			}
-		}
-
-		if len(invalidNames) > 0 {
-			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name(s); must be alphanumeric or _, cannot start with a number: %v", invalidNames))
-		}
-	}
-
-	//TODO: get params.
-
-	return nil
 }

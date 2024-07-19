@@ -106,6 +106,10 @@ func (l *Local) PutSecret(ctx context.Context, name, value string) error {
 	return client.ErrNotImplemented("not implemented for local driver")
 }
 
+func (l *Local) GetConfig(ctx context.Context, names []string) (types.ConfigData, error) {
+	return nil, client.ErrNotImplemented("not implemented for local driver")
+}
+
 func (l *Local) ListSecrets(ctx context.Context) ([]string, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }

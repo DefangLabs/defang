@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 
+	clitypes "github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
@@ -89,6 +90,34 @@ func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
 		return err
 	}
 	return nil
+}
+
+func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigData, error) {
+	cfg, err := a.LoadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for index, name := range names {
+		names[index] = *getSecretID(name)
+	}
+
+	svc := ssm.NewFromConfig(cfg)
+
+	gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
+		WithDecryption: ptr.Bool(true),
+		Names:          names,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	output := make(map[string]string)
+	for _, p := range gpo.Parameters {
+		output[*p.Name] = *p.Value
+	}
+
+	return output, nil
 }
 
 func (a *Aws) ListSecrets(ctx context.Context) ([]string, error) {
