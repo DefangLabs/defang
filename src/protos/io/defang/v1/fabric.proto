@@ -55,6 +55,10 @@ service FabricController {
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
+  rpc ShowSecrets(Secrets) returns (Secrets) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+  
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)

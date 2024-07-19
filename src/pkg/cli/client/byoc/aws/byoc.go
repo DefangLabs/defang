@@ -745,3 +745,22 @@ func ensure(cond bool, msg string) {
 func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
+
+func (b *ByocAws) ShowConfig(ctx context.Context, secret *defangv1.Secrets) error {
+	if secret.Names != nil && len(secret.Names) > 0 {
+		invalidNames := []string{}
+		for _, name := range secret.Names {
+			if !pkg.IsValidSecretName(name) {
+				invalidNames = append(invalidNames, name)
+			}
+		}
+
+		if len(invalidNames) > 0 {
+			return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name(s); must be alphanumeric or _, cannot start with a number: %v", invalidNames))
+		}
+	}
+
+	//TODO: get params.
+
+	return nil
+}

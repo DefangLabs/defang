@@ -92,6 +92,9 @@ const (
 	// FabricControllerListSecretsProcedure is the fully-qualified name of the FabricController's
 	// ListSecrets RPC.
 	FabricControllerListSecretsProcedure = "/io.defang.v1.FabricController/ListSecrets"
+	// FabricControllerShowSecretsProcedure is the fully-qualified name of the FabricController's
+	// ShowSecrets RPC.
+	FabricControllerShowSecretsProcedure = "/io.defang.v1.FabricController/ShowSecrets"
 	// FabricControllerCreateUploadURLProcedure is the fully-qualified name of the FabricController's
 	// CreateUploadURL RPC.
 	FabricControllerCreateUploadURLProcedure = "/io.defang.v1.FabricController/CreateUploadURL"
@@ -134,6 +137,7 @@ type FabricControllerClient interface {
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
+	ShowSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
@@ -264,6 +268,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		showSecrets: connect_go.NewClient[v1.Secrets, v1.Secrets](
+			httpClient,
+			baseURL+FabricControllerShowSecretsProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
 		createUploadURL: connect_go.NewClient[v1.UploadURLRequest, v1.UploadURLResponse](
 			httpClient,
 			baseURL+FabricControllerCreateUploadURLProcedure,
@@ -322,6 +332,7 @@ type fabricControllerClient struct {
 	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
+	showSecrets              *connect_go.Client[v1.Secrets, v1.Secrets]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
@@ -435,6 +446,11 @@ func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_g
 	return c.listSecrets.CallUnary(ctx, req)
 }
 
+// ShowSecrets calls io.defang.v1.FabricController.ShowSecrets.
+func (c *fabricControllerClient) ShowSecrets(ctx context.Context, req *connect_go.Request[v1.Secrets]) (*connect_go.Response[v1.Secrets], error) {
+	return c.showSecrets.CallUnary(ctx, req)
+}
+
 // CreateUploadURL calls io.defang.v1.FabricController.CreateUploadURL.
 func (c *fabricControllerClient) CreateUploadURL(ctx context.Context, req *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
 	return c.createUploadURL.CallUnary(ctx, req)
@@ -489,6 +505,7 @@ type FabricControllerHandler interface {
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
+	ShowSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[v1.Secrets], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
@@ -615,6 +632,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerShowSecretsHandler := connect_go.NewUnaryHandler(
+		FabricControllerShowSecretsProcedure,
+		svc.ShowSecrets,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	fabricControllerCreateUploadURLHandler := connect_go.NewUnaryHandler(
 		FabricControllerCreateUploadURLProcedure,
 		svc.CreateUploadURL,
@@ -691,6 +714,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteSecretsHandler.ServeHTTP(w, r)
 		case FabricControllerListSecretsProcedure:
 			fabricControllerListSecretsHandler.ServeHTTP(w, r)
+		case FabricControllerShowSecretsProcedure:
+			fabricControllerShowSecretsHandler.ServeHTTP(w, r)
 		case FabricControllerCreateUploadURLProcedure:
 			fabricControllerCreateUploadURLHandler.ServeHTTP(w, r)
 		case FabricControllerDelegateSubdomainZoneProcedure:
@@ -794,6 +819,10 @@ func (UnimplementedFabricControllerHandler) DeleteSecrets(context.Context, *conn
 
 func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListSecrets is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) ShowSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[v1.Secrets], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ShowSecrets is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error) {
