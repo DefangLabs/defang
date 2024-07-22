@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -47,16 +48,36 @@ func Debug(ctx context.Context, c client.Client, etag, folder string) error {
 	if err != nil {
 		return err
 	}
-	term.Warn(resp.General)
+
+	term.Println("")
+	term.Println("===================")
+	term.Println("Debugging Summary")
+	term.Println("===================")
+	term.Println(resp.General)
+	term.Println("")
+	term.Println("")
+
+	counter := 1
 	for _, service := range resp.Issues {
-		term.Warn(service.Details)
-		for _, changes := range service.CodeChanges {
-			term.Info(changes.File)
-			term.Println(changes.Change)
+		term.Println("-------------------")
+		term.Println(fmt.Sprintf("Issue #%d", counter))
+		term.Println("-------------------")
+		term.Println(service.Details)
+		term.Println("")
+		term.Println("")
+
+		if (len(service.CodeChanges)) > 0 {
+			for _, changes := range service.CodeChanges {
+				term.Println(fmt.Sprintf("File %s:", changes.File))
+				term.Println("-------------------")
+				term.Println(changes.Change)
+				term.Println("")
+				term.Println("")
+			}
 		}
 	}
-	for _, request := range resp.Requests {
-		term.Info(request)
-	}
+	// for _, request := range resp.Requests {
+	// 	term.Info(request)
+	// }
 	return nil
 }
