@@ -843,7 +843,6 @@ var composeUpCmd = &cobra.Command{
 		defer cancelTail(nil) // to cancel waitServiceState
 
 		errSuccess := errors.New("deployment succeeded")
-		var serviceStates map[string]defangv1.ServiceState = nil
 		targetStateReached := false
 
 		go func() {
@@ -903,19 +902,14 @@ var composeUpCmd = &cobra.Command{
 			}
 		}
 
-		if serviceStates == nil {
-			term.Warn("no service states available")
-			return nil
-		}
-
 		// Print the current service states of the deployment
 		if targetStateReached {
 			for _, service := range deploy.Services {
 				service.State = targetState
 			}
-		}
 
-		printEndpoints(deploy.Services)
+			printEndpoints(deploy.Services)
+		}
 
 		term.Info("Done.")
 		return nil
