@@ -2,19 +2,17 @@ package command
 
 import (
 	"context"
+	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, serviceInfos []*defangv1.ServiceInfo) error {
-	serviceList := []string{}
-	for _, serviceInfo := range serviceInfos {
-		serviceList = append(serviceList, compose.NormalizeServiceName(serviceInfo.Service.Name))
-	}
+var errFailedToReachStartedState = errors.New("failed to reach STARTED state")
+var errDeploymentFailed = errors.New("deployment failed")
 
+func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, serviceList []string) error {
 	// set up service status subscription (non-blocking)
 	subscribeServiceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
 	if err != nil {
@@ -29,6 +27,8 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 
 	// monitor for when all services are completed to end this command
 	for newStatus := range subscribeServiceStatusChan {
+		term.Debugf("service %s with state ( %s ) and status: %s\n", newStatus.Name, newStatus.State, newStatus.Status)
+
 		if _, ok := serviceState[newStatus.Name]; !ok {
 			term.Debugf("unexpected service %s update", newStatus.Name)
 			continue
@@ -36,20 +36,18 @@ func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, se
 
 		// exit on detecting a FAILED state
 		if newStatus.State == defangv1.ServiceState_SERVICE_FAILED {
-			return ErrDeploymentFailed
+			return errDeploymentFailed
 		}
 
 		serviceState[newStatus.Name] = newStatus.State
 
 		if allInState(targetState, serviceState) {
-			for _, sInfo := range serviceInfos {
-				sInfo.State = targetState
-			}
-			return nil
+			return nil // all services are in the target state
 		}
 	}
 
-	return ErrFailedToReachStartedState
+	term.Debug("service status subscription closed prematurely")
+	return errFailedToReachStartedState
 }
 
 func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
