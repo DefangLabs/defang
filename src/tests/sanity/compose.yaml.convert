@@ -15,6 +15,7 @@
     "ports": [
       {
         "target": 80,
+        "protocol": 3,
         "mode": 1
       }
     ],
