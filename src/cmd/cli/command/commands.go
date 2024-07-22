@@ -912,6 +912,7 @@ var composeUpCmd = &cobra.Command{
 					}
 				}
 
+				cancelTail()
 				return err // return the error from waitServiceState
 			} else {
 				term.Warnf("failed to wait for service status: %v", err)

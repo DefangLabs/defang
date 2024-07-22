@@ -418,20 +418,34 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 }
 
 func (b *ByocAws) GetConfig(ctx context.Context, secret *defangv1.Configs) (types.ConfigData, error) {
-	names := make([]string, len(secret.Names))
-	for _, name := range secret.Names {
+	paramNameToName := make(map[string]string, len(secret.Names))
+	paramNames := make([]string, len(secret.Names))
+	for index, name := range secret.Names {
 		if !pkg.IsValidSecretName(name) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", name))
 		}
-		names = append(names, b.getSecretID(name))
+		paramNames[index] = b.getSecretID(name)
+		paramNameToName[paramNames[index]] = name
 	}
 
-	term.Debugf("Show parameters %q", names)
-	results, err := b.driver.GetConfig(ctx, names)
+	term.Debugf("Show parameters %q", paramNames)
+
+	configData, err := b.driver.GetConfig(ctx, paramNames)
 	if err != nil {
 		term.Errorf("error getting config: %v", err)
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve environment configs"))
 	}
+
+	results := make(types.ConfigData, 1)
+	for paramName, value := range configData {
+		name, ok := paramNameToName[paramName]
+		if !ok {
+			term.Errorf("Error finding name for parameter %q", paramName)
+			continue
+		}
+		results[name] = value
+	}
+
 	return results, nil
 }
 
