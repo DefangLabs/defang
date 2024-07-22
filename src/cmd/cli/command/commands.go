@@ -878,7 +878,8 @@ var composeUpCmd = &cobra.Command{
 			if errors.Is(context.Cause(ctx), errDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 
-				if !nonInteractive {
+				_, isPlayground := client.(*cliClient.PlaygroundClient)
+				if !nonInteractive && isPlayground {
 					var aiDebug bool
 					if err := survey.AskOne(&survey.Confirm{
 						Message: "Would you like to debug the deployment with AI?",
