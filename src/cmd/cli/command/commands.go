@@ -821,6 +821,7 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
+		targetState := defangv1.ServiceState_SERVICE_COMPLETED
 		since := time.Now()
 		deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
@@ -842,20 +843,22 @@ var composeUpCmd = &cobra.Command{
 		defer cancelTail(nil) // to cancel waitServiceState
 
 		errSuccess := errors.New("deployment succeeded")
+		var serviceStates map[string]defangv1.ServiceState = nil
+		targetStateReached := false
 
 		go func() {
 			services := make([]string, len(deploy.Services))
 			for i, serviceInfo := range deploy.Services {
 				services[i] = serviceInfo.Service.Name
 			}
-
-			if err := waitServiceState(ctx, defangv1.ServiceState_SERVICE_COMPLETED, services); err != nil {
+			if err := waitServiceState(ctx, targetState, services); err != nil {
 				if errors.Is(err, errDeploymentFailed) {
 					cancelTail(err)
 				} else if !errors.Is(err, context.Canceled) {
 					term.Warnf("failed to wait for service status: %v", err)
 				}
 			} else {
+				targetStateReached = true
 				cancelTail(errSuccess)
 			}
 		}()
@@ -897,6 +900,18 @@ var composeUpCmd = &cobra.Command{
 				<-ctx.Done()
 			} else if !errors.Is(context.Cause(ctx), errSuccess) {
 				return err
+			}
+		}
+
+		if serviceStates == nil {
+			term.Warn("no service states available")
+			return nil
+		}
+
+		// Print the current service states of the deployment
+		if targetStateReached {
+			for _, service := range deploy.Services {
+				service.State = targetState
 			}
 		}
 
