@@ -7,6 +7,7 @@
     "ports": [
       {
         "target": 5432,
+        "protocol": 3,
         "mode": 1
       }
     ],
@@ -29,7 +30,8 @@
     "internal": true,
     "ports": [
       {
-        "target": 8000
+        "target": 8000,
+        "protocol": 2
       }
     ],
     "networks": 1
