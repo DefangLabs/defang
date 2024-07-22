@@ -8,7 +8,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -38,14 +37,6 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		defer serverStream.Close()
 		defer close(statusChan)
 		for {
-			// handle cancel from caller; TODO: do we need this? Receive() should return false on context done
-			select {
-			case <-ctx.Done():
-				term.Debug("Context Done - exiting Subscribe goroutine")
-				return
-			default:
-			}
-
 			if !serverStream.Receive() {
 				// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 				if isTransientError(serverStream.Err()) {
@@ -56,7 +47,6 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 					}
 					continue
 				}
-				term.Debug("Subscribe Stream closed", serverStream.Err())
 				return
 			}
 
@@ -66,12 +56,12 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			subStatus := SubscribeServiceStatus{
-				Name:   msg.GetName(),
-				Status: msg.GetStatus(),
-				State:  msg.GetState(),
+				Name:   msg.Name,
+				Status: msg.Status,
+				State:  msg.State,
 			}
 
-			servInfo := msg.GetService()
+			servInfo := msg.Service
 			if subStatus.Name == "" && (servInfo != nil && servInfo.Service != nil) {
 				subStatus.Name = servInfo.Service.Name
 				subStatus.Status = servInfo.Status
@@ -79,7 +69,6 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 			}
 
 			statusChan <- subStatus
-			term.Debugf("service %s with state ( %s ) and status: %s\n", subStatus.Name, subStatus.State.String(), subStatus.Status)
 		}
 	}()
 
