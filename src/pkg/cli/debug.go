@@ -11,7 +11,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Debug(ctx context.Context, c client.Client, etag, folder string) error {
+func Debug(ctx context.Context, c client.Client, etag, folder string, services []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
 	// FIXME: use the project information to determine which files to send
@@ -42,8 +42,10 @@ func Debug(ctx context.Context, c client.Client, etag, folder string) error {
 	}
 
 	resp, err := c.Debug(ctx, &defangv1.DebugRequest{
-		Etag:  etag,
-		Files: files,
+		Etag:     etag,
+		Files:    files,
+		Services: services,
+		Logs:     "",
 	})
 	if err != nil {
 		return err
