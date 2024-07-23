@@ -879,9 +879,6 @@ var composeUpCmd = &cobra.Command{
 		if err := cli.Tail(ctx, client, tailParams); err != nil {
 			if errors.Is(context.Cause(ctx), errDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
-			}
-
-			if errors.Is(context.Cause(ctx), errDeploymentFailed) || errors.Is(err, context.Canceled) {
 				_, isPlayground := client.(*cliClient.PlaygroundClient)
 				if !nonInteractive && isPlayground {
 					var aiDebug bool
@@ -891,8 +888,8 @@ var composeUpCmd = &cobra.Command{
 					}, &aiDebug); err != nil {
 						term.Debugf("failed to ask for AI debug: %v", err)
 					} else if aiDebug {
-						if err := cli.Debug(ctx, client, deploy.Etag, project.WorkingDir); err != nil {
-							term.Debugf("failed to debug deployment: %v", err)
+						if err := cli.Debug(cmd.Context(), client, deploy.Etag, project.WorkingDir); err != nil {
+							term.Warnf("failed to debug deployment: %v", err)
 						}
 					}
 				}
