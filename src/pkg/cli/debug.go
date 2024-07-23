@@ -45,7 +45,6 @@ func Debug(ctx context.Context, c client.Client, etag, folder string, services [
 		Etag:     etag,
 		Files:    files,
 		Services: services,
-		Logs:     "",
 	})
 	if err != nil {
 		return err
