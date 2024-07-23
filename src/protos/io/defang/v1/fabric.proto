@@ -116,8 +116,7 @@ message DeployResponse {
 
 message DeleteRequest {
   repeated string names = 1;
-
-  // string project = 2; // defaults to tenant ID
+  string project = 2; // defaults to tenant ID
 }
 
 message DeleteResponse { string etag = 1; }
@@ -262,6 +261,7 @@ message ListServicesResponse {
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
+  string project = 3;
 }
 
 enum Platform {
