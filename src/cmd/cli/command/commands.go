@@ -891,7 +891,7 @@ var composeUpCmd = &cobra.Command{
 					} else if aiDebug {
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 						if err := cli.Debug(cmd.Context(), client, deploy.Etag, project.WorkingDir); err != nil {
-							term.Debugf("failed to debug deployment: %v", err)
+							term.Warnf("failed to debug deployment: %v", err)
 						}
 					}
 				}
