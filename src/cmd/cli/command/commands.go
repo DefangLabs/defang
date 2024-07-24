@@ -445,8 +445,8 @@ var generateCmd = &cobra.Command{
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
-				Options: []string{"JavaScript", "Go", "Python"},
-				Default: "JavaScript",
+				Options: []string{"Nodejs", "Golang", "Python"},
+				Default: "Nodejs",
 				Help:    "The project code will be in the language you choose here.",
 			}, &language); err != nil {
 				return err
@@ -457,15 +457,10 @@ var generateCmd = &cobra.Command{
 			} else if len(sampleList) > 0 {
 				const generateWithAI = "Generate with AI"
 
-				lang := strings.ToLower(language)
 				sampleNames := []string{generateWithAI}
 				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
 				for _, sample := range sampleList {
-					sampleLangs := make([]string, len(sample.Languages))
-					for _, l := range sample.Languages {
-						sampleLangs = append(sampleLangs, strings.ToLower(l))
-					}
-					if slices.Contains(sampleLangs, lang) {
+					if slices.ContainsFunc(sample.Languages, func(l string) bool { return strings.EqualFold(l, language) }) {
 						sampleNames = append(sampleNames, sample.Name)
 						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
 					}
