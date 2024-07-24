@@ -445,8 +445,8 @@ var generateCmd = &cobra.Command{
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
-				Options: []string{"JavaScript", "Go", "Python"},
-				Default: "JavaScript",
+				Options: []string{"Nodejs", "Golang", "Python"},
+				Default: "Nodejs",
 				Help:    "The project code will be in the language you choose here.",
 			}, &language); err != nil {
 				return err
