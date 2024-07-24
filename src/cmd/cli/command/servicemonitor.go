@@ -12,9 +12,9 @@ import (
 var errFailedToReachStartedState = errors.New("failed to reach STARTED state")
 var errDeploymentFailed = errors.New("deployment failed")
 
-func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, serviceList []string) error {
+func waitServiceState(ctx context.Context, targetState defangv1.ServiceState, etag string, serviceList []string) error {
 	// set up service status subscription (non-blocking)
-	subscribeServiceStatusChan, err := cli.Subscribe(ctx, client, serviceList)
+	subscribeServiceStatusChan, err := cli.Subscribe(ctx, client, etag, serviceList)
 	if err != nil {
 		term.Debugf("error subscribing to service status: %v", err)
 		return err
