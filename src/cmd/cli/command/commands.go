@@ -850,7 +850,7 @@ var composeUpCmd = &cobra.Command{
 			for i, serviceInfo := range deploy.Services {
 				services[i] = serviceInfo.Service.Name
 			}
-			if err := waitServiceState(tailCtx, targetState, services); err != nil {
+			if err := waitServiceState(tailCtx, targetState, deploy.Etag, services); err != nil {
 				if errors.Is(err, errDeploymentFailed) {
 					cancelTail(err)
 				} else if !errors.Is(err, context.Canceled) {

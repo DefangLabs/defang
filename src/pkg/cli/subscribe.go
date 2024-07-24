@@ -17,7 +17,7 @@ type SubscribeServiceStatus struct {
 	State  defangv1.ServiceState
 }
 
-func Subscribe(ctx context.Context, client client.Client, services []string) (<-chan SubscribeServiceStatus, error) {
+func Subscribe(ctx context.Context, client client.Client, etag string, services []string) (<-chan SubscribeServiceStatus, error) {
 	if len(services) == 0 {
 		return nil, fmt.Errorf("no services specified")
 	}
@@ -28,7 +28,8 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 		return statusChan, ErrDryRun
 	}
 
-	serverStream, err := client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
+	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
+	serverStream, err := client.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func Subscribe(ctx context.Context, client client.Client, services []string) (<-
 				// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 				if isTransientError(serverStream.Err()) {
 					pkg.SleepWithContext(ctx, 1*time.Second)
-					serverStream, err = client.Subscribe(ctx, &defangv1.SubscribeRequest{Services: services})
+					serverStream, err = client.Subscribe(ctx, &subscribeRequest)
 					if err != nil {
 						return
 					}
