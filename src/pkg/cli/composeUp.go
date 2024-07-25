@@ -61,6 +61,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.Depl
 	}
 
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
+		Project:  project.Name,
 		Services: services,
 	})
 	if err != nil {

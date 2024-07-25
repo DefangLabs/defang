@@ -57,10 +57,9 @@ func Debug(ctx context.Context, c client.Client, etag, folder string) error {
 	term.Println("")
 	term.Println("")
 
-	counter := 1
-	for _, service := range resp.Issues {
+	for counter, service := range resp.Issues {
 		term.Println("-------------------")
-		term.Println(fmt.Sprintf("Issue #%d", counter))
+		term.Println(fmt.Sprintf("Issue #%d", counter+1))
 		term.Println("-------------------")
 		term.Println(service.Details)
 		term.Println("")

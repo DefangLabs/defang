@@ -457,11 +457,10 @@ var generateCmd = &cobra.Command{
 			} else if len(sampleList) > 0 {
 				const generateWithAI = "Generate with AI"
 
-				lang := strings.ToLower(language)
 				sampleNames := []string{generateWithAI}
 				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
 				for _, sample := range sampleList {
-					if slices.Contains(sample.Languages, lang) {
+					if slices.ContainsFunc(sample.Languages, func(l string) bool { return strings.EqualFold(l, language) }) {
 						sampleNames = append(sampleNames, sample.Name)
 						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
 					}
@@ -839,7 +838,7 @@ var composeUpCmd = &cobra.Command{
 			return nil
 		}
 
-		ctx, cancelTail := context.WithCancelCause(cmd.Context())
+		tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
 		defer cancelTail(nil) // to cancel waitServiceState
 
 		errSuccess := errors.New("deployment succeeded")
@@ -850,7 +849,7 @@ var composeUpCmd = &cobra.Command{
 			for i, serviceInfo := range deploy.Services {
 				services[i] = serviceInfo.Service.Name
 			}
-			if err := waitServiceState(ctx, targetState, services); err != nil {
+			if err := waitServiceState(tailCtx, targetState, deploy.Etag, services); err != nil {
 				if errors.Is(err, errDeploymentFailed) {
 					cancelTail(err)
 				} else if !errors.Is(err, context.Canceled) {
@@ -876,8 +875,8 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		// blocking call to tail
-		if err := cli.Tail(ctx, client, tailParams); err != nil {
-			if errors.Is(context.Cause(ctx), errDeploymentFailed) {
+		if err := cli.Tail(tailCtx, client, tailParams); err != nil {
+			if errors.Is(context.Cause(tailCtx), errDeploymentFailed) {
 				term.Warn("Deployment FAILED. Service(s) not running.")
 				_, isPlayground := client.(*cliClient.PlaygroundClient)
 				if !nonInteractive && isPlayground {
@@ -888,6 +887,7 @@ var composeUpCmd = &cobra.Command{
 					}, &aiDebug); err != nil {
 						term.Debugf("failed to ask for AI debug: %v", err)
 					} else if aiDebug {
+						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 						if err := cli.Debug(cmd.Context(), client, deploy.Etag, project.WorkingDir); err != nil {
 							term.Warnf("failed to debug deployment: %v", err)
 						}
@@ -896,8 +896,8 @@ var composeUpCmd = &cobra.Command{
 			} else if connect.CodeOf(err) == connect.CodePermissionDenied {
 				// If tail fails because of missing permission, we wait for the deployment to finish
 				term.Warn("Failed to tail logs. Waiting for the deployment to finish.")
-				<-ctx.Done()
-			} else if !errors.Is(context.Cause(ctx), errSuccess) {
+				<-tailCtx.Done()
+			} else if !errors.Is(context.Cause(tailCtx), errSuccess) {
 				return err
 			}
 		}
