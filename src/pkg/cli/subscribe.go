@@ -3,89 +3,87 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type SubscribeServiceStatus struct {
-	Name   string
-	Status string
-	State  defangv1.ServiceState
+type ErrDeploymentFailed struct {
+	Service string
 }
 
-func Subscribe(ctx context.Context, client client.Client, etag string, services []string) (<-chan SubscribeServiceStatus, error) {
-	if len(services) == 0 {
-		return nil, fmt.Errorf("no services specified")
-	}
+func (e ErrDeploymentFailed) Error() string {
+	return fmt.Sprintf("deployment failed for service %q", e.Service)
+}
 
-	statusChan := make(chan SubscribeServiceStatus, len(services))
+func WaitServiceState(ctx context.Context, client client.Client, targetState defangv1.ServiceState, etag string, services []string) error {
+	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
+
 	if DoDryRun {
-		defer close(statusChan)
-		return statusChan, ErrDryRun
+		return ErrDryRun
 	}
 
+	// Assume "services" are normalized service names
 	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
 	serverStream, err := client.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	go func() {
-		defer serverStream.Close()
-		defer close(statusChan)
-		for {
-			if !serverStream.Receive() {
-				// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-				if isTransientError(serverStream.Err()) {
-					pkg.SleepWithContext(ctx, 1*time.Second)
-					serverStream, err = client.Subscribe(ctx, &subscribeRequest)
-					if err != nil {
-						return
-					}
-					continue
-				}
-				return
-			}
+	serviceStates := make(map[string]defangv1.ServiceState, len(services))
+	for _, name := range services {
+		serviceStates[name] = defangv1.ServiceState_NOT_SPECIFIED
+	}
 
-			msg := serverStream.Msg()
-			if msg == nil {
+	// Monitor for when all services are completed to end this command
+	for {
+		if !serverStream.Receive() {
+			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
+			if isTransientError(serverStream.Err()) {
+				pkg.SleepWithContext(ctx, 1*time.Second)
+				serverStream, err = client.Subscribe(ctx, &subscribeRequest)
+				if err != nil {
+					return err
+				}
 				continue
 			}
-
-			subStatus := SubscribeServiceStatus{
-				Name:   msg.Name,
-				Status: msg.Status,
-				State:  msg.State,
-			}
-
-			servInfo := msg.Service
-			if subStatus.Name == "" && (servInfo != nil && servInfo.Service != nil) {
-				subStatus.Name = servInfo.Service.Name
-				subStatus.Status = servInfo.Status
-				subStatus.State = convertServiceState(servInfo.Status)
-			}
-
-			statusChan <- subStatus
+			return serverStream.Err()
 		}
-	}()
 
-	return statusChan, nil
+		msg := serverStream.Msg()
+		if msg == nil {
+			continue
+		}
+
+		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
+
+		if _, ok := serviceStates[msg.Name]; !ok {
+			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
+			continue
+		}
+
+		// exit early on detecting a FAILED state
+		switch msg.State {
+		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
+			return ErrDeploymentFailed{msg.Name}
+		}
+
+		serviceStates[msg.Name] = msg.State
+
+		if allInState(targetState, serviceStates) {
+			return nil // all services are in the target state
+		}
+	}
 }
 
-// Deprecated: for old backend compatibility
-func convertServiceState(status string) defangv1.ServiceState {
-	switch strings.ToUpper(status) {
-	default:
-		return defangv1.ServiceState_NOT_SPECIFIED
-	case "IN_PROGRESS", "STARTING":
-		return defangv1.ServiceState_SERVICE_PENDING
-	case "COMPLETED":
-		return defangv1.ServiceState_SERVICE_COMPLETED
-	case "FAILED":
-		return defangv1.ServiceState_SERVICE_FAILED
+func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
+	for _, state := range serviceStates {
+		if state != targetState {
+			return false
+		}
 	}
+	return true
 }
