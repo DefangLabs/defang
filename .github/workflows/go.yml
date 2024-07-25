@@ -154,7 +154,7 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        uses: goreleaser/goreleaser-action@v5=6
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
