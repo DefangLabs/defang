@@ -109,6 +109,11 @@ jobs:
         run: echo blah | go run ./cmd/cli config set -n dummy -f tests/sanity/compose.yaml --debug
         working-directory: src
 
+      - name: Run clean up DOWN
+        continue-on-error: true
+        run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
+        working-directory: src
+
       - name: Run sanity tests UP
         run: go run ./cmd/cli compose up -f tests/sanity/compose.yaml --debug
         working-directory: src
