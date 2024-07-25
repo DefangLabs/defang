@@ -264,7 +264,7 @@ func ValidateProject(project *compose.Project) error {
 
 		for k := range svccfg.Extensions {
 			switch k {
-			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis":
+			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres":
 				continue
 			default:
 				term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
