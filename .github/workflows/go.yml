@@ -214,6 +214,7 @@ jobs:
 
   build-and-sign-mac:
     name: Build app and sign (MacOS)
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' # only run this step on tagged commits or the main branch
     needs: go-test
     runs-on: macos-latest # for codesign and notarytool
     steps:
