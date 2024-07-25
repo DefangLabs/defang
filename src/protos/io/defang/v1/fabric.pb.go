@@ -2616,6 +2616,7 @@ type Service struct {
 	StaticFiles *StaticFiles      `protobuf:"bytes,15,opt,name=static_files,json=staticFiles,proto3" json:"static_files,omitempty"`   // x-defang-static-files: use a managed CDN
 	Networks    Network           `protobuf:"varint,16,opt,name=networks,proto3,enum=io.defang.v1.Network" json:"networks,omitempty"` // currently only 1 network is supported
 	Redis       *Redis            `protobuf:"bytes,18,opt,name=redis,proto3" json:"redis,omitempty"`                                  // x-defang-redis: use a managed redis
+	Postgres    *Postgres         `protobuf:"bytes,19,opt,name=postgres,proto3" json:"postgres,omitempty"`                            // x-defang-postgres: use a managed
 }
 
 func (x *Service) Reset() {
@@ -2769,6 +2770,13 @@ func (x *Service) GetRedis() *Redis {
 	return nil
 }
 
+func (x *Service) GetPostgres() *Postgres {
+	if x != nil {
+		return x.Postgres
+	}
+	return nil
+}
+
 type StaticFiles struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2862,6 +2870,44 @@ func (*Redis) Descriptor() ([]byte, []int) {
 	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{39}
 }
 
+type Postgres struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *Postgres) Reset() {
+	*x = Postgres{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[40]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Postgres) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Postgres) ProtoMessage() {}
+
+func (x *Postgres) ProtoReflect() protoreflect.Message {
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[40]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Postgres.ProtoReflect.Descriptor instead.
+func (*Postgres) Descriptor() ([]byte, []int) {
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{40}
+}
+
 type Event struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2881,7 +2927,7 @@ type Event struct {
 func (x *Event) Reset() {
 	*x = Event{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[40]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[41]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2894,7 +2940,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[40]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[41]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2907,7 +2953,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{40}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *Event) GetSpecversion() string {
@@ -2984,7 +3030,7 @@ type PublishRequest struct {
 func (x *PublishRequest) Reset() {
 	*x = PublishRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[41]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[42]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2997,7 +3043,7 @@ func (x *PublishRequest) String() string {
 func (*PublishRequest) ProtoMessage() {}
 
 func (x *PublishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[41]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[42]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3010,7 +3056,7 @@ func (x *PublishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
 func (*PublishRequest) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{41}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *PublishRequest) GetEvent() *Event {
@@ -3032,7 +3078,7 @@ type SubscribeRequest struct {
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[42]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[43]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3045,7 +3091,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[42]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[43]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3058,7 +3104,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{42}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SubscribeRequest) GetServices() []string {
@@ -3090,7 +3136,7 @@ type SubscribeResponse struct {
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[43]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[44]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3103,7 +3149,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[43]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[44]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3116,7 +3162,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{43}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{44}
 }
 
 // Deprecated: Marked as deprecated in io/defang/v1/fabric.proto.
@@ -3159,7 +3205,7 @@ type DelegateSubdomainZoneRequest struct {
 func (x *DelegateSubdomainZoneRequest) Reset() {
 	*x = DelegateSubdomainZoneRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[44]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[45]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3172,7 +3218,7 @@ func (x *DelegateSubdomainZoneRequest) String() string {
 func (*DelegateSubdomainZoneRequest) ProtoMessage() {}
 
 func (x *DelegateSubdomainZoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[44]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[45]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3185,7 +3231,7 @@ func (x *DelegateSubdomainZoneRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DelegateSubdomainZoneRequest.ProtoReflect.Descriptor instead.
 func (*DelegateSubdomainZoneRequest) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{44}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DelegateSubdomainZoneRequest) GetNameServerRecords() []string {
@@ -3206,7 +3252,7 @@ type DelegateSubdomainZoneResponse struct {
 func (x *DelegateSubdomainZoneResponse) Reset() {
 	*x = DelegateSubdomainZoneResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[45]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[46]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3219,7 +3265,7 @@ func (x *DelegateSubdomainZoneResponse) String() string {
 func (*DelegateSubdomainZoneResponse) ProtoMessage() {}
 
 func (x *DelegateSubdomainZoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[45]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[46]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3232,7 +3278,7 @@ func (x *DelegateSubdomainZoneResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DelegateSubdomainZoneResponse.ProtoReflect.Descriptor instead.
 func (*DelegateSubdomainZoneResponse) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{45}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *DelegateSubdomainZoneResponse) GetZone() string {
@@ -3256,7 +3302,7 @@ type WhoAmIResponse struct {
 func (x *WhoAmIResponse) Reset() {
 	*x = WhoAmIResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_io_defang_v1_fabric_proto_msgTypes[46]
+		mi := &file_io_defang_v1_fabric_proto_msgTypes[47]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3269,7 +3315,7 @@ func (x *WhoAmIResponse) String() string {
 func (*WhoAmIResponse) ProtoMessage() {}
 
 func (x *WhoAmIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_io_defang_v1_fabric_proto_msgTypes[46]
+	mi := &file_io_defang_v1_fabric_proto_msgTypes[47]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3282,7 +3328,7 @@ func (x *WhoAmIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhoAmIResponse.ProtoReflect.Descriptor instead.
 func (*WhoAmIResponse) Descriptor() ([]byte, []int) {
-	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{46}
+	return file_io_defang_v1_fabric_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *WhoAmIResponse) GetTenant() string {
@@ -3569,7 +3615,7 @@ var file_io_defang_v1_fabric_proto_rawDesc = []byte{
 	0x65, 0x72, 0x76, 0x61, 0x6c, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74,
 	0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x12,
 	0x18, 0x0a, 0x07, 0x72, 0x65, 0x74, 0x72, 0x69, 0x65, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d,
-	0x52, 0x07, 0x72, 0x65, 0x74, 0x72, 0x69, 0x65, 0x73, 0x22, 0x82, 0x06, 0x0a, 0x07, 0x53, 0x65,
+	0x52, 0x07, 0x72, 0x65, 0x74, 0x72, 0x69, 0x65, 0x73, 0x22, 0xb6, 0x06, 0x0a, 0x07, 0x53, 0x65,
 	0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6d, 0x61,
 	0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x69, 0x6d, 0x61, 0x67, 0x65, 0x12,
@@ -3613,16 +3659,20 @@ var file_io_defang_v1_fabric_proto_rawDesc = []byte{
 	0x31, 0x2e, 0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x52, 0x08, 0x6e, 0x65, 0x74, 0x77, 0x6f,
 	0x72, 0x6b, 0x73, 0x12, 0x29, 0x0a, 0x05, 0x72, 0x65, 0x64, 0x69, 0x73, 0x18, 0x12, 0x20, 0x01,
 	0x28, 0x0b, 0x32, 0x13, 0x2e, 0x69, 0x6f, 0x2e, 0x64, 0x65, 0x66, 0x61, 0x6e, 0x67, 0x2e, 0x76,
-	0x31, 0x2e, 0x52, 0x65, 0x64, 0x69, 0x73, 0x52, 0x05, 0x72, 0x65, 0x64, 0x69, 0x73, 0x1a, 0x3e,
-	0x0a, 0x10, 0x45, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e, 0x74, 0x45, 0x6e, 0x74,
-	0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x43,
-	0x0a, 0x0b, 0x53, 0x74, 0x61, 0x74, 0x69, 0x63, 0x46, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x16, 0x0a,
-	0x06, 0x66, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x66,
-	0x6f, 0x6c, 0x64, 0x65, 0x72, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x64, 0x69, 0x72, 0x65, 0x63,
-	0x74, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x09, 0x72, 0x65, 0x64, 0x69, 0x72, 0x65,
-	0x63, 0x74, 0x73, 0x22, 0x07, 0x0a, 0x05, 0x52, 0x65, 0x64, 0x69, 0x73, 0x22, 0x8d, 0x02, 0x0a,
+	0x31, 0x2e, 0x52, 0x65, 0x64, 0x69, 0x73, 0x52, 0x05, 0x72, 0x65, 0x64, 0x69, 0x73, 0x12, 0x32,
+	0x0a, 0x08, 0x70, 0x6f, 0x73, 0x74, 0x67, 0x72, 0x65, 0x73, 0x18, 0x13, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x16, 0x2e, 0x69, 0x6f, 0x2e, 0x64, 0x65, 0x66, 0x61, 0x6e, 0x67, 0x2e, 0x76, 0x31, 0x2e,
+	0x50, 0x6f, 0x73, 0x74, 0x67, 0x72, 0x65, 0x73, 0x52, 0x08, 0x70, 0x6f, 0x73, 0x74, 0x67, 0x72,
+	0x65, 0x73, 0x1a, 0x3e, 0x0a, 0x10, 0x45, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e,
+	0x74, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
+	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
+	0x38, 0x01, 0x22, 0x43, 0x0a, 0x0b, 0x53, 0x74, 0x61, 0x74, 0x69, 0x63, 0x46, 0x69, 0x6c, 0x65,
+	0x73, 0x12, 0x16, 0x0a, 0x06, 0x66, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x06, 0x66, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x64,
+	0x69, 0x72, 0x65, 0x63, 0x74, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x09, 0x72, 0x65,
+	0x64, 0x69, 0x72, 0x65, 0x63, 0x74, 0x73, 0x22, 0x07, 0x0a, 0x05, 0x52, 0x65, 0x64, 0x69, 0x73,
+	0x22, 0x0a, 0x0a, 0x08, 0x50, 0x6f, 0x73, 0x74, 0x67, 0x72, 0x65, 0x73, 0x22, 0x8d, 0x02, 0x0a,
 	0x05, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x73, 0x70, 0x65, 0x63, 0x76, 0x65,
 	0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x73, 0x70, 0x65,
 	0x63, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65,
@@ -3855,7 +3905,7 @@ func file_io_defang_v1_fabric_proto_rawDescGZIP() []byte {
 }
 
 var file_io_defang_v1_fabric_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_io_defang_v1_fabric_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
+var file_io_defang_v1_fabric_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_io_defang_v1_fabric_proto_goTypes = []any{
 	(ServiceState)(0),                     // 0: io.defang.v1.ServiceState
 	(Platform)(0),                         // 1: io.defang.v1.Platform
@@ -3902,33 +3952,34 @@ var file_io_defang_v1_fabric_proto_goTypes = []any{
 	(*Service)(nil),                       // 42: io.defang.v1.Service
 	(*StaticFiles)(nil),                   // 43: io.defang.v1.StaticFiles
 	(*Redis)(nil),                         // 44: io.defang.v1.Redis
-	(*Event)(nil),                         // 45: io.defang.v1.Event
-	(*PublishRequest)(nil),                // 46: io.defang.v1.PublishRequest
-	(*SubscribeRequest)(nil),              // 47: io.defang.v1.SubscribeRequest
-	(*SubscribeResponse)(nil),             // 48: io.defang.v1.SubscribeResponse
-	(*DelegateSubdomainZoneRequest)(nil),  // 49: io.defang.v1.DelegateSubdomainZoneRequest
-	(*DelegateSubdomainZoneResponse)(nil), // 50: io.defang.v1.DelegateSubdomainZoneResponse
-	(*WhoAmIResponse)(nil),                // 51: io.defang.v1.WhoAmIResponse
-	nil,                                   // 52: io.defang.v1.TrackRequest.PropertiesEntry
-	nil,                                   // 53: io.defang.v1.Build.ArgsEntry
-	nil,                                   // 54: io.defang.v1.Service.EnvironmentEntry
-	(*timestamppb.Timestamp)(nil),         // 55: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                 // 56: google.protobuf.Empty
+	(*Postgres)(nil),                      // 45: io.defang.v1.Postgres
+	(*Event)(nil),                         // 46: io.defang.v1.Event
+	(*PublishRequest)(nil),                // 47: io.defang.v1.PublishRequest
+	(*SubscribeRequest)(nil),              // 48: io.defang.v1.SubscribeRequest
+	(*SubscribeResponse)(nil),             // 49: io.defang.v1.SubscribeResponse
+	(*DelegateSubdomainZoneRequest)(nil),  // 50: io.defang.v1.DelegateSubdomainZoneRequest
+	(*DelegateSubdomainZoneResponse)(nil), // 51: io.defang.v1.DelegateSubdomainZoneResponse
+	(*WhoAmIResponse)(nil),                // 52: io.defang.v1.WhoAmIResponse
+	nil,                                   // 53: io.defang.v1.TrackRequest.PropertiesEntry
+	nil,                                   // 54: io.defang.v1.Build.ArgsEntry
+	nil,                                   // 55: io.defang.v1.Service.EnvironmentEntry
+	(*timestamppb.Timestamp)(nil),         // 56: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                 // 57: google.protobuf.Empty
 }
 var file_io_defang_v1_fabric_proto_depIdxs = []int32{
 	15, // 0: io.defang.v1.DebugRequest.files:type_name -> io.defang.v1.File
 	7,  // 1: io.defang.v1.DebugResponse.issues:type_name -> io.defang.v1.Issue
 	8,  // 2: io.defang.v1.Issue.code_changes:type_name -> io.defang.v1.CodeChange
-	52, // 3: io.defang.v1.TrackRequest.properties:type_name -> io.defang.v1.TrackRequest.PropertiesEntry
+	53, // 3: io.defang.v1.TrackRequest.properties:type_name -> io.defang.v1.TrackRequest.PropertiesEntry
 	42, // 4: io.defang.v1.DeployRequest.services:type_name -> io.defang.v1.Service
 	21, // 5: io.defang.v1.DeployResponse.services:type_name -> io.defang.v1.ServiceInfo
 	15, // 6: io.defang.v1.GenerateFilesResponse.files:type_name -> io.defang.v1.File
 	42, // 7: io.defang.v1.ServiceInfo.service:type_name -> io.defang.v1.Service
-	55, // 8: io.defang.v1.ServiceInfo.created_at:type_name -> google.protobuf.Timestamp
-	55, // 9: io.defang.v1.ServiceInfo.updated_at:type_name -> google.protobuf.Timestamp
+	56, // 8: io.defang.v1.ServiceInfo.created_at:type_name -> google.protobuf.Timestamp
+	56, // 9: io.defang.v1.ServiceInfo.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: io.defang.v1.ServiceInfo.state:type_name -> io.defang.v1.ServiceState
-	55, // 11: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
-	55, // 12: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	56, // 11: io.defang.v1.TailRequest.since:type_name -> google.protobuf.Timestamp
+	56, // 12: io.defang.v1.LogEntry.timestamp:type_name -> google.protobuf.Timestamp
 	29, // 13: io.defang.v1.TailResponse.entries:type_name -> io.defang.v1.LogEntry
 	21, // 14: io.defang.v1.ListServicesResponse.services:type_name -> io.defang.v1.ServiceInfo
 	21, // 15: io.defang.v1.ProjectUpdate.services:type_name -> io.defang.v1.ServiceInfo
@@ -3937,80 +3988,81 @@ var file_io_defang_v1_fabric_proto_depIdxs = []int32{
 	36, // 18: io.defang.v1.Deploy.resources:type_name -> io.defang.v1.Resources
 	2,  // 19: io.defang.v1.Port.protocol:type_name -> io.defang.v1.Protocol
 	3,  // 20: io.defang.v1.Port.mode:type_name -> io.defang.v1.Mode
-	53, // 21: io.defang.v1.Build.args:type_name -> io.defang.v1.Build.ArgsEntry
+	54, // 21: io.defang.v1.Build.args:type_name -> io.defang.v1.Build.ArgsEntry
 	1,  // 22: io.defang.v1.Service.platform:type_name -> io.defang.v1.Platform
 	37, // 23: io.defang.v1.Service.deploy:type_name -> io.defang.v1.Deploy
 	38, // 24: io.defang.v1.Service.ports:type_name -> io.defang.v1.Port
-	54, // 25: io.defang.v1.Service.environment:type_name -> io.defang.v1.Service.EnvironmentEntry
+	55, // 25: io.defang.v1.Service.environment:type_name -> io.defang.v1.Service.EnvironmentEntry
 	40, // 26: io.defang.v1.Service.build:type_name -> io.defang.v1.Build
 	39, // 27: io.defang.v1.Service.secrets:type_name -> io.defang.v1.Secret
 	41, // 28: io.defang.v1.Service.healthcheck:type_name -> io.defang.v1.HealthCheck
 	43, // 29: io.defang.v1.Service.static_files:type_name -> io.defang.v1.StaticFiles
 	4,  // 30: io.defang.v1.Service.networks:type_name -> io.defang.v1.Network
 	44, // 31: io.defang.v1.Service.redis:type_name -> io.defang.v1.Redis
-	55, // 32: io.defang.v1.Event.time:type_name -> google.protobuf.Timestamp
-	45, // 33: io.defang.v1.PublishRequest.event:type_name -> io.defang.v1.Event
-	21, // 34: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
-	0,  // 35: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
-	56, // 36: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
-	56, // 37: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
-	24, // 38: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
-	56, // 39: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
-	28, // 40: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
-	42, // 41: io.defang.v1.FabricController.Update:input_type -> io.defang.v1.Service
-	10, // 42: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
-	33, // 43: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.ServiceID
-	12, // 44: io.defang.v1.FabricController.Delete:input_type -> io.defang.v1.DeleteRequest
-	46, // 45: io.defang.v1.FabricController.Publish:input_type -> io.defang.v1.PublishRequest
-	47, // 46: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
-	56, // 47: io.defang.v1.FabricController.GetServices:input_type -> google.protobuf.Empty
-	14, // 48: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
-	14, // 49: io.defang.v1.FabricController.StartGenerate:input_type -> io.defang.v1.GenerateFilesRequest
-	18, // 50: io.defang.v1.FabricController.GenerateStatus:input_type -> io.defang.v1.GenerateStatusRequest
-	5,  // 51: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
-	56, // 52: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
-	56, // 53: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
-	23, // 54: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.SecretValue
-	22, // 55: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
-	56, // 56: io.defang.v1.FabricController.ListSecrets:input_type -> google.protobuf.Empty
-	19, // 57: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
-	49, // 58: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
-	56, // 59: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> google.protobuf.Empty
-	56, // 60: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> google.protobuf.Empty
-	56, // 61: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
-	9,  // 62: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
-	26, // 63: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
-	27, // 64: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
-	25, // 65: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
-	56, // 66: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
-	30, // 67: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
-	21, // 68: io.defang.v1.FabricController.Update:output_type -> io.defang.v1.ServiceInfo
-	11, // 69: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
-	21, // 70: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
-	13, // 71: io.defang.v1.FabricController.Delete:output_type -> io.defang.v1.DeleteResponse
-	56, // 72: io.defang.v1.FabricController.Publish:output_type -> google.protobuf.Empty
-	48, // 73: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
-	31, // 74: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.ListServicesResponse
-	16, // 75: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
-	17, // 76: io.defang.v1.FabricController.StartGenerate:output_type -> io.defang.v1.StartGenerateResponse
-	16, // 77: io.defang.v1.FabricController.GenerateStatus:output_type -> io.defang.v1.GenerateFilesResponse
-	6,  // 78: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
-	56, // 79: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
-	56, // 80: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
-	56, // 81: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
-	56, // 82: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
-	22, // 83: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
-	20, // 84: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
-	50, // 85: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	56, // 86: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
-	50, // 87: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
-	51, // 88: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
-	56, // 89: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
-	63, // [63:90] is the sub-list for method output_type
-	36, // [36:63] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	45, // 32: io.defang.v1.Service.postgres:type_name -> io.defang.v1.Postgres
+	56, // 33: io.defang.v1.Event.time:type_name -> google.protobuf.Timestamp
+	46, // 34: io.defang.v1.PublishRequest.event:type_name -> io.defang.v1.Event
+	21, // 35: io.defang.v1.SubscribeResponse.service:type_name -> io.defang.v1.ServiceInfo
+	0,  // 36: io.defang.v1.SubscribeResponse.state:type_name -> io.defang.v1.ServiceState
+	57, // 37: io.defang.v1.FabricController.GetStatus:input_type -> google.protobuf.Empty
+	57, // 38: io.defang.v1.FabricController.GetVersion:input_type -> google.protobuf.Empty
+	24, // 39: io.defang.v1.FabricController.Token:input_type -> io.defang.v1.TokenRequest
+	57, // 40: io.defang.v1.FabricController.RevokeToken:input_type -> google.protobuf.Empty
+	28, // 41: io.defang.v1.FabricController.Tail:input_type -> io.defang.v1.TailRequest
+	42, // 42: io.defang.v1.FabricController.Update:input_type -> io.defang.v1.Service
+	10, // 43: io.defang.v1.FabricController.Deploy:input_type -> io.defang.v1.DeployRequest
+	33, // 44: io.defang.v1.FabricController.Get:input_type -> io.defang.v1.ServiceID
+	12, // 45: io.defang.v1.FabricController.Delete:input_type -> io.defang.v1.DeleteRequest
+	47, // 46: io.defang.v1.FabricController.Publish:input_type -> io.defang.v1.PublishRequest
+	48, // 47: io.defang.v1.FabricController.Subscribe:input_type -> io.defang.v1.SubscribeRequest
+	57, // 48: io.defang.v1.FabricController.GetServices:input_type -> google.protobuf.Empty
+	14, // 49: io.defang.v1.FabricController.GenerateFiles:input_type -> io.defang.v1.GenerateFilesRequest
+	14, // 50: io.defang.v1.FabricController.StartGenerate:input_type -> io.defang.v1.GenerateFilesRequest
+	18, // 51: io.defang.v1.FabricController.GenerateStatus:input_type -> io.defang.v1.GenerateStatusRequest
+	5,  // 52: io.defang.v1.FabricController.Debug:input_type -> io.defang.v1.DebugRequest
+	57, // 53: io.defang.v1.FabricController.SignEULA:input_type -> google.protobuf.Empty
+	57, // 54: io.defang.v1.FabricController.CheckToS:input_type -> google.protobuf.Empty
+	23, // 55: io.defang.v1.FabricController.PutSecret:input_type -> io.defang.v1.SecretValue
+	22, // 56: io.defang.v1.FabricController.DeleteSecrets:input_type -> io.defang.v1.Secrets
+	57, // 57: io.defang.v1.FabricController.ListSecrets:input_type -> google.protobuf.Empty
+	19, // 58: io.defang.v1.FabricController.CreateUploadURL:input_type -> io.defang.v1.UploadURLRequest
+	50, // 59: io.defang.v1.FabricController.DelegateSubdomainZone:input_type -> io.defang.v1.DelegateSubdomainZoneRequest
+	57, // 60: io.defang.v1.FabricController.DeleteSubdomainZone:input_type -> google.protobuf.Empty
+	57, // 61: io.defang.v1.FabricController.GetDelegateSubdomainZone:input_type -> google.protobuf.Empty
+	57, // 62: io.defang.v1.FabricController.WhoAmI:input_type -> google.protobuf.Empty
+	9,  // 63: io.defang.v1.FabricController.Track:input_type -> io.defang.v1.TrackRequest
+	26, // 64: io.defang.v1.FabricController.GetStatus:output_type -> io.defang.v1.Status
+	27, // 65: io.defang.v1.FabricController.GetVersion:output_type -> io.defang.v1.Version
+	25, // 66: io.defang.v1.FabricController.Token:output_type -> io.defang.v1.TokenResponse
+	57, // 67: io.defang.v1.FabricController.RevokeToken:output_type -> google.protobuf.Empty
+	30, // 68: io.defang.v1.FabricController.Tail:output_type -> io.defang.v1.TailResponse
+	21, // 69: io.defang.v1.FabricController.Update:output_type -> io.defang.v1.ServiceInfo
+	11, // 70: io.defang.v1.FabricController.Deploy:output_type -> io.defang.v1.DeployResponse
+	21, // 71: io.defang.v1.FabricController.Get:output_type -> io.defang.v1.ServiceInfo
+	13, // 72: io.defang.v1.FabricController.Delete:output_type -> io.defang.v1.DeleteResponse
+	57, // 73: io.defang.v1.FabricController.Publish:output_type -> google.protobuf.Empty
+	49, // 74: io.defang.v1.FabricController.Subscribe:output_type -> io.defang.v1.SubscribeResponse
+	31, // 75: io.defang.v1.FabricController.GetServices:output_type -> io.defang.v1.ListServicesResponse
+	16, // 76: io.defang.v1.FabricController.GenerateFiles:output_type -> io.defang.v1.GenerateFilesResponse
+	17, // 77: io.defang.v1.FabricController.StartGenerate:output_type -> io.defang.v1.StartGenerateResponse
+	16, // 78: io.defang.v1.FabricController.GenerateStatus:output_type -> io.defang.v1.GenerateFilesResponse
+	6,  // 79: io.defang.v1.FabricController.Debug:output_type -> io.defang.v1.DebugResponse
+	57, // 80: io.defang.v1.FabricController.SignEULA:output_type -> google.protobuf.Empty
+	57, // 81: io.defang.v1.FabricController.CheckToS:output_type -> google.protobuf.Empty
+	57, // 82: io.defang.v1.FabricController.PutSecret:output_type -> google.protobuf.Empty
+	57, // 83: io.defang.v1.FabricController.DeleteSecrets:output_type -> google.protobuf.Empty
+	22, // 84: io.defang.v1.FabricController.ListSecrets:output_type -> io.defang.v1.Secrets
+	20, // 85: io.defang.v1.FabricController.CreateUploadURL:output_type -> io.defang.v1.UploadURLResponse
+	51, // 86: io.defang.v1.FabricController.DelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	57, // 87: io.defang.v1.FabricController.DeleteSubdomainZone:output_type -> google.protobuf.Empty
+	51, // 88: io.defang.v1.FabricController.GetDelegateSubdomainZone:output_type -> io.defang.v1.DelegateSubdomainZoneResponse
+	52, // 89: io.defang.v1.FabricController.WhoAmI:output_type -> io.defang.v1.WhoAmIResponse
+	57, // 90: io.defang.v1.FabricController.Track:output_type -> google.protobuf.Empty
+	64, // [64:91] is the sub-list for method output_type
+	37, // [37:64] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_io_defang_v1_fabric_proto_init() }
@@ -4500,7 +4552,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[40].Exporter = func(v any, i int) any {
-			switch v := v.(*Event); i {
+			switch v := v.(*Postgres); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4512,7 +4564,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[41].Exporter = func(v any, i int) any {
-			switch v := v.(*PublishRequest); i {
+			switch v := v.(*Event); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4524,7 +4576,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[42].Exporter = func(v any, i int) any {
-			switch v := v.(*SubscribeRequest); i {
+			switch v := v.(*PublishRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4536,7 +4588,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[43].Exporter = func(v any, i int) any {
-			switch v := v.(*SubscribeResponse); i {
+			switch v := v.(*SubscribeRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4548,7 +4600,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[44].Exporter = func(v any, i int) any {
-			switch v := v.(*DelegateSubdomainZoneRequest); i {
+			switch v := v.(*SubscribeResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4560,7 +4612,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[45].Exporter = func(v any, i int) any {
-			switch v := v.(*DelegateSubdomainZoneResponse); i {
+			switch v := v.(*DelegateSubdomainZoneRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4572,6 +4624,18 @@ func file_io_defang_v1_fabric_proto_init() {
 			}
 		}
 		file_io_defang_v1_fabric_proto_msgTypes[46].Exporter = func(v any, i int) any {
+			switch v := v.(*DelegateSubdomainZoneResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_io_defang_v1_fabric_proto_msgTypes[47].Exporter = func(v any, i int) any {
 			switch v := v.(*WhoAmIResponse); i {
 			case 0:
 				return &v.state
@@ -4590,7 +4654,7 @@ func file_io_defang_v1_fabric_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_io_defang_v1_fabric_proto_rawDesc,
 			NumEnums:      5,
-			NumMessages:   50,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
