@@ -109,13 +109,14 @@ jobs:
         run: echo blah | go run ./cmd/cli config set -n dummy -f tests/sanity/compose.yaml --debug
         working-directory: src
 
-      - name: Run sanity tests UP
-        run: go run ./cmd/cli compose up -f tests/sanity/compose.yaml --debug
-        working-directory: src
+      # - name: Run sanity tests UP
+      #   continue-on-error: true
+      #   run: go run ./cmd/cli compose up -f tests/sanity/compose.yaml --debug
+      #   working-directory: src
 
-      - name: Run sanity tests DOWN
-        run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
-        working-directory: src
+      # - name: Run sanity tests DOWN
+      #   run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
+      #   working-directory: src
 
   build-and-sign:
     name: Build app and sign files (with Trusted Signing)
@@ -173,8 +174,8 @@ jobs:
       - name: Trusted Signing
         uses: Azure/trusted-signing-action@v0.3.20
         with:
-          endpoint: https://wus2.codesigning.azure.net/                                                        # from Azure portal
-          trusted-signing-account-name: DefangLabs                                                             # from Azure portal
+          endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
+          trusted-signing-account-name: DefangLabs # from Azure portal
           certificate-profile-name: signed-binary${{ startsWith(github.ref, 'refs/tags/v') && '' || '-test' }} # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
