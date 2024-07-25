@@ -1,0 +1,19 @@
+name: postgres
+services:
+  x:
+    image: postgres
+    networks:
+      default: null
+    x-defang-postgres: null
+  "y":
+    image: example
+    networks:
+      default: null
+    x-defang-postgres: null
+  z:
+    image: postgres
+    networks:
+      default: null
+networks:
+  default:
+    name: postgres_default
