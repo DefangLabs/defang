@@ -55,7 +55,6 @@ func prettyError(err error) error {
 		err = errors.Unwrap(cerr)
 	}
 	return err
-
 }
 
 func Execute(ctx context.Context) error {
