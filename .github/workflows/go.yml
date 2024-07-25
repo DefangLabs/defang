@@ -142,7 +142,7 @@ jobs:
         working-directory: src
 
       - name: Run GoReleaser (Linux)
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -153,7 +153,7 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v5=6
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -231,7 +231,7 @@ jobs:
       #   working-directory: src
 
       - name: Run GoReleaser (macOS)
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
@@ -294,7 +294,7 @@ jobs:
           cache-dependency-path: src/go.sum
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
