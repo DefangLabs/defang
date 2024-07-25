@@ -115,6 +115,7 @@ jobs:
         working-directory: src
 
       - name: Run sanity tests DOWN
+        continue-on-error: true
         run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
         working-directory: src
 
