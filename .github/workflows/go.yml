@@ -348,7 +348,45 @@ jobs:
           node-version: "20" # same as the version in flake.nix
           registry-url: https://registry.npmjs.org
 
+      - name: Set Version Variable
+        id: set_version
+        run: echo "::set-output name=version::${GITHUB_REF_NAME#refs/tags/v}"
+        shell: bash
+
+      - name: Check release assets
+        id: check_release_assets
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const release_id = context.payload.release.id;
+            const release_version = '${{ steps.set_version.outputs.version }}'; // Use the version set in the previous step 
+              
+            // Define the required files with the release version included in the name
+            const requiredFiles = [
+              `defang_${release_version}_linux_amd64.tar.gz`, 
+              `defang_${release_version}_linux_arm64.tar.gz`, 
+              `defang_${release_version}_macOS.zip`, 
+              `defang_${release_version}_windows_amd64.zip`, 
+              `defang_${release_version}_windows_arm64.zip`, 
+            ];
+
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release_id
+            });
+
+            const assetNames = assets.map(asset => asset.name);
+            const missingFiles = requiredFiles.filter(file => !assetNames.includes(file));
+
+            if (missingFiles.length > 0) {
+              core.setFailed(`Missing required files: ${missingFiles.join(', ')}`);
+            } else {
+              core.info('All required files are present in the release assets.');
+            }
+
       - name: Publish to NPM
+        if: success()
         shell: bash
         working-directory: ./pkgs/npm
         run: |
