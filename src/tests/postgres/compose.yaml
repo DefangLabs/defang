@@ -1,0 +1,11 @@
+services:
+  x:
+    image: postgres
+    x-defang-postgres:
+
+  y:
+    image: example
+    x-defang-postgres:
+
+  z:
+    image: postgres
