@@ -903,8 +903,7 @@ var composeUpCmd = &cobra.Command{
 					// TODO: some services might be OK and we should only debug the ones that are not
 				}
 
-				_, isPlayground := client.(*cliClient.PlaygroundClient)
-				if !nonInteractive && isPlayground {
+				if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
 					var aiDebug bool
 					if err := survey.AskOne(&survey.Confirm{
 						Message: "Would you like to debug the deployment with AI?",
@@ -912,9 +911,9 @@ var composeUpCmd = &cobra.Command{
 					}, &aiDebug); err != nil {
 						term.Debugf("failed to ask for AI debug: %v", err)
 					} else if aiDebug {
-						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled); HACK: cmd might be canceled too
 						// TODO: use the WorkingDir of the failed service, might not be the project's root
-						if err := cli.Debug(cmd.Context(), client, deploy.Etag, project.WorkingDir, failedServices); err != nil {
+						if err := cli.Debug(context.TODO(), client, deploy.Etag, project.WorkingDir, failedServices); err != nil {
 							term.Warnf("failed to debug deployment: %v", err)
 						}
 					}
