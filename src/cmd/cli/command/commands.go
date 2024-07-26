@@ -79,8 +79,12 @@ func Execute(ctx context.Context) error {
 			printDefangHint("Fix the error and try again. To validate the compose file, use:", compose+" config")
 		}
 
-		if strings.Contains(err.Error(), "secret") {
+		if strings.Contains(err.Error(), "config") {
 			printDefangHint("To manage sensitive service config, use:", "config")
+		}
+
+		if err.Error() == "resource_exhausted: maximum number of projects reached" {
+			printDefangHint("To deactivate a project, do:", "compose down")
 		}
 
 		var cerr *cli.CancelError
