@@ -79,8 +79,12 @@ func Execute(ctx context.Context) error {
 			printDefangHint("Fix the error and try again. To validate the compose file, use:", compose+" config")
 		}
 
-		if strings.Contains(err.Error(), "secret") {
+		if strings.Contains(err.Error(), "config") {
 			printDefangHint("To manage sensitive service config, use:", "config")
+		}
+
+		if err.Error() == "resource_exhausted: maximum number of projects reached" {
+			printDefangHint("To deactivate a project, do:", "compose down")
 		}
 
 		var cerr *cli.CancelError
@@ -820,7 +824,6 @@ var composeUpCmd = &cobra.Command{
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
 
-		targetState := defangv1.ServiceState_SERVICE_COMPLETED
 		since := time.Now()
 		deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
@@ -839,9 +842,10 @@ var composeUpCmd = &cobra.Command{
 		}
 
 		tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
-		defer cancelTail(nil) // to cancel waitServiceState
+		defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
-		errSuccess := errors.New("deployment succeeded")
+		errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+		const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 		targetStateReached := false
 
 		go func() {
@@ -849,25 +853,27 @@ var composeUpCmd = &cobra.Command{
 			for i, serviceInfo := range deploy.Services {
 				services[i] = serviceInfo.Service.Name
 			}
-			if err := waitServiceState(tailCtx, targetState, deploy.Etag, services); err != nil {
-				if errors.Is(err, errDeploymentFailed) {
+
+			if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
+				var errDeploymentFailed cli.ErrDeploymentFailed
+				if errors.As(err, &errDeploymentFailed) {
 					cancelTail(err)
 				} else if !errors.Is(err, context.Canceled) {
-					term.Warnf("failed to wait for service status: %v", err)
+					term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
 				}
 			} else {
 				targetStateReached = true
-				cancelTail(errSuccess)
+				cancelTail(errCompleted)
 			}
 		}()
 
 		// show users the current streaming logs
-		services := "all services"
+		tailSource := "all services"
 		if deploy.Etag != "" {
-			services = "deployment ID " + deploy.Etag
+			tailSource = "deployment ID " + deploy.Etag
 		}
 
-		term.Info("Tailing logs for", services, "; press Ctrl+C to detach:")
+		term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
 			Etag:  deploy.Etag,
 			Since: since,
@@ -876,11 +882,28 @@ var composeUpCmd = &cobra.Command{
 
 		// blocking call to tail
 		if err := cli.Tail(tailCtx, client, tailParams); err != nil {
-			if errors.Is(context.Cause(tailCtx), errDeploymentFailed) {
-				term.Warn("Deployment FAILED. Service(s) not running.")
+			term.Debugf("Tail failed with %v", err)
+			if connect.CodeOf(err) == connect.CodePermissionDenied {
+				// If tail fails because of missing permission, we wait for the deployment to finish
+				term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
+				<-tailCtx.Done()
+			} else if !errors.Is(tailCtx.Err(), context.Canceled) {
+				return err // any error other than cancelation
+			}
 
-				_, isPlayground := client.(*cliClient.PlaygroundClient)
-				if !nonInteractive && isPlayground {
+			// Tail got canceled; if it was by anything other than completion, prompt to show debugger
+			if !errors.Is(context.Cause(tailCtx), errCompleted) {
+				var failedServices []string
+				var errDeploymentFailed cli.ErrDeploymentFailed
+				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+					term.Warn(errDeploymentFailed)
+					failedServices = []string{errDeploymentFailed.Service, errDeploymentFailed.Service + "-image"} // HACK: also grab Kaniko logs
+				} else {
+					term.Warn("Deployment is not finished. Service(s) might not be running.")
+					// TODO: some services might be OK and we should only debug the ones that are not
+				}
+
+				if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
 					var aiDebug bool
 					if err := survey.AskOne(&survey.Confirm{
 						Message: "Would you like to debug the deployment with AI?",
@@ -888,17 +911,13 @@ var composeUpCmd = &cobra.Command{
 					}, &aiDebug); err != nil {
 						term.Debugf("failed to ask for AI debug: %v", err)
 					} else if aiDebug {
-						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						if err := cli.Debug(cmd.Context(), client, deploy.Etag, project.WorkingDir); err != nil {
+						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled); HACK: cmd might be canceled too
+						// TODO: use the WorkingDir of the failed service, might not be the project's root
+						if err := cli.Debug(context.TODO(), client, deploy.Etag, project.WorkingDir, failedServices); err != nil {
 							term.Warnf("failed to debug deployment: %v", err)
 						}
 					}
 				}
-			} else if connect.CodeOf(err) == connect.CodePermissionDenied {
-				// If tail fails because of missing permission, we wait for the deployment to finish
-				term.Warn("Failed to tail logs. Waiting for the deployment to finish.")
-				<-tailCtx.Done()
-			} else if !errors.Is(context.Cause(tailCtx), errSuccess) {
 				return err
 			}
 		}
@@ -952,7 +971,8 @@ var debugCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
 
-		return cli.Debug(cmd.Context(), client, etag, ".")
+		// TODO: use the WorkingDir of the current project instead of current folder
+		return cli.Debug(cmd.Context(), client, etag, ".", nil)
 	},
 }
 
