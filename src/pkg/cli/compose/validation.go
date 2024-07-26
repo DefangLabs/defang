@@ -262,6 +262,14 @@ func ValidateProject(project *compose.Project) error {
 			}
 		}
 
+		if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+			// Ensure the image is a valid Postgres image
+			repo := strings.SplitN(svccfg.Image, ":", 2)[0]
+			if !strings.HasSuffix(repo, "postgres") {
+				term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
+			}
+		}
+
 		for k := range svccfg.Extensions {
 			switch k {
 			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres":

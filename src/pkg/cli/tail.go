@@ -296,6 +296,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			onlyErrors := !DoVerbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
+					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
 				continue
@@ -364,7 +365,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
-					cancel()
+					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
 			}
