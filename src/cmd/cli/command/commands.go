@@ -400,10 +400,12 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.Whoami(cmd.Context(), client) // always prints
+		str, err := cli.Whoami(cmd.Context(), client)
 		if err != nil {
 			return err
 		}
+
+		term.Infof(str)
 		return nil
 	},
 }
