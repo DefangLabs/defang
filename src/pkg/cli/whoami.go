@@ -3,15 +3,18 @@ package cli
 import (
 	"context"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func Whoami(ctx context.Context, client client.Client) error {
+func Whoami(ctx context.Context, client cliClient.Client) error {
 	resp, err := client.WhoAmI(ctx)
 	if err != nil {
 		return err
 	}
-	term.Infof("You are logged into tenant %q in %q region %q", resp.Tenant, resp.Account, resp.Region)
+
+	term.Infof("You are logged into %s region %s with tenant %q",
+		resp.Account, resp.Region, resp.Tenant)
+
 	return nil
 }
