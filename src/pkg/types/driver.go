@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 const (
@@ -49,7 +51,7 @@ type Driver interface {
 	Stop(ctx context.Context, taskID TaskID) error
 	// Exec(ctx context.Context, taskID TaskID, args ...string) error
 	GetInfo(ctx context.Context, taskID TaskID) (*TaskInfo, error)
-	PutSecret(ctx context.Context, name, value string) error
+	PutConfig(ctx context.Context, name, value string, attributes *[]defangv1.ConfigAttributes) error
 	GetConfig(ctx context.Context, name []string) (ConfigData, error)
 	// DeleteSecrets(ctx context.Context, names ...string) error
 	ListSecrets(ctx context.Context) ([]string, error) // no values

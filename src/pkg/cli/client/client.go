@@ -50,7 +50,7 @@ type Client interface {
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	GetConfig(context.Context, *defangv1.Configs) (types.ConfigData, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
-	PutConfig(context.Context, *defangv1.SecretValue) error
+	PutConfig(context.Context, *defangv1.PutValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)

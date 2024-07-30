@@ -182,6 +182,8 @@ func SetupCommands(version string) {
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
+	configSetCmd.Flags().BoolP("sensitive", "h", false, "set the config as sensitive")
+	configSetCmd.Flags().BoolP("no-value", "e", false, "set the config as no-value")
 	_ = configSetCmd.Flags().MarkHidden("name")
 	configCmd.AddCommand(configSetCmd)
 
@@ -719,6 +721,17 @@ var configSetCmd = &cobra.Command{
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var isSensitive, _ = cmd.Flags().GetBool("sensitive")
+		var isNoValue, _ = cmd.Flags().GetBool("no-value")
+
+		attributes := []defangv1.ConfigAttributes{}
+		if isSensitive {
+			attributes = append(attributes, defangv1.ConfigAttributes_SENSITIVE)
+		}
+
+		if isNoValue {
+			attributes = append(attributes, defangv1.ConfigAttributes_NO_VALUE)
+		}
 
 		// Make sure we have a project to set config for before asking for a value
 		_, err := client.LoadProjectName(cmd.Context())
@@ -728,6 +741,10 @@ var configSetCmd = &cobra.Command{
 
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
+
+		if len(parts) >= 2 && isNoValue {
+			return fmt.Errorf("cannot set a value and have no-value flag")
+		}
 
 		if !pkg.IsValidSecretName(name) {
 			return fmt.Errorf("invalid config name: %q", name)
@@ -767,7 +784,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), client, name, value, &attributes); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)

@@ -20,7 +20,7 @@ func isErrCodeNotFound(err error) bool {
 	return errors.As(err, &e)
 }
 
-func TestPutSecret(t *testing.T) {
+func TestPutConfig(t *testing.T) {
 	a := Aws{Region: Region(pkg.Getenv("AWS_REGION", "us-west-2"))}
 
 	ctx := context.Background()
@@ -45,7 +45,7 @@ func TestPutSecret(t *testing.T) {
 		t.Fatal("secret should not exist")
 	}
 
-	err = a.PutSecret(ctx, name, value)
+	err = a.PutConfig(ctx, name, value)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestPutSecret(t *testing.T) {
 	}
 
 	// Overwrite secret with a new value
-	err = a.PutSecret(ctx, name, "new value")
+	err = a.PutConfig(ctx, name, "new value")
 	if err != nil {
 		t.Fatal(err)
 	}

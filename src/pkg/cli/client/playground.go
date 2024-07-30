@@ -37,8 +37,8 @@ func (g PlaygroundClient) GetServices(ctx context.Context) (*defangv1.ListServic
 	return getMsg(g.client.GetServices(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.SecretValue) error {
-	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
+func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutValue) error {
+	_, err := g.client.PutConfig(ctx, connect.NewRequest(req))
 	return err
 }
 

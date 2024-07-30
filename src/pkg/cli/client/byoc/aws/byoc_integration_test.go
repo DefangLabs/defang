@@ -86,10 +86,10 @@ func TestGetServices(t *testing.T) {
 	}
 }
 
-func TestPutSecret(t *testing.T) {
+func TestPutConfig(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByoc(ctx, client.GrpcClient{}, "TestPutSecret")
+	b := NewByoc(ctx, client.GrpcClient{}, "TestPutConfig")
 	b.PulumiProject = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
@@ -106,14 +106,14 @@ func TestPutSecret(t *testing.T) {
 	})
 
 	t.Run("invalid name", func(t *testing.T) {
-		err := b.PutConfig(context.Background(), &defangv1.SecretValue{})
+		err := b.PutConfig(context.Background(), &defangv1.PutValue{})
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("expected invalid argument, got %v", err)
 		}
 	})
 
 	t.Run("put", func(t *testing.T) {
-		err := b.PutConfig(context.Background(), &defangv1.SecretValue{Name: secretName, Value: "world"})
+		err := b.PutConfig(context.Background(), &defangv1.PutValue{Name: secretName, Value: "world"})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
