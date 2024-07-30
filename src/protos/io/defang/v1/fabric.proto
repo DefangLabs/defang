@@ -218,23 +218,17 @@ message SecretValue {
   string project = 3; // defaults to tenant ID
 }
 
-enum ConfigAttributes {
-  NO_ATTRIBUTE = 0;
-  SENSITIVE = 1;
-  NO_VALUE = 2;
-}
-
 message PutValue {
   string name = 1;
   string value = 2;
   string project = 3;
-  repeated ConfigAttributes attributes = 4;
+  bool is_sensitive = 4;
 }
 
 message ConfigValue {
   string name = 1;
   string value = 2;
-  repeated ConfigAttributes attributes = 3;
+  bool is_sensitive = 4;
 }
 
 message ConfigValues {

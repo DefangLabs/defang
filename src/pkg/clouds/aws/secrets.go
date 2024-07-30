@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	clitypes "github.com/DefangLabs/defang/src/pkg/types"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
@@ -68,7 +67,7 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 	return len(res.Parameters) == 1, nil
 }
 
-func (a *Aws) PutConfig(ctx context.Context, name, value string, attributes *[]defangv1.ConfigAttributes) error {
+func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive bool) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
@@ -79,25 +78,18 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, attributes *[]d
 
 	svc := ssm.NewFromConfig(cfg)
 
-	tags := []types.Tag{}
-	for _, attr := range *attributes {
-		tags = append(tags, types.Tag{
-			Key: ptr.String(attr.String()),
-		})
-	}
-
 	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
 		Name:      secretId,
 		Value:     secretString,
-		Tags:      tags,
 	})
 
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/types"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/docker/docker/client"
 )
 
@@ -32,7 +31,7 @@ func New() *Docker {
 
 var _ types.Driver = (*Docker)(nil)
 
-func (Docker) PutConfig(ctx context.Context, name, value string, attributes *[]defangv1.ConfigAttributes) error {
+func (Docker) PutConfig(ctx context.Context, name, value string, isSensitive bool) error {
 	return errors.New("docker does not support secrets")
 }
 

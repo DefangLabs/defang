@@ -411,10 +411,13 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutValue) erro
 	if !pkg.IsValidSecretName(config.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", config.Name))
 	}
+
+	isSensitive := false
+
 	fqn := b.getSecretID(config.Name)
 	term.Debugf("Putting parameter %q", fqn)
 
-	err := b.driver.PutConfig(ctx, fqn, config.Value, &config.Attributes)
+	err := b.driver.PutConfig(ctx, fqn, config.Value, isSensitive)
 
 	return annotateAwsError(err)
 }
