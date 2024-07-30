@@ -50,13 +50,20 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  // deprecate - change to use *Config functions
+  rpc PutSecret(SecretValue) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  }; // no values
+    option deprecated = true;
+  } // no values
 
   rpc GetConfig(Configs) returns (ConfigValues) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+  rpc PutConfig(ConfigValue) returns (google.protobuf.Empty);
+  rpc DeleteConfigs(Configs) returns (google.protobuf.Empty);
+  rpc ListConfigs(google.protobuf.Empty) returns (Configs) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   
@@ -211,9 +218,16 @@ message SecretValue {
   string project = 3; // defaults to tenant ID
 }
 
+enum ConfigAttributes {
+  NO_ATTRIBUTE = 0;
+  SENSITIVE = 1;
+  EMPTY = 2;
+}
+
 message ConfigValue {
   string name = 1;
   string value = 2;
+  repeated ConfigAttributes attributes = 3;
 }
 
 message ConfigValues {

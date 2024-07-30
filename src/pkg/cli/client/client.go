@@ -48,11 +48,11 @@ type Client interface {
 	Destroy(context.Context) (types.ETag, error)
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
+	GetConfig(context.Context, *defangv1.Configs) (types.ConfigData, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
 	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
-	GetConfig(context.Context, *defangv1.Configs) (types.ConfigData, error)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
