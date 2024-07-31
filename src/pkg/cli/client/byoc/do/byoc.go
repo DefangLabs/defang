@@ -161,7 +161,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return nil, nil
+	return &defangv1.DeleteResponse{}, nil
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -173,15 +173,15 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return nil, nil
+	return &defangv1.ServiceInfo{}, nil
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	return nil, nil
+	return &defangv1.ListServicesResponse{}, nil
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return nil, nil
+	return &defangv1.Secrets{}, nil
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
@@ -213,11 +213,14 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	term.Debug(logs.LiveURL)
 	//newByocServerStream(ctx, logs, nil)
 
+	newUrl := fmt.Sprintf("wss%s", strings.TrimPrefix(logs.LiveURL, "https"))
+
+	term.Debug(newUrl)
 	if err != nil {
 		return nil, err
 	}
 
-	return newByocServerStream(ctx, logs.LiveURL, []string{})
+	return newByocServerStream(ctx, newUrl, []string{})
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
@@ -227,7 +230,7 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
-	return nil, nil
+	return &defangv1.WhoAmIResponse{}, nil
 }
 
 func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
@@ -237,7 +240,7 @@ func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 
 func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 
-	return nil, nil
+	return &defangv1.ServiceInfo{}, nil
 }
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
