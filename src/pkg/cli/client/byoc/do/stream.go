@@ -2,7 +2,6 @@ package do
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -52,13 +51,13 @@ func (bs *byocServerStream) readPump() {
 			return
 		}
 
-		var response defangv1.TailResponse
-		if err := json.Unmarshal(message, &response); err != nil {
-			bs.errCh <- err
-			return
+		bs.response = &defangv1.TailResponse{
+			Entries: []*defangv1.LogEntry{
+				&defangv1.LogEntry{
+					Message: string(message),
+				},
+			},
 		}
-
-		bs.response = &response
 	}
 }
 
