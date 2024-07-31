@@ -114,3 +114,12 @@ func Contains[T comparable](s []T, v T) bool {
 	}
 	return false
 }
+
+func StripPath(name string) string {
+	lastIndex := strings.LastIndex(name, "/")
+	if lastIndex >= 0 {
+		return name[lastIndex+1:]
+	} else {
+		return name
+	}
+}

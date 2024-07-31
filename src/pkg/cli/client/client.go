@@ -48,7 +48,7 @@ type Client interface {
 	Destroy(context.Context) (types.ETag, error)
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
-	GetConfig(context.Context, *defangv1.Configs) (types.ConfigData, error)
+	GetConfig(context.Context, *defangv1.Configs) (*defangv1.ConfigValues, error)
 	ListConfig(context.Context) (*defangv1.Configs, error)
 	PutConfig(context.Context, *defangv1.PutValue) error
 	Restart(context.Context, ...string) (types.ETag, error)

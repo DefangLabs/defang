@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/docker/docker/client"
 )
 
@@ -35,7 +36,7 @@ func (Docker) PutConfig(ctx context.Context, name, value string, isSensitive boo
 	return errors.New("docker does not support secrets")
 }
 
-func (Docker) GetConfig(ctx context.Context, name []string) (types.ConfigData, error) {
+func (Docker) GetConfig(ctx context.Context, name []string, rootPath string) (*defangv1.ConfigValues, error) {
 	return nil, errors.New("docker does not support secrets")
 }
 

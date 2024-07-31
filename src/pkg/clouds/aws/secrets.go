@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	clitypes "github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
@@ -159,7 +159,7 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive boo
 	return nil
 }
 
-func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string, isSensitive bool, outdata *clitypes.ConfigData) error {
+func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata *defangv1.ConfigValues) error {
 	namePaths := make([]string, len(names))
 
 	insertPathPart := CONFIG_PATH_PART
@@ -171,7 +171,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string
 	var basePath string
 	var path *string
 	for index, name := range names {
-		basePath = *getConfigPathID(name)
+		basePath = *getConfigPathID(rootPath + name)
 
 		path, err = insertPreConfigNamePath(basePath, insertPathPart)
 		if err != nil {
@@ -194,16 +194,18 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string
 	}
 
 	for _, param := range gpo.Parameters {
-		(*outdata)[*param.Name] = clitypes.DataInfo{
-			Value:       *param.Value,
-			IsSensitive: isSensitive,
-		}
+		(*outdata).Configs = append((*outdata).Configs,
+			&defangv1.ConfigValue{
+				Name:        *param.Name,
+				Value:       *param.Value,
+				IsSensitive: isSensitive,
+			})
 	}
 
 	return nil
 }
 
-func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigData, error) {
+func (a *Aws) GetConfig(ctx context.Context, names []string, rootPath string) (*defangv1.ConfigValues, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -211,21 +213,21 @@ func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigDat
 
 	svc := ssm.NewFromConfig(cfg)
 
-	output := clitypes.ConfigData{}
-	if err := GetConfigValuesByParam(ctx, svc, names, false, &output); err != nil {
+	output := defangv1.ConfigValues{}
+	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, false, &output); err != nil {
 		return nil, err
 	}
 
 	// we are done when output has the same number
-	if len(output) == len(names) {
-		return output, nil
+	if len(output.Configs) == len(names) {
+		return &output, nil
 	}
 
-	if err := GetConfigValuesByParam(ctx, svc, names, true, &output); err != nil {
+	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
 		return nil, err
 	}
 
-	return output, nil
+	return &output, nil
 }
 
 func (a *Aws) ListConfigs(ctx context.Context) ([]string, error) {

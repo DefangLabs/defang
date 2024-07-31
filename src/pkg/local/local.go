@@ -14,6 +14,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type PID = types.TaskID
@@ -106,7 +107,7 @@ func (l *Local) PutConfig(ctx context.Context, name, value string, isSensitive b
 	return client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) GetConfig(ctx context.Context, names []string) (types.ConfigData, error) {
+func (l *Local) GetConfig(ctx context.Context, names []string, rootPath string) (*defangv1.ConfigValues, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 

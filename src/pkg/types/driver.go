@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 const (
@@ -39,12 +41,6 @@ type TaskVolume struct {
 	ReadOnly bool
 }
 
-type DataInfo struct {
-	Value       string
-	IsSensitive bool
-}
-
-type ConfigData map[string]DataInfo
 type Driver interface {
 	SetUp(ctx context.Context, containers []Container) error
 	TearDown(ctx context.Context) error
@@ -55,7 +51,7 @@ type Driver interface {
 	// Exec(ctx context.Context, taskID TaskID, args ...string) error
 	GetInfo(ctx context.Context, taskID TaskID) (*TaskInfo, error)
 	PutConfig(ctx context.Context, name, value string, isSensitive bool) error
-	GetConfig(ctx context.Context, name []string) (ConfigData, error)
+	GetConfig(ctx context.Context, name []string, rootPath string) (*defangv1.ConfigValues, error)
 	// DeleteSecrets(ctx context.Context, names ...string) error
 	ListConfigs(ctx context.Context) ([]string, error) // no values
 	CreateUploadURL(ctx context.Context, name string) (string, error)

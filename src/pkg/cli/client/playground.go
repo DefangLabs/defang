@@ -55,13 +55,12 @@ func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.Upl
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) GetConfig(ctx context.Context, req *defangv1.Configs) (types.ConfigData, error) {
+func (g PlaygroundClient) GetConfig(ctx context.Context, req *defangv1.Configs) (*defangv1.ConfigValues, error) {
 	param := connect.NewRequest(&defangv1.Configs{})
 	if req.Names != nil && len(req.Names) >= 0 {
 		param = connect.NewRequest(&defangv1.Configs{Names: req.Names})
 	}
-	_, err := g.client.GetConfig(ctx, param)
-	return nil, err
+	return getMsg(g.client.GetConfig(ctx, param))
 }
 
 func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {

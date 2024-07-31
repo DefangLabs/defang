@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 var (
@@ -44,12 +44,12 @@ func PrintObject(root string, data proto.Message) error {
 	return nil
 }
 
-func PrintConfigData(config types.ConfigData) {
-	for key, value := range config {
-		if value.IsSensitive {
-			fmt.Printf("%s: [hidden]\n", key)
+func PrintConfigData(configs *defangv1.ConfigValues) {
+	for _, config := range (*configs).Configs {
+		if config.IsSensitive {
+			fmt.Printf("%s: [hidden]\n", config.Name)
 		} else {
-			fmt.Printf("%s: %s\n", key, value.Value)
+			fmt.Printf("%s: %s\n", config.Name, config.Value)
 		}
 	}
 }

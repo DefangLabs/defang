@@ -56,15 +56,6 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 	return b
 }
 
-func stripPath(name string) string {
-	lastIndex := strings.LastIndex(name, "/")
-	if lastIndex >= 0 {
-		return name[lastIndex+1:]
-	} else {
-		return name
-	}
-}
-
 func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
@@ -438,30 +429,39 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutValue) erro
 	return annotateAwsError(err)
 }
 
-func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (types.ConfigData, error) {
+func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (*defangv1.ConfigValues, error) {
 	paramNames := make([]string, len(config.Names))
-	for index, name := range config.Names {
+	for _, name := range config.Names {
 		if !pkg.IsValidSecretName(name) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", name))
 		}
-		paramNames[index] = b.getConfigPathID(name)
 	}
 
-	term.Debugf("Show parameters %q", paramNames)
+	if len(config.Names) == 0 {
+		term.Debug("Show all parameters")
+	} else {
+		term.Debugf("Show parameters %q", paramNames)
+	}
 
-	configData, err := b.driver.GetConfig(ctx, paramNames)
+	rootPath := b.getConfigPathID("")
+	configValue, err := b.driver.GetConfig(ctx, config.Names, rootPath)
 	if err != nil {
 		term.Errorf("error getting config: %v", err)
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve configs"))
 	}
 
-	results := make(types.ConfigData, 1)
-	for paramName, value := range configData {
-		name := stripPath(paramName)
-		results[name] = value
+	results := defangv1.ConfigValues{}
+	for _, data := range (*configValue).Configs {
+		name := pkg.StripPath(data.Name)
+		results.Configs = append(results.Configs,
+			&defangv1.ConfigValue{
+				Name:        name,
+				Value:       data.Value,
+				IsSensitive: data.IsSensitive,
+			})
 	}
 
-	return results, nil
+	return &results, nil
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
@@ -474,7 +474,7 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
 
 	configs := make([]string, len(awsConfigs))
 	for index, config := range awsConfigs {
-		configs[index] = stripPath(config)
+		configs[index] = pkg.StripPath(config)
 	}
 
 	return &defangv1.Configs{Names: configs}, nil
