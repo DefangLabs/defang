@@ -45,6 +45,7 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	b := &ByocDo{
 		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
 		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		appIds:         map[string]string{},
 	}
 
 	return b
@@ -114,11 +115,11 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
 
-	appID, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s %s", CommandPrefix, "up", payloadString))
-	if err != nil {
-		return nil, err
-	}
-	b.appIds[etag] = appID
+	//appID, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s %s", CommandPrefix, "up", payloadString))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//b.appIds[etag] = appID
 
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
@@ -127,8 +128,16 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
+	if err := b.setUp(ctx); err != nil {
+		return "", err
+	}
 
-	return "", nil
+	foo, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s", CommandPrefix, "up"))
+	if err != nil {
+		return "", err
+	}
+
+	return foo, nil
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
@@ -187,6 +196,24 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	client := b.driver.Client
+
+	logs, _, err := client.Apps.GetLogs(ctx, "bb05e4c4-f8c8-4440-a1a0-07f88c353fea", "", "", godo.AppLogType("RUN"), true, 5)
+	if err != nil {
+		return nil, err
+	}
+	term.Debug("LIVE URL")
+	term.Debug(logs.LiveURL)
+	//newByocServerStream(ctx, logs, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -212,13 +239,6 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd string) (string, error) {
 	env := b.environment()
-	//if term.DoDebug {
-	//	debugEnv := " -"
-	//	for k, v := range env {
-	//		debugEnv += " " + k + "=" + v
-	//	}
-	//	term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
-	//}
 	return b.driver.Run(ctx, env, cmd)
 }
 
@@ -255,7 +275,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "PULUMI_BACKEND_URL",
-			Value: fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName),
+			Value: fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region),
 		},
 		{
 			Key:   "PULUMI_CONFIG_PASSPHRASE",
@@ -285,10 +305,25 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		{
 			Key:   "SPACES_SECRET_ACCESS_KEY",
 			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Type:  Secret,
 		},
 		{
 			Key:   "REGION",
-			Value: "sfo3",
+			Value: region.String(),
+		},
+		{
+			Key:   "AWS_REGION",
+			Value: region.String(),
+		},
+		{
+			Key:   "AWS_ACCESS_KEY_ID",
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Type:  Secret,
+		},
+		{
+			Key:   "AWS_SECRET_ACCESS_KEY",
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Type:  Secret,
 		},
 	}
 }

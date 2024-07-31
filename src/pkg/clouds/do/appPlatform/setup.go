@@ -20,6 +20,7 @@ import (
 const (
 	DockerHub = "DOCKER_HUB"
 	Docr      = "DOCR"
+	CDName    = "defang-cd"
 )
 
 type DoAppPlatform struct {
@@ -77,24 +78,51 @@ func (d DoApp) SetUp(ctx context.Context, services []*godo.AppServiceSpec, jobs 
 func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd string) (string, error) {
 	client := d.newClient(ctx)
 
-	app, _, err := client.Apps.Create(ctx, &godo.AppCreateRequest{
-		Spec: &godo.AppSpec{
-			Name: "defang-cd",
-			Services: []*godo.AppServiceSpec{{
-				Name: fmt.Sprintf("defang-cd-%s", d.ProjectName),
-				Envs: env,
-				Image: &godo.ImageSourceSpec{
-					RegistryType: Docr,
-					Repository:   "defangmvp/do-cd",
-				},
-				InstanceCount:    1,
-				InstanceSizeSlug: "basic-xs",
-				RunCommand:       cmd,
-			}},
-		},
-	})
+	appJobSpec := &godo.AppSpec{
+		Name: CDName,
+		Jobs: []*godo.AppJobSpec{{
+			Name: fmt.Sprintf("defang-cd-%s", d.ProjectName),
+			Envs: env,
+			Image: &godo.ImageSourceSpec{
+				RegistryType: Docr,
+				Repository:   "defangmvp/do-cd",
+			},
+			InstanceCount:    1,
+			InstanceSizeSlug: "basic-xs",
+			RunCommand:       cmd,
+		}},
+	}
 
-	return app.ID, err
+	var currentCd = &godo.App{}
+
+	appList, _, err := client.Apps.List(ctx, &godo.ListOptions{})
+
+	if err != nil {
+		return "", nil
+	}
+
+	for _, app := range appList {
+		if app.Spec.Name == CDName {
+			currentCd = app
+		}
+	}
+
+	//Update current CD app if it exists
+	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
+		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
+			Spec: appJobSpec,
+		})
+	} else {
+		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{
+			Spec: appJobSpec,
+		})
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return currentCd.ID, err
 }
 
 func (d DoApp) newClient(ctx context.Context) *godo.Client {
