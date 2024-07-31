@@ -3,9 +3,12 @@ package do
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/digitalocean/godo"
 
@@ -20,13 +23,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
-)
-
-const (
-	DockerHub     = "DOCKER_HUB"
-	Docr          = "DOCR"
-	Secret        = "SECRET"
-	CommandPrefix = "node lib/index.js"
 )
 
 type ByocDo struct {
@@ -90,13 +86,13 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, etag)
+	payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
 	if err != nil {
 		return nil, err
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
+	resp, err := http.Put(ctx, payloadUrl, "application/protobuf", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -104,23 +100,25 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 	}
-	payloadUrl := strings.Split(http.RemoveQueryParam(url), "/")
 
-	payloadFileName := payloadUrl[len(payloadUrl)-1]
-
-	payloadString, err := b.driver.CreateS3DownloadUrl(ctx, fmt.Sprintf("uploads/%s", payloadFileName))
-
+	// FIXME: find the bucket and key name
+	parsedUrl, err := url.Parse(payloadUrl)
+	if err != nil {
+		return nil, err
+	}
+	payloadKey := strings.TrimLeft(parsedUrl.Path, "/"+b.driver.BucketName+"/")
+	payloadString, err := b.driver.CreateS3DownloadUrl(ctx, payloadKey)
 	if err != nil {
 		return nil, err
 	}
 
 	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
 
-	//appID, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s %s", CommandPrefix, "up", payloadString))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//b.appIds[etag] = appID
+	appID, err := b.runCdCommand(ctx, "up", payloadString)
+	if err != nil {
+		return nil, err
+	}
+	b.appIds[etag] = *appID
 
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
@@ -133,12 +131,12 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 		return "", err
 	}
 
-	foo, err := b.runCdCommand(ctx, CommandPrefix, "up")
+	foo, err := b.runCdCommand(ctx, "up", command)
 	if err != nil {
 		return "", err
 	}
 
-	return foo, nil
+	return *foo, nil
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
@@ -161,7 +159,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return &defangv1.DeleteResponse{}, nil
+	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -169,19 +167,19 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	return nil
+	return errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return &defangv1.ServiceInfo{}, nil
+	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	return &defangv1.ListServicesResponse{}, nil
+	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{}, nil
+	return &defangv1.Secrets{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
@@ -189,7 +187,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 }
 
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", nil
+	return "", errors.ErrUnsupported
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
@@ -201,36 +199,41 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	ctx, _ = context.WithCancel(ctx)
+	appId := req.Etag
+	if pkg.IsValidRandomID(appId) {
+		// This is an etag; look up the app ID
+		appId = b.appIds[appId]
+	}
+
+	// ctx, cancel := context.WithCancel(ctx)
+	// defer cancel()
 
 	client := b.driver.Client
 
-	logs, _, err := client.Apps.GetLogs(ctx, "bb05e4c4-f8c8-4440-a1a0-07f88c353fea", "", "", godo.AppLogType("RUN"), true, 5)
+	logs, _, err := client.Apps.GetLogs(ctx, appId, "", "", godo.AppLogTypeRun, true, 5)
 	if err != nil {
-		return nil, err
+		// assume not found; try again after a while
+		pkg.SleepWithContext(ctx, 2*time.Second)
+		logs, _, err = client.Apps.GetLogs(ctx, appId, "", "", godo.AppLogTypeRun, true, 5)
+		if err != nil {
+			return nil, err
+		}
 	}
 	term.Debug("LIVE URL")
 	term.Debug(logs.LiveURL)
 	//newByocServerStream(ctx, logs, nil)
 
-	newUrl := fmt.Sprintf("wss%s", strings.TrimPrefix(logs.LiveURL, "https"))
-
-	term.Debug(newUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	return newByocServerStream(ctx, "", []string{})
+	return newByocServerStream(ctx, logs.LiveURL, []string{})
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	return nil
+	return errors.ErrUnsupported
 	//return b.Driver.TearDown(ctx)
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
-	return &defangv1.WhoAmIResponse{}, nil
+	return &defangv1.WhoAmIResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
@@ -239,15 +242,14 @@ func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 }
 
 func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-
-	return &defangv1.ServiceInfo{}, nil
+	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+	return nil, errors.ErrUnsupported
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (types.TaskID, error) {
 	env := b.environment()
 	if term.DoDebug() {
 		debugEnv := " -"
@@ -256,7 +258,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
 	}
-	return b.driver.Run(ctx, env, strings.Join(cmd, ""))
+	return b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 }
 
 func (b *ByocDo) environment() []*godo.AppVariableDefinition {
@@ -317,12 +319,12 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
 			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
-			Type:  Secret,
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "SPACES_SECRET_ACCESS_KEY",
 			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
-			Type:  Secret,
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "REGION",
@@ -335,12 +337,12 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		{
 			Key:   "AWS_ACCESS_KEY_ID",
 			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
-			Type:  Secret,
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "AWS_SECRET_ACCESS_KEY",
 			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
-			Type:  Secret,
+			Type:  godo.AppVariableType_Secret,
 		},
 	}
 }
@@ -361,6 +363,10 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 func (b *ByocDo) setUp(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
+	}
+
+	if err := b.driver.SetUp(ctx); err != nil {
+		return err
 	}
 
 	//cdTaskName := byoc.CdTaskPrefix

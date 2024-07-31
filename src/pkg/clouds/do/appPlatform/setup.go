@@ -4,8 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -13,20 +19,11 @@ import (
 	"github.com/digitalocean/godo"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
-	"os"
-	"regexp"
 )
 
 const (
-	DockerHub = "DOCKER_HUB"
-	Docr      = "DOCR"
-	CDName    = "defang-cd"
+	CDName = "defang-cd"
 )
-
-type DoAppPlatform struct {
-	DoApp
-	appName string
-}
 
 type DoApp struct {
 	Client      *godo.Client
@@ -36,69 +33,90 @@ type DoApp struct {
 	AppID       string
 }
 
+const bucketPrefix = "defang-test" // FIXME: rename
+
 func New(stack string, region do.Region) *DoApp {
 	if stack == "" {
 		panic("stack must be set")
 	}
 
-	client := DoApp{}.newClient(context.Background())
+	client := newClient(context.TODO())
 
 	return &DoApp{
 		Client:      client,
 		Region:      region,
-		ProjectName: stack,
-		BucketName:  "defang-test",
+		ProjectName: stack, // FIXME: stack != project
+		BucketName:  os.Getenv("DEFANG_CD_BUCKET"),
 	}
 
 }
 
-func (d DoApp) SetUp(ctx context.Context, services []*godo.AppServiceSpec, jobs []*godo.AppJobSpec) error {
-	fmt.Printf("PROJECT NAME: %s", d.ProjectName)
-	request := &godo.AppCreateRequest{
-		Spec: &godo.AppSpec{
-			Name:     d.ProjectName,
-			Services: services,
-			Jobs:     jobs,
-		},
-	}
+func (d *DoApp) SetUp(ctx context.Context) error {
+	s3Client := d.createS3Client()
 
-	//appService := &godo.AppsServiceOp{}
-	app, resp, err := d.Client.Apps.Create(ctx, request)
-
-	fmt.Println(err)
-	fmt.Println(app.ID)
-	fmt.Println(resp.StatusCode)
+	lbo, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	if d.BucketName == "" {
+		// Find an existing bucket that starts with the bucketPrefix
+		for _, b := range lbo.Buckets {
+			if strings.HasPrefix(*b.Name, bucketPrefix) {
+				d.BucketName = *b.Name
+				break
+			}
+		}
+	}
+
+	if d.BucketName == "" {
+		d.BucketName = fmt.Sprintf("%s-%s", bucketPrefix, uuid.NewString())
+		_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
+			Bucket: &d.BucketName,
+		})
+	}
+	return err
 }
 
-func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd string) (string, error) {
-	client := d.newClient(ctx)
+func shellQuote(args ...string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = strconv.Quote(arg)
+	}
+	return strings.Join(quoted, " ")
+}
+
+func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (types.TaskID, error) {
+	client := newClient(ctx)
+
+	// parts := strings.Split(pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:latest"), ":")
 
 	appJobSpec := &godo.AppSpec{
-		Name: CDName,
+		Name:   CDName,
+		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
-			Name: fmt.Sprintf("defang-cd-%s", d.ProjectName),
+			Name: d.ProjectName,
 			Envs: env,
 			Image: &godo.ImageSourceSpec{
-				RegistryType: Docr,
-				Repository:   "defangmvp/do-cd",
+				// RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+				// Repository:   "defangmvp/do-cd",
+				RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+				Registry:     "defangio",
+				Repository:   "cd",
+				Digest:       "sha256:f026d3f7e4694a0a942bb46815e3183ef45b69e22f00cb892537794bbd58a376",
+				// Tag:          "latest", // FIXME: DO will not always pull the image
 			},
 			InstanceCount:    1,
 			InstanceSizeSlug: "basic-xs",
-			RunCommand:       cmd,
+			RunCommand:       shellQuote(cmd...),
 		}},
 	}
 
 	var currentCd = &godo.App{}
 
 	appList, _, err := client.Apps.List(ctx, &godo.ListOptions{})
-
 	if err != nil {
-		return "", nil
+		term.Debugf("Error listing apps: %s", err)
 	}
 
 	for _, app := range appList {
@@ -109,29 +127,31 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd s
 
 	//Update current CD app if it exists
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
+		term.Debugf("Updating existing CD app")
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec: appJobSpec,
 		})
 	} else {
+		term.Debugf("Creating new CD app")
 		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{
 			Spec: appJobSpec,
 		})
 	}
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return currentCd.ID, err
+	return &currentCd.ID, nil
 }
 
-func (d DoApp) newClient(ctx context.Context) *godo.Client {
+func newClient(ctx context.Context) *godo.Client {
 	pat := os.Getenv("DO_PAT")
 	if pat == "" {
 		panic("digital ocean pat must be set")
 	}
 	tokenSource := &oauth2.Token{AccessToken: pat}
-	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(tokenSource))
+	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
 	return godo.NewClient(client)
 }
 
@@ -189,11 +209,14 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 func (d DoApp) createS3Client() *s3.Client {
 	id := os.Getenv("DO_SPACES_ID")
 	key := os.Getenv("DO_SPACES_KEY")
+	if id == "" || key == "" {
+		panic("digital ocean DO_SPACES_ID and DO_SPACES_KEY must be set")
+	}
 
 	cfg := aws.Config{
 		Credentials:  credentials.NewStaticCredentialsProvider(id, key, ""),
-		BaseEndpoint: aws.String(fmt.Sprintf("https://%s.digitaloceanspaces.com", d.Region.String())),
-		Region:       *aws.String(d.Region.String()),
+		BaseEndpoint: ptr.String(fmt.Sprintf("https://%s.digitaloceanspaces.com", d.Region)),
+		Region:       d.Region.String(),
 	}
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -202,3 +225,17 @@ func (d DoApp) createS3Client() *s3.Client {
 
 	return s3Client
 }
+
+// var _ types.Driver = (*DoAppPlatform)(nil)
+
+// func (DoApp) GetInfo(context.Context, types.TaskID) (*types.TaskInfo, error) {
+// 	panic("implement me")
+// }
+
+// func (DoApp) ListSecrets(context.Context) ([]string, error) {
+// 	panic("implement me")
+// }
+
+// func (DoApp) PutSecret(context.Context, string, string) error {
+// 	panic("implement me")
+// }

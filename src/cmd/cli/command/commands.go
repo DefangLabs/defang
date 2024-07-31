@@ -297,6 +297,8 @@ var RootCmd = &cobra.Command{
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
 				provider = cliClient.ProviderAWS
+			} else if doInEnv() {
+				provider = cliClient.ProviderDO
 			} else {
 				provider = cliClient.ProviderDefang
 			}

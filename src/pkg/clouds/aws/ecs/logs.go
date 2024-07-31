@@ -149,7 +149,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error)
 	if input.LogStreamNamePrefix != "" {
 		prefixes = []string{input.LogStreamNamePrefix}
 	}
-	return startTail(ctx, &cloudwatchlogs.StartLiveTailInput{
+	return startLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{
 		LogGroupIdentifiers:   []string{getLogGroupIdentifier(input.LogGroupARN)},
 		LogStreamNames:        input.LogStreamNames,
 		LogStreamNamePrefixes: prefixes,
@@ -209,7 +209,7 @@ func (c *CWLogGroupQuery) Next(ctx context.Context) ([]LogEvent, error) {
 	return events, nil
 }
 
-func startTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (EventStream, error) {
+func startLiveTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (EventStream, error) {
 	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
