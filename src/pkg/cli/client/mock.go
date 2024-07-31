@@ -20,8 +20,8 @@ func (m MockClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURL
 	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }
 
-func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{Names: []string{"VAR1"}}, nil
+func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
+	return &defangv1.Configs{Names: []string{"VAR1"}}, nil
 }
 
 func (m MockClient) ServiceDNS(service string) string {

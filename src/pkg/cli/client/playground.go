@@ -42,7 +42,7 @@ func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutValue)
 	return err
 }
 
-func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
+func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Configs) error {
 	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(&defangv1.Configs{Names: req.Names}))
 	return err
 }

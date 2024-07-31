@@ -49,7 +49,7 @@ func PrintConfigData(config types.ConfigData) {
 		if value.IsSensitive {
 			fmt.Printf("%s: [hidden]\n", key)
 		} else {
-			fmt.Printf("%s: %s\n", key, value)
+			fmt.Printf("%s: %s\n", key, value.Value)
 		}
 	}
 }

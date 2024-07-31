@@ -57,8 +57,8 @@ type MockClient struct {
 	configs []string
 }
 
-func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{
+func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
+	return &defangv1.Configs{
 		Names:   m.configs,
 		Project: "mock-project",
 	}, nil

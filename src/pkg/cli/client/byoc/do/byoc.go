@@ -158,7 +158,7 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
 }
 
-func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Configs) error {
 	return nil
 }
 
@@ -170,7 +170,7 @@ func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 	return nil, nil
 }
 
-func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
 	return nil, nil
 }
 

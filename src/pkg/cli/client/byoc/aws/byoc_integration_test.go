@@ -93,7 +93,7 @@ func TestPutConfig(t *testing.T) {
 	b.PulumiProject = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+		err := b.DeleteConfig(context.Background(), &defangv1.Configs{Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -122,7 +122,7 @@ func TestPutConfig(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		t.Cleanup(func() {
-			b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+			b.DeleteConfig(context.Background(), &defangv1.Configs{Names: []string{secretName}})
 		})
 		// Check that the secret is in the list
 		prefix := "/Defang/" + b.PulumiProject + "/beta/"
@@ -145,7 +145,7 @@ func TestListConfigs(t *testing.T) {
 	b.PulumiProject = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 
 	t.Run("list", func(t *testing.T) {
-		secrets, err := b.ListConfig(context.Background())
+		configs, err := b.ListConfig(context.Background())
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {

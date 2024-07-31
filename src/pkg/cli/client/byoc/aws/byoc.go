@@ -464,7 +464,7 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (type
 	return results, nil
 }
 
-func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
 	prefix := b.getConfigPathID("")
 	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsConfigs, err := b.driver.ListSecretsByPrefix(ctx, prefix)
@@ -477,7 +477,7 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 		configs[index] = stripPath(config)
 	}
 
-	return &defangv1.Secrets{Names: configs}, nil
+	return &defangv1.Configs{Names: configs}, nil
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -714,9 +714,9 @@ func (b *ByocAws) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
 }
 
-func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	ids := make([]string, len(secrets.Names))
-	for i, name := range secrets.Names {
+func (b *ByocAws) DeleteConfig(ctx context.Context, configs *defangv1.Configs) error {
+	ids := make([]string, len(configs.Names))
+	for i, name := range configs.Names {
 		ids[i] = b.getConfigPathID(name)
 	}
 	term.Debug("Deleting parameters", ids)

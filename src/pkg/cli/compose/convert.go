@@ -39,7 +39,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	config, err := c.ListConfig(ctx)
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
-		config = &defangv1.Secrets{}
+		config = &defangv1.Configs{}
 	}
 	slices.Sort(config.Names) // sort for binary search
 
