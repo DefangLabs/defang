@@ -44,9 +44,8 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 	}
 
 	b := &ByocDo{
-		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
-		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
-		appIds:         map[string]string{},
+		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		appIds: map[string]string{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
@@ -134,7 +133,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 		return "", err
 	}
 
-	foo, err := b.runCdCommand(ctx, fmt.Sprintf("%s %s", CommandPrefix, "up"))
+	foo, err := b.runCdCommand(ctx, CommandPrefix, "up")
 	if err != nil {
 		return "", err
 	}
@@ -197,10 +196,12 @@ func (b *ByocDo) ServiceDNS(name string) string {
 	return ""
 }
 
-func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
+
+	ctx, _ = context.WithCancel(ctx)
 
 	client := b.driver.Client
 
@@ -216,7 +217,7 @@ func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.Se
 		return nil, err
 	}
 
-	return nil, nil
+	return newByocServerStream(ctx, logs.LiveURL, []string{})
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
@@ -239,16 +240,20 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 	return nil, nil
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd string) (string, error) {
+func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+}
+
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
 	env := b.environment()
 	if term.DoDebug() {
 		debugEnv := " -"
-		for k, v := range env {
-			debugEnv += " " + k + "=" + v
+		for _, v := range env {
+			debugEnv += " " + v.Key + "=" + v.Value
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
 	}
-	return b.driver.Run(ctx, env, cmd...)
+	return b.driver.Run(ctx, env, strings.Join(cmd, ""))
 }
 
 func (b *ByocDo) environment() []*godo.AppVariableDefinition {
