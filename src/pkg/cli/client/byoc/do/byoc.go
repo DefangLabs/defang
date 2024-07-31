@@ -220,7 +220,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	return newByocServerStream(ctx, newUrl, []string{})
+	return newByocServerStream(ctx, "", []string{})
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
