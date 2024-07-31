@@ -1,0 +1,12 @@
+services:
+  x:
+    image: redis
+    x-defang-redis:
+
+  y:
+    image: example
+    x-defang-redis:
+
+  z:
+    image: redis
+

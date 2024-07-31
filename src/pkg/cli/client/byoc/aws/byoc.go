@@ -35,7 +35,7 @@ import (
 )
 
 type ByocAws struct {
-	byoc.ByocBaseClient
+	*byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
@@ -44,12 +44,12 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
+func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
-		cdTasks:        make(map[string]ecs.TaskArn),
-		driver:         cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		cdTasks: make(map[string]ecs.TaskArn),
+		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	return b
 }
 
@@ -97,7 +97,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	if b.ProjectDomain == "" {
 		domain, err := b.GetDelegateSubdomainZone(ctx)
 		if err != nil {
-			term.Debug(" - Failed to get subdomain zone:", err)
+			term.Debug("Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
 			b.ProjectDomain = b.getProjectDomain(domain.Zone)
@@ -327,7 +327,7 @@ func (b *ByocAws) environment() map[string]string {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
-	if term.DoDebug {
+	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
 			debugEnv += fmt.Sprintf(" AWS_PROFILE=%q", awsProfile)
@@ -379,7 +379,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	ensure(b.PulumiProject != "", "pulumiProject not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
 
-	term.Debug(" - Getting services from", bucketName, path)
+	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
@@ -387,7 +387,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	var serviceInfos defangv1.ListServicesResponse
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
-			term.Debug(" - s3.GetObject:", err)
+			term.Debug("s3.GetObject:", err)
 			return &serviceInfos, nil // no services yet
 		}
 		return nil, annotateAwsError(err)
@@ -412,14 +412,14 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) e
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
 	fqn := b.getSecretID(secret.Name)
-	term.Debug(" - Putting parameter", fqn)
+	term.Debugf("Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
 	return annotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	prefix := b.getSecretID("")
-	term.Debug(" - Listing parameters with prefix", prefix)
+	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -445,7 +445,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -468,22 +468,24 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
+		term.Debug("Tailing task", etag)
 		etag = "" // no need to filter by etag
-		term.Debug(" - Tailing task", taskArn)
 	} else {
-		// Tail CD, kaniko, and all services
+		// Tail CD, kaniko, and all services (this requires PulumiProject to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
-		term.Debug(" - Tailing kaniko logs", kanikoTail.LogGroupARN)
+		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
-		term.Debug(" - Tailing services logs", servicesTail.LogGroupARN)
+		term.Debug("Tailing services logs", servicesTail.LogGroupARN)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
+		term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
 			// If we know the CD task ARN, only tail the logstream for the CD task
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
-		term.Debug(" - Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail)
+		term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
@@ -498,7 +500,7 @@ func (b *ByocAws) Tail(ctx context.Context, req *defangv1.TailRequest) (client.S
 		}()
 	}
 
-	return newByocServerStream(ctx, eventStream, etag, req.Service), nil
+	return newByocServerStream(ctx, eventStream, etag, req.GetServices()), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -513,7 +515,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, err
 	}
 	if missing != nil {
-		return nil, fmt.Errorf("missing config %s", missing) // retryable CodeFailedPrecondition
+		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
 	ensure(b.PulumiProject != "", "pulumiProject not set")
@@ -567,8 +569,10 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 
 	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	si.Status = "UPDATE_QUEUED"
+	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if si.Service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
 	return si, nil
 }
@@ -666,7 +670,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	for i, name := range secrets.Names {
 		ids[i] = b.getSecretID(name)
 	}
-	term.Debug(" - Deleting parameters", ids)
+	term.Debug("Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
 		return annotateAwsError(err)
 	}
@@ -674,7 +678,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 }
 
 func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", errors.New("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+	return "", client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }
 
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
@@ -691,10 +695,10 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		return nil, annotateAwsError(err)
 	}
 
-	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 	s3client := s3.NewFromConfig(cfg)
+	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
-	term.Debug(" - Listing stacks in bucket", bucketName)
+	term.Debug("Listing stacks in bucket:", bucketName)
 	out, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &bucketName,
 		Prefix: &prefix,
@@ -736,4 +740,8 @@ func ensure(cond bool, msg string) {
 	if !cond {
 		panic(msg)
 	}
+}
+
+func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
 }

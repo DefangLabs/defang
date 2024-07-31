@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/digitalocean/godo"
 	"os"
 	"strings"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -29,13 +30,13 @@ const (
 )
 
 type ByocDo struct {
-	byoc.ByocBaseClient
+	*byoc.ByocBaseClient
 
 	appIds map[string]string
 	driver *appPlatform.DoApp
 }
 
-func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
+func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	regionString := os.Getenv("REGION")
 
 	if regionString == "" {
@@ -47,6 +48,7 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 		appIds:         map[string]string{},
 	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
 	return b
 }
@@ -141,7 +143,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -239,7 +241,14 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd string) (string, error) {
 	env := b.environment()
-	return b.driver.Run(ctx, env, cmd)
+	if term.DoDebug() {
+		debugEnv := " -"
+		for k, v := range env {
+			debugEnv += " " + k + "=" + v
+		}
+		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+	}
+	return b.driver.Run(ctx, env, cmd...)
 }
 
 func (b *ByocDo) environment() []*godo.AppVariableDefinition {

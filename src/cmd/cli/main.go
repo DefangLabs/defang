@@ -18,7 +18,7 @@ func main() {
 	go func() {
 		<-sigs
 		signal.Stop(sigs)
-		term.Debug("Received interrupt signal; cancelling...")
+		term.Debug("Received interrupt signal; canceling...")
 		command.Track("User Interrupted")
 		cancel()
 	}()

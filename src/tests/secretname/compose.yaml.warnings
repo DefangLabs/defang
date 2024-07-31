@@ -1,0 +1,3 @@
+ ! service "app": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "app": secrets will be exposed as environment variables, not files (use 'environment' instead)
+ * Compressing build context for app at .

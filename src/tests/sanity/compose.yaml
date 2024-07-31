@@ -1,0 +1,13 @@
+services:
+  nginx:
+    restart: unless-stopped
+    image: nginx
+    environment:
+      - dummy
+    ports:
+      - target: 80
+        mode: ingress
+    deploy:
+      resources:
+        reservations:
+          memory: 256M

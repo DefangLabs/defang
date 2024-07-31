@@ -1,6 +1,13 @@
 package logs
 
-import "github.com/DefangLabs/defang/src/pkg"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/sirupsen/logrus"
+)
 
 func IsLogrusError(message string) bool {
 	// Logrus's TextFormatter prefixes messages with the uppercase log level, optionally truncated and/or in color
@@ -16,4 +23,37 @@ func IsLogrusError(message string) bool {
 	default:
 		return true // show by default (likely Dockerfile errors)
 	}
+}
+
+type TermLogFormatter struct {
+	Term *term.Term
+}
+
+func (f TermLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	var buf strings.Builder
+	buf.WriteString(entry.Message)
+	for k, v := range entry.Data {
+		fmt.Fprintf(&buf, " %s=%v", k, v)
+	}
+
+	switch entry.Level {
+	case logrus.PanicLevel, logrus.FatalLevel:
+		f.Term.Fatal(buf.String())
+	case logrus.ErrorLevel:
+		f.Term.Error(buf.String())
+	case logrus.WarnLevel:
+		f.Term.Warn(buf.String())
+	case logrus.InfoLevel:
+		f.Term.Info(buf.String())
+	case logrus.DebugLevel, logrus.TraceLevel:
+		f.Term.Debug(buf.String())
+	}
+
+	return nil, nil
+}
+
+type DiscardFormatter struct{}
+
+func (f DiscardFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return nil, nil
 }

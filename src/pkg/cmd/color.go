@@ -14,7 +14,7 @@ const (
 func ParseColor(color string) Color {
 	switch color {
 	case "auto":
-		if term.CanColor {
+		if term.StdoutCanColor() {
 			return ColorAlways
 		}
 		fallthrough

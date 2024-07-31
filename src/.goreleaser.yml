@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 project_name: defang
 builds:
   - id: defang-mac
@@ -36,13 +36,29 @@ universal_binaries:
         - ./bin/codesign.sh "{{ .Path }}"
 
 archives:
-  - format_overrides:
+  - id: defang-archive
+    format_overrides:
       - goos: darwin
         format: zip
       - goos: windows
         format: zip
     # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    hooks:
+      after:
+        - echo '{{ printf "%#v" (index .Artifacts 1) }}'
+        - '{{ if eq .Os "darwin" }}./bin/notarize.sh "dist/darwin/defang_{{ .Version }}_macOS.zip"{{ else }}true{{ end }}'
+
+# notarize:
+#   macos:
+#     - enabled: true
+#       sign:
+#         certificate: "{{ .Env.MACOS_P12_BASE64 }}"
+#         password: "{{ .Env.MACOS_P12_PASSWORD }}"
+#       notarize:
+#         issuer_id: "{{ .Env.MACOS_NOTARIZATION_APPLE_ID }}"
+#         key: "{{ .Env.MACOS_NOTARIZATION_APP_PW }}" TODO: this should be a base64 .p8 key file
+#         key_id: "{{ .Env.MACOS_NOTARIZATION_TEAM_ID }}"
 
 release:
   github:
@@ -66,9 +82,9 @@ release:
   # prerelease: "true"
 
 nix:
-  # commit_author: defang-io
   - homepage: https://defang.io/
-    description: Command-line interface for the Defang Opinionated Platform
+    # commit_author: defang-io
+    description: Defang is the easiest way for developers to create and deploy their containerized applications
     license: "mit"
     repository:
       owner: DefangLabs
@@ -80,10 +96,36 @@ nix:
         --fish <($out/bin/defang completion fish)
 
 changelog:
+  use: github-native
   filters:
     exclude:
       # Ignore messages like "defang: v0.5.3 -> v0.5.4" (which are actually for the previous version)
       - "^defang: v[0-9]+\\.[0-9]+\\.[0-9]+ -> v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      - "^Merge branch "
+      - "^Merge remote-tracking branch "
+      - "^New version: DefangLabs."
+
+winget:
+  - publisher: DefangLabs
+    name: Defang
+    short_description: The Defang command-line interface (CLI)
+    description: Defang is the easiest way for developers to create and deploy their containerized applications to the cloud.
+    license: MIT
+    publisher_url: https://defang.io/
+    homepage: https://github.com/DefangLabs/defang/
+    publisher_support_url: https://github.com/DefangLabs/defang/issues/
+    repository:
+      token: "{{ .Env.GH_PAT_WINGET }}"
+      owner: DefangLabs
+      name: winget-pkgs
+      branch: "Defang-{{.Version}}"
+      # pull_request:
+      #   enabled: true
+      #   draft: true
+      #   base:
+      #     owner: microsoft
+      #     name: winget-pkgs
+      #     branch: master
 
 announce:
   discord:

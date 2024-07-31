@@ -1,0 +1,19 @@
+name: secretname
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
+    restart: unless-stopped
+    secrets:
+      - source: dummy
+        target: /run/secrets/dummy
+networks:
+  default:
+    name: secretname_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

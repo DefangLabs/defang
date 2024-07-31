@@ -1,0 +1,9 @@
+name: longname
+services:
+  aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError:
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: longname_default

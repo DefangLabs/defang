@@ -1,0 +1,23 @@
+[
+  {
+    "name": "emptyenv",
+    "platform": 2,
+    "internal": true,
+    "environment": {
+      "ENV2": ""
+    },
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "ARG2": ""
+      }
+    },
+    "secrets": [
+      {
+        "source": "ENV1"
+      }
+    ],
+    "networks": 1
+  }
+]

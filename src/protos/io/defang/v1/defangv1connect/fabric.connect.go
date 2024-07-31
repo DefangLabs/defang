@@ -75,6 +75,8 @@ const (
 	// FabricControllerGenerateStatusProcedure is the fully-qualified name of the FabricController's
 	// GenerateStatus RPC.
 	FabricControllerGenerateStatusProcedure = "/io.defang.v1.FabricController/GenerateStatus"
+	// FabricControllerDebugProcedure is the fully-qualified name of the FabricController's Debug RPC.
+	FabricControllerDebugProcedure = "/io.defang.v1.FabricController/Debug"
 	// FabricControllerSignEULAProcedure is the fully-qualified name of the FabricController's SignEULA
 	// RPC.
 	FabricControllerSignEULAProcedure = "/io.defang.v1.FabricController/SignEULA"
@@ -126,6 +128,7 @@ type FabricControllerClient interface {
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	Debug(context.Context, *connect_go.Request[v1.DebugRequest]) (*connect_go.Response[v1.DebugResponse], error)
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
@@ -229,6 +232,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		debug: connect_go.NewClient[v1.DebugRequest, v1.DebugResponse](
+			httpClient,
+			baseURL+FabricControllerDebugProcedure,
+			opts...,
+		),
 		signEULA: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerSignEULAProcedure,
@@ -308,6 +316,7 @@ type fabricControllerClient struct {
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
 	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
+	debug                    *connect_go.Client[v1.DebugRequest, v1.DebugResponse]
 	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
@@ -396,6 +405,11 @@ func (c *fabricControllerClient) GenerateStatus(ctx context.Context, req *connec
 	return c.generateStatus.CallUnary(ctx, req)
 }
 
+// Debug calls io.defang.v1.FabricController.Debug.
+func (c *fabricControllerClient) Debug(ctx context.Context, req *connect_go.Request[v1.DebugRequest]) (*connect_go.Response[v1.DebugResponse], error) {
+	return c.debug.CallUnary(ctx, req)
+}
+
 // SignEULA calls io.defang.v1.FabricController.SignEULA.
 func (c *fabricControllerClient) SignEULA(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.signEULA.CallUnary(ctx, req)
@@ -469,6 +483,7 @@ type FabricControllerHandler interface {
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
+	Debug(context.Context, *connect_go.Request[v1.DebugRequest]) (*connect_go.Response[v1.DebugResponse], error)
 	SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
@@ -568,6 +583,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerDebugHandler := connect_go.NewUnaryHandler(
+		FabricControllerDebugProcedure,
+		svc.Debug,
+		opts...,
+	)
 	fabricControllerSignEULAHandler := connect_go.NewUnaryHandler(
 		FabricControllerSignEULAProcedure,
 		svc.SignEULA,
@@ -659,6 +679,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerStartGenerateHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateStatusProcedure:
 			fabricControllerGenerateStatusHandler.ServeHTTP(w, r)
+		case FabricControllerDebugProcedure:
+			fabricControllerDebugHandler.ServeHTTP(w, r)
 		case FabricControllerSignEULAProcedure:
 			fabricControllerSignEULAHandler.ServeHTTP(w, r)
 		case FabricControllerCheckToSProcedure:
@@ -748,6 +770,10 @@ func (UnimplementedFabricControllerHandler) StartGenerate(context.Context, *conn
 
 func (UnimplementedFabricControllerHandler) GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateStatus is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) Debug(context.Context, *connect_go.Request[v1.DebugRequest]) (*connect_go.Response[v1.DebugResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Debug is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) SignEULA(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {

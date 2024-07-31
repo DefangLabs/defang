@@ -42,6 +42,7 @@ service FabricController {
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  rpc Debug(DebugRequest) returns (DebugResponse); // TEST
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
@@ -70,6 +71,32 @@ service FabricController {
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 }
 
+message DebugRequest {
+  repeated File files = 1;
+  string etag = 2;
+  string project = 3;
+  string logs = 4;
+  repeated string services = 5;
+}
+
+message DebugResponse {
+  string general = 1;
+  repeated Issue issues = 2;
+  repeated string requests = 3;
+}
+
+message Issue {
+  string type = 1;
+  string severity = 2;
+  string details = 3;
+  repeated CodeChange code_changes = 4;
+}
+
+message CodeChange {
+  string file = 1;
+  string change = 2;
+}
+
 message TrackRequest {
   string anon_id = 1;
   string event = 2;
@@ -78,7 +105,10 @@ message TrackRequest {
   string arch = 5;
 }
 
-message DeployRequest { repeated Service services = 1; }
+message DeployRequest {
+  repeated Service services = 1;
+  string project = 2;
+}
 
 message DeployResponse {
   repeated ServiceInfo services = 1;
@@ -87,8 +117,7 @@ message DeployResponse {
 
 message DeleteRequest {
   repeated string names = 1;
-
-  // string project = 2; // defaults to tenant ID
+  string project = 2; // defaults to tenant ID
 }
 
 message DeleteResponse { string etag = 1; }
@@ -114,6 +143,28 @@ message UploadURLRequest { string digest = 1; }
 
 message UploadURLResponse { string url = 1; }
 
+
+enum ServiceState {
+  NOT_SPECIFIED = 0;
+
+  // Build states
+  BUILD_QUEUED = 1; // initial state for build
+  BUILD_PROVISIONING = 2;
+  BUILD_PENDING = 3;
+  BUILD_ACTIVATING = 4;
+  BUILD_RUNNING = 5;
+  BUILD_STOPPING = 6;
+
+  UPDATE_QUEUED = 7; // initial state for existing image
+
+  // Deployment states
+  DEPLOYMENT_PENDING = 8;
+  DEPLOYMENT_COMPLETED = 9;
+  DEPLOYMENT_FAILED = 10;
+
+  BUILD_FAILED = 11;
+}
+
 message ServiceInfo {
   Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
@@ -121,16 +172,15 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips =
-      7; // comma-separated list of internal CIDR for the load-balancer
+  repeated string lb_ips = 7; // comma-separated list of internal CIDR for the load-balancer
   string private_fqdn = 8; // fully qualified domain name (host)
   string public_fqdn = 9;  // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
-  bool use_acme_cert =
-      13; // If we should setup the facilities to use ACME(let's encrypt) certs
-  string lb_dns = 14; // public load-balancer DNS name
+  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  reserved 14; // was: string lb_dns
+  ServiceState state = 15; // enumerated status of the service
 
   // bool is_function = 5; // true if service is a function
 }
@@ -181,17 +231,18 @@ message Version {
 }
 
 message TailRequest {
-  string service = 1; // was "name"
+  repeated string services = 1;
   google.protobuf.Timestamp since = 2;
   string etag = 3;
-
-  // string host = 4;
 }
 
 message LogEntry {
   string message = 1;
   google.protobuf.Timestamp timestamp = 2;
   bool stderr = 3;
+  string service = 4;
+  string etag = 5;
+  string host = 6;
 }
 
 message TailResponse {
@@ -202,7 +253,17 @@ message TailResponse {
   string host = 5;
 }
 
-message ListServicesResponse { repeated ServiceInfo services = 1; }
+message ListServicesResponse {
+  repeated ServiceInfo services = 1;
+  string project = 2;
+}
+
+// TODO: internal message; move to a separate proto file
+message ProjectUpdate {
+  repeated ServiceInfo services = 1;
+  string alb_arn = 2;
+  string project = 3;
+}
 
 enum Platform {
   LINUX_AMD64 = 0;
@@ -364,9 +425,17 @@ message Event {
 
 message PublishRequest { Event event = 1; }
 
-message SubscribeRequest { string service = 1; }
+message SubscribeRequest {
+  repeated string services = 1;
+  string etag = 2;
+}
 
-message SubscribeResponse { repeated ServiceInfo services = 1; }
+message SubscribeResponse {
+  ServiceInfo service = 1 [deprecated = true];
+  string name = 2;
+  string status = 3;
+  ServiceState state = 4;
+}
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;

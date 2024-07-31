@@ -1,0 +1,16 @@
+name: tests
+services:
+  dfnx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        reservations:
+          memory: "268435456"
+    networks:
+      default: null
+    restart: unless-stopped
+networks:
+  default:
+    name: tests_default

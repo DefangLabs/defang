@@ -2,9 +2,10 @@ package docker
 
 import (
 	"context"
-	"errors"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
 func (d Docker) TearDown(ctx context.Context) error {
-	return errors.New("not implemented")
+	return client.ErrNotImplemented("not implemented")
 }

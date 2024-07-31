@@ -9,11 +9,11 @@ import (
 )
 
 func ConfigSet(ctx context.Context, client client.Client, name string, value string) error {
-	projectName, err := client.LoadProjectName()
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debug(" - Setting config", name, "in project", projectName)
+	term.Debugf("Setting config %q in project %q", name, projectName)
 
 	if DoDryRun {
 		return ErrDryRun

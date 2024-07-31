@@ -12,8 +12,10 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
+var ctx = context.Background()
+
 func TestDeploy(t *testing.T) {
-	b := NewByoc(client.GrpcClient{}, "ten ant") // no domain
+	b := NewByoc(ctx, client.GrpcClient{}, "ten ant") // no domain
 	b.PulumiProject = "byoc_integration_test"
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
@@ -39,11 +41,11 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByoc(client.GrpcClient{}, "TestTail")
+	b := NewByoc(ctx, client.GrpcClient{}, "TestTail")
 	b.PulumiProject = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
 
-	ss, err := b.Tail(context.Background(), &defangv1.TailRequest{})
+	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
 		if connect.CodeOf(err) != connect.CodeUnauthenticated {
@@ -67,7 +69,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByoc(client.GrpcClient{}, "TestGetServices")
+	b := NewByoc(ctx, client.GrpcClient{}, "TestGetServices")
 	b.PulumiProject = "byoc_integration_test"
 
 	services, err := b.GetServices(context.Background())
@@ -87,7 +89,7 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByoc(client.GrpcClient{}, "TestPutSecret")
+	b := NewByoc(ctx, client.GrpcClient{}, "TestPutSecret")
 	b.PulumiProject = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
@@ -139,7 +141,7 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByoc(client.GrpcClient{}, "TestListSecrets")
+	b := NewByoc(ctx, client.GrpcClient{}, "TestListSecrets")
 	b.PulumiProject = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 
 	t.Run("list", func(t *testing.T) {

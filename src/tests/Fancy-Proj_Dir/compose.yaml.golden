@@ -1,0 +1,9 @@
+name: fancy-proj_dir
+services: {}
+networks:
+  default:
+    name: fancy-proj_dir_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

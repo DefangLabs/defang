@@ -1,0 +1,19 @@
+name: redis
+services:
+  x:
+    image: redis
+    networks:
+      default: null
+    x-defang-redis: null
+  "y":
+    image: example
+    networks:
+      default: null
+    x-defang-redis: null
+  z:
+    image: redis
+    networks:
+      default: null
+networks:
+  default:
+    name: redis_default

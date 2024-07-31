@@ -3,7 +3,9 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -15,13 +17,8 @@ type PlaygroundClient struct {
 	GrpcClient
 }
 
-func (g PlaygroundClient) LoadProject() (*compose.Project, error) {
-	projectName, _ := g.LoadProjectName()
-	return g.Loader.LoadWithDefaultProjectName(projectName)
-}
-
-func (g PlaygroundClient) Update(ctx context.Context, req *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.client.Update(ctx, connect.NewRequest(req)))
+func (g PlaygroundClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+	return g.Loader.LoadCompose(ctx)
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -58,12 +55,16 @@ func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.Upl
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundClient) Tail(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
+	return g.client.Subscribe(ctx, connect.NewRequest(req))
+}
+
+func (g *PlaygroundClient) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
 func (g *PlaygroundClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
-	return "", errors.New("the bootstrap command is not valid for the Defang provider")
+	return "", errors.New("the bootstrap command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
@@ -78,7 +79,7 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	for _, service := range project.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: project.Project, Names: names})
 	if err != nil {
 		return "", err
 	}
@@ -86,25 +87,34 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 }
 
 func (g *PlaygroundClient) TearDown(ctx context.Context) error {
-	return errors.New("the teardown command is not valid for the Defang provider")
+	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
 }
 
 func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
-	return nil, errors.New("this command is not valid for the Defang provider")
+	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
 func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
 	// For now, we'll just get the service info and pass it back to Deploy as-is.
-	services := make([]*defangv1.Service, 0, len(names))
-	for _, name := range names {
-		serviceInfo, err := g.GetService(ctx, &defangv1.ServiceID{Name: name})
-		if err != nil {
-			return "", err
-		}
-		services = append(services, serviceInfo.Service)
+	resp, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	existingServices := make(map[string]*defangv1.Service)
+	for _, serviceInfo := range resp.Services {
+		existingServices[serviceInfo.Service.Name] = serviceInfo.Service
 	}
 
-	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Services: services})
+	servicesToUpdate := make([]*defangv1.Service, 0, len(names))
+	for _, name := range names {
+		service, ok := existingServices[name]
+		if !ok {
+			return "", fmt.Errorf("service %s not found", name)
+		}
+		servicesToUpdate = append(servicesToUpdate, service)
+	}
+
+	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Project: resp.Project, Services: servicesToUpdate})
 	if err != nil {
 		return "", err
 	}
@@ -112,9 +122,24 @@ func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.
 }
 
 func (g PlaygroundClient) ServiceDNS(name string) string {
-	return string(g.tenantID) + "-" + name
+	return string(g.TenantID) + "-" + name
 }
 
-func (g PlaygroundClient) LoadProjectName() (string, error) {
-	return string(g.tenantID), nil
+func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
+	proj, err := g.Loader.LoadCompose(ctx)
+	if err == nil {
+		return proj.Name, nil
+	}
+	if !errors.Is(err, types.ErrComposeFileNotFound) {
+		return "", err
+	}
+
+	// Hack: Use GetServices to get the current project name
+	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
+	resp, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	term.Debug("Using default playground project: ", resp.Project)
+	return resp.Project, nil
 }

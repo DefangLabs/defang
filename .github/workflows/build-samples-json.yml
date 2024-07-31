@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
         - name: Trigger CLI Autodoc
-          uses: peter-evans/repository-dispatch@v1
+          uses: peter-evans/repository-dispatch@v3
           with:
             token: ${{ secrets.DOCS_ACTION_TRIGGER_TOKEN }}
             repository: DefangLabs/defang-docs

@@ -2,14 +2,20 @@ package byoc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/quota"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/consts"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -32,6 +38,10 @@ func DnsSafe(fqdn string) string {
 	return strings.ToLower(fqdn)
 }
 
+type BootstrapLister interface {
+	BootstrapList(context.Context) ([]string, error)
+}
+
 type ByocBaseClient struct {
 	client.GrpcClient
 
@@ -45,13 +55,16 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantID                string
+
+	loadProjOnce    func() (*compose.Project, error)
+	bootstrapLister BootstrapLister
 }
 
-func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *ByocBaseClient {
-	return &ByocBaseClient{
+func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
+	b := &ByocBaseClient{
 		GrpcClient:    grpcClient,
 		TenantID:      string(tenantID),
-		PulumiProject: os.Getenv("COMPOSE_PROJECT_NAME"),
+		PulumiProject: "",     // To be overwritten by LoadProject
 		PulumiStack:   "beta", // TODO: make customizable
 		Quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
@@ -62,7 +75,22 @@ func NewByocBaseClient(grpcClient client.GrpcClient, tenantID types.TenantID) *B
 			Services:   40,
 			ShmSizeMiB: 30720,
 		},
+		bootstrapLister: bl,
 	}
+	b.loadProjOnce = sync.OnceValues(func() (*compose.Project, error) {
+		proj, err := b.GrpcClient.Loader.LoadCompose(ctx)
+		if err != nil {
+			return nil, err
+		}
+		b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
+		b.PulumiProject = proj.Name
+		return proj, nil
+	})
+	return b
+}
+
+func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
@@ -70,35 +98,50 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b *ByocBaseClient) LoadProject() (*compose.Project, error) {
-	if b.PrivateDomain != "" {
-		panic("LoadProject should only be called once")
-	}
-	var proj *compose.Project
-	var err error
-
-	if b.PulumiProject != "" {
-		proj, err = b.GrpcClient.Loader.LoadWithProjectName(b.PulumiProject)
-	} else {
-		proj, err = b.GrpcClient.Loader.LoadWithDefaultProjectName(b.TenantID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
-	b.PulumiProject = proj.Name
-	return proj, nil
+func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+	return b.loadProjOnce()
 }
 
-func (b *ByocBaseClient) LoadProjectName() (string, error) {
-	if b.PulumiProject != "" {
-		return b.PulumiProject, nil
+func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
+
+	proj, err := b.loadProjOnce()
+	if err == nil {
+		b.PulumiProject = proj.Name
+		return proj.Name, nil
 	}
-	p, err := b.LoadProject()
+	if !errors.Is(err, types.ErrComposeFileNotFound) {
+		return "", err
+	}
+
+	// Get the list of projects from remote
+	projectNames, err := b.bootstrapLister.BootstrapList(ctx)
 	if err != nil {
-		return b.TenantID, err
+		return "", err
 	}
-	return p.Name, nil
+	for i, name := range projectNames {
+		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
+	}
+
+	if len(projectNames) == 0 {
+		return "", errors.New("no projects found")
+	}
+	if len(projectNames) == 1 {
+		term.Debug("Using default project: ", projectNames[0])
+		b.PulumiProject = projectNames[0]
+		return projectNames[0], nil
+	}
+
+	// When there are multiple projects, take a hint from COMPOSE_PROJECT_NAME environment variable if set
+	if projectName, ok := os.LookupEnv(consts.ComposeProjectName); ok {
+		if !slices.Contains(projectNames, projectName) {
+			return "", fmt.Errorf("project %q specified by COMPOSE_PROJECT_NAME not found", projectName)
+		}
+		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectNames[0])
+		b.PulumiProject = projectName
+		return projectName, nil
+	}
+
+	return "", errors.New("multiple projects found; please go to the correct project directory where the compose file is or set COMPOSE_PROJECT_NAME")
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {

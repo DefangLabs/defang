@@ -18,7 +18,8 @@ func InteractiveAgreeToS(ctx context.Context, client client.Client) error {
 	var agreeToS bool
 	err := survey.AskOne(&survey.Confirm{
 		Message: "Do you agree to the Defang terms of service?",
-	}, &agreeToS, nil)
+		Help:    "You must agree to the Defang terms of service to continue using this tool",
+	}, &agreeToS)
 	if err != nil {
 		return err
 	}
@@ -38,6 +39,6 @@ func NonInteractiveAgreeToS(ctx context.Context, client client.Client) error {
 	if err := client.AgreeToS(ctx); err != nil {
 		return err
 	}
-	term.Info(" * You have agreed to the Defang terms of service")
+	term.Info("You have agreed to the Defang terms of service")
 	return nil
 }

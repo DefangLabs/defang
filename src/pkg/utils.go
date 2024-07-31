@@ -106,8 +106,11 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-var ansiRegex = regexp.MustCompile("\x1b(?:\\[[=?]?[0-9;]{0,10}[@-~]|].{0,10}?(?:\x1b\\\\|\x07|$)|[@-Z\\\\^_])")
-
-func StripAnsi(s string) string {
-	return ansiRegex.ReplaceAllLiteralString(s, "")
+func Contains[T comparable](s []T, v T) bool {
+	for _, val := range s {
+		if val == v {
+			return true
+		}
+	}
+	return false
 }

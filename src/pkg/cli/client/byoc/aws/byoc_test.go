@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -22,8 +23,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PublicFqdn  string
 		PrivateFqdn string
 	}{
-		{"", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
 		{"project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
 		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
 		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
@@ -38,8 +39,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByoc(*grpcClient, tt.TenantID)
-			if _, err := b.LoadProject(); err != nil {
+			b := NewByoc(context.Background(), *grpcClient, tt.TenantID)
+			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}
 			b.ProjectDomain = b.getProjectDomain("example.com")
@@ -66,14 +67,6 @@ type FakeLoader struct {
 	ProjectName string
 }
 
-func (f FakeLoader) LoadWithDefaultProjectName(defaultName string) (*compose.Project, error) {
-	name := defaultName
-	if f.ProjectName != "" {
-		name = f.ProjectName
-	}
-	return &compose.Project{Name: name}, nil
-}
-
-func (f FakeLoader) LoadWithProjectName(projectName string) (*compose.Project, error) {
-	return &compose.Project{Name: projectName}, nil
+func (f FakeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+	return &compose.Project{Name: f.ProjectName}, nil
 }
