@@ -39,7 +39,12 @@ type TaskVolume struct {
 	ReadOnly bool
 }
 
-type ConfigData map[string]string
+type DataInfo struct {
+	Value       string
+	IsSensitive bool
+}
+
+type ConfigData map[string]DataInfo
 type Driver interface {
 	SetUp(ctx context.Context, containers []Container) error
 	TearDown(ctx context.Context) error

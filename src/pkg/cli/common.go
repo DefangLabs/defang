@@ -45,8 +45,11 @@ func PrintObject(root string, data proto.Message) error {
 }
 
 func PrintConfigData(config types.ConfigData) {
-
 	for key, value := range config {
-		fmt.Printf("%s: %s\n", key, value)
+		if value.IsSensitive {
+			fmt.Printf("%s: [hidden]\n", key)
+		} else {
+			fmt.Printf("%s: %s\n", key, value)
+		}
 	}
 }

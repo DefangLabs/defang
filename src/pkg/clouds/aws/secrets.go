@@ -4,16 +4,31 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 
 	clitypes "github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
 )
 
+const CONFIG_PATH_PART = "config"
+const SENSITIVE_PATH_PART = "sensitive"
+
 // TODO: this function is pretty useless, but it's here for consistency
 func getSecretID(name string) *string {
 	return ptr.String(name)
+}
+
+func insertPreConfigNamePath(name, pathPart string) (*string, error) {
+	pathParts := strings.Split(name, "/")
+	if len(pathParts) < 2 {
+		return nil, errors.New("invalid config name")
+	}
+
+	pathParts[len(pathParts)-2] = pathPart
+	return ptr.String(strings.Join(pathParts, "/")), nil
 }
 
 func IsParameterNotFoundError(err error) bool {
@@ -47,24 +62,64 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 
-	secretId := getSecretID(name)
-
+	rootPath := getSecretID("")
 	svc := ssm.NewFromConfig(cfg)
 
-	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		MaxResults: ptr.Int32(1),
-		ParameterFilters: []types.ParameterStringFilter{
-			{
-				Key:    ptr.String("Name"),
-				Option: ptr.String("Equals"),
-				Values: []string{*secretId},
-			},
-		},
-	})
-	if err != nil {
-		return false, err
+	gpo, error := svc.GetParametersByPath(ctx,
+		&ssm.GetParametersByPathInput{
+			Path:           rootPath,
+			Recursive:      aws.Bool(true),
+			WithDecryption: aws.Bool(false),
+		})
+
+	if error != nil {
+		return false, error
 	}
-	return len(res.Parameters) == 1, nil
+
+	for _, param := range gpo.Parameters {
+		parts := strings.Split(*param.Name, "/")
+		if strings.EqualFold(parts[len(parts)-1], name) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, name string, isSensitive bool) error {
+	var altPath *string
+
+	var err error
+	if isSensitive {
+		altPath, err = insertPreConfigNamePath(name, SENSITIVE_PATH_PART)
+	} else {
+		altPath, err = insertPreConfigNamePath(name, CONFIG_PATH_PART)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	_, err = svc.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           altPath,
+		WithDecryption: ptr.Bool(false),
+	})
+
+	// param should not exist in any other path otherwise there is a conflict
+	if err != nil {
+		if !IsParameterNotFoundError(err) {
+			return err
+		}
+	} else {
+		// found in another path, return error
+		if isSensitive {
+			return errors.New("variable already exists as a non-sensitive")
+		} else {
+			return errors.New("variable already exists as a sensitive")
+		}
+	}
+
+	return nil
 }
 
 func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive bool) error {
@@ -73,21 +128,69 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive boo
 		return err
 	}
 
-	secretId := getSecretID(name)
-	secretString := ptr.String(value)
+	configPath := getSecretID(name)
+	configValue := ptr.String(value)
 
 	svc := ssm.NewFromConfig(cfg)
+
+	if err := errorOnDuplicateConfigExist(ctx, svc, name, isSensitive); err != nil {
+		return err
+	}
 
 	// Call ssm:PutParameter
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
-		Name:      secretId,
-		Value:     secretString,
+		Name:      configPath,
+		Value:     configValue,
 	})
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string, isSensitive bool, outdata *clitypes.ConfigData) error {
+	namePaths := make([]string, 0, len(names))
+
+	insertPathPart := CONFIG_PATH_PART
+	if isSensitive {
+		insertPathPart = SENSITIVE_PATH_PART
+	}
+
+	var err error
+	var basePath string
+	var path *string
+	for index, name := range names {
+		basePath = *getSecretID(name)
+
+		path, err = insertPreConfigNamePath(basePath, insertPathPart)
+		if err != nil {
+			return err
+		}
+		namePaths[index] = *path
+	}
+
+	// 1. if sensitive ... tell user, don't need to have to fetch value
+	// 2. get value
+	gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
+		WithDecryption: ptr.Bool(true),
+		Names:          namePaths,
+	})
+
+	if err != nil {
+		if !IsParameterNotFoundError(err) {
+			return err
+		}
+	}
+
+	for _, param := range gpo.Parameters {
+		(*outdata)[*param.Name] = clitypes.DataInfo{
+			Value:       *param.Value,
+			IsSensitive: isSensitive,
+		}
 	}
 
 	return nil
@@ -99,27 +202,20 @@ func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigDat
 		return nil, err
 	}
 
-	for index, name := range names {
-		names[index] = *getSecretID(name)
-	}
-
 	svc := ssm.NewFromConfig(cfg)
 
-	// 1. if secret ... tell user, don't need to have to fetch value
-	// 2. get value
-	gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
-		WithDecryption: ptr.Bool(true),
-		Names:          names,
-	})
-	if err != nil {
+	var output clitypes.ConfigData
+	if err := GetConfigValuesByParam(ctx, svc, names, false, &output); err != nil {
 		return nil, err
 	}
 
-	// 3. get whether the value is empty
+	// we are done when output has the same number
+	if len(output) == len(names) {
+		return output, nil
+	}
 
-	output := make(map[string]string)
-	for _, p := range gpo.Parameters {
-		output[*p.Name] = *p.Value
+	if err := GetConfigValuesByParam(ctx, svc, names, true, &output); err != nil {
+		return nil, err
 	}
 
 	return output, nil
