@@ -129,6 +129,7 @@ func SetupCommands(version string) {
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; "auto", "always" or "never"`)
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use; use "aws" for bring-your-own-cloud`)
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
