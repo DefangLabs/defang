@@ -222,10 +222,10 @@ func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigDat
 }
 
 func (a *Aws) ListConfigs(ctx context.Context) ([]string, error) {
-	return a.ListSecretsByPrefix(ctx, "")
+	return a.ListConfigsByPrefix(ctx, "")
 }
 
-func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string, error) {
+func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err

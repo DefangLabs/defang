@@ -59,7 +59,7 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 func stripPath(name string) string {
 	lastIndex := strings.LastIndex(name, "/")
 	if lastIndex >= 0 {
-		return name[:lastIndex]
+		return name[lastIndex+1:]
 	} else {
 		return name
 	}
@@ -467,7 +467,7 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (type
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
 	prefix := b.getConfigPathID("")
 	term.Debugf("Listing parameters with prefix %q", prefix)
-	awsConfigs, err := b.driver.ListSecretsByPrefix(ctx, prefix)
+	awsConfigs, err := b.driver.ListConfigsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -632,7 +632,7 @@ func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv
 		return nil, nil // no secrets to check
 	}
 	prefix := b.getConfigPathID("")
-	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
+	sorted, err := b.driver.ListConfigsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}

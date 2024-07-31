@@ -126,7 +126,7 @@ func TestPutConfig(t *testing.T) {
 		})
 		// Check that the secret is in the list
 		prefix := "/Defang/" + b.PulumiProject + "/beta/"
-		secrets, err := b.driver.ListSecretsByPrefix(context.Background(), prefix)
+		secrets, err := b.driver.ListConfigByPrefix(context.Background(), prefix)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
