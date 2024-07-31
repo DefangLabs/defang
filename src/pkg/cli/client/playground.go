@@ -43,12 +43,12 @@ func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutValue)
 }
 
 func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
+	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(&defangv1.Configs{Names: req.Names}))
 	return err
 }
 
-func (g PlaygroundClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
+func (g PlaygroundClient) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
+	return getMsg(g.client.ListConfigs(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {

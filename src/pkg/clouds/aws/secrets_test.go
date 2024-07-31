@@ -74,7 +74,7 @@ func TestPutConfig(t *testing.T) {
 	}
 
 	// Check that the secret is in the list
-	ls, err := a.ListSecrets(ctx)
+	ls, err := a.ListConfigs(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestPutConfig(t *testing.T) {
 
 	// Check that the secret is not in the list; delete is lazy so retry for up to 5 seconds
 	for i := 0; i < 5; i++ {
-		ls, err = a.ListSecrets(ctx)
+		ls, err = a.ListConfigs(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

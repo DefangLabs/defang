@@ -415,7 +415,7 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	return &serviceInfos, nil
 }
 
-func (b *ByocAws) getSecretID(name string) string {
+func (b *ByocAws) getConfigPathID(name string) string {
 	return b.stackDir(name) // same as defang_service.ts
 }
 
@@ -430,7 +430,7 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutValue) erro
 		name = fmt.Sprintf("%s/%s", CONFIG_PATH_PART, name)
 	}
 
-	fqn := b.getSecretID(name)
+	fqn := b.getConfigPathID(name)
 	term.Debugf("Putting parameter %q", fqn)
 
 	err := b.driver.PutConfig(ctx, fqn, config.Value, config.IsSensitive)
@@ -444,7 +444,7 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (type
 		if !pkg.IsValidSecretName(name) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", name))
 		}
-		paramNames[index] = b.getSecretID(name)
+		paramNames[index] = b.getConfigPathID(name)
 	}
 
 	term.Debugf("Show parameters %q", paramNames)
@@ -465,7 +465,7 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (type
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	prefix := b.getSecretID("")
+	prefix := b.getConfigPathID("")
 	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsConfigs, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
@@ -631,13 +631,13 @@ func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv
 	if len(secrets) == 0 {
 		return nil, nil // no secrets to check
 	}
-	prefix := b.getSecretID("")
+	prefix := b.getConfigPathID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
 	for _, secret := range secrets {
-		fqn := b.getSecretID(secret.Source)
+		fqn := b.getConfigPathID(secret.Source)
 		if !searchSecret(sorted, fqn) {
 			return secret, nil // secret not found
 		}
@@ -717,7 +717,7 @@ func (b *ByocAws) Destroy(ctx context.Context) (string, error) {
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	ids := make([]string, len(secrets.Names))
 	for i, name := range secrets.Names {
-		ids[i] = b.getSecretID(name)
+		ids[i] = b.getConfigPathID(name)
 	}
 	term.Debug("Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {

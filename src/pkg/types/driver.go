@@ -57,7 +57,7 @@ type Driver interface {
 	PutConfig(ctx context.Context, name, value string, isSensitive bool) error
 	GetConfig(ctx context.Context, name []string) (ConfigData, error)
 	// DeleteSecrets(ctx context.Context, names ...string) error
-	ListSecrets(ctx context.Context) ([]string, error) // no values
+	ListConfigs(ctx context.Context) ([]string, error) // no values
 	CreateUploadURL(ctx context.Context, name string) (string, error)
 }
 

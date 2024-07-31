@@ -110,7 +110,7 @@ func (l *Local) GetConfig(ctx context.Context, names []string) (types.ConfigData
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) ListSecrets(ctx context.Context) ([]string, error) {
+func (l *Local) ListConfigs(ctx context.Context) ([]string, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 

@@ -140,7 +140,7 @@ func TestPutConfig(t *testing.T) {
 	})
 }
 
-func TestListSecrets(t *testing.T) {
+func TestListConfigs(t *testing.T) {
 	b := NewByoc(ctx, client.GrpcClient{}, "TestListSecrets")
 	b.PulumiProject = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 

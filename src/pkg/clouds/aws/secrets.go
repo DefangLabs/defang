@@ -17,7 +17,7 @@ const CONFIG_PATH_PART = "config"
 const SENSITIVE_PATH_PART = "sensitive"
 
 // TODO: this function is pretty useless, but it's here for consistency
-func getSecretID(name string) *string {
+func getConfigPathID(name string) *string {
 	return ptr.String(name)
 }
 
@@ -45,7 +45,7 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 	svc := ssm.NewFromConfig(cfg)
 
 	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
-		Names: names, // works because getSecretID is a no-op
+		Names: names, // works because getConfigPathID is a no-op
 	})
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 		return false, err
 	}
 
-	rootPath := getSecretID("")
+	rootPath := getConfigPathID("")
 	svc := ssm.NewFromConfig(cfg)
 
 	gpo, error := svc.GetParametersByPath(ctx,
@@ -128,7 +128,7 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive boo
 		return err
 	}
 
-	configPath := getSecretID(name)
+	configPath := getConfigPathID(name)
 	configValue := ptr.String(value)
 
 	svc := ssm.NewFromConfig(cfg)
@@ -164,7 +164,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string
 	var basePath string
 	var path *string
 	for index, name := range names {
-		basePath = *getSecretID(name)
+		basePath = *getConfigPathID(name)
 
 		path, err = insertPreConfigNamePath(basePath, insertPathPart)
 		if err != nil {
@@ -221,7 +221,7 @@ func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigDat
 	return output, nil
 }
 
-func (a *Aws) ListSecrets(ctx context.Context) ([]string, error) {
+func (a *Aws) ListConfigs(ctx context.Context) ([]string, error) {
 	return a.ListSecretsByPrefix(ctx, "")
 }
 
@@ -235,7 +235,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	var filters []types.ParameterStringFilter
 	// DescribeParameters fails if the BeginsWith value is empty
-	if prefix := *getSecretID(prefix); prefix != "" {
+	if prefix := *getConfigPathID(prefix); prefix != "" {
 		filters = append(filters, types.ParameterStringFilter{
 			Key:    ptr.String("Name"),
 			Option: ptr.String("BeginsWith"),

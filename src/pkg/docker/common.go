@@ -39,7 +39,7 @@ func (Docker) GetConfig(ctx context.Context, name []string) (types.ConfigData, e
 	return nil, errors.New("docker does not support secrets")
 }
 
-func (Docker) ListSecrets(ctx context.Context) ([]string, error) {
+func (Docker) ListConfigs(ctx context.Context) ([]string, error) {
 	return nil, errors.New("docker does not support secrets")
 }
 
