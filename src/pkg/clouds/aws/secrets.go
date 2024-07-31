@@ -22,12 +22,19 @@ func getConfigPathID(name string) *string {
 }
 
 func insertPreConfigNamePath(name, pathPart string) (*string, error) {
-	pathParts := strings.Split(name, "/")
+	// add the new path part to the name (we will swap positions of the
+	// variable name part with the new path part below)
+	pathParts := strings.Split(name+"/"+pathPart, "/")
 	if len(pathParts) < 2 {
 		return nil, errors.New("invalid config name")
 	}
 
+	// swap the variable name part with the new path part
+	varPart := pathParts[len(pathParts)-2]
 	pathParts[len(pathParts)-2] = pathPart
+	pathParts[len(pathParts)-1] = varPart
+
+	// rejoin everthing and return
 	return ptr.String(strings.Join(pathParts, "/")), nil
 }
 
@@ -153,7 +160,7 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive boo
 }
 
 func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string, isSensitive bool, outdata *clitypes.ConfigData) error {
-	namePaths := make([]string, 0, len(names))
+	namePaths := make([]string, len(names))
 
 	insertPathPart := CONFIG_PATH_PART
 	if isSensitive {
@@ -176,7 +183,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, names []string
 	// 1. if sensitive ... tell user, don't need to have to fetch value
 	// 2. get value
 	gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
-		WithDecryption: ptr.Bool(true),
+		WithDecryption: ptr.Bool(!isSensitive),
 		Names:          namePaths,
 	})
 
@@ -204,7 +211,7 @@ func (a *Aws) GetConfig(ctx context.Context, names []string) (clitypes.ConfigDat
 
 	svc := ssm.NewFromConfig(cfg)
 
-	var output clitypes.ConfigData
+	output := clitypes.ConfigData{}
 	if err := GetConfigValuesByParam(ctx, svc, names, false, &output); err != nil {
 		return nil, err
 	}
