@@ -149,7 +149,10 @@ func TestConvertPort(t *testing.T) {
 
 func TestConvert(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
-		loader := Loader{path}
+		loader, err := NewLoader(path)
+		if err != nil {
+			t.Fatal(err)
+		}
 		proj, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatal(err)

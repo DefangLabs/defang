@@ -16,11 +16,15 @@ import (
 
 func TestLoader(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
-		loader := Loader{path}
+		loader, err := NewLoader(path)
+		if err != nil {
+			t.Fatal(err)
+		}
 		proj, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		yaml, err := proj.MarshalYAML()
 		if err != nil {
 			t.Fatal(err)

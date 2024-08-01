@@ -19,6 +19,10 @@ type Loader struct {
 	ComposeFilePath string
 }
 
+func NewLoader(composeFilePath string) (*Loader, error) {
+	return &Loader{ComposeFilePath: composeFilePath}, nil
+}
+
 func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	composeFilePath, err := getComposeFilePath(c.ComposeFilePath)
 	if err != nil {
