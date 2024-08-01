@@ -899,7 +899,7 @@ var composeUpCmd = &cobra.Command{
 				var errDeploymentFailed cli.ErrDeploymentFailed
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					term.Warn(errDeploymentFailed)
-					failedServices = []string{errDeploymentFailed.Service, errDeploymentFailed.Service + "-image"} // HACK: also grab Kaniko logs
+					failedServices = []string{errDeploymentFailed.Service}
 				} else {
 					term.Warn("Deployment is not finished. Service(s) might not be running.")
 					// TODO: some services might be OK and we should only debug the ones that are not
@@ -967,7 +967,6 @@ var composeStartCmd = &cobra.Command{
 var debugCmd = &cobra.Command{
 	Use:         "debug [SERVICE...]",
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {

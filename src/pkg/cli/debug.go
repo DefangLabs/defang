@@ -83,6 +83,22 @@ func readFile(path string) *defangv1.File {
 	}
 }
 
+func getServices(project *types.Project, names []string) types.Services {
+	// project.GetServices(…) aborts if any service is not found, so we filter them out ourselves
+	if len(names) == 0 {
+		return project.Services
+	}
+	services := types.Services{}
+	for _, s := range names {
+		if svc, err := project.GetService(s); err != nil {
+			term.Debugf("can't get service %q", s)
+		} else {
+			services[s] = svc
+		}
+	}
+	return services
+}
+
 func findMatchingProjectFiles(project *types.Project, services []string) []*defangv1.File {
 	var files []*defangv1.File
 
@@ -92,10 +108,11 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 		}
 	}
 
-	for _, s := range services {
-		if service, err := project.GetService(s); err == nil && service.Build != nil {
+	for _, service := range getServices(project, services) {
+		if service.Build != nil {
 			files = append(files, findMatchingFiles(service.Build.Context, service.Build.Dockerfile)...)
 		}
+		// TODO: also consider other files, lke .dockerignore, .env, etc.
 	}
 
 	return files
