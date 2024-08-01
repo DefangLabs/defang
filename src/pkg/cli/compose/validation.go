@@ -237,7 +237,7 @@ func ValidateProject(project *compose.Project) error {
 			}
 		}
 		if reservations == nil || reservations.MemoryBytes == 0 {
-			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
+			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 
 		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
