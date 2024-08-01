@@ -19,7 +19,7 @@ require (
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.1.4
 	github.com/digitalocean/godo v1.111.0
-	github.com/docker/docker v25.0.5+incompatible
+	github.com/docker/docker v25.0.6+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
