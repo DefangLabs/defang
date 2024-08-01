@@ -3,16 +3,20 @@ package do
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
+	"os"
+	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/http"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/digitalocean/doctl/pkg/listen"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type byocServerStream struct {
-	// ctx context.Context
+	ctx context.Context
 	err error
 	// etag     string
 	resp     io.ReadCloser
@@ -20,28 +24,42 @@ type byocServerStream struct {
 	// done     chan struct{}
 }
 
-func newByocServerStream(ctx context.Context, url string) (*byocServerStream, error) {
-	// u, err := url.Parse(wsURL)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("invalid WebSocket URL: %w", err)
-	// }
-
-	// resp, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
-	// }
-
-	resp, err := http.GetWithContext(ctx, url)
+func newByocServerStream(ctx context.Context, liveUrl string) (*byocServerStream, error) {
+	url, err := url.Parse(liveUrl)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to connect to log stream: %s", resp.Status)
+
+	schemaFunc := func(message []byte) (io.Reader, error) {
+		data := struct {
+			Data string `json:"data"`
+		}{}
+		err = json.Unmarshal(message, &data)
+		if err != nil {
+			return nil, err
+		}
+		r := strings.NewReader(data.Data)
+
+		return r, nil
+	}
+
+	token := url.Query().Get("token")
+	switch url.Scheme {
+	case "http":
+		url.Scheme = "ws"
+	default:
+		url.Scheme = "wss"
+	}
+
+	listener := listen.NewListener(url, token, schemaFunc, os.Stderr)
+	err = listener.Start()
+	if err != nil {
+		return nil, err
 	}
 
 	bs := &byocServerStream{
-		// ctx:  ctx,
-		resp: resp.Body,
+		ctx: ctx,
+		// resp: resp.Body,
 	}
 
 	return bs, nil
@@ -52,6 +70,7 @@ func (bs *byocServerStream) Msg() *defangv1.TailResponse {
 }
 
 func (bs *byocServerStream) Receive() bool {
+	<-bs.ctx.Done()
 	// scanner := bufio.NewScanner(); TODO: probably need to use this
 	buffer := &bytes.Buffer{}
 	var message [1]byte
