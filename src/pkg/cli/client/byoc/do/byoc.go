@@ -221,9 +221,8 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 	term.Debug("LIVE URL")
 	term.Debug(logs.LiveURL)
-	//newByocServerStream(ctx, logs, nil)
 
-	return newByocServerStream(ctx, logs.LiveURL, []string{})
+	return newByocServerStream(ctx, logs.LiveURL)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
@@ -318,12 +317,12 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
-			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "SPACES_SECRET_ACCESS_KEY",
-			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
@@ -336,12 +335,12 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "AWS_ACCESS_KEY_ID",
-			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "AWS_SECRET_ACCESS_KEY",
-			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
 			Type:  godo.AppVariableType_Secret,
 		},
 	}

@@ -1,64 +1,50 @@
 package do
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"net/url"
+	"io"
 
+	"github.com/DefangLabs/defang/src/pkg/http"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type byocServerStream struct {
-	ctx      context.Context
-	err      error
-	errCh    chan error
-	etag     string
+	// ctx context.Context
+	err error
+	// etag     string
+	resp     io.ReadCloser
 	response *defangv1.TailResponse
-	conn     *websocket.Conn
-	done     chan struct{}
+	// done     chan struct{}
 }
 
-func newByocServerStream(ctx context.Context, wsURL string, services []string) (*byocServerStream, error) {
-	u, err := url.Parse(wsURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid WebSocket URL: %w", err)
-	}
+func newByocServerStream(ctx context.Context, url string) (*byocServerStream, error) {
+	// u, err := url.Parse(wsURL)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("invalid WebSocket URL: %w", err)
+	// }
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	// resp, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
+	// }
+
+	resp, err := http.GetWithContext(ctx, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to log stream: %s", resp.Status)
 	}
 
 	bs := &byocServerStream{
-		ctx:   ctx,
-		errCh: make(chan error, 1),
-		conn:  conn,
-		done:  make(chan struct{}),
+		// ctx:  ctx,
+		resp: resp.Body,
 	}
-
-	go bs.readPump()
 
 	return bs, nil
-}
-
-func (bs *byocServerStream) readPump() {
-	defer close(bs.done)
-	for {
-		_, message, err := bs.conn.ReadMessage()
-		if err != nil {
-			bs.errCh <- err
-			return
-		}
-
-		bs.response = &defangv1.TailResponse{
-			Entries: []*defangv1.LogEntry{
-				&defangv1.LogEntry{
-					Message: string(message),
-				},
-			},
-		}
-	}
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
@@ -66,16 +52,33 @@ func (bs *byocServerStream) Msg() *defangv1.TailResponse {
 }
 
 func (bs *byocServerStream) Receive() bool {
-	select {
-	case <-bs.ctx.Done():
-		return false
-	case err := <-bs.errCh:
-		bs.err = err
-		return false
-	case <-bs.done:
-		return false
-	default:
-		return bs.response != nil
+	// scanner := bufio.NewScanner(); TODO: probably need to use this
+	buffer := &bytes.Buffer{}
+	var message [1]byte
+	for {
+		// _, message, err := bs.resp.ReadMessage(); TODO: websocket support
+		n, err := bs.resp.Read(message[:])
+		fmt.Println(n)
+		if err != nil {
+			bs.err = err
+			return false
+		}
+		if message[0] != '\n' {
+			buffer.Write(message[:n])
+			continue
+		}
+
+		bs.response = &defangv1.TailResponse{
+			Entries: []*defangv1.LogEntry{
+				{
+					Message:   buffer.String(),
+					Timestamp: timestamppb.Now(), // ??
+					Stderr:    true,
+				},
+			},
+		}
+		buffer.Reset()
+		return true
 	}
 }
 
@@ -84,8 +87,5 @@ func (bs *byocServerStream) Err() error {
 }
 
 func (bs *byocServerStream) Close() error {
-	if bs.conn != nil {
-		return bs.conn.Close()
-	}
-	return nil
+	return bs.resp.Close()
 }

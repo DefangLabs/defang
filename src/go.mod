@@ -21,7 +21,6 @@ require (
 	github.com/digitalocean/godo v1.111.0
 	github.com/docker/docker v25.0.5+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/miekg/dns v1.1.59
