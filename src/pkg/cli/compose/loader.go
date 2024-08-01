@@ -27,15 +27,6 @@ func NewLoader(composeFilePath string) (*Loader, error) {
 		if err != nil {
 			return nil, types.ErrComposeFileNotFound
 		}
-
-		workingDir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		err = warnMultipleComposeFiles(workingDir)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	composeFilePath, err = filepath.Abs(composeFilePath)
@@ -71,21 +62,6 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		fmt.Println(string(b))
 	}
 	return project, nil
-}
-
-func warnMultipleComposeFiles(workingDir string) error {
-	count := 0
-	for _, file := range cli.DefaultFileNames {
-		if _, err := os.Stat(filepath.Join(workingDir, file)); err == nil {
-			count++
-		}
-	}
-
-	if count > 1 {
-		return types.ErrMultipleComposeFilesFound
-	}
-
-	return nil
 }
 
 func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
