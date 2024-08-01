@@ -130,7 +130,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	return reader
 }
 
-func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
 	foundDockerfile := false
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
@@ -152,20 +152,13 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
 	reader.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	pm, err := patternmatcher.New(patterns)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
-	fileCount := 0
-	var buf bytes.Buffer
-	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(&buf)}
-	tarWriter := tar.NewWriter(gzipWriter)
-
-	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err = filepath.WalkDir(root, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -182,21 +175,21 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		baseName := filepath.ToSlash(relPath)
+		slashPath := filepath.ToSlash(relPath)
 
 		// we need the Dockerfile, even if it's in the .dockerignore file
-		if !foundDockerfile && relPath == dockerfile {
+		if relPath == dockerfile {
 			foundDockerfile = true
 		} else if relPath == dockerignore {
 			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile
 		} else {
 			// Ignore files using the dockerignore patternmatcher
-			ignore, err := pm.MatchesOrParentMatches(baseName)
+			ignore, err := pm.MatchesOrParentMatches(slashPath) // always use forward slashes
 			if err != nil {
 				return err
 			}
 			if ignore {
-				term.Debug("Ignoring", relPath)
+				term.Debug("Ignoring", relPath) // TODO: avoid printing in this function
 				if de.IsDir() {
 					return filepath.SkipDir
 				}
@@ -204,10 +197,33 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			}
 		}
 
+		return fn(path, de, slashPath)
+	})
+	if err != nil {
+		return err
+	}
+
+	if !foundDockerfile {
+		return fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
+	}
+
+	return nil
+
+}
+
+func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+	fileCount := 0
+	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
+	buf := &bytes.Buffer{}
+	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
+	tarWriter := tar.NewWriter(gzipWriter)
+
+	doProgress := term.StdoutCanColor() && term.IsTerminal()
+	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
 		if term.DoDebug() {
-			term.Debug("Adding", baseName)
+			term.Debug("Adding", slashPath)
 		} else if doProgress {
-			term.Printf("%4d %s\r", fileCount, baseName)
+			term.Printf("%4d %s\r", fileCount, slashPath)
 			defer term.ClearLine()
 		}
 
@@ -225,7 +241,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		header.ModTime = time.Unix(sourceDateEpoch, 0)
 		header.Gid = 0
 		header.Uid = 0
-		header.Name = baseName
+		header.Name = slashPath
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
 			return err
@@ -266,9 +282,5 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		return nil, err
 	}
 
-	if !foundDockerfile {
-		return nil, fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
-	}
-
-	return &buf, nil
+	return buf, nil
 }

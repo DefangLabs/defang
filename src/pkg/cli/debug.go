@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
@@ -17,28 +19,12 @@ import (
 // FIXME: Find a better way to handle files.
 const maxFiles = 20
 
-var ErrFileLimitReached = errors.New("file limit reached")
+var errFileLimitReached = errors.New("file limit reached")
 
-func Debug(ctx context.Context, c client.Client, etag, service string, services []string) error {
+func Debug(ctx context.Context, c client.Client, etag string, project *types.Project, services []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
-	project, err := c.LoadProject(ctx)
-	if err != nil {
-		return err
-	}
-
-	dockerfile := "Dockerfile"
-	folder := project.WorkingDir
-	s, _ := project.GetService(service)
-	if s.Build != nil {
-		folder = s.Build.Context
-		dockerfile = s.Build.Dockerfile
-	}
-
-	// FIXME: use the project information to determine which files to send
-	patterns := []string{dockerfile, "*compose.yaml", "*compose.yml", "*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"}
-
-	files := findMatchingFiles(folder, patterns)
+	files := findMatchingProjectFiles(project, services)
 
 	if DoDryRun {
 		return ErrDryRun
@@ -85,23 +71,52 @@ func Debug(ctx context.Context, c client.Client, etag, service string, services 
 	return nil
 }
 
-func findMatchingFiles(folder string, patterns []string) []*defangv1.File {
+func readFile(path string) *defangv1.File {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		term.Debug("failed to read file:", err)
+		return nil
+	}
+	return &defangv1.File{
+		Name:    filepath.Base(path),
+		Content: string(b),
+	}
+}
+
+func findMatchingProjectFiles(project *types.Project, services []string) []*defangv1.File {
 	var files []*defangv1.File
-	fileCount := 0
 
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			term.Debug("error accessing path:", err)
-			return nil // continue walking
+	for _, path := range project.ComposeFiles {
+		if file := readFile(path); file != nil {
+			files = append(files, file)
 		}
+	}
 
+	for _, s := range services {
+		if service, err := project.GetService(s); err == nil && service.Build != nil {
+			files = append(files, findMatchingFiles(service.Build.Context, service.Build.Dockerfile)...)
+		}
+	}
+
+	return files
+}
+
+func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
+	var files []*defangv1.File
+	patterns := []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"}
+
+	if file := readFile(filepath.Join(folder, dockerfile)); file != nil {
+		files = append(files, file)
+	}
+
+	err := compose.WalkContextFolder(folder, dockerfile, func(path string, info os.DirEntry, slashPath string) error {
 		if info.IsDir() {
 			return nil // continue to next file/directory
 		}
 
-		if fileCount >= maxFiles {
+		if len(files) >= maxFiles {
 			term.Debug("file limit reached, stopping search")
-			return ErrFileLimitReached
+			return errFileLimitReached
 		}
 
 		for _, pattern := range patterns {
@@ -111,23 +126,16 @@ func findMatchingFiles(folder string, patterns []string) []*defangv1.File {
 				continue
 			}
 			if matched {
-				b, err := os.ReadFile(path)
-				if err != nil {
-					term.Debug("failed to read file:", err)
-					continue
+				if file := readFile(path); file != nil {
+					files = append(files, file)
+					break // file matched, no need to check other patterns
 				}
-				files = append(files, &defangv1.File{
-					Name:    filepath.Base(path),
-					Content: string(b),
-				})
-				fileCount++
-				break // file matched, no need to check other patterns
 			}
 		}
 		return nil
 	})
 
-	if err != nil && err != ErrFileLimitReached {
+	if err != nil && err != errFileLimitReached {
 		term.Debug("error walking the path:", err)
 	}
 
