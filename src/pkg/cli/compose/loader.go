@@ -20,21 +20,29 @@ type Loader struct {
 }
 
 func NewLoader(composeFilePath string) (*Loader, error) {
+	var err error
+
+	if composeFilePath == "" {
+		composeFilePath, err = findDefaultComposeFilePath()
+		if err != nil {
+			return nil, types.ErrComposeFileNotFound
+		}
+	}
+
+	composeFilePath, err = filepath.Abs(composeFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Loader{ComposeFilePath: composeFilePath}, nil
 }
 
 func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
-	composeFilePath, err := getComposeFilePath(c.ComposeFilePath)
-	if err != nil {
-		return nil, err
-	}
-	term.Debug("Loading compose file", composeFilePath)
-
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
-	projOpts, err := getDefaultProjectOptions(composeFilePath)
+	projOpts, err := getDefaultProjectOptions(c.ComposeFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +80,7 @@ func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOp
 		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
-		// cli.WithDefaultConfigPath, NO: this ends up picking the "first" when more than one file is found
+		// cli.WithDefaultConfigPath, // NO: we find the config path eagerly when setting up the Loader
 		// cli.WithName(o.ProjectName)
 
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
@@ -94,46 +102,15 @@ func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOp
 	return projOpts, nil
 }
 
-func getComposeFilePath(userSpecifiedComposeFile string) (string, error) {
-	// The Compose file is compose.yaml (preferred) or compose.yml that is placed in the current directory or higher.
-	// Compose also supports docker-compose.yaml and docker-compose.yml for backwards compatibility.
-	// Users can override the file by specifying file name
-	const DEFAULT_COMPOSE_FILE_PATTERN = "*compose.y*ml"
-
-	path, err := os.Getwd()
+func findDefaultComposeFilePath() (string, error) {
+	opts := []cli.ProjectOptionsFn{
+		cli.WithDefaultConfigPath,
+	}
+	projOpts, err := cli.NewProjectOptions([]string{}, opts...)
 	if err != nil {
-		return path, err
+		return "", err
 	}
 
-	searchPattern := DEFAULT_COMPOSE_FILE_PATTERN
-	if len(userSpecifiedComposeFile) > 0 {
-		path = ""
-		searchPattern = userSpecifiedComposeFile
-	}
-
-	// iterate through this loop at least once to find the compose file.
-	// if the user did not specify a specific file (i.e. userSpecifiedComposeFile == "")
-	// then walk the tree up to the root directory looking for a compose file.
-	term.Debug("Looking for compose file - searching for", searchPattern)
-	for {
-		if files, _ := filepath.Glob(filepath.Join(path, searchPattern)); len(files) > 1 {
-			return "", fmt.Errorf("multiple Compose files found: %q; use -f to specify which one to use", files)
-		} else if len(files) == 1 {
-			// found compose file, we're done
-			return files[0], nil
-		}
-
-		if len(userSpecifiedComposeFile) > 0 {
-			return "", fmt.Errorf("no Compose file found at %q: %w", userSpecifiedComposeFile, os.ErrNotExist)
-		}
-
-		// compose file not found, try parent directory
-		nextPath := filepath.Dir(path)
-		if nextPath == path {
-			// previous search was of root, we're done
-			return "", types.ErrComposeFileNotFound
-		}
-
-		path = nextPath
-	}
+	// TODO: add support for default override files
+	return projOpts.ConfigPaths[0], nil
 }
