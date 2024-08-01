@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -51,11 +52,29 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 
 	svc := ssm.NewFromConfig(cfg)
 
+	offset := len(names)
+	paths := make([]string, 2*offset)
+
+	for index, name := range names {
+		path, err := insertPreConfigNamePath(name, SENSITIVE_PATH_PART)
+		if err != nil {
+			return err
+		}
+		paths[index] = *path
+
+		path, err = insertPreConfigNamePath(name, CONFIG_PATH_PART)
+		if err != nil {
+			return err
+		}
+		paths[offset+index] = *path
+	}
+
 	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
-		Names: names, // works because getConfigPathID is a no-op
+		Names: paths,
 	})
+
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete configs: %v", err)
 	}
 	if len(o.InvalidParameters) > 0 && len(o.DeletedParameters) == 0 {
 		return &types.ParameterNotFound{}
