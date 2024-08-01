@@ -18,6 +18,7 @@ func TestDebug(t *testing.T) {
 	files := findMatchingProjectFiles(project, []string{"failing", "failing-image"})
 	expected := []*defangv1.File{
 		{Name: "compose.yaml", Content: "services:\n  failing:\n    build: ./app\n  ok:\n    build: .\n"},
+		{Name: "Dockerfile", Content: "FROM scratch"},
 		{Name: "main.js", Content: "// This file should be sent to the debugger"},
 	}
 	if len(files) != len(expected) {

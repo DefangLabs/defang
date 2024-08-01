@@ -91,7 +91,7 @@ func getServices(project *types.Project, names []string) types.Services {
 	services := types.Services{}
 	for _, s := range names {
 		if svc, err := project.GetService(s); err != nil {
-			term.Debugf("can't get service %q", s)
+			term.Debug("skipped for debugging:", err)
 		} else {
 			services[s] = svc
 		}
