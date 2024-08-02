@@ -1,5 +1,18 @@
 name: healthcheck
 services:
+  cmd-shell:
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - echo hello
+        - second line
+    image: alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
   curl:
     healthcheck:
       test:
@@ -10,6 +23,10 @@ services:
     image: curl
     networks:
       default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
   flask1:
     healthcheck:
       test:
@@ -21,6 +38,10 @@ services:
     image: flask
     networks:
       default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
   flask2:
     healthcheck:
       test:
@@ -31,6 +52,22 @@ services:
     image: flask
     networks:
       default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
+  none:
+    healthcheck:
+      test:
+        - NONE
+        - ignored
+    image: alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
   wget:
     healthcheck:
       test:
@@ -38,10 +75,14 @@ services:
         - wget
         - -q
         - --spider
-        - localhost:5000
+        - localhost:80
     image: alpine
     networks:
       default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
 networks:
   default:
     name: healthcheck_default
