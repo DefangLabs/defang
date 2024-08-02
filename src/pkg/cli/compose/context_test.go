@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,6 +52,41 @@ func TestUploadTarball(t *testing.T) {
 		}
 		if url != server.URL+path {
 			t.Errorf("Expected %v, got %v", server.URL+path, url)
+		}
+	})
+}
+
+func TestWalkContextFolder(t *testing.T) {
+	t.Run("Default Dockerfile", func(t *testing.T) {
+		var files []string
+		err := WalkContextFolder("../../../tests/testproj", "", func(path string, de os.DirEntry, slashPath string) error {
+			if strings.Contains(slashPath, "testproj") {
+				t.Errorf("Path is not relative: %v", slashPath)
+			}
+			files = append(files, slashPath)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("WalkContextFolder() failed: %v", err)
+		}
+
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
+		if !reflect.DeepEqual(files, expected) {
+			t.Errorf("Expected files: %v, got %v", expected, files)
+		}
+	})
+
+	t.Run("Missing Dockerfile", func(t *testing.T) {
+		err := WalkContextFolder("../../tests", "Dockerfile.missing", func(string, os.DirEntry, string) error { return nil })
+		if err == nil {
+			t.Fatal("WalkContextFolder() should have failed")
+		}
+	})
+
+	t.Run("Missing Context", func(t *testing.T) {
+		err := WalkContextFolder("asdfqwer", "", func(string, os.DirEntry, string) error { return nil })
+		if err == nil {
+			t.Fatal("WalkContextFolder() should have failed")
 		}
 	})
 }
