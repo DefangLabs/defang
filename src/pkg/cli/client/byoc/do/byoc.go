@@ -28,7 +28,7 @@ import (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	appIds map[string]string
+	apps   map[string]*godo.App
 	driver *appPlatform.DoApp
 }
 
@@ -41,7 +41,7 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 
 	b := &ByocDo{
 		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
-		appIds: map[string]string{},
+		apps:   map[string]*godo.App{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
@@ -114,11 +114,11 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
 
-	appID, err := b.runCdCommand(ctx, "up", payloadString)
+	cdApp, err := b.runCdCommand(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
-	b.appIds[etag] = *appID
+	b.apps[etag] = cdApp
 
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
@@ -131,12 +131,12 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 		return "", err
 	}
 
-	foo, err := b.runCdCommand(ctx, "up", command)
+	_, err := b.runCdCommand(ctx, command)
 	if err != nil {
 		return "", err
 	}
 
-	return *foo, nil
+	return "", nil
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
@@ -159,6 +159,10 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
 	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
 }
 
@@ -167,7 +171,7 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	return errors.ErrUnsupported
+	return errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
@@ -179,11 +183,11 @@ func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{}, errors.ErrUnsupported
+	return nil, errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
-	return nil
+	return errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
@@ -199,22 +203,22 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	appId := req.Etag
-	if pkg.IsValidRandomID(appId) {
+	cdApp := &godo.App{}
+	eTag := req.Etag
+	if pkg.IsValidRandomID(eTag) {
 		// This is an etag; look up the app ID
-		appId = b.appIds[appId]
+		cdApp = b.apps[eTag]
 	}
 
-	// ctx, cancel := context.WithCancel(ctx)
-	// defer cancel()
+	term.Debug("FOLLOW APP ID: %s", cdApp.ID)
 
 	client := b.driver.Client
 
-	logs, _, err := client.Apps.GetLogs(ctx, appId, "", "", godo.AppLogTypeRun, true, 5)
+	logs, _, err := client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
 	if err != nil {
 		// assume not found; try again after a while
 		pkg.SleepWithContext(ctx, 2*time.Second)
-		logs, _, err = client.Apps.GetLogs(ctx, appId, "", "", godo.AppLogTypeRun, true, 5)
+		logs, _, err = client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
 		if err != nil {
 			return nil, err
 		}
@@ -231,8 +235,15 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
+	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
+		return nil, err
+	}
 
-	return &defangv1.WhoAmIResponse{}, errors.ErrUnsupported
+	return &defangv1.WhoAmIResponse{
+		Tenant:  b.TenantID,
+		Region:  b.driver.Region.String(),
+		Account: "Digital Ocean",
+	}, nil
 }
 
 func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
@@ -248,7 +259,7 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 	return nil, errors.ErrUnsupported
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (types.TaskID, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
 	env := b.environment()
 	if term.DoDebug() {
 		debugEnv := " -"
@@ -257,7 +268,8 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (types.TaskID,
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
 	}
-	return b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
+	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
+	return app, err
 }
 
 func (b *ByocDo) environment() []*godo.AppVariableDefinition {

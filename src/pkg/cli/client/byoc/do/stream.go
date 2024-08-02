@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"io"
 	"net/url"
 	"os"
@@ -25,7 +26,7 @@ type byocServerStream struct {
 }
 
 func newByocServerStream(ctx context.Context, liveUrl string) (*byocServerStream, error) {
-	url, err := url.Parse(liveUrl)
+	urlString, err := url.Parse(liveUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -43,15 +44,17 @@ func newByocServerStream(ctx context.Context, liveUrl string) (*byocServerStream
 		return r, nil
 	}
 
-	token := url.Query().Get("token")
-	switch url.Scheme {
+	token := urlString.Query().Get("token")
+	term.Println("TOKEN: " + token)
+	switch urlString.Scheme {
 	case "http":
-		url.Scheme = "ws"
+		urlString.Scheme = "wss"
 	default:
-		url.Scheme = "wss"
+		urlString.Scheme = "wss"
 	}
 
-	listener := listen.NewListener(url, token, schemaFunc, os.Stderr)
+	term.Println("URL: " + urlString.String())
+	listener := listen.NewListener(urlString, token, schemaFunc, os.Stderr)
 	err = listener.Start()
 	if err != nil {
 		return nil, err

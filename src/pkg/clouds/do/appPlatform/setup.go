@@ -11,7 +11,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -86,7 +85,7 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
-func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (types.TaskID, error) {
+func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
 	client := newClient(ctx)
 
 	// parts := strings.Split(pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:latest"), ":")
@@ -125,6 +124,8 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		}
 	}
 
+	term.Println("CURRENT CD: " + currentCd.ID)
+
 	//Update current CD app if it exists
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
 		term.Debugf("Updating existing CD app")
@@ -142,7 +143,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		return nil, err
 	}
 
-	return &currentCd.ID, nil
+	return currentCd, nil
 }
 
 func newClient(ctx context.Context) *godo.Client {
