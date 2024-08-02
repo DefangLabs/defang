@@ -3,7 +3,7 @@ package quota
 import (
 	"errors"
 	"fmt"
-	"regexp"
+	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -15,16 +15,6 @@ type ServiceQuotas struct {
 	Replicas   uint32
 	ShmSizeMiB float32
 }
-
-// Based on https://www.ietf.org/rfc/rfc3986.txt, using the pattern for query
-// (which is a superset of path's `pchar`) but removing the single quote.
-//
-//	query       = *( pchar / "/" / "?" )
-//	pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
-//	unreserved    = ALPHA / DIGIT / "-" / "." / "_" / "~"
-//	pct-encoded   = "%" HEXDIG HEXDIG
-//	sub-delims    = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
-var healthcheckUrlRegex = regexp.MustCompile(`(?i)(http://)?(localhost|127.0.0.1)(:\d{1,5})?(/(?:[?a-z0-9._~!$&()*+,;=:@-]|%[a-f0-9]{2})*)*`)
 
 func (q ServiceQuotas) Validate(service *defangv1.Service) error {
 	if service.Name == "" {
@@ -52,15 +42,15 @@ func (q ServiceQuotas) Validate(service *defangv1.Service) error {
 			return fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
 		}
 		if port.Mode == defangv1.Mode_INGRESS {
+			hasIngress = true
 			if port.Protocol == defangv1.Protocol_TCP || port.Protocol == defangv1.Protocol_UDP {
 				return fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
 			}
 		}
 		if uniquePorts[port.Target] {
-			return fmt.Errorf("duplicate port %d", port.Target) // CodeInvalidArgument
+			return fmt.Errorf("duplicate target port %d", port.Target) // CodeInvalidArgument
 		}
 		// hasHost = hasHost || port.Mode == v1.Mode_HOST
-		hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
 		uniquePorts[port.Target] = true
 	}
 	if service.Healthcheck != nil && len(service.Healthcheck.Test) > 0 {
@@ -72,15 +62,16 @@ func (q ServiceQuotas) Validate(service *defangv1.Service) error {
 		case "CMD", "CMD-SHELL":
 			if hasIngress {
 				// For ingress ports, we derive the target group healthcheck path/port from the service healthcheck
-				hasHttpUrl := false
+				hasLocalhostUrl := false
 				for _, arg := range service.Healthcheck.Test[1:] {
-					if healthcheckUrlRegex.MatchString(arg) {
-						hasHttpUrl = true
+					// Leave the actual parsing to the CD code; here we just check for localhost
+					if strings.Contains(arg, "localhost") || strings.Contains(arg, "127.0.0.1") {
+						hasLocalhostUrl = true
 						break
 					}
 				}
-				if !hasHttpUrl {
-					return errors.New("invalid healthcheck: ingress ports require a healthcheck with HTTP URL")
+				if !hasLocalhostUrl {
+					return errors.New("invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`")
 				}
 			}
 		case "NONE": // OK iff there are no ingress ports
