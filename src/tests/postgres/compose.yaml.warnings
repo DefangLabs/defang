@@ -1,0 +1,8 @@
+ ! service "x": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "x": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "y": managed Postgres service should use a postgres image
+ ! service "y": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "y": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "z": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "z": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "z": stateful service will lose data on restart; use a managed service instead

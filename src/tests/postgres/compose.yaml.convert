@@ -1,0 +1,25 @@
+[
+  {
+    "name": "x",
+    "image": "postgres",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "postgres": {}
+  },
+  {
+    "name": "y",
+    "image": "example",
+    "platform": 2,
+    "internal": true,
+    "networks": 1,
+    "postgres": {}
+  },
+  {
+    "name": "z",
+    "image": "postgres",
+    "platform": 2,
+    "internal": true,
+    "networks": 1
+  }
+]
