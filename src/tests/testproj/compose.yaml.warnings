@@ -1,4 +1,4 @@
- ! No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)
+ ! UDP ports default to 'host' mode (add 'mode: host' to silence)
  ! service "dfnx": secrets will be exposed as environment variables, not files (use 'environment' instead)
  ! unsupported compose extension: "x-unsupported"
  * Compressing build context for dfnx at .

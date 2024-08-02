@@ -88,6 +88,7 @@ message DebugRequest {
   string etag = 2;
   string project = 3;
   string logs = 4;
+  repeated string services = 5;
 }
 
 message DebugResponse {
@@ -128,8 +129,7 @@ message DeployResponse {
 
 message DeleteRequest {
   repeated string names = 1;
-
-  // string project = 2; // defaults to tenant ID
+  string project = 2; // defaults to tenant ID
 }
 
 message DeleteResponse { string etag = 1; }
@@ -159,22 +159,22 @@ message UploadURLResponse { string url = 1; }
 enum ServiceState {
   NOT_SPECIFIED = 0;
 
-  // Build states (initial state for build)
-  BUILD_QUEUED = 1;
+  // Build states
+  BUILD_QUEUED = 1; // initial state for build
   BUILD_PROVISIONING = 2;
   BUILD_PENDING = 3;
   BUILD_ACTIVATING = 4;
   BUILD_RUNNING = 5;
+  BUILD_STOPPING = 6;
 
-  BUILD_DEACTIVATING = 6;
-
-  // Update states (initial state for existing image)
-  UPDATE_QUEUED = 7;
+  UPDATE_QUEUED = 7; // initial state for existing image
 
   // Deployment states
-  SERVICE_PENDING = 8;
-  SERVICE_COMPLETED = 9;
-  SERVICE_FAILED = 10;
+  DEPLOYMENT_PENDING = 8;
+  DEPLOYMENT_COMPLETED = 9;
+  DEPLOYMENT_FAILED = 10;
+
+  BUILD_FAILED = 11;
 }
 
 message ServiceInfo {
@@ -297,6 +297,7 @@ message ListServicesResponse {
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
+  string project = 3;
 }
 
 enum Platform {
@@ -461,6 +462,7 @@ message PublishRequest { Event event = 1; }
 
 message SubscribeRequest {
   repeated string services = 1;
+  string etag = 2;
 }
 
 message SubscribeResponse {

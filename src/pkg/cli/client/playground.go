@@ -87,7 +87,7 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	for _, service := range project.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: project.Project, Names: names})
 	if err != nil {
 		return "", err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -179,7 +180,10 @@ func isTransientError(err error) bool {
 	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
 	code := connect.CodeOf(err)
 	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-	return code == connect.CodeUnavailable || (code == connect.CodeInternal && !connect.IsWireError(err))
+	return code == connect.CodeUnavailable ||
+		(code == connect.CodeInternal && !connect.IsWireError(err)) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
+
 }
 
 func tail(ctx context.Context, client client.Client, params TailOptions) error {
@@ -292,6 +296,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			onlyErrors := !DoVerbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
+					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
 				continue
@@ -360,7 +365,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
-					cancel()
+					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
 			}

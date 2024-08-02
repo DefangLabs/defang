@@ -15,11 +15,17 @@
     "ports": [
       {
         "target": 80,
+        "protocol": 3,
         "mode": 1
       },
       {
         "target": 1234,
+        "protocol": 3,
         "mode": 1
+      },
+      {
+        "target": 4567,
+        "protocol": 1
       }
     ],
     "environment": {

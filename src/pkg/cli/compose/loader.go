@@ -45,35 +45,6 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		return nil, err
 	}
 
-	// Hack: Fill in the missing environment variables that were stripped by the normalization process
-	projOpts, err = getDefaultProjectOptions(composeFilePath, cli.WithNormalization(false)) // Disable normalization to keep unset environment variables
-	if err != nil {
-		return nil, err
-	}
-
-	// Disable logrus output to prevent double warnings from compose-go
-	logrus.SetFormatter(logs.DiscardFormatter{})
-	rawProj, err := projOpts.LoadProject(ctx)
-	logrus.SetFormatter(termLogger)
-	if err != nil {
-		panic(err) // there's no good reason this should fail, since we've already loaded the project before
-	}
-
-	// TODO: Remove this hack once the PR is merged
-	// PR Filed: https://github.com/compose-spec/compose-go/pull/634
-	for name, rawService := range rawProj.Services {
-		for key, value := range rawService.Environment {
-			service := project.Services[name]
-			if service.Environment[key] == nil {
-				if service.Environment == nil {
-					service.Environment = make(map[string]*string)
-				}
-				service.Environment[key] = value
-				project.Services[name] = service
-			}
-		}
-	}
-
 	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
