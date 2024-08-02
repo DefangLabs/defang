@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/smithy-go/ptr"
 )
 
 var (
@@ -18,8 +18,8 @@ var (
 
 func GetZoneIdFromDomain(ctx context.Context, domain string, r53 *route53.Client) (string, error) {
 	params := &route53.ListHostedZonesByNameInput{
-		DNSName:  aws.String(domain),
-		MaxItems: aws.Int32(1),
+		DNSName:  ptr.String(domain),
+		MaxItems: ptr.Int32(1),
 	}
 	resp, err := r53.ListHostedZonesByName(ctx, params)
 	if err != nil {
@@ -40,10 +40,10 @@ func GetZoneIdFromDomain(ctx context.Context, domain string, r53 *route53.Client
 
 func CreateZone(ctx context.Context, domain string, r53 *route53.Client) (string, error) {
 	params := &route53.CreateHostedZoneInput{
-		Name:            aws.String(domain),
-		CallerReference: aws.String(domain + time.Now().String()),
+		Name:            ptr.String(domain),
+		CallerReference: ptr.String(domain + time.Now().String()),
 		HostedZoneConfig: &types.HostedZoneConfig{
-			Comment: aws.String("Created by defang cli"),
+			Comment: ptr.String("Created by defang cli"),
 		},
 	}
 	resp, err := r53.CreateHostedZone(ctx, params)
@@ -55,10 +55,10 @@ func CreateZone(ctx context.Context, domain string, r53 *route53.Client) (string
 
 func GetRecordsValue(ctx context.Context, zoneId, name string, recordType types.RRType, r53 *route53.Client) ([]string, error) {
 	listInput := &route53.ListResourceRecordSetsInput{
-		HostedZoneId:    aws.String(zoneId),
-		StartRecordName: aws.String(name),
+		HostedZoneId:    ptr.String(zoneId),
+		StartRecordName: ptr.String(name),
 		StartRecordType: recordType,
-		MaxItems:        aws.Int32(1),
+		MaxItems:        ptr.Int32(1),
 	}
 
 	listResp, err := r53.ListResourceRecordSets(ctx, listInput)

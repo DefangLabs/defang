@@ -3,9 +3,14 @@ package do
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,15 +25,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	DockerHub = "DOCKER_HUB"
-	Docr      = "DOCR"
-)
-
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	appIds map[string]string
+	apps   map[string]*godo.App
 	driver *appPlatform.DoApp
 }
 
@@ -41,6 +41,7 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 
 	b := &ByocDo{
 		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		apps:   map[string]*godo.App{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
@@ -85,13 +86,13 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, etag)
+	payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
 	if err != nil {
 		return nil, err
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
+	resp, err := http.Put(ctx, payloadUrl, "application/protobuf", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -99,34 +100,41 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 	}
-	payloadUrl := strings.Split(http.RemoveQueryParam(url), "/")
 
-	payloadFileName := payloadUrl[len(payloadUrl)-1]
-
-	payloadString, err := b.driver.CreateS3DownloadUrl(ctx, fmt.Sprintf("uploads/%s", payloadFileName))
-
+	// FIXME: find the bucket and key name
+	parsedUrl, err := url.Parse(payloadUrl)
+	if err != nil {
+		return nil, err
+	}
+	payloadKey := strings.TrimLeft(parsedUrl.Path, "/"+b.driver.BucketName+"/")
+	payloadString, err := b.driver.CreateS3DownloadUrl(ctx, payloadKey)
 	if err != nil {
 		return nil, err
 	}
 
 	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
 
-	//appID, err := b.runCdCommand(ctx, "up", payloadString)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//b.AppIds[etag] = appID
+	cdApp, err := b.runCdCommand(ctx, "up", payloadString)
+	if err != nil {
+		return nil, err
+	}
+	b.apps[etag] = cdApp
 
-	//return &defangv1.DeployResponse{
-	//	Services: serviceInfos,
-	//	Etag:     etag,
-	//}, nil
-
-	res := &defangv1.DeployResponse{}
-	return res, nil
+	return &defangv1.DeployResponse{
+		Services: serviceInfos,
+		Etag:     etag,
+	}, nil
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
+	if err := b.setUp(ctx); err != nil {
+		return "", err
+	}
+
+	_, err := b.runCdCommand(ctx, command)
+	if err != nil {
+		return "", err
+	}
 
 	return "", nil
 }
@@ -151,7 +159,11 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return nil, nil
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -159,49 +171,79 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	return nil
+	return errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return nil, nil
+	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	return nil, nil
+	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return nil, nil
+	return nil, errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
-	return nil
+	return errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", nil
+	return "", errors.ErrUnsupported
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
 	return ""
 }
 
-func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, client.ErrNotImplemented("not implemented for ByocDo")
-}
-
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	return nil, nil
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	cdApp := &godo.App{}
+	eTag := req.Etag
+	if pkg.IsValidRandomID(eTag) {
+		// This is an etag; look up the app ID
+		cdApp = b.apps[eTag]
+	}
+
+	term.Debug("FOLLOW APP ID: %s", cdApp.ID)
+
+	client := b.driver.Client
+
+	logs, _, err := client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
+	if err != nil {
+		// assume not found; try again after a while
+		pkg.SleepWithContext(ctx, 2*time.Second)
+		logs, _, err = client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
+		if err != nil {
+			return nil, err
+		}
+	}
+	term.Debug("LIVE URL")
+	term.Debug(logs.LiveURL)
+
+	return newByocServerStream(ctx, logs.LiveURL)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	return nil
+	return errors.ErrUnsupported
 	//return b.Driver.TearDown(ctx)
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
+	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	return &defangv1.WhoAmIResponse{
+		Tenant:  b.TenantID,
+		Region:  b.driver.Region.String(),
+		Account: "Digital Ocean",
+	}, nil
 }
 
 func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
@@ -210,40 +252,109 @@ func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 }
 
 func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-
-	return nil, nil
+	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
+func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
 	env := b.environment()
 	if term.DoDebug() {
 		debugEnv := " -"
-		for k, v := range env {
-			debugEnv += " " + k + "=" + v
+		for _, v := range env {
+			debugEnv += " " + v.Key + "=" + v.Value
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
 	}
-	return b.driver.Run(ctx, env, cmd...)
+	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
+	return app, err
 }
 
-func (b *ByocDo) environment() map[string]string {
+func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return map[string]string{
-		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":              byoc.DefangPrefix,
-		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":                 b.TenantID,
-		"DOMAIN":                     b.ProjectDomain,
-		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject,
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName), // TODO: add a way to override bucket
-		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
-		"STACK":                      b.PulumiStack,
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"DO_PAT":                     os.Getenv("DO_PAT"),
-		"DO_SPACES_ID":               os.Getenv("DO_SPACES_ID"),
-		"DO_SPACES_KEY":              os.Getenv("DO_SPACES_KEY"),
+	return []*godo.AppVariableDefinition{
+		{
+			Key:   "DEFANG_PREFIX",
+			Value: byoc.DefangPrefix,
+		},
+		{
+			Key:   "DEFANG_DEBUG",
+			Value: pkg.Getenv("DEFANG_DEBUG", "false"),
+		},
+		{
+			Key:   "DEFANG_ORG",
+			Value: b.TenantID,
+		},
+		{
+			Key:   "DEFANG_CLOUD",
+			Value: "do",
+		},
+		{
+			Key:   "DOMAIN",
+			Value: b.ProjectDomain,
+		},
+		{
+			Key:   "PRIVATE_DOMAIN",
+			Value: b.PrivateDomain,
+		},
+		{
+			Key:   "PROJECT",
+			Value: b.PulumiProject,
+		},
+		{
+			Key:   "PULUMI_BACKEND_URL",
+			Value: fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region),
+		},
+		{
+			Key:   "PULUMI_CONFIG_PASSPHRASE",
+			Value: pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),
+		},
+		{
+			Key:   "STACK",
+			Value: b.PulumiStack,
+		},
+		{
+			Key:   "NPM_CONFIG_UPDATE_NOTIFIER",
+			Value: "false",
+		},
+		{
+			Key:   "PULUMI_SKIP_UPDATE_CHECK",
+			Value: "true",
+		},
+		{
+			Key:   "DIGITALOCEAN_TOKEN",
+			Value: os.Getenv("DO_PAT"),
+		},
+		{
+			Key:   "SPACES_ACCESS_KEY_ID",
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
+			Type:  godo.AppVariableType_Secret,
+		},
+		{
+			Key:   "SPACES_SECRET_ACCESS_KEY",
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
+			Type:  godo.AppVariableType_Secret,
+		},
+		{
+			Key:   "REGION",
+			Value: region.String(),
+		},
+		{
+			Key:   "AWS_REGION",
+			Value: region.String(),
+		},
+		{
+			Key:   "AWS_ACCESS_KEY_ID",
+			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
+			Type:  godo.AppVariableType_Secret,
+		},
+		{
+			Key:   "AWS_SECRET_ACCESS_KEY",
+			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
+			Type:  godo.AppVariableType_Secret,
+		},
 	}
 }
 
@@ -263,6 +374,10 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 func (b *ByocDo) setUp(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
+	}
+
+	if err := b.driver.SetUp(ctx); err != nil {
+		return err
 	}
 
 	//cdTaskName := byoc.CdTaskPrefix
@@ -291,8 +406,8 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	//		Kind:             godo.AppJobSpecKind_PreDeploy,
 	//	},
 	//}
-
-	//if err := b.Driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
+	//
+	//if err := b.driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
 	//	return err
 	//}
 

@@ -154,13 +154,13 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		payloadString = base64.StdEncoding.EncodeToString(data)
 		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
-		url, err := b.driver.CreateUploadURL(ctx, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
 		if err != nil {
 			return nil, err
 		}
 
 		// Do an HTTP PUT to the generated URL
-		resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
+		resp, err := http.Put(ctx, payloadUrl, "application/protobuf", bytes.NewReader(data))
 		if err != nil {
 			return nil, err
 		}
@@ -168,8 +168,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
-		payloadString = http.RemoveQueryParam(url)
-		// FIXME: this code path didn't work
+		payloadString = http.RemoveQueryParam(payloadUrl)
 	}
 
 	if b.ShouldDelegateSubdomain {
