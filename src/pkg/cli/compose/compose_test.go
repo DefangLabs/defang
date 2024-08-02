@@ -14,10 +14,7 @@ func TestLoadCompose(t *testing.T) {
 	term.SetDebug(testing.Verbose())
 
 	t.Run("no project name defaults to parent directory name", func(t *testing.T) {
-		loader, err := NewLoader("../../../tests/noprojname/compose.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/noprojname/compose.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -28,10 +25,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
-		loader, err := NewLoader("../../../tests/Fancy-Proj_Dir/compose.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/Fancy-Proj_Dir/compose.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -42,10 +36,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name in compose file", func(t *testing.T) {
-		loader, err := NewLoader("../../../tests/testproj/compose.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/testproj/compose.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -57,10 +48,7 @@ func TestLoadCompose(t *testing.T) {
 
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
-		loader, err := NewLoader("../../../tests/testproj/compose.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/testproj/compose.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -71,10 +59,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
-		loader, err := NewLoader("../../../tests/testproj/compose.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/testproj/compose.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -103,10 +88,7 @@ func TestLoadCompose(t *testing.T) {
 		t.Cleanup(teardown)
 
 		// execute test
-		loader, err := NewLoader("")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -117,10 +99,7 @@ func TestLoadCompose(t *testing.T) {
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
-		loader, err := NewLoader("../../../tests/alttestproj/altcomp.yaml")
-		if err != nil {
-			t.Fatalf("NewLoader() failed: %v", err)
-		}
+		loader := NewLoader("../../../tests/alttestproj/altcomp.yaml")
 		p, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatalf("LoadCompose() failed: %v", err)
@@ -141,11 +120,8 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	var warnings bytes.Buffer
 	term.DefaultTerm = term.NewTerm(&warnings, &warnings)
 
-	loader, err := NewLoader("../../../tests/compose-go-warn/compose.yaml")
-	if err != nil {
-		t.Fatalf("NewLoader() failed: %v", err)
-	}
-	_, err = loader.LoadCompose(context.Background())
+	loader := NewLoader("../../../tests/compose-go-warn/compose.yaml")
+	_, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
 	}

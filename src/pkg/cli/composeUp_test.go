@@ -15,10 +15,7 @@ func TestComposeUp(t *testing.T) {
 	DoDryRun = true
 	defer func() { DoDryRun = false }()
 
-	loader, err := compose.NewLoader("../../tests/testproj/compose.yaml")
-	if err != nil {
-		t.Fatalf("NewLoader() failed: %v", err)
-	}
+	loader := compose.NewLoader("../../tests/testproj/compose.yaml")
 	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)

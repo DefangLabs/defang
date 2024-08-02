@@ -322,10 +322,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		composeFilePath, _ := cmd.Flags().GetString("file")
-		loader, err := compose.NewLoader(composeFilePath)
-		if err != nil {
-			return err
-		}
+		loader := compose.NewLoader(composeFilePath)
 		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
@@ -586,10 +583,7 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		loader, err := compose.NewLoader(filepath.Join(prompt.Folder, "compose.yaml"))
-		if err != nil {
-			return err
-		}
+		loader := compose.NewLoader(filepath.Join(prompt.Folder, "compose.yaml"))
 		project, _ := loader.LoadCompose(cmd.Context())
 
 		var envInstructions []string

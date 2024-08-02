@@ -19,25 +19,13 @@ type Loader struct {
 	ComposeFilePath string
 }
 
-func NewLoader(composeFilePath string) (*Loader, error) {
-	var err error
-
-	if composeFilePath == "" {
-		composeFilePath, err = findDefaultComposeFilePath()
-		if err != nil {
-			return nil, types.ErrComposeFileNotFound
-		}
-	}
-
-	composeFilePath, err = filepath.Abs(composeFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Loader{ComposeFilePath: composeFilePath}, nil
+func NewLoader(composeFilePath string) *Loader {
+	return &Loader{ComposeFilePath: composeFilePath}
 }
 
 func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+	c.initializeComposeFilePath()
+
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -62,6 +50,25 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		fmt.Println(string(b))
 	}
 	return project, nil
+}
+
+func (c *Loader) initializeComposeFilePath() error {
+	composeFilePath := c.ComposeFilePath
+	var err error
+	if composeFilePath == "" {
+		composeFilePath, err = findDefaultComposeFilePath()
+		if err != nil {
+			return err
+		}
+	}
+
+	composeFilePath, err = filepath.Abs(composeFilePath)
+	if err != nil {
+		return err
+	}
+
+	c.ComposeFilePath = composeFilePath
+	return nil
 }
 
 func getDefaultProjectOptions(composeFilePath string, extraOpts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
