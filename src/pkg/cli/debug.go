@@ -16,10 +16,12 @@ import (
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
 // context window for the LLM also.
-// FIXME: Find a better way to handle files.
 const maxFiles = 20
 
-var errFileLimitReached = errors.New("file limit reached")
+var (
+	errFileLimitReached = errors.New("file limit reached")
+	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
+)
 
 func Debug(ctx context.Context, c client.Client, etag string, project *types.Project, services []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
@@ -120,7 +122,6 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 
 func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
 	var files []*defangv1.File
-	patterns := []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"}
 
 	if file := readFile(filepath.Join(folder, dockerfile)); file != nil {
 		files = append(files, file)
