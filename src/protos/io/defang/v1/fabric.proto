@@ -402,6 +402,7 @@ message Service {
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
+  Postgres postgres = 19; // x-defang-postgres: use a managed
 }
 
 message StaticFiles {
@@ -410,6 +411,7 @@ message StaticFiles {
 }
 
 message Redis {}
+message Postgres {}
 
 message Event {
   string specversion = 1; // required (but we don't care)
