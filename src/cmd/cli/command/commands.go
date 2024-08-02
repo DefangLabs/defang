@@ -55,7 +55,6 @@ func prettyError(err error) error {
 		err = errors.Unwrap(cerr)
 	}
 	return err
-
 }
 
 func Execute(ctx context.Context) error {
@@ -900,7 +899,7 @@ var composeUpCmd = &cobra.Command{
 				var errDeploymentFailed cli.ErrDeploymentFailed
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					term.Warn(errDeploymentFailed)
-					failedServices = []string{errDeploymentFailed.Service, errDeploymentFailed.Service + "-image"} // HACK: also grab Kaniko logs
+					failedServices = []string{errDeploymentFailed.Service}
 				} else {
 					term.Warn("Deployment is not finished. Service(s) might not be running.")
 					// TODO: some services might be OK and we should only debug the ones that are not
@@ -916,7 +915,7 @@ var composeUpCmd = &cobra.Command{
 					} else if aiDebug {
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled); HACK: cmd might be canceled too
 						// TODO: use the WorkingDir of the failed service, might not be the project's root
-						if err := cli.Debug(context.TODO(), client, deploy.Etag, project.WorkingDir, failedServices); err != nil {
+						if err := cli.Debug(context.TODO(), client, deploy.Etag, project, failedServices); err != nil {
 							term.Warnf("failed to debug deployment: %v", err)
 						}
 					}
@@ -966,16 +965,19 @@ var composeStartCmd = &cobra.Command{
 }
 
 var debugCmd = &cobra.Command{
-	Use:         "debug",
+	Use:         "debug [SERVICE...]",
 	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
 	Hidden:      true,
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
 
-		// TODO: use the WorkingDir of the current project instead of current folder
-		return cli.Debug(cmd.Context(), client, etag, ".", nil)
+		project, err := client.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.Debug(cmd.Context(), client, etag, project, args)
 	},
 }
 
