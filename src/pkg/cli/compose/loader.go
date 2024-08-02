@@ -124,7 +124,7 @@ func findDefaultComposeFilePath() (string, error) {
 
 	// TODO: add support for default override files
 	// if more than one default ConfigPath is found here, the second one will be
-	// and override file, see: https://github.com/compose-spec/compose-go/blob/bfaf10bba3cb8dce5f74dc4a1ff6ec22ab174a0f/cli/options.go#L172
+	// an override file, see: https://github.com/compose-spec/compose-go/blob/bfaf10bba3cb8dce5f74dc4a1ff6ec22ab174a0f/cli/options.go#L172
 	if len(projOpts.ConfigPaths) > 1 {
 		term.Warn("override files are not yet supported by defang. The following files will be ignored", projOpts.ConfigPaths[1:])
 	}
