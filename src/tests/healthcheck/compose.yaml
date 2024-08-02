@@ -1,17 +1,37 @@
 services:
   flask1:
     image: flask
+    ports:
+      - 5000
     healthcheck:
       test: ["CMD", "python", "-c", "import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()", "http://localhost/"]
   flask2:
     image: flask
+    ports:
+      - 5000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()"]
   wget:
     image: alpine
+    ports:
+      - 80
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "localhost:5000"]
+      test: ["CMD", "wget", "-q", "--spider", "localhost:80"]
   curl:
     image: curl
+    ports:
+      - 80
     healthcheck:
       test: ["CMD", "curl", "-f", "localhost"]
+  cmd-shell:
+    image: alpine
+    ports:
+      - 5000
+    healthcheck:
+      test: ["CMD-SHELL", "echo hello", "second line"]
+  none:
+    image: alpine
+    ports:
+      - 5000
+    healthcheck:
+      test: ["NONE", "ignored"]

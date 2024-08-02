@@ -1,9 +1,37 @@
 [
   {
+    "name": "cmd-shell",
+    "image": "alpine",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 5000,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "healthcheck": {
+      "test": [
+        "CMD-SHELL",
+        "echo hello",
+        "second line"
+      ]
+    },
+    "networks": 1
+  },
+  {
     "name": "curl",
     "image": "curl",
     "platform": 2,
     "internal": true,
+    "ports": [
+      {
+        "target": 80,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
     "healthcheck": {
       "test": [
         "CMD",
@@ -19,6 +47,13 @@
     "image": "flask",
     "platform": 2,
     "internal": true,
+    "ports": [
+      {
+        "target": 5000,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
     "healthcheck": {
       "test": [
         "CMD",
@@ -35,6 +70,13 @@
     "image": "flask",
     "platform": 2,
     "internal": true,
+    "ports": [
+      {
+        "target": 5000,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
     "healthcheck": {
       "test": [
         "CMD",
@@ -46,17 +88,44 @@
     "networks": 1
   },
   {
+    "name": "none",
+    "image": "alpine",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 5000,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "healthcheck": {
+      "test": [
+        "NONE",
+        "ignored"
+      ]
+    },
+    "networks": 1
+  },
+  {
     "name": "wget",
     "image": "alpine",
     "platform": 2,
     "internal": true,
+    "ports": [
+      {
+        "target": 80,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
     "healthcheck": {
       "test": [
         "CMD",
         "wget",
         "-q",
         "--spider",
-        "localhost:5000"
+        "localhost:80"
       ]
     },
     "networks": 1
