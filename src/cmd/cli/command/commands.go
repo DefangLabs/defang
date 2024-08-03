@@ -217,6 +217,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
+	composeCmd.AddCommand(getServicesCmd) // like docker compose ls
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -669,6 +670,7 @@ var getVersionCmd = &cobra.Command{
 var tailCmd = &cobra.Command{
 	Use:         "tail",
 	Annotations: authNeededAnnotation,
+	Aliases:     []string{"logs"},
 	Args:        cobra.NoArgs,
 	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -775,7 +777,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose start")
+		printDefangHint("To update the deployed values, do:", "compose restart")
 		return nil
 	},
 }
@@ -814,7 +816,16 @@ var configListCmd = &cobra.Command{
 }
 
 var composeCmd = &cobra.Command{
-	Use:     "compose",
+	Use: "compose",
+	Long: `Define and deploy multi-container applications with Defang. Most compose commands require
+a "compose.yaml" file. The simplest "compose.yaml" file with a single service is:
+
+services:
+  app:              # the name of the service
+    build: .        # the folder with the Dockerfile and app sources (. means current folder)
+    ports:
+      - 80          # the port the service listens on for HTTP requests
+`,
 	Aliases: []string{"stack"},
 	Args:    cobra.NoArgs,
 	Short:   "Work with local Compose files",
@@ -832,6 +843,10 @@ var composeUpCmd = &cobra.Command{
 		since := time.Now()
 		deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
+			if !errors.Is(err, types.ErrComposeFileNotFound) {
+				return err
+			}
+			printDefangHint("To start a new project, do:", "new")
 			return err
 		}
 
