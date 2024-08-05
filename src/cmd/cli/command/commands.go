@@ -271,7 +271,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Use:           "defang",
 	Args:          cobra.NoArgs,
-	Short:         "Defang CLI manages services on the Defang cluster",
+	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		term.SetDebug(doDebug)
@@ -434,7 +434,7 @@ var generateCmd = &cobra.Command{
 	Use:     "generate [SAMPLE]",
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"gen", "new", "init"},
-	Short:   "Generate a sample Defang project in the current folder",
+	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var sample, language, defaultFolder string
 		if len(args) > 0 {
@@ -816,7 +816,10 @@ var configListCmd = &cobra.Command{
 }
 
 var composeCmd = &cobra.Command{
-	Use: "compose",
+	Use:     "compose",
+	Aliases: []string{"stack"},
+	Args:    cobra.NoArgs,
+	Short:   "Work with local Compose files",
 	Long: `Define and deploy multi-container applications with Defang. Most compose commands require
 a "compose.yaml" file. The simplest "compose.yaml" file with a single service is:
 
@@ -826,9 +829,6 @@ services:
     ports:
       - 80          # the port the service listens on for HTTP requests
 `,
-	Aliases: []string{"stack"},
-	Args:    cobra.NoArgs,
-	Short:   "Work with local Compose files",
 }
 
 var composeUpCmd = &cobra.Command{
