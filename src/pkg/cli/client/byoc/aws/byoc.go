@@ -774,7 +774,7 @@ func annotateAwsError(err error) error {
 	if aws.IsS3NoSuchKeyError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	if aws.IsParameternNotFoundError(err) {
+	if aws.IsParameterNotFoundError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
