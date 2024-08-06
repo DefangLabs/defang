@@ -14,11 +14,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Loader struct {
-	options *cli.ProjectOptions
+type LoaderOptions struct {
+	ConfigPaths []string
+	WorkingDir  string
 }
 
-func NewLoaderWithOptions(options *cli.ProjectOptions) Loader {
+type Loader struct {
+	options LoaderOptions
+}
+
+func NewLoaderWithOptions(options LoaderOptions) Loader {
 	return Loader{options: options}
 }
 
@@ -27,7 +32,7 @@ func NewLoaderWithPath(path string) Loader {
 	if path != "" {
 		configPaths = append(configPaths, path)
 	}
-	return NewLoaderWithOptions(&cli.ProjectOptions{ConfigPaths: configPaths})
+	return NewLoaderWithOptions(LoaderOptions{ConfigPaths: configPaths})
 }
 
 func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
@@ -35,17 +40,17 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
-	err := c.normalizeProjectOptions()
+	projOpts, err := c.projectOptions()
 	if err != nil {
 		return nil, err
 	}
 
 	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
 	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		c.options.Environment["COMPOSE_PROJECT_NAME"] = envProjName
+		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
-	project, err := c.options.LoadProject(ctx)
+	project, err := projOpts.LoadProject(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +60,14 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		fmt.Println(string(b))
 	}
 
-	if len(c.options.ConfigPaths) == 0 {
+	if len(project.ComposeFiles) == 0 {
 		return nil, types.ErrComposeFileNotFound
 	}
 
 	return project, nil
 }
 
-func (c *Loader) normalizeProjectOptions() error {
+func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 	options := c.options
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
@@ -91,12 +96,5 @@ func (c *Loader) normalizeProjectOptions() error {
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	}
 
-	projOpts, err := cli.NewProjectOptions(options.ConfigPaths, optFns...)
-	if err != nil {
-		return err
-	}
-
-	c.options = projOpts
-
-	return nil
+	return cli.NewProjectOptions(options.ConfigPaths, optFns...)
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/cli"
 )
 
 func TestLoadCompose(t *testing.T) {
@@ -157,7 +156,7 @@ func TestComposeMultipleFiles(t *testing.T) {
 	os.Chdir("../../../tests/multiple")
 
 	composeFiles := []string{"compose1.yaml", "compose2.yaml"}
-	loader := NewLoaderWithOptions(&cli.ProjectOptions{ConfigPaths: composeFiles})
+	loader := NewLoaderWithOptions(LoaderOptions{ConfigPaths: composeFiles})
 	project, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)

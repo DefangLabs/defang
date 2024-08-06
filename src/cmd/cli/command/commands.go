@@ -25,7 +25,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	composeCli "github.com/compose-spec/compose-go/v2/cli"
 	proj "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
@@ -570,11 +569,11 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		projectOptions := composeCli.ProjectOptions{
+		loaderOptions := compose.LoaderOptions{
 			WorkingDir:  prompt.Folder,
 			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
 		}
-		loader := compose.NewLoaderWithOptions(&projectOptions)
+		loader := compose.NewLoaderWithOptions(loaderOptions)
 		project, _ := loader.LoadCompose(cmd.Context())
 
 		var envInstructions []string
@@ -1261,18 +1260,19 @@ var tosCmd = &cobra.Command{
 
 func configureLoader(cmd *cobra.Command) compose.Loader {
 	f := cmd.Flags()
-	o := composeCli.ProjectOptions{}
+	o := compose.LoaderOptions{}
 	var err error
 	o.ConfigPaths, err = f.GetStringArray("file") // to make sure the flag is defined
 	if err != nil {
 		panic(err)
 	}
+
 	o.WorkingDir, err = f.GetString("cwd")
 	if err != nil {
 		panic(err)
 	}
 
-	return compose.NewLoaderWithOptions(&o)
+	return compose.NewLoaderWithOptions(o)
 }
 
 func awsInEnv() bool {
