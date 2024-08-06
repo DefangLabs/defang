@@ -68,6 +68,16 @@ func Execute(ctx context.Context) error {
 			term.Error("Error:", prettyError(err))
 		}
 
+		var derr *cli.ComposeError
+		if errors.As(err, &derr) {
+			compose := "compose"
+			fileFlag := composeCmd.Flag("file")
+			if fileFlag.Changed {
+				compose += " -f " + fileFlag.Value.String()
+			}
+			printDefangHint("Fix the error and try again. To validate the compose file, use:", compose+" config")
+		}
+
 		if strings.Contains(err.Error(), "config") {
 			printDefangHint("To manage sensitive service config, use:", "config")
 		}
@@ -124,7 +134,9 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
+	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
@@ -162,7 +174,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(generateCmd)
 
 	// Get Services Command
-	getServicesCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
 	RootCmd.AddCommand(getServicesCmd)
 
@@ -173,7 +184,6 @@ func SetupCommands(version string) {
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
-	configCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	configCmd.AddCommand(configSetCmd)
 
 	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
@@ -183,7 +193,6 @@ func SetupCommands(version string) {
 	configCmd.AddCommand(configListCmd)
 
 	RootCmd.AddCommand(configCmd)
-	restartCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	RootCmd.AddCommand(restartCmd)
 
 	// Compose Command
@@ -193,8 +202,6 @@ func SetupCommands(version string) {
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
-	composeCmd.Flags().StringP("cwd", "C", "", "change directory before running the command")
-	composeCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -216,7 +223,6 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
-	tailCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	tailCmd.Flags().StringP("name", "n", "", "name of the service")
 	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
@@ -308,6 +314,13 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		cwd, _ := cmd.Flags().GetString("cwd")
+		if cwd != "" {
+			// Change directory before running the command
+			if err = os.Chdir(cwd); err != nil {
+				return err
+			}
+		}
 		loader := configureLoader(cmd)
 		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
@@ -1262,7 +1275,8 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 	f := cmd.Flags()
 	o := compose.LoaderOptions{}
 	var err error
-	o.ConfigPaths, err = f.GetStringArray("file") // to make sure the flag is defined
+
+	o.ConfigPaths, err = f.GetStringArray("file")
 	if err != nil {
 		panic(err)
 	}
