@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/errdefs"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -52,16 +54,16 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 
 	project, err := projOpts.LoadProject(ctx)
 	if err != nil {
+		if errors.Is(err, errdefs.ErrNotFound) {
+			return nil, types.ErrComposeFileNotFound
+		}
+
 		return nil, err
 	}
 
 	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
 		fmt.Println(string(b))
-	}
-
-	if len(project.ComposeFiles) == 0 {
-		return nil, types.ErrComposeFileNotFound
 	}
 
 	return project, nil
