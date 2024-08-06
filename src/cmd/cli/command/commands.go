@@ -732,7 +732,7 @@ var configSetCmd = &cobra.Command{
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
-		if !pkg.IsValidSecretName(name) {
+		if !pkg.IsValidConfigName(name) {
 			return fmt.Errorf("invalid config name: %q", name)
 		}
 
@@ -820,7 +820,8 @@ var configGetCmd = &cobra.Command{
 	Aliases:     []string{"show", "inspect"},
 	Short:       "Show configs",
 	RunE: func(cmd *cobra.Command, names []string) error {
-		return cli.ConfigGet(cmd.Context(), client, names...)
+		_, err := cli.ConfigGet(cmd.Context(), client, names...)
+		return err
 	},
 }
 

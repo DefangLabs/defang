@@ -25,7 +25,7 @@ func IsValidTailName(name string) bool {
 	return len(name) < 64 && validServiceRegex.MatchString(name)
 }
 
-func IsValidSecretName(name string) bool {
+func IsValidConfigName(name string) bool {
 	return validSecretRegex.MatchString(name)
 }
 

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/google/uuid"
@@ -33,11 +32,11 @@ func TestPutConfig(t *testing.T) {
 	svc := ssm.NewFromConfig(cfg)
 
 	// Create random secret name and value
+	rootPath = "/"
 	name := uuid.NewString()
 	value := uuid.NewString()
-	secretId := name // caller should have added any prefix
-
-	exist, err := a.IsValidSecret(ctx, name)
+	secretId := rootPath + name
+	exist, err := a.IsValidConfig(ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +44,7 @@ func TestPutConfig(t *testing.T) {
 		t.Fatal("secret should not exist")
 	}
 
-	err = a.PutConfig(ctx, name, value)
+	err = a.PutConfig(ctx, name, value, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,18 +53,20 @@ func TestPutConfig(t *testing.T) {
 		Name: &secretId,
 	})
 
-	gsv, err := svc.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           &secretId,
-		WithDecryption: aws.Bool(true),
-	})
+	configValues, err := a.GetConfig(ctx, []string{name}, rootPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if value != *gsv.Parameter.Value {
-		t.Fatalf("expected %s, got %s", value, *gsv.Parameter.Value)
+
+	if len(configValues.Configs) == 1 {
+		t.Fatalf("expected 1 config, got %d", len(configValues.Configs))
 	}
 
-	exist, err = a.IsValidSecret(ctx, name)
+	if value != configValues.Configs[0].Value {
+		t.Fatalf("expected %s, got %s", value, configValues.Configs[0].Value)
+	}
+
+	exist, err = a.IsValidConfigName(ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,13 +91,13 @@ func TestPutConfig(t *testing.T) {
 	}
 
 	// Overwrite secret with a new value
-	err = a.PutConfig(ctx, name, "new value")
+	err = a.PutConfig(ctx, name, "new value", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Overwrite secret with empty; this should delete the secret
-	err = a.DeleteSecrets(ctx, name)
+	err = a.DeleteConfig(ctx, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestPutConfig(t *testing.T) {
 	}
 
 	// Delete the secret again; this should return NotFound
-	err = a.DeleteSecrets(ctx, name)
+	err = a.DeleteConfig(ctx, name)
 	if !isErrCodeNotFound(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)
 	}
