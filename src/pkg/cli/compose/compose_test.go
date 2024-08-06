@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/compose-spec/compose-go/v2/cli"
 )
 
 func TestLoadCompose(t *testing.T) {
@@ -145,5 +146,28 @@ func TestComposeOnlyOneFile(t *testing.T) {
 
 	if len(project.ComposeFiles) != 1 {
 		t.Errorf("LoadCompose() failed: expected only one config file, got %d", len(project.ComposeFiles))
+	}
+}
+
+func TestComposeMultipleFiles(t *testing.T) {
+	cwd, _ := os.Getwd()
+	t.Cleanup(func() {
+		os.Chdir(cwd)
+	})
+	os.Chdir("../../../tests/multiple")
+
+	composeFiles := []string{"compose1.yaml", "compose2.yaml"}
+	loader := NewLoaderWithOptions(cli.ProjectOptions{ConfigPaths: composeFiles})
+	project, err := loader.LoadCompose(context.Background())
+	if err != nil {
+		t.Fatalf("LoadCompose() failed: %v", err)
+	}
+
+	if len(project.ComposeFiles) != 2 {
+		t.Errorf("LoadCompose() failed: expected 2 compose files, got %d", len(project.ComposeFiles))
+	}
+
+	if len(project.Services) != 2 {
+		t.Errorf("LoadCompose() failed: expected 2 services, got %d", len(project.Services))
 	}
 }
