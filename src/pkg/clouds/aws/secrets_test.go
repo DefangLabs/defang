@@ -48,10 +48,9 @@ func TestPutConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// Cleanup after test
-	defer svc.DeleteParameter(ctx, &ssm.DeleteParameterInput{
-		Name: &secretId,
-	})
+	defer a.DeleteConfig(ctx, name)
 
 	configValues, err := a.GetConfig(ctx, []string{name}, rootPath)
 	if err != nil {
@@ -103,9 +102,7 @@ func TestPutConfig(t *testing.T) {
 	}
 
 	// Check that the secret is deleted
-	_, err = svc.GetParameter(ctx, &ssm.GetParameterInput{
-		Name: &secretId,
-	})
+	_, err = a.GetConfig(ctx, rootPath, name)
 	if !isErrCodeNotFound(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)
 	}

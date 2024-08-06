@@ -23,15 +23,17 @@ func getConfigPathID(name string) *string {
 }
 
 func getSensitiveConfigPathID(rootPath, name string) *string {
-	return ptr.String(strings.Join([]string{rootPath, SENSITIVE_PATH_PART, name}, "/"))
+	root := strings.TrimRight(strings.Trim(rootPath, " "), "/")
+	return ptr.String(strings.Join([]string{root, SENSITIVE_PATH_PART, name}, "/"))
 }
 
 func getNonSensitiveConfigPathID(rootPath, name string) *string {
-	return ptr.String(strings.Join([]string{rootPath, CONFIG_PATH_PART, name}, "/"))
+	root := strings.TrimRight(strings.Trim(rootPath, " "), "/")
+	return ptr.String(strings.Join([]string{root, CONFIG_PATH_PART, name}, "/"))
 }
 
-func IsParameterNotFoundError(err error) bool {
-	var e *types.ParameterNotFound
+func IsParameterInvalidError(err error) bool {
+	var e *types.InvalidParameters
 	return errors.As(err, &e)
 }
 
@@ -110,9 +112,7 @@ func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, rootPath,
 
 	// param should not exist in any other path otherwise there is a conflict
 	if err != nil {
-		if !IsParameterNotFoundError(err) {
-			return err
-		}
+		return err
 	} else {
 		// found in another path, return error
 		if isSensitive {
@@ -177,16 +177,19 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 	})
 
 	if err != nil {
-		if !IsParameterNotFoundError(err) {
-			return err
-		}
+		return err
 	}
 
 	for _, param := range gpo.Parameters {
+		value := ""
+		if !isSensitive {
+			value = *param.Value
+		}
+
 		(*outdata).Configs = append((*outdata).Configs,
 			&defangv1.ConfigValue{
 				Name:        *param.Name,
-				Value:       *param.Value,
+				Value:       value,
 				IsSensitive: isSensitive,
 			})
 	}
@@ -195,6 +198,20 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 }
 
 func (a *Aws) GetConfig(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
+
+	// if not names are provided, get all the configs
+	if len(names) == 0 {
+		list, err := a.ListConfigsByPrefix(ctx, rootPath)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, name := range list {
+			lastIndex := strings.LastIndex(name, "/")
+			names = append(names, name[lastIndex+1:])
+		}
+	}
+
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err

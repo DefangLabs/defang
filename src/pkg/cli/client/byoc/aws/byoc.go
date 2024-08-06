@@ -445,7 +445,7 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (*def
 	configValue, err := b.driver.GetConfig(ctx, rootPath, config.Names...)
 	if err != nil {
 		term.Errorf("error getting config: %v", err)
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve configs"))
+		return nil, annotateAwsError(err)
 	}
 
 	results := defangv1.ConfigValues{}
@@ -774,7 +774,7 @@ func annotateAwsError(err error) error {
 	if aws.IsS3NoSuchKeyError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	if aws.IsParameterNotFoundError(err) {
+	if aws.IsParameterInvalidError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	return err
