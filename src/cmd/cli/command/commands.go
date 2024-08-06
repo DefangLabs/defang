@@ -136,7 +136,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
-	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
+	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
@@ -183,6 +183,7 @@ func SetupCommands(version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	_ = configSetCmd.Flags().MarkHidden("name")
+
 	configCmd.AddCommand(configSetCmd)
 
 	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
@@ -320,9 +321,7 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
-
-		composeFilePath, _ := cmd.Flags().GetString("file")
-		loader := compose.Loader{ComposeFilePath: composeFilePath}
+		loader := configureLoader(cmd)
 		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
@@ -583,7 +582,11 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		loader := compose.Loader{ComposeFilePath: filepath.Join(prompt.Folder, "compose.yaml")}
+		loaderOptions := compose.LoaderOptions{
+			WorkingDir:  prompt.Folder,
+			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
+		}
+		loader := compose.NewLoaderWithOptions(loaderOptions)
 		project, _ := loader.LoadCompose(cmd.Context())
 
 		var envInstructions []string
@@ -1266,6 +1269,24 @@ var tosCmd = &cobra.Command{
 		printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 		return nil
 	},
+}
+
+func configureLoader(cmd *cobra.Command) compose.Loader {
+	f := cmd.Flags()
+	o := compose.LoaderOptions{}
+	var err error
+
+	o.ConfigPaths, err = f.GetStringArray("file")
+	if err != nil {
+		panic(err)
+	}
+
+	o.WorkingDir, err = f.GetString("cwd")
+	if err != nil {
+		panic(err)
+	}
+
+	return compose.NewLoaderWithOptions(o)
 }
 
 func awsInEnv() bool {
