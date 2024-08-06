@@ -58,12 +58,12 @@ service FabricController {
     option deprecated = true;
   } // no values
 
-  rpc GetConfig(Configs) returns (ConfigValues) {
+  rpc GetConfigs(Configs) returns (ConfigValues) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   rpc PutConfig(PutValue) returns (google.protobuf.Empty);
   rpc DeleteConfigs(Configs) returns (google.protobuf.Empty);
-  rpc ListConfigs(google.protobuf.Empty) returns (Configs) {
+  rpc ListConfigs(ListConfigsRequest) returns (Configs) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
   
@@ -234,6 +234,10 @@ message ConfigValue {
 message ConfigValues {
   repeated ConfigValue configs = 1;
   string project = 2; // defaults to tenant ID
+}
+
+message ListConfigsRequest {
+  string project = 1; // defaults to tenant ID
 }
 
 message TokenRequest {

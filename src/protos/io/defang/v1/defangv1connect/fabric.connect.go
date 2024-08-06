@@ -92,9 +92,9 @@ const (
 	// FabricControllerListSecretsProcedure is the fully-qualified name of the FabricController's
 	// ListSecrets RPC.
 	FabricControllerListSecretsProcedure = "/io.defang.v1.FabricController/ListSecrets"
-	// FabricControllerGetConfigProcedure is the fully-qualified name of the FabricController's
-	// GetConfig RPC.
-	FabricControllerGetConfigProcedure = "/io.defang.v1.FabricController/GetConfig"
+	// FabricControllerGetConfigsProcedure is the fully-qualified name of the FabricController's
+	// GetConfigs RPC.
+	FabricControllerGetConfigsProcedure = "/io.defang.v1.FabricController/GetConfigs"
 	// FabricControllerPutConfigProcedure is the fully-qualified name of the FabricController's
 	// PutConfig RPC.
 	FabricControllerPutConfigProcedure = "/io.defang.v1.FabricController/PutConfig"
@@ -151,10 +151,10 @@ type FabricControllerClient interface {
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	GetConfig(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error)
+	GetConfigs(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error)
 	PutConfig(context.Context, *connect_go.Request[v1.PutValue]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[emptypb.Empty], error)
-	ListConfigs(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Configs], error)
+	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Configs], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
@@ -285,9 +285,9 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		getConfig: connect_go.NewClient[v1.Configs, v1.ConfigValues](
+		getConfigs: connect_go.NewClient[v1.Configs, v1.ConfigValues](
 			httpClient,
-			baseURL+FabricControllerGetConfigProcedure,
+			baseURL+FabricControllerGetConfigsProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
@@ -301,7 +301,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDeleteConfigsProcedure,
 			opts...,
 		),
-		listConfigs: connect_go.NewClient[emptypb.Empty, v1.Configs](
+		listConfigs: connect_go.NewClient[v1.ListConfigsRequest, v1.Configs](
 			httpClient,
 			baseURL+FabricControllerListConfigsProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -365,10 +365,10 @@ type fabricControllerClient struct {
 	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
 	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
-	getConfig                *connect_go.Client[v1.Configs, v1.ConfigValues]
+	getConfigs               *connect_go.Client[v1.Configs, v1.ConfigValues]
 	putConfig                *connect_go.Client[v1.PutValue, emptypb.Empty]
 	deleteConfigs            *connect_go.Client[v1.Configs, emptypb.Empty]
-	listConfigs              *connect_go.Client[emptypb.Empty, v1.Configs]
+	listConfigs              *connect_go.Client[v1.ListConfigsRequest, v1.Configs]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
@@ -488,9 +488,9 @@ func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_g
 	return c.listSecrets.CallUnary(ctx, req)
 }
 
-// GetConfig calls io.defang.v1.FabricController.GetConfig.
-func (c *fabricControllerClient) GetConfig(ctx context.Context, req *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error) {
-	return c.getConfig.CallUnary(ctx, req)
+// GetConfigs calls io.defang.v1.FabricController.GetConfigs.
+func (c *fabricControllerClient) GetConfigs(ctx context.Context, req *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error) {
+	return c.getConfigs.CallUnary(ctx, req)
 }
 
 // PutConfig calls io.defang.v1.FabricController.PutConfig.
@@ -504,7 +504,7 @@ func (c *fabricControllerClient) DeleteConfigs(ctx context.Context, req *connect
 }
 
 // ListConfigs calls io.defang.v1.FabricController.ListConfigs.
-func (c *fabricControllerClient) ListConfigs(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Configs], error) {
+func (c *fabricControllerClient) ListConfigs(ctx context.Context, req *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Configs], error) {
 	return c.listConfigs.CallUnary(ctx, req)
 }
 
@@ -567,10 +567,10 @@ type FabricControllerHandler interface {
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
-	GetConfig(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error)
+	GetConfigs(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error)
 	PutConfig(context.Context, *connect_go.Request[v1.PutValue]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[emptypb.Empty], error)
-	ListConfigs(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Configs], error)
+	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Configs], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
@@ -697,9 +697,9 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
-	fabricControllerGetConfigHandler := connect_go.NewUnaryHandler(
-		FabricControllerGetConfigProcedure,
-		svc.GetConfig,
+	fabricControllerGetConfigsHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetConfigsProcedure,
+		svc.GetConfigs,
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
@@ -795,8 +795,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteSecretsHandler.ServeHTTP(w, r)
 		case FabricControllerListSecretsProcedure:
 			fabricControllerListSecretsHandler.ServeHTTP(w, r)
-		case FabricControllerGetConfigProcedure:
-			fabricControllerGetConfigHandler.ServeHTTP(w, r)
+		case FabricControllerGetConfigsProcedure:
+			fabricControllerGetConfigsHandler.ServeHTTP(w, r)
 		case FabricControllerPutConfigProcedure:
 			fabricControllerPutConfigHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteConfigsProcedure:
@@ -908,8 +908,8 @@ func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connec
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListSecrets is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) GetConfig(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetConfig is not implemented"))
+func (UnimplementedFabricControllerHandler) GetConfigs(context.Context, *connect_go.Request[v1.Configs]) (*connect_go.Response[v1.ConfigValues], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetConfigs is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) PutConfig(context.Context, *connect_go.Request[v1.PutValue]) (*connect_go.Response[emptypb.Empty], error) {
@@ -920,7 +920,7 @@ func (UnimplementedFabricControllerHandler) DeleteConfigs(context.Context, *conn
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteConfigs is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) ListConfigs(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Configs], error) {
+func (UnimplementedFabricControllerHandler) ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Configs], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListConfigs is not implemented"))
 }
 

@@ -36,7 +36,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	}
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := c.ListConfig(ctx)
+	config, err := c.ListConfigs(ctx, &defangv1.ListConfigsRequest{})
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
 		config = &defangv1.Configs{}

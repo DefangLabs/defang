@@ -103,15 +103,19 @@ func (l *Local) GetInfo(ctx context.Context, taskID PID) (*types.TaskInfo, error
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) PutConfig(ctx context.Context, name, value string, isSensitive bool) error {
+func (l *Local) PutConfig(ctx context.Context, rootPath, name, value string, isSensitive bool) error {
 	return client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) GetConfig(ctx context.Context, names []string, rootPath string) (*defangv1.ConfigValues, error) {
+func (l *Local) DeleteConfigs(ctx context.Context, rootPath string, name ...string) error {
+	return client.ErrNotImplemented("not implemented for local driver")
+}
+
+func (l *Local) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) ListConfigs(ctx context.Context) ([]string, error) {
+func (l *Local) ListConfigs(ctx context.Context, projectName string) ([]string, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 

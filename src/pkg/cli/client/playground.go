@@ -42,25 +42,25 @@ func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutValue)
 	return err
 }
 
-func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Configs) error {
+func (g PlaygroundClient) DeleteConfigs(ctx context.Context, req *defangv1.Configs) error {
 	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(&defangv1.Configs{Names: req.Names}))
 	return err
 }
 
-func (g PlaygroundClient) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
-	return getMsg(g.client.ListConfigs(ctx, &connect.Request[emptypb.Empty]{}))
+func (g PlaygroundClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Configs, error) {
+	return getMsg(g.client.ListConfigs(ctx, connect.NewRequest(&defangv1.ListConfigsRequest{Project: req.Project})))
 }
 
 func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) GetConfig(ctx context.Context, req *defangv1.Configs) (*defangv1.ConfigValues, error) {
+func (g PlaygroundClient) GetConfigs(ctx context.Context, req *defangv1.Configs) (*defangv1.ConfigValues, error) {
 	param := connect.NewRequest(&defangv1.Configs{})
 	if req.Names != nil && len(req.Names) >= 0 {
 		param = connect.NewRequest(&defangv1.Configs{Names: req.Names})
 	}
-	return getMsg(g.client.GetConfig(ctx, param))
+	return getMsg(g.client.GetConfigs(ctx, param))
 }
 
 func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {

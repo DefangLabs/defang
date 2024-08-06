@@ -51,7 +51,7 @@ func TestIsValidServiceName(t *testing.T) {
 	}
 }
 
-func TestIsValidSecretName(t *testing.T) {
+func TestIsValidConfigName(t *testing.T) {
 	tests := []struct {
 		name string
 		want bool
@@ -74,8 +74,8 @@ func TestIsValidSecretName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsValidSecretName(tt.name); got != tt.want {
-				t.Errorf("IsValidSecretName(%v) = %v, want %v", tt.name, got, tt.want)
+			if got := IsValidConfigName(tt.name); got != tt.want {
+				t.Errorf("IsValidConfigName(%v) = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}

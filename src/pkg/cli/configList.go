@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func ConfigList(ctx context.Context, client client.Client) error {
@@ -14,7 +15,7 @@ func ConfigList(ctx context.Context, client client.Client) error {
 	}
 	term.Debugf("Listing config in project %q", projectName)
 
-	config, err := client.ListConfig(ctx)
+	config, err := client.ListConfigs(ctx, &defangv1.ListConfigsRequest{Project: projectName})
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -15,28 +16,27 @@ import (
 )
 
 const CONFIG_PATH_PART = "config"
-const SENSITIVE_PATH_PART = "sensitive"
+const SENSITIVE_PATH_PART = ""
 
 // TODO: this function is pretty useless, but it's here for consistency
 func getConfigPathID(name string) *string {
 	return ptr.String(name)
 }
 
-func insertPreConfigNamePath(name, pathPart string) (*string, error) {
-	// add the new path part to the name (we will swap positions of the
-	// variable name part with the new path part below)
-	pathParts := strings.Split(name+"/"+pathPart, "/")
-	if len(pathParts) < 2 {
-		return nil, errors.New("invalid config name")
-	}
+func stripPath(name string) string {
+	lastIndex := strings.LastIndex(name, "/")
+	return name[lastIndex+1:]
+}
 
-	// swap the variable name part with the new path part
-	varPart := pathParts[len(pathParts)-2]
-	pathParts[len(pathParts)-2] = pathPart
-	pathParts[len(pathParts)-1] = varPart
+func getSensitiveConfigPathID(rootPath, name string) *string {
+	root := strings.TrimRight(strings.Trim(rootPath, " "), "/")
+	path.Join()
+	return ptr.String(path.Join(root, SENSITIVE_PATH_PART, name))
+}
 
-	// rejoin everthing and return
-	return ptr.String(strings.Join(pathParts, "/")), nil
+func getNonSensitiveConfigPathID(rootPath, name string) *string {
+	root := strings.TrimRight(strings.Trim(rootPath, " "), "/")
+	return ptr.String(path.Join(root, CONFIG_PATH_PART, name))
 }
 
 func IsParameterNotFoundError(err error) bool {
@@ -44,7 +44,7 @@ func IsParameterNotFoundError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
+func (a *Aws) DeleteConfigs(ctx context.Context, rootPath string, names ...string) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
@@ -55,34 +55,28 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 	offset := len(names)
 	paths := make([]string, 2*offset)
 
+	// since we don't know whether the config is sensitive or not,
+	// we delete from both paths expecting half to be invalid
 	for index, name := range names {
-		path, err := insertPreConfigNamePath(name, SENSITIVE_PATH_PART)
-		if err != nil {
-			return err
-		}
-		paths[index] = *path
-
-		path, err = insertPreConfigNamePath(name, CONFIG_PATH_PART)
-		if err != nil {
-			return err
-		}
-		paths[offset+index] = *path
+		paths[index] = *getSensitiveConfigPathID(rootPath, name)
+		paths[offset+index] = *getNonSensitiveConfigPathID(rootPath, name)
 	}
 
-	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
+	dpo, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
 		Names: paths,
 	})
-
 	if err != nil {
-		return fmt.Errorf("failed to delete configs: %v", err)
+		return fmt.Errorf("failed to delete all configs: %v", err)
 	}
-	if len(o.InvalidParameters) > 0 && len(o.DeletedParameters) == 0 {
+
+	if len(dpo.DeletedParameters) < len(names) {
 		return &types.ParameterNotFound{}
 	}
+
 	return nil
 }
 
-func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
+func (a *Aws) IsValidConfigName(ctx context.Context, name string) (bool, error) {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return false, err
@@ -99,7 +93,7 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 		})
 
 	if error != nil {
-		return false, error
+		return false, fmt.Errorf("failed to validate config name: %s", name)
 	}
 
 	for _, param := range gpo.Parameters {
@@ -112,67 +106,60 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
 
-func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, name string, isSensitive bool) error {
-	var altPath *string
-
-	var err error
+func doesConfigNameExist(ctx context.Context, svc *ssm.Client, rootPath, name string, isSensitive bool) bool {
+	var path *string
 	if isSensitive {
-		altPath, err = insertPreConfigNamePath(name, SENSITIVE_PATH_PART)
+		path = getSensitiveConfigPathID(rootPath, name)
 	} else {
-		altPath, err = insertPreConfigNamePath(name, CONFIG_PATH_PART)
+		path = getNonSensitiveConfigPathID(rootPath, name)
 	}
 
-	if err != nil {
-		return err
-	}
-
-	_, err = svc.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           altPath,
+	_, err := svc.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           path,
 		WithDecryption: ptr.Bool(false),
 	})
 
 	// param should not exist in any other path otherwise there is a conflict
 	if err != nil {
-		if !IsParameterNotFoundError(err) {
-			return err
-		}
-	} else {
-		// found in another path, return error
-		if isSensitive {
-			return errors.New("variable already exists as a non-sensitive")
-		} else {
-			return errors.New("variable already exists as a sensitive")
+		if IsParameterNotFoundError(err) {
+			return false
 		}
 	}
 
-	return nil
+	return true
 }
 
-func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive bool) error {
+func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSensitive bool) error {
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	configPath := getConfigPathID(name)
-	configValue := ptr.String(value)
-
 	svc := ssm.NewFromConfig(cfg)
-
-	if err := errorOnDuplicateConfigExist(ctx, svc, name, isSensitive); err != nil {
-		return err
+	if doesConfigNameExist(ctx, svc, rootPath, name, !isSensitive) {
+		if isSensitive {
+			return fmt.Errorf("cannot change %q from sensitive to non-sensitive", name)
+		} else {
+			return fmt.Errorf("cannot change %q from non-sensitive to sensitive", name)
+		}
 	}
 
-	// Call ssm:PutParameter
+	var configPath *string
+	if isSensitive {
+		configPath = getSensitiveConfigPathID(rootPath, name)
+	} else {
+		configPath = getNonSensitiveConfigPathID(rootPath, name)
+	}
+
 	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
 		Name:      configPath,
-		Value:     configValue,
+		Value:     ptr.String(value),
 	})
 
 	if err != nil {
-		return err
+		return errors.New("failed to save config")
 	}
 
 	return nil
@@ -181,22 +168,13 @@ func (a *Aws) PutConfig(ctx context.Context, name, value string, isSensitive boo
 func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata *defangv1.ConfigValues) error {
 	namePaths := make([]string, len(names))
 
-	insertPathPart := CONFIG_PATH_PART
-	if isSensitive {
-		insertPathPart = SENSITIVE_PATH_PART
-	}
-
 	var err error
-	var basePath string
-	var path *string
 	for index, name := range names {
-		basePath = *getConfigPathID(rootPath + name)
-
-		path, err = insertPreConfigNamePath(basePath, insertPathPart)
-		if err != nil {
-			return err
+		if isSensitive {
+			namePaths[index] = *getSensitiveConfigPathID(rootPath, name)
+		} else {
+			namePaths[index] = *getNonSensitiveConfigPathID(rootPath, name)
 		}
-		namePaths[index] = *path
 	}
 
 	// 1. if sensitive ... tell user, don't need to have to fetch value
@@ -207,16 +185,19 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 	})
 
 	if err != nil {
-		if !IsParameterNotFoundError(err) {
-			return err
-		}
+		return errors.New("failed to get config")
 	}
 
 	for _, param := range gpo.Parameters {
+		value := ""
+		if !isSensitive {
+			value = *param.Value
+		}
+
 		(*outdata).Configs = append((*outdata).Configs,
 			&defangv1.ConfigValue{
 				Name:        *param.Name,
-				Value:       *param.Value,
+				Value:       value,
 				IsSensitive: isSensitive,
 			})
 	}
@@ -224,7 +205,20 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 	return nil
 }
 
-func (a *Aws) GetConfig(ctx context.Context, names []string, rootPath string) (*defangv1.ConfigValues, error) {
+func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
+	// if no names are provided, get all the configs
+	if len(names) == 0 {
+		list, err := a.ListConfigsByPrefix(ctx, rootPath)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, name := range list {
+			lastIndex := strings.LastIndex(name, "/")
+			names = append(names, name[lastIndex+1:])
+		}
+	}
+
 	cfg, err := a.LoadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -237,20 +231,21 @@ func (a *Aws) GetConfig(ctx context.Context, names []string, rootPath string) (*
 		return nil, err
 	}
 
-	// we are done when output has the same number
-	if len(output.Configs) == len(names) {
-		return &output, nil
+	// if we didn't get all the configs, try to get the rest as sensitives
+	if len(output.Configs) != len(names) {
+		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
-		return nil, err
+	for _, config := range output.Configs {
+		config.Name = stripPath(config.Name)
 	}
-
 	return &output, nil
 }
 
-func (a *Aws) ListConfigs(ctx context.Context) ([]string, error) {
-	return a.ListConfigsByPrefix(ctx, "")
+func (a *Aws) ListConfigs(ctx context.Context, projectName string) ([]string, error) {
+	return a.ListConfigsByPrefix(ctx, *getConfigPathID(""))
 }
 
 func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string, error) {
@@ -261,28 +256,28 @@ func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	svc := ssm.NewFromConfig(cfg)
 
-	var filters []types.ParameterStringFilter
-	// DescribeParameters fails if the BeginsWith value is empty
-	if prefix := *getConfigPathID(prefix); prefix != "" {
-		filters = append(filters, types.ParameterStringFilter{
-			Key:    ptr.String("Name"),
-			Option: ptr.String("BeginsWith"),
-			Values: []string{prefix},
+	var nextToken *string = nil
+	var names = make([]string, 0)
+	for {
+		res, err := svc.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
+			Path:           &prefix,
+			Recursive:      aws.Bool(true),
+			NextToken:      nextToken,
+			WithDecryption: aws.Bool(false),
 		})
-	}
+		if err != nil {
+			return nil, errors.New("failed to get of list configs")
+		}
 
-	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
-		ParameterFilters: filters,
-	})
-	if err != nil {
-		return nil, err
+		for _, p := range res.Parameters {
+			name := stripPath(*p.Name)
+			names = append(names, name)
+		}
+		if res.NextToken == nil {
+			break
+		}
+		nextToken = res.NextToken
 	}
-
-	names := make([]string, 0, len(res.Parameters))
-	for _, p := range res.Parameters {
-		names = append(names, *p.Name)
-	}
-	sort.Strings(names) // make sure the output is deterministic
+	sort.Strings(names)
 	return names, nil
 }
