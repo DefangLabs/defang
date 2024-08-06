@@ -32,8 +32,8 @@ func getNonSensitiveConfigPathID(rootPath, name string) *string {
 	return ptr.String(strings.Join([]string{root, CONFIG_PATH_PART, name}, "/"))
 }
 
-func IsParameterInvalidError(err error) bool {
-	var e *types.InvalidParameters
+func IsParameternNotFoundError(err error) bool {
+	var e *types.ParameterNotFound
 	return errors.As(err, &e)
 }
 
@@ -112,6 +112,10 @@ func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, rootPath,
 
 	// param should not exist in any other path otherwise there is a conflict
 	if err != nil {
+		if IsParameternNotFoundError(err) {
+			return nil
+		}
+
 		return err
 	} else {
 		// found in another path, return error
@@ -121,8 +125,6 @@ func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, rootPath,
 			return errors.New("variable already exists as a sensitive")
 		}
 	}
-
-	return nil
 }
 
 func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSensitive bool) error {
