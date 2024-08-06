@@ -155,7 +155,7 @@ func ValidateProject(project *compose.Project) error {
 			}
 		}
 		for _, secret := range svccfg.Secrets {
-			if !pkg.IsValidSecretName(secret.Source) {
+			if !pkg.IsValidConfigName(secret.Source) {
 				return fmt.Errorf("service %q: secret name is invalid: %q", svccfg.Name, secret.Source)
 			}
 			// secret.Target will always be automatically constructed by compose-go to "/run/secrets/<source>"
