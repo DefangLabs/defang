@@ -450,10 +450,9 @@ func (b *ByocAws) GetConfig(ctx context.Context, config *defangv1.Configs) (*def
 
 	results := defangv1.ConfigValues{}
 	for _, data := range (*configValue).Configs {
-		name := pkg.StripPath(data.Name)
 		results.Configs = append(results.Configs,
 			&defangv1.ConfigValue{
-				Name:        name,
+				Name:        data.Name,
 				Value:       data.Value,
 				IsSensitive: data.IsSensitive,
 			})
@@ -470,12 +469,7 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Configs, error) {
 		return nil, err
 	}
 
-	configs := make([]string, len(awsConfigs))
-	for index, config := range awsConfigs {
-		configs[index] = pkg.StripPath(config)
-	}
-
-	return &defangv1.Configs{Names: configs}, nil
+	return &defangv1.Configs{Names: awsConfigs}, nil
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {

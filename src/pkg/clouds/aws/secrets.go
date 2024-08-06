@@ -22,6 +22,11 @@ func getConfigPathID(name string) *string {
 	return ptr.String(name)
 }
 
+func stripPath(name string) string {
+	lastIndex := strings.LastIndex(name, "/")
+	return name[lastIndex+1:]
+}
+
 func getSensitiveConfigPathID(rootPath, name string) *string {
 	root := strings.TrimRight(strings.Trim(rootPath, " "), "/")
 	return ptr.String(strings.Join([]string{root, SENSITIVE_PATH_PART, name}, "/"))
@@ -226,15 +231,16 @@ func (a *Aws) GetConfig(ctx context.Context, rootPath string, names ...string) (
 		return nil, err
 	}
 
-	// we are done when output has the same number
-	if len(output.Configs) == len(names) {
-		return &output, nil
+	// if we didn't get all the configs, try to get the rest
+	if len(output.Configs) != len(names) {
+		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
-		return nil, err
+	for _, config := range output.Configs {
+		config.Name = stripPath(config.Name)
 	}
-
 	return &output, nil
 }
 
@@ -250,28 +256,28 @@ func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string,
 
 	svc := ssm.NewFromConfig(cfg)
 
-	var filters []types.ParameterStringFilter
-	// DescribeParameters fails if the BeginsWith value is empty
-	if prefix != "" {
-		filters = append(filters, types.ParameterStringFilter{
-			Key:    ptr.String("Name"),
-			Option: ptr.String("BeginsWith"),
-			Values: []string{prefix},
+	var nextToken *string = nil
+	var names = make([]string, 0)
+	for {
+		res, err := svc.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
+			Path:           &prefix,
+			Recursive:      aws.Bool(true),
+			NextToken:      nextToken,
+			WithDecryption: aws.Bool(false),
 		})
-	}
+		if err != nil {
+			return nil, errors.New("failed to get of list configs")
+		}
 
-	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
-		ParameterFilters: filters,
-	})
-	if err != nil {
-		return nil, errors.New("failed to get list of configs")
+		for _, p := range res.Parameters {
+			name := stripPath(*p.Name)
+			names = append(names, name)
+		}
+		if res.NextToken == nil {
+			break
+		}
+		nextToken = res.NextToken
 	}
-
-	names := make([]string, 0, len(res.Parameters))
-	for _, p := range res.Parameters {
-		names = append(names, *p.Name)
-	}
-	sort.Strings(names) // make sure the output is deterministic
+	sort.Strings(names)
 	return names, nil
 }
