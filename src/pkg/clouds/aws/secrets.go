@@ -83,7 +83,7 @@ func (a *Aws) IsValidConfigName(ctx context.Context, name string) (bool, error) 
 		})
 
 	if error != nil {
-		return false, error
+		return false, fmt.Errorf("failed to validate config name: %s", name)
 	}
 
 	for _, param := range gpo.Parameters {
@@ -116,7 +116,7 @@ func errorOnDuplicateConfigExist(ctx context.Context, svc *ssm.Client, rootPath,
 			return nil
 		}
 
-		return err
+		return errors.New("error checking for duplicate config")
 	} else {
 		// found in another path, return error
 		if isSensitive {
@@ -153,7 +153,7 @@ func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 	})
 
 	if err != nil {
-		return err
+		return errors.New("failed to save config")
 	}
 
 	return nil
@@ -179,7 +179,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 	})
 
 	if err != nil {
-		return err
+		return errors.New("failed to get config")
 	}
 
 	for _, param := range gpo.Parameters {
@@ -265,7 +265,7 @@ func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string,
 		ParameterFilters: filters,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to get list of configs")
 	}
 
 	names := make([]string, 0, len(res.Parameters))
