@@ -16,7 +16,7 @@ import (
 
 func TestLoader(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
-		loader := NewLoader(path)
+		loader := NewLoaderWithPath(path)
 		proj, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatal(err)

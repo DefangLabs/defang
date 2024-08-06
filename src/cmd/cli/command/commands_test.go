@@ -13,7 +13,7 @@ func TestVersion(t *testing.T) {
 }
 
 func testCommand(args []string) error {
-	ctx := context.TODO()
+	ctx := context.Background()
 	SetupCommands("test")
 	RootCmd.SetArgs(args)
 	return RootCmd.ExecuteContext(ctx)

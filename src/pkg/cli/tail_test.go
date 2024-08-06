@@ -79,7 +79,7 @@ func TestTail(t *testing.T) {
 		term.DefaultTerm = defaultTerm
 	})
 
-	loader := compose.NewLoader("../../tests/testproj/compose.yaml")
+	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
 	proj, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)

@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/cli"
 )
 
 func TestValidationAndConvert(t *testing.T) {
@@ -22,7 +23,8 @@ func TestValidationAndConvert(t *testing.T) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 
-		loader := NewLoader(path)
+		options := cli.ProjectOptions{ConfigPaths: []string{path}}
+		loader := Loader{options: options}
 		proj, err := loader.LoadCompose(context.Background())
 		if err != nil {
 			t.Fatal(err)

@@ -25,6 +25,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
+	composeCli "github.com/compose-spec/compose-go/v2/cli"
 	proj "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
@@ -66,16 +67,6 @@ func Execute(ctx context.Context) error {
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			term.Error("Error:", prettyError(err))
-		}
-
-		var derr *cli.ComposeError
-		if errors.As(err, &derr) {
-			compose := "compose"
-			fileFlag := composeCmd.Flag("file")
-			if fileFlag.Changed {
-				compose += " -f " + fileFlag.Value.String()
-			}
-			printDefangHint("Fix the error and try again. To validate the compose file, use:", compose+" config")
 		}
 
 		if strings.Contains(err.Error(), "config") {
@@ -134,9 +125,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
-	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
-	RootCmd.PersistentFlags().StringP("file", "f", "", `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
@@ -174,6 +163,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(generateCmd)
 
 	// Get Services Command
+	getServicesCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
 	RootCmd.AddCommand(getServicesCmd)
 
@@ -183,6 +173,8 @@ func SetupCommands(version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	_ = configSetCmd.Flags().MarkHidden("name")
+
+	configCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	configCmd.AddCommand(configSetCmd)
 
 	configDeleteCmd.Flags().BoolP("name", "n", false, "name of the config(s) (backwards compat)")
@@ -192,6 +184,7 @@ func SetupCommands(version string) {
 	configCmd.AddCommand(configListCmd)
 
 	RootCmd.AddCommand(configCmd)
+	restartCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	RootCmd.AddCommand(restartCmd)
 
 	// Compose Command
@@ -201,6 +194,8 @@ func SetupCommands(version string) {
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
 	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
+	composeCmd.Flags().StringP("cwd", "C", "", "change directory before running the command")
+	composeCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -222,6 +217,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
+	tailCmd.Flags().StringArrayP("file", "f", []string{}, "compose configuration files")
 	tailCmd.Flags().StringP("name", "n", "", "name of the service")
 	tailCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	tailCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
@@ -313,16 +309,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		cwd, _ := cmd.Flags().GetString("cwd")
-		if cwd != "" {
-			// Change directory before running the command
-			if err = os.Chdir(cwd); err != nil {
-				return err
-			}
-		}
-
-		composeFilePath, _ := cmd.Flags().GetString("file")
-		loader := compose.NewLoader(composeFilePath)
+		loader := configureLoader(cmd)
 		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
@@ -583,7 +570,11 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		loader := compose.NewLoader(filepath.Join(prompt.Folder, "compose.yaml"))
+		projectOptions := composeCli.ProjectOptions{
+			WorkingDir:  prompt.Folder,
+			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
+		}
+		loader := compose.NewLoaderWithOptions(projectOptions)
 		project, _ := loader.LoadCompose(cmd.Context())
 
 		var envInstructions []string
@@ -1266,6 +1257,22 @@ var tosCmd = &cobra.Command{
 		printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 		return nil
 	},
+}
+
+func configureLoader(cmd *cobra.Command) compose.Loader {
+	f := cmd.Flags()
+	o := composeCli.ProjectOptions{}
+	var err error
+	o.ConfigPaths, err = f.GetStringArray("file") // to make sure the flag is defined
+	if err != nil {
+		panic(err)
+	}
+	o.WorkingDir, err = f.GetString("cwd")
+	if err != nil {
+		panic(err)
+	}
+
+	return compose.NewLoaderWithOptions(o)
 }
 
 func awsInEnv() bool {
