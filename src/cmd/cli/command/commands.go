@@ -574,7 +574,7 @@ var generateCmd = &cobra.Command{
 			WorkingDir:  prompt.Folder,
 			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
 		}
-		loader := compose.NewLoaderWithOptions(projectOptions)
+		loader := compose.NewLoaderWithOptions(&projectOptions)
 		project, _ := loader.LoadCompose(cmd.Context())
 
 		var envInstructions []string
@@ -1272,7 +1272,7 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 		panic(err)
 	}
 
-	return compose.NewLoaderWithOptions(o)
+	return compose.NewLoaderWithOptions(&o)
 }
 
 func awsInEnv() bool {

@@ -15,10 +15,10 @@ import (
 )
 
 type Loader struct {
-	options cli.ProjectOptions
+	options *cli.ProjectOptions
 }
 
-func NewLoaderWithOptions(options cli.ProjectOptions) Loader {
+func NewLoaderWithOptions(options *cli.ProjectOptions) Loader {
 	return Loader{options: options}
 }
 
@@ -27,7 +27,7 @@ func NewLoaderWithPath(path string) Loader {
 	if path != "" {
 		configPaths = append(configPaths, path)
 	}
-	return NewLoaderWithOptions(cli.ProjectOptions{ConfigPaths: configPaths})
+	return NewLoaderWithOptions(&cli.ProjectOptions{ConfigPaths: configPaths})
 }
 
 func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
@@ -35,17 +35,17 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
-	projOpts, err := c.normalizeProjectOptions(c.options.ConfigPaths)
+	err := c.normalizeProjectOptions()
 	if err != nil {
 		return nil, err
 	}
 
 	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
 	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
+		c.options.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
-	project, err := projOpts.LoadProject(ctx)
+	project, err := c.options.LoadProject(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +55,14 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 		fmt.Println(string(b))
 	}
 
-	if len(projOpts.ConfigPaths) == 0 {
+	if len(c.options.ConfigPaths) == 0 {
 		return nil, types.ErrComposeFileNotFound
 	}
 
 	return project, nil
 }
 
-func (c Loader) normalizeProjectOptions(configs []string) (*cli.ProjectOptions, error) {
+func (c *Loader) normalizeProjectOptions() error {
 	options := c.options
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
@@ -93,8 +93,10 @@ func (c Loader) normalizeProjectOptions(configs []string) (*cli.ProjectOptions, 
 
 	projOpts, err := cli.NewProjectOptions(options.ConfigPaths, optFns...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return projOpts, nil
+	c.options = projOpts
+
+	return nil
 }

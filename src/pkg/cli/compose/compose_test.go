@@ -157,7 +157,7 @@ func TestComposeMultipleFiles(t *testing.T) {
 	os.Chdir("../../../tests/multiple")
 
 	composeFiles := []string{"compose1.yaml", "compose2.yaml"}
-	loader := NewLoaderWithOptions(cli.ProjectOptions{ConfigPaths: composeFiles})
+	loader := NewLoaderWithOptions(&cli.ProjectOptions{ConfigPaths: composeFiles})
 	project, err := loader.LoadCompose(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCompose() failed: %v", err)
