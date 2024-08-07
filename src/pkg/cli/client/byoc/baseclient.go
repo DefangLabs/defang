@@ -7,7 +7,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -49,23 +48,23 @@ type ByocBaseClient struct {
 	PrivateLbIps            []string // TODO: use API to get these
 	PrivateNatIps           []string // TODO: use API to get these
 	ProjectDomain           string
-	PulumiProject           string
+	ProjectName             string
 	PulumiStack             string
 	Quota                   quota.Quotas
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantID                string
 
-	loadProjOnce    func() (*compose.Project, error)
+	project         *compose.Project
 	bootstrapLister BootstrapLister
 }
 
 func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
 	b := &ByocBaseClient{
-		GrpcClient:    grpcClient,
-		TenantID:      string(tenantID),
-		PulumiProject: "",     // To be overwritten by LoadProject
-		PulumiStack:   "beta", // TODO: make customizable
+		GrpcClient:  grpcClient,
+		TenantID:    string(tenantID),
+		ProjectName: "",     // To be overwritten by LoadProject
+		PulumiStack: "beta", // TODO: make customizable
 		Quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			ServiceQuotas: quota.ServiceQuotas{
@@ -82,15 +81,6 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 		},
 		bootstrapLister: bl,
 	}
-	b.loadProjOnce = sync.OnceValues(func() (*compose.Project, error) {
-		proj, err := b.GrpcClient.Loader.LoadCompose(ctx)
-		if err != nil {
-			return nil, err
-		}
-		b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
-		b.PulumiProject = proj.Name
-		return proj, nil
-	})
 	return b
 }
 
@@ -104,20 +94,42 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
-	return b.loadProjOnce()
+	if b.project != nil {
+		return b.project, nil
+	}
+	project, err := b.Loader.LoadProject(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	b.project = project
+	b.setProjectName(project.Name)
+
+	return project, nil
 }
 
 func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
-
-	proj, err := b.loadProjOnce()
-	if err == nil {
-		b.PulumiProject = proj.Name
-		return proj.Name, nil
+	if b.ProjectName != "" {
+		return b.ProjectName, nil
 	}
-	if !errors.Is(err, types.ErrComposeFileNotFound) {
+	projectName, err := b.Loader.LoadProjectName(ctx) // Load the project to get the name
+	if err != nil {
+		if errors.Is(err, types.ErrComposeFileNotFound) {
+			return b.loadProjectNameFromRemote(ctx)
+		}
+
 		return "", err
 	}
 
+	b.setProjectName(projectName)
+	return projectName, nil
+}
+
+func (b *ByocBaseClient) ServiceDNS(name string) string {
+	return DnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+}
+
+func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
 	projectNames, err := b.bootstrapLister.BootstrapList(ctx)
 	if err != nil {
@@ -132,7 +144,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 	}
 	if len(projectNames) == 1 {
 		term.Debug("Using default project: ", projectNames[0])
-		b.PulumiProject = projectNames[0]
+		b.setProjectName(projectNames[0])
 		return projectNames[0], nil
 	}
 
@@ -141,14 +153,15 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 		if !slices.Contains(projectNames, projectName) {
 			return "", fmt.Errorf("project %q specified by COMPOSE_PROJECT_NAME not found", projectName)
 		}
-		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectNames[0])
-		b.PulumiProject = projectName
+		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectName)
+		b.setProjectName(projectName)
 		return projectName, nil
 	}
 
 	return "", errors.New("multiple projects found; please go to the correct project directory where the compose file is or set COMPOSE_PROJECT_NAME")
 }
 
-func (b *ByocBaseClient) ServiceDNS(name string) string {
-	return DnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+func (b *ByocBaseClient) setProjectName(projectName string) {
+	b.ProjectName = projectName
+	b.PrivateDomain = DnsSafeLabel(b.ProjectName) + ".internal"
 }

@@ -16,9 +16,9 @@ func TestComposeUp(t *testing.T) {
 	defer func() { DoDryRun = false }()
 
 	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
-	proj, err := loader.LoadCompose(context.Background())
+	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
+		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

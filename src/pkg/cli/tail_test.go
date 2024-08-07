@@ -80,9 +80,9 @@ func TestTail(t *testing.T) {
 	})
 
 	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
-	proj, err := loader.LoadCompose(context.Background())
+	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
+		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

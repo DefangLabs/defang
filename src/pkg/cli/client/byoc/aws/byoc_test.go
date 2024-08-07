@@ -67,6 +67,10 @@ type FakeLoader struct {
 	ProjectName string
 }
 
-func (f FakeLoader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+func (f FakeLoader) LoadProject(ctx context.Context) (*compose.Project, error) {
 	return &compose.Project{Name: f.ProjectName}, nil
+}
+
+func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {
+	return f.ProjectName, nil
 }

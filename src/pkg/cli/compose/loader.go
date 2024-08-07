@@ -19,6 +19,7 @@ import (
 type LoaderOptions struct {
 	ConfigPaths []string
 	WorkingDir  string
+	ProjectName string
 }
 
 type Loader struct {
@@ -26,6 +27,14 @@ type Loader struct {
 }
 
 func NewLoaderWithOptions(options LoaderOptions) Loader {
+	// if no --project-name is provided, try to get it from the environment
+	// https://docs.docker.com/compose/project-name/#set-a-project-name
+	if options.ProjectName == "" {
+		if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
+			options.ProjectName = envProjName
+		}
+	}
+
 	return Loader{options: options}
 }
 
@@ -37,7 +46,20 @@ func NewLoaderWithPath(path string) Loader {
 	return NewLoaderWithOptions(LoaderOptions{ConfigPaths: configPaths})
 }
 
-func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
+	if c.options.ProjectName != "" {
+		return c.options.ProjectName, nil
+	}
+
+	project, err := c.LoadProject(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return project.Name, nil
+}
+
+func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -45,11 +67,6 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	projOpts, err := c.projectOptions()
 	if err != nil {
 		return nil, err
-	}
-
-	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
-	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
 	project, err := projOpts.LoadProject(ctx)
@@ -85,7 +102,7 @@ func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
-		// cli.WithName(o.ProjectName)
+		cli.WithName(c.options.ProjectName),
 
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
