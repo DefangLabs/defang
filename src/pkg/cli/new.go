@@ -50,7 +50,17 @@ func FetchSamples(ctx context.Context) ([]Sample, error) {
 	return samples, err
 }
 
+// MixinFromSamples copies the sample files into the given directory, skipping existing files.
+func MixinFromSample(ctx context.Context, dir string, name string) error {
+	return copyFromSamples(ctx, dir, []string{name}, true)
+}
+
+// InitFromSamples copies the sample(s) into the given directory, aborting if any files already exist.
 func InitFromSamples(ctx context.Context, dir string, names []string) error {
+	return copyFromSamples(ctx, dir, names, false)
+}
+
+func copyFromSamples(ctx context.Context, dir string, names []string, skipExisting bool) error {
 	const repo = "samples"
 	const branch = "main"
 
@@ -99,8 +109,12 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 					}
 					continue
 				}
-				if err := createFile(path, h, tarReader); err != nil {
-					return err
+				// Use the same mode as the original file (so scripts are executable, etc.)
+				if err := writeFileExcl(path, tarReader, h.FileInfo().Mode()); err != nil {
+					if !skipExisting || !os.IsExist(err) {
+						return err
+					}
+					term.Warnf("File %q already exists, skipping", path)
 				}
 			}
 		}
@@ -111,14 +125,14 @@ func InitFromSamples(ctx context.Context, dir string, names []string) error {
 	return nil
 }
 
-func createFile(base string, h *tar.Header, tarReader *tar.Reader) error {
-	// Like os.Create, but with the same mode as the original file (so scripts are executable, etc.)
-	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, h.FileInfo().Mode())
+// writeFileExcl is like os.WriteFile, but with O_EXCL to avoid overwriting existing files.
+func writeFileExcl(base string, reader io.Reader, mode os.FileMode) error {
+	file, err := os.OpenFile(base, os.O_RDWR|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	if _, err := io.Copy(file, tarReader); err != nil {
+	if _, err := io.Copy(file, reader); err != nil {
 		return err
 	}
 	return nil

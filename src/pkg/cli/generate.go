@@ -11,6 +11,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+var SupportedLanguages = []string{"Nodejs", "Golang", "Python"}
+
 func GenerateWithAI(ctx context.Context, client client.Client, language, dir, description string) ([]string, error) {
 	if DoDryRun {
 		term.Warn("Dry run, not generating files")
