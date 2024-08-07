@@ -27,9 +27,11 @@ type Loader struct {
 }
 
 func NewLoaderWithOptions(options LoaderOptions) Loader {
-	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
-	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		options.ProjectName = envProjName
+	// We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
+	if options.ProjectName == "" {
+		if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
+			options.ProjectName = envProjName
+		}
 	}
 
 	return Loader{options: options}
