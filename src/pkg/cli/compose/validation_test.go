@@ -24,7 +24,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
-		proj, err := loader.LoadCompose(context.Background())
+		proj, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

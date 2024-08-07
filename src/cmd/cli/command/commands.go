@@ -587,7 +587,7 @@ var generateCmd = &cobra.Command{
 			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
 		}
 		loader := compose.NewLoaderWithOptions(loaderOptions)
-		project, _ := loader.LoadCompose(cmd.Context())
+		project, _ := loader.LoadProject(cmd.Context())
 
 		var envInstructions []string
 		for _, envVar := range collectUnsetEnvVars(project) {
