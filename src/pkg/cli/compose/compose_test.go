@@ -42,6 +42,21 @@ func TestLoadProjectName(t *testing.T) {
 			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
 		}
 	})
+
+	t.Run("--project-name has precidence over COMPOSE_PROJECT_NAME env var", func(t *testing.T) {
+		t.Setenv("COMPOSE_PROJECT_NAME", "ignoreme")
+		options := LoaderOptions{ProjectName: "expectedname"}
+		loader := NewLoaderWithOptions(options)
+		name, err := loader.LoadProjectName(context.Background())
+		if err != nil {
+			t.Fatalf("LoadProjectName() failed: %v", err)
+		}
+
+		if name != "expectedname" {
+			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
+		}
+	})
+
 }
 
 func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
