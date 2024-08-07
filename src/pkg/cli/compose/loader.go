@@ -27,6 +27,11 @@ type Loader struct {
 }
 
 func NewLoaderWithOptions(options LoaderOptions) Loader {
+	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
+	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
+		options.ProjectName = envProjName
+	}
+
 	return Loader{options: options}
 }
 
@@ -46,11 +51,6 @@ func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
 	projOpts, err := c.projectOptions()
 	if err != nil {
 		return nil, err
-	}
-
-	// HACK: We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
-	if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
-		projOpts.Environment["COMPOSE_PROJECT_NAME"] = envProjName
 	}
 
 	project, err := projOpts.LoadProject(ctx)
@@ -86,7 +86,7 @@ func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
-		// cli.WithName(o.ProjectName)
+		cli.WithName(c.options.ProjectName),
 
 		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
