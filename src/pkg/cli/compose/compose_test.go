@@ -31,8 +31,7 @@ func TestLoadProjectName(t *testing.T) {
 	}
 
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
-		os.Setenv("COMPOSE_PROJECT_NAME", "overridename")
-		defer os.Unsetenv("COMPOSE_PROJECT_NAME")
+		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
 		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
 		name, err := loader.LoadProjectName(context.Background())
 		if err != nil {
