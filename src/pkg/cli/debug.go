@@ -120,6 +120,24 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 	return files
 }
 
+func IsProjectFile(basename string) bool {
+	return filepathMatchAny(patterns, basename)
+}
+
+func filepathMatchAny(patterns []string, name string) bool {
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, name)
+		if err != nil {
+			term.Debug("error matching pattern:", err)
+			continue
+		}
+		if matched {
+			return true // file matched, no need to check other patterns
+		}
+	}
+	return false
+}
+
 func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
 	var files []*defangv1.File
 
@@ -137,17 +155,9 @@ func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
 			return errFileLimitReached
 		}
 
-		for _, pattern := range patterns {
-			matched, err := filepath.Match(pattern, info.Name())
-			if err != nil {
-				term.Debug("error matching pattern:", err)
-				continue
-			}
-			if matched {
-				if file := readFile(path); file != nil {
-					files = append(files, file)
-					break // file matched, no need to check other patterns
-				}
+		if IsProjectFile(info.Name()) {
+			if file := readFile(path); file != nil {
+				files = append(files, file)
 			}
 		}
 		return nil

@@ -173,6 +173,7 @@ func SetupCommands(version string) {
 
 	// Generate Command
 	RootCmd.AddCommand(generateCmd)
+	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
 	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
@@ -214,9 +215,17 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
-	RootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
+	composeCmd.AddCommand(getServicesCmd) // like docker compose ls
+	RootCmd.AddCommand(composeCmd)
+
+	// Add up/down commands to the root as well
+	RootCmd.AddCommand(composeDownCmd)
+	RootCmd.AddCommand(composeUpCmd)
+	// RootCmd.AddCommand(composeStartCmd)
+	// RootCmd.AddCommand(composeRestartCmd)
+	// RootCmd.AddCommand(composeStopCmd)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -270,7 +279,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Use:           "defang",
 	Args:          cobra.NoArgs,
-	Short:         "Defang CLI manages services on the Defang cluster",
+	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		term.SetDebug(doDebug)
@@ -430,10 +439,10 @@ var certGenerateCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:     "generate [SAMPLE]",
+	Use:     "generate",
 	Args:    cobra.MaximumNArgs(1),
-	Aliases: []string{"gen", "new", "init"},
-	Short:   "Generate a sample Defang project in the current folder",
+	Aliases: []string{"gen"},
+	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var sample, language, defaultFolder string
 		if len(args) > 0 {
@@ -446,12 +455,12 @@ var generateCmd = &cobra.Command{
 			}
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
+
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
 				Message: "Choose the language you'd like to use:",
-				Options: []string{"Nodejs", "Golang", "Python"},
-				Default: "Nodejs",
+				Options: cli.SupportedLanguages,
 				Help:    "The project code will be in the language you choose here.",
 			}, &language); err != nil {
 				return err
@@ -604,6 +613,14 @@ var generateCmd = &cobra.Command{
 	},
 }
 
+var newCmd = &cobra.Command{
+	Use:     "new [SAMPLE]",
+	Args:    cobra.MaximumNArgs(1),
+	Aliases: []string{"init"},
+	Short:   "Create a new Defang project from a sample",
+	RunE:    generateCmd.RunE,
+}
+
 func collectUnsetEnvVars(project *proj.Project) []string {
 	var envVars []string
 	if project != nil {
@@ -669,6 +686,7 @@ var getVersionCmd = &cobra.Command{
 var tailCmd = &cobra.Command{
 	Use:         "tail",
 	Annotations: authNeededAnnotation,
+	Aliases:     []string{"logs"},
 	Args:        cobra.NoArgs,
 	Short:       "Tail logs from one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -775,7 +793,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose start")
+		printDefangHint("To update the deployed values, do:", "compose restart")
 		return nil
 	},
 }
@@ -818,13 +836,22 @@ var composeCmd = &cobra.Command{
 	Aliases: []string{"stack"},
 	Args:    cobra.NoArgs,
 	Short:   "Work with local Compose files",
+	Long: `Define and deploy multi-container applications with Defang. Most compose commands require
+a "compose.yaml" file. The simplest "compose.yaml" file with a single service is:
+
+services:
+  app:              # the name of the service
+    build: .        # the folder with the Dockerfile and app sources (. means current folder)
+    ports:
+      - 80          # the port the service listens on for HTTP requests
+`,
 }
 
 var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Like 'start' but immediately tracks the progress of the deployment",
+	Short:       "Reads a Compose file and deploy a new project or update an existing project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
@@ -832,6 +859,10 @@ var composeUpCmd = &cobra.Command{
 		since := time.Now()
 		deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
 		if err != nil {
+			if !errors.Is(err, types.ErrComposeFileNotFound) {
+				return err
+			}
+			printDefangHint("To start a new project, do:", "new")
 			return err
 		}
 
@@ -1019,7 +1050,7 @@ var composeDownCmd = &cobra.Command{
 	Aliases:     []string{"rm"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Like 'stop' but also deprovisions the services from the cluster",
+	Short:       "Reads a Compose file and deprovisions its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var detach, _ = cmd.Flags().GetBool("detach")
 

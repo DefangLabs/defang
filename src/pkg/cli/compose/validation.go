@@ -13,6 +13,8 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
+var ErrDockerfileNotFound = errors.New("dockerfile not found")
+
 func ValidateProject(project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
@@ -111,7 +113,7 @@ func ValidateProject(project *compose.Project) error {
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					return fmt.Errorf("service %q: dockerfile not found: %q", svccfg.Name, dockerfilePath)
+					return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 				}
 			}
 			if svccfg.Build.SSH != nil {

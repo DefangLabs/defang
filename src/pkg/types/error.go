@@ -2,4 +2,4 @@ package types
 
 import "errors"
 
-var ErrComposeFileNotFound = errors.New("no compose file found")
+var ErrComposeFileNotFound = errors.New("no compose.yaml file found")
