@@ -182,6 +182,7 @@ func SetupCommands(version string) {
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
+	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -716,12 +717,13 @@ var configCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:         "create CONFIG [file]", // like Docker
+	Use:         "create CONFIG [file|-]", // like Docker
 	Annotations: authNeededAnnotation,
 	Args:        cobra.RangeArgs(1, 2),
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fromEnv, _ := cmd.Flags().GetBool("env")
 
 		// Make sure we have a project to set config for before asking for a value
 		_, err := client.LoadProjectName(cmd.Context())
@@ -737,7 +739,16 @@ var configSetCmd = &cobra.Command{
 		}
 
 		var value string
-		if len(parts) == 2 {
+		if fromEnv {
+			if len(args) == 2 || len(parts) == 2 {
+				return errors.New("cannot specify config value or input file when using --env")
+			}
+			var ok bool
+			value, ok = os.LookupEnv(name)
+			if !ok {
+				return fmt.Errorf("environment variable %q not found", name)
+			}
+		} else if len(parts) == 2 {
 			// Handle name=value; can't also specify a file in this case
 			if len(args) == 2 {
 				return errors.New("cannot specify both config value and input file")
