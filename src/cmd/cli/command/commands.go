@@ -83,7 +83,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if err.Error() == "resource_exhausted: maximum number of projects reached" {
-			printDefangHint("To deactivate a project, do:", "compose down")
+			printDefangHint("To deactivate a project, do:", "compose down --project-name <name>")
 		}
 
 		var cerr *cli.CancelError
@@ -134,6 +134,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
+	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
@@ -201,7 +202,6 @@ func SetupCommands(version string) {
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
-	// composeCmd.Flags().StringP("project", "p", "", "Compose project name"); TODO: Implement compose option
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -587,7 +587,7 @@ var generateCmd = &cobra.Command{
 			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
 		}
 		loader := compose.NewLoaderWithOptions(loaderOptions)
-		project, _ := loader.LoadCompose(cmd.Context())
+		project, _ := loader.LoadProject(cmd.Context())
 
 		var envInstructions []string
 		for _, envVar := range collectUnsetEnvVars(project) {
@@ -1286,6 +1286,10 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 		panic(err)
 	}
 
+	o.ProjectName, err = f.GetString("project-name")
+	if err != nil {
+		panic(err)
+	}
 	return compose.NewLoaderWithOptions(o)
 }
 
