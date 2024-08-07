@@ -43,7 +43,20 @@ func NewLoaderWithPath(path string) Loader {
 	return NewLoaderWithOptions(LoaderOptions{ConfigPaths: configPaths})
 }
 
-func (c Loader) LoadCompose(ctx context.Context) (*compose.Project, error) {
+func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
+	if c.options.ProjectName != "" {
+		return c.options.ProjectName, nil
+	}
+
+	project, err := c.LoadProject(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return project.Name, nil
+}
+
+func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
