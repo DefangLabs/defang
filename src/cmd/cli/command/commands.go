@@ -173,6 +173,7 @@ func SetupCommands(version string) {
 
 	// Generate Command
 	RootCmd.AddCommand(generateCmd)
+	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
 	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
@@ -431,9 +432,9 @@ var certGenerateCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:     "generate [SAMPLE]",
+	Use:     "generate",
 	Args:    cobra.MaximumNArgs(1),
-	Aliases: []string{"gen", "new", "init"},
+	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var sample, language, defaultFolder string
@@ -447,6 +448,7 @@ var generateCmd = &cobra.Command{
 			}
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
+
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
 			if err := survey.AskOne(&survey.Select{
@@ -602,6 +604,14 @@ var generateCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+var newCmd = &cobra.Command{
+	Use:     "new [SAMPLE]",
+	Args:    cobra.MaximumNArgs(1),
+	Aliases: []string{"init"},
+	Short:   "Create a new Defang project from a sample",
+	RunE:    generateCmd.RunE,
 }
 
 func collectUnsetEnvVars(project *proj.Project) []string {
