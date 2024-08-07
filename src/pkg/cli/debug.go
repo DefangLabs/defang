@@ -121,10 +121,10 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 }
 
 func IsProjectFile(basename string) bool {
-	return matchAny(patterns, basename)
+	return filepathMatchAny(patterns, basename)
 }
 
-func matchAny(patterns []string, name string) bool {
+func filepathMatchAny(patterns []string, name string) bool {
 	for _, pattern := range patterns {
 		matched, err := filepath.Match(pattern, name)
 		if err != nil {
