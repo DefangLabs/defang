@@ -49,7 +49,7 @@ type ByocBaseClient struct {
 	PrivateLbIps            []string // TODO: use API to get these
 	PrivateNatIps           []string // TODO: use API to get these
 	ProjectDomain           string
-	PulumiProject           string
+	ProjectName             string
 	PulumiStack             string
 	Quota                   quota.Quotas
 	SetupDone               bool
@@ -62,10 +62,10 @@ type ByocBaseClient struct {
 
 func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
 	b := &ByocBaseClient{
-		GrpcClient:    grpcClient,
-		TenantID:      string(tenantID),
-		PulumiProject: "",     // To be overwritten by LoadProject
-		PulumiStack:   "beta", // TODO: make customizable
+		GrpcClient:  grpcClient,
+		TenantID:    string(tenantID),
+		ProjectName: "",     // To be overwritten by LoadProject
+		PulumiStack: "beta", // TODO: make customizable
 		Quota: quota.Quotas{
 			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
 			ServiceQuotas: quota.ServiceQuotas{
@@ -88,7 +88,7 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 			return nil, err
 		}
 		b.PrivateDomain = DnsSafeLabel(proj.Name) + ".internal"
-		b.PulumiProject = proj.Name
+		b.ProjectName = proj.Name
 		return proj, nil
 	})
 	return b
@@ -111,7 +111,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 
 	proj, err := b.loadProjOnce()
 	if err == nil {
-		b.PulumiProject = proj.Name
+		b.ProjectName = proj.Name
 		return proj.Name, nil
 	}
 	if !errors.Is(err, types.ErrComposeFileNotFound) {
@@ -132,7 +132,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 	}
 	if len(projectNames) == 1 {
 		term.Debug("Using default project: ", projectNames[0])
-		b.PulumiProject = projectNames[0]
+		b.ProjectName = projectNames[0]
 		return projectNames[0], nil
 	}
 
@@ -142,7 +142,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("project %q specified by COMPOSE_PROJECT_NAME not found", projectName)
 		}
 		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectNames[0])
-		b.PulumiProject = projectName
+		b.ProjectName = projectName
 		return projectName, nil
 	}
 

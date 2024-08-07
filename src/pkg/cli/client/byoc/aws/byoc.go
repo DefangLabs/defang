@@ -316,7 +316,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject, // may be empty
+		"PROJECT":                    b.ProjectName, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.PulumiStack,
@@ -356,8 +356,8 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
-	ensure(b.PulumiProject != "", "pulumiProject not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.PulumiProject, b.PulumiStack, name) // same as shared/common.ts
+	ensure(b.ProjectName != "", "pulumiProject not set")
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.ProjectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
@@ -376,8 +376,8 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
-	ensure(b.PulumiProject != "", "pulumiProject not set")
-	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
+	ensure(b.ProjectName != "", "ProjectName not set")
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -518,11 +518,11 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
-	ensure(b.PulumiProject != "", "pulumiProject not set")
+	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject, // was: tenant
-		Etag:    pkg.RandomID(),  // TODO: could be hash for dedup/idempotency
+		Project: b.ProjectName,  // was: tenant
+		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 	}
 
 	hasHost := false
@@ -636,10 +636,10 @@ func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 }
 
 func (b *ByocAws) getProjectDomain(zone string) string {
-	if b.PulumiProject == "" {
+	if b.ProjectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := byoc.DnsSafeLabel(b.PulumiProject)
+	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
 	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
 		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
 	}
