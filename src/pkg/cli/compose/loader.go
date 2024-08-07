@@ -27,7 +27,8 @@ type Loader struct {
 }
 
 func NewLoaderWithOptions(options LoaderOptions) Loader {
-	// We do not want to include all the os environment variables, only COMPOSE_PROJECT_NAME
+	// if no --project-name is provided, try to get it from the environment
+	// https://docs.docker.com/compose/project-name/#set-a-project-name
 	if options.ProjectName == "" {
 		if envProjName, ok := os.LookupEnv("COMPOSE_PROJECT_NAME"); ok {
 			options.ProjectName = envProjName
