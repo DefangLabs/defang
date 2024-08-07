@@ -24,9 +24,16 @@ if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
     CI="1"
 fi
 
+# check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
+if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
+    RELEASE_PATH="/latest"
+else
+    RELEASE_PATH="/tags/$DEFANG_INSTALL_VERSION"
+fi
+
 # Use curl to fetch the latest release data
 echo "Fetching the latest release information..."
-RELEASE_JSON=$(curl -s -L https://api.github.com/repos/DefangLabs/defang/releases/latest)
+RELEASE_JSON=$(curl -s -L https://api.github.com/repos/DefangLabs/defang/releases$RELEASE_PATH)
 
 # Check for curl failure
 if [ $? -ne 0 ]; then
