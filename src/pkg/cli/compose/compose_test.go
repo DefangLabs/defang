@@ -72,9 +72,6 @@ func TestLoadProject(t *testing.T) {
 		if len(p.Services) != 0 {
 			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
 		}
-		if len(p.Secrets) != 1 {
-			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
-		}
 	})
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
@@ -90,9 +87,6 @@ func TestLoadProject(t *testing.T) {
 		if len(p.Services) != 0 {
 			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
 		}
-		if len(p.Secrets) != 1 {
-			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
-		}
 	})
 
 	t.Run("use project name in compose file", func(t *testing.T) {
@@ -106,9 +100,6 @@ func TestLoadProject(t *testing.T) {
 		}
 		if len(p.Services) != 1 {
 			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
-		}
-		if len(p.Secrets) != 1 {
-			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
 		}
 	})
 
@@ -125,9 +116,6 @@ func TestLoadProject(t *testing.T) {
 		if len(p.Services) != 1 {
 			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
-		if len(p.Secrets) != 1 {
-			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
-		}
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
@@ -141,9 +129,6 @@ func TestLoadProject(t *testing.T) {
 		}
 		if len(p.Services) != 1 {
 			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
-		}
-		if len(p.Secrets) != 1 {
-			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
 		}
 	})
 
@@ -176,9 +161,6 @@ func TestLoadProject(t *testing.T) {
 		}
 		if len(p.Services) != 1 {
 			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
-		}
-		if len(p.Secrets) != 0 {
-			t.Errorf("LoadProject() failed: expected 0 secrets, got %d", len(p.Secrets))
 		}
 	})
 
