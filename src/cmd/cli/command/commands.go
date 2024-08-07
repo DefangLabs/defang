@@ -83,7 +83,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if err.Error() == "resource_exhausted: maximum number of projects reached" {
-			printDefangHint("To deactivate a project, do:", "compose down")
+			printDefangHint("To deactivate a project, do:", "compose down --project-name <name>")
 		}
 
 		var cerr *cli.CancelError
