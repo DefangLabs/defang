@@ -9,6 +9,54 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
+func TestLoadProjectName(t *testing.T) {
+	var tests = map[string]string{
+		"noprojname":     "../../../tests/noprojname/compose.yaml",
+		"tests":          "../../../tests/testproj/compose.yaml",
+		"fancy-proj_dir": "../../../tests/Fancy-Proj_Dir/compose.yaml",
+		"altcomp":        "../../../tests/alttestproj/altcomp.yaml",
+	}
+
+	for expectedName, path := range tests {
+		t.Run("Load project name from compose file or directory:"+expectedName, func(t *testing.T) {
+			loader := NewLoaderWithPath(path)
+			name, err := loader.LoadProjectName(context.Background())
+			if err != nil {
+				t.Fatalf("LoadProjectName() failed: %v", err)
+			}
+			if name != expectedName {
+				t.Errorf("LoadProjectName() failed: expected project name %q, got %q", expectedName, name)
+			}
+		})
+	}
+
+	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
+		os.Setenv("COMPOSE_PROJECT_NAME", "overridename")
+		defer os.Unsetenv("COMPOSE_PROJECT_NAME")
+		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
+		name, err := loader.LoadProjectName(context.Background())
+		if err != nil {
+			t.Fatalf("LoadProjectName() failed: %v", err)
+		}
+
+		if name != "overridename" {
+			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
+		}
+	})
+}
+
+func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
+	loader := NewLoaderWithOptions(LoaderOptions{ProjectName: "testproj"})
+	name, err := loader.LoadProjectName(context.Background())
+	if err != nil {
+		t.Fatalf("LoadProjectName() failed: %v", err)
+	}
+
+	if name != "testproj" {
+		t.Errorf("LoadProjectName() failed: expected project name testproj, got %q", name)
+	}
+}
+
 func TestLoadProject(t *testing.T) {
 	term.SetDebug(testing.Verbose())
 
@@ -21,6 +69,13 @@ func TestLoadProject(t *testing.T) {
 		if p.Name != "noprojname" { // Use the parent directory name as project name
 			t.Errorf("LoadProject() failed: expected project name tenant-id, got %q", p.Name)
 		}
+		// the echo service has the donotstart profile so it is not included
+		if len(p.Services) != 0 {
+			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
+		}
 	})
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
@@ -32,6 +87,13 @@ func TestLoadProject(t *testing.T) {
 		if p.Name != "fancy-proj_dir" { // Use the parent directory name as project name
 			t.Errorf("LoadProject() failed: expected project name tenant-id, got %q", p.Name)
 		}
+		// the echo service has the donotstart profile so it is not included
+		if len(p.Services) != 0 {
+			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
+		}
 	})
 
 	t.Run("use project name in compose file", func(t *testing.T) {
@@ -42,6 +104,12 @@ func TestLoadProject(t *testing.T) {
 		}
 		if p.Name != "tests" {
 			t.Errorf("LoadProject() failed: expected project name, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
 		}
 	})
 
@@ -55,6 +123,12 @@ func TestLoadProject(t *testing.T) {
 		if p.Name != "overridename" {
 			t.Errorf("LoadProject() failed: expected project name to be overwritten by env var, got %q", p.Name)
 		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
+		}
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
@@ -65,6 +139,12 @@ func TestLoadProject(t *testing.T) {
 		}
 		if p.Name != "tests" {
 			t.Errorf("LoadProject() failed: expected project name tests, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 secrets, got %d", len(p.Secrets))
 		}
 	})
 
@@ -95,6 +175,12 @@ func TestLoadProject(t *testing.T) {
 		if p.Name != "tests" {
 			t.Errorf("LoadProject() failed: expected project name tests, got %q", p.Name)
 		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
+		}
+		if len(p.Secrets) != 0 {
+			t.Errorf("LoadProject() failed: expected 0 secrets, got %d", len(p.Secrets))
+		}
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
@@ -105,6 +191,9 @@ func TestLoadProject(t *testing.T) {
 		}
 		if p.Name != "altcomp" {
 			t.Errorf("LoadProject() failed: expected project name altcomp, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 }
