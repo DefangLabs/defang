@@ -215,10 +215,17 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeDownCmd)
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeCmd.AddCommand(composeStartCmd)
-	RootCmd.AddCommand(composeCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
 	composeCmd.AddCommand(getServicesCmd) // like docker compose ls
+	RootCmd.AddCommand(composeCmd)
+
+	// Add up/down commands to the root as well
+	RootCmd.AddCommand(composeDownCmd)
+	RootCmd.AddCommand(composeUpCmd)
+	// RootCmd.AddCommand(composeStartCmd)
+	// RootCmd.AddCommand(composeRestartCmd)
+	// RootCmd.AddCommand(composeStopCmd)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -844,7 +851,7 @@ var composeUpCmd = &cobra.Command{
 	Use:         "up",
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Like 'start' but immediately tracks the progress of the deployment",
+	Short:       "Reads a Compose file and deploy a new project or update an existing project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var force, _ = cmd.Flags().GetBool("force")
 		var detach, _ = cmd.Flags().GetBool("detach")
@@ -1043,7 +1050,7 @@ var composeDownCmd = &cobra.Command{
 	Aliases:     []string{"rm"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs, // TODO: takes optional list of service names
-	Short:       "Like 'stop' but also deprovisions the services from the cluster",
+	Short:       "Reads a Compose file and deprovisions its services",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var detach, _ = cmd.Flags().GetBool("detach")
 
