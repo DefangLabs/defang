@@ -28,9 +28,11 @@ type byocServerStream struct {
 	response *defangv1.TailResponse
 	services []string
 	stream   ecs.EventStream
+
+	ecsEventsHandler EcsEventHandler
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string) *byocServerStream {
+func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler EcsEventHandler) *byocServerStream {
 	var errCh <-chan error
 	if errch, ok := stream.(hasErrCh); ok {
 		errCh = errch.Errs()
@@ -42,6 +44,8 @@ func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag strin
 		etag:     etag,
 		stream:   stream,
 		services: services,
+
+		ecsEventsHandler: ecsEventHandler,
 	}
 }
 
@@ -70,6 +74,10 @@ func (bs *byocServerStream) Receive() bool {
 	var evts []ecs.LogEvent
 	select {
 	case e := <-bs.stream.Events(): // blocking
+		if bs.stream.Err() != nil {
+			bs.err = bs.stream.Err()
+			return false
+		}
 		var err error
 		evts, err = ecs.GetLogEvents(e)
 		if err != nil {
@@ -132,6 +140,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		}
 	} else if strings.HasSuffix(*event.LogGroupIdentifier, "/ecs") || strings.HasSuffix(*event.LogGroupIdentifier, "/ecs:*") {
 		parseECSEventRecords = true
+		response.Etag = bs.etag
+		response.Service = "ecs"
 	}
 
 	// Client-side filtering
@@ -143,8 +153,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
-	entries := make([]*defangv1.LogEntry, len(events))
-	for i, event := range events {
+	entries := make([]*defangv1.LogEntry, 0, len(events))
+	for _, event := range events {
 		entry := &defangv1.LogEntry{
 			Message:   *event.Message,
 			Stderr:    false,
@@ -162,19 +172,28 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 			}
 		} else if parseECSEventRecords {
 			var err error
-			if err = parseECSEventRecord(event, entry); err != nil {
+			if err = bs.parseECSEventRecord(event, entry); err != nil {
 				term.Debugf("error parsing ECS event, output raw event log: %v", err)
 			}
 		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, " ** ") {
 			entry.Stderr = true
 		}
-		entries[i] = entry
+		if entry.Etag != "" && entry.Etag != bs.etag {
+			continue
+		}
+		if entry.Service != "" && len(bs.services) > 0 && !pkg.Contains(bs.services, entry.Service) {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	if len(entries) == 0 {
+		return nil, nil
 	}
 	response.Entries = entries
 	return &response, nil
 }
 
-func parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
+func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
 	var ecsEvt ecs.Event
 	if err := json.Unmarshal([]byte(*event.Message), &ecsEvt); err != nil {
 		return fmt.Errorf("error unmarshaling ECS event: %w", err)
@@ -192,6 +211,12 @@ func parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
 			return fmt.Errorf("error unmarshaling ECS task state change: %w", err)
 		}
 
+		defer func() {
+			if bs.ecsEventsHandler != nil {
+				bs.ecsEventsHandler.HandleEcsTaskStateChange(detail)
+			}
+		}()
+
 		// Container name is in the format of "service_etag"
 		if len(detail.Containers) < 1 {
 			return fmt.Errorf("error parsing ECS task state change: missing containers section")
@@ -203,7 +228,7 @@ func parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
 		entry.Service = detail.Containers[0].Name[:i]
 		entry.Etag = detail.Containers[0].Name[i+1:]
 		entry.Host = path.Base(ecsEvt.Resources[0])
-		fmt.Fprintf(&buf, "%s %s", path.Base(detail.ClusterArn), detail.LastStatus)
+		fmt.Fprintf(&buf, "%s %s (%s, %s, %s)", path.Base(detail.ClusterArn), detail.LastStatus, entry.Service, entry.Etag, entry.Host)
 		if detail.StoppedReason != "" {
 			fmt.Fprintf(&buf, " : %s", detail.StoppedReason)
 		}
@@ -212,6 +237,13 @@ func parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
 		if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
 			return fmt.Errorf("error unmarshaling ECS service/deployment event: %v", err)
 		}
+
+		defer func() {
+			if bs.ecsEventsHandler != nil {
+				bs.ecsEventsHandler.HandleEcsDeploymentStateChange(detail, ecsEvt.Resources)
+			}
+		}()
+
 		ecsSvcName := path.Base(ecsEvt.Resources[0])
 		// TODO: etag is not available at service and deployment level, find a possible correlation, possibly task definition revision using the deploymentId
 		snStart := strings.LastIndex(ecsSvcName, "_") // ecsSvcName is in the format "project_service-random", our validation does not allow '_' in service names
@@ -221,7 +253,7 @@ func parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
 		}
 		entry.Service = ecsSvcName[snStart+1 : snEnd]
 		entry.Host = detail.DeploymentId
-		fmt.Fprintf(&buf, "%s", detail.EventName)
+		fmt.Fprintf(&buf, "%s (%s, %s, %s)", detail.EventName, entry.Service, entry.Etag, entry.Host)
 		if detail.Reason != "" {
 			fmt.Fprintf(&buf, " : %s", detail.Reason)
 		}
