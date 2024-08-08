@@ -4,12 +4,21 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime/debug"
 
 	"github.com/DefangLabs/defang/src/cmd/cli/command"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			command.Track("Panic", command.P{"error", r}, command.P{"stack", string(debug.Stack())})
+			command.FlushAllTracking()
+			panic(r)
+		}
+	}()
+
 	// Handle Ctrl+C so we can exit gracefully
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
