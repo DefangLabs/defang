@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -714,6 +715,43 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		}
 		// Cut off the prefix and the .json suffix
 		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
+		// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
+		objOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: &bucketName,
+			Key:    obj.Key,
+		})
+		if err != nil {
+			term.Debugf("Failed to get Pulumi state object %q: %v", *obj.Key, err)
+		} else {
+			defer objOutput.Body.Close()
+			var state struct {
+				Version    int `json:"version"`
+				Checkpoint struct {
+					// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
+					Latest struct {
+						Resources         []struct{} `json:"resources,omitempty"`
+						PendingOperations []struct {
+							Resource struct {
+								Urn string `json:"urn"`
+							}
+						} `json:"pending_operations,omitempty"`
+					}
+				}
+			}
+			if err := json.NewDecoder(objOutput.Body).Decode(&state); err != nil {
+				term.Debugf("Failed to decode Pulumi state %q: %v", *obj.Key, err)
+			} else if state.Version != 3 {
+				term.Debug("Skipping Pulumi state with version", state.Version)
+			} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
+				for _, op := range state.Checkpoint.Latest.PendingOperations {
+					parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
+					stack += fmt.Sprintf(" (pending %q)", parts[3])
+				}
+			} else if len(state.Checkpoint.Latest.Resources) == 0 {
+				continue // skip: no resources and no pending operations
+			}
+		}
+
 		stacks = append(stacks, stack)
 	}
 	return stacks, nil
