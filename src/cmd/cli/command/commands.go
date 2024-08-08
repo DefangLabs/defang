@@ -218,12 +218,12 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeStartCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
-	composeCmd.AddCommand(getServicesCmd) // like docker compose ls
+	// composeCmd.AddCommand(getServicesCmd) // like docker compose ls
 	RootCmd.AddCommand(composeCmd)
 
 	// Add up/down commands to the root as well
-	RootCmd.AddCommand(composeDownCmd)
-	RootCmd.AddCommand(composeUpCmd)
+	// RootCmd.AddCommand(composeDownCmd)
+	// RootCmd.AddCommand(composeUpCmd)
 	// RootCmd.AddCommand(composeStartCmd)
 	// RootCmd.AddCommand(composeRestartCmd)
 	// RootCmd.AddCommand(composeStopCmd)
