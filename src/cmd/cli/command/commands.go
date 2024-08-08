@@ -386,7 +386,7 @@ var RootCmd = &cobra.Command{
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Args:  cobra.NoArgs,
-	Short: "Authenticate to the Defang cluster",
+	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
@@ -641,7 +641,7 @@ var getServicesCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"getServices", "ls", "list"},
-	Short:       "Get list of services on the cluster",
+	Short:       "Get list of services in the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		long, _ := cmd.Flags().GetBool("long")
 
