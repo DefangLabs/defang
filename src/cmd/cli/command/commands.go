@@ -70,7 +70,7 @@ func Execute(ctx context.Context) error {
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
-			fileFlag := composeCmd.Flag("file")
+			fileFlag := RootCmd.Flag("file")
 			if fileFlag.Changed {
 				compose += " -f " + fileFlag.Value.String()
 			}
@@ -197,8 +197,7 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(restartCmd)
 
-	composeCmd := setupComposeCommand()
-	RootCmd.AddCommand(composeCmd)
+	RootCmd.AddCommand(setupComposeCommand())
 
 	// Add up/down commands to the root as well
 	// RootCmd.AddCommand(composeDownCmd)
