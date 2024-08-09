@@ -357,7 +357,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
-	ensure(b.ProjectName != "", "pulumiProject not set")
+	ensure(b.ProjectName != "", "ProjectName not set")
 	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.ProjectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
@@ -472,7 +472,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		term.Debug("Tailing task", etag)
 		etag = "" // no need to filter by etag
 	} else {
-		// Tail CD, kaniko, and all services (this requires PulumiProject to be set)
+		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
 		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
