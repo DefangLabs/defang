@@ -175,8 +175,10 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
-	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
-	RootCmd.AddCommand(getServicesCmd)
+	lsCommand := makeComposeLsCmd()
+	lsCommand.Use = "services"
+	lsCommand.Aliases = []string{"getServices", "ls", "list"}
+	RootCmd.AddCommand(makeComposeLsCmd())
 
 	// Get Status Command
 	RootCmd.AddCommand(getVersionCmd)
@@ -198,13 +200,12 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(restartCmd)
 
 	RootCmd.AddCommand(setupComposeCommand())
-
 	// Add up/down commands to the root as well
-	// RootCmd.AddCommand(composeDownCmd)
-	// RootCmd.AddCommand(composeUpCmd)
-	// RootCmd.AddCommand(composeStartCmd)
-	// RootCmd.AddCommand(composeRestartCmd)
-	// RootCmd.AddCommand(composeStopCmd)
+	RootCmd.AddCommand(makeComposeDownCmd())
+	RootCmd.AddCommand(makeComposeUpCmd())
+	RootCmd.AddCommand(makeComposeStartCmd())
+	RootCmd.AddCommand(makeComposeRestartCmd())
+	RootCmd.AddCommand(makeComposeStopCmd())
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -612,34 +613,6 @@ func collectUnsetEnvVars(project *proj.Project) []string {
 		}
 	}
 	return envVars
-}
-
-var getServicesCmd = &cobra.Command{
-	Use:         "services",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
-	Aliases:     []string{"getServices", "ls", "list"},
-	Short:       "Get list of services in the project",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		long, _ := cmd.Flags().GetBool("long")
-
-		err := cli.GetServices(cmd.Context(), client, long)
-		if err != nil {
-			if !errors.Is(err, cli.ErrNoServices) {
-				return err
-			}
-
-			term.Warn("No services found")
-
-			printDefangHint("To start a new project, do:", "new")
-			return nil
-		}
-
-		if !long {
-			printDefangHint("To see more information about your services, do:", cmd.CalledAs()+" -l")
-		}
-		return nil
-	},
 }
 
 var getVersionCmd = &cobra.Command{

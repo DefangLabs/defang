@@ -288,6 +288,38 @@ func makeComposeConfigCmd() *cobra.Command {
 	}
 }
 
+func makeComposeLsCmd() *cobra.Command {
+	getServicesCmd := &cobra.Command{
+		Use:         "ls",
+		Annotations: authNeededAnnotation,
+		Args:        cobra.NoArgs,
+		Aliases:     []string{"getServices", "services", "list"},
+		Short:       "Get list of services in the project",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			long, _ := cmd.Flags().GetBool("long")
+
+			err := cli.GetServices(cmd.Context(), client, long)
+			if err != nil {
+				if !errors.Is(err, cli.ErrNoServices) {
+					return err
+				}
+
+				term.Warn("No services found")
+
+				printDefangHint("To start a new project, do:", "new")
+				return nil
+			}
+
+			if !long {
+				printDefangHint("To see more information about your services, do:", cmd.CalledAs()+" -l")
+			}
+			return nil
+		},
+	}
+	getServicesCmd.Flags().BoolP("long", "l", false, "show more details")
+	return getServicesCmd
+}
+
 func setupComposeCommand() *cobra.Command {
 	var composeCmd = &cobra.Command{
 		Use:     "compose",
@@ -316,7 +348,7 @@ services:
 	composeCmd.AddCommand(makeComposeStartCmd())
 	composeCmd.AddCommand(makeComposeRestartCmd())
 	composeCmd.AddCommand(makeComposeStopCmd())
-	// composeCmd.AddCommand(getServicesCmd) // like docker compose ls
+	composeCmd.AddCommand(makeComposeLsCmd())
 
 	return composeCmd
 }
