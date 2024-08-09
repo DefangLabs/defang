@@ -3,6 +3,9 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -320,6 +323,57 @@ func makeComposeLsCmd() *cobra.Command {
 	return getServicesCmd
 }
 
+func makeComposeLogsCmd() *cobra.Command {
+	var logsCmd = &cobra.Command{
+		Use:         "logs",
+		Annotations: authNeededAnnotation,
+		Aliases:     []string{"tail"},
+		Args:        cobra.NoArgs,
+		Short:       "Tail logs from one or more services",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var name, _ = cmd.Flags().GetString("name")
+			var etag, _ = cmd.Flags().GetString("etag")
+			var raw, _ = cmd.Flags().GetBool("raw")
+			var since, _ = cmd.Flags().GetString("since")
+			var utc, _ = cmd.Flags().GetBool("utc")
+
+			if utc {
+				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
+			}
+
+			ts, err := cli.ParseTimeOrDuration(since, time.Now())
+			if err != nil {
+				return fmt.Errorf("invalid duration or time: %w", err)
+			}
+
+			ts = ts.UTC()
+			sinceStr := ""
+			if !ts.IsZero() {
+				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
+			}
+			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
+			services := []string{}
+			if len(name) > 0 {
+				services = strings.Split(name, ",")
+			}
+			tailOptions := cli.TailOptions{
+				Services: services,
+				Etag:     etag,
+				Since:    ts,
+				Raw:      raw,
+			}
+
+			return cli.Tail(cmd.Context(), client, tailOptions)
+		},
+	}
+	logsCmd.Flags().StringP("name", "n", "", "name of the service")
+	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
+	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
+	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	return logsCmd
+}
+
 func setupComposeCommand() *cobra.Command {
 	var composeCmd = &cobra.Command{
 		Use:     "compose",
@@ -349,6 +403,7 @@ services:
 	composeCmd.AddCommand(makeComposeRestartCmd())
 	composeCmd.AddCommand(makeComposeStopCmd())
 	composeCmd.AddCommand(makeComposeLsCmd())
+	composeCmd.AddCommand(makeComposeLogsCmd())
 
 	return composeCmd
 }
