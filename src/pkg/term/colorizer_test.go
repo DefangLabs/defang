@@ -10,19 +10,19 @@ import (
 	"github.com/muesli/termenv"
 )
 
-func TestOutputf(t *testing.T) {
+func TestOutput(t *testing.T) {
 	tests := []struct {
 		msg, output string
 		profile     termenv.Profile
 	}{
-		{"Hello, World!", "Hello, World!\n", termenv.Ascii},
+		{"Hello, World!", "Hello, World!", termenv.Ascii},
 		{"Hello, World!\r", "Hello, World!\r", termenv.Ascii},
 		{"Hello, World!\n", "Hello, World!\n", termenv.Ascii},
-		{"", "\n", termenv.Ascii},
-		{"Hello, World!", "\x1b[95mHello, World!\n\x1b[0m", termenv.ANSI},
+		{"", "", termenv.Ascii},
+		{"Hello, World!", "\x1b[95mHello, World!\x1b[0m", termenv.ANSI},
 		{"Hello, World!\r", "\x1b[95mHello, World!\r\x1b[0m", termenv.ANSI},
 		{"Hello, World!\n", "\x1b[95mHello, World!\n\x1b[0m", termenv.ANSI},
-		{"", "\x1b[95m\n\x1b[0m", termenv.ANSI},
+		{"", "", termenv.ANSI},
 	}
 
 	for i, test := range tests {
@@ -30,11 +30,11 @@ func TestOutputf(t *testing.T) {
 			var buf strings.Builder
 			out := termenv.NewOutput(&buf)
 			out.Profile = test.profile
-			if _, err := outputf(out, InfoColor, test.msg); err != nil {
-				t.Errorf("outputf(out, InfoColor, %q) results in error: %v", test.msg, err)
+			if _, err := output(out, InfoColor, test.msg); err != nil {
+				t.Errorf("output(out, InfoColor, %q) results in error: %v", test.msg, err)
 			}
 			if buf.String() != test.output {
-				t.Errorf("outputf(out, InfoColor, %q) = %q, want %q", test.msg, buf.String(), test.output)
+				t.Errorf("output(out, InfoColor, %q) = %q, want %q", test.msg, buf.String(), test.output)
 			}
 		})
 	}

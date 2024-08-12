@@ -121,17 +121,45 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	if len(msg) == 0 {
 		return 0, nil
 	}
+	var buf strings.Builder
 	if doColor(w) {
-		w.WriteString(termenv.CSI + c.Sequence(false) + "m")
-		defer w.Reset()
+		Append(&buf, doColor(w), c, msg)
+		msg = buf.String()
 	}
 	return w.WriteString(msg)
 }
 
-func outputf(w *termenv.Output, c Color, format string, v ...any) (int, error) {
-	line := fmt.Sprintf(format, v...)
-	line = ensureNewline(line)
-	return output(w, c, line)
+const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
+
+func Append(w io.Writer, canColor bool, c Color, v ...any) (int, error) {
+
+	var l int
+	if canColor {
+		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
+		l += n
+		if err != nil {
+			return l, err
+		}
+	}
+	for _, s := range v {
+		n, err := fmt.Fprint(w, s)
+		l += n
+		if err != nil {
+			return l, err
+		}
+	}
+	if canColor {
+		n, err := io.WriteString(w, ResetColorStr)
+		l += n
+		if err != nil {
+			return l, err
+		}
+	}
+	return l, nil
+}
+
+func AppendReset(w io.Writer) (int, error) {
+	return io.WriteString(w, ResetColorStr)
 }
 
 func ensureNewline(s string) string {
@@ -158,7 +186,8 @@ func (t *Term) Printlnc(c Color, v ...any) (int, error) {
 }
 
 func (t *Term) Printfc(c Color, format string, v ...any) (int, error) {
-	return outputf(t.stdout, c, format, v...)
+	line := ensureNewline(fmt.Sprintf(format, v...))
+	return output(t.stdout, c, line)
 }
 
 func (t *Term) Print(v ...any) (int, error) {
@@ -210,7 +239,8 @@ func (t *Term) Error(v ...any) (int, error) {
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
-	return outputf(t.stderr, ErrorColor, format, v...)
+	line := ensureNewline(fmt.Sprintf(format, v...))
+	return output(t.stderr, ErrorColor, line)
 }
 
 func (t *Term) Fatal(msg any) {

@@ -743,9 +743,9 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	s := &byocSubscribeServerStream{
 		services: req.Services,
 		etag:     req.Etag,
+		ctx:      ctx,
 
-		ch:              make(chan *defangv1.SubscribeResponse),
-		deploymentEtags: make(map[string]string),
+		ch: make(chan *defangv1.SubscribeResponse),
 	}
 	b.AddEcsEventHandler(s)
 	return s, nil

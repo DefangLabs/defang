@@ -217,25 +217,22 @@ func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defan
 			}
 		}()
 
-		// Container name is in the format of "service_etag"
-		if len(detail.Containers) < 1 {
-			return fmt.Errorf("error parsing ECS task state change: missing containers section")
+		_, service, etag, err := GetEcsTaskStateChangeServiceEtag(detail)
+		if err != nil {
+			return err
 		}
-		i := strings.LastIndex(detail.Containers[0].Name, "_")
-		if i < 0 {
-			return fmt.Errorf("error parsing ECS task state change: invalid container name %q", detail.Containers[0].Name)
-		}
-		entry.Service = detail.Containers[0].Name[:i]
-		entry.Etag = detail.Containers[0].Name[i+1:]
+
+		entry.Service = service
+		entry.Etag = etag
 		entry.Host = path.Base(ecsEvt.Resources[0])
-		fmt.Fprintf(&buf, "%s %s (%s, %s, %s)", path.Base(detail.ClusterArn), detail.LastStatus, entry.Service, entry.Etag, entry.Host)
+		fmt.Fprintf(&buf, "%s %s", path.Base(detail.ClusterArn), detail.LastStatus)
 		if detail.StoppedReason != "" {
 			fmt.Fprintf(&buf, " : %s", detail.StoppedReason)
 		}
 	case "ECS Service Action", "ECS Deployment State Change": // pretty much the same JSON structure for both
 		var detail ecs.ECSDeploymentStateChange
 		if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
-			return fmt.Errorf("error unmarshaling ECS service/deployment event: %v", err)
+			return fmt.Errorf("error unmarshaling ECS service/deployment event: %w", err)
 		}
 
 		defer func() {
@@ -244,16 +241,15 @@ func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defan
 			}
 		}()
 
-		ecsSvcName := path.Base(ecsEvt.Resources[0])
-		// TODO: etag is not available at service and deployment level, find a possible correlation, possibly task definition revision using the deploymentId
-		snStart := strings.LastIndex(ecsSvcName, "_") // ecsSvcName is in the format "project_service-random", our validation does not allow '_' in service names
-		snEnd := strings.LastIndex(ecsSvcName, "-")
-		if snStart < 0 || snEnd < 0 || snStart >= snEnd {
-			return fmt.Errorf("error parsing ECS service action: invalid service name %q", ecsEvt.Resources[0])
+		service, err := GetEcsDeploymetStateChangeService(ecsEvt.Resources)
+		if err != nil {
+			return err
 		}
-		entry.Service = ecsSvcName[snStart+1 : snEnd]
+
+		entry.Service = service
+		entry.Etag = deploymentEtags[detail.DeploymentId]
 		entry.Host = detail.DeploymentId
-		fmt.Fprintf(&buf, "%s (%s, %s, %s)", detail.EventName, entry.Service, entry.Etag, entry.Host)
+		fmt.Fprintf(&buf, "%s", detail.EventName)
 		if detail.Reason != "" {
 			fmt.Fprintf(&buf, " : %s", detail.Reason)
 		}

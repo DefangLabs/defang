@@ -1,10 +1,18 @@
 package aws
 
 import (
+	"bytes"
 	"context"
+	"embed"
+	"encoding/json"
+	"io"
+	"path"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
@@ -73,4 +81,101 @@ func (f FakeLoader) LoadProject(ctx context.Context) (*compose.Project, error) {
 
 func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {
 	return f.ProjectName, nil
+}
+
+//go:embed test_ecs_events/*.json
+var testDir embed.FS
+
+//go:embed test_ecs_events/*.events
+var expectedDir embed.FS
+
+func TestSubscribe(t *testing.T) {
+
+	tests, err := testDir.ReadDir("test_ecs_events")
+	if err != nil {
+		t.Fatalf("failed to load ecs events test files: %v", err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name(), func(t *testing.T) {
+			start := strings.LastIndex(tt.Name(), "-")
+			end := strings.LastIndex(tt.Name(), ".")
+			if start == -1 || end == -1 {
+				t.Fatalf("cannot find etag from invalid test file name: %s", tt.Name())
+			}
+			name := tt.Name()[:start]
+			etag := tt.Name()[start+1 : end]
+
+			byoc := &ByocAws{}
+
+			resp, err := byoc.Subscribe(context.Background(), &defangv1.SubscribeRequest{
+				Etag:     etag,
+				Services: []string{"api", "web"},
+			})
+			if err != nil {
+				t.Fatalf("Subscribe() failed: %v", err)
+			}
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				ef, _ := expectedDir.ReadFile("test_ecs_events/" + name + ".events")
+				dec := json.NewDecoder(bytes.NewReader(ef))
+
+				for {
+					if !resp.Receive() {
+						if resp.Err() != nil {
+							t.Errorf("Receive() failed: %v", resp.Err())
+						}
+						break
+					}
+					msg := resp.Msg()
+					var expected defangv1.SubscribeResponse
+					if err := dec.Decode(&expected); err == io.EOF {
+						t.Errorf("unexpected message: %v", msg)
+					} else if err != nil {
+						t.Errorf("error unmarshaling expected ECS event: %v", err)
+					}
+					if msg.Name != expected.Name || msg.Status != expected.Status || msg.State != expected.State {
+						t.Errorf("expected message %v, got %v", &expected, msg)
+					}
+				}
+			}()
+
+			data, err := testDir.ReadFile(path.Join("test_ecs_events", tt.Name()))
+			if err != nil {
+				t.Fatalf("failed to read test file: %v", err)
+			}
+			dec := json.NewDecoder(bytes.NewReader(data))
+			for {
+				var ecsEvt ecs.Event
+				if err := dec.Decode(&ecsEvt); err == io.EOF {
+					t.Logf("end of file")
+					break
+				} else if err != nil {
+					t.Fatalf("error unmarshaling ECS event: %v", err)
+				}
+
+				switch ecsEvt.DetailType {
+				case "ECS Task State Change":
+					var detail ecs.ECSTaskStateChange
+					if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
+						t.Fatalf("error unmarshaling ECS task state change: %v", err)
+					}
+					byoc.HandleEcsTaskStateChange(detail)
+
+				case "ECS Service Action", "ECS Deployment State Change":
+					var detail ecs.ECSDeploymentStateChange
+					if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
+						t.Fatalf("error unmarshaling ECS service/deployment event: %v", err)
+					}
+					byoc.HandleEcsDeploymentStateChange(detail, ecsEvt.Resources)
+				}
+			}
+			resp.Close()
+
+			wg.Wait()
+		})
+	}
 }
