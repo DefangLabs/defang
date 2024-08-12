@@ -218,12 +218,12 @@ func SetupCommands(version string) {
 	composeCmd.AddCommand(composeStartCmd)
 	composeCmd.AddCommand(composeRestartCmd)
 	composeCmd.AddCommand(composeStopCmd)
-	composeCmd.AddCommand(getServicesCmd) // like docker compose ls
+	// composeCmd.AddCommand(getServicesCmd) // like docker compose ls
 	RootCmd.AddCommand(composeCmd)
 
 	// Add up/down commands to the root as well
-	RootCmd.AddCommand(composeDownCmd)
-	RootCmd.AddCommand(composeUpCmd)
+	// RootCmd.AddCommand(composeDownCmd)
+	// RootCmd.AddCommand(composeUpCmd)
 	// RootCmd.AddCommand(composeStartCmd)
 	// RootCmd.AddCommand(composeRestartCmd)
 	// RootCmd.AddCommand(composeStopCmd)
@@ -386,7 +386,7 @@ var RootCmd = &cobra.Command{
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Args:  cobra.NoArgs,
-	Short: "Authenticate to the Defang cluster",
+	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
@@ -641,7 +641,7 @@ var getServicesCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Aliases:     []string{"getServices", "ls", "list"},
-	Short:       "Get list of services on the cluster",
+	Short:       "Get list of services in the project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		long, _ := cmd.Flags().GetBool("long")
 
@@ -952,17 +952,22 @@ var composeUpCmd = &cobra.Command{
 
 				if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
 					var aiDebug bool
+					Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", context.Cause(tailCtx)})
 					if err := survey.AskOne(&survey.Confirm{
 						Message: "Would you like to debug the deployment with AI?",
 						Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 					}, &aiDebug); err != nil {
 						term.Debugf("failed to ask for AI debug: %v", err)
+						Track("Debug Prompt Failed", P{"etag", deploy.Etag}, P{"reason", err})
 					} else if aiDebug {
+						Track("Debug Prompt Accepted", P{"etag", deploy.Etag})
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled); HACK: cmd might be canceled too
 						// TODO: use the WorkingDir of the failed service, might not be the project's root
 						if err := cli.Debug(context.TODO(), client, deploy.Etag, project, failedServices); err != nil {
 							term.Warnf("failed to debug deployment: %v", err)
 						}
+					} else {
+						Track("Debug Prompt Skipped", P{"etag", deploy.Etag})
 					}
 				}
 				return err

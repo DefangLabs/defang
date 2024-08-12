@@ -24,13 +24,20 @@ if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
     CI="1"
 fi
 
-# Use curl to fetch the latest release data
-echo "Fetching the latest release information..."
-RELEASE_JSON=$(curl -s -L https://api.github.com/repos/DefangLabs/defang/releases/latest)
+# check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
+if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
+    RELEASE_PATH="latest"
+else
+    RELEASE_PATH="tags/$DEFANG_INSTALL_VERSION"
+fi
+
+# Echo fetching the release path either latest or strip the tags/ from the version
+echo "Fetching the ${DEFANG_INSTALL_VERSION:-latest} release of defang..."
+RELEASE_JSON=$(curl -s -f -L https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
 # Check for curl failure
-if [ $? -ne 0 ]; then
-    echo "Error fetching release information. Please check your connection or if the URL is correct."
+if [ -z "$RELEASE_JSON" ]; then
+    echo "Error fetching release information. Please check your connection or if the version is correct."
     return 1
 fi
 
@@ -73,7 +80,7 @@ elif [ "$OS" = "Linux" ]; then
 fi
 
 # Download the file
-if ! curl -s -L "$DOWNLOAD_URL" -o "$FILENAME"; then
+if ! curl -s -f -L "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
     return 4
 fi
@@ -232,5 +239,5 @@ rm "$FILENAME"
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
 
 # Unset the variables and functions to avoid polluting the user's environment
-unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
+unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
 unset -f _prompt_and_append_to_file _generate_completion_script _install_completion_script
