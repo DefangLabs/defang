@@ -1,10 +1,10 @@
  ! service "service1": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "service1": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service1": network "invalid-network-name" is not defined in the top-level networks section
  ! service "service2": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "service2": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service3": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "service3": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service3": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service4": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "service4": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "service4": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "service4": network "private" is not defined in the top-level networks section
