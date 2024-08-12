@@ -357,7 +357,7 @@ var RootCmd = &cobra.Command{
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
 
-				defer trackCmd(nil, "Login", P{"reason", err})
+				defer func() { trackCmd(nil, "Login", P{"reason", err}) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
 				}
@@ -373,9 +373,9 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
 				term.Warn(prettyError(err))
 
-				defer trackCmd(nil, "Terms", P{"reason", err})
+				defer func() { trackCmd(nil, "Terms", P{"reason", err}) }()
 				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-					return err
+					return err // fatal
 				}
 			}
 		}
@@ -548,11 +548,10 @@ var generateCmd = &cobra.Command{
 		if client.CheckLoginAndToS(cmd.Context()) != nil {
 			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
 			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-				// This might fail because the user did not log in. This is fine: we won't persist the terms agreement, but can proceed with the generation
+				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
 				if connect.CodeOf(err) != connect.CodeUnauthenticated {
 					return err
 				}
-				// TODO: persist the terms agreement in the state file
 			}
 		}
 
