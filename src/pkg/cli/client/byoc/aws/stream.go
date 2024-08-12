@@ -23,7 +23,6 @@ import (
 type byocServerStream struct {
 	ctx      context.Context
 	err      error
-	errCh    <-chan error
 	etag     string
 	response *defangv1.TailResponse
 	services []string
@@ -33,14 +32,8 @@ type byocServerStream struct {
 }
 
 func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler EcsEventHandler) *byocServerStream {
-	var errCh <-chan error
-	if errch, ok := stream.(hasErrCh); ok {
-		errCh = errch.Errs()
-	}
-
 	return &byocServerStream{
 		ctx:      ctx,
-		errCh:    errCh,
 		etag:     etag,
 		stream:   stream,
 		services: services,
@@ -66,10 +59,6 @@ func (bs *byocServerStream) Msg() *defangv1.TailResponse {
 	return bs.response
 }
 
-type hasErrCh interface {
-	Errs() <-chan error
-}
-
 func (bs *byocServerStream) Receive() bool {
 	var evts []ecs.LogEvent
 	select {
@@ -84,10 +73,6 @@ func (bs *byocServerStream) Receive() bool {
 			bs.err = err
 			return false
 		}
-	case err := <-bs.errCh: // blocking (if not nil)
-		bs.err = err
-		return false // abort on first error?
-
 	case <-bs.ctx.Done(): // blocking (if not nil)
 		bs.err = context.Cause(bs.ctx)
 		return false
