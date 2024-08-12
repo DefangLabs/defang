@@ -1,12 +1,12 @@
  ! service "cmd-shell": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "cmd-shell": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "cmd-shell": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "curl": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "curl": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "curl": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "flask1": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "flask1": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "flask1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "flask2": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "flask2": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "flask2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "none": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "none": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "none": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "wget": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "wget": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "wget": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
