@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/digitalocean/godo"
 	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -210,18 +209,19 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		cdApp = b.apps[eTag]
 	}
 
-	term.Debug("FOLLOW APP ID: %s", cdApp.ID)
-
-	client := b.driver.Client
-
-	logs, _, err := client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
+	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
+	deploymentID := cdApp.GetPendingDeployment().GetID()
+	term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
+	logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+	term.Debug(fmt.Sprintf("STATUS CODE: %d", resp.StatusCode))
+	// Logs aren't immediately available, wait until they're ready.
+	if resp.StatusCode == 400 && deploymentID != "" {
+		term.Info("Waiting for DO APP to become available")
+		pkg.SleepWithContext(ctx, 10*time.Second)
+		logs, resp, err = b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+	}
 	if err != nil {
-		// assume not found; try again after a while
-		pkg.SleepWithContext(ctx, 2*time.Second)
-		logs, _, err = client.Apps.GetLogs(ctx, cdApp.ID, cdApp.InProgressDeployment.ID, "defang-cd", godo.AppLogTypeDeploy, true, 50)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	term.Debug("LIVE URL")
 	term.Debug(logs.LiveURL)
