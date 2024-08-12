@@ -36,23 +36,23 @@ func TestInitState(t *testing.T) {
 }
 
 func TestTerms(t *testing.T) {
-	statePath = filepath.Join(t.TempDir(), "state.json")
-	_ = GetAnonID()
-	if !state.TermsAccepted.IsZero() {
+	tmp := filepath.Join(t.TempDir(), "state.json")
+	state := initState(tmp)
+	if !state.TermsAcceptedAt.IsZero() {
 		t.Errorf("initState() returned non-zero TermsAccepted")
 	}
-	if TermsAccepted() {
+	if state.termsAccepted() {
 		t.Errorf("TermsAccepted() returned true, expected false")
 	}
-	if err := AcceptTerms(); err != nil {
+	if err := state.acceptTerms(); err != nil {
 		t.Errorf("AcceptTerms() returned error: %v", err)
 	}
-	if !TermsAccepted() {
+	if !state.termsAccepted() {
 		t.Errorf("TermsAccepted() returned false, expected true")
 	}
 	// Old acceptance should not count
-	state.TermsAccepted = state.TermsAccepted.Add(-25 * time.Hour)
-	if TermsAccepted() {
+	state.TermsAcceptedAt = state.TermsAcceptedAt.Add(-25 * time.Hour)
+	if state.termsAccepted() {
 		t.Errorf("TermsAccepted() returned true, expected false")
 	}
 }

@@ -29,8 +29,8 @@ var (
 )
 
 type State struct {
-	AnonID        string
-	TermsAccepted time.Time
+	AnonID          string
+	TermsAcceptedAt time.Time
 }
 
 func initState(path string) State {
@@ -52,17 +52,25 @@ func (state State) write(path string) error {
 	}
 }
 
+func (state *State) acceptTerms() error {
+	state.TermsAcceptedAt = time.Now()
+	return state.write(statePath)
+}
+
+func (state State) termsAccepted() bool {
+	// Consider the terms accepted if the timestamp is within the last 24 hours
+	return time.Since(state.TermsAcceptedAt) < 24*time.Hour
+}
+
 func GetAnonID() string {
 	state = initState(statePath)
 	return state.AnonID
 }
 
 func AcceptTerms() error {
-	state.TermsAccepted = time.Now()
-	return state.write(statePath)
+	return state.acceptTerms()
 }
 
 func TermsAccepted() bool {
-	// Consider the terms accepted if the timestamp is within the last 24 hours
-	return time.Since(state.TermsAccepted) < 24*time.Hour
+	return state.termsAccepted()
 }

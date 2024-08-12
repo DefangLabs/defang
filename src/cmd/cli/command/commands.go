@@ -357,7 +357,7 @@ var RootCmd = &cobra.Command{
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
 
-				defer trackCmd(nil, "Login", P{"reason", err})
+				defer func() { trackCmd(nil, "Login", P{"reason", err}) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
 				}
@@ -371,18 +371,11 @@ var RootCmd = &cobra.Command{
 
 			// Check if the user has agreed to the terms of service and show a prompt if needed
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				defer trackCmd(nil, "Terms", P{"reason", err})
-				if cliClient.TermsAccepted() {
-					// The user has already agreed to the terms of service previously
-					if err = cli.NonInteractiveAgreeToS(cmd.Context(), client); err != nil {
-						term.Debug("unable to agree to terms:", err) // not fatal
-					}
-				} else {
-					term.Warn(prettyError(err))
+				term.Warn(prettyError(err))
 
-					if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-						return err // fatal
-					}
+				defer func() { trackCmd(nil, "Terms", P{"reason", err}) }()
+				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
+					return err // fatal
 				}
 			}
 		}
@@ -552,16 +545,12 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 
-		if client.CheckLoginAndToS(cmd.Context()) != nil && !cliClient.TermsAccepted() {
+		if client.CheckLoginAndToS(cmd.Context()) != nil {
 			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
 			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
 				if connect.CodeOf(err) != connect.CodeUnauthenticated {
 					return err
-				}
-				// Persist the terms agreement in the state file so that we don't ask again
-				if err := cliClient.AcceptTerms(); err != nil {
-					term.Debug("unable to persist terms agreement:", err) // not fatal
 				}
 			}
 		}
