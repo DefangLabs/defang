@@ -293,10 +293,10 @@ func makeComposeConfigCmd() *cobra.Command {
 
 func makeComposeLsCmd() *cobra.Command {
 	getServicesCmd := &cobra.Command{
-		Use:         "ls",
+		Use:         "ps",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs,
-		Aliases:     []string{"getServices", "services", "list"},
+		Aliases:     []string{"getServices", "services"},
 		Short:       "Get list of services in the project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
