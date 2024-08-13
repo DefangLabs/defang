@@ -3,9 +3,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"path"
 	"strings"
 	"time"
 
@@ -28,10 +26,10 @@ type byocServerStream struct {
 	services []string
 	stream   ecs.EventStream
 
-	ecsEventsHandler EcsEventHandler
+	ecsEventsHandler ECSEventHandler
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler EcsEventHandler) *byocServerStream {
+func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
 	return &byocServerStream{
 		ctx:      ctx,
 		etag:     etag,
@@ -179,77 +177,13 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 }
 
 func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
-	var ecsEvt ecs.Event
-	if err := json.Unmarshal([]byte(*event.Message), &ecsEvt); err != nil {
-		return fmt.Errorf("error unmarshaling ECS event: %w", err)
+	evt, err := ecs.ParseECSEvent([]byte(*event.Message))
+	if err != nil {
+		return err
 	}
-
-	var buf strings.Builder
-	fmt.Fprintf(&buf, "%s ", ecsEvt.DetailType)
-	if len(ecsEvt.Resources) > 0 {
-		fmt.Fprintf(&buf, "%s ", path.Base(ecsEvt.Resources[0]))
-	}
-	switch ecsEvt.DetailType {
-	case "ECS Task State Change":
-		var detail ecs.ECSTaskStateChange
-		if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
-			return fmt.Errorf("error unmarshaling ECS task state change: %w", err)
-		}
-
-		defer func() {
-			if bs.ecsEventsHandler != nil {
-				bs.ecsEventsHandler.HandleEcsTaskStateChange(detail)
-			}
-		}()
-
-		_, service, etag, err := GetEcsTaskStateChangeServiceEtag(detail)
-		if err != nil {
-			return err
-		}
-
-		entry.Service = service
-		entry.Etag = etag
-		entry.Host = path.Base(ecsEvt.Resources[0])
-		fmt.Fprintf(&buf, "%s %s", path.Base(detail.ClusterArn), detail.LastStatus)
-		if detail.StoppedReason != "" {
-			fmt.Fprintf(&buf, " : %s", detail.StoppedReason)
-		}
-	case "ECS Service Action", "ECS Deployment State Change": // pretty much the same JSON structure for both
-		var detail ecs.ECSDeploymentStateChange
-		if err := json.Unmarshal(ecsEvt.Detail, &detail); err != nil {
-			return fmt.Errorf("error unmarshaling ECS service/deployment event: %w", err)
-		}
-
-		defer func() {
-			if bs.ecsEventsHandler != nil {
-				bs.ecsEventsHandler.HandleEcsDeploymentStateChange(detail, ecsEvt.Resources)
-			}
-		}()
-
-		service, err := GetEcsDeploymetStateChangeService(ecsEvt.Resources)
-		if err != nil {
-			return err
-		}
-
-		entry.Service = service
-		entry.Etag = deploymentEtags[detail.DeploymentId]
-		entry.Host = detail.DeploymentId
-		fmt.Fprintf(&buf, "%s", detail.EventName)
-		if detail.Reason != "" {
-			fmt.Fprintf(&buf, " : %s", detail.Reason)
-		}
-	default:
-		entry.Service = "ecs"
-		if len(ecsEvt.Resources) > 0 {
-			entry.Host = path.Base(ecsEvt.Resources[0])
-		}
-		// Print the unrecogonalized ECS event detail in prettry JSON format if possible
-		raw, err := json.MarshalIndent(ecsEvt.Detail, "", "  ")
-		if err != nil {
-			raw = []byte(ecsEvt.Detail)
-		}
-		fmt.Fprintf(&buf, "\n%s", raw)
-	}
-	entry.Message = buf.String()
+	entry.Service = evt.Service()
+	entry.Etag = evt.Etag()
+	entry.Host = evt.Host()
+	entry.Message = evt.Summary()
 	return nil
 }

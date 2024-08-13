@@ -42,7 +42,7 @@ type ByocAws struct {
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
-	ecsEventsHandlers []EcsEventHandler
+	ecsEventsHandlers []ECSEventHandler
 	handlersLock      sync.RWMutex
 }
 
@@ -772,9 +772,8 @@ func ensure(cond bool, msg string) {
 	}
 }
 
-type EcsEventHandler interface {
-	HandleEcsTaskStateChange(evt ecs.ECSTaskStateChange)
-	HandleEcsDeploymentStateChange(evt ecs.ECSDeploymentStateChange, resources []string)
+type ECSEventHandler interface {
+	HandleECSEvent(evt ecs.Event)
 }
 
 func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
@@ -789,23 +788,15 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	return s, nil
 }
 
-func (b *ByocAws) HandleEcsTaskStateChange(evt ecs.ECSTaskStateChange) {
+func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
 	b.handlersLock.RLock()
 	defer b.handlersLock.RUnlock()
 	for _, handler := range b.ecsEventsHandlers {
-		handler.HandleEcsTaskStateChange(evt)
+		handler.HandleECSEvent(evt)
 	}
 }
 
-func (b *ByocAws) HandleEcsDeploymentStateChange(evt ecs.ECSDeploymentStateChange, resources []string) {
-	b.handlersLock.RLock()
-	defer b.handlersLock.RUnlock()
-	for _, handler := range b.ecsEventsHandlers {
-		handler.HandleEcsDeploymentStateChange(evt, resources)
-	}
-}
-
-func (b *ByocAws) AddEcsEventHandler(handler EcsEventHandler) {
+func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventsHandlers = append(b.ecsEventsHandlers, handler)
