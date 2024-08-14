@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/digitalocean/godo"
+	"io"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -130,12 +132,14 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, command)
+	cdApp, err := b.runCdCommand(ctx, command)
 	if err != nil {
 		return "", err
 	}
+	etag := pkg.RandomID()
+	b.apps[etag] = cdApp
 
-	return "", nil
+	return etag, nil
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
@@ -202,31 +206,43 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	cdApp := &godo.App{}
-	eTag := req.Etag
-	if pkg.IsValidRandomID(eTag) {
-		// This is an etag; look up the app ID
-		cdApp = b.apps[eTag]
+	// This is an etag; look up the app ID
+	cdApp := b.apps[req.Etag]
+	if cdApp == nil {
+		return nil, fmt.Errorf("unknown etag: %s", req.Etag)
 	}
 
 	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
-	deploymentID := cdApp.GetPendingDeployment().GetID()
-	term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
-	logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
-	term.Debug(fmt.Sprintf("STATUS CODE: %d", resp.StatusCode))
-	// Logs aren't immediately available, wait until they're ready.
-	if resp.StatusCode == 400 && deploymentID != "" {
-		term.Info("Waiting for DO APP to become available")
-		pkg.SleepWithContext(ctx, 10*time.Second)
-		logs, resp, err = b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
-	}
-	if err != nil {
-		return nil, err
-	}
-	term.Debug("LIVE URL")
-	term.Debug(logs.LiveURL)
+	var liveURL string
+	for {
+		deploymentID := cdApp.PendingDeployment.ID
+		term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
 
-	return newByocServerStream(ctx, logs.LiveURL)
+		logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+		term.Debugf("STATUS CODE: %d", resp.StatusCode)
+		// Logs aren't immediately available, wait until they're ready.
+		if resp.StatusCode == 400 && deploymentID != "" {
+			pkg.SleepWithContext(ctx, time.Second)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		for _, u := range logs.HistoricURLs {
+			resp, err := http.GetWithContext(ctx, u)
+			if err != nil {
+				continue
+			}
+			defer resp.Body.Close()
+			io.Copy(os.Stdout, resp.Body)
+		}
+		liveURL = logs.LiveURL
+		break
+	}
+	term.Debug("LIVE URL:", liveURL)
+
+	return newByocServerStream(ctx, liveURL, req.Etag)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
@@ -325,7 +341,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "DIGITALOCEAN_TOKEN",
-			Value: os.Getenv("DO_PAT"),
+			Value: pkg.Getenv("DIGITALOCEAN_TOKEN", os.Getenv("DO_PAT")),
 		},
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
@@ -342,16 +358,16 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 			Value: region.String(),
 		},
 		{
-			Key:   "AWS_REGION",
+			Key:   "AWS_REGION", // FIXME: why do we need this?
 			Value: region.String(),
 		},
 		{
-			Key:   "AWS_ACCESS_KEY_ID",
+			Key:   "AWS_ACCESS_KEY_ID", // FIXME: why do we need this?
 			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
-			Key:   "AWS_SECRET_ACCESS_KEY",
+			Key:   "AWS_SECRET_ACCESS_KEY", // FIXME: why do we need this?
 			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
 			Type:  godo.AppVariableType_Secret,
 		},

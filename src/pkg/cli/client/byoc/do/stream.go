@@ -1,107 +1,83 @@
 package do
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/DefangLabs/defang/src/pkg/term"
-	"io"
 	"net/url"
-	"os"
-	"strings"
 
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/digitalocean/doctl/pkg/listen"
+	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type byocServerStream struct {
-	ctx context.Context
-	err error
-	// etag     string
-	resp     io.ReadCloser
-	response *defangv1.TailResponse
-	// done     chan struct{}
+	conn *websocket.Conn
+	data struct {
+		Data string `json:"data"`
+	}
+	err  error
+	etag types.ETag
 }
 
-func newByocServerStream(ctx context.Context, liveUrl string) (*byocServerStream, error) {
-	urlString, err := url.Parse(liveUrl)
+func newByocServerStream(ctx context.Context, liveUrl string, etag types.ETag) (*byocServerStream, error) {
+	liveURL, err := url.Parse(liveUrl)
 	if err != nil {
 		return nil, err
 	}
 
-	schemaFunc := func(message []byte) (io.Reader, error) {
-		data := struct {
-			Data string `json:"data"`
-		}{}
-		err = json.Unmarshal(message, &data)
-		if err != nil {
-			return nil, err
-		}
-		r := strings.NewReader(data.Data)
-
-		return r, nil
-	}
-
-	token := urlString.Query().Get("token")
-	term.Println("TOKEN: " + token)
-	switch urlString.Scheme {
+	switch liveURL.Scheme {
 	case "http":
-		urlString.Scheme = "wss"
+		liveURL.Scheme = "ws"
 	default:
-		urlString.Scheme = "wss"
+		liveURL.Scheme = "wss"
 	}
 
-	term.Println("URL: " + urlString.String())
-	listener := listen.NewListener(urlString, token, schemaFunc, os.Stderr)
-	err = listener.Start()
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, liveURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	bs := &byocServerStream{
-		ctx: ctx,
-		// resp: resp.Body,
+		// ctx:    ctx,
+		// cancel: cancel,
+		conn: conn,
+		etag: etag,
 	}
 
 	return bs, nil
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
-	return bs.response
+	return &defangv1.TailResponse{
+		Entries: []*defangv1.LogEntry{{
+			Message:   bs.data.Data,
+			Timestamp: timestamppb.Now(),
+			Stderr:    true,
+			Service:   "service1",
+			Etag:      bs.etag,
+			Host:      "host1",
+		}},
+		Service: "service2",
+		Etag:    bs.etag,
+		Host:    "host2",
+	}
 }
 
 func (bs *byocServerStream) Receive() bool {
-	<-bs.ctx.Done()
-	// scanner := bufio.NewScanner(); TODO: probably need to use this
-	buffer := &bytes.Buffer{}
-	var message [1]byte
-	for {
-		// _, message, err := bs.resp.ReadMessage(); TODO: websocket support
-		n, err := bs.resp.Read(message[:])
-		fmt.Println(n)
-		if err != nil {
-			bs.err = err
-			return false
-		}
-		if message[0] != '\n' {
-			buffer.Write(message[:n])
-			continue
-		}
-
-		bs.response = &defangv1.TailResponse{
-			Entries: []*defangv1.LogEntry{
-				{
-					Message:   buffer.String(),
-					Timestamp: timestamppb.Now(), // ??
-					Stderr:    true,
-				},
-			},
-		}
-		buffer.Reset()
-		return true
+	messageType, message, err := bs.conn.ReadMessage()
+	println("messageType: ", messageType)
+	if err != nil {
+		bs.err = err
+		return false
 	}
+	println(string(message))
+	if err := json.Unmarshal(message, &bs.data); err != nil {
+		bs.err = err
+		return false
+	}
+	return true
 }
 
 func (bs *byocServerStream) Err() error {
@@ -109,5 +85,15 @@ func (bs *byocServerStream) Err() error {
 }
 
 func (bs *byocServerStream) Close() error {
-	return bs.resp.Close()
+	writeCloseMessage(bs.conn)
+	return bs.conn.Close()
+}
+
+func writeCloseMessage(c *websocket.Conn) error {
+	err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

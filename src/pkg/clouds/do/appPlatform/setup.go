@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -85,26 +88,46 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
+func getCdImage() (*godo.ImageSourceSpec, error) {
+	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:latest")
+	image, err := ParseImage(cdImage)
+	if err != nil {
+		return nil, err
+	}
+	if image.Registry == "docker.io" || image.Registry == "index.docker.io" {
+		image.Registry = path.Dir(image.Repo)
+		image.Repo = path.Base(image.Repo)
+	}
+	if image.Tag == "" && image.Digest == "" {
+		image.Tag = "latest"
+	}
+	return &godo.ImageSourceSpec{
+		// RegistryType: godo.ImageSourceSpecRegistryType_DOCR, TODO: support DOCR and GHCR
+		// Repository:   "defangmvp/do-cd",
+		RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+		Registry:     image.Registry,
+		Repository:   image.Repo,
+		Digest:       image.Digest,
+		Tag:          image.Tag,
+	}, nil
+}
+
 func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
 	client := newClient(ctx)
 
-	// parts := strings.Split(pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:latest"), ":")
+	image, err := getCdImage()
+	if err != nil {
+		return nil, err
+	}
 
 	appJobSpec := &godo.AppSpec{
 		Name:   CDName,
 		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
-			Name: d.ProjectName,
-			Envs: env,
-			Image: &godo.ImageSourceSpec{
-				// RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-				// Repository:   "defangmvp/do-cd",
-				RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
-				Registry:     "defangio",
-				Repository:   "cd",
-				Digest:       "sha256:f026d3f7e4694a0a942bb46815e3183ef45b69e22f00cb892537794bbd58a376",
-				// Tag:          "latest", // FIXME: DO will not always pull the image
-			},
+			Kind:             godo.AppJobSpecKind_FailedDeploy,
+			Name:             d.ProjectName, // component name
+			Envs:             env,
+			Image:            image,
 			InstanceCount:    1,
 			InstanceSizeSlug: "basic-xs",
 			RunCommand:       shellQuote(cmd...),
@@ -143,7 +166,44 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		return nil, err
 	}
 
+	// if err := waitForActiveDeployment(ctx, client.Apps, currentCd.ID, currentCd.PendingDeployment.ID); err != nil {
+	// 	term.Debug("Error waiting for active deployment: ", err)
+	// }
 	return currentCd, nil
+}
+
+// From https://github.com/digitalocean/doctl/blob/7fd3b7b253c7d6847b6b78d400eb26ed9be60796/commands/apps.go#L494
+func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID string, deploymentID string) error {
+	const maxAttempts = 180
+	attempts := 0
+	printNewLineSet := false
+
+	for i := 0; i < maxAttempts; i++ {
+		if attempts != 0 {
+			fmt.Fprint(os.Stderr, ".")
+			if !printNewLineSet {
+				printNewLineSet = true
+				defer fmt.Fprintln(os.Stderr)
+			}
+		}
+
+		deployment, _, err := apps.GetDeployment(ctx, appID, deploymentID)
+		if err != nil {
+			return err
+		}
+
+		allSuccessful := deployment.Progress.SuccessSteps == deployment.Progress.TotalSteps
+		if allSuccessful {
+			return nil
+		}
+
+		if deployment.Progress.ErrorSteps > 0 {
+			return fmt.Errorf("error deploying app (%s) (deployment ID: %s):\n%s", appID, deployment.ID, godo.Stringify(deployment.Progress))
+		}
+		attempts++
+		pkg.SleepWithContext(ctx, 10*time.Second) // was changed from time.Sleep
+	}
+	return fmt.Errorf("timeout waiting to app (%s) deployment", appID)
 }
 
 func newClient(ctx context.Context) *godo.Client {
