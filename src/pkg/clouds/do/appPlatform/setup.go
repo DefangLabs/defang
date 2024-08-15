@@ -77,6 +77,7 @@ func (d *DoApp) SetUp(ctx context.Context) error {
 			Bucket: &d.BucketName,
 		})
 	}
+
 	return err
 }
 
@@ -124,7 +125,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		Name:   CDName,
 		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
-			Kind:             godo.AppJobSpecKind_FailedDeploy,
+			Kind:             godo.AppJobSpecKind_PostDeploy,
 			Name:             d.ProjectName, // component name
 			Envs:             env,
 			Image:            image,

@@ -29,8 +29,9 @@ import (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	apps   map[string]*godo.App
-	driver *appPlatform.DoApp
+	apps      map[string]*godo.App
+	buildRepo string
+	driver    *appPlatform.DoApp
 }
 
 func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
@@ -358,6 +359,10 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 			Value: region.String(),
 		},
 		{
+			Key:   "DEFANG_BUILD_REPO",
+			Value: b.buildRepo,
+		},
+		{
 			Key:   "AWS_REGION", // FIXME: why do we need this?
 			Value: region.String(),
 		},
@@ -395,6 +400,24 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	if err := b.driver.SetUp(ctx); err != nil {
 		return err
 	}
+
+	// Create the Container Registry here, because DO only allows a single one per account,
+	// so we can't create it in the CD Pulumi process.
+	registry, _, err := b.driver.Client.Registry.Get(ctx)
+	if err != nil {
+		term.Debug("Registry.Get error:", err) // FIXME: check error
+		// Create registry if it doesn't exist
+		registry, _, err = b.driver.Client.Registry.Create(ctx, &godo.RegistryCreateRequest{
+			Name:                 b.PulumiProject,
+			SubscriptionTierSlug: "starter", // TODO: make this configurable
+			Region:               b.driver.Region.String(),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	b.buildRepo = registry.Name + "/kaniko-build"
 
 	//cdTaskName := byoc.CdTaskPrefix
 	//serviceContainers := []*godo.AppServiceSpec{
