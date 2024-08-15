@@ -19,6 +19,8 @@ func ValidateProject(project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
+
+	numOfManagedServices := 0
 	for _, svccfg := range project.Services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
@@ -274,12 +276,19 @@ func ValidateProject(project *compose.Project) error {
 
 		for k := range svccfg.Extensions {
 			switch k {
-			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres":
+			case "x-defang-redis", "x-defang-postgres":
+				numOfManagedServices++
+				continue
+			case "x-defang-dns-role", "x-defang-static-files":
 				continue
 			default:
 				term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
 			}
 		}
+	}
+
+	if numOfManagedServices == len(project.Services) {
+		return fmt.Errorf("projects may not contain only managed services")
 	}
 
 	for k := range project.Extensions {
