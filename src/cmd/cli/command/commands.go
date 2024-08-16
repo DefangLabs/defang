@@ -154,8 +154,8 @@ func SetupCommands(version string) {
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
 	RootCmd.AddCommand(tosCmd)
 
-	// Update command
-	RootCmd.AddCommand(updateCmd)
+	// Upgrade command
+	RootCmd.AddCommand(upgradeCmd)
 
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
@@ -962,13 +962,13 @@ var tosCmd = &cobra.Command{
 	},
 }
 
-var updateCmd = &cobra.Command{
-	Use:     "update",
+var upgradeCmd = &cobra.Command{
+	Use:     "upgrade",
 	Args:    cobra.NoArgs,
-	Aliases: []string{"upgrade"},
-	Short:   "Update the Defang CLI to the latest version",
+	Aliases: []string{"update"},
+	Short:   "Upgrade the Defang CLI to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.Update(cmd.Context())
+		return cli.Upgrade(cmd.Context())
 	},
 }
 

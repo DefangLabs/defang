@@ -10,8 +10,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func Update(ctx context.Context) error {
-	// Find path to the current executable to determine how to update
+func Upgrade(ctx context.Context) error {
+	// Find path to the current executable to determine how to upgrade
 	ex, err := os.Executable()
 	if err != nil {
 		return err
@@ -71,5 +71,5 @@ func homebrewPrefix(ctx context.Context) string {
 }
 
 func printInstructions(cmd string) {
-	term.Info("To update defang, run the following command:\n\n", cmd)
+	term.Info("To upgrade defang, run the following command:\n\n", cmd)
 }
