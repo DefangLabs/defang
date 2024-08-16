@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,7 +69,5 @@ func homebrewPrefix(ctx context.Context) string {
 }
 
 func printInstructions(cmd string) {
-	fmt.Println(`Run the following command to update defang:
-
-`, cmd)
+	term.Info("To update defang, run the following command:\n\n", cmd)
 }
