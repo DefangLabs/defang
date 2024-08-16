@@ -413,7 +413,7 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 		}
 	}
 
-	b.buildRepo = registry.Name + "/kaniko_build" // TODO: use/add b.PulumiProject but only if !starter
+	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
 
 	//cdTaskName := byoc.CdTaskPrefix
 	//serviceContainers := []*godo.AppServiceSpec{
