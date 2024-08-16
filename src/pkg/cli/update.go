@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -26,30 +25,31 @@ func Update(ctx context.Context) error {
 	term.Debugf(" - Evaluated: %s\n", ex)
 
 	if strings.Contains("brew/", ex) {
-		term.Info(" * Updating defang via Homebrew...")
-		return exec.CommandContext(ctx, "brew", "upgrade", "defang").Run()
+		printInstructions("brew upgrade defang")
 	}
 
 	if strings.Contains("/nix/store/", ex) {
 		// Detect whether the user has used Flakes or nix-env
 		if strings.Contains("-defang-cli-", ex) {
-			term.Info(" * Updating defang via nix-env...")
-			return exec.CommandContext(ctx, "nix-env", "-if", "https://github.com/DefangLabs/defang/archive/main.tar.gz").Run()
+			printInstructions("nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz")
 		} else {
-			term.Info(" * Updating defang via Nix Flake...")
-			return exec.CommandContext(ctx, "nix", "profile", "install", "github:DefangLabs/defang#defang-bin", "--refresh").Run()
+			printInstructions("nix profile install github:DefangLabs/defang#defang-bin --refresh")
 		}
 	}
 
 	// Check if we're running in PowerShell
 	if _, exists := os.LookupEnv("PSModulePath"); exists {
-		term.Info(" * Updating defang via PowerShell...")
-		return exec.CommandContext(ctx, "pwsh", "-c", "iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip").Run()
+		printInstructions(`pwsh -c "iwr https://s.defang.io/defang_win_amd64.zip -OutFile defang.zip"`)
+
+		return nil
 	}
 
 	// Default to the shell script
-	fmt.Println(`Run the following command to update defang:
+	printInstructions(`. <(curl -Ls https://s.defang.io/install)`)
 
-  . <(curl -Ls https://s.defang.io/install)`)
 	return nil
+}
+
+func printInstructions(cmd string) {
+	fmt.Println(`Run the following command to update defang:\n\n`, cmd)
 }
