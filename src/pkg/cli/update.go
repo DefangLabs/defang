@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -24,11 +25,11 @@ func Update(ctx context.Context) error {
 	}
 	term.Debugf(" - Evaluated: %s\n", ex)
 
-	if strings.Contains("brew/", ex) {
+	if strings.HasPrefix(ex, homebrewPrefix(ctx)) {
 		printInstructions("brew upgrade defang")
 	}
 
-	if strings.Contains("/nix/store/", ex) {
+	if strings.HasPrefix(ex, "/nix/store/") {
 		// Detect whether the user has used Flakes or nix-env
 		if strings.Contains("-defang-cli-", ex) {
 			printInstructions("nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz")
@@ -48,6 +49,24 @@ func Update(ctx context.Context) error {
 	printInstructions(`. <(curl -Ls https://s.defang.io/install)`)
 
 	return nil
+}
+
+func homebrewPrefix(ctx context.Context) string {
+	output, err := exec.CommandContext(ctx, "brew", "config").Output()
+	if err != nil {
+		return ""
+	}
+	homebrewPrefix := ""
+	// filter out the line which includes HOMEBREW_PREFIX
+	for _, line := range strings.Split(string(output), "\n") {
+		config_key := "HOMEBREW_PREFIX: "
+		if strings.HasPrefix(line, config_key) {
+			// remove the prefix from the line
+			homebrewPrefix = strings.TrimPrefix(line, config_key)
+			break
+		}
+	}
+	return homebrewPrefix
 }
 
 func printInstructions(cmd string) {
