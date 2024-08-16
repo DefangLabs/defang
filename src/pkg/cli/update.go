@@ -70,5 +70,7 @@ func homebrewPrefix(ctx context.Context) string {
 }
 
 func printInstructions(cmd string) {
-	fmt.Println(`Run the following command to update defang:\n\n`, cmd)
+	fmt.Println(`Run the following command to update defang:
+
+`, cmd)
 }
