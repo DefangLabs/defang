@@ -220,7 +220,6 @@ func newClient(ctx context.Context) *godo.Client {
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
-
 	term.Debug("Creating upload url for: ", name)
 	s3Client := d.createS3Client()
 
@@ -238,6 +237,8 @@ func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error)
 	}
 
 	// Use S3 SDK to create a presigned URL for uploading a file.
+	// FIXME: we need S3 auth anyway for Kaniko to be able to download the context from the bucket,
+	// so should we just stick to the S3 SDK for all S3 operations, instead of using presigned URLs?
 	req, err := s3.NewPresignClient(s3Client).PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: &d.BucketName,
 		Key:    ptr.String(prefix + name),
