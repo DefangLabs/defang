@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -13,7 +14,7 @@ var deploymentEtags = make(map[string]string)
 
 type byocSubscribeServerStream struct {
 	services []string
-	etag     string
+	etag     types.ETag
 	ctx      context.Context
 
 	ch          chan *defangv1.SubscribeResponse

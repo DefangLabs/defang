@@ -42,8 +42,8 @@ type ByocAws struct {
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
-	ecsEventsHandlers []ECSEventHandler
-	handlersLock      sync.RWMutex
+	ecsEventHandlers []ECSEventHandler
+	handlersLock     sync.RWMutex
 }
 
 var _ client.Client = (*ByocAws)(nil)
@@ -791,7 +791,7 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
 	b.handlersLock.RLock()
 	defer b.handlersLock.RUnlock()
-	for _, handler := range b.ecsEventsHandlers {
+	for _, handler := range b.ecsEventHandlers {
 		handler.HandleECSEvent(evt)
 	}
 }
@@ -799,5 +799,5 @@ func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
 func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
-	b.ecsEventsHandlers = append(b.ecsEventsHandlers, handler)
+	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
 }

@@ -44,8 +44,6 @@ type Event interface {
 	Host() string
 	Status() string
 	State() defangv1.ServiceState
-
-	Summary() string
 }
 
 type eventCommonFields struct {
@@ -156,6 +154,12 @@ func (e *TaskStateChangeEvent) Status() string {
 	if e.Detail.StoppedReason != "" {
 		status += " " + e.Detail.StoppedReason
 	}
+	if e.Detail.LastStatus == "DEPROVISIONING" {
+		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers)
+		if exitCode != 0 {
+			status += fmt.Sprintf(" (exit code %v)", exitCode)
+		}
+	}
 	return status
 }
 
@@ -163,19 +167,15 @@ func (e *TaskStateChangeEvent) State() defangv1.ServiceState {
 	state := defangv1.ServiceState_NOT_SPECIFIED
 	if e.Detail.LastStatus == "DEACTIVATING" {
 		state = defangv1.ServiceState_DEPLOYMENT_FAILED // Fast deployment fail
+	} else if e.Detail.LastStatus == "DEPROVISIONING" {
+		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers)
+		if exitCode != 0 {
+			state = defangv1.ServiceState_DEPLOYMENT_FAILED
+		}
 	} else {
 		state = defangv1.ServiceState_DEPLOYMENT_PENDING // Treat all other task updates as deployment pending
 	}
 	return state
-}
-
-func (e *TaskStateChangeEvent) Summary() string {
-	var buf strings.Builder
-	fmt.Fprintf(&buf, "Service Task %s", e.Detail.LastStatus)
-	if e.Detail.StoppedReason != "" {
-		fmt.Fprintf(&buf, " : %s", e.Detail.StoppedReason)
-	}
-	return buf.String()
 }
 
 func (e *KanikoTaskStateChangeEvent) Service() string {
@@ -217,15 +217,19 @@ func (e *KanikoTaskStateChangeEvent) Host() string {
 }
 
 func (e *KanikoTaskStateChangeEvent) Status() string {
-	override := e.getKanikoOverride()
-	if override == nil {
-		return "BUILD_UNKNOWN"
-	}
-	status := "BUILD_" + e.Detail.LastStatus
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "BUILD_%s", e.Detail.LastStatus)
 	if e.Detail.StoppedReason != "" {
-		status += " " + e.Detail.StoppedReason
+		fmt.Fprintf(&buf, " : %s", e.Detail.StoppedReason)
 	}
-	return status
+	override := e.getKanikoOverride()
+	if override != nil {
+		exitCode := getTaskExitCode(override.Name, e.Detail.Containers)
+		if exitCode != 0 {
+			fmt.Fprintf(&buf, " (exit code %v)", exitCode)
+		}
+	}
+	return buf.String()
 }
 
 var kanikoTaskStateMap = map[string]defangv1.ServiceState{
@@ -244,23 +248,12 @@ func (e *KanikoTaskStateChangeEvent) State() defangv1.ServiceState {
 
 	state := kanikoTaskStateMap[e.Detail.LastStatus]
 	if state == defangv1.ServiceState_BUILD_STOPPING {
-		for _, container := range e.Detail.Containers {
-			if container.Name == override.Name && container.ExitCode != 0 {
-				state = defangv1.ServiceState_BUILD_FAILED
-				break
-			}
+		exitCode := getTaskExitCode(override.Name, e.Detail.Containers)
+		if exitCode != 0 {
+			state = defangv1.ServiceState_BUILD_FAILED
 		}
 	}
 	return state
-}
-
-func (e *KanikoTaskStateChangeEvent) Summary() string {
-	var buf strings.Builder
-	fmt.Fprintf(&buf, "Build Task %s", e.Detail.LastStatus)
-	if e.Detail.StoppedReason != "" {
-		fmt.Fprintf(&buf, " : %s", e.Detail.StoppedReason)
-	}
-	return buf.String()
 }
 
 func (e *KanikoTaskStateChangeEvent) getKanikoOverride() *ecstaskstatechange.OverridesItem {
@@ -286,9 +279,6 @@ func (e *ServiceActionEvent) Status() string {
 }
 func (e *ServiceActionEvent) State() defangv1.ServiceState {
 	return defangv1.ServiceState_NOT_SPECIFIED
-}
-func (e *ServiceActionEvent) Summary() string {
-	return "Service state : " + e.Detail.EventName
 }
 
 func (e *DeploymentStateChangeEvent) Service() string {
@@ -316,9 +306,6 @@ func (e *DeploymentStateChangeEvent) State() defangv1.ServiceState {
 	}
 	return state
 }
-func (e *DeploymentStateChangeEvent) Summary() string {
-	return ""
-}
 
 func serviceNameFromResources(resources []string) string {
 	if len(resources) <= 0 {
@@ -331,4 +318,13 @@ func serviceNameFromResources(resources []string) string {
 		return ""
 	}
 	return id[snStart+1 : snEnd]
+}
+
+func getTaskExitCode(name string, containers []ecstaskstatechange.ContainerDetails) float64 {
+	for _, c := range containers {
+		if c.Name == name {
+			return c.ExitCode
+		}
+	}
+	return 0
 }

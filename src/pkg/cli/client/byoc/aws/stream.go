@@ -132,7 +132,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
-	if len(bs.services) > 0 && !pkg.Contains(bs.services, bs.response.GetService()) {
+	if len(bs.services) > 0 && !pkg.Contains(bs.services, response.GetService()) {
 		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
@@ -161,7 +161,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, " ** ") {
 			entry.Stderr = true
 		}
-		if entry.Etag != "" && entry.Etag != bs.etag {
+		if entry.Etag != "" && bs.etag != "" && entry.Etag != bs.etag {
 			continue
 		}
 		if entry.Service != "" && len(bs.services) > 0 && !pkg.Contains(bs.services, entry.Service) {
@@ -181,9 +181,10 @@ func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defan
 	if err != nil {
 		return err
 	}
+	bs.ecsEventsHandler.HandleECSEvent(evt)
 	entry.Service = evt.Service()
 	entry.Etag = evt.Etag()
 	entry.Host = evt.Host()
-	entry.Message = evt.Summary()
+	entry.Message = evt.Status()
 	return nil
 }
