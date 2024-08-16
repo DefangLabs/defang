@@ -305,10 +305,6 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 			Value: b.TenantID,
 		},
 		{
-			Key:   "DEFANG_CLOUD",
-			Value: "do",
-		},
-		{
 			Key:   "DOMAIN",
 			Value: b.ProjectDomain,
 		},

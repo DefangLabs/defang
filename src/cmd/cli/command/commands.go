@@ -308,7 +308,7 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn("Digital Ocean provider was selected, but DO_PAT environment variable is not set")
+				term.Warn("Digital Ocean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			if awsInEnv() {
@@ -1273,5 +1273,5 @@ func awsInEnv() bool {
 }
 
 func doInEnv() bool {
-	return os.Getenv("DO_PAT") != ""
+	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }

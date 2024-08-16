@@ -208,9 +208,9 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 }
 
 func newClient(ctx context.Context) *godo.Client {
-	pat := os.Getenv("DO_PAT")
+	pat := os.Getenv("DIGITALOCEAN_TOKEN")
 	if pat == "" {
-		panic("digital ocean pat must be set")
+		panic("DIGITALOCEAN_TOKEN must be set")
 	}
 	tokenSource := &oauth2.Token{AccessToken: pat}
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
@@ -256,8 +256,9 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 	s3Client := d.createS3Client()
 
 	req, err := s3.NewPresignClient(s3Client).PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: &d.BucketName,
-		Key:    &name,
+		Bucket:          &d.BucketName,
+		Key:             &name,
+		ResponseExpires: ptr.Time(time.Now().Add(1 * time.Hour)),
 	})
 
 	if err != nil {
@@ -269,10 +270,10 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 }
 
 func (d DoApp) createS3Client() *s3.Client {
-	id := os.Getenv("DO_SPACES_ID")
-	key := os.Getenv("DO_SPACES_KEY")
+	id := os.Getenv("SPACES_ACCESS_KEY_ID")
+	key := os.Getenv("SPACES_SECRET_ACCESS_KEY")
 	if id == "" || key == "" {
-		panic("digital ocean DO_SPACES_ID and DO_SPACES_KEY must be set")
+		panic("digital ocean SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY must be set")
 	}
 
 	cfg := aws.Config{
