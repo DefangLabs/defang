@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
@@ -98,17 +99,17 @@ func (l *Local) Stop(ctx context.Context, taskID PID) error {
 }
 
 func (l *Local) GetInfo(ctx context.Context, taskID PID) (*types.TaskInfo, error) {
-	return nil, errors.New("not implemented for local driver")
+	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
 func (l *Local) PutSecret(ctx context.Context, name, value string) error {
-	return errors.New("not implemented for local driver")
+	return client.ErrNotImplemented("not implemented for local driver")
 }
 
 func (l *Local) ListSecrets(ctx context.Context) ([]string, error) {
-	return nil, errors.New("not implemented for local driver")
+	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 
 func (l *Local) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	return "", errors.New("not implemented for local driver")
+	return "", client.ErrNotImplemented("not implemented for local driver")
 }

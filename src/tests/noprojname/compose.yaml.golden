@@ -1,0 +1,9 @@
+name: noprojname
+services: {}
+networks:
+  default:
+    name: noprojname_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

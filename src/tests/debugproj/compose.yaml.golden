@@ -1,0 +1,17 @@
+name: debugproj
+services:
+  failing:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    networks:
+      default: null
+  ok:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
+networks:
+  default:
+    name: debugproj_default

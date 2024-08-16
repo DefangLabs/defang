@@ -75,9 +75,11 @@ func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 	}
 }
 
-var ResolverAt = func(nsServer string) Resolver {
+func DirectResolverAt(nsServer string) Resolver {
 	return DirectResolver{NSServer: nsServer}
 }
+
+var ResolverAt = DirectResolverAt
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}
 

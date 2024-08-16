@@ -2,11 +2,8 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -16,7 +13,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
-	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -24,7 +20,7 @@ type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
 
-	tenantID types.TenantID
+	TenantID types.TenantID
 	Loader   ProjectLoader
 }
 
@@ -35,22 +31,9 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader Pro
 	}
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
-	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken)))
+	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
 
-	state := State{AnonID: uuid.NewString()}
-
-	// Restore anonID from config file
-	statePath := filepath.Join(StateDir, "state.json")
-	if bytes, err := os.ReadFile(statePath); err == nil {
-		json.Unmarshal(bytes, &state)
-	} else { // could be not found or path error
-		if bytes, err := json.MarshalIndent(state, "", "  "); err == nil {
-			os.MkdirAll(StateDir, 0700)
-			os.WriteFile(statePath, bytes, 0644)
-		}
-	}
-
-	return GrpcClient{client: fabricClient, anonID: state.AnonID, tenantID: tenantID, Loader: loader}
+	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantID: tenantID, Loader: loader}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -103,6 +86,10 @@ func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.Del
 func (g GrpcClient) AgreeToS(ctx context.Context) error {
 	_, err := g.client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
 	return err
+}
+
+func (g GrpcClient) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	return getMsg(g.client.Debug(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Track(event string, properties ...Property) error {

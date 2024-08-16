@@ -23,10 +23,16 @@ services:
         mode: ingress
       - target: 1234
         # mode: host
+      - target: 4567
+        protocol: udp
+        mode: ingress
     secrets:
       - dummy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
+    environment:
+      - DOTENV
+      - DOT_ENV_INTERPOLATION=${DOTENV}
       # disable: true
 
   # dfnx:

@@ -1,0 +1,16 @@
+name: emptyenv
+services:
+  emptyenv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ARG2: ""
+    environment:
+      ENV1: null
+      ENV2: ""
+    networks:
+      default: null
+networks:
+  default:
+    name: emptyenv_default

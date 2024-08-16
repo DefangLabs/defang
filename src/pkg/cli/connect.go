@@ -8,16 +8,17 @@ import (
 	"net"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
-
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/DefangLabs/defang/src/pkg/term"
-
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
+
+var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
 // Deprecated: should use grpc to get the tenant ID
 func GetTenantID(cluster string) types.TenantID {
@@ -36,7 +37,7 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 		tenant, cluster = types.TenantID(parts[0]), parts[1]
 	}
 	if cluster == "" {
-		cluster = DefaultCluster
+		cluster = DefangFabric
 	}
 	if _, _, err := net.SplitHostPort(cluster); err != nil {
 		cluster = cluster + ":443" // default to https
@@ -54,38 +55,40 @@ func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
 	return accessToken, tenantId
 }
 
-func Connect(cluster string, loader client.ProjectLoader) (client.GrpcClient, types.TenantID) {
+func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
 	accessToken, tenantId := getExistingTokenAndTenant(cluster)
 
 	tenant, host := SplitTenantHost(cluster)
 	if tenant != types.DEFAULT_TENANT {
 		tenantId = tenant
 	}
-	term.Debug(" - Using tenant", tenantId, "for cluster", host)
+	term.Debug("Using tenant", tenantId, "for cluster", host)
 
-	defangClient := client.NewGrpcClient(host, accessToken, tenantId, loader)
-	resp, err := defangClient.WhoAmI(context.TODO()) // TODO: Should we pass in the command context?
-	if err != nil {
-		term.Debug(" - Unable to validate tenant ID with server:", err)
-	}
-	if resp != nil && tenantId != types.TenantID(resp.Tenant) {
-		term.Warnf(" ! Overriding locally cached TenantID %v with server provided value %v", tenantId, resp.Tenant)
-		tenantId = types.TenantID(resp.Tenant)
-	}
-	return defangClient, tenantId
+	return client.NewGrpcClient(host, accessToken, tenantId, loader)
 }
 
-func NewClient(cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
-	grpcClient, tenantId := Connect(cluster, loader)
+func NewClient(ctx context.Context, cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
+	grpcClient := Connect(cluster, loader)
+
+	// Determine the current tenant ID
+	resp, err := grpcClient.WhoAmI(ctx)
+	if err != nil {
+		term.Debug("Unable to validate tenant ID with server:", err)
+	}
+	tenantId := grpcClient.TenantID
+	if resp != nil && string(tenantId) != resp.Tenant {
+		term.Warnf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
+		tenantId = types.TenantID(resp.Tenant)
+	}
 
 	switch provider {
 	case client.ProviderAWS:
-		term.Info(" # Using AWS provider")
-		byocClient := aws.NewByoc(grpcClient, tenantId)
+		term.Info("Using AWS provider") // '#' hack no logner needed as root command skips new client for competion command now
+		byocClient := aws.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	case client.ProviderDO:
-		term.Info("# Using DO provider")
-		byocClient := do.NewByoc(grpcClient, tenantId)
+		term.Info("Using DO provider")
+		byocClient := do.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	default:
 		return &client.PlaygroundClient{GrpcClient: grpcClient}

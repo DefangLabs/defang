@@ -26,13 +26,13 @@ const (
 )
 
 type ByocDo struct {
-	byoc.ByocBaseClient
+	*byoc.ByocBaseClient
 
 	appIds map[string]string
 	driver *appPlatform.DoApp
 }
 
-func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
+func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	regionString := os.Getenv("REGION")
 
 	if regionString == "" {
@@ -40,9 +40,9 @@ func NewByoc(grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
 	}
 
 	b := &ByocDo{
-		ByocBaseClient: *byoc.NewByocBaseClient(grpcClient, tenantId),
-		driver:         appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
 	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 
 	return b
 }
@@ -132,7 +132,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
-	return nil, nil
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -186,7 +186,11 @@ func (b *ByocDo) ServiceDNS(name string) string {
 	return ""
 }
 
-func (b *ByocDo) Tail(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	return nil, client.ErrNotImplemented("not implemented for ByocDo")
+}
+
+func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	return nil, nil
 }
 
@@ -212,7 +216,7 @@ func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.Serv
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (string, error) {
 	env := b.environment()
-	if term.DoDebug {
+	if term.DoDebug() {
 		debugEnv := " -"
 		for k, v := range env {
 			debugEnv += " " + k + "=" + v
@@ -231,7 +235,7 @@ func (b *ByocDo) environment() map[string]string {
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject,
+		"PROJECT":                    b.ProjectName,
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName), // TODO: add a way to override bucket
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
 		"STACK":                      b.PulumiStack,
@@ -247,7 +251,7 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject,
+		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 	}
 

@@ -9,11 +9,11 @@ import (
 )
 
 func ComposeDown(ctx context.Context, client client.Client) (types.ETag, error) {
-	projectName, err := client.LoadProjectName()
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return "", err
 	}
-	term.Debug(" - Destroying project", projectName)
+	term.Debugf("Destroying project %q", projectName)
 
 	if DoDryRun {
 		return "", ErrDryRun

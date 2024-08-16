@@ -1,0 +1,20 @@
+[
+  {
+    "name": "dfnx",
+    "platform": 2,
+    "internal": true,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "reservations": {
+          "memory": 256
+        }
+      }
+    },
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "networks": 1
+  }
+]

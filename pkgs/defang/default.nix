@@ -10,22 +10,22 @@ system ? builtins.currentSystem
 }:
 let
   shaMap = {
-    x86_64-linux = "0qa6x5ymmhqq56g85y9rd1dprn0s8r0l7d5zy8qbjrq28fd6y8hz";
-    aarch64-linux = "0xf0b8vhr23z9d8w98jliqrmyr49cf6r4wdmh59kjjgallnwazi4";
-    x86_64-darwin = "1rqndxmd6bd9jmaynsf9q6lh9gqa8iq6qa6k6smirvkw38imqc1w";
-    aarch64-darwin = "1rqndxmd6bd9jmaynsf9q6lh9gqa8iq6qa6k6smirvkw38imqc1w";
+    x86_64-linux = "0crcm1sr1zpi1cz6mbyhj6iivsz9akpln1zrk0flcy9dnkn4av9a";
+    aarch64-linux = "1nmmf7nw7s2d9q9y780nzgd3i0pz8dvyryjxccrfdp01sfzlks61";
+    x86_64-darwin = "1sncfvh315sp0n6chpvzdx5hp7hsrkx6m03aix8hfkb1hxjlg0hc";
+    aarch64-darwin = "1sncfvh315sp0n6chpvzdx5hp7hsrkx6m03aix8hfkb1hxjlg0hc";
   };
 
   urlMap = {
-    x86_64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.21/defang_0.5.21_linux_amd64.tar.gz";
-    aarch64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.21/defang_0.5.21_linux_arm64.tar.gz";
-    x86_64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.21/defang_0.5.21_macOS.zip";
-    aarch64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.21/defang_0.5.21_macOS.zip";
+    x86_64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.38/defang_0.5.38_linux_amd64.tar.gz";
+    aarch64-linux = "https://github.com/DefangLabs/defang/releases/download/v0.5.38/defang_0.5.38_linux_arm64.tar.gz";
+    x86_64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.38/defang_0.5.38_macOS.zip";
+    aarch64-darwin = "https://github.com/DefangLabs/defang/releases/download/v0.5.38/defang_0.5.38_macOS.zip";
   };
 in
 stdenvNoCC.mkDerivation {
   pname = "defang";
-  version = "0.5.21";
+  version = "0.5.38";
   src = fetchurl {
     url = urlMap.${system};
     sha256 = shaMap.${system};
@@ -49,7 +49,7 @@ stdenvNoCC.mkDerivation {
   system = system;
 
   meta = {
-    description = "Command-line interface for the Defang Opinionated Platform";
+    description = "Defang is the easiest way for developers to create and deploy their containerized applications";
     homepage = "https://defang.io/";
     license = lib.licenses.mit;
 

@@ -1,0 +1,17 @@
+name: compose-go-warning
+services:
+  echo:
+    image: ealen/echo-server
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
+networks:
+  default:
+    name: compose-go-warning_default
+secrets:
+  dummy:
+    name: dummy
+    external: true

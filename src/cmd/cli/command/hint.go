@@ -23,32 +23,45 @@ func prettyExecutable(def string) string {
 	if err != nil {
 		return def
 	}
+
+	// for npm/npx defang is executed within a child process,
+	// but we want to use parent process command line
+	execLine := os.Getenv("DEFANG_COMMAND_EXECUTOR")
+	if execLine != "" {
+		return execLine
+	}
+
 	executable, _ = filepath.Rel(wd, executable)
 	if executable == def {
 		executable = "./" + def // to ensure it's executable
 	}
+
 	if executable == "" {
 		return def
 	}
 	return executable
 }
 
-func printDefangHint(hint, args string) {
+func printDefangHint(hint string, cmds ...string) {
 	if pkg.GetenvBool("DEFANG_HIDE_HINTS") || !hasTty {
 		return
 	}
 
 	executable := prettyExecutable("defang")
 
-	fmt.Printf("\n%s\n", hint)
+	fmt.Printf("\n%s\n\n", hint)
 	providerFlag := RootCmd.Flag("provider")
 	clusterFlag := RootCmd.Flag("cluster")
+	var prefix string
 	if providerFlag.Changed {
-		fmt.Printf("\n  %s --provider %s %s\n\n", executable, providerFlag.Value.String(), args)
+		prefix = fmt.Sprintf("%s --provider %s", executable, providerFlag.Value.String())
 	} else if clusterFlag.Changed {
-		fmt.Printf("\n  %s --cluster %s %s\n\n", executable, clusterFlag.Value.String(), args)
+		prefix = fmt.Sprintf("%s --cluster %s", executable, clusterFlag.Value.String())
 	} else {
-		fmt.Printf("\n  %s %s\n\n", executable, args)
+		prefix = executable
+	}
+	for _, arg := range cmds {
+		fmt.Printf("  %s %s\n\n", prefix, arg)
 	}
 	if rand.Intn(10) == 0 {
 		fmt.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")

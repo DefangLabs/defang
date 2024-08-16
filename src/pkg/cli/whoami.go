@@ -2,16 +2,19 @@ package cli
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/term"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func Whoami(ctx context.Context, client client.Client) error {
+func Whoami(ctx context.Context, client cliClient.Client) (string, error) {
 	resp, err := client.WhoAmI(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
-	term.Infof(" * You are logged into tenant %q in %q region %q", resp.Tenant, resp.Account, resp.Region)
-	return nil
+
+	return fmt.Sprintf(
+		"You are logged into %s region %s with tenant %q",
+		resp.Account, resp.Region, resp.Tenant,
+	), nil
 }

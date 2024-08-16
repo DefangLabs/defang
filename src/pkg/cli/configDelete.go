@@ -9,11 +9,11 @@ import (
 )
 
 func ConfigDelete(ctx context.Context, client client.Client, names ...string) error {
-	projectName, err := client.LoadProjectName()
+	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debug(" - Deleting config", names, "in project", projectName)
+	term.Debugf("Deleting config %v in project %q", names, projectName)
 
 	if DoDryRun {
 		return ErrDryRun

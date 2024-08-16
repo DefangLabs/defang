@@ -50,10 +50,11 @@ func getCacheRepoPrefix(prefix, suffix string) string {
 }
 
 type TemplateOverrides struct {
-	SkipBucket bool // skip creating the bucket
-	Spot       bool
-	VpcID      string // existing VPC ID
+	Spot  bool
+	VpcID string
 }
+
+const TemplateRevision = 1 // bump this when the template changes!
 
 func createTemplate(stack string, containers []types.Container, overrides TemplateOverrides) *cloudformation.Template {
 	prefix := stack + "-"
@@ -66,22 +67,21 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	}
 
 	template := cloudformation.NewTemplate()
+	template.Description = "Defang AWS CloudFormation template for an ECS task. Don't delete: use the CLI instead."
 
-	// 1. bucket (for deployment state; only created if not skipped)
+	// 1. bucket (for deployment state)
 	const _bucket = "Bucket"
-	if !overrides.SkipBucket {
-		var bucketDeletionPolicy policies.DeletionPolicy
-		if retainBucket {
-			bucketDeletionPolicy = "RetainExceptOnCreate"
-		}
-		template.Resources[_bucket] = &s3.Bucket{
-			Tags: defaultTags,
-			// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
-			AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
-			VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
-				Status: "Enabled",
-			},
-		}
+	var bucketDeletionPolicy policies.DeletionPolicy
+	if retainBucket {
+		bucketDeletionPolicy = "RetainExceptOnCreate"
+	}
+	template.Resources[_bucket] = &s3.Bucket{
+		Tags: defaultTags,
+		// BucketName: ptr.String(PREFIX + "bucket" + SUFFIX), // optional; TODO: might want to fix this name to allow Pulumi destroy after stack deletion
+		AWSCloudFormationDeletionPolicy: bucketDeletionPolicy,
+		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
+			Status: "Enabled",
+		},
 	}
 
 	// 2. ECS cluster
@@ -514,26 +514,28 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 
 	// Declare stack outputs
 	template.Outputs[outputs.TaskDefArn] = cloudformation.Output{
-		Value:       cloudformation.Ref(_taskDefinition),
 		Description: ptr.String("ARN of the ECS task definition"),
+		Value:       cloudformation.Ref(_taskDefinition),
 	}
 	template.Outputs[outputs.ClusterName] = cloudformation.Output{
-		Value:       cloudformation.Ref(_cluster),
 		Description: ptr.String("Name of the ECS cluster"),
+		Value:       cloudformation.Ref(_cluster),
 	}
 	template.Outputs[outputs.LogGroupARN] = cloudformation.Output{
-		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
 		Description: ptr.String("ARN of the CloudWatch log group"),
+		Value:       cloudformation.GetAtt(_logGroup, "Arn"),
 	}
 	template.Outputs[outputs.SecurityGroupID] = cloudformation.Output{
-		Value:       cloudformation.Ref(_securityGroup),
 		Description: ptr.String("ID of the security group"),
+		Value:       cloudformation.Ref(_securityGroup),
 	}
-	if !overrides.SkipBucket {
-		template.Outputs[outputs.BucketName] = cloudformation.Output{
-			Value:       cloudformation.Ref(_bucket),
-			Description: ptr.String("Name of the S3 bucket"),
-		}
+	template.Outputs[outputs.BucketName] = cloudformation.Output{
+		Description: ptr.String("Name of the S3 bucket"),
+		Value:       cloudformation.Ref(_bucket),
+	}
+	template.Outputs[outputs.TemplateVersion] = cloudformation.Output{
+		Description: ptr.String("Version of this CloudFormation template"),
+		Value:       cloudformation.Int(TemplateRevision),
 	}
 
 	return template

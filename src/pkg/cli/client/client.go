@@ -16,13 +16,14 @@ type ServerStream[Res any] interface {
 }
 
 type ProjectLoader interface {
-	LoadWithDefaultProjectName(string) (*compose.Project, error)
-	LoadWithProjectName(string) (*compose.Project, error)
+	LoadProjectName(context.Context) (string, error)
+	LoadProject(context.Context) (*compose.Project, error)
 }
 
 type FabricClient interface {
 	AgreeToS(context.Context) error
 	CheckLoginAndToS(context.Context) error
+	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context) error
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
@@ -52,15 +53,22 @@ type Client interface {
 	PutConfig(context.Context, *defangv1.SecretValue) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
-	Tail(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
+	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
-	LoadProject() (*compose.Project, error)
-	LoadProjectName() (string, error) // TODO: should probably be a private method
+	LoadProject(context.Context) (*compose.Project, error)
+	LoadProjectName(context.Context) (string, error)
 }
 
 type Property struct {
 	Name  string
 	Value any
+}
+
+type ErrNotImplemented string
+
+func (n ErrNotImplemented) Error() string {
+	return string(n)
 }

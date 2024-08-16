@@ -1,3 +1,0 @@
-uwsgi
-flask
-requests

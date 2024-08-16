@@ -7,4 +7,5 @@ const (
 	SecurityGroupID = "securityGroupId"
 	SubnetID        = "subnetId"
 	TaskDefArn      = "taskDefArn"
+	TemplateVersion = "templateVersion"
 )

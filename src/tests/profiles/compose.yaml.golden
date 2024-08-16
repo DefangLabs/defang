@@ -1,0 +1,15 @@
+name: profiles
+services:
+  always:
+    image: alpine
+    networks:
+      default: null
+  defangonly:
+    profiles:
+      - defang
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: profiles_default

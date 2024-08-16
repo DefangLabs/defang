@@ -28,7 +28,7 @@ func Token(ctx context.Context, client client.Client, clientId string, tenant ty
 		return err
 	}
 
-	term.Print(term.BrightCyan, "Scoped access token: ")
+	term.Printc(term.BrightCyan, "Scoped access token: ")
 	fmt.Println(at)
 	return nil
 }
@@ -43,7 +43,7 @@ func exchangeCodeForToken(ctx context.Context, client client.Client, code string
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debug(" - Generating token for tenant", tenant, "with scopes", scopes)
+	term.Debug("Generating token for tenant", tenant, "with scopes", scopes)
 
 	token, err := client.Token(ctx, &defangv1.TokenRequest{AuthCode: code, Tenant: string(tenant), Scope: scopes, ExpiresIn: uint32(dur.Seconds())})
 	if err != nil {

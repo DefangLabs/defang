@@ -12,13 +12,22 @@ import (
 
 var ErrTermsNotAgreed = errors.New("You must agree to the Defang terms of service to use this tool")
 
-func InteractiveAgreeToS(ctx context.Context, client client.Client) error {
+func InteractiveAgreeToS(ctx context.Context, c client.Client) error {
+	if client.TermsAccepted() {
+		// The user has already agreed to the terms of service recently
+		if err := nonInteractiveAgreeToS(ctx, c); err != nil {
+			term.Debug("unable to agree to terms:", err) // not fatal
+		}
+		return nil
+	}
+
 	fmt.Println("Our latest terms of service can be found at https://defang.io/terms-service.html")
 
 	var agreeToS bool
 	err := survey.AskOne(&survey.Confirm{
 		Message: "Do you agree to the Defang terms of service?",
-	}, &agreeToS, nil)
+		Help:    "You must agree to the Defang terms of service to continue using this tool",
+	}, &agreeToS)
 	if err != nil {
 		return err
 	}
@@ -27,17 +36,26 @@ func InteractiveAgreeToS(ctx context.Context, client client.Client) error {
 		return ErrTermsNotAgreed
 	}
 
-	return NonInteractiveAgreeToS(ctx, client)
+	return NonInteractiveAgreeToS(ctx, c)
 }
 
-func NonInteractiveAgreeToS(ctx context.Context, client client.Client) error {
+func NonInteractiveAgreeToS(ctx context.Context, c client.Client) error {
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	if err := client.AgreeToS(ctx); err != nil {
+	// Persist the terms agreement in the state file so that we don't ask again
+	if err := client.AcceptTerms(); err != nil {
+		term.Debug("unable to persist terms agreement:", err) // not fatal
+	}
+
+	return nonInteractiveAgreeToS(ctx, c)
+}
+
+func nonInteractiveAgreeToS(ctx context.Context, c client.Client) error {
+	if err := c.AgreeToS(ctx); err != nil {
 		return err
 	}
-	term.Info(" * You have agreed to the Defang terms of service")
+	term.Info("You have agreed to the Defang terms of service")
 	return nil
 }

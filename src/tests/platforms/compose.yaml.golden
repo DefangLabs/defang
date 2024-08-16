@@ -1,0 +1,10 @@
+name: platforms
+services:
+  intel2:
+    image: busybox
+    networks:
+      default: null
+    platform: LINUX/X86_64
+networks:
+  default:
+    name: platforms_default
