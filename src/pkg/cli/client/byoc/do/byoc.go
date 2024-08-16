@@ -19,6 +19,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
+	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -35,14 +36,13 @@ type ByocDo struct {
 }
 
 func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
-	regionString := os.Getenv("REGION")
-
-	if regionString == "" {
-		regionString = "sfo3"
+	doRegion := do.Region(os.Getenv("REGION"))
+	if doRegion == "" {
+		doRegion = region.SFO3
 	}
 
 	b := &ByocDo{
-		driver: appPlatform.New(byoc.CdTaskPrefix, do.Region(regionString)),
+		driver: appPlatform.New(byoc.CdTaskPrefix, doRegion),
 		apps:   map[string]*godo.App{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
@@ -404,8 +404,8 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 		term.Debug("Registry.Get error:", err) // FIXME: check error
 		// Create registry if it doesn't exist
 		registry, _, err = b.driver.Client.Registry.Create(ctx, &godo.RegistryCreateRequest{
-			Name:                 b.PulumiProject,
-			SubscriptionTierSlug: "starter", // TODO: make this configurable
+			Name:                 pkg.RandomID(), // has to be globally unique
+			SubscriptionTierSlug: "starter",      // max 1 repo; TODO: make this configurable
 			Region:               b.driver.Region.String(),
 		})
 		if err != nil {
@@ -413,7 +413,7 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 		}
 	}
 
-	b.buildRepo = registry.Name + "/kaniko-build"
+	b.buildRepo = registry.Name + "/kaniko_build" // TODO: use/add b.PulumiProject but only if !starter
 
 	//cdTaskName := byoc.CdTaskPrefix
 	//serviceContainers := []*godo.AppServiceSpec{

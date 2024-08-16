@@ -21,12 +21,12 @@ import (
 
 const (
 	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
-	DefangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
 var (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
+	CdImage      = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
+	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC

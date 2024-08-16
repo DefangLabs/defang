@@ -125,7 +125,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		Name:   CDName,
 		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
-			Kind:             godo.AppJobSpecKind_PostDeploy,
+			Kind:             godo.AppJobSpecKind_PreDeploy,
 			Name:             d.ProjectName, // component name
 			Envs:             env,
 			Image:            image,
@@ -256,9 +256,8 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 	s3Client := d.createS3Client()
 
 	req, err := s3.NewPresignClient(s3Client).PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:          &d.BucketName,
-		Key:             &name,
-		ResponseExpires: ptr.Time(time.Now().Add(1 * time.Hour)),
+		Bucket: &d.BucketName,
+		Key:    &name,
 	})
 
 	if err != nil {
