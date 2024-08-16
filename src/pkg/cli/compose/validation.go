@@ -14,6 +14,7 @@ import (
 )
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
+var ErrOnlyManagedServicesDefined = errors.New("only managed services are defined")
 
 func ValidateProject(project *compose.Project) error {
 	if project == nil {
@@ -287,13 +288,14 @@ func ValidateProject(project *compose.Project) error {
 		}
 	}
 
-	if numOfManagedServices > 0 && numOfManagedServices == len(project.Services) {
-		return fmt.Errorf("projects may not contain only managed services")
-	}
-
 	for k := range project.Extensions {
 		term.Warnf("unsupported compose extension: %q", k)
 	}
+
+	if numOfManagedServices > 0 && numOfManagedServices == len(project.Services) {
+		return ErrOnlyManagedServicesDefined
+	}
+
 	return nil
 }
 

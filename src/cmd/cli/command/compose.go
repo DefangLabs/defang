@@ -29,7 +29,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force)
+			deploy, project, bypassSubscribe, err := cli.ComposeUp(cmd.Context(), client, force)
 			if err != nil {
 				if !errors.Is(err, types.ErrComposeFileNotFound) {
 					return err
@@ -44,7 +44,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			if detach {
+			if detach || bypassSubscribe {
 				term.Info("Detached.")
 				return nil
 			}
@@ -165,7 +165,7 @@ func makeComposeStartCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force)
+			deploy, _, _, err := cli.ComposeUp(cmd.Context(), client, force)
 			if err != nil {
 				return err
 			}
@@ -283,7 +283,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli.DoDryRun = true // config is like start in a dry run
 			// force=false to calculate the digest
-			if _, _, err := cli.ComposeUp(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, _, err := cli.ComposeUp(cmd.Context(), client, false); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
