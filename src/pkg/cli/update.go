@@ -26,6 +26,7 @@ func Update(ctx context.Context) error {
 
 	if strings.HasPrefix(ex, homebrewPrefix(ctx)) {
 		printInstructions("brew upgrade defang")
+		return nil
 	}
 
 	if strings.HasPrefix(ex, "/nix/store/") {
@@ -35,6 +36,7 @@ func Update(ctx context.Context) error {
 		} else {
 			printInstructions("nix profile install github:DefangLabs/defang#defang-bin --refresh")
 		}
+		return nil
 	}
 
 	// Check if we're running in PowerShell
