@@ -320,8 +320,8 @@ var RootCmd = &cobra.Command{
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
-				term.Warn("Your CLI version is outdated. Please update to the latest version.")
-				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
+				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\ndefang upgrade")
+				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
 			}
 		}
 
