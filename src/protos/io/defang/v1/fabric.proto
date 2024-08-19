@@ -106,9 +106,10 @@ message TrackRequest {
 }
 
 enum Behavior {
-  DEVELOPMENT = 0;
-  STAGING = 1;
-  PRODUCTION = 2;
+  UNSPECIFIED_BEHAVIOR= 0;
+  DEVELOPMENT = 1;
+  STAGING = 2;
+  PRODUCTION = 3;
 }
 
 message DeployRequest {
