@@ -105,9 +105,16 @@ message TrackRequest {
   string arch = 5;
 }
 
+enum Behavior {
+  DEVELOPMENT = 0;
+  STAGING = 1;
+  PRODUCTION = 2;
+}
+
 message DeployRequest {
   repeated Service services = 1;
   string project = 2;
+  Behavior behavior = 3;
 }
 
 message DeployResponse {
