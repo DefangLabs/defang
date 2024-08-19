@@ -35,3 +35,6 @@ services:
       - 5000
     healthcheck:
       test: ["NONE", "ignored"]
+      interval: 1m
+      retries: 3
+      timeout: 1s
