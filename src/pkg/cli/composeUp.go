@@ -46,24 +46,23 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, mode defangv1.D
 		return nil, project, err
 	}
 
-	if DoDryRun {
-		fmt.Println("Project:", project.Name)
-		yaml, _ := project.MarshalYAML()
-		fmt.Println(string(yaml))
-		return nil, project, ErrDryRun
-	}
-
 	bytes, err := project.MarshalYAML()
 	if err != nil {
 		return nil, project, err
 	}
 
+	if DoDryRun {
+		fmt.Println(string(bytes))
+		return nil, project, ErrDryRun
+	}
+
+	// Unmarshal the project into a map so we can convert it to a structpb.Struct
 	var asMap map[string]any
 	if err := yaml.Unmarshal(bytes, &asMap); err != nil {
 		return nil, project, err
 	}
 
-	str, err := structpb.NewStruct(asMap)
+	strpb, err := structpb.NewStruct(asMap)
 	if err != nil {
 		return nil, project, err
 	}
@@ -75,7 +74,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, mode defangv1.D
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
 		Mode:    mode,
 		Project: project.Name,
-		Compose: str,
+		Compose: strpb,
 	})
 	if err != nil {
 		return nil, project, err

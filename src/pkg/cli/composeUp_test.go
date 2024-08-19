@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -24,14 +25,23 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	}
 
 	asMap := req.Compose.AsMap()
-	_, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: asMap}}}, func(o *loader.Options) {
+	p, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: asMap}}}, func(o *loader.Options) {
 		o.SetProjectName(asMap["name"].(string), true) // HACK: workaround for bug in compose-go where it insists on loading the project name from the file
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &defangv1.DeployResponse{}, nil
+	var services []*defangv1.ServiceInfo
+	for _, service := range p.Services {
+		services = append(services, &defangv1.ServiceInfo{
+			Service: &defangv1.ServiceID{
+				Name: service.Name,
+			},
+		})
+	}
+
+	return &defangv1.DeployResponse{Services: services}, nil
 }
 
 func TestComposeUp(t *testing.T) {
@@ -41,24 +51,32 @@ func TestComposeUp(t *testing.T) {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
-	gotContext := false
+	gotContext := atomic.Bool{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			t.Errorf("ComposeStart() failed: expected PUT request, got %s", r.Method)
 		}
-		gotContext = true
+		gotContext.Store(true)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
-	_, project, err := ComposeUp(context.Background(), deployMock{MockClient: client.MockClient{UploadUrl: server.URL + "/", Project: proj}}, false, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(context.Background(), deployMock{MockClient: client.MockClient{UploadUrl: server.URL + "/", Project: proj}}, false, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
 	if project == nil {
 		t.Fatalf("ComposeUp() failed: project is nil")
 	}
-	if !gotContext {
+	if !gotContext.Load() {
 		t.Errorf("ComposeStart() failed: did not get context")
+	}
+	if len(d.Services) != len(proj.Services) {
+		t.Errorf("ComposeUp() failed: expected %d services, got %d", len(proj.Services), len(d.Services))
+	}
+	for _, service := range d.Services {
+		if _, ok := proj.Services[service.Service.Name]; !ok {
+			t.Errorf("ComposeUp() failed: service %s not found", service.Service.Name)
+		}
 	}
 }
