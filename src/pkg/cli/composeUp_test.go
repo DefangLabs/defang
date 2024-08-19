@@ -9,6 +9,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestComposeUp(t *testing.T) {
@@ -26,7 +27,7 @@ func TestComposeUp(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false)
+	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false, defangv1.Behavior_DEVELOPMENT)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
