@@ -154,6 +154,9 @@ func SetupCommands(version string) {
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
 	RootCmd.AddCommand(tosCmd)
 
+	// Upgrade command
+	RootCmd.AddCommand(upgradeCmd)
+
 	// Token command
 	tokenCmd.Flags().Duration("expires", 24*time.Hour, "validity duration of the token")
 	tokenCmd.Flags().String("scope", "", fmt.Sprintf("scope of the token; one of %v (required)", scope.All())) // TODO: make it an Option
@@ -317,8 +320,8 @@ var RootCmd = &cobra.Command{
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
-				term.Warn("Your CLI version is outdated. Please update to the latest version.")
-				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the update hint at the end
+				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\ndefang upgrade")
+				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
 			}
 		}
 
@@ -956,6 +959,16 @@ var tosCmd = &cobra.Command{
 
 		printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
 		return nil
+	},
+}
+
+var upgradeCmd = &cobra.Command{
+	Use:     "upgrade",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"update"},
+	Short:   "Upgrade the Defang CLI to the latest version",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cli.Upgrade(cmd.Context())
 	},
 }
 
