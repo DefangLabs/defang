@@ -3,12 +3,15 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -173,4 +176,68 @@ func TestComposeBlob(t *testing.T) {
 	if len(blob) != 62 {
 		t.Errorf("expected empty blob, got %v", blob)
 	}
+}
+
+func convertPort(port compose.ServicePortConfig) *defangv1.Port {
+	pbPort := &defangv1.Port{
+		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
+		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
+		// Published string `yaml:",omitempty" json:"published,omitempty"`
+		// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
+		Target: port.Target,
+	}
+
+	// TODO: Use AppProtocol as hint for application protocol
+	// https://github.com/compose-spec/compose-spec/blob/main/05-services.md#long-syntax-3
+	switch port.Protocol {
+	case "":
+		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
+	case "tcp":
+		pbPort.Protocol = defangv1.Protocol_TCP
+	case "udp":
+		pbPort.Protocol = defangv1.Protocol_UDP
+	case "http": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_HTTP
+	case "http2": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_HTTP2
+	case "grpc": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_GRPC
+	default:
+		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %q", port.Protocol))
+	}
+
+	switch port.AppProtocol {
+	case "http":
+		pbPort.Protocol = defangv1.Protocol_HTTP
+	case "http2":
+		pbPort.Protocol = defangv1.Protocol_HTTP2
+	case "grpc":
+		pbPort.Protocol = defangv1.Protocol_GRPC
+	}
+
+	switch port.Mode {
+	case "":
+		// TODO: This never happens now as compose-go set default to "ingress"
+		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		fallthrough
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
+		if port.Protocol != "udp" {
+			if port.Published != "" {
+				term.Warnf("Published ports are ignored in ingress mode")
+			}
+			pbPort.Mode = defangv1.Mode_INGRESS
+			if pbPort.Protocol == defangv1.Protocol_TCP {
+				pbPort.Protocol = defangv1.Protocol_HTTP
+			}
+			break
+		}
+		term.Warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
+		fallthrough
+	case "host":
+		pbPort.Mode = defangv1.Mode_HOST
+	default:
+		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %q", port.Mode))
+	}
+	return pbPort
 }

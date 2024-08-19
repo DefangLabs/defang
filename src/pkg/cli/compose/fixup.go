@@ -12,12 +12,15 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
+// HACK: Use magic network name "public" to determine if the service is public
+const NetworkPublic = "public"
+
 func FixupServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force BuildContext) error {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
 	for _, svccfg := range serviceConfigs {
-		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+		if _, public := svccfg.Networks[NetworkPublic]; !public && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))
