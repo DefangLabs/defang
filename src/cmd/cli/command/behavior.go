@@ -10,7 +10,7 @@ import (
 type Behavior defangv1.Behavior
 
 func (b Behavior) String() string {
-	return defangv1.Behavior_name[int32(b)]
+	return strings.ToLower(defangv1.Behavior_name[int32(b)])
 }
 func (b *Behavior) Set(s string) error {
 	behavior, ok := defangv1.Behavior_value[strings.ToUpper(s)]
@@ -29,8 +29,11 @@ func (b Behavior) Value() defangv1.Behavior {
 }
 
 func allBehaviors() []string {
-	behaviors := make([]string, 0, len(defangv1.Behavior_name))
-	for _, behavior := range defangv1.Behavior_name {
+	behaviors := make([]string, 0, len(defangv1.Behavior_name)-1)
+	for i, behavior := range defangv1.Behavior_name {
+		if i == 0 {
+			continue
+		}
 		behaviors = append(behaviors, strings.ToLower(behavior))
 	}
 	return behaviors

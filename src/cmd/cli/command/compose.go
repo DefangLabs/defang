@@ -19,7 +19,7 @@ import (
 )
 
 func makeComposeUpCmd() *cobra.Command {
-	var behavior Behavior
+	behavior := Behavior(defangv1.Behavior_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Annotations: authNeededAnnotation,
