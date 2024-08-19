@@ -19,6 +19,7 @@ import (
 )
 
 func makeComposeUpCmd() *cobra.Command {
+	var behavior Behavior
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Annotations: authNeededAnnotation,
@@ -27,14 +28,9 @@ func makeComposeUpCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
-			var behaviorStr, _ = cmd.Flags().GetString("behavior")
-			behavior, err := parseBehavior(behaviorStr)
-			if err != nil {
-				return err
-			}
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, behavior)
+			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, behavior.Value())
 			if err != nil {
 				if !errors.Is(err, types.ErrComposeFileNotFound) {
 					return err
@@ -156,7 +152,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().StringP("behavior", "b", defangv1.Behavior_DEVELOPMENT.String(), "behavior for the deployment")
+	composeUpCmd.Flags().VarP(&behavior, "behavior", "b", "behavior for the deployment, possible values: "+strings.Join(allBehaviors(), ", "))
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	return composeUpCmd
 }
@@ -170,13 +166,8 @@ func makeComposeStartCmd() *cobra.Command {
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
-			var behaviorStr, _ = cmd.Flags().GetString("behavior")
-			behavior, err := parseBehavior(behaviorStr)
-			if err != nil {
-				return err
-			}
 
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, behavior)
+			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.Behavior_UNSPECIFIED_BEHAVIOR)
 			if err != nil {
 				return err
 			}
@@ -193,7 +184,6 @@ func makeComposeStartCmd() *cobra.Command {
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
-	composeStartCmd.Flags().StringP("behavior", "b", defangv1.Behavior_DEVELOPMENT.String(), "behavior for the deployment")
 	return composeStartCmd
 }
 
@@ -295,7 +285,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli.DoDryRun = true // config is like start in a dry run
 			// force=false to calculate the digest
-			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.Behavior_DEVELOPMENT); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.Behavior_UNSPECIFIED_BEHAVIOR); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
@@ -418,20 +408,4 @@ services:
 	composeCmd.AddCommand(makeComposeLogsCmd())
 
 	return composeCmd
-}
-
-func parseBehavior(s string) (defangv1.Behavior, error) {
-	behavior, ok := defangv1.Behavior_value[strings.ToUpper(s)]
-	if !ok {
-		return defangv1.Behavior_DEVELOPMENT, fmt.Errorf("invalid behavior: %s, valid values are: %v", s, strings.Join(allBehaviors(), ", "))
-	}
-	return defangv1.Behavior(behavior), nil
-}
-
-func allBehaviors() []string {
-	behaviors := make([]string, 0, len(defangv1.Behavior_name))
-	for _, behavior := range defangv1.Behavior_name {
-		behaviors = append(behaviors, strings.ToLower(behavior))
-	}
-	return behaviors
 }

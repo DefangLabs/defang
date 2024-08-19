@@ -106,7 +106,7 @@ message TrackRequest {
 }
 
 enum Behavior {
-  BEHAVIOR_UNSPECIFIED= 0;
+  UNSPECIFIED_BEHAVIOR= 0;
   DEVELOPMENT = 1;
   STAGING = 2;
   PRODUCTION = 3;

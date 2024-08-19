@@ -178,7 +178,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdCommand(ctx, map[string]string{"DEFANG_BEHAVIOR": req.Behavior.String()}, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, req.Behavior, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -326,11 +326,9 @@ func (b *ByocAws) environment() map[string]string {
 	}
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, extraEnv map[string]string, cmd ...string) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, behavior defangv1.Behavior, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
-	for k, v := range extraEnv {
-		env[k] = v
-	}
+	env["DEFANG_BEHAVIOR"] = strings.ToLower(behavior.String())
 	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
@@ -349,7 +347,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, nil, "up", "")
+	taskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, "up", "")
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
@@ -658,7 +656,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string,
 	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, nil, command)
+	cdTaskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, command)
 	if err != nil || cdTaskArn == nil {
 		return "", annotateAwsError(err)
 	}
