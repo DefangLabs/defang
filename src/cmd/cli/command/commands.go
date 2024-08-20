@@ -183,7 +183,7 @@ func SetupCommands(version string) {
 	// TODO: when we add multi-project support to the playground, differentiate
 	// between ls and ps
 	lsCommand.Aliases = []string{"getServices", "ps", "ls", "list"}
-	RootCmd.AddCommand(makeComposeLsCmd())
+	RootCmd.AddCommand(lsCommand)
 
 	// Get Status Command
 	RootCmd.AddCommand(getVersionCmd)
