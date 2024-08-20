@@ -67,6 +67,10 @@ func Execute(ctx context.Context) error {
 			term.Error("Error:", prettyError(err))
 		}
 
+		if err == cli.ErrDryRun {
+			return nil
+		}
+
 		var derr *cli.ComposeError
 		if errors.As(err, &derr) {
 			compose := "compose"
