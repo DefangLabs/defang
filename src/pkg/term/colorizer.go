@@ -123,7 +123,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	var buf strings.Builder
 	if doColor(w) {
-		Append(&buf, doColor(w), c, msg)
+		append(&buf, doColor(w), c, msg)
 		msg = buf.String()
 	}
 	return w.WriteString(msg)
@@ -131,7 +131,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 
 const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 
-func Append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
+func append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 
 	if canColor {
 		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
@@ -146,18 +146,12 @@ func Append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 		}()
 	}
 
-	for _, s := range v {
-		n, err := fmt.Fprint(w, s)
-		l += n
-		if err != nil {
-			return l, err
-		}
+	n, err := fmt.Fprint(w, v...)
+	l += n
+	if err != nil {
+		return l, err
 	}
 	return l, nil
-}
-
-func AppendReset(w io.Writer) (int, error) {
-	return io.WriteString(w, ResetColorStr)
 }
 
 func ensureNewline(s string) string {
@@ -376,4 +370,18 @@ var ansiRegex = regexp.MustCompile("\x1b(?:[@-WYZ\\\\`-~]|\\[[0-?]*[ -/]*[@-~]|[
 
 func StripAnsi(s string) string {
 	return ansiRegex.ReplaceAllLiteralString(s, "")
+}
+
+type MessageBuilder struct {
+	strings.Builder
+
+	canColor bool
+}
+
+func NewMessageBuilder(canColor bool) *MessageBuilder {
+	return &MessageBuilder{canColor: canColor}
+}
+
+func (b *MessageBuilder) Printc(c Color, v ...any) (int, error) {
+	return append(&b.Builder, b.canColor, c, v...)
 }

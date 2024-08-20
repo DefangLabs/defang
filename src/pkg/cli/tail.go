@@ -335,34 +335,33 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			}
 			var prefixLen int
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
-			var buf strings.Builder
+			buf := term.NewMessageBuilder(term.StdoutCanColor())
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
-					prefixLen, _ = term.Append(&buf, term.StdoutCanColor(), tsColor, tsString, " ")
+					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
 					if params.Etag == "" {
-						l, _ := term.Append(&buf, term.StdoutCanColor(), termenv.ANSIYellow, etag, " ")
+						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
 					if len(params.Services) == 0 {
-						l, _ := term.Append(&buf, term.StdoutCanColor(), termenv.ANSIGreen, service, " ")
+						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
 					if DoVerbose {
-						l, _ := term.Append(&buf, term.StdoutCanColor(), termenv.ANSIMagenta, host, " ")
+						l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
 						prefixLen += l
 					}
 				} else {
-					io.WriteString(&buf, strings.Repeat(" ", prefixLen))
+					io.WriteString(buf, strings.Repeat(" ", prefixLen))
 				}
 				if term.StdoutCanColor() {
 					if !strings.Contains(line, "\033[") {
 						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
 					}
-					term.AppendReset(&buf)
 				} else {
 					line = term.StripAnsi(line)
 				}
-				io.WriteString(&buf, line)
+				io.WriteString(buf, line)
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
