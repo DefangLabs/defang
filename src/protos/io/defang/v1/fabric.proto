@@ -271,6 +271,7 @@ message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
   string project = 3;
+  Behavior behavior = 4;
 }
 
 enum Platform {
