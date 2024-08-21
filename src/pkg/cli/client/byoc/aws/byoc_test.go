@@ -23,17 +23,17 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PublicFqdn  string
 		PrivateFqdn string
 	}{
-		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
-		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
-		{"tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.123456789012.example.com", "web.tenant1.internal"},
+		{"project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.123456789012.project1.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "api", port8080, "api--8080.123456789012.project1.example.com", "api.123456789012.project1.example.com", "api.project1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.123456789012.example.com", "web.tenant1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
+		{"Tenant2", "tenant1", "web", port80, "web--80.123456789012.tenant2.example.com", "web.123456789012.tenant2.example.com", "web.tenant2.internal"},
+		{"tenant1", "tenAnt1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
 	}
 
 	for _, tt := range tests {
@@ -43,7 +43,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}
-			b.ProjectDomain = b.getProjectDomain("example.com")
+			b.ProjectDomain = b.getProjectDomain("123456789012", "example.com")
 
 			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
 			if endpoint != tt.EndPoint {

@@ -101,7 +101,17 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			term.Debug("Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
-			b.ProjectDomain = b.getProjectDomain(domain.Zone)
+			// Use STS to get the account ID
+			cfg, err := b.driver.LoadConfig(ctx)
+			if err != nil {
+				return annotateAwsError(err)
+			}
+			identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+			if err != nil {
+				return annotateAwsError(err)
+			}
+
+			b.ProjectDomain = b.getProjectDomain(*identity.Account, domain.Zone)
 			if b.ProjectDomain != "" {
 				b.ShouldDelegateSubdomain = true
 			}
@@ -637,15 +647,22 @@ func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 	return fmt.Sprintf("%s.%s", safeFqn, b.PrivateDomain) // TODO: consider merging this with ServiceDNS
 }
 
-func (b *ByocAws) getProjectDomain(zone string) string {
+func (b *ByocAws) getProjectDomain(account, zone string) string {
 	if b.ProjectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
-	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
-		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
+	var buf strings.Builder
+	if account != "" {
+		buf.WriteString(account)
+		buf.WriteByte('.')
 	}
-	return projectLabel + "." + byoc.DnsSafe(zone)
+	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
+	if projectLabel != byoc.DnsSafeLabel(b.TenantID) {
+		buf.WriteString(projectLabel)
+		buf.WriteByte('.')
+	}
+	buf.WriteString(byoc.DnsSafe(zone))
+	return buf.String()
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {
