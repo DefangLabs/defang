@@ -50,6 +50,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, behavior defang
 	}
 
 	if DoDryRun {
+		fmt.Println("Project:", project.Name)
 		for _, service := range services {
 			PrintObject(service.Name, service)
 		}
@@ -70,6 +71,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, behavior defang
 	}
 
 	if term.DoDebug() {
+		fmt.Println("Project:", project.Name)
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}
