@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,8 +16,33 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
+
+var MANAGED_RESOURCES = []string{"x-defang-redis", "x-defang-postgres"}
+
+func isOnlyManagedResources(project *compose.Project) bool {
+	if len(project.Services) == 0 {
+		return false
+	}
+
+	for _, service := range project.Services {
+		if len(service.Extensions) == 0 {
+			// no managed resources in this service
+			return false
+		}
+
+		for k := range service.Extensions {
+			if !slices.Contains(MANAGED_RESOURCES, k) {
+				// at least one non-managed resource
+				return false
+			}
+		}
+	}
+
+	return true
+}
 
 func makeComposeUpCmd() *cobra.Command {
 	behavior := Behavior(defangv1.Behavior_DEVELOPMENT)
@@ -45,6 +71,11 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
+			var hasOnlyManagedResources = isOnlyManagedResources(project)
+			if hasOnlyManagedResources {
+				term.Warn("Deploying project consisting of only managed services, please use the AWS console to monitor status")
+			}
+
 			if detach {
 				term.Info("Detached.")
 				return nil
@@ -57,24 +88,26 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 			targetStateReached := false
 
-			go func() {
-				services := make([]string, len(deploy.Services))
-				for i, serviceInfo := range deploy.Services {
-					services[i] = serviceInfo.Service.Name
-				}
-
-				if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
-					var errDeploymentFailed cli.ErrDeploymentFailed
-					if errors.As(err, &errDeploymentFailed) {
-						cancelTail(err)
-					} else if !errors.Is(err, context.Canceled) {
-						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
+			if !hasOnlyManagedResources {
+				go func() {
+					services := make([]string, len(deploy.Services))
+					for i, serviceInfo := range deploy.Services {
+						services[i] = serviceInfo.Service.Name
 					}
-				} else {
-					targetStateReached = true
-					cancelTail(errCompleted)
-				}
-			}()
+
+					if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
+						var errDeploymentFailed cli.ErrDeploymentFailed
+						if errors.As(err, &errDeploymentFailed) {
+							cancelTail(err)
+						} else if !errors.Is(err, context.Canceled) {
+							term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
+						}
+					} else {
+						targetStateReached = true
+						cancelTail(errCompleted)
+					}
+				}()
+			}
 
 			// show users the current streaming logs
 			tailSource := "all services"
@@ -107,6 +140,8 @@ func makeComposeUpCmd() *cobra.Command {
 					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
+					} else if hasOnlyManagedResources {
+						term.Warn("Deployment may not be finished. All managed resource(s) might not yet be available.")
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
