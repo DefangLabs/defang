@@ -23,17 +23,17 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PublicFqdn  string
 		PrivateFqdn string
 	}{
-		{"tenant1", "tenant1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.123456789012.example.com", "web.tenant1.internal"},
-		{"project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.123456789012.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "api", port8080, "api--8080.123456789012.project1.example.com", "api.123456789012.project1.example.com", "api.project1.internal"},
-		{"tenant1", "tenant1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.123456789012.example.com", "web.tenant1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.123456789012.project1.example.com", "web.123456789012.project1.example.com", "web.project1.internal"},
-		{"Tenant2", "tenant1", "web", port80, "web--80.123456789012.tenant2.example.com", "web.123456789012.tenant2.example.com", "web.tenant2.internal"},
-		{"tenant1", "tenAnt1", "web", port80, "web--80.123456789012.example.com", "web.123456789012.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.1fa1857b71717f6b.example.com", "web.1fa1857b71717f6b.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.1fa1857b71717f6b.example.com", "web.tenant1.internal"},
+		{"project1", "tenant1", "web", port80, "web--80.1ac7562668796635.example.com", "web.1ac7562668796635.example.com", "web.project1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.40b35d8b26ff71ae.example.com", "web.40b35d8b26ff71ae.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.1ac7562668796635.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "api", port8080, "api--8080.1ac7562668796635.example.com", "api.1ac7562668796635.example.com", "api.project1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.1fa1857b71717f6b.example.com", "web.1fa1857b71717f6b.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.1fa1857b71717f6b.example.com", "web.tenant1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.40b35d8b26ff71ae.example.com", "web.40b35d8b26ff71ae.example.com", "web.project1.internal"},
+		{"Tenant2", "tenant1", "web", port80, "web--80.f5600a0d61784e9d.example.com", "web.f5600a0d61784e9d.example.com", "web.tenant2.internal"},
+		{"tenant1", "tenAnt1", "web", port80, "web--80.7360f2237c979f46.example.com", "web.7360f2237c979f46.example.com", "web.tenant1.internal"},
 	}
 
 	for _, tt := range tests {

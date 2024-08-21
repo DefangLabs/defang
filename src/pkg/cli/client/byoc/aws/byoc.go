@@ -3,6 +3,7 @@ package aws
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -651,18 +652,9 @@ func (b *ByocAws) getProjectDomain(account, zone string) string {
 	if b.ProjectName == "" {
 		return "" // no project name => no custom domain
 	}
-	var buf strings.Builder
-	if account != "" {
-		buf.WriteString(account)
-		buf.WriteByte('.')
-	}
-	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
-	if projectLabel != byoc.DnsSafeLabel(b.TenantID) {
-		buf.WriteString(projectLabel)
-		buf.WriteByte('.')
-	}
-	buf.WriteString(byoc.DnsSafe(zone))
-	return buf.String()
+	h := sha256.New()
+	fmt.Fprintf(h, "%s.%s.%s.%s", account, b.ProjectName, b.TenantID, zone)
+	return fmt.Sprintf("%x", h.Sum(nil)[:8]) + "." + byoc.DnsSafe(zone)
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {
