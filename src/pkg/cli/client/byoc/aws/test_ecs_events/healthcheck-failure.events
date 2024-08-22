@@ -1,0 +1,45 @@
+{"name":"web","status":"BUILD_PROVISIONING ","state":2}
+{"name":"web","status":"BUILD_PENDING ","state":3}
+{"name":"api","status":"TASK_PROVISIONING","state":8}
+{"name":"api","status":"TASK_PENDING","state":8}
+{"name":"web","status":"BUILD_RUNNING ","state":5}
+{"name":"api","status":"TASK_PENDING","state":8}
+{"name":"api","status":"TASK_ACTIVATING","state":8}
+{"name":"api","status":"TASK_ACTIVATING","state":8}
+{"name":"api","status":"TASK_RUNNING","state":8}
+{"name":"api","status":"SERVICE_DEPLOYMENT_COMPLETED ECS deployment ecs-svc/8200647442030213590 completed.","state":9}
+{"name":"web","status":"BUILD_DEPROVISIONING Essential container in task exited","state":6}
+{"name":"web","status":"TASK_PROVISIONING","state":8}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"web","status":"TASK_RUNNING","state":8}
+{"name":"web","status":"TASK_PROVISIONING","state":8}
+{"name":"web","status":"TASK_DEACTIVATING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":10}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"web","status":"TASK_RUNNING","state":8}
+{"name":"web","status":"TASK_STOPPING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_DEPROVISIONING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_STOPPED Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_PROVISIONING","state":8}
+{"name":"web","status":"TASK_DEACTIVATING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":10}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"web","status":"TASK_STOPPING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_RUNNING","state":8}
+{"name":"web","status":"TASK_DEPROVISIONING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_STOPPED Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_PROVISIONING","state":8}
+{"name":"web","status":"TASK_DEACTIVATING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":10}
+{"name":"web","status":"SERVICE_DEPLOYMENT_FAILED ECS deployment circuit breaker: tasks failed to start.","state":10}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"web","status":"TASK_STOPPING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_RUNNING","state":8}
+{"name":"web","status":"TASK_DEPROVISIONING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_STOPPED Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_DEACTIVATING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":10}
+{"name":"web","status":"TASK_STOPPING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_DEPROVISIONING Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}
+{"name":"web","status":"TASK_STOPPED Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/Defang-testproj-beta-web-8080/0d170f313c8a2ffd)","state":8}

@@ -12,7 +12,7 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -41,6 +41,9 @@ type ByocAws struct {
 	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
 	publicNatIps []string
+
+	ecsEventHandlers []ECSEventHandler
+	handlersLock     sync.RWMutex
 }
 
 var _ client.Client = (*ByocAws)(nil)
@@ -452,8 +455,6 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
@@ -493,16 +494,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, annotateAwsError(err)
 	}
 
-	if taskArn != nil {
-		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
-				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-				cancel(err)
-			}
-		}()
-	}
-
-	return newByocServerStream(ctx, eventStream, etag, req.GetServices()), nil
+	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -781,6 +773,32 @@ func ensure(cond bool, msg string) {
 	}
 }
 
-func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+type ECSEventHandler interface {
+	HandleECSEvent(evt ecs.Event)
+}
+
+func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	s := &byocSubscribeServerStream{
+		services: req.Services,
+		etag:     req.Etag,
+		ctx:      ctx,
+
+		ch: make(chan *defangv1.SubscribeResponse),
+	}
+	b.AddEcsEventHandler(s)
+	return s, nil
+}
+
+func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
+	b.handlersLock.RLock()
+	defer b.handlersLock.RUnlock()
+	for _, handler := range b.ecsEventHandlers {
+		handler.HandleECSEvent(evt)
+	}
+}
+
+func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
+	b.handlersLock.Lock()
+	defer b.handlersLock.Unlock()
+	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
 }

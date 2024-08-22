@@ -1,0 +1,15 @@
+{"name":"api","status":"SERVICE_DEPLOYMENT_IN_PROGRESS ECS deployment ecs-svc/0548903365926546085 in progress.","state":8}
+{"name":"web","status":"SERVICE_DEPLOYMENT_IN_PROGRESS ECS deployment ecs-svc/8634367199868246568 in progress.","state":8}
+{"name":"web","status":"TASK_PROVISIONING","state":8}
+{"name":"api","status":"TASK_PROVISIONING","state":8}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"web","status":"TASK_ACTIVATING","state":8}
+{"name":"api","status":"TASK_PENDING","state":8}
+{"name":"api","status":"TASK_PENDING","state":8}
+{"name":"web","status":"TASK_RUNNING","state":8}
+{"name":"api","status":"TASK_ACTIVATING","state":8}
+{"name":"api","status":"TASK_RUNNING","state":8}
+{"name":"web","status":"SERVICE_DEPLOYMENT_COMPLETED ECS deployment ecs-svc/8634367199868246568 completed.","state":9}
+{"name":"api","status":"SERVICE_DEPLOYMENT_COMPLETED ECS deployment ecs-svc/0548903365926546085 completed.","state":9}
