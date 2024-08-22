@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -653,8 +654,9 @@ func (b *ByocAws) getProjectDomain(account, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	h := sha256.New()
-	fmt.Fprintf(h, "%s.%s.%s.%s", account, b.ProjectName, b.TenantID, zone)
-	return fmt.Sprintf("%x", h.Sum(nil)[:8]) + "." + byoc.DnsSafe(zone)
+	fmt.Fprintf(h, "%s.%s.%s.%s.%s", account, b.ProjectName, b.PulumiStack, b.TenantID, zone)
+
+	return pkg.Base36ID(binary.LittleEndian.Uint64(h.Sum(nil)[:8])) + "." + byoc.DnsSafe(zone)
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {

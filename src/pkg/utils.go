@@ -66,13 +66,17 @@ func (l *OneOrList) UnmarshalJSON(data []byte) error {
 }
 
 func RandomID() string {
-	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
-	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:]
+	return Base36ID(rand.Uint64())
 }
 
 func IsValidRandomID(s string) bool {
 	_, err := strconv.ParseUint(s, 36, 64)
 	return len(s) == 12 && err == nil
+}
+
+func Base36ID(i uint64) string {
+	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
+	return strconv.FormatUint(i|uint64msb, 36)[1:]
 }
 
 func Min(a, b int) int {
