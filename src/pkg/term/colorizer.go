@@ -132,12 +132,9 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 
 func append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
-
 	if canColor {
-		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
-		l += n
-		if err != nil {
-			return l, err
+		if l, e = io.WriteString(w, termenv.CSI+c.Sequence(false)+"m"); e != nil {
+			return
 		}
 		defer func() {
 			n, err := io.WriteString(w, ResetColorStr)
@@ -146,12 +143,8 @@ func append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 		}()
 	}
 
-	n, err := fmt.Fprint(w, v...)
-	l += n
-	if err != nil {
-		return l, err
-	}
-	return l, nil
+	l, e := fmt.Fprint(w, v...)
+	return l+n, e
 }
 
 func ensureNewline(s string) string {
