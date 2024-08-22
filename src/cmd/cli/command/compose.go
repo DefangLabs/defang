@@ -20,13 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var MANAGED_RESOURCES = []string{"x-defang-redis", "x-defang-postgres"}
+var managed_resources = []string{"x-defang-redis", "x-defang-postgres"}
 
-func isOnlyManagedResources(project *compose.Project) bool {
-	if len(project.Services) == 0 {
-		return false
-	}
-
+func IsOnlyManagedResources(project *compose.Project) bool {
 	for _, service := range project.Services {
 		if len(service.Extensions) == 0 {
 			// no managed resources in this service
@@ -34,7 +30,7 @@ func isOnlyManagedResources(project *compose.Project) bool {
 		}
 
 		for k := range service.Extensions {
-			if !slices.Contains(MANAGED_RESOURCES, k) {
+			if !slices.Contains(managed_resources, k) {
 				// at least one non-managed resource
 				return false
 			}
@@ -71,7 +67,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var hasOnlyManagedResources = isOnlyManagedResources(project)
+			var hasOnlyManagedResources = IsOnlyManagedResources(project)
 			if hasOnlyManagedResources {
 				term.Warn("Deploying project consisting of only managed services, please use the AWS console to monitor status")
 			}
@@ -88,26 +84,24 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 			targetStateReached := false
 
-			if !hasOnlyManagedResources {
-				go func() {
-					services := make([]string, len(deploy.Services))
-					for i, serviceInfo := range deploy.Services {
-						services[i] = serviceInfo.Service.Name
-					}
+			go func() {
+				services := make([]string, len(deploy.Services))
+				for i, serviceInfo := range deploy.Services {
+					services[i] = serviceInfo.Service.Name
+				}
 
-					if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
-						var errDeploymentFailed cli.ErrDeploymentFailed
-						if errors.As(err, &errDeploymentFailed) {
-							cancelTail(err)
-						} else if !errors.Is(err, context.Canceled) {
-							term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
-						}
-					} else {
-						targetStateReached = true
-						cancelTail(errCompleted)
+				if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
+					var errDeploymentFailed cli.ErrDeploymentFailed
+					if errors.As(err, &errDeploymentFailed) {
+						cancelTail(err)
+					} else if !errors.Is(err, context.Canceled) {
+						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
 					}
-				}()
-			}
+				} else {
+					targetStateReached = true
+					cancelTail(errCompleted)
+				}
+			}()
 
 			// show users the current streaming logs
 			tailSource := "all services"
