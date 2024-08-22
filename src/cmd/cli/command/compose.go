@@ -78,7 +78,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			var managedResources = GetUnreferencedManagedResources(project)
 			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed resources %v. Please use the AWS console directly.", managedResources)
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   - Please edit compose file, add to the \"depends_on\" section of any services requiring them.", managedResources)
 			}
 
 			if detach {
@@ -144,7 +144,7 @@ func makeComposeUpCmd() *cobra.Command {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
 					} else if len(managedResources) > 0 {
-						term.Warnf("Defang cannot monitor status of the following managed service(s): %v. Please use the AWS console directly.", managedResources)
+						term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   - Please edit compose file, add to the \"depends_on\" section of any services requiring them.", managedResources)
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not

@@ -158,27 +158,13 @@ func TestContains(t *testing.T) {
 	}
 }
 
-func deepEquals(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for _, value := range a {
-		if !Contains(b, value) {
-			return false
-		}
-	}
-
-	return true
-}
-
 func TestSubtractMap(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		m1 := map[string]bool{}
 		m2 := map[string]bool{}
 		expected := []string{}
 		result := SubtractMap(&m1, &m2)
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
@@ -189,7 +175,7 @@ func TestSubtractMap(t *testing.T) {
 		expected := []string{}
 		result := SubtractMap(&m1, &m2)
 
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
@@ -200,7 +186,7 @@ func TestSubtractMap(t *testing.T) {
 		expected := []string{"a", "b"}
 		result := SubtractMap(&m1, &m2)
 
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
@@ -211,7 +197,7 @@ func TestSubtractMap(t *testing.T) {
 		expected := []string{"a"}
 		result := SubtractMap(&m1, &m2)
 
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
@@ -222,7 +208,7 @@ func TestSubtractMap(t *testing.T) {
 		expected := []string{}
 		result := SubtractMap(&m1, &m2)
 
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
@@ -233,7 +219,7 @@ func TestSubtractMap(t *testing.T) {
 		expected := []string{}
 		result := SubtractMap(&m1, &m2)
 
-		if !deepEquals(result, expected) {
+		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("SubtractMap() = %v, want %v", result, expected)
 		}
 	})
