@@ -4,74 +4,128 @@ import (
 	"testing"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
-	assert "github.com/stretchr/testify/assert"
 )
 
-func TestIsOnlyManagedResources(t *testing.T) {
+func TestGetUnreferencedManagedResources(t *testing.T) {
 
 	t.Run("no services", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
 
-		assert.Equal(t, true, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resources, got %d (%v)", len(managed), managed)
+		}
 	})
 
 	t.Run("one service all managed", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
-		serviceCfg := compose.ServiceConfig{}
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
 		extensions := compose.Extensions{"x-defang-redis": true}
 
 		serviceCfg.Extensions = compose.Extensions(extensions)
-		project.Services["service1"] = serviceCfg
+		project.Services[serviceCfg.Name] = serviceCfg
 
-		assert.Equal(t, true, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
+		}
 	})
 
 	t.Run("one service unmanaged", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
-		serviceCfg := compose.ServiceConfig{}
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
 		extensions := compose.Extensions{}
 		serviceCfg.Extensions = compose.Extensions(extensions)
-		project.Services["service1"] = serviceCfg
+		project.Services[serviceCfg.Name] = serviceCfg
 
-		assert.Equal(t, false, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
+		}
 	})
 
 	t.Run("one service unmanaged, one service managed", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
-		project.Services["service1"] = compose.ServiceConfig{}
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
+		project.Services[serviceCfg.Name] = serviceCfg
 
-		serviceCfg := compose.ServiceConfig{}
 		extensions := compose.Extensions{"x-defang-redis": true}
-		serviceCfg.Extensions = compose.Extensions(extensions)
-		project.Services["service2"] = serviceCfg
+		serviceCfg2 := compose.ServiceConfig{Name: "service2"}
+		serviceCfg2.Extensions = compose.Extensions(extensions)
+		project.Services[serviceCfg2.Name] = serviceCfg2
 
-		assert.Equal(t, false, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
+		}
 	})
 
 	t.Run("two service two unmanaged", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
-		project.Services["service1"] = compose.ServiceConfig{}
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
+		project.Services[serviceCfg.Name] = serviceCfg
 
-		serviceCfg := compose.ServiceConfig{}
-		project.Services["service2"] = serviceCfg
+		serviceCfg2 := compose.ServiceConfig{Name: "service2"}
+		project.Services[serviceCfg2.Name] = serviceCfg2
 
-		assert.Equal(t, false, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
+		}
 	})
 
 	t.Run("one service two managed", func(t *testing.T) {
 		project := &compose.Project{}
 		project.Services = make(map[string]compose.ServiceConfig)
-		serviceCfg := compose.ServiceConfig{}
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
 		extensions := compose.Extensions{"x-defang-redis": true, "x-defang-postgres": true}
 		serviceCfg.Extensions = compose.Extensions(extensions)
-		project.Services["service1"] = serviceCfg
+		project.Services[serviceCfg.Name] = serviceCfg
 
-		assert.Equal(t, true, IsOnlyManagedResources(project))
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%s)", len(managed), managed)
+		}
 	})
 
+	t.Run("one service depends on a second with managed resource", func(t *testing.T) {
+		project := &compose.Project{}
+		project.Services = make(map[string]compose.ServiceConfig)
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
+		extensions := compose.Extensions{"x-defang-redis": true}
+		serviceCfg.Extensions = compose.Extensions(extensions)
+		project.Services[serviceCfg.Name] = serviceCfg
+
+		serviceCfg2 := compose.ServiceConfig{Name: "service2"}
+		serviceCfg2.DependsOn = compose.DependsOnConfig{serviceCfg.Name: compose.ServiceDependency{}}
+		project.Services[serviceCfg2.Name] = serviceCfg2
+
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 1 managed resource, got %d (%s)", len(managed), managed)
+		}
+	})
+
+	t.Run("one service depends on a second service", func(t *testing.T) {
+		project := &compose.Project{}
+		project.Services = make(map[string]compose.ServiceConfig)
+		serviceCfg := compose.ServiceConfig{Name: "service1"}
+		extensions := compose.Extensions{"x-defang-redis": true}
+		serviceCfg.Extensions = compose.Extensions(extensions)
+		project.Services[serviceCfg.Name] = serviceCfg
+
+		serviceCfg2 := compose.ServiceConfig{Name: "service2"}
+		serviceCfg2.DependsOn = compose.DependsOnConfig{"service3": compose.ServiceDependency{}}
+		project.Services[serviceCfg2.Name] = serviceCfg2
+
+		managed := GetUnreferencedManagedResources(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%s)", len(managed), managed)
+		}
+	})
 }

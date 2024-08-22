@@ -157,3 +157,84 @@ func TestContains(t *testing.T) {
 		})
 	}
 }
+
+func deepEquals(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for _, value := range a {
+		if !Contains(b, value) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestSubtractMap(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		m1 := map[string]bool{}
+		m2 := map[string]bool{}
+		expected := []string{}
+		result := SubtractMap(&m1, &m2)
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("m1 is empty but not m2", func(t *testing.T) {
+		m1 := map[string]bool{}
+		m2 := map[string]bool{"c": true, "d": true}
+		expected := []string{}
+		result := SubtractMap(&m1, &m2)
+
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("m1 has no overlap with m2", func(t *testing.T) {
+		m1 := map[string]bool{"a": true, "b": true}
+		m2 := map[string]bool{"c": true, "d": true}
+		expected := []string{"a", "b"}
+		result := SubtractMap(&m1, &m2)
+
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("m1 has single overlap with m2", func(t *testing.T) {
+		m1 := map[string]bool{"a": true, "b": true}
+		m2 := map[string]bool{"b": true, "c": true}
+		expected := []string{"a"}
+		result := SubtractMap(&m1, &m2)
+
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("m1 has all overlap with m2", func(t *testing.T) {
+		m1 := map[string]bool{"a": true, "b": true}
+		m2 := map[string]bool{"a": true, "b": true}
+		expected := []string{}
+		result := SubtractMap(&m1, &m2)
+
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+
+	t.Run("m1 has all overlap with m2, different order of keys", func(t *testing.T) {
+		m1 := map[string]bool{"a": true, "b": true}
+		m2 := map[string]bool{"b": true, "a": true}
+		expected := []string{}
+		result := SubtractMap(&m1, &m2)
+
+		if !deepEquals(result, expected) {
+			t.Errorf("SubtractMap() = %v, want %v", result, expected)
+		}
+	})
+}

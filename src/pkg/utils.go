@@ -114,3 +114,15 @@ func Contains[T comparable](s []T, v T) bool {
 	}
 	return false
 }
+
+// m1 - m2 -> remaining keys from m1 that are not present in m2.
+func SubtractMap[K comparable, V any](m1, m2 *map[K]V) []K {
+	result := make([]K, 0)
+	for k := range *m1 {
+		if _, ok := (*m2)[k]; !ok {
+			result = append(result, k)
+		}
+	}
+
+	return result
+}

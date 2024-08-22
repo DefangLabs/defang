@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -20,24 +21,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var managed_resources = []string{"x-defang-redis", "x-defang-postgres"}
+var managed_resources = []string{"x-defang-redis", "x-defang-postgres", "x-defang-static-files"}
 
-func IsOnlyManagedResources(project *compose.Project) bool {
+func isManagedResource(extension string) bool {
+	return slices.Contains(managed_resources, extension)
+}
+
+// return a list of resources not being depended on by other services
+func GetUnreferencedManagedResources(project *compose.Project) []string {
+	dependencies := make(map[string]bool)
+	managedResources := make(map[string]bool)
 	for _, service := range project.Services {
-		if len(service.Extensions) == 0 {
-			// no managed resources in this service
-			return false
+		if service.DependsOn != nil {
+			for key := range service.DependsOn {
+				dependencies[key] = true
+			}
 		}
 
 		for k := range service.Extensions {
-			if !slices.Contains(managed_resources, k) {
-				// at least one non-managed resource
-				return false
+			if isManagedResource(k) {
+				managedResources[service.Name] = true
+				break
 			}
 		}
 	}
 
-	return true
+	return pkg.SubtractMap(&managedResources, &dependencies)
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -67,9 +76,9 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var hasOnlyManagedResources = IsOnlyManagedResources(project)
-			if hasOnlyManagedResources {
-				term.Warn("Deploying project consisting of only managed services, please use the AWS console to monitor status")
+			var managedResources = GetUnreferencedManagedResources(project)
+			if len(managedResources) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed resources %v. Please use the AWS console directly.", managedResources)
 			}
 
 			if detach {
@@ -134,8 +143,8 @@ func makeComposeUpCmd() *cobra.Command {
 					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
-					} else if hasOnlyManagedResources {
-						term.Warn("Deployment may not be finished. All managed resource(s) might not yet be available.")
+					} else if len(managedResources) > 0 {
+						term.Warnf("Defang cannot monitor status of the following managed service(s): %v. Please use the AWS console directly.", managedResources)
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
