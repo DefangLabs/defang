@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/digitalocean/godo"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -204,7 +205,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-
 	// This is an etag; look up the app ID
 	cdApp := b.apps[req.Etag]
 	if cdApp == nil {
@@ -212,7 +212,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
-	//var liveURL string
+	var appLiveURL string
 	term.Info("Waiting for Deploy to finish to gather logs")
 	deploymentID := cdApp.PendingDeployment.ID
 	for {
@@ -225,34 +225,70 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 		term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
 
-		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active || deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
-			logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
+			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, false, 150)
+			if err != nil {
+				return nil, err
+			}
+			readHistoricalLogs(ctx, logs.HistoricURLs)
+			return nil, errors.New("problem deploying app")
+		}
+
+		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
+			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, true, 50)
 
 			if err != nil {
 				return nil, err
 			}
 
-			term.Debugf("LOGS STATUS CODE: %d", resp.StatusCode)
+			readHistoricalLogs(ctx, logs.HistoricURLs)
 
-			for _, u := range logs.HistoricURLs {
-				//resp, err := http.GetWithContext(ctx, u)
-				//term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
-				//if err != nil {
-				//	continue
-				//}
-				//defer resp.Body.Close()
-				//io.Copy(os.Stdout, resp.Body)
-				return newByocServerStream(ctx, u, req.Etag)
+			project, err := b.LoadProject(ctx)
+			if err != nil {
+				return nil, err
 			}
+
+			buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
+			mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
+
+			term.Debugf("BUILD APP NAME: %s", buildAppName)
+			term.Debugf("MAIN APP NAME: %s", mainAppName)
+
+			// If we can get projects working, we can add the project to the list options
+			currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+
+			if err != nil {
+				return nil, err
+			}
+
+			for _, app := range currentApps {
+				term.Debugf("APP NAME: %s", app.Spec.Name)
+				if app.Spec.Name == buildAppName {
+					buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
+					if err != nil {
+						return nil, err
+					}
+					readHistoricalLogs(ctx, buildLogs.HistoricURLs)
+				}
+				if app.Spec.Name == mainAppName {
+					mainLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+					if err != nil {
+						return nil, err
+					}
+					readHistoricalLogs(ctx, mainLogs.HistoricURLs)
+					appLiveURL = mainLogs.LiveURL
+				}
+			}
+
 			break
 		}
 		//Sleep for 15 seconds so we dont spam the DO API
 		pkg.SleepWithContext(ctx, (time.Second)*15)
 
 	}
-	//term.Debug("LIVE URL:", liveURL)
+	term.Debug("LIVE URL:", appLiveURL)
 
-	return newByocServerStream(ctx, "", req.Etag)
+	return newByocServerStream(ctx, appLiveURL, req.Etag)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
@@ -424,38 +460,19 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
 
-	//cdTaskName := byoc.CdTaskPrefix
-	//serviceContainers := []*godo.AppServiceSpec{
-	//	{
-	//		Name: "main",
-	//		Image: &godo.ImageSourceSpec{
-	//			Repository:   "pulumi-nodejs",
-	//			Registry:     "pulumi",
-	//			RegistryType: DockerHub,
-	//		},
-	//		RunCommand:       "node lib/index.js",
-	//		InstanceCount:    1,
-	//		InstanceSizeSlug: "basic-xs",
-	//	},
-	//}
-	//jobContainers := []*godo.AppJobSpec{
-	//	{
-	//		Name: cdTaskName,
-	//		Image: &godo.ImageSourceSpec{
-	//			Repository:   "cd",
-	//			RegistryType: DockerHub,
-	//		},
-	//		InstanceCount:    1,
-	//		InstanceSizeSlug: "basic-xxs",
-	//		Kind:             godo.AppJobSpecKind_PreDeploy,
-	//	},
-	//}
-	//
-	//if err := b.driver.SetUp(ctx, serviceContainers, jobContainers); err != nil {
-	//	return err
-	//}
-
 	b.SetupDone = true
 
 	return nil
+}
+
+func readHistoricalLogs(ctx context.Context, urls []string) {
+	for _, u := range urls {
+		resp, err := http.GetWithContext(ctx, u)
+		term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		io.Copy(os.Stdout, resp.Body)
+	}
 }

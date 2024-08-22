@@ -22,6 +22,10 @@ type byocServerStream struct {
 }
 
 func newByocServerStream(ctx context.Context, liveUrl string, etag types.ETag) (*byocServerStream, error) {
+	if liveUrl == "none" {
+		return &byocServerStream{}, nil
+	}
+
 	liveURL, err := url.Parse(liveUrl)
 	if err != nil {
 		return nil, err
