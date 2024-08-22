@@ -5,13 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/digitalocean/godo"
 	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -214,36 +212,47 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
-	var liveURL string
+	//var liveURL string
+	term.Info("Waiting for Deploy to finish to gather logs")
+	deploymentID := cdApp.PendingDeployment.ID
 	for {
-		deploymentID := cdApp.PendingDeployment.ID
-		term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
 
-		logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
-		term.Debugf("STATUS CODE: %d", resp.StatusCode)
-		// Logs aren't immediately available, wait until they're ready.
-		if resp.StatusCode == 400 && deploymentID != "" {
-			pkg.SleepWithContext(ctx, time.Second)
-			continue
-		}
+		deploymentInfo, _, err := b.driver.Client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
+
 		if err != nil {
 			return nil, err
 		}
 
-		for _, u := range logs.HistoricURLs {
-			resp, err := http.GetWithContext(ctx, u)
-			if err != nil {
-				continue
-			}
-			defer resp.Body.Close()
-			io.Copy(os.Stdout, resp.Body)
-		}
-		liveURL = logs.LiveURL
-		break
-	}
-	term.Debug("LIVE URL:", liveURL)
+		term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
 
-	return newByocServerStream(ctx, liveURL, req.Etag)
+		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active || deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
+			logs, resp, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+
+			if err != nil {
+				return nil, err
+			}
+
+			term.Debugf("LOGS STATUS CODE: %d", resp.StatusCode)
+
+			for _, u := range logs.HistoricURLs {
+				//resp, err := http.GetWithContext(ctx, u)
+				//term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
+				//if err != nil {
+				//	continue
+				//}
+				//defer resp.Body.Close()
+				//io.Copy(os.Stdout, resp.Body)
+				return newByocServerStream(ctx, u, req.Etag)
+			}
+			break
+		}
+		//Sleep for 15 seconds so we dont spam the DO API
+		pkg.SleepWithContext(ctx, (time.Second)*15)
+
+	}
+	//term.Debug("LIVE URL:", liveURL)
+
+	return newByocServerStream(ctx, "", req.Etag)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
