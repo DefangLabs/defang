@@ -5,48 +5,36 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
-var managed_resources = []string{"x-defang-redis", "x-defang-postgres", "x-defang-static-files"}
+func isManagedService(service *defangv1.Service) bool {
+	if service == nil {
+		return false
+	}
 
-func isManagedResource(extension string) bool {
-	return slices.Contains(managed_resources, extension)
+	return service.StaticFiles != nil || service.Redis != nil || service.Postgres != nil
 }
 
-// return a list of resources not being depended on by other services
-func GetUnreferencedManagedResources(project *compose.Project) []string {
-	dependencies := make(map[string]bool)
-	managedResources := make(map[string]bool)
-	for _, service := range project.Services {
-		if service.DependsOn != nil {
-			for key := range service.DependsOn {
-				dependencies[key] = true
-			}
-		}
-
-		for k := range service.Extensions {
-			if isManagedResource(k) {
-				managedResources[service.Name] = true
-				break
-			}
+func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []string {
+	managedResources := make([]string, 0)
+	for _, service := range serviceInfos {
+		if isManagedService(service.Service) {
+			managedResources = append(managedResources, service.Service.Name)
 		}
 	}
 
-	return pkg.SubtractMap(&managedResources, &dependencies)
+	return managedResources
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -76,9 +64,9 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = GetUnreferencedManagedResources(project)
+			var managedResources = GetUnreferencedManagedResources(deploy.Services)
 			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   - Please edit compose file, add to the \"depends_on\" section of any services requiring them.", managedResources)
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   Check if the managed service is up by checking your dependant service's status.", managedResources)
 			}
 
 			if detach {
@@ -144,7 +132,7 @@ func makeComposeUpCmd() *cobra.Command {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
 					} else if len(managedResources) > 0 {
-						term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   - Please edit compose file, add to the \"depends_on\" section of any services requiring them.", managedResources)
+						term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   Check if the managed service is up by checking your dependant service's status.", managedResources)
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
