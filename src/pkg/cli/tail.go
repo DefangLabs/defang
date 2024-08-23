@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -177,12 +178,26 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 }
 
 func isTransientError(err error) bool {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+
+	// Consider connection reset error as transient
+	if errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+
+	// Network timeouts are transient, not using Temporary() because it's not always accurate
+	// See https://pkg.go.dev/net#Error
+	if neterr, ok := err.(interface{ Timeout() bool }); ok && neterr.Timeout() {
+		return true
+	}
+
 	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
 	code := connect.CodeOf(err)
 	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 	return code == connect.CodeUnavailable ||
-		(code == connect.CodeInternal && !connect.IsWireError(err)) ||
-		errors.Is(err, io.ErrUnexpectedEOF)
+		(code == connect.CodeInternal && !connect.IsWireError(err))
 
 }
 
