@@ -16,7 +16,7 @@ var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
 	b := NewByoc(ctx, client.GrpcClient{}, "ten ant") // no domain
-	b.PulumiProject = "byoc_integration_test"
+	b.ProjectName = "byoc_integration_test"
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
@@ -42,7 +42,7 @@ func TestDeploy(t *testing.T) {
 
 func TestTail(t *testing.T) {
 	b := NewByoc(ctx, client.GrpcClient{}, "TestTail")
-	b.PulumiProject = "byoc_integration_test"
+	b.ProjectName = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
 
 	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{})
@@ -70,7 +70,7 @@ func TestTail(t *testing.T) {
 
 func TestGetServices(t *testing.T) {
 	b := NewByoc(ctx, client.GrpcClient{}, "TestGetServices")
-	b.PulumiProject = "byoc_integration_test"
+	b.ProjectName = "byoc_integration_test"
 
 	services, err := b.GetServices(context.Background())
 	if err != nil {
@@ -89,8 +89,8 @@ func TestGetServices(t *testing.T) {
 func TestPutConfig(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByoc(ctx, client.GrpcClient{}, "TestPutConfig")
-	b.PulumiProject = "byoc_integration_test"
+	b := NewByoc(ctx, client.GrpcClient{}, "TestPutSecret")
+	b.ProjectName = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
 		err := b.DeleteConfigs(context.Background(), &defangv1.Configs{Names: []string{secretName}})
@@ -125,8 +125,8 @@ func TestPutConfig(t *testing.T) {
 			b.DeleteConfigs(context.Background(), &defangv1.Configs{Names: []string{secretName}})
 		})
 		// Check that the secret is in the list
-		prefix := "/Defang/" + b.PulumiProject + "/beta/"
-		secrets, err := b.driver.ListConfigByPrefix(context.Background(), prefix)
+		prefix := "/Defang/" + b.ProjectName + "/beta/"
+		secrets, err := b.driver.ListSecretsByPrefix(context.Background(), prefix)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,7 +142,7 @@ func TestPutConfig(t *testing.T) {
 
 func TestListConfigs(t *testing.T) {
 	b := NewByoc(ctx, client.GrpcClient{}, "TestListSecrets")
-	b.PulumiProject = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
+	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 
 	t.Run("list", func(t *testing.T) {
 		configs, err := b.ListConfigs(context.Background())

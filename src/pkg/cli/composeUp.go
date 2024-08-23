@@ -30,7 +30,7 @@ func buildContext(force bool) compose.BuildContext {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.DeployResponse, *types.Project, error) {
+func ComposeUp(ctx context.Context, c client.Client, force bool, behavior defangv1.Behavior) (*defangv1.DeployResponse, *types.Project, error) {
 	project, err := c.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
@@ -50,6 +50,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.Depl
 	}
 
 	if DoDryRun {
+		fmt.Println("Project:", project.Name)
 		for _, service := range services {
 			PrintObject(service.Name, service)
 		}
@@ -61,6 +62,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.Depl
 	}
 
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
+		Behavior: behavior,
 		Project:  project.Name,
 		Services: services,
 	})
@@ -69,6 +71,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool) (*defangv1.Depl
 	}
 
 	if term.DoDebug() {
+		fmt.Println("Project:", project.Name)
 		for _, service := range resp.Services {
 			PrintObject(service.Service.Name, service)
 		}

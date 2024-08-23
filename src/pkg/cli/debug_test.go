@@ -9,7 +9,7 @@ import (
 )
 
 func TestDebug(t *testing.T) {
-	project, err := compose.Loader{"../../tests/debugproj/compose.yaml"}.LoadCompose(context.Background())
+	project, err := compose.NewLoaderWithPath("../../tests/debugproj/compose.yaml").LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

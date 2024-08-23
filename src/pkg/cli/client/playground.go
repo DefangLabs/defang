@@ -15,10 +15,16 @@ import (
 
 type PlaygroundClient struct {
 	GrpcClient
+	project     *compose.Project
+	projectName string
 }
 
 func (g PlaygroundClient) LoadProject(ctx context.Context) (*compose.Project, error) {
-	return g.Loader.LoadCompose(ctx)
+	if g.project != nil {
+		return g.project, nil
+	}
+
+	return g.Loader.LoadProject(ctx)
 }
 
 func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -134,9 +140,13 @@ func (g PlaygroundClient) ServiceDNS(name string) string {
 }
 
 func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
-	proj, err := g.Loader.LoadCompose(ctx)
+	if g.projectName != "" {
+		return g.projectName, nil
+	}
+
+	name, err := g.Loader.LoadProjectName(ctx)
 	if err == nil {
-		return proj.Name, nil
+		return name, nil
 	}
 	if !errors.Is(err, types.ErrComposeFileNotFound) {
 		return "", err

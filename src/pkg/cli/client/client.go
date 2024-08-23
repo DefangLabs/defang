@@ -16,7 +16,8 @@ type ServerStream[Res any] interface {
 }
 
 type ProjectLoader interface {
-	LoadCompose(context.Context) (*compose.Project, error)
+	LoadProjectName(context.Context) (string, error)
+	LoadProject(context.Context) (*compose.Project, error)
 }
 
 type FabricClient interface {

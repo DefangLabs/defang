@@ -9,16 +9,17 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestComposeUp(t *testing.T) {
 	DoDryRun = true
 	defer func() { DoDryRun = false }()
 
-	loader := compose.Loader{"../../tests/testproj/compose.yaml"}
-	proj, err := loader.LoadCompose(context.Background())
+	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
+	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
+		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func TestComposeUp(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false)
+	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false, defangv1.Behavior_DEVELOPMENT)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}

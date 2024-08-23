@@ -117,9 +117,17 @@ message TrackRequest {
   string arch = 5;
 }
 
+enum Behavior {
+  UNSPECIFIED_BEHAVIOR= 0;
+  DEVELOPMENT = 1;
+  STAGING = 2;
+  PRODUCTION = 3;
+}
+
 message DeployRequest {
   repeated Service services = 1;
   string project = 2;
+  Behavior behavior = 3;
 }
 
 message DeployResponse {
@@ -302,6 +310,7 @@ message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
   string project = 3;
+  Behavior behavior = 4;
 }
 
 enum Platform {
@@ -441,6 +450,7 @@ message Service {
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
+  Postgres postgres = 19; // x-defang-postgres: use a managed
 }
 
 message StaticFiles {
@@ -449,6 +459,7 @@ message StaticFiles {
 }
 
 message Redis {}
+message Postgres {}
 
 message Event {
   string specversion = 1; // required (but we don't care)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -40,6 +41,9 @@ type ByocAws struct {
 	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
 	publicNatIps []string
+
+	ecsEventHandlers []ECSEventHandler
+	handlersLock     sync.RWMutex
 }
 
 const SENSITIVE_PATH_PART = ""
@@ -180,7 +184,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdCommand(ctx, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, req.Behavior, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +323,7 @@ func (b *ByocAws) environment() map[string]string {
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject, // may be empty
+		"PROJECT":                    b.ProjectName, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"STACK":                      b.PulumiStack,
@@ -328,8 +332,9 @@ func (b *ByocAws) environment() map[string]string {
 	}
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, cmd ...string) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, behavior defangv1.Behavior, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
+	env["DEFANG_BEHAVIOR"] = strings.ToLower(behavior.String())
 	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
@@ -348,7 +353,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, "up", "")
+	taskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, "up", "")
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
@@ -359,8 +364,8 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 // stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
 func (b *ByocAws) stackDir(name string) string {
-	ensure(b.PulumiProject != "", "pulumiProject not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.PulumiProject, b.PulumiStack, name) // same as shared/common.ts
+	ensure(b.ProjectName != "", "ProjectName not set")
+	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.ProjectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
@@ -379,8 +384,8 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
-	ensure(b.PulumiProject != "", "pulumiProject not set")
-	path := fmt.Sprintf("projects/%s/%s/project.pb", b.PulumiProject, b.PulumiStack)
+	ensure(b.ProjectName != "", "ProjectName not set")
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
 	getObjectOutput, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
@@ -491,8 +496,6 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancelCause(ctx)
-
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
@@ -512,7 +515,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		term.Debug("Tailing task", etag)
 		etag = "" // no need to filter by etag
 	} else {
-		// Tail CD, kaniko, and all services (this requires PulumiProject to be set)
+		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
 		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
 		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
@@ -532,16 +535,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, annotateAwsError(err)
 	}
 
-	if taskArn != nil {
-		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
-				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-				cancel(err)
-			}
-		}()
-	}
-
-	return newByocServerStream(ctx, eventStream, etag, req.GetServices()), nil
+	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -559,11 +553,11 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
-	ensure(b.PulumiProject != "", "pulumiProject not set")
+	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject, // was: tenant
-		Etag:    pkg.RandomID(),  // TODO: could be hash for dedup/idempotency
+		Project: b.ProjectName,  // was: tenant
+		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 	}
 
 	hasHost := false
@@ -677,10 +671,10 @@ func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 }
 
 func (b *ByocAws) getProjectDomain(zone string) string {
-	if b.PulumiProject == "" {
+	if b.ProjectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := byoc.DnsSafeLabel(b.PulumiProject)
+	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
 	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
 		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
 	}
@@ -695,7 +689,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string,
 	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, command)
+	cdTaskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, command)
 	if err != nil || cdTaskArn == nil {
 		return "", annotateAwsError(err)
 	}
@@ -752,6 +746,43 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		}
 		// Cut off the prefix and the .json suffix
 		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
+		// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
+		objOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: &bucketName,
+			Key:    obj.Key,
+		})
+		if err != nil {
+			term.Debugf("Failed to get Pulumi state object %q: %v", *obj.Key, err)
+		} else {
+			defer objOutput.Body.Close()
+			var state struct {
+				Version    int `json:"version"`
+				Checkpoint struct {
+					// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
+					Latest struct {
+						Resources         []struct{} `json:"resources,omitempty"`
+						PendingOperations []struct {
+							Resource struct {
+								Urn string `json:"urn"`
+							}
+						} `json:"pending_operations,omitempty"`
+					}
+				}
+			}
+			if err := json.NewDecoder(objOutput.Body).Decode(&state); err != nil {
+				term.Debugf("Failed to decode Pulumi state %q: %v", *obj.Key, err)
+			} else if state.Version != 3 {
+				term.Debug("Skipping Pulumi state with version", state.Version)
+			} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
+				for _, op := range state.Checkpoint.Latest.PendingOperations {
+					parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
+					stack += fmt.Sprintf(" (pending %q)", parts[3])
+				}
+			} else if len(state.Checkpoint.Latest.Resources) == 0 {
+				continue // skip: no resources and no pending operations
+			}
+		}
+
 		stacks = append(stacks, stack)
 	}
 	return stacks, nil
@@ -780,6 +811,32 @@ func ensure(cond bool, msg string) {
 	}
 }
 
-func (b *ByocAws) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	return nil, client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
+type ECSEventHandler interface {
+	HandleECSEvent(evt ecs.Event)
+}
+
+func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	s := &byocSubscribeServerStream{
+		services: req.Services,
+		etag:     req.Etag,
+		ctx:      ctx,
+
+		ch: make(chan *defangv1.SubscribeResponse),
+	}
+	b.AddEcsEventHandler(s)
+	return s, nil
+}
+
+func (b *ByocAws) HandleECSEvent(evt ecs.Event) {
+	b.handlersLock.RLock()
+	defer b.handlersLock.RUnlock()
+	for _, handler := range b.ecsEventHandlers {
+		handler.HandleECSEvent(evt)
+	}
+}
+
+func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
+	b.handlersLock.Lock()
+	defer b.handlersLock.Unlock()
+	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
 }

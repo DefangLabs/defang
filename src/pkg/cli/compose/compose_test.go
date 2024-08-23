@@ -4,68 +4,146 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func TestLoadCompose(t *testing.T) {
+func TestLoadProjectName(t *testing.T) {
+	var tests = map[string]string{
+		"noprojname":     "../../../tests/noprojname/compose.yaml",
+		"tests":          "../../../tests/testproj/compose.yaml",
+		"fancy-proj_dir": "../../../tests/Fancy-Proj_Dir/compose.yaml",
+		"altcomp":        "../../../tests/alttestproj/altcomp.yaml",
+	}
+
+	for expectedName, path := range tests {
+		t.Run("Load project name from compose file or directory:"+expectedName, func(t *testing.T) {
+			loader := NewLoaderWithPath(path)
+			name, err := loader.LoadProjectName(context.Background())
+			if err != nil {
+				t.Fatalf("LoadProjectName() failed: %v", err)
+			}
+			if name != expectedName {
+				t.Errorf("LoadProjectName() failed: expected project name %q, got %q", expectedName, name)
+			}
+		})
+	}
+
+	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
+		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
+		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
+		name, err := loader.LoadProjectName(context.Background())
+		if err != nil {
+			t.Fatalf("LoadProjectName() failed: %v", err)
+		}
+
+		if name != "overridename" {
+			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
+		}
+	})
+
+	t.Run("--project-name has precidence over COMPOSE_PROJECT_NAME env var", func(t *testing.T) {
+		t.Setenv("COMPOSE_PROJECT_NAME", "ignoreme")
+		options := LoaderOptions{ProjectName: "expectedname"}
+		loader := NewLoaderWithOptions(options)
+		name, err := loader.LoadProjectName(context.Background())
+		if err != nil {
+			t.Fatalf("LoadProjectName() failed: %v", err)
+		}
+
+		if name != "expectedname" {
+			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
+		}
+	})
+
+}
+
+func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
+	loader := NewLoaderWithOptions(LoaderOptions{ProjectName: "testproj"})
+	name, err := loader.LoadProjectName(context.Background())
+	if err != nil {
+		t.Fatalf("LoadProjectName() failed: %v", err)
+	}
+
+	if name != "testproj" {
+		t.Errorf("LoadProjectName() failed: expected project name testproj, got %q", name)
+	}
+}
+
+func TestLoadProject(t *testing.T) {
 	term.SetDebug(testing.Verbose())
 
 	t.Run("no project name defaults to parent directory name", func(t *testing.T) {
-		loader := Loader{"../../../tests/noprojname/compose.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/noprojname/compose.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "noprojname" { // Use the parent directory name as project name
-			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name tenant-id, got %q", p.Name)
+		}
+		// the echo service has the donotstart profile so it is not included
+		if len(p.Services) != 0 {
+			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
 		}
 	})
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
-		loader := Loader{"../../../tests/Fancy-Proj_Dir/compose.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/Fancy-Proj_Dir/compose.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "fancy-proj_dir" { // Use the parent directory name as project name
-			t.Errorf("LoadCompose() failed: expected project name tenant-id, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name tenant-id, got %q", p.Name)
+		}
+		// the echo service has the donotstart profile so it is not included
+		if len(p.Services) != 0 {
+			t.Errorf("LoadProject() failed: expected 0 services, got %d", len(p.Services))
 		}
 	})
 
 	t.Run("use project name in compose file", func(t *testing.T) {
-		loader := Loader{"../../../tests/testproj/compose.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("LoadCompose() failed: expected project name, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
-		loader := Loader{"../../../tests/testproj/compose.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "overridename" {
-			t.Errorf("LoadCompose() failed: expected project name to be overwritten by env var, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name to be overwritten by env var, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 
 	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
-		loader := Loader{"../../../tests/testproj/compose.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name tests, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 
@@ -88,24 +166,30 @@ func TestLoadCompose(t *testing.T) {
 		t.Cleanup(teardown)
 
 		// execute test
-		loader := Loader{}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "tests" {
-			t.Errorf("LoadCompose() failed: expected project name tests, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name tests, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 
 	t.Run("load alternative compose file", func(t *testing.T) {
-		loader := Loader{"../../../tests/alttestproj/altcomp.yaml"}
-		p, err := loader.LoadCompose(context.Background())
+		loader := NewLoaderWithPath("../../../tests/alttestproj/altcomp.yaml")
+		p, err := loader.LoadProject(context.Background())
 		if err != nil {
-			t.Fatalf("LoadCompose() failed: %v", err)
+			t.Fatalf("LoadProject() failed: %v", err)
 		}
 		if p.Name != "altcomp" {
-			t.Errorf("LoadCompose() failed: expected project name altcomp, got %q", p.Name)
+			t.Errorf("LoadProject() failed: expected project name altcomp, got %q", p.Name)
+		}
+		if len(p.Services) != 1 {
+			t.Errorf("LoadProject() failed: expected 1 services, got %d", len(p.Services))
 		}
 	})
 }
@@ -120,10 +204,10 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	var warnings bytes.Buffer
 	term.DefaultTerm = term.NewTerm(&warnings, &warnings)
 
-	loader := Loader{"../../../tests/compose-go-warn/compose.yaml"}
-	_, err := loader.LoadCompose(context.Background())
+	loader := NewLoaderWithPath("../../../tests/compose-go-warn/compose.yaml")
+	_, err := loader.LoadProject(context.Background())
 	if err != nil {
-		t.Fatalf("LoadCompose() failed: %v", err)
+		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
 	if bytes.Count(warnings.Bytes(), []byte(`"yes" for boolean is not supported by YAML 1.2`)) != 1 {
@@ -138,15 +222,36 @@ func TestComposeOnlyOneFile(t *testing.T) {
 	})
 	os.Chdir("../../../tests/toomany")
 
-	loader := Loader{}
-	_, err := loader.LoadCompose(context.Background())
-	if err == nil {
-		t.Fatalf("LoadCompose() failed: expected error, got nil")
+	loader := NewLoaderWithPath("")
+	project, err := loader.LoadProject(context.Background())
+	if err != nil {
+		t.Errorf("LoadProject() failed: %v", err)
 	}
 
-	const expected = `multiple Compose files found: ["./compose.yaml" "./docker-compose.yml"]; use -f to specify which one to use`
-	newCwd, _ := os.Getwd() // make the error message independent of the current working directory
-	if got := strings.ReplaceAll(err.Error(), newCwd, "."); got != expected {
-		t.Errorf("LoadCompose() failed: expected error %q, got: %s", expected, got)
+	if len(project.ComposeFiles) != 1 {
+		t.Errorf("LoadProject() failed: expected only one config file, got %d", len(project.ComposeFiles))
+	}
+}
+
+func TestComposeMultipleFiles(t *testing.T) {
+	cwd, _ := os.Getwd()
+	t.Cleanup(func() {
+		os.Chdir(cwd)
+	})
+	os.Chdir("../../../tests/multiple")
+
+	composeFiles := []string{"compose1.yaml", "compose2.yaml"}
+	loader := NewLoaderWithOptions(LoaderOptions{ConfigPaths: composeFiles})
+	project, err := loader.LoadProject(context.Background())
+	if err != nil {
+		t.Fatalf("LoadProject() failed: %v", err)
+	}
+
+	if len(project.ComposeFiles) != 2 {
+		t.Errorf("LoadProject() failed: expected 2 compose files, got %d", len(project.ComposeFiles))
+	}
+
+	if len(project.Services) != 2 {
+		t.Errorf("LoadProject() failed: expected 2 services, got %d", len(project.Services))
 	}
 }

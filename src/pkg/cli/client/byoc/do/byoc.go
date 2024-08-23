@@ -239,7 +239,7 @@ func (b *ByocDo) environment() map[string]string {
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
-		"PROJECT":                    b.PulumiProject,
+		"PROJECT":                    b.ProjectName,
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s.digitaloceanspaces.com/%s`, region, b.driver.BucketName), // TODO: add a way to override bucket
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),                                // TODO: make customizable
 		"STACK":                      b.PulumiStack,
@@ -255,7 +255,7 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject,
+		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 	}
 
