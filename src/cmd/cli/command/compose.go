@@ -18,6 +18,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func isManagedService(service *defangv1.Service) bool {
+	if service == nil {
+		return false
+	}
+
+	return service.StaticFiles != nil || service.Redis != nil || service.Postgres != nil
+}
+
+func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []string {
+	managedResources := make([]string, 0)
+	for _, service := range serviceInfos {
+		if isManagedService(service.Service) {
+			managedResources = append(managedResources, service.Service.Name)
+		}
+	}
+
+	return managedResources
+}
+
 func makeComposeUpCmd() *cobra.Command {
 	behavior := Behavior(defangv1.Behavior_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -44,6 +63,11 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
+
+			var managedResources = GetUnreferencedManagedResources(deploy.Services)
+			if len(managedResources) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
+			}
 
 			if detach {
 				term.Info("Detached.")
@@ -107,6 +131,8 @@ func makeComposeUpCmd() *cobra.Command {
 					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
+					} else if len(managedResources) > 0 {
+						term.Warn("Managed services have been deployed but not all services may be available yet.")
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
