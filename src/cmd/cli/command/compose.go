@@ -66,7 +66,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			var managedResources = GetUnreferencedManagedResources(deploy.Services)
 			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   Check if the managed service is up by checking your dependant service's status.", managedResources)
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
 			}
 
 			if detach {
@@ -132,7 +132,7 @@ func makeComposeUpCmd() *cobra.Command {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
 					} else if len(managedResources) > 0 {
-						term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   Check if the managed service is up by checking your dependant service's status.", managedResources)
+						term.Warn("Managed services have been deployed but not all services may be available yet.")
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
