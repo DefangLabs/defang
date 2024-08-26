@@ -28,21 +28,24 @@ fi
 if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
     RELEASE_PATH="latest"
 else
-    RELEASE_PATH="tags/$DEFANG_INSTALL_VERSION"
+    RELEASE_PATH="tags/v${DEFANG_INSTALL_VERSION#v}"
 fi
 
 # Anonymous API request to GitHub are rate limited to 60 requests per hour.
 # Check whether the user has set a GitHub token to increase the rate limit.
 AUTH_HEADER=""
 if [[ -n "$GITHUB_TOKEN" ]]; then
-    AUTH_HEADER="-H 'Authorization: Bearer $GITHUB_TOKEN'"
+    AUTH_HEADER="Authorization: Bearer $GITHUB_TOKEN"
 elif [[ -n "$GH_TOKEN" ]]; then
-    AUTH_HEADER="-H 'Authorization: Bearer $GH_TOKEN'"
+    AUTH_HEADER="Authorization: Bearer $GH_TOKEN"
 fi
 
 # Echo fetching the release path either latest or the version
-echo "Fetching the ${DEFANG_INSTALL_VERSION:-latest} release of defang..."
-RELEASE_JSON=$(curl -s -f -L $AUTH_HEADER https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
+echo "Fetching the ${RELEASE_PATH#tags/} release of defang..."
+# Download the release information from GitHub, using the token if available, but falling back to anonymous access
+RELEASE_JSON=$([[ -n "$AUTH_HEADER" ]] &&
+    curl -sfL -H "$AUTH_HEADER" https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH ||
+    curl -sfL https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
 # Check for curl failure
 if [ -z "$RELEASE_JSON" ]; then
@@ -89,7 +92,7 @@ elif [ "$OS" = "Linux" ]; then
 fi
 
 # Download the file
-if ! curl -s -f -L "$DOWNLOAD_URL" -o "$FILENAME"; then
+if ! curl -sfL "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
     return 4
 fi
@@ -248,5 +251,5 @@ rm "$FILENAME"
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
 
 # Unset the variables and functions to avoid polluting the user's environment
-unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
+unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE AUTH_HEADER
 unset -f _prompt_and_append_to_file _generate_completion_script _install_completion_script
