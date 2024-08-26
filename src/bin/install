@@ -31,9 +31,18 @@ else
     RELEASE_PATH="tags/$DEFANG_INSTALL_VERSION"
 fi
 
-# Echo fetching the release path either latest or strip the tags/ from the version
+# Anonymous API request to GitHub are rate limited to 60 requests per hour.
+# Check whether the user has set a GitHub token to increase the rate limit.
+AUTH_HEADER=""
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    AUTH_HEADER="-H 'Authorization: Bearer $GITHUB_TOKEN'"
+elif [[ -n "$GH_TOKEN" ]]; then
+    AUTH_HEADER="-H 'Authorization: Bearer $GH_TOKEN'"
+fi
+
+# Echo fetching the release path either latest or the version
 echo "Fetching the ${DEFANG_INSTALL_VERSION:-latest} release of defang..."
-RELEASE_JSON=$(curl -s -f -L https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
+RELEASE_JSON=$(curl -s -f -L $AUTH_HEADER https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
 # Check for curl failure
 if [ -z "$RELEASE_JSON" ]; then
