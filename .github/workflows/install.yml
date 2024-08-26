@@ -5,7 +5,7 @@ on:
     types: [published]
   push:
     branches:
-      - main
+      - "**"
     paths:
       - '.github/workflows/install.yml'
       - 'src/bin/install'
