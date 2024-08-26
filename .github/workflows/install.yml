@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Install defang
         run: . <(curl -Ls https://s.defang.io/install)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sanity check
         run: defang --version
