@@ -27,7 +27,7 @@ func TestComposeUp(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false, defangv1.Behavior_DEVELOPMENT)
+	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false, defangv1.DeploymentMode_DEVELOPMENT)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
