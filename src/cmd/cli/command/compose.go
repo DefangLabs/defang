@@ -38,7 +38,7 @@ func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []str
 }
 
 func makeComposeUpCmd() *cobra.Command {
-	behavior := Behavior(defangv1.Behavior_DEVELOPMENT)
+	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Annotations: authNeededAnnotation,
@@ -49,7 +49,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, behavior.Value())
+			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
 			if err != nil {
 				if !errors.Is(err, types.ErrComposeFileNotFound) {
 					return err
@@ -178,7 +178,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().VarP(&behavior, "behavior", "b", "behavior for the deployment, possible values: "+strings.Join(allBehaviors(), ", "))
+	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	return composeUpCmd
 }
@@ -193,7 +193,7 @@ func makeComposeStartCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.Behavior_UNSPECIFIED_BEHAVIOR)
+			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 			if err != nil {
 				return err
 			}
@@ -311,7 +311,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli.DoDryRun = true // config is like start in a dry run
 			// force=false to calculate the digest
-			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.Behavior_UNSPECIFIED_BEHAVIOR); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
