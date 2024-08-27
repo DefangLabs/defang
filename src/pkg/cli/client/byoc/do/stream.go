@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,7 +17,8 @@ import (
 type byocServerStream struct {
 	conn *websocket.Conn
 	data struct {
-		Data string `json:"data"`
+		Op   string `json:"op"`   //  aka source "stdout", "stderr"
+		Data string `json:"data"` // "component timestamp message\n"
 	}
 	err  error
 	etag types.ETag
@@ -54,29 +57,31 @@ func newByocServerStream(ctx context.Context, liveUrl string, etag types.ETag) (
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
+	parts := strings.SplitN(bs.data.Data, " ", 3)
+	ts, _ := time.Parse(time.RFC3339Nano, parts[1]) // TODO: handle error
 	return &defangv1.TailResponse{
 		Entries: []*defangv1.LogEntry{{
-			Message:   bs.data.Data,
-			Timestamp: timestamppb.Now(),
-			Stderr:    true,
-			Service:   "service1",
+			Message:   parts[2],
+			Timestamp: timestamppb.New(ts),
+			Stderr:    bs.data.Op != "stdout",
+			Service:   parts[0],
 			Etag:      bs.etag,
-			Host:      "host1",
+			// Host:      "host1",
 		}},
-		Service: "service2",
+		Service: parts[0],
 		Etag:    bs.etag,
-		Host:    "host2",
+		// Host:    "host2",
 	}
 }
 
 func (bs *byocServerStream) Receive() bool {
-	messageType, message, err := bs.conn.ReadMessage()
-	println("messageType: ", messageType)
+	_, message, err := bs.conn.ReadMessage()
+	// println("messageType: ", messageType)
 	if err != nil {
 		bs.err = err
 		return false
 	}
-	println(string(message))
+	// println(string(message))
 	if err := json.Unmarshal(message, &bs.data); err != nil {
 		bs.err = err
 		return false

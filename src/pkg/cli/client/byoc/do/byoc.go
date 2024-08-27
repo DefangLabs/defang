@@ -330,6 +330,9 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, er
 			debugEnv += " " + v.Key + "=" + v.Value
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+		if pkg.GetenvBool("NO_CD") {
+			return nil, errors.New("NO_CD is set")
+		}
 	}
 	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
