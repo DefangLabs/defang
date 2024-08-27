@@ -1,0 +1,88 @@
+name: healthcheck
+services:
+  cmd-shell:
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - echo hello
+        - second line
+    image: alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
+  curl:
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - localhost
+    image: curl
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
+  flask1:
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()
+        - http://localhost/
+    image: flask
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
+  flask2:
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()
+    image: flask
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
+  none:
+    healthcheck:
+      test:
+        - NONE
+        - ignored
+    image: alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5000
+        protocol: tcp
+  wget:
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - --spider
+        - localhost:80
+    image: alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
+networks:
+  default:
+    name: healthcheck_default

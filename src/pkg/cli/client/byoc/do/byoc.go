@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/digitalocean/godo"
 	"io"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -359,7 +360,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "PROJECT",
-			Value: b.PulumiProject,
+			Value: b.ProjectName,
 		},
 		{
 			Key:   "PULUMI_BACKEND_URL",
@@ -424,7 +425,7 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject,
+		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 	}
 
