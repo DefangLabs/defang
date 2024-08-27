@@ -138,9 +138,9 @@ func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 	svc := ssm.NewFromConfig(cfg)
 	if doesConfigNameExist(ctx, svc, rootPath, name, !isSensitive) {
 		if isSensitive {
-			return fmt.Errorf("cannot change %q from sensitive to non-sensitive", name)
-		} else {
 			return fmt.Errorf("cannot change %q from non-sensitive to sensitive", name)
+		} else {
+			return fmt.Errorf("cannot change %q from sensitive to non-sensitive", name)
 		}
 	}
 
