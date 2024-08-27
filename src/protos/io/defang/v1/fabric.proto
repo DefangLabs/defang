@@ -117,8 +117,8 @@ message TrackRequest {
   string arch = 5;
 }
 
-enum Behavior {
-  UNSPECIFIED_BEHAVIOR= 0;
+enum DeploymentMode {
+  UNSPECIFIED_MODE= 0;
   DEVELOPMENT = 1;
   STAGING = 2;
   PRODUCTION = 3;
@@ -127,7 +127,7 @@ enum Behavior {
 message DeployRequest {
   repeated Service services = 1;
   string project = 2;
-  Behavior behavior = 3;
+  DeploymentMode mode = 3;
 }
 
 message DeployResponse {
@@ -310,7 +310,6 @@ message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
   string project = 3;
-  Behavior behavior = 4;
 }
 
 enum Platform {
