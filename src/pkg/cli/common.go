@@ -44,17 +44,20 @@ func PrintObject(root string, data proto.Message) error {
 	return nil
 }
 
+var indentSpaces = "    "
+
 func PrintConfigData(configs *defangv1.ConfigValues) {
 	if len((*configs).Configs) == 0 {
 		fmt.Printf("Config values not found\n")
 		return
 	}
 
+	fmt.Println("configs:")
 	for _, config := range (*configs).Configs {
 		if config.IsSensitive {
-			fmt.Printf("%s: [hidden]\n", config.Name)
+			fmt.Printf("%s - %s: [hidden]\n", indentSpaces, config.Name)
 		} else {
-			fmt.Printf("%s: %s\n", config.Name, config.Value)
+			fmt.Printf("%s - %s: %s\n", indentSpaces, config.Name, config.Value)
 		}
 	}
 }
