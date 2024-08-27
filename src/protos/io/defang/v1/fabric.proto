@@ -50,11 +50,23 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  // deprecate - change to use *Config functions
+  rpc PutSecret(SecretValue) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
+    option deprecated = true;
+  } // no values
+
+  rpc GetConfigs(Configs) returns (ConfigValues) {
+    option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
+  rpc PutConfig(PutValue) returns (google.protobuf.Empty);
+  rpc DeleteConfigs(Configs) returns (google.protobuf.Empty);
+  rpc ListConfigs(ListConfigsRequest) returns (Configs) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+  
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
@@ -203,10 +215,37 @@ message Secrets {
   string project = 2; // defaults to tenant ID
 }
 
+message Configs {
+  repeated string names = 1;
+  string project = 2; // defaults to tenant ID
+}
+
 message SecretValue {
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
+}
+
+message PutValue {
+  string name = 1;
+  string value = 2;
+  string project = 3;
+  bool is_sensitive = 4;
+}
+
+message ConfigValue {
+  string name = 1;
+  string value = 2;
+  bool is_sensitive = 4;
+}
+
+message ConfigValues {
+  repeated ConfigValue configs = 1;
+  string project = 2; // defaults to tenant ID
+}
+
+message ListConfigsRequest {
+  string project = 1; // defaults to tenant ID
 }
 
 message TokenRequest {
