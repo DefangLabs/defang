@@ -79,15 +79,15 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	}
 
 	// Get all the services in the project and delete them all at once
-	project, err := g.GetServices(ctx)
+	servicesList, err := g.GetServices(ctx)
 	if err != nil {
 		return "", err
 	}
-	if len(project.Services) == 0 {
+	if len(servicesList.Services) == 0 {
 		return "", errors.New("no services found")
 	}
 	var names []string
-	for _, service := range project.Services {
+	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
 	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names})
