@@ -22,7 +22,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:    "No target port xfail",
 			input:   types.ServicePortConfig{},
-			wantErr: "port 'target' must be an integer between 1 and 32767",
+			wantErr: "port 0: 'target' must be an integer between 1 and 32767",
 		},
 		{
 			name:     "Undefined mode and protocol, target only",
@@ -72,12 +72,12 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:    "Host mode and protocol, published range xfail",
 			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1511-2222"},
-			wantErr: "port 'published' range must include 'target': 1511-2222",
+			wantErr: "port 1234: 'published' range must include 'target': 1511-2222",
 		},
 		{
 			name:    "Host mode and protocol, published range xfail",
 			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "22222"},
-			wantErr: "port 'published' must be empty or equal to 'target': 22222",
+			wantErr: "port 1234: 'published' must be empty or equal to 'target': 22222",
 		},
 		{
 			name:     "Host mode and protocol, target in published range",
@@ -107,7 +107,7 @@ func TestConvertPort(t *testing.T) {
 		{
 			name:    "Localhost IP, unsupported mode and protocol xfail",
 			input:   types.ServicePortConfig{Mode: "ingress", HostIP: "127.0.0.1", Protocol: "tcp", Published: "1234", Target: 1234},
-			wantErr: "port 'host_ip' is not supported",
+			wantErr: "port 1234: 'host_ip' is not supported",
 		},
 		{
 			name:     "Ingress mode without host IP, single target, published range xfail", // - 1511-2223:1234
