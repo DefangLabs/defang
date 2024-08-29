@@ -310,13 +310,13 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 	switch port.Mode {
 	case "":
 		// TODO: This never happens now as compose-go set default to "ingress"
-		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
 		fallthrough
 	case "ingress":
 		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
 		if port.Protocol != "udp" {
 			if port.Published != "" {
-				term.Warnf("Published ports are ignored in ingress mode")
+				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
 			pbPort.Mode = defangv1.Mode_INGRESS
 			if pbPort.Protocol == defangv1.Protocol_TCP {
@@ -324,7 +324,7 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 			}
 			break
 		}
-		term.Warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
+		term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
 		fallthrough
 	case "host":
 		pbPort.Mode = defangv1.Mode_HOST

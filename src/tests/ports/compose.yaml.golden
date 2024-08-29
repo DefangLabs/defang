@@ -1,0 +1,56 @@
+name: ports
+services:
+  long:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 82
+        protocol: tcp
+  long-published:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 83
+        published: "8083"
+        protocol: tcp
+  short:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
+  short-published:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 81
+        published: "8081"
+        protocol: tcp
+  short-udp:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 84
+        protocol: udp
+  short-udp-published:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 85
+        published: "8085"
+        protocol: udp
+networks:
+  default:
+    name: ports_default

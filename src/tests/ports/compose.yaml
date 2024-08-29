@@ -1,0 +1,26 @@
+services:
+  short:
+    image: bogus
+    ports:
+      - 80
+  short-published:
+    image: bogus
+    ports:
+      - "8081:81"
+  long:
+    image: bogus
+    ports:
+      - target: 82
+  long-published:
+    image: bogus
+    ports:
+      - target: 83
+        published: 8083
+  short-udp:
+    image: bogus
+    ports:
+      - "84/udp"
+  short-udp-published:
+    image: bogus
+    ports:
+      - "8085:85/udp"
