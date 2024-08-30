@@ -3,9 +3,6 @@ package byoc
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -14,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/compose-spec/compose-go/v2/consts"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -148,17 +144,9 @@ func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string,
 		return projectNames[0], nil
 	}
 
-	// When there are multiple projects, take a hint from COMPOSE_PROJECT_NAME environment variable if set
-	if projectName, ok := os.LookupEnv(consts.ComposeProjectName); ok {
-		if !slices.Contains(projectNames, projectName) {
-			return "", fmt.Errorf("project %q specified by COMPOSE_PROJECT_NAME not found", projectName)
-		}
-		term.Debug("Using project from COMPOSE_PROJECT_NAME environment variable:", projectName)
-		b.setProjectName(projectName)
-		return projectName, nil
-	}
+	term.Warn("Multiple projects found: ", projectNames)
 
-	return "", errors.New("multiple projects found; please go to the correct project directory where the compose file is or set COMPOSE_PROJECT_NAME")
+	return "", errors.New("use the --project-name flag to specify a project")
 }
 
 func (b *ByocBaseClient) setProjectName(projectName string) {
