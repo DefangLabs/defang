@@ -61,7 +61,10 @@ service FabricController {
   rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty);
+  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+
+  };
   rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty);
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -224,12 +227,16 @@ message SecretValue {
 message Config {
   string name = 1;
   string value = 2;
-  bool is_sensitive = 4;
+  bool is_sensitive = 3;
+}
+
+message ConfigKey {
+  string names = 1;
+  string project = 2; // defaults to tenant ID
 }
 
 message GetConfigsRequest {
-  repeated string names = 1;
-  string project = 2; // defaults to tenant ID
+  repeated ConfigKey configs = 1;
 }
 
 message GetConfigsResponse {
@@ -239,8 +246,7 @@ message GetConfigsResponse {
 
 
 message DeleteConfigsRequest {
-  repeated string names = 1;
-  string project = 2; // defaults to tenant ID
+  repeated ConfigKey configs = 1;
 }
 
 message PutConfigRequest {
@@ -255,8 +261,7 @@ message ListConfigsRequest {
 }
 
 message ListConfigsResponse {
-  repeated string names = 1;
-  string project = 2; // defaults to tenant ID
+  repeated ConfigKey configs = 1;
 }
 
 message TokenRequest {

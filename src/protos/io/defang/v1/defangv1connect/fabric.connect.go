@@ -294,7 +294,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		putConfig: connect_go.NewClient[v1.PutConfigRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutConfigProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		deleteConfigs: connect_go.NewClient[v1.DeleteConfigsRequest, emptypb.Empty](
 			httpClient,
@@ -706,7 +707,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerPutConfigHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutConfigProcedure,
 		svc.PutConfig,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerDeleteConfigsHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteConfigsProcedure,
