@@ -143,6 +143,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 }
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
+	// Use DO api to query which apps (or projects) exist based on defang constant
 	return nil, client.ErrNotImplemented("not implemented for ByocDo")
 }
 
@@ -162,10 +163,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
+	// Unsupported in DO
 	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
 }
 
@@ -174,22 +172,28 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
+	//Create app, it fails, add secrets later
+	// triggers an app update with the new config
 	return errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
 	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
 	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+	//get app and return the environment
 	return nil, errors.New("Digital Ocean does not currently support config.")
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+	// redeploy app with updated config in pulumi "regular deployment"
 	return errors.New("Digital Ocean does not currently support config.")
 }
 
@@ -198,7 +202,7 @@ func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, erro
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
-	return ""
+	return "localhost"
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
@@ -292,6 +296,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
+	// kills the CD app as well, use DO api to remove CD
 	return errors.ErrUnsupported
 	//return b.Driver.TearDown(ctx)
 }
@@ -313,11 +318,8 @@ func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
-func (b *ByocDo) Get(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
-	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
-}
-
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	//optional
 	return nil, errors.ErrUnsupported
 }
 
