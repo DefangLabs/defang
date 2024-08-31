@@ -399,7 +399,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 			MountPoints:      mountPoints,
 			EntryPoint:       container.EntryPoint,
 			Command:          container.Command,
-			WorkingDirectory: container.WorkDir,
+			WorkingDirectory: &container.WorkDir,
 			DependsOnProp:    dependsOn,
 		}
 		containerDefinitions = append(containerDefinitions, def)

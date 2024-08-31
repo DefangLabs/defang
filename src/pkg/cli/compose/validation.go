@@ -13,6 +13,8 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
+var ErrDockerfileNotFound = errors.New("dockerfile not found")
+
 func ValidateProject(project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
@@ -111,7 +113,7 @@ func ValidateProject(project *compose.Project) error {
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					return fmt.Errorf("service %q: dockerfile not found: %q", svccfg.Name, dockerfilePath)
+					return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 				}
 			}
 			if svccfg.Build.SSH != nil {
@@ -237,7 +239,7 @@ func ValidateProject(project *compose.Project) error {
 			}
 		}
 		if reservations == nil || reservations.MemoryBytes == 0 {
-			term.Warnf("service %q: missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
+			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 
 		if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
@@ -262,9 +264,17 @@ func ValidateProject(project *compose.Project) error {
 			}
 		}
 
+		if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+			// Ensure the image is a valid Postgres image
+			repo := strings.SplitN(svccfg.Image, ":", 2)[0]
+			if !strings.HasSuffix(repo, "postgres") {
+				term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
+			}
+		}
+
 		for k := range svccfg.Extensions {
 			switch k {
-			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis":
+			case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres":
 				continue
 			default:
 				term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)

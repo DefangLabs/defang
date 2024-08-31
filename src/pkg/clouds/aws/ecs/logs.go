@@ -63,13 +63,7 @@ func getLogGroupIdentifier(arnOrId string) string {
 }
 
 func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupInput) (EventStream, error) {
-	child, cancel := context.WithCancel(ctx)
-	var cs = collectionStream{
-		cancel: cancel,
-		ch:     make(chan types.StartLiveTailResponseStream, 10), // max number of loggroups to query
-		ctx:    child,
-		errCh:  make(chan error, 1),
-	}
+	cs := newCollectionStream(ctx)
 
 	type pair struct {
 		es  EventStream
@@ -129,7 +123,7 @@ func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupIn
 		cs.addAndStart(s.es, since, s.lgi)
 	}
 
-	return &cs, nil
+	return cs, nil
 }
 
 // LogGroupInput is like cloudwatchlogs.StartLiveTailInput but with only one loggroup and one logstream prefix.
@@ -304,17 +298,53 @@ type LogEvent = types.LiveTailSessionLogEvent
 type EventStream interface {
 	Close() error
 	Events() <-chan types.StartLiveTailResponseStream
+	Err() error
 }
 
 type collectionStream struct {
-	cancel  context.CancelFunc
-	ch      chan types.StartLiveTailResponseStream
-	ctx     context.Context // derived from the context passed to TailLogGroups
-	errCh   chan error
-	streams []EventStream
+	cancel   context.CancelFunc
+	ch       chan types.StartLiveTailResponseStream
+	outputCh chan types.StartLiveTailResponseStream
+	ctx      context.Context // derived from the context passed to TailLogGroups
+	errCh    chan error
+	streams  []EventStream
+
+	err error
 
 	lock sync.Mutex
 	wg   sync.WaitGroup
+}
+
+func newCollectionStream(ctx context.Context) *collectionStream {
+	child, cancel := context.WithCancel(ctx)
+	cs := &collectionStream{
+		cancel:   cancel,
+		ch:       make(chan types.StartLiveTailResponseStream, 10), // max number of loggroups to query
+		outputCh: make(chan types.StartLiveTailResponseStream),
+		ctx:      child,
+		errCh:    make(chan error, 1),
+	}
+
+	go func() {
+		defer close(cs.outputCh)
+		for {
+			select {
+			case e, ok := <-cs.ch:
+				// This would make sure the goroutine exits after close is called
+				if !ok {
+					return
+				}
+				cs.outputCh <- e
+			case err := <-cs.errCh:
+				cs.err = err
+				cs.outputCh <- nil
+			case <-cs.ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return cs
 }
 
 func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGroupInput) {
@@ -346,6 +376,13 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
 			select {
 			case e := <-s.Events(): // blocking
+				if err := s.Err(); err != nil {
+					select {
+					case c.errCh <- err:
+					case <-c.ctx.Done():
+					}
+					return
+				}
 				select {
 				case c.ch <- e:
 				case <-c.ctx.Done():
@@ -375,11 +412,11 @@ func (c *collectionStream) Close() error {
 }
 
 func (c *collectionStream) Events() <-chan types.StartLiveTailResponseStream {
-	return c.ch
+	return c.outputCh
 }
 
-func (c *collectionStream) Errs() <-chan error {
-	return c.errCh
+func (c *collectionStream) Err() error {
+	return c.err
 }
 
 func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {

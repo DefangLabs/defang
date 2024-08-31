@@ -1,0 +1,6 @@
+ ! service "failing": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "failing": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "ok": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "ok": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ * Compressing build context for failing at ./app
+ * Compressing build context for ok at .

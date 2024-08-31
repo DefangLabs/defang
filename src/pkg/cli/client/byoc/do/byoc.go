@@ -5,16 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/digitalocean/godo"
 	"io"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/digitalocean/godo"
+
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/local"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
@@ -323,6 +325,27 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 	return nil, errors.ErrUnsupported
 }
 
+func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
+	driver := local.New()
+	if err := driver.SetUp(ctx, []types.Container{{
+		EntryPoint: []string{"npm", "run", "dev"},
+		WorkDir:    dir,
+	}}); err != nil {
+		return err
+	}
+	localEnv := map[string]string{
+		"PATH": os.Getenv("PATH"),
+	}
+	for _, v := range b.environment() {
+		localEnv[v.Key] = v.Value
+	}
+	pid, err := driver.Run(ctx, localEnv, cmd...)
+	if err != nil {
+		return err
+	}
+	return driver.Tail(ctx, pid)
+}
+
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
 	env := b.environment()
 	if term.DoDebug() {
@@ -331,6 +354,9 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, er
 			debugEnv += " " + v.Key + "=" + v.Value
 		}
 		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+	}
+	if dir := os.Getenv("DEFANG_PULUMI_DIR"); dir != "" {
+		return nil, b.runLocalPulumiCommand(ctx, dir, cmd...)
 	}
 	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
@@ -361,7 +387,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "PROJECT",
-			Value: b.PulumiProject,
+			Value: b.ProjectName,
 		},
 		{
 			Key:   "PULUMI_BACKEND_URL",
@@ -426,7 +452,7 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 
 	si := &defangv1.ServiceInfo{
 		Service: service,
-		Project: b.PulumiProject,
+		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 	}
 

@@ -213,7 +213,12 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			redis = &defangv1.Redis{}
 		}
 
-		if redis == nil && isStatefulImage(svccfg.Image) {
+		var postgres *defangv1.Postgres
+		if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+			postgres = &defangv1.Postgres{}
+		}
+
+		if redis == nil && postgres == nil && isStatefulImage(svccfg.Image) {
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
@@ -237,6 +242,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			DnsRole:     dnsRole,
 			StaticFiles: staticFiles,
 			Redis:       redis,
+			Postgres:    postgres,
 		})
 	}
 	return services, nil

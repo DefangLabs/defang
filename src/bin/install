@@ -24,13 +24,32 @@ if [[ "$1" == "-y" ]] || [[ "$CI" == "1" ]] || [[ "$CI" == "true" ]]; then
     CI="1"
 fi
 
-# Use curl to fetch the latest release data
-echo "Fetching the latest release information..."
-RELEASE_JSON=$(curl -s -L https://api.github.com/repos/DefangLabs/defang/releases/latest)
+# check if DEFANG_INSTALL_VERSION is set and set the release path accordingly
+if [[ -z "$DEFANG_INSTALL_VERSION" ]]; then
+    RELEASE_PATH="latest"
+else
+    RELEASE_PATH="tags/v${DEFANG_INSTALL_VERSION#v}"
+fi
+
+# Anonymous API request to GitHub are rate limited to 60 requests per hour.
+# Check whether the user has set a GitHub token to increase the rate limit.
+AUTH_HEADER=""
+if [[ -n "$GITHUB_TOKEN" ]]; then
+    AUTH_HEADER="Authorization: Bearer $GITHUB_TOKEN"
+elif [[ -n "$GH_TOKEN" ]]; then
+    AUTH_HEADER="Authorization: Bearer $GH_TOKEN"
+fi
+
+# Echo fetching the release path either latest or the version
+echo "Fetching the ${RELEASE_PATH#tags/} release of defang..."
+# Download the release information from GitHub, using the token if available, but falling back to anonymous access
+RELEASE_JSON=$([[ -n "$AUTH_HEADER" ]] &&
+    curl -sfL -H "$AUTH_HEADER" https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH ||
+    curl -sfL https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
 # Check for curl failure
-if [ $? -ne 0 ]; then
-    echo "Error fetching release information. Please check your connection or if the URL is correct."
+if [ -z "$RELEASE_JSON" ]; then
+    echo "Error fetching release information. Please check your connection or if the version is correct."
     return 1
 fi
 
@@ -73,7 +92,7 @@ elif [ "$OS" = "Linux" ]; then
 fi
 
 # Download the file
-if ! curl -s -L "$DOWNLOAD_URL" -o "$FILENAME"; then
+if ! curl -sfL "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
     return 4
 fi
@@ -232,5 +251,5 @@ rm "$FILENAME"
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
 
 # Unset the variables and functions to avoid polluting the user's environment
-unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE
+unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE AUTH_HEADER
 unset -f _prompt_and_append_to_file _generate_completion_script _install_completion_script

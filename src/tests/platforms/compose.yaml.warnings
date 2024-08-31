@@ -1,2 +1,2 @@
  ! service "intel2": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
- ! service "intel2": missing memory reservation; specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "intel2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

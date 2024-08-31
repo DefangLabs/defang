@@ -8,24 +8,25 @@ import (
 	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
 // context window for the LLM also.
-// FIXME: Find a better way to handle files.
 const maxFiles = 20
 
-var ErrFileLimitReached = errors.New("file limit reached")
+var (
+	errFileLimitReached = errors.New("file limit reached")
+	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
+)
 
-func Debug(ctx context.Context, c client.Client, etag, folder string, services []string) error {
+func Debug(ctx context.Context, c client.Client, etag string, project *types.Project, services []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
-	// FIXME: use the project information to determine which files to send
-	patterns := []string{"Dockerfile", "*compose.yaml", "*compose.yml", "*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"}
-
-	files := findMatchingFiles(folder, patterns)
+	files := findMatchingProjectFiles(project, services)
 
 	if DoDryRun {
 		return ErrDryRun
@@ -72,49 +73,97 @@ func Debug(ctx context.Context, c client.Client, etag, folder string, services [
 	return nil
 }
 
-func findMatchingFiles(folder string, patterns []string) []*defangv1.File {
-	var files []*defangv1.File
-	fileCount := 0
+func readFile(path string) *defangv1.File {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		term.Debug("failed to read file:", err)
+		return nil
+	}
+	return &defangv1.File{
+		Name:    filepath.Base(path),
+		Content: string(b),
+	}
+}
 
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			term.Debug("error accessing path:", err)
-			return nil // continue walking
+func getServices(project *types.Project, names []string) types.Services {
+	// project.GetServices(…) aborts if any service is not found, so we filter them out ourselves
+	if len(names) == 0 {
+		return project.Services
+	}
+	services := types.Services{}
+	for _, s := range names {
+		if svc, err := project.GetService(s); err != nil {
+			term.Debug("skipped for debugging:", err)
+		} else {
+			services[s] = svc
 		}
+	}
+	return services
+}
 
+func findMatchingProjectFiles(project *types.Project, services []string) []*defangv1.File {
+	var files []*defangv1.File
+
+	for _, path := range project.ComposeFiles {
+		if file := readFile(path); file != nil {
+			files = append(files, file)
+		}
+	}
+
+	for _, service := range getServices(project, services) {
+		if service.Build != nil {
+			files = append(files, findMatchingFiles(service.Build.Context, service.Build.Dockerfile)...)
+		}
+		// TODO: also consider other files, lke .dockerignore, .env, etc.
+	}
+
+	return files
+}
+
+func IsProjectFile(basename string) bool {
+	return filepathMatchAny(patterns, basename)
+}
+
+func filepathMatchAny(patterns []string, name string) bool {
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, name)
+		if err != nil {
+			term.Debug("error matching pattern:", err)
+			continue
+		}
+		if matched {
+			return true // file matched, no need to check other patterns
+		}
+	}
+	return false
+}
+
+func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
+	var files []*defangv1.File
+
+	if file := readFile(filepath.Join(folder, dockerfile)); file != nil {
+		files = append(files, file)
+	}
+
+	err := compose.WalkContextFolder(folder, dockerfile, func(path string, info os.DirEntry, slashPath string) error {
 		if info.IsDir() {
 			return nil // continue to next file/directory
 		}
 
-		if fileCount >= maxFiles {
+		if len(files) >= maxFiles {
 			term.Debug("file limit reached, stopping search")
-			return ErrFileLimitReached
+			return errFileLimitReached
 		}
 
-		for _, pattern := range patterns {
-			matched, err := filepath.Match(pattern, info.Name())
-			if err != nil {
-				term.Debug("error matching pattern:", err)
-				continue
-			}
-			if matched {
-				b, err := os.ReadFile(path)
-				if err != nil {
-					term.Debug("failed to read file:", err)
-					continue
-				}
-				files = append(files, &defangv1.File{
-					Name:    filepath.Base(path),
-					Content: string(b),
-				})
-				fileCount++
-				break // file matched, no need to check other patterns
+		if IsProjectFile(info.Name()) {
+			if file := readFile(path); file != nil {
+				files = append(files, file)
 			}
 		}
 		return nil
 	})
 
-	if err != nil && err != ErrFileLimitReached {
+	if err != nil && err != errFileLimitReached {
 		term.Debug("error walking the path:", err)
 	}
 

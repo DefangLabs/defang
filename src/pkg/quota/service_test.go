@@ -75,7 +75,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "echo 1"},
 				},
 			},
-			wantErr: "invalid CMD healthcheck: expected a command and URL",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
 		},
 		{
 			name: "CMD without curl or wget",
@@ -87,7 +87,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "echo", "1"},
 				},
 			},
-			wantErr: "invalid CMD healthcheck: expected curl or wget",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
 		},
 		{
 			name: "CMD without HTTP URL",
@@ -99,7 +99,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "curl", "1"},
 				},
 			},
-			wantErr: "invalid CMD healthcheck; missing HTTP URL",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
 		},
 		{
 			name: "NONE with arguments",
@@ -110,7 +110,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"NONE", "echo", "1"},
 				},
 			},
-			wantErr: "invalid NONE healthcheck; expected no arguments",
+			// wantErr: "invalid NONE healthcheck; expected no arguments",
 		},
 		{
 			name: "CMD-SHELL with ingress",
@@ -122,7 +122,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD-SHELL", "echo 1"},
 				},
 			},
-			wantErr: "ingress port requires a CMD healthcheck",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
 		},
 		{
 			name: "NONE with ingress",
@@ -134,7 +134,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"NONE"},
 				},
 			},
-			wantErr: "ingress port requires a CMD healthcheck",
+			wantErr: "invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck",
 		},
 		{
 			name: "unsupported healthcheck test",
@@ -298,20 +298,23 @@ func TestValidate(t *testing.T) {
 	}
 
 	byoc := Quotas{
-		Cpus:       16,
-		Gpus:       8,
-		MemoryMiB:  65536,
-		Replicas:   16,
-		Services:   40,
-		ShmSizeMiB: 30720,
+		ServiceQuotas: ServiceQuotas{
+			Cpus:       16,
+			Gpus:       8,
+			MemoryMiB:  65536,
+			Replicas:   16,
+			ShmSizeMiB: 30720,
+		},
+		Services: 40,
+		Ingress:  10,
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := byoc.Validate(tt.service); err != nil && err.Error() != tt.wantErr {
-				t.Errorf("Byoc.Validate() = %v, want %v", err, tt.wantErr)
+				t.Errorf("Byoc.Validate() = %q, want %q", err, tt.wantErr)
 			} else if err == nil && tt.wantErr != "" {
-				t.Errorf("Byoc.Validate() = nil, want %v", tt.wantErr)
+				t.Errorf("Byoc.Validate() = nil, want %q", tt.wantErr)
 			}
 		})
 	}
