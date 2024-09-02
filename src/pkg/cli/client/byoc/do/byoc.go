@@ -119,8 +119,6 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	term.Debug(fmt.Sprintf("PAYLOAD STRING: %s", payloadString))
-
 	cdApp, err := b.runCdCommand(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
@@ -216,12 +214,34 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
 	//Only used in Tail
-	term.Debugf("SERVICE NAME: %s", s.Name)
-	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
+	app, err := b.getAppByName(ctx, b.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+
+	var serviceInfo *defangv1.ServiceInfo
+
+	for _, service := range app.Spec.Services {
+		if service.Name == s.Name {
+			serviceInfo = b.processServiceInfo(service)
+		}
+	}
+
+	return serviceInfo, nil
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
+	app, err := b.getAppByName(ctx, b.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+	services := &defangv1.ListServicesResponse{}
+
+	for _, service := range app.Spec.Services {
+		serviceInfo := b.processServiceInfo(service)
+		services.Services = append(services.Services, serviceInfo)
+	}
 
 	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
 }
@@ -268,7 +288,14 @@ func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) er
 }
 
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", errors.ErrUnsupported
+	app, err := b.getAppByName(ctx, b.ProjectName)
+	if err != nil {
+		return "", err
+	}
+
+	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+
+	return pkg.RandomID(), err
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
@@ -279,16 +306,21 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
-	// This is an etag; look up the app ID
-	cdApp := b.apps[req.Etag]
-	if cdApp == nil {
-		return nil, fmt.Errorf("unknown etag: %s", req.Etag)
+
+	//Look up the CD app directly instead of relying on the etag
+	cdApp, err := b.getAppByName(ctx, "defang-cd")
+	if err != nil {
+		return nil, err
 	}
 
 	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
 	var appLiveURL string
 	term.Info("Waiting for command to finish to gather logs")
-	deploymentID := cdApp.PendingDeployment.ID
+	deploymentID := cdApp.PendingDeployment.GetID()
+	if deploymentID == "" {
+		//Cover the chance that someone runs Tail against a deploy that is already finished.
+		deploymentID = cdApp.ActiveDeployment.GetID()
+	}
 	for {
 
 		deploymentInfo, _, err := b.driver.Client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
@@ -561,20 +593,11 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	return nil
 }
 
-func readHistoricalLogs(ctx context.Context, urls []string) {
-	for _, u := range urls {
-		resp, err := http.GetWithContext(ctx, u)
-		term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
-		if err != nil {
-			continue
-		}
-		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
-	}
-}
-
 func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, error) {
-	appName := fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
+	appName := name
+	if !strings.Contains(name, "defang") {
+		appName = fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
+	}
 
 	term.Debugf("APP NAME: %s", appName)
 
@@ -590,5 +613,40 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		}
 	}
 
-	return nil, errors.New("app not found")
+	return nil, errors.New(fmt.Sprintf("app not found: %s", appName))
+}
+
+func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
+
+	serviceInfo := &defangv1.ServiceInfo{
+		Project: b.ProjectName,
+		Etag:    pkg.RandomID(),
+		Service: &defangv1.Service{
+			Name:        service.Name,
+			Image:       service.Image.Digest,
+			Environment: getServiceEnv(service.Envs),
+		},
+	}
+
+	return serviceInfo
+}
+
+func readHistoricalLogs(ctx context.Context, urls []string) {
+	for _, u := range urls {
+		resp, err := http.GetWithContext(ctx, u)
+		term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		io.Copy(os.Stdout, resp.Body)
+	}
+}
+
+func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
+	env := make(map[string]string)
+	for _, envVar := range envVars {
+		env[envVar.Key] = envVar.Value
+	}
+	return env
 }
