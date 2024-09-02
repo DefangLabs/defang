@@ -227,11 +227,12 @@ message SecretValue {
 message Config {
   string name = 1;
   string value = 2;
-  bool is_sensitive = 3;
+  string project = 3;
+  bool is_sensitive = 4;
 }
 
 message ConfigKey {
-  string names = 1;
+  string name = 1;
   string project = 2; // defaults to tenant ID
 }
 
@@ -241,7 +242,6 @@ message GetConfigsRequest {
 
 message GetConfigsResponse {
   repeated Config configs = 1;
-  string project = 2; // defaults to tenant ID
 }
 
 
