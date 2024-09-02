@@ -28,6 +28,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	DEFANG = "defang"
+)
+
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
@@ -146,7 +150,21 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 
 func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 	// Use DO api to query which apps (or projects) exist based on defang constant
-	return nil, client.ErrNotImplemented("not implemented for ByocDo")
+
+	var projectList []string
+
+	projects, _, err := b.driver.Client.Projects.List(ctx, &godo.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, project := range projects {
+		if strings.Contains(project.Name, "Defang") {
+			projectList = append(projectList, project.Name)
+		}
+	}
+
+	return projectList, nil
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -176,27 +194,77 @@ func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
 	//Create app, it fails, add secrets later
 	// triggers an app update with the new config
-	return errors.New("Digital Ocean does not currently support config.")
+	app, err := b.getAppByName(ctx, secrets.Project)
+
+	toDelete := strings.Join(secrets.Names, ",")
+
+	if err != nil {
+		return err
+	}
+
+	deleteEnvVars(toDelete, &app.Spec.Envs)
+	for _, service := range app.Spec.Services {
+		deleteEnvVars(toDelete, &service.Envs)
+		term.Debugf("CURRENT ENV: %s", service.Envs)
+	}
+
+	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+
+	return err
 }
 
 func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
+	//Only used in Tail
+	term.Debugf("SERVICE NAME: %s", s.Name)
 	return &defangv1.ServiceInfo{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
+
 	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	//get app and return the environment
-	return nil, errors.New("Digital Ocean does not currently support config.")
+	app, err := b.getAppByName(ctx, b.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+
+	secrets := &defangv1.Secrets{}
+
+	for _, envVar := range app.Spec.Envs {
+		secrets.Names = append(secrets.Names, envVar.Key)
+	}
+
+	for _, service := range app.Spec.Services {
+		for _, envVar := range service.Envs {
+			secrets.Names = append(secrets.Names, envVar.Key)
+		}
+	}
+
+	return secrets, nil
 }
 
 func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
 	// redeploy app with updated config in pulumi "regular deployment"
-	return errors.New("Digital Ocean does not currently support config.")
+	app, err := b.getAppByName(ctx, secret.Project)
+	if err != nil {
+		return err
+	}
+
+	newSecret := &godo.AppVariableDefinition{
+		Key:   secret.Name,
+		Value: secret.Value,
+		Type:  godo.AppVariableType_Secret,
+	}
+
+	app.Spec.Envs = append(app.Spec.Envs, newSecret)
+
+	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+
+	return err
 }
 
 func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
@@ -219,7 +287,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
 	var appLiveURL string
-	term.Info("Waiting for Deploy to finish to gather logs")
+	term.Info("Waiting for command to finish to gather logs")
 	deploymentID := cdApp.PendingDeployment.ID
 	for {
 
@@ -503,4 +571,24 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 		defer resp.Body.Close()
 		io.Copy(os.Stdout, resp.Body)
 	}
+}
+
+func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, error) {
+	appName := fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
+
+	term.Debugf("APP NAME: %s", appName)
+
+	apps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, app := range apps {
+		term.Debugf("LOOP APP NAME: %s", app.Spec.Name)
+		if app.Spec.Name == appName {
+			return app, nil
+		}
+	}
+
+	return nil, errors.New("app not found")
 }
