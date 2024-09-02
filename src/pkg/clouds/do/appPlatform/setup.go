@@ -45,10 +45,10 @@ func New(stack string, region do.Region) *DoApp {
 	client := newClient(context.TODO())
 
 	return &DoApp{
-		Client:      client,
-		Region:      region,
-		ProjectName: stack, // FIXME: stack != project
-		BucketName:  os.Getenv("DEFANG_CD_BUCKET"),
+		Client: client,
+		Region: region,
+		//ProjectName: stack, // FIXME: stack != project
+		BucketName: os.Getenv("DEFANG_CD_BUCKET"),
 	}
 
 }
@@ -126,7 +126,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
 			Kind:             godo.AppJobSpecKind_PreDeploy,
-			Name:             d.ProjectName, // component name
+			Name:             CDName,
 			Envs:             env,
 			Image:            image,
 			InstanceCount:    1,
@@ -153,9 +153,11 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 	//Update current CD app if it exists
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
 		term.Debugf("Updating existing CD app")
+
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec: appJobSpec,
 		})
+		term.Debugf("JOB NAME: %s", currentCd.Spec)
 	} else {
 		term.Debugf("Creating new CD app")
 		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{

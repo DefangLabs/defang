@@ -51,7 +51,7 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 		apps:   map[string]*godo.App{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
-
+	b.ProjectName, _ = b.LoadProjectName(ctx)
 	return b
 }
 
@@ -243,7 +243,7 @@ func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 		services.Services = append(services.Services, serviceInfo)
 	}
 
-	return &defangv1.ListServicesResponse{}, errors.ErrUnsupported
+	return services, nil
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -308,7 +308,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	//Look up the CD app directly instead of relying on the etag
-	cdApp, err := b.getAppByName(ctx, "defang-cd")
+	cdApp, err := b.getAppByName(ctx, appPlatform.CDName)
 	if err != nil {
 		return nil, err
 	}
@@ -398,9 +398,19 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	// kills the CD app as well, use DO api to remove CD
-	return errors.ErrUnsupported
-	//return b.Driver.TearDown(ctx)
+	_, err := b.BootstrapCommand(ctx, "down")
+	if err != nil {
+		return err
+	}
+
+	app, err := b.getAppByName(ctx, appPlatform.CDName)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.driver.Client.Apps.Delete(ctx, app.ID)
+
+	return err
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
@@ -532,16 +542,16 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 			Value: b.buildRepo,
 		},
 		{
-			Key:   "AWS_REGION", // FIXME: why do we need this?
+			Key:   "AWS_REGION", // Needed for CD S3 functions
 			Value: region.String(),
 		},
 		{
-			Key:   "AWS_ACCESS_KEY_ID", // FIXME: why do we need this?
+			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions
 			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", os.Getenv("DO_SPACES_ID")),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
-			Key:   "AWS_SECRET_ACCESS_KEY", // FIXME: why do we need this?
+			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions
 			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", os.Getenv("DO_SPACES_KEY")),
 			Type:  godo.AppVariableType_Secret,
 		},
