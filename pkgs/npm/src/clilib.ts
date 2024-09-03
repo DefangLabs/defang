@@ -31,7 +31,7 @@ async function downloadAppArchive(
   archiveFilename: string,
   outputPath: string
 ): Promise<string | null> {
-  const downloadUrl = `https://s.dayifu.net/${archiveFilename}?x-defang-source=npm`;
+  const downloadUrl = `https://s.defang.io/${archiveFilename}?x-defang-source=npm`;
   const downloadTargetFile = path.join(outputPath, archiveFilename);
 
   return await downloadFile(downloadUrl, downloadTargetFile);
