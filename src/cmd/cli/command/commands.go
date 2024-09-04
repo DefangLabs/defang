@@ -876,6 +876,7 @@ var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",
+	Hidden:  true,
 }
 
 var bootstrapDestroyCmd = &cobra.Command{
