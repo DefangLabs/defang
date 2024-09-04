@@ -23,8 +23,27 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var resolver dns.Resolver = dns.RootResolver{}
-var httpClient HTTPClient = http.DefaultClient
+var (
+	resolver   dns.Resolver = dns.RootResolver{}
+	httpClient HTTPClient   = &http.Client{
+		// Based on the default transport: https://pkg.go.dev/net/http#RoundTripper
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				// CONTINUE HERE: USE ROOT RESOLVER TO GET THE IP ADDRESS OF THE DNS SERVER
+
+				// Fall back to default dialer
+				dialer := &net.Dialer{}
+				return dialer.DialContext(ctx, network, addr)
+			},
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+)
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
 	projectName, err := client.LoadProjectName(ctx)
