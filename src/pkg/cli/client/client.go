@@ -42,7 +42,6 @@ type Client interface {
 	BootstrapCommand(context.Context, string) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
-	// Deprecated: Use Deploy or Destroy instead.
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
