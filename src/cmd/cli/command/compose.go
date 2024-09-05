@@ -249,16 +249,15 @@ func makeComposeStopCmd() *cobra.Command {
 
 func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
-		Use:         "down",
-		Aliases:     []string{"rm"},
+		Use:         "down [SERVICE...]",
+		Aliases:     []string{"rm", "remove"}, // like docker stack
 		Annotations: authNeededAnnotation,
-		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), client)
+			etag, err := cli.ComposeDown(cmd.Context(), client, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
