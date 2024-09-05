@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"slices"
@@ -30,11 +31,17 @@ var (
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				// CONTINUE HERE: USE ROOT RESOLVER TO GET THE IP ADDRESS OF THE DNS SERVER
-
-				// Fall back to default dialer
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				ips, err := resolver.LookupIPAddr(ctx, host)
+				if err != nil {
+					return nil, err
+				}
 				dialer := &net.Dialer{}
-				return dialer.DialContext(ctx, network, addr)
+				rootAddr := net.JoinHostPort(ips[rand.Intn(len(ips))].String(), port)
+				return dialer.DialContext(ctx, network, rootAddr)
 			},
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          100,
@@ -271,7 +278,17 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 }
 
 func checkTLSCert(ctx context.Context, domain string) error {
-	return getWithRetries(ctx, fmt.Sprintf("https://%v", domain), 3)
+	url := fmt.Sprintf("https://%v", domain)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req) // http non 200 errors are not considered as errors
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func getWithRetries(ctx context.Context, url string, tries int) error {
@@ -286,7 +303,6 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 			defer resp.Body.Close()
 			var msg []byte
 			msg, err = io.ReadAll(resp.Body)
-			term.Debugf("Response from %v: %v", url, string(msg))
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
