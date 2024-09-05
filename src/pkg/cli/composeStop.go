@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
+// Deprecated: this doesn't do the right thing right now
 func ComposeStop(ctx context.Context, client client.Client) (types.ETag, error) {
 	project, err := client.LoadProject(ctx)
 	if err != nil {
