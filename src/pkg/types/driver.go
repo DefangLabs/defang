@@ -51,7 +51,7 @@ type Driver interface {
 	// Exec(ctx context.Context, taskID TaskID, args ...string) error
 	GetInfo(ctx context.Context, taskID TaskID) (*TaskInfo, error)
 	PutConfig(ctx context.Context, rootPath, name, value string, isSensitive bool) error
-	GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error)
+	GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.GetConfigsResponse, error)
 	DeleteConfigs(ctx context.Context, rootPath string, names ...string) error
 	ListConfigs(ctx context.Context, projectName string) ([]string, error) // no values
 	CreateUploadURL(ctx context.Context, name string) (string, error)

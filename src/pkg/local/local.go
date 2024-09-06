@@ -111,7 +111,7 @@ func (l *Local) DeleteConfigs(ctx context.Context, rootPath string, name ...stri
 	return client.ErrNotImplemented("not implemented for local driver")
 }
 
-func (l *Local) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
+func (l *Local) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.GetConfigsResponse, error) {
 	return nil, client.ErrNotImplemented("not implemented for local driver")
 }
 

@@ -36,7 +36,7 @@ func (Docker) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 	return errors.New("docker does not support secrets")
 }
 
-func (Docker) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
+func (Docker) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.GetConfigsResponse, error) {
 	return nil, errors.New("docker does not support secrets")
 }
 

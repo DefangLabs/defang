@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
-func ConfigGet(ctx context.Context, client client.Client, names ...string) (*defangv1.ConfigValues, error) {
+func ConfigGet(ctx context.Context, client client.Client, names ...string) ([]*defangv1.Config, error) {
 	projectName, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return nil, err
@@ -21,18 +21,23 @@ func ConfigGet(ctx context.Context, client client.Client, names ...string) (*def
 		return nil, ErrDryRun
 	}
 
-	config, err := client.GetConfigs(ctx, &defangv1.Configs{Names: names, Project: projectName})
+	req := defangv1.GetConfigsRequest{}
+	for _, name := range names {
+		req.Configs = append(req.Configs, &defangv1.ConfigKey{Project: projectName, Name: name})
+	}
+
+	resp, err := client.GetConfigs(ctx, &req)
 	if err != nil {
 		var e *types.InvalidParameters
 		if errors.As(err, &e) {
 			term.Warnf("Config %v not found in project %q", names, projectName)
-			return config, nil
+			return resp.Configs, nil
 		}
 
 		return nil, err
 	}
 
-	PrintConfigData(config)
+	PrintConfigData(resp.Configs)
 
-	return config, nil
+	return resp.Configs, nil
 }

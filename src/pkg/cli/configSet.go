@@ -9,15 +9,15 @@ import (
 )
 
 func ConfigSet(ctx context.Context, client client.Client, name string, value string, isSensitive bool) error {
-	projectName, err := client.LoadProjectName(ctx)
+	project, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debugf("Setting config %q in project %q", name, projectName)
+	term.Debugf("Setting config %q in project %q", name, project)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	return client.PutConfig(ctx, &defangv1.PutValue{Name: name, Value: value, IsSensitive: isSensitive})
+	return client.PutConfig(ctx, &defangv1.PutConfigRequest{Project: project, Name: name, Value: value, IsSensitive: isSensitive})
 }

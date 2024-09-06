@@ -17,6 +17,11 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
+	projectName, err := c.LoadProjectName(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, svccfg := range serviceConfigs {
 		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
@@ -36,12 +41,21 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	}
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := c.ListConfigs(ctx, &defangv1.ListConfigsRequest{})
+	req := defangv1.ListConfigsRequest{Project: projectName}
+
+	secrets := &defangv1.Secrets{Project: projectName}
+	resp, err := c.ListConfigs(ctx, &req)
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
-		config = &defangv1.Configs{}
 	}
-	slices.Sort(config.Names) // sort for binary search
+
+	if resp != nil {
+		for _, config := range resp.Configs {
+			secrets.Names = append(secrets.Names, config.Name)
+		}
+	}
+
+	slices.Sort(secrets.Names) // sort for binary search
 
 	//
 	// Publish updates
@@ -136,7 +150,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			}
 
 			// Check if the environment variable is an existing config; if so, mark it as such
-			if _, ok := slices.BinarySearch(config.Names, key); ok {
+			if _, ok := slices.BinarySearch(secrets.Names, key); ok {
 				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
 					term.Warnf("service %q: environment variable %q needs service name fix-up, but is overridden by config, which will not be fixed up.", svccfg.Name, key)
 				} else {
@@ -310,13 +324,13 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 	switch port.Mode {
 	case "":
 		// TODO: This never happens now as compose-go set default to "ingress"
-		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
 		fallthrough
 	case "ingress":
 		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
 		if port.Protocol != "udp" {
 			if port.Published != "" {
-				term.Warnf("Published ports are ignored in ingress mode")
+				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
 			pbPort.Mode = defangv1.Mode_INGRESS
 			if pbPort.Protocol == defangv1.Protocol_TCP {
@@ -324,7 +338,7 @@ func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 			}
 			break
 		}
-		term.Warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
+		term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
 		fallthrough
 	case "host":
 		pbPort.Mode = defangv1.Mode_HOST

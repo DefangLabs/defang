@@ -165,7 +165,7 @@ func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 	return nil
 }
 
-func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata *defangv1.ConfigValues) error {
+func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata []*defangv1.Config) error {
 	namePaths := make([]string, len(names))
 
 	var err error
@@ -194,8 +194,8 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 			value = *param.Value
 		}
 
-		(*outdata).Configs = append((*outdata).Configs,
-			&defangv1.ConfigValue{
+		outdata = append(outdata,
+			&defangv1.Config{
 				Name:        *param.Name,
 				Value:       value,
 				IsSensitive: isSensitive,
@@ -205,7 +205,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 	return nil
 }
 
-func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.ConfigValues, error) {
+func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) (*defangv1.GetConfigsResponse, error) {
 	// if no names are provided, get all the configs
 	if len(names) == 0 {
 		list, err := a.ListConfigsByPrefix(ctx, rootPath)
@@ -226,22 +226,22 @@ func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) 
 
 	svc := ssm.NewFromConfig(cfg)
 
-	output := defangv1.ConfigValues{}
-	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, false, &output); err != nil {
+	output := []*defangv1.Config{}
+	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, false, output); err != nil {
 		return nil, err
 	}
 
 	// if we didn't get all the configs, try to get the rest as sensitives
-	if len(output.Configs) != len(names) {
-		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, &output); err != nil {
+	if len(output) != len(names) {
+		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, output); err != nil {
 			return nil, err
 		}
 	}
 
-	for _, config := range output.Configs {
+	for _, config := range output {
 		config.Name = stripPath(config.Name)
 	}
-	return &output, nil
+	return &defangv1.GetConfigsResponse{Configs: output}, nil
 }
 
 func (a *Aws) ListConfigs(ctx context.Context, projectName string) ([]string, error) {

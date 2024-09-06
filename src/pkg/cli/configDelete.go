@@ -19,5 +19,10 @@ func ConfigDelete(ctx context.Context, client client.Client, names ...string) er
 		return ErrDryRun
 	}
 
-	return client.DeleteConfigs(ctx, &defangv1.Configs{Names: names})
+	configs := make([]*defangv1.ConfigKey, len(names))
+	for i, name := range names {
+		configs[i] = &defangv1.ConfigKey{Name: name, Project: projectName}
+	}
+
+	return client.DeleteConfigs(ctx, &defangv1.DeleteConfigsRequest{Configs: configs})
 }

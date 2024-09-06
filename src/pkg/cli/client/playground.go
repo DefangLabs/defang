@@ -43,30 +43,26 @@ func (g PlaygroundClient) GetServices(ctx context.Context) (*defangv1.ListServic
 	return getMsg(g.client.GetServices(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutValue) error {
+func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
 	_, err := g.client.PutConfig(ctx, connect.NewRequest(req))
 	return err
 }
 
-func (g PlaygroundClient) DeleteConfigs(ctx context.Context, req *defangv1.Configs) error {
-	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(&defangv1.Configs{Names: req.Names}))
+func (g PlaygroundClient) DeleteConfigs(ctx context.Context, req *defangv1.DeleteConfigsRequest) error {
+	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(req))
 	return err
 }
 
-func (g PlaygroundClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Configs, error) {
-	return getMsg(g.client.ListConfigs(ctx, connect.NewRequest(&defangv1.ListConfigsRequest{Project: req.Project})))
+func (g PlaygroundClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.ListConfigsResponse, error) {
+	return getMsg(g.client.ListConfigs(ctx, connect.NewRequest(req)))
 }
 
 func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) GetConfigs(ctx context.Context, req *defangv1.Configs) (*defangv1.ConfigValues, error) {
-	param := connect.NewRequest(&defangv1.Configs{})
-	if req.Names != nil && len(req.Names) >= 0 {
-		param = connect.NewRequest(&defangv1.Configs{Names: req.Names})
-	}
-	return getMsg(g.client.GetConfigs(ctx, param))
+func (g PlaygroundClient) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	return getMsg(g.client.GetConfigs(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {

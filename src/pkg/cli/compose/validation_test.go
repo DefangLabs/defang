@@ -58,13 +58,23 @@ type MockClient struct {
 	configs []string
 }
 
-func (m MockClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Configs, error) {
-	return &defangv1.Configs{
-		Names:   m.configs,
-		Project: "mock-project",
-	}, nil
+func (m MockClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.ListConfigsResponse, error) {
+	configKeys := make([]*defangv1.ConfigKey, len(m.configs))
+
+	for i, config := range m.configs {
+		configKeys[i] = &defangv1.ConfigKey{
+			Name:    config,
+			Project: "mock-project",
+		}
+	}
+
+	return &defangv1.ListConfigsResponse{Configs: configKeys}, nil
 }
 
 func (m MockClient) ServiceDNS(name string) string {
 	return "mock-" + name
+}
+
+func (m MockClient) LoadProjectName(ctx context.Context) (string, error) {
+	return "project1", nil
 }
