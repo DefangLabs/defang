@@ -119,13 +119,15 @@ func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.
 	}
 
 	var result []net.IPAddr
+	var cname string
+	var ansErr error
 	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.A); ok {
 			result = append(result, net.IPAddr{IP: ns.A})
-		} else if cname, ok := rr.(*dns.CNAME); ok {
-			return nil, ErrCNAMEFound(cname.Target)
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
 		} else {
-			return nil, fmt.Errorf("unexpected type %T [%v]", rr, rr)
+			ansErr = fmt.Errorf("unexpected type %T [%v]", rr, rr)
 		}
 	}
 
@@ -137,13 +139,18 @@ func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.
 	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.AAAA); ok {
 			result = append(result, net.IPAddr{IP: ns.AAAA})
-		} else if cname, ok := rr.(*dns.CNAME); ok {
-			return nil, ErrCNAMEFound(cname.Target)
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
 		} else {
-			return nil, fmt.Errorf("unexpected type %T [%v]", rr, rr)
+			ansErr = fmt.Errorf("unexpected type %T [%v]", rr, rr)
 		}
 	}
 	if len(result) == 0 {
+		if cname != "" {
+			return nil, ErrCNAMEFound(cname)
+		} else if ansErr != nil {
+			return nil, ansErr
+		}
 		return nil, ErrNoSuchHost
 	}
 	return result, nil
