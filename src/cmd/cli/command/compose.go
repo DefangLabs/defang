@@ -122,10 +122,8 @@ func makeComposeUpCmd() *cobra.Command {
 					<-tailCtx.Done()
 				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
 					return err // any error other than cancelation
-				}
-
-				// Tail got canceled; if it was by anything other than completion, prompt to show debugger
-				if !errors.Is(context.Cause(tailCtx), errCompleted) {
+				} else if !errors.Is(context.Cause(tailCtx), errCompleted) {
+					// Tail got canceled; if it was by anything other than completion, prompt to show debugger
 					var failedServices []string
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
