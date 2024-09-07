@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -515,8 +516,17 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debug("Tailing task", etag)
+		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
+
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+				cancel(err)
+			}
+		}()
 	} else {
 		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
