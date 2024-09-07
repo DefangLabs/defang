@@ -46,13 +46,14 @@ func PrintObject(root string, data proto.Message) error {
 
 var indentSpaces = "    "
 
-func PrintConfigData(configs []*defangv1.Config) {
+func PrintConfigData(projectname string, configs []*defangv1.Config) {
 	if len(configs) == 0 {
-		fmt.Printf("Config values not found\n")
+		fmt.Printf("No config values found\n")
 		return
 	}
 
-	fmt.Println("configs:")
+	fmt.Printf("Project: %s\n", projectname)
+	fmt.Println("Configs:")
 	for _, config := range configs {
 		if (*config).IsSensitive {
 			fmt.Printf("%s - %s: [hidden]\n", indentSpaces, config.Name)

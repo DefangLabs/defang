@@ -18,6 +18,9 @@ import (
 const CONFIG_PATH_PART = "config"
 const SENSITIVE_PATH_PART = ""
 
+const SENSITIVE = true
+const NON_SENSITIVE = false
+
 // TODO: this function is pretty useless, but it's here for consistency
 func getConfigPathID(name string) *string {
 	return ptr.String(name)
@@ -165,7 +168,7 @@ func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 	return nil
 }
 
-func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata []*defangv1.Config) error {
+func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata *[]*defangv1.Config) error {
 	namePaths := make([]string, len(names))
 
 	var err error
@@ -194,7 +197,7 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 			value = *param.Value
 		}
 
-		outdata = append(outdata,
+		*outdata = append(*outdata,
 			&defangv1.Config{
 				Name:        *param.Name,
 				Value:       value,
@@ -213,10 +216,7 @@ func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) 
 			return nil, err
 		}
 
-		for _, name := range list {
-			lastIndex := strings.LastIndex(name, "/")
-			names = append(names, name[lastIndex+1:])
-		}
+		names = list
 	}
 
 	cfg, err := a.LoadConfig(ctx)
@@ -227,13 +227,13 @@ func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) 
 	svc := ssm.NewFromConfig(cfg)
 
 	output := []*defangv1.Config{}
-	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, false, output); err != nil {
+	if err := GetConfigValuesByParam(ctx, svc, rootPath, names, NON_SENSITIVE, &output); err != nil {
 		return nil, err
 	}
 
 	// if we didn't get all the configs, try to get the rest as sensitives
 	if len(output) != len(names) {
-		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, true, output); err != nil {
+		if err := GetConfigValuesByParam(ctx, svc, rootPath, names, SENSITIVE, &output); err != nil {
 			return nil, err
 		}
 	}

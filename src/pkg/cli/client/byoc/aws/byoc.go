@@ -433,18 +433,15 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutConfigReque
 }
 
 func (b *ByocAws) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
-	paramNames := make([]string, len(req.Configs))
-	for i, config := range req.Configs {
-		if !pkg.IsValidConfigName(config.Name) {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", config.Name))
-		}
-		paramNames[i] = config.Name
-	}
+	paramNames := []string{}
+	for _, config := range req.Configs {
+		if config.Name != "" {
+			if !pkg.IsValidConfigName(config.Name) {
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", config.Name))
+			}
 
-	if len(req.Configs) == 0 {
-		term.Debug("Show all parameters")
-	} else {
-		term.Debugf("Show parameters %q", paramNames)
+			paramNames = append(paramNames, config.Name)
+		}
 	}
 
 	rootPath := b.getConfigPathID("")
@@ -708,7 +705,7 @@ func (b *ByocAws) Destroy(ctx context.Context) (string, error) {
 
 func (b *ByocAws) DeleteConfigs(ctx context.Context, req *defangv1.DeleteConfigsRequest) error {
 	rootPath := b.getConfigPathID("")
-	nameList := make([]string, 0, len(req.Configs))
+	nameList := make([]string, len(req.Configs))
 	for i, config := range req.Configs {
 		nameList[i] = config.Name
 	}

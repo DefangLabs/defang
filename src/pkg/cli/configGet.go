@@ -22,8 +22,13 @@ func ConfigGet(ctx context.Context, client client.Client, names ...string) ([]*d
 	}
 
 	req := defangv1.GetConfigsRequest{}
-	for _, name := range names {
-		req.Configs = append(req.Configs, &defangv1.ConfigKey{Project: projectName, Name: name})
+	if len(names) == 0 {
+		req.Configs = append(req.Configs, &defangv1.ConfigKey{Project: projectName})
+	} else {
+
+		for _, name := range names {
+			req.Configs = append(req.Configs, &defangv1.ConfigKey{Project: projectName, Name: name})
+		}
 	}
 
 	resp, err := client.GetConfigs(ctx, &req)
@@ -37,7 +42,7 @@ func ConfigGet(ctx context.Context, client client.Client, names ...string) ([]*d
 		return nil, err
 	}
 
-	PrintConfigData(resp.Configs)
+	PrintConfigData(projectName, resp.Configs)
 
 	return resp.Configs, nil
 }
