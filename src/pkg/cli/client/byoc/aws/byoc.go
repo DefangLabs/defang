@@ -128,7 +128,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
-			return nil, fmt.Errorf("service '%q': %w", service.Name, err)
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 		serviceInfo.Etag = etag // same etag for all services
 		serviceInfos = append(serviceInfos, serviceInfo)
