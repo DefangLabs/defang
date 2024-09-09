@@ -56,7 +56,7 @@ service FabricController {
   }
 
   // deprecate - change to use *Config functions
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc PutSecret(Config) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -215,17 +215,14 @@ message ServiceInfo {
   // bool is_function = 5; // true if service is a function
 }
 
-// message Project {
-//   repeated Service services = 1;
-//   repeated SecretValue secrets = 2;
-// }
-
 message Secrets {
+  option deprecated = true;
   repeated string names = 1;
   string project = 2; // defaults to tenant ID
 }
 
 message SecretValue {
+  option deprecated = true;
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID

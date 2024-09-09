@@ -66,9 +66,6 @@ const (
 	// FabricControllerGetServicesProcedure is the fully-qualified name of the FabricController's
 	// GetServices RPC.
 	FabricControllerGetServicesProcedure = "/io.defang.v1.FabricController/GetServices"
-	// FabricControllerRestartProcedure is the fully-qualified name of the FabricController's Restart
-	// RPC.
-	FabricControllerRestartProcedure = "/io.defang.v1.FabricController/Restart"
 	// FabricControllerGenerateFilesProcedure is the fully-qualified name of the FabricController's
 	// GenerateFiles RPC.
 	FabricControllerGenerateFilesProcedure = "/io.defang.v1.FabricController/GenerateFiles"
@@ -142,7 +139,6 @@ type FabricControllerClient interface {
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
-	Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -152,7 +148,7 @@ type FabricControllerClient interface {
 	// deprecate - change to use *Config functions
 	//
 	// Deprecated: do not use.
-	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
@@ -243,11 +239,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		restart: connect_go.NewClient[v1.RestartRequest, emptypb.Empty](
-			httpClient,
-			baseURL+FabricControllerRestartProcedure,
-			opts...,
-		),
 		generateFiles: connect_go.NewClient[v1.GenerateFilesRequest, v1.GenerateFilesResponse](
 			httpClient,
 			baseURL+FabricControllerGenerateFilesProcedure,
@@ -280,7 +271,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		putSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
+		putSecret: connect_go.NewClient[v1.Config, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
 			opts...,
@@ -368,14 +359,13 @@ type fabricControllerClient struct {
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices              *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
-	restart                  *connect_go.Client[v1.RestartRequest, emptypb.Empty]
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
 	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
 	debug                    *connect_go.Client[v1.DebugRequest, v1.DebugResponse]
 	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
+	putSecret                *connect_go.Client[v1.Config, emptypb.Empty]
 	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
 	getConfigs               *connect_go.Client[v1.GetConfigsRequest, v1.GetConfigsResponse]
@@ -454,11 +444,6 @@ func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_g
 	return c.getServices.CallUnary(ctx, req)
 }
 
-// Restart calls io.defang.v1.FabricController.Restart.
-func (c *fabricControllerClient) Restart(ctx context.Context, req *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return c.restart.CallUnary(ctx, req)
-}
-
 // GenerateFiles calls io.defang.v1.FabricController.GenerateFiles.
 func (c *fabricControllerClient) GenerateFiles(ctx context.Context, req *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error) {
 	return c.generateFiles.CallUnary(ctx, req)
@@ -492,7 +477,7 @@ func (c *fabricControllerClient) CheckToS(ctx context.Context, req *connect_go.R
 // PutSecret calls io.defang.v1.FabricController.PutSecret.
 //
 // Deprecated: do not use.
-func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.putSecret.CallUnary(ctx, req)
 }
 
@@ -577,7 +562,6 @@ type FabricControllerHandler interface {
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
-	Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -587,7 +571,7 @@ type FabricControllerHandler interface {
 	// deprecate - change to use *Config functions
 	//
 	// Deprecated: do not use.
-	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
@@ -673,11 +657,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.GetServices,
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
-	)
-	fabricControllerRestartHandler := connect_go.NewUnaryHandler(
-		FabricControllerRestartProcedure,
-		svc.Restart,
-		opts...,
 	)
 	fabricControllerGenerateFilesHandler := connect_go.NewUnaryHandler(
 		FabricControllerGenerateFilesProcedure,
@@ -808,8 +787,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerSubscribeHandler.ServeHTTP(w, r)
 		case FabricControllerGetServicesProcedure:
 			fabricControllerGetServicesHandler.ServeHTTP(w, r)
-		case FabricControllerRestartProcedure:
-			fabricControllerRestartHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateFilesProcedure:
 			fabricControllerGenerateFilesHandler.ServeHTTP(w, r)
 		case FabricControllerStartGenerateProcedure:
@@ -905,10 +882,6 @@ func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connec
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetServices is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Restart is not implemented"))
-}
-
 func (UnimplementedFabricControllerHandler) GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateFiles is not implemented"))
 }
@@ -933,7 +906,7 @@ func (UnimplementedFabricControllerHandler) CheckToS(context.Context, *connect_g
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CheckToS is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutSecret is not implemented"))
 }
 
