@@ -129,10 +129,10 @@ func Execute(ctx context.Context) error {
 
 func SetupCommands(version string) {
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; "auto", "always" or "never"`)
+	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; one of [always never]`)
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use; use "aws" for bring-your-own-cloud`)
+	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use for bring-your-own-cloud; one of [defang aws]`)
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -292,22 +292,21 @@ var RootCmd = &cobra.Command{
 		switch provider {
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
-				provider = cliClient.ProviderAWS
-			} else {
-				provider = cliClient.ProviderDefang
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws?")
+			} else if doInEnv() {
+				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean?")
 			}
+			provider = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:
 			if !awsInEnv() {
 				term.Warn("AWS provider was selected, but AWS environment variables are not set")
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn("Digital Ocean provider was selected, but DO_PAT environment variable is not set")
+				term.Warn("DigitalOcean provider was selected, but DO_PAT environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider?")
-			}
+			// Ignore any env vars when explicitly using the Defang playground provider
 		}
 
 		cwd, _ := cmd.Flags().GetString("cwd")

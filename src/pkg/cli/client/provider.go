@@ -11,7 +11,7 @@ const (
 	ProviderAuto   Provider = "auto"
 	ProviderDefang Provider = "defang"
 	ProviderAWS    Provider = "aws"
-	ProviderDO     Provider = "do"
+	ProviderDO     Provider = "digitalocean"
 	// ProviderAzure  Provider = "azure"
 	// ProviderGCP    Provider = "gcp"
 )
