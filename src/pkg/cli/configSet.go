@@ -19,5 +19,5 @@ func ConfigSet(ctx context.Context, client client.Client, name string, value str
 		return ErrDryRun
 	}
 
-	return client.PutConfig(ctx, &defangv1.PutConfigRequest{Project: project, Name: name, Value: value, IsSensitive: isSensitive})
+	return client.PutConfig(ctx, &defangv1.Config{Project: project, Name: name, Value: value, IsSensitive: isSensitive})
 }

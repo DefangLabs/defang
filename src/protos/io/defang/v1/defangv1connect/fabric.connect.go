@@ -148,13 +148,13 @@ type FabricControllerClient interface {
 	// deprecate - change to use *Config functions
 	//
 	// Deprecated: do not use.
-	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	GetConfigs(context.Context, *connect_go.Request[v1.GetConfigsRequest]) (*connect_go.Response[v1.GetConfigsResponse], error)
-	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
+	PutConfig(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.ListConfigsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -271,7 +271,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		putSecret: connect_go.NewClient[v1.SecretValue, emptypb.Empty](
+		putSecret: connect_go.NewClient[v1.Config, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
 			opts...,
@@ -293,7 +293,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
-		putConfig: connect_go.NewClient[v1.PutConfigRequest, emptypb.Empty](
+		putConfig: connect_go.NewClient[v1.Config, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutConfigProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
@@ -365,11 +365,11 @@ type fabricControllerClient struct {
 	debug                    *connect_go.Client[v1.DebugRequest, v1.DebugResponse]
 	signEULA                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	putSecret                *connect_go.Client[v1.SecretValue, emptypb.Empty]
+	putSecret                *connect_go.Client[v1.Config, emptypb.Empty]
 	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
 	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
 	getConfigs               *connect_go.Client[v1.GetConfigsRequest, v1.GetConfigsResponse]
-	putConfig                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
+	putConfig                *connect_go.Client[v1.Config, emptypb.Empty]
 	deleteConfigs            *connect_go.Client[v1.DeleteConfigsRequest, emptypb.Empty]
 	listConfigs              *connect_go.Client[v1.ListConfigsRequest, v1.ListConfigsResponse]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
@@ -477,7 +477,7 @@ func (c *fabricControllerClient) CheckToS(ctx context.Context, req *connect_go.R
 // PutSecret calls io.defang.v1.FabricController.PutSecret.
 //
 // Deprecated: do not use.
-func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+func (c *fabricControllerClient) PutSecret(ctx context.Context, req *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.putSecret.CallUnary(ctx, req)
 }
 
@@ -501,7 +501,7 @@ func (c *fabricControllerClient) GetConfigs(ctx context.Context, req *connect_go
 }
 
 // PutConfig calls io.defang.v1.FabricController.PutConfig.
-func (c *fabricControllerClient) PutConfig(ctx context.Context, req *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error) {
+func (c *fabricControllerClient) PutConfig(ctx context.Context, req *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.putConfig.CallUnary(ctx, req)
 }
 
@@ -571,13 +571,13 @@ type FabricControllerHandler interface {
 	// deprecate - change to use *Config functions
 	//
 	// Deprecated: do not use.
-	PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error)
+	PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
 	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
 	GetConfigs(context.Context, *connect_go.Request[v1.GetConfigsRequest]) (*connect_go.Response[v1.GetConfigsResponse], error)
-	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
+	PutConfig(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.ListConfigsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -906,7 +906,7 @@ func (UnimplementedFabricControllerHandler) CheckToS(context.Context, *connect_g
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CheckToS is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.SecretValue]) (*connect_go.Response[emptypb.Empty], error) {
+func (UnimplementedFabricControllerHandler) PutSecret(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutSecret is not implemented"))
 }
 
@@ -922,7 +922,7 @@ func (UnimplementedFabricControllerHandler) GetConfigs(context.Context, *connect
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetConfigs is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error) {
+func (UnimplementedFabricControllerHandler) PutConfig(context.Context, *connect_go.Request[v1.Config]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.PutConfig is not implemented"))
 }
 

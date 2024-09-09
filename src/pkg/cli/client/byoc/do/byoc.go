@@ -174,7 +174,7 @@ func (b *ByocDo) ListConfigs(ctx context.Context, req *defangv1.ListConfigsReque
 	return nil, nil
 }
 
-func (b *ByocDo) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+func (b *ByocDo) PutConfig(ctx context.Context, req *defangv1.Config) error {
 	return nil
 }
 
