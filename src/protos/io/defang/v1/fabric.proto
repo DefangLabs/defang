@@ -53,7 +53,7 @@ service FabricController {
   }
 
   // deprecate - change to use *Config functions
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc PutSecret(Config) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -63,9 +63,8 @@ service FabricController {
   rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
+  rpc PutConfig(Config) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
-
   };
   rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty);
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
@@ -213,21 +212,34 @@ message ServiceInfo {
 }
 
 message Secrets {
+  option deprecated = true;
   repeated string names = 1;
   string project = 2; // defaults to tenant ID
 }
 
 message SecretValue {
+  option deprecated = true;
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
+}
+
+enum Sensitivity {
+  NON_SENSITIVE = 0;
+  SENSITIVE = 1;
+}
+
+enum ConfigType {
+  RAW = 0;
+  INTERPOLATED = 2;
 }
 
 message Config {
   string name = 1;
   string value = 2;
   string project = 3;
-  bool is_sensitive = 4;
+  Sensitivity sensitivity = 4;
+  ConfigType type = 5;
 }
 
 message ConfigKey {
@@ -248,12 +260,12 @@ message DeleteConfigsRequest {
   repeated ConfigKey configs = 1;
 }
 
-message PutConfigRequest {
-  string name = 1;
-  string value = 2;
-  string project = 3;
-  bool is_sensitive = 4;
-}
+// message PutConfigRequest {
+//   string name = 1;
+//   string value = 2;
+//   string project = 3;
+//   bool is_sensitive = 4;
+// }
 
 message ListConfigsRequest {
   string project = 1; // defaults to tenant ID

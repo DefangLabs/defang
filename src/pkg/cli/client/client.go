@@ -49,7 +49,7 @@ type Client interface {
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
-	PutConfig(context.Context, *defangv1.SecretValue) error
+	PutConfig(context.Context, *defangv1.Config) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)

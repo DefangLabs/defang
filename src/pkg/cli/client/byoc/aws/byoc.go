@@ -413,7 +413,7 @@ func (b *ByocAws) getSecretID(name string) string {
 	return b.stackDir(name) // same as defang_service.ts
 }
 
-func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.Config) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
