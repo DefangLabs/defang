@@ -20,5 +20,6 @@ func ConfigList(ctx context.Context, client client.Client) error {
 		return err
 	}
 
-	return PrintObject("", config)
+	PrintConfigList("", config.Configs)
+	return nil
 }

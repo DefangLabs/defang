@@ -19,5 +19,11 @@ func ConfigSet(ctx context.Context, client client.Client, name string, value str
 		return ErrDryRun
 	}
 
-	return client.PutConfig(ctx, &defangv1.Config{Project: project, Name: name, Value: value, IsSensitive: isSensitive})
+	sensitivity := defangv1.Sensitivity_NON_SENSITIVE
+	if isSensitive {
+		sensitivity = defangv1.Sensitivity_SENSITIVE
+	}
+
+	config := defangv1.Config{Project: project, Name: name, Value: value, Sensitivity: sensitivity}
+	return client.PutConfig(ctx, &config)
 }

@@ -197,11 +197,17 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 			value = *param.Value
 		}
 
+		sensitivity := defangv1.Sensitivity_NON_SENSITIVE
+		if isSensitive {
+			sensitivity = defangv1.Sensitivity_SENSITIVE
+		}
+
 		*outdata = append(*outdata,
 			&defangv1.Config{
 				Name:        *param.Name,
 				Value:       value,
-				IsSensitive: isSensitive,
+				Sensitivity: sensitivity,
+				Type:        defangv1.ConfigType_RAW,
 			})
 	}
 

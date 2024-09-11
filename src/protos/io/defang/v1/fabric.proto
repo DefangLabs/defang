@@ -1,10 +1,7 @@
-// protos/v1/fabric.proto
+// protos/io/defang/v1/fabric.proto
 syntax = "proto3";
 
 option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
-// option java_multiple_files = true;
-// option java_package = "io.defang.fabric";
-// option java_outer_classname = "FabricProto";
 
 package io.defang.v1;
 
@@ -26,14 +23,14 @@ service FabricController {
   rpc Tail(TailRequest) returns (stream TailResponse);
   rpc Update(Service) returns (ServiceInfo) {
     option deprecated = true;
-  }; // deprecated; use Deploy
+  }; // used by pulumi-defang provider; should use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(ServiceID) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };                                                  // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse){
     option deprecated = true;
-  }; // deprecated; use Deploy
+  }; // used by pulumi-defang provider; should use Deploy
   rpc Publish(PublishRequest) returns (google.protobuf.Empty);
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -47,7 +44,7 @@ service FabricController {
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc Debug(DebugRequest) returns (DebugResponse); // TEST
+  rpc Debug(DebugRequest) returns (DebugResponse);
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
@@ -227,11 +224,24 @@ message SecretValue {
   string project = 3; // defaults to tenant ID
 }
 
+enum Sensitivity {
+  UNSPECIFIED_SENSITIVITY = 0;
+  NON_SENSITIVE = 1;
+  SENSITIVE = 2;
+}
+
+enum ConfigType {
+  UNSPECIFIED_CONFIGTYPE = 0;
+  RAW = 1;
+  INTERPOLATED = 2;
+}
+
 message Config {
   string name = 1;
   string value = 2;
   string project = 3;
-  bool is_sensitive = 4;
+  Sensitivity sensitivity = 4;
+  ConfigType type = 5;
 }
 
 message ConfigKey {
@@ -239,8 +249,15 @@ message ConfigKey {
   string project = 2; // defaults to tenant ID
 }
 
+enum ConfigOptions {
+  UNSPECIFIED_CONFIG_OPTIONS = 0;
+  NO_OPTION = 1;
+  SHOW_SENSITIVE_VALUES = 2;
+}
+
 message GetConfigsRequest {
   repeated ConfigKey configs = 1;
+  ConfigOptions options = 2;
 }
 
 message GetConfigsResponse {
@@ -453,6 +470,7 @@ message Service {
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
   Postgres postgres = 19; // x-defang-postgres: use a managed
+  string project = 20; // defaults to tenant ID
 }
 
 message StaticFiles {

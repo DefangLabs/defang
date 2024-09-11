@@ -132,7 +132,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 		serviceInfo.Etag = etag // same etag for all services
 		serviceInfos = append(serviceInfos, serviceInfo)
@@ -422,13 +422,13 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.Config) error 
 	}
 
 	describe := ""
-	if config.IsSensitive {
+	if config.Sensitivity == defangv1.Sensitivity_SENSITIVE {
 		describe = " (sensitive)"
 	}
 
 	term.Debugf("Putting parameter %q%s", config.Name, describe)
 
-	err := b.driver.PutConfig(ctx, b.getConfigPathID(""), config.Name, config.Value, config.IsSensitive)
+	err := b.driver.PutConfig(ctx, b.getConfigPathID(""), config.Name, config.Value, config.Sensitivity == defangv1.Sensitivity_SENSITIVE)
 
 	return annotateAwsError(err)
 }
@@ -453,15 +453,7 @@ func (b *ByocAws) GetConfigs(ctx context.Context, req *defangv1.GetConfigsReques
 	}
 
 	results := defangv1.GetConfigsResponse{}
-	for _, data := range (*configValue).Configs {
-		results.Configs = append(results.Configs,
-			&defangv1.Config{
-				Name:        data.Name,
-				Value:       data.Value,
-				IsSensitive: data.IsSensitive,
-			})
-	}
-
+	results.Configs = configValue.Configs
 	return &results, nil
 }
 
