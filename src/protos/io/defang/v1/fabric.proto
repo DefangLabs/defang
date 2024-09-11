@@ -269,13 +269,6 @@ message DeleteConfigsRequest {
   repeated ConfigKey configs = 1;
 }
 
-// message PutConfigRequest {
-//   string name = 1;
-//   string value = 2;
-//   string project = 3;
-//   bool is_sensitive = 4;
-// }
-
 message ListConfigsRequest {
   string project = 1; // defaults to tenant ID
 }
