@@ -247,8 +247,14 @@ message ConfigKey {
   string project = 2; // defaults to tenant ID
 }
 
+enum ConfigOptions {
+  NO_OPTION = 0;
+  SHOW_SENSITIVE_VALUES = 1;
+}
+
 message GetConfigsRequest {
   repeated ConfigKey configs = 1;
+  optional ConfigOptions options = 2;
 }
 
 message GetConfigsResponse {
