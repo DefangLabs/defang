@@ -53,7 +53,7 @@ service FabricController {
   }
 
   // deprecate - change to use *Config functions
-  rpc PutSecret(Config) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -63,7 +63,7 @@ service FabricController {
   rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-  rpc PutConfig(Config) returns (google.protobuf.Empty) {
+  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   };
   rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty);
@@ -225,15 +225,13 @@ message SecretValue {
 }
 
 enum Sensitivity {
-  UNSPECIFIED_SENSITIVITY = 0;
-  NON_SENSITIVE = 1;
-  SENSITIVE = 2;
+  NON_SENSITIVE = 0;
+  SENSITIVE = 1;
 }
 
 enum ConfigType {
-  UNSPECIFIED_CONFIGTYPE = 0;
-  RAW = 1;
-  INTERPOLATED = 2;
+  RAW = 0;
+  INTERPOLATED = 1;
 }
 
 message Config {
@@ -249,15 +247,16 @@ message ConfigKey {
   string project = 2; // defaults to tenant ID
 }
 
-enum ConfigOptions {
-  UNSPECIFIED_CONFIG_OPTIONS = 0;
-  NO_OPTION = 1;
-  SHOW_SENSITIVE_VALUES = 2;
+message PutConfigRequest {
+  string name = 1;
+  string value = 2;
+  string project = 3;
+  Sensitivity sensitivity = 4;
+  ConfigType type = 5;
 }
 
 message GetConfigsRequest {
   repeated ConfigKey configs = 1;
-  ConfigOptions options = 2;
 }
 
 message GetConfigsResponse {

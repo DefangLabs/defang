@@ -19,5 +19,5 @@ func ConfigSet(ctx context.Context, client client.Client, name string, value str
 		return ErrDryRun
 	}
 
-	return client.PutConfig(ctx, &defangv1.Config{Name: name, Value: value})
+	return client.PutConfig(ctx, &defangv1.PutConfigRequest{Name: name, Value: value})
 }
