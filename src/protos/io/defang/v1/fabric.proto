@@ -257,7 +257,7 @@ enum ConfigOptions {
 
 message GetConfigsRequest {
   repeated ConfigKey configs = 1;
-  optional ConfigOptions options = 2;
+  ConfigOptions options = 2;
 }
 
 message GetConfigsResponse {
