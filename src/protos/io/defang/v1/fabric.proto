@@ -86,6 +86,9 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
+
+  // Endpoint for GDPR compliance
+  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message DebugRequest {
