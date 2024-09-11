@@ -225,12 +225,14 @@ message SecretValue {
 }
 
 enum Sensitivity {
-  NON_SENSITIVE = 0;
-  SENSITIVE = 1;
+  UNSPECIFIED_SENSITIVITY = 0;
+  NON_SENSITIVE = 1;
+  SENSITIVE = 2;
 }
 
 enum ConfigType {
-  RAW = 0;
+  UNSPECIFIED_CONFIGTYPE = 0;
+  RAW = 1;
   INTERPOLATED = 2;
 }
 
@@ -248,8 +250,9 @@ message ConfigKey {
 }
 
 enum ConfigOptions {
-  NO_OPTION = 0;
-  SHOW_SENSITIVE_VALUES = 1;
+  UNSPECIFIED_CONFIG_OPTIONS = 0;
+  NO_OPTION = 1;
+  SHOW_SENSITIVE_VALUES = 2;
 }
 
 message GetConfigsRequest {
