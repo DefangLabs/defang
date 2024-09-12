@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 	"slices"
@@ -36,7 +38,19 @@ var rootServers = []*net.NS{
 }
 
 func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	return r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
+	for i := 0; i < 10; i++ {
+		ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
+		if err != nil {
+			if cnameErr, ok := err.(ErrCNAMEFound); ok {
+				domain = cnameErr.CNAME()
+				continue
+			} else {
+				return nil, err
+			}
+		}
+		return ips, nil
+	}
+	return nil, errors.New("too many CNAME lookups")
 }
 
 func (r RootResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
@@ -83,6 +97,16 @@ var ResolverAt = DirectResolverAt
 
 var ErrNoSuchHost = &net.DNSError{Err: "no such host", IsNotFound: true}
 
+type ErrCNAMEFound string
+
+func (e ErrCNAMEFound) Error() string {
+	return fmt.Sprintf("CNAME found: %v", string(e))
+}
+
+func (e ErrCNAMEFound) CNAME() string {
+	return string(e)
+}
+
 type DirectResolver struct {
 	NSServer string
 }
@@ -100,9 +124,15 @@ func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.
 	}
 
 	var result []net.IPAddr
+	var cname string
+	var ansErr error
 	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.A); ok {
 			result = append(result, net.IPAddr{IP: ns.A})
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
+		} else {
+			ansErr = fmt.Errorf("unexpected type %T [%v]", rr, rr)
 		}
 	}
 
@@ -114,9 +144,18 @@ func (r DirectResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.
 	for _, rr := range res.Answer {
 		if ns, ok := rr.(*dns.AAAA); ok {
 			result = append(result, net.IPAddr{IP: ns.AAAA})
+		} else if cn, ok := rr.(*dns.CNAME); ok {
+			cname = cn.Target
+		} else {
+			ansErr = fmt.Errorf("unexpected type %T [%v]", rr, rr)
 		}
 	}
 	if len(result) == 0 {
+		if cname != "" {
+			return nil, ErrCNAMEFound(cname)
+		} else if ansErr != nil {
+			return nil, ansErr
+		}
 		return nil, ErrNoSuchHost
 	}
 	return result, nil

@@ -18,8 +18,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func isManagedService(service *defangv1.Service) bool {
+	if service == nil {
+		return false
+	}
+
+	return service.StaticFiles != nil || service.Redis != nil || service.Postgres != nil
+}
+
+func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []string {
+	managedResources := make([]string, 0)
+	for _, service := range serviceInfos {
+		if isManagedService(service.Service) {
+			managedResources = append(managedResources, service.Service.Name)
+		}
+	}
+
+	return managedResources
+}
+
 func makeComposeUpCmd() *cobra.Command {
-	behavior := Behavior(defangv1.Behavior_DEVELOPMENT)
+	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Annotations: authNeededAnnotation,
@@ -30,7 +49,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, behavior.Value())
+			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
 			if err != nil {
 				if !errors.Is(err, types.ErrComposeFileNotFound) {
 					return err
@@ -44,6 +63,11 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
+
+			var managedResources = GetUnreferencedManagedResources(deploy.Services)
+			if len(managedResources) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
+			}
 
 			if detach {
 				term.Info("Detached.")
@@ -98,15 +122,15 @@ func makeComposeUpCmd() *cobra.Command {
 					<-tailCtx.Done()
 				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
 					return err // any error other than cancelation
-				}
-
-				// Tail got canceled; if it was by anything other than completion, prompt to show debugger
-				if !errors.Is(context.Cause(tailCtx), errCompleted) {
+				} else if !errors.Is(context.Cause(tailCtx), errCompleted) {
+					// Tail got canceled; if it was by anything other than completion, prompt to show debugger
 					var failedServices []string
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 						term.Warn(errDeploymentFailed)
 						failedServices = []string{errDeploymentFailed.Service}
+					} else if len(managedResources) > 0 {
+						term.Warn("Managed services have been deployed but not all services may be available yet.")
 					} else {
 						term.Warn("Deployment is not finished. Service(s) might not be running.")
 						// TODO: some services might be OK and we should only debug the ones that are not
@@ -152,7 +176,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().VarP(&behavior, "behavior", "b", "behavior for the deployment, possible values: "+strings.Join(allBehaviors(), ", "))
+	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	return composeUpCmd
 }
@@ -167,7 +191,7 @@ func makeComposeStartCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.Behavior_UNSPECIFIED_BEHAVIOR)
+			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 			if err != nil {
 				return err
 			}
@@ -223,16 +247,15 @@ func makeComposeStopCmd() *cobra.Command {
 
 func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd := &cobra.Command{
-		Use:         "down",
-		Aliases:     []string{"rm"},
+		Use:         "down [SERVICE...]",
+		Aliases:     []string{"rm", "remove"}, // like docker stack
 		Annotations: authNeededAnnotation,
-		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), client)
+			etag, err := cli.ComposeDown(cmd.Context(), client, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -285,7 +308,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli.DoDryRun = true // config is like start in a dry run
 			// force=false to calculate the digest
-			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.Behavior_UNSPECIFIED_BEHAVIOR); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil

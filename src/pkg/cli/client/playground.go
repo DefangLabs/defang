@@ -73,19 +73,24 @@ func (g *PlaygroundClient) BootstrapCommand(ctx context.Context, command string)
 	return "", errors.New("the bootstrap command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
-	// Get all the services in the project and delete them all at once
-	project, err := g.GetServices(ctx)
+	projectName, err := g.LoadProjectName(ctx)
 	if err != nil {
 		return "", err
 	}
-	if len(project.Services) == 0 {
+
+	// Get all the services in the project and delete them all at once
+	servicesList, err := g.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(servicesList.Services) == 0 {
 		return "", errors.New("no services found")
 	}
 	var names []string
-	for _, service := range project.Services {
+	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: project.Project, Names: names})
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names})
 	if err != nil {
 		return "", err
 	}

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -140,7 +141,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 		serviceInfo.Etag = etag // same etag for all services
 		serviceInfos = append(serviceInfos, serviceInfo)
@@ -193,7 +194,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, err
 		}
 	}
-	taskArn, err := b.runCdCommand(ctx, req.Behavior, "up", payloadString)
+	taskArn, err := b.runCdCommand(ctx, req.Mode, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -341,9 +342,9 @@ func (b *ByocAws) environment() map[string]string {
 	}
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, behavior defangv1.Behavior, cmd ...string) (ecs.TaskArn, error) {
+func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
-	env["DEFANG_BEHAVIOR"] = strings.ToLower(behavior.String())
+	env["DEFANG_MODE"] = strings.ToLower(mode.String())
 	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
@@ -362,7 +363,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, "up", "")
+	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, "up", "")
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
@@ -483,8 +484,17 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debug("Tailing task", etag)
+		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
+
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+				cancel(err)
+			}
+		}()
 	} else {
 		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
@@ -659,7 +669,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string,
 	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, defangv1.Behavior_UNSPECIFIED_BEHAVIOR, command)
+	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, command)
 	if err != nil || cdTaskArn == nil {
 		return "", annotateAwsError(err)
 	}
