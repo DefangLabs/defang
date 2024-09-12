@@ -146,7 +146,7 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 }
 
 func waitForTLS(ctx context.Context, domain string) error {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	timeout, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -195,7 +195,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	msgShown := false
