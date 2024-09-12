@@ -3,9 +3,11 @@ package scope
 type Scope string
 
 const (
-	Admin Scope = "admin"
-	Tail  Scope = "tail"
-	Read  Scope = "read"
+	Admin  Scope = "admin"
+	Any    Scope = "" // used for matching any scope
+	Delete Scope = "delete"
+	Read   Scope = "read"
+	Tail   Scope = "tail"
 )
 
 func (s Scope) String() string {
@@ -13,5 +15,5 @@ func (s Scope) String() string {
 }
 
 func All() []Scope {
-	return []Scope{Admin, Read, Tail}
+	return []Scope{Admin, Delete, Read, Tail}
 }
