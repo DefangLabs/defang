@@ -43,4 +43,15 @@ func TestRootResolver(t *testing.T) {
 			t.Errorf("Expected same IP addresses, got %v <> %v", ips, nIPs)
 		}
 	})
+
+	t.Run("LookupIPAddr follows multiple CNAME redirects", func(t *testing.T) {
+		r := RootResolver{}
+		ips, err := r.LookupIPAddr(context.Background(), "cname-a.gnafed.click")
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if !SameIPs(IpAddrsToIPs(ips), []net.IP{net.ParseIP("1.2.3.4")}) {
+			t.Errorf("Expected IP address 1.2.3.4 got %v", ips)
+		}
+	})
 }

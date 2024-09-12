@@ -49,6 +49,10 @@ var (
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			term.Debugf("Redirecting from %v to %v", via[len(via)-1].URL, req.URL)
+			return nil
+		},
 	}
 )
 
