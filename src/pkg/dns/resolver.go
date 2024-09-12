@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -37,15 +38,19 @@ var rootServers = []*net.NS{
 }
 
 func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
-	if err != nil {
-		if err, ok := err.(ErrCNAMEFound); ok {
-			return r.getResolver(ctx, err.CNAME()).LookupIPAddr(ctx, err.CNAME())
-		} else {
-			return nil, err
+	for i := 0; i < 10; i++ {
+		ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
+		if err != nil {
+			if cnameErr, ok := err.(ErrCNAMEFound); ok {
+				domain = cnameErr.CNAME()
+				continue
+			} else {
+				return nil, err
+			}
 		}
+		return ips, nil
 	}
-	return ips, nil
+	return nil, errors.New("too many CNAME lookups")
 }
 
 func (r RootResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
