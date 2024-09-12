@@ -174,7 +174,7 @@ func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return nil, nil
 }
 
-func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b *ByocDo) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	return nil
 }
 
