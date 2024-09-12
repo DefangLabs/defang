@@ -24,6 +24,6 @@ func ConfigSet(ctx context.Context, client client.Client, name string, value str
 		sensitivity = defangv1.Sensitivity_SENSITIVE
 	}
 
-	config := defangv1.Config{Project: project, Name: name, Value: value, Sensitivity: sensitivity}
+	config := defangv1.PutConfigRequest{Project: project, Name: name, Value: value, Sensitivity: sensitivity}
 	return client.PutConfig(ctx, &config)
 }
