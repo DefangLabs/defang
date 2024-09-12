@@ -71,7 +71,7 @@ func PrintConfigData(projectname string, configs []*defangv1.Config) {
 	fmt.Printf("Project: %s\n", projectname)
 	fmt.Println("Configs:")
 	for _, config := range configs {
-		if (*config).Sensitivity == defangv1.Sensitivity_SENSITIVE {
+		if (*config).Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE {
 			fmt.Printf("%s - %s: [hidden]\n", indentSpaces, config.Name)
 		} else {
 			fmt.Printf("%s - %s: %s\n", indentSpaces, config.Name, config.Value)

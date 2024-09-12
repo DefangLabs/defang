@@ -422,13 +422,13 @@ func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutConfigReque
 	}
 
 	describe := ""
-	if config.Sensitivity == defangv1.Sensitivity_SENSITIVE {
+	if config.Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE {
 		describe = " (sensitive)"
 	}
 
 	term.Debugf("Putting parameter %q%s", config.Name, describe)
 
-	err := b.driver.PutConfig(ctx, b.getConfigPathID(""), config.Name, config.Value, config.Sensitivity == defangv1.Sensitivity_SENSITIVE)
+	err := b.driver.PutConfig(ctx, b.getConfigPathID(""), config.Name, config.Value, config.Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE)
 
 	return annotateAwsError(err)
 }

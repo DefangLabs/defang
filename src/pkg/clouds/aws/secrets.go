@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"sort"
 	"strings"
@@ -169,9 +170,9 @@ func (a *Aws) PutConfig(ctx context.Context, rootPath, name, value string, isSen
 }
 
 func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath string, names []string, isSensitive bool, outdata *[]*defangv1.Config) error {
+	const MAX_GET_PARAM_PER_CALL = 10
 	namePaths := make([]string, len(names))
 
-	var err error
 	for index, name := range names {
 		if isSensitive {
 			namePaths[index] = *getSensitiveConfigPathID(rootPath, name)
@@ -180,35 +181,43 @@ func GetConfigValuesByParam(ctx context.Context, svc *ssm.Client, rootPath strin
 		}
 	}
 
-	// 1. if sensitive ... tell user, don't need to have to fetch value
-	// 2. get value
-	gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
-		WithDecryption: ptr.Bool(!isSensitive),
-		Names:          namePaths,
-	})
-
-	if err != nil {
-		return errors.New("failed to get config")
-	}
-
-	for _, param := range gpo.Parameters {
-		value := ""
-		if !isSensitive {
-			value = *param.Value
+	maxIterations := int(math.Ceil(float64(len(namePaths)) / MAX_GET_PARAM_PER_CALL))
+	for i := 0; i < maxIterations; i++ {
+		var searchPaths []string
+		startIndex := i * MAX_GET_PARAM_PER_CALL
+		if i == maxIterations-1 {
+			searchPaths = namePaths[startIndex:]
+		} else {
+			searchPaths = namePaths[startIndex : startIndex+MAX_GET_PARAM_PER_CALL]
 		}
 
-		sensitivity := defangv1.Sensitivity_NON_SENSITIVE
-		if isSensitive {
-			sensitivity = defangv1.Sensitivity_SENSITIVE
+		gpo, err := svc.GetParameters(ctx, &ssm.GetParametersInput{
+			WithDecryption: ptr.Bool(!isSensitive),
+			Names:          searchPaths,
+		})
+
+		if err != nil {
+			return errors.New("failed to get config")
 		}
 
-		*outdata = append(*outdata,
-			&defangv1.Config{
-				Name:        *param.Name,
-				Value:       value,
-				Sensitivity: sensitivity,
-				Type:        defangv1.ConfigType_RAW,
-			})
+		for _, param := range gpo.Parameters {
+			value := ""
+			if !isSensitive {
+				value = *param.Value
+			}
+
+			configType := defangv1.ConfigType_CONFIGTYPE_UNSPECIFIED
+			if isSensitive {
+				configType = defangv1.ConfigType_CONFIGTYPE_SENSITIVE
+			}
+
+			*outdata = append(*outdata,
+				&defangv1.Config{
+					Name:  *param.Name,
+					Value: value,
+					Type:  configType,
+				})
+		}
 	}
 
 	return nil
