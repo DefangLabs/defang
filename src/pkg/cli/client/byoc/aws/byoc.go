@@ -107,17 +107,12 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			term.Debug("Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
-			// Use STS to get the account ID
-			cfg, err := b.driver.LoadConfig(ctx)
+			whoami, err := b.WhoAmI(ctx)
 			if err != nil {
-				return annotateAwsError(err)
-			}
-			identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-			if err != nil {
-				return annotateAwsError(err)
+				return err
 			}
 
-			b.ProjectDomain = b.getProjectDomain(*identity.Account, domain.Zone)
+			b.ProjectDomain = b.getProjectDomain(whoami.Account, domain.Zone)
 			if b.ProjectDomain != "" {
 				b.ShouldDelegateSubdomain = true
 			}
@@ -480,7 +475,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var err error
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
-	if etag != "" && !pkg.IsValidRandomID(etag) {
+	if etag != "" && !pkg.IsValidBase36ID(etag) {
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)

@@ -69,7 +69,7 @@ func RandomID() string {
 	return Base36ID(rand.Uint64())
 }
 
-func IsValidRandomID(s string) bool {
+func IsValidBase36ID(s string) bool {
 	_, err := strconv.ParseUint(s, 36, 64)
 	return len(s) == 12 && err == nil
 }
