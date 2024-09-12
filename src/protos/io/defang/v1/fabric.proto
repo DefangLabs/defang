@@ -227,22 +227,16 @@ message SecretValue {
   string project = 3; // defaults to tenant ID
 }
 
-enum Sensitivity {
-  NON_SENSITIVE = 0;
-  SENSITIVE = 1;
-}
-
 enum ConfigType {
-  RAW = 0;
-  INTERPOLATED = 1;
+  CONFIGTYPE_UNSPECIFIED = 0;
+  CONFIGTYPE_SENSITIVE = 1;
 }
 
 message Config {
   string name = 1;
   string value = 2;
   string project = 3;
-  Sensitivity sensitivity = 4;
-  ConfigType type = 5;
+  ConfigType type = 4;
 }
 
 message ConfigKey {
@@ -254,8 +248,7 @@ message PutConfigRequest {
   string name = 1;
   string value = 2;
   string project = 3;
-  Sensitivity sensitivity = 4;
-  ConfigType type = 5;
+  ConfigType type = 4;
 }
 
 message GetConfigsRequest {
