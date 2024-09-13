@@ -24,9 +24,16 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type DNSResult struct {
+	IPs    []net.IPAddr
+	Expiry time.Time
+}
+
 var (
-	resolver   dns.Resolver = dns.RootResolver{}
-	httpClient HTTPClient   = &http.Client{
+	resolver         dns.Resolver = dns.RootResolver{}
+	dnsCache                      = make(map[string]DNSResult)
+	dnsCacheDuration              = 1 * time.Minute
+	httpClient       HTTPClient   = &http.Client{
 		// Based on the default transport: https://pkg.go.dev/net/http#RoundTripper
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -35,10 +42,20 @@ var (
 				if err != nil {
 					return nil, err
 				}
-				ips, err := resolver.LookupIPAddr(ctx, host)
-				if err != nil {
-					return nil, err
+				cached, ok := dnsCache[host]
+				var ips []net.IPAddr
+				if ok && cached.Expiry.After(time.Now()) {
+					ips = cached.IPs
+				} else {
+					ips, err = resolver.LookupIPAddr(ctx, host)
+					if err != nil {
+						return nil, err
+					}
+					// Keep 1min of dns cache to avoid spamming root dns servers
+					expiry := time.Now().Add(dnsCacheDuration)
+					dnsCache[host] = DNSResult{ips, expiry}
 				}
+
 				dialer := &net.Dialer{}
 				rootAddr := net.JoinHostPort(ips[rand.Intn(len(ips))].String(), port)
 				return dialer.DialContext(ctx, network, rootAddr)
