@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -256,6 +257,9 @@ func (a *Aws) GetConfigs(ctx context.Context, rootPath string, names ...string) 
 	for _, config := range output {
 		config.Name = stripPath(config.Name)
 	}
+
+	sort.Slice(output, func(i, j int) bool { return strings.ToLower(output[i].Name) < strings.ToLower(output[j].Name) })
+
 	return &defangv1.GetConfigsResponse{Configs: output}, nil
 }
 
@@ -293,6 +297,8 @@ func (a *Aws) ListConfigsByPrefix(ctx context.Context, prefix string) ([]string,
 		}
 		nextToken = res.NextToken
 	}
-	sort.Strings(names)
+	slices.SortFunc(names, func(a, b string) int {
+		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	})
 	return names, nil
 }
