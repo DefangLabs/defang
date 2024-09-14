@@ -259,12 +259,12 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			term.Warnf("The build context contains more than %d files; use --debug or create .dockerignore", ContextFileLimit)
+			term.Warnf("The build context contains more than %d files; use --debug or create .dockerignore to exclude caches or built artifacts", ContextFileLimit)
 		}
 
 		_, err = io.Copy(tarWriter, file)
 		if buf.Len() > ContextSizeLimit {
-			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB", ContextSizeLimit/MiB)
+			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB, use --debug or create .dockerignore to exclude caches or built artifacts", ContextSizeLimit/MiB)
 		}
 		return err
 	})
