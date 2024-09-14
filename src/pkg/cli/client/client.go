@@ -38,6 +38,7 @@ type FabricClient interface {
 
 type Client interface {
 	FabricClient
+	ProjectLoader
 
 	BootstrapCommand(context.Context, string) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
@@ -56,9 +57,6 @@ type Client interface {
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
-
-	LoadProject(context.Context) (*compose.Project, error)
-	LoadProjectName(context.Context) (string, error)
 }
 
 type Property struct {

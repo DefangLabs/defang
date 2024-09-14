@@ -173,6 +173,7 @@ func makeComposeUpCmd() *cobra.Command {
 			return nil
 		},
 	}
+	composeUpCmd.Flags().StringArrayP("env", "e", nil, "expose environment variables")
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
@@ -185,6 +186,7 @@ func makeComposeStartCmd() *cobra.Command {
 	composeStartCmd := &cobra.Command{
 		Use:         "start",
 		Aliases:     []string{"deploy"},
+		Deprecated:  "use 'up --detach' instead",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploys services to the cluster",
@@ -231,6 +233,7 @@ func makeComposeRestartCmd() *cobra.Command {
 func makeComposeStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "stop",
+		Deprecated:  "use 'down --detach' instead",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and stops its services",
@@ -301,7 +304,7 @@ func makeComposeDownCmd() *cobra.Command {
 }
 
 func makeComposeConfigCmd() *cobra.Command {
-	return &cobra.Command{
+	composeConfigCmd := &cobra.Command{
 		Use:   "config",
 		Args:  cobra.NoArgs, // TODO: takes optional list of service names
 		Short: "Reads a Compose file and shows the generated config",
@@ -314,6 +317,8 @@ func makeComposeConfigCmd() *cobra.Command {
 			return nil
 		},
 	}
+	composeConfigCmd.Flags().StringArrayP("env", "e", nil, "expose environment variables")
+	return composeConfigCmd
 }
 
 func makeComposeLsCmd() *cobra.Command {

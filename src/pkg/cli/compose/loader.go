@@ -18,8 +18,9 @@ import (
 
 type LoaderOptions struct {
 	ConfigPaths []string
-	WorkingDir  string
+	ExposedEnv  []string
 	ProjectName string
+	WorkingDir  string
 }
 
 type Loader struct {
@@ -87,13 +88,18 @@ func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
 }
 
 func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
-	options := c.options
+	var osEnv []string
+	for _, key := range c.options.ExposedEnv {
+		if value, ok := os.LookupEnv(key); ok {
+			osEnv = append(osEnv, key+"="+value)
+		}
+	}
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	optFns := []cli.ProjectOptionsFn{
-		cli.WithWorkingDirectory(options.WorkingDir),
+		cli.WithWorkingDirectory(c.options.WorkingDir),
 		// First apply os.Environment, always win
-		// -- DISABLED -- cli.WithOsEnv,
+		// -- DISABLED -- cli.WithOsEnv, we expose explicit env vars to the project below
 		// Load PWD/.env if present and no explicit --env-file has been set
 		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		// read dot env file to populate project environment
@@ -110,10 +116,11 @@ func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 		cli.WithDotEnv,
 
 		// DEFANG SPECIFIC OPTIONS
+		cli.WithEnv(osEnv),
 		cli.WithDefaultProfiles("defang"),
 		cli.WithDiscardEnvFile,
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 	}
 
-	return cli.NewProjectOptions(options.ConfigPaths, optFns...)
+	return cli.NewProjectOptions(c.options.ConfigPaths, optFns...)
 }

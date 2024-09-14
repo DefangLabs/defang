@@ -193,8 +193,8 @@ func SetupCommands(version string) {
 	RootCmd.AddCommand(getVersionCmd)
 
 	// Config Command (was: secrets)
-	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
+	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -430,7 +430,7 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var sample, language, defaultFolder string
+		var sample, language string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -478,9 +478,20 @@ var generateCmd = &cobra.Command{
 				}
 				if sample == generateWithAI {
 					sample = ""
-					defaultFolder = "project1"
-				} else {
-					defaultFolder = sample
+				}
+			}
+		}
+
+		defaultFolder := sample
+		if defaultFolder == "" {
+			// Find the first available project folder name; TODO: can we ask AI for a suggestion?
+			for i := 1; ; i++ {
+				defaultFolder = fmt.Sprintf("project%d", i)
+				if _, err := os.Stat(defaultFolder); err != nil {
+					if os.IsNotExist(err) {
+						break
+					}
+					return err
 				}
 			}
 		}
@@ -995,6 +1006,7 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 	if err != nil {
 		panic(err)
 	}
+	o.ExposedEnv, _ = f.GetStringArray("env") // ignore error if the flag is not defined
 	return compose.NewLoaderWithOptions(o)
 }
 
