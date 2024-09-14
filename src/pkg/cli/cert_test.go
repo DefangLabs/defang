@@ -294,6 +294,10 @@ func mockBody(s string) io.ReadCloser {
 }
 
 func TestGetWithRetries(t *testing.T) {
+	originalDelayBase := httpRetryDelayBase
+	httpRetryDelayBase = 100 * time.Millisecond
+	t.Cleanup(func() { httpRetryDelayBase = originalDelayBase })
+
 	t.Run("success on first try", func(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
