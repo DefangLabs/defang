@@ -14,9 +14,15 @@ import (
 	"github.com/hexops/gotextdiff/span"
 )
 
+func newLoaderWithPath(t *testing.T, path string) Loader {
+	t.Setenv("FROM_ENV", "exposed-from-env")
+	options := LoaderOptions{ConfigPaths: []string{path}, ExposedEnv: []string{"FROM_ENV"}}
+	return NewLoaderWithOptions(options)
+}
+
 func TestLoader(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
-		loader := NewLoaderWithPath(path)
+		loader := newLoaderWithPath(t, path)
 		proj, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)

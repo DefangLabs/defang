@@ -22,8 +22,7 @@ func TestValidationAndConvert(t *testing.T) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 
-		options := LoaderOptions{ConfigPaths: []string{path}}
-		loader := Loader{options: options}
+		loader := newLoaderWithPath(t, path)
 		proj, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)

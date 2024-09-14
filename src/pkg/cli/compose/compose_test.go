@@ -225,7 +225,7 @@ func TestComposeOnlyOneFile(t *testing.T) {
 	loader := NewLoaderWithPath("")
 	project, err := loader.LoadProject(context.Background())
 	if err != nil {
-		t.Errorf("LoadProject() failed: %v", err)
+		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
 	if len(project.ComposeFiles) != 1 {

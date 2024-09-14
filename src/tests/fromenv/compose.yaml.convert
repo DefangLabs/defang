@@ -1,0 +1,12 @@
+[
+  {
+    "name": "fromenv",
+    "image": "alpine",
+    "platform": 2,
+    "internal": true,
+    "environment": {
+      "FROM_ENV": "exposed-from-env"
+    },
+    "networks": 1
+  }
+]

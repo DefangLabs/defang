@@ -40,11 +40,11 @@ func NewLoaderWithOptions(options LoaderOptions) Loader {
 }
 
 func NewLoaderWithPath(path string) Loader {
-	configPaths := []string{}
+	options := LoaderOptions{}
 	if path != "" {
-		configPaths = append(configPaths, path)
+		options.ConfigPaths = []string{path}
 	}
-	return NewLoaderWithOptions(LoaderOptions{ConfigPaths: configPaths})
+	return NewLoaderWithOptions(options)
 }
 
 func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
