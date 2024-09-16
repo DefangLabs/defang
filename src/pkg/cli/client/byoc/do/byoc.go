@@ -8,10 +8,12 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/digitalocean/godo"
+	"github.com/muesli/termenv"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -26,10 +28,19 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	DEFANG = "defang"
+	ansiCyan      = "\033[36m"
+	ansiReset     = "\033[0m"
+	DEFANG        = "defang"
+	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00"
+	replaceString = ansiCyan + "$0" + ansiReset
+)
+
+var (
+	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`)
 )
 
 type ByocDo struct {
@@ -48,7 +59,6 @@ func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.T
 
 	b := &ByocDo{
 		driver: appPlatform.New(byoc.CdTaskPrefix, doRegion),
-		apps:   map[string]*godo.App{},
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	b.ProjectName, _ = b.LoadProjectName(ctx)
@@ -119,11 +129,10 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	cdApp, err := b.runCdCommand(ctx, "up", payloadString)
+	_, err = b.runCdCommand(ctx, "up", payloadString)
 	if err != nil {
 		return nil, err
 	}
-	b.apps[etag] = cdApp
 
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
@@ -136,12 +145,11 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, 
 		return "", err
 	}
 
-	cdApp, err := b.runCdCommand(ctx, command)
+	_, err := b.runCdCommand(ctx, command)
 	if err != nil {
 		return "", err
 	}
 	etag := pkg.RandomID()
-	b.apps[etag] = cdApp
 
 	return etag, nil
 }
@@ -313,7 +321,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	term.Debug(fmt.Sprintf("FOLLOW APP ID: %s", cdApp.ID))
 	var appLiveURL string
 	term.Info("Waiting for command to finish to gather logs")
 	deploymentID := cdApp.PendingDeployment.GetID()
@@ -392,7 +399,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		pkg.SleepWithContext(ctx, (time.Second)*15)
 
 	}
-	term.Debug("LIVE URL:", appLiveURL)
 
 	return newByocServerStream(ctx, appLiveURL, req.Etag)
 }
@@ -644,13 +650,32 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 func readHistoricalLogs(ctx context.Context, urls []string) {
 	for _, u := range urls {
 		resp, err := http.GetWithContext(ctx, u)
-		term.Debugf("GET LOGS STATUS CODE: %d", resp.StatusCode)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
+		// io.Copy(os.Stdout, resp.Body)
+		tailResp := &defangv1.TailResponse{}
+		body, _ := io.ReadAll(resp.Body)
+		lines := strings.Split(string(body), "\n")
+		for _, line := range lines {
+			parts := strings.SplitN(line, " ", 3)
+			if len(parts) == 1 {
+				continue
+			}
+			ts, _ := time.Parse(time.RFC3339Nano, parts[1])
+			tailResp.Entries = append(tailResp.Entries, &defangv1.LogEntry{
+				Message:   parts[2],
+				Timestamp: timestamppb.New(ts),
+				Service:   parts[0],
+			})
+		}
+
+		for _, msg := range tailResp.Entries {
+			Printlogs(tailResp, msg)
+		}
 	}
+
 }
 
 func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
@@ -659,4 +684,56 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 		env[envVar.Key] = envVar.Value
 	}
 	return env
+}
+
+func Printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
+	service := msg.Service
+	// host := msg.Host
+	etag := msg.Etag
+	ts := msg.Timestamp.AsTime()
+	tsString := ts.Local().Format(RFC3339Micro)
+	tsColor := termenv.ANSIBrightBlack
+	if term.HasDarkBackground() {
+		tsColor = termenv.ANSIWhite
+	}
+	if msg.Stderr {
+		tsColor = termenv.ANSIBrightRed
+	}
+	var prefixLen int
+	trimmed := strings.TrimRight(msg.Message, "\t\r\n ")
+	buf := term.NewMessageBuilder(term.StdoutCanColor())
+	for i, line := range strings.Split(trimmed, "\n") {
+		if i == 0 {
+			prefixLen, _ = buf.Printc(tsColor, tsString, " ")
+			l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
+			prefixLen += l
+			l, _ = buf.Printc(termenv.ANSIYellow, etag, " ")
+			prefixLen += l
+			l, _ = buf.Printc(termenv.ANSIGreen, service, " ")
+			prefixLen += l
+
+			// if DoVerbose {
+			// 	l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
+			// 	prefixLen += l
+			// }
+		} else {
+			io.WriteString(buf, strings.Repeat(" ", prefixLen))
+		}
+		if term.StdoutCanColor() {
+			if !strings.Contains(line, "\033[") {
+				line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
+			}
+		} else {
+			line = term.StripAnsi(line)
+		}
+		io.WriteString(buf, line)
+
+		// Detect end logging event
+		// if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
+		// 	cancel() // TODO: stuck on defer Close() if we don't do this
+		// 	return nil
+		// }
+	}
+	term.Println(buf.String())
+
 }
