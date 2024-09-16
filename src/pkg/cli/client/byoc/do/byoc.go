@@ -688,7 +688,6 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 
 func Printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 	service := msg.Service
-	// host := msg.Host
 	etag := msg.Etag
 	ts := msg.Timestamp.AsTime()
 	tsString := ts.Local().Format(RFC3339Micro)
@@ -711,11 +710,6 @@ func Printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 			prefixLen += l
 			l, _ = buf.Printc(termenv.ANSIGreen, service, " ")
 			prefixLen += l
-
-			// if DoVerbose {
-			// 	l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
-			// 	prefixLen += l
-			// }
 		} else {
 			io.WriteString(buf, strings.Repeat(" ", prefixLen))
 		}
@@ -727,12 +721,6 @@ func Printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 			line = term.StripAnsi(line)
 		}
 		io.WriteString(buf, line)
-
-		// Detect end logging event
-		// if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
-		// 	cancel() // TODO: stuck on defer Close() if we don't do this
-		// 	return nil
-		// }
 	}
 	term.Println(buf.String())
 
