@@ -314,6 +314,7 @@ message LogEntry {
   string service = 4;
   string etag = 5;
   string host = 6;
+  string job = 7;
 }
 
 message TailResponse {
