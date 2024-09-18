@@ -2365,6 +2365,7 @@ type LogEntry struct {
 	Message   string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Stderr    bool                   `protobuf:"varint,3,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Job       string                 `protobuf:"bytes,4,opt,name=job,proto3" json:"job,omitempty"`
 	Service   string                 `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
 	Etag      string                 `protobuf:"bytes,5,opt,name=etag,proto3" json:"etag,omitempty"`
 	Host      string                 `protobuf:"bytes,6,opt,name=host,proto3" json:"host,omitempty"`
@@ -2450,6 +2451,7 @@ type TailResponse struct {
 	unknownFields protoimpl.UnknownFields
 
 	Entries []*LogEntry `protobuf:"bytes,2,rep,name=entries,proto3" json:"entries,omitempty"`
+	Job     string      `protobuf:"bytes,5,opt,name=job,proto3" json:"job,omitempty"`
 	Service string      `protobuf:"bytes,3,opt,name=service,proto3" json:"service,omitempty"`
 	Etag    string      `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
 	Host    string      `protobuf:"bytes,5,opt,name=host,proto3" json:"host,omitempty"`

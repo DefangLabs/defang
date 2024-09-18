@@ -287,12 +287,13 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 		}
 
 		for _, e := range msg.Entries {
+			job := valueOrDefault(e.Job, msg.Job)
 			service := valueOrDefault(e.Service, msg.Service)
 			host := valueOrDefault(e.Host, msg.Host)
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
+			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || job == "kaniko" || job == "fabric"
 			onlyErrors := !DoVerbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
@@ -341,6 +342,10 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
 					if params.Etag == "" {
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
+						prefixLen += l
+					}
+					if DoVerbose {
+						l, _ := buf.Printc(termenv.ANSIMagenta, job, " ")
 						prefixLen += l
 					}
 					if len(params.Services) == 0 {
