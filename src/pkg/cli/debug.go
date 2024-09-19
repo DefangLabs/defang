@@ -73,15 +73,18 @@ func Debug(ctx context.Context, c client.Client, etag string, project *types.Pro
 	return nil
 }
 
-func readFile(path string) *defangv1.File {
-	b, err := os.ReadFile(path)
+func readFile(basepath, path string) *defangv1.File {
+	content, err := os.ReadFile(path)
 	if err != nil {
 		term.Debug("failed to read file:", err)
 		return nil
 	}
+	if path, err = filepath.Rel(basepath, path); err != nil {
+		path = filepath.Base(path)
+	}
 	return &defangv1.File{
-		Name:    filepath.Base(path),
-		Content: string(b),
+		Name:    path,
+		Content: string(content),
 	}
 }
 
@@ -105,14 +108,14 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 	var files []*defangv1.File
 
 	for _, path := range project.ComposeFiles {
-		if file := readFile(path); file != nil {
+		if file := readFile(project.WorkingDir, path); file != nil {
 			files = append(files, file)
 		}
 	}
 
 	for _, service := range getServices(project, services) {
 		if service.Build != nil {
-			files = append(files, findMatchingFiles(service.Build.Context, service.Build.Dockerfile)...)
+			files = append(files, findMatchingFiles(project.WorkingDir, service.Build.Context, service.Build.Dockerfile)...)
 		}
 		// TODO: also consider other files, lke .dockerignore, .env, etc.
 	}
@@ -138,14 +141,14 @@ func filepathMatchAny(patterns []string, name string) bool {
 	return false
 }
 
-func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
+func findMatchingFiles(basepath, context, dockerfile string) []*defangv1.File {
 	var files []*defangv1.File
 
-	if file := readFile(filepath.Join(folder, dockerfile)); file != nil {
+	if file := readFile(basepath, filepath.Join(context, dockerfile)); file != nil {
 		files = append(files, file)
 	}
 
-	err := compose.WalkContextFolder(folder, dockerfile, func(path string, info os.DirEntry, slashPath string) error {
+	err := compose.WalkContextFolder(context, dockerfile, func(path string, info os.DirEntry, slashPath string) error {
 		if info.IsDir() {
 			return nil // continue to next file/directory
 		}
@@ -156,7 +159,7 @@ func findMatchingFiles(folder, dockerfile string) []*defangv1.File {
 		}
 
 		if IsProjectFile(info.Name()) {
-			if file := readFile(path); file != nil {
+			if file := readFile(basepath, path); file != nil {
 				files = append(files, file)
 			}
 		}
