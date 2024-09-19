@@ -24,9 +24,16 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type DNSResult struct {
+	IPs    []net.IPAddr
+	Expiry time.Time
+}
+
 var (
-	resolver   dns.Resolver = dns.RootResolver{}
-	httpClient HTTPClient   = &http.Client{
+	resolver         dns.Resolver = dns.RootResolver{}
+	dnsCache                      = make(map[string]DNSResult)
+	dnsCacheDuration              = 1 * time.Minute
+	httpClient       HTTPClient   = &http.Client{
 		// Based on the default transport: https://pkg.go.dev/net/http#RoundTripper
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -35,10 +42,20 @@ var (
 				if err != nil {
 					return nil, err
 				}
-				ips, err := resolver.LookupIPAddr(ctx, host)
-				if err != nil {
-					return nil, err
+				cached, ok := dnsCache[host]
+				var ips []net.IPAddr
+				if ok && cached.Expiry.After(time.Now()) {
+					ips = cached.IPs
+				} else {
+					ips, err = resolver.LookupIPAddr(ctx, host)
+					if err != nil {
+						return nil, err
+					}
+					// Keep 1min of dns cache to avoid spamming root dns servers
+					expiry := time.Now().Add(dnsCacheDuration)
+					dnsCache[host] = DNSResult{ips, expiry}
 				}
+
 				dialer := &net.Dialer{}
 				rootAddr := net.JoinHostPort(ips[rand.Intn(len(ips))].String(), port)
 				return dialer.DialContext(ctx, network, rootAddr)
@@ -54,6 +71,7 @@ var (
 			return nil
 		},
 	}
+	httpRetryDelayBase = 5 * time.Second
 )
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
@@ -106,7 +124,10 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 		return
 	}
 	term.Infof("Triggering cert generation for %v", domain)
-	triggerCertGeneration(ctx, domain)
+	if err := triggerCertGeneration(ctx, domain); err != nil {
+		term.Errorf("Error triggering cert generation, please try again")
+		return
+	}
 
 	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
@@ -118,7 +139,7 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 	term.Printf("TLS cert for %v is ready\n", domain)
 }
 
-func triggerCertGeneration(ctx context.Context, domain string) {
+func triggerCertGeneration(ctx context.Context, domain string) error {
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		spinCtx, cancel := context.WithCancel(ctx)
@@ -139,10 +160,13 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 			}
 		}()
 	}
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
+	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
 		term.Debugf(" - Error triggering cert generation: %v", err)
+		return err
 	}
+	return nil
 }
 
 func waitForTLS(ctx context.Context, domain string) error {
@@ -318,7 +342,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		term.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
 		errs = append(errs, err)
 
-		delay := (100 * time.Millisecond) << i // Simple exponential backoff
+		delay := httpRetryDelayBase << i // Simple exponential backoff
 		if err := pkg.SleepWithContext(ctx, delay); err != nil {
 			return err
 		}
