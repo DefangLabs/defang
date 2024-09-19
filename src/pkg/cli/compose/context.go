@@ -33,7 +33,7 @@ const (
 
 const (
 	MiB                 = 1024 * 1024
-	ContextFileLimit    = 10
+	ContextFileLimit    = 100
 	ContextSizeLimit    = 10 * MiB
 	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
 	defaultDockerIgnore = `# Default .dockerignore file for Defang
