@@ -303,7 +303,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
 		originalClient := httpClient
-		defer func() { httpClient = originalClient }()
+		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err != nil {
@@ -320,7 +320,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 200, Body: mockBody("")}, err: nil},
 		}}
 		originalClient := httpClient
-		defer func() { httpClient = originalClient }()
+		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err != nil {
@@ -337,7 +337,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: nil, err: errors.New("error")},
 		}}
 		originalClient := httpClient
-		defer func() { httpClient = originalClient }()
+		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err == nil {
@@ -356,7 +356,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
 		originalClient := httpClient
-		defer func() { httpClient = originalClient }()
+		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err == nil {
@@ -375,7 +375,7 @@ func TestGetWithRetries(t *testing.T) {
 			{result: &http.Response{StatusCode: 503, Body: mockBody("Random Error")}, err: nil},
 		}}
 		originalClient := httpClient
-		defer func() { httpClient = originalClient }()
+		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
 		err := getWithRetries(context.Background(), "http://example.com", 1)
 		if err == nil {
