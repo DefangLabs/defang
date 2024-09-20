@@ -101,7 +101,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	}
 	failures := make([]error, len(ecsOutput.Failures))
 	for i, f := range ecsOutput.Failures {
-		failures[i] = taskFailure{*f.Reason, *f.Detail}
+		failures[i] = TaskFailure{*f.Reason, *f.Detail}
 	}
 	if err := errors.Join(failures...); err != nil || len(ecsOutput.Tasks) == 0 {
 		return nil, err
@@ -140,12 +140,12 @@ func getSubnetVPCId(ctx context.Context, cfg aws.Config, subnetId string) (strin
 	return *subnetsOutput.Subnets[0].VpcId, nil // TODO: make configurable/deterministic
 }
 
-type taskFailure struct {
+type TaskFailure struct {
 	Reason string
 	Detail string
 }
 
-func (t taskFailure) Error() string {
+func (t TaskFailure) Error() string {
 	return t.Reason + ": " + t.Detail
 }
 
