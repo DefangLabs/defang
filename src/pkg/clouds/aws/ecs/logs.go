@@ -267,12 +267,12 @@ func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId strin
 
 	switch task.StopCode {
 	default:
-		return taskFailure{string(task.StopCode), *task.StoppedReason}
+		return TaskFailure{task.StopCode, *task.StoppedReason}
 	case ecsTypes.TaskStopCodeEssentialContainerExited:
 		for _, c := range task.Containers {
 			if c.ExitCode != nil && *c.ExitCode != 0 {
 				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
-				return taskFailure{string(task.StopCode), reason}
+				return TaskFailure{task.StopCode, reason}
 			}
 		}
 		fallthrough
