@@ -43,7 +43,7 @@ func TestLoadProjectName(t *testing.T) {
 		}
 	})
 
-	t.Run("--project-name has precidence over COMPOSE_PROJECT_NAME env var", func(t *testing.T) {
+	t.Run("--project-name has precedence over COMPOSE_PROJECT_NAME env var", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "ignoreme")
 		options := LoaderOptions{ProjectName: "expectedname"}
 		loader := NewLoaderWithOptions(options)

@@ -85,8 +85,12 @@ func Execute(ctx context.Context) error {
 			printDefangHint("To manage sensitive service config, use:", "config")
 		}
 
-		if err.Error() == "resource_exhausted: maximum number of projects reached" {
-			printDefangHint("To deactivate a project, do:", "compose down --project-name <name>")
+		if strings.Contains(err.Error(), "maximum number of projects") {
+			projectName := "<name>"
+			if resp, err := client.GetServices(ctx); err == nil {
+				projectName = resp.Project
+			}
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
 		var cerr *cli.CancelError
@@ -99,7 +103,7 @@ func Execute(ctx context.Context) error {
 			// All AWS errors are wrapped in OperationError
 			var oe *smithy.OperationError
 			if errors.As(err, &oe) {
-				fmt.Println("Could not authenticate to the AWS service. Please check your aws credentials and try again.")
+				fmt.Println("Could not authenticate to the AWS service. Please check your AWS credentials and try again.")
 			} else {
 				printDefangHint("Please use the following command to log in:", "login")
 			}
