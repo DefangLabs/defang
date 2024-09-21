@@ -79,7 +79,6 @@ func makeComposeUpCmd() *cobra.Command {
 
 			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-			targetStateReached := false
 
 			go func() {
 				services := make([]string, len(deploy.Services))
@@ -95,7 +94,6 @@ func makeComposeUpCmd() *cobra.Command {
 						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
 					}
 				} else {
-					targetStateReached = true
 					cancelTail(errCompleted)
 				}
 			}()
@@ -116,29 +114,31 @@ func makeComposeUpCmd() *cobra.Command {
 			// blocking call to tail
 			if err := cli.Tail(tailCtx, client, tailParams); err != nil {
 				term.Debugf("Tail failed with %v", err)
+
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
 					<-tailCtx.Done()
-				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
+				} else if !errors.Is(err, context.Canceled) {
 					return err // any error other than cancelation
-				} else if !errors.Is(context.Cause(tailCtx), errCompleted) {
-					// Tail got canceled; if it was by anything other than completion, prompt to show debugger
-					var failedServices []string
-					var errDeploymentFailed cli.ErrDeploymentFailed
-					if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
-						term.Warn(errDeploymentFailed)
-						failedServices = []string{errDeploymentFailed.Service}
-					} else if len(managedResources) > 0 {
-						term.Warn("Managed services have been deployed but not all services may be available yet.")
-					} else {
-						term.Warn("Deployment is not finished. Service(s) might not be running.")
-						// TODO: some services might be OK and we should only debug the ones that are not
-					}
+				}
+
+				// The tail was canceled; check if it was because of deployment failure or explicit cancelation
+				if errors.Is(context.Cause(tailCtx), context.Canceled) {
+					// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
+					term.Warn("Deployment is not finished. Service(s) might not be running.")
+					return err
+				}
+
+				var errDeploymentFailed cli.ErrDeploymentFailed
+				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+					// Tail got canceled because of deployment failure: prompt to show the debugger
+					term.Warn(errDeploymentFailed)
 
 					if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
-						var aiDebug bool
+						failedServices := []string{errDeploymentFailed.Service}
 						Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", context.Cause(tailCtx)})
+						var aiDebug bool
 						if err := survey.AskOne(&survey.Confirm{
 							Message: "Would you like to debug the deployment with AI?",
 							Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
@@ -147,9 +147,8 @@ func makeComposeUpCmd() *cobra.Command {
 							Track("Debug Prompt Failed", P{"etag", deploy.Etag}, P{"reason", err})
 						} else if aiDebug {
 							Track("Debug Prompt Accepted", P{"etag", deploy.Etag})
-							// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled); HACK: cmd might be canceled too
-							// TODO: use the WorkingDir of the failed service, might not be the project's root
-							if err := cli.Debug(context.TODO(), client, deploy.Etag, project, failedServices); err != nil {
+							// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+							if err := cli.Debug(cmd.Context(), client, deploy.Etag, project, failedServices); err != nil {
 								term.Warnf("failed to debug deployment: %v", err)
 							}
 						} else {
@@ -161,7 +160,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			if targetStateReached {
+			if errors.Is(context.Cause(tailCtx), errCompleted) {
 				for _, service := range deploy.Services {
 					service.State = targetState
 				}
