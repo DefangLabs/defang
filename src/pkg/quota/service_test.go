@@ -75,7 +75,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "echo 1"},
 				},
 			},
-			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`, see https://s.defang.io/healthchecks",
 		},
 		{
 			name: "CMD without curl or wget",
@@ -87,7 +87,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "echo", "1"},
 				},
 			},
-			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`, see https://s.defang.io/healthchecks",
 		},
 		{
 			name: "CMD without HTTP URL",
@@ -99,7 +99,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD", "curl", "1"},
 				},
 			},
-			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`, see https://s.defang.io/healthchecks",
 		},
 		{
 			name: "NONE with arguments",
@@ -122,7 +122,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"CMD-SHELL", "echo 1"},
 				},
 			},
-			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`",
+			wantErr: "invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`, see https://s.defang.io/healthchecks",
 		},
 		{
 			name: "NONE with ingress",
@@ -134,7 +134,7 @@ func TestValidate(t *testing.T) {
 					Test: []string{"NONE"},
 				},
 			},
-			wantErr: "invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck",
+			wantErr: "invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck, see https://s.defang.io/healthchecks",
 		},
 		{
 			name: "unsupported healthcheck test",
