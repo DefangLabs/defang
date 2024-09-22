@@ -148,16 +148,12 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		}
 	}
 
-	term.Println("CURRENT CD: " + currentCd.ID)
-
 	//Update current CD app if it exists
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
 		term.Debugf("Updating existing CD app")
-
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec: appJobSpec,
 		})
-		term.Debugf("JOB NAME: %s", currentCd.Spec)
 	} else {
 		term.Debugf("Creating new CD app")
 		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{
@@ -169,9 +165,6 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		return nil, err
 	}
 
-	// if err := waitForActiveDeployment(ctx, client.Apps, currentCd.ID, currentCd.PendingDeployment.ID); err != nil {
-	// 	term.Debug("Error waiting for active deployment: ", err)
-	// }
 	return currentCd, nil
 }
 
@@ -222,7 +215,6 @@ func newClient(ctx context.Context) *godo.Client {
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	term.Debug("Creating upload url for: ", name)
 	s3Client := d.createS3Client()
 
 	prefix := "uploads/"
@@ -250,7 +242,6 @@ func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error)
 		return "", err
 	}
 
-	term.Debug(fmt.Sprintf("S3 URL: %s", req.URL))
 	return req.URL, nil
 }
 
