@@ -211,7 +211,6 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 	deleteEnvVars(toDelete, &app.Spec.Envs)
 	for _, service := range app.Spec.Services {
 		deleteEnvVars(toDelete, &service.Envs)
-		term.Debugf("CURRENT ENV: %s", service.Envs)
 	}
 
 	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
@@ -336,8 +335,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			return nil, err
 		}
 
-		term.Debug(fmt.Sprintf("DEPLOYMENT ID: %s", deploymentID))
-
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
 			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, false, 150)
 			if err != nil {
@@ -364,9 +361,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
 			mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
 
-			term.Debugf("BUILD APP NAME: %s", buildAppName)
-			term.Debugf("MAIN APP NAME: %s", mainAppName)
-
 			// If we can get projects working, we can add the project to the list options
 			currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
 
@@ -375,7 +369,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			}
 
 			for _, app := range currentApps {
-				term.Debugf("APP NAME: %s", app.Spec.Name)
 				if app.Spec.Name == buildAppName {
 					buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
 					if err != nil {
@@ -615,15 +608,12 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		appName = fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
 	}
 
-	term.Debugf("APP NAME: %s", appName)
-
 	apps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	for _, app := range apps {
-		term.Debugf("LOOP APP NAME: %s", app.Spec.Name)
 		if app.Spec.Name == appName {
 			return app, nil
 		}
