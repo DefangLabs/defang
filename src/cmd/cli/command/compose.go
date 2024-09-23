@@ -119,7 +119,7 @@ func makeComposeUpCmd() *cobra.Command {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
 					<-tailCtx.Done()
-				} else if !errors.Is(err, context.Canceled) {
+				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
 					return err // any error other than cancelation
 				}
 
