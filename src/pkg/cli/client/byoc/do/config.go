@@ -1,9 +1,9 @@
 package do
 
 import (
-	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/digitalocean/godo"
 	"strings"
+
+	"github.com/digitalocean/godo"
 )
 
 func deleteEnvVars(toDelete string, envVars *[]*godo.AppVariableDefinition) {
@@ -12,7 +12,6 @@ func deleteEnvVars(toDelete string, envVars *[]*godo.AppVariableDefinition) {
 
 	for _, envVar := range *envVars {
 		if !strings.Contains(toDelete, envVar.Key) {
-			term.Debugf("MATCH FOUND: %s", envVar.Key)
 			finalVars = append(finalVars, envVar)
 		}
 	}

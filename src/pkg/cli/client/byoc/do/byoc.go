@@ -323,6 +323,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	var appLiveURL string
 	term.Info("Waiting for command to finish to gather logs")
 	deploymentID := cdApp.PendingDeployment.GetID()
+
 	if deploymentID == "" {
 		//Cover the chance that someone runs Tail against a deploy that is already finished.
 		deploymentID = cdApp.ActiveDeployment.GetID()
