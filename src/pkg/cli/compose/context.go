@@ -62,8 +62,8 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
 	}
-
-	term.Info("Compressing build context for", name, "at", root)
+	
+	term.Info("Packaging the project files for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
@@ -81,7 +81,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		return root, nil
 	}
 
-	term.Info("Uploading build context for", name)
+	term.Info("Uploading the project files for", name)
 	return uploadTarball(ctx, client, buffer, digest)
 }
 
