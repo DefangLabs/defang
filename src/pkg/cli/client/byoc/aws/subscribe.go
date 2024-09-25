@@ -28,7 +28,7 @@ func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
 	if etag := evt.Etag(); etag == "" || etag != s.etag {
 		return
 	}
-	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) {
+	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) && service != "cd" {
 		return
 	}
 	s.send(&defangv1.SubscribeResponse{

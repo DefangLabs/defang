@@ -308,6 +308,10 @@ func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defan
 	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", s.Name))
 }
 
+func (b *ByocAws) GetCDTaskArn(etag string) ecs.TaskArn {
+	return b.cdTasks[etag]
+}
+
 func (b *ByocAws) bucketName() string {
 	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
 }
@@ -785,6 +789,10 @@ func ensure(cond bool, msg string) {
 
 type ECSEventHandler interface {
 	HandleECSEvent(evt ecs.Event)
+}
+
+type CDTaskArnProvider interface {
+	GetCDTaskArn(etag string) ecs.TaskArn
 }
 
 func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {

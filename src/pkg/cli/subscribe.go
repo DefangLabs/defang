@@ -60,7 +60,7 @@ func WaitServiceState(ctx context.Context, client client.Client, targetState def
 
 		term.Debugf("service %s with state ( %s ) and status: %s\n", msg.Name, msg.State, msg.Status) // TODO: don't print in Go-routine
 
-		if _, ok := serviceStates[msg.Name]; !ok {
+		if _, ok := serviceStates[msg.Name]; !ok && msg.Name != "cd" {
 			term.Debugf("unexpected service %s update", msg.Name) // TODO: don't print in Go-routine
 			continue
 		}
@@ -71,7 +71,9 @@ func WaitServiceState(ctx context.Context, client client.Client, targetState def
 			return ErrDeploymentFailed{msg.Name}
 		}
 
-		serviceStates[msg.Name] = msg.State
+		if msg.Name != "cd" {
+			serviceStates[msg.Name] = msg.State
+		}
 
 		if allInState(targetState, serviceStates) {
 			return nil // all services are in the target state

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -27,17 +28,52 @@ type byocServerStream struct {
 	stream   ecs.EventStream
 
 	ecsEventsHandler ECSEventHandler
+	cdTaskFailureCh  chan cdTaskFailureEvent
+}
+
+type cdTaskFailureEvent struct {
+	etag      string
+	cdTaskArn ecs.TaskArn
+	err       ecs.TaskFailure
+}
+
+func (e cdTaskFailureEvent) Service() string { return "cd" }
+func (e cdTaskFailureEvent) Etag() string    { return e.etag }
+func (e cdTaskFailureEvent) Host() string    { return *e.cdTaskArn }
+func (e cdTaskFailureEvent) Status() string  { return e.err.Error() }
+func (e cdTaskFailureEvent) State() defangv1.ServiceState {
+	// CD task failure indicates a deployment failure
+	return defangv1.ServiceState_DEPLOYMENT_FAILED
 }
 
 func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
-	return &byocServerStream{
-		ctx:      ctx,
-		etag:     etag,
-		stream:   stream,
-		services: services,
+
+	bss := &byocServerStream{
+		cdTaskFailureCh: make(chan cdTaskFailureEvent),
+		ctx:             ctx,
+		etag:            etag,
+		stream:          stream,
+		services:        services,
 
 		ecsEventsHandler: ecsEventHandler,
 	}
+
+	if cdTaskArnProvider, ok := ecsEventHandler.(CDTaskArnProvider); ok {
+		cdTaskArn := cdTaskArnProvider.GetCDTaskArn(etag)
+		if cdTaskArn != nil {
+			go func() {
+				var taskFailure ecs.TaskFailure
+				err := ecs.WaitForTask(ctx, cdTaskArn, time.Second*3)
+				term.Debugf("CD task %s has stopped: %v", *cdTaskArn, err)
+				if err != nil && errors.As(err, &taskFailure) {
+					bss.cdTaskFailureCh <- cdTaskFailureEvent{etag: etag, cdTaskArn: cdTaskArn, err: taskFailure}
+				}
+				// Ignore other cd errors
+			}()
+		}
+	}
+
+	return bss
 }
 
 var _ client.ServerStream[defangv1.TailResponse] = (*byocServerStream)(nil)
@@ -71,6 +107,9 @@ func (bs *byocServerStream) Receive() bool {
 			bs.err = err
 			return false
 		}
+	case taskFailure := <-bs.cdTaskFailureCh:
+		bs.ecsEventsHandler.HandleECSEvent(taskFailure)
+		return true // continue to receive other events, subscribe will handle the failure
 	case <-bs.ctx.Done(): // blocking (if not nil)
 		bs.err = context.Cause(bs.ctx)
 		return false
