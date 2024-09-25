@@ -112,7 +112,8 @@ func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 		// DEFANG SPECIFIC OPTIONS
 		cli.WithDefaultProfiles("defang"),
 		cli.WithDiscardEnvFile,
-		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		cli.WithConsistency(false),   // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		cli.WithInterpolation(false), // disable compose loader interpolation, we will do this ourself
 	}
 
 	return cli.NewProjectOptions(options.ConfigPaths, optFns...)
