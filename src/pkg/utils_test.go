@@ -130,7 +130,7 @@ func TestRandomID(t *testing.T) {
 			t.Errorf("RandomID() = %v, want unique ID", id)
 		}
 		unique[id] = true
-		if !IsValidRandomID(id) {
+		if !IsValidBase36ID(id) {
 			t.Errorf("RandomID() = %v, want IsValidRandomID true", id)
 		}
 	}

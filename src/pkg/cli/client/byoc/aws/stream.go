@@ -104,7 +104,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 			// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
 			response.Host = parts[2] // TODO: figure out actual hostname/IP
 			parts = strings.Split(parts[1], "_")
-			if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
+			if len(parts) != 2 || !pkg.IsValidBase36ID(parts[1]) {
 				// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
 				return nil, nil
 			}

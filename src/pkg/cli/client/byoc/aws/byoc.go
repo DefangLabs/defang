@@ -3,7 +3,9 @@ package aws
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,7 +107,12 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			term.Debug("Failed to get subdomain zone:", err)
 			// return err; FIXME: ignore this error for now
 		} else {
-			b.ProjectDomain = b.getProjectDomain(domain.Zone)
+			whoami, err := b.WhoAmI(ctx)
+			if err != nil {
+				return err
+			}
+
+			b.ProjectDomain = b.getProjectDomain(whoami.Account, domain.Zone)
 			if b.ProjectDomain != "" {
 				b.ShouldDelegateSubdomain = true
 			}
@@ -468,7 +475,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var err error
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
-	if etag != "" && !pkg.IsValidRandomID(etag) {
+	if etag != "" && !pkg.IsValidBase36ID(etag) {
 		// Assume "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
@@ -639,15 +646,14 @@ func (b *ByocAws) getPrivateFqdn(fqn qualifiedName) string {
 	return fmt.Sprintf("%s.%s", safeFqn, b.PrivateDomain) // TODO: consider merging this with ServiceDNS
 }
 
-func (b *ByocAws) getProjectDomain(zone string) string {
+func (b *ByocAws) getProjectDomain(account, zone string) string {
 	if b.ProjectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
-	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
-		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
-	}
-	return projectLabel + "." + byoc.DnsSafe(zone)
+	h := sha256.New()
+	fmt.Fprintf(h, "%s.%s.%s.%s.%s", account, b.ProjectName, b.PulumiStack, b.TenantID, zone)
+
+	return pkg.Base36ID(binary.LittleEndian.Uint64(h.Sum(nil)[:8])) + "." + byoc.DnsSafe(zone)
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {
