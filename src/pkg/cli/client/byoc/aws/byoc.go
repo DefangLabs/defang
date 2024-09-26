@@ -495,16 +495,18 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	if err != nil {
 		return nil, annotateAwsError(err)
 	}
-	var cancel context.CancelCauseFunc
-	ctx, cancel = context.WithCancelCause(ctx)
-	go func() {
-		if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
-			if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
-				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-				cancel(err)
+	if taskArn != nil {
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
+					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+					cancel(err)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
 }
