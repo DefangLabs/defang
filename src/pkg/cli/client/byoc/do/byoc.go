@@ -322,12 +322,21 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 	var appLiveURL string
 	term.Info("Waiting for command to finish to gather logs")
-	deploymentID := cdApp.PendingDeployment.GetID()
 
-	if deploymentID == "" {
-		//Cover the chance that someone runs Tail against a deploy that is already finished.
+	deploymentID := ""
+
+	if cdApp.PendingDeployment != nil {
+		deploymentID = cdApp.PendingDeployment.GetID()
+	}
+
+	if deploymentID == "" && cdApp.ActiveDeployment != nil {
 		deploymentID = cdApp.ActiveDeployment.GetID()
 	}
+
+	if deploymentID == "" {
+		return nil, errors.New("No deployments found")
+	}
+
 	for {
 
 		deploymentInfo, _, err := b.driver.Client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
@@ -337,7 +346,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, false, 150)
+			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, false, 150)
 			if err != nil {
 				return nil, err
 			}
@@ -346,7 +355,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 
 			if err != nil {
 				return nil, err
@@ -408,9 +417,19 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 		return err
 	}
 
+	_, err = b.driver.Client.Registry.Delete(ctx)
+
+	if err != nil {
+		return err
+	}
+
 	_, err = b.driver.Client.Apps.Delete(ctx, app.ID)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
