@@ -331,7 +331,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 				tsColor = termenv.ANSIWhite
 			}
 			if e.Stderr {
-				tsColor = termenv.ANSIBrightRed
+				tsColor = termenv.ansiCyan
 			}
 			var prefixLen int
 			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
