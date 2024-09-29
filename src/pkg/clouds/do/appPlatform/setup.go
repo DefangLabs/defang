@@ -156,13 +156,24 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		})
 	} else {
 		term.Debugf("Creating new CD app")
-		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{
-			Spec: appJobSpec,
+		project, _, err := client.Projects.Create(ctx, &godo.CreateProjectRequest{
+			Name:    CDName,
+			Purpose: "Infrastructure for running Defang commands",
 		})
-	}
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
+		currentCd, _, err = client.Apps.Create(ctx, &godo.AppCreateRequest{
+			Spec:      appJobSpec,
+			ProjectID: project.ID,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return currentCd, nil

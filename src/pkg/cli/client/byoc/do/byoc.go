@@ -350,51 +350,31 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			if err != nil {
 				return nil, err
 			}
+
+			// Return build and app logs if there are any
+			_, err = b.processServiceLogs(ctx)
+			if err != nil {
+				return nil, err
+			}
+
 			readHistoricalLogs(ctx, logs.HistoricURLs)
 			return nil, errors.New("problem deploying app")
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
+
 			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+			if err != nil {
+				return nil, err
+			}
+
+			appLiveURL, err = b.processServiceLogs(ctx)
 
 			if err != nil {
 				return nil, err
 			}
 
 			readHistoricalLogs(ctx, logs.HistoricURLs)
-
-			project, err := b.LoadProject(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
-			mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
-
-			// If we can get projects working, we can add the project to the list options
-			currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
-
-			if err != nil {
-				return nil, err
-			}
-
-			for _, app := range currentApps {
-				if app.Spec.Name == buildAppName {
-					buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
-					if err != nil {
-						return nil, err
-					}
-					readHistoricalLogs(ctx, buildLogs.HistoricURLs)
-				}
-				if app.Spec.Name == mainAppName {
-					mainLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
-					if err != nil {
-						return nil, err
-					}
-					readHistoricalLogs(ctx, mainLogs.HistoricURLs)
-					appLiveURL = mainLogs.LiveURL
-				}
-			}
 
 			break
 		}
@@ -418,13 +398,16 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 	}
 
 	_, err = b.driver.Client.Registry.Delete(ctx)
-
 	if err != nil {
 		return err
 	}
 
 	_, err = b.driver.Client.Apps.Delete(ctx, app.ID)
+	if err != nil {
+		return err
+	}
 
+	_, err = b.driver.Client.Projects.Delete(ctx, byoc.CdTaskPrefix)
 	if err != nil {
 		return err
 	}
@@ -601,9 +584,12 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	// Create the Container Registry here, because DO only allows a single one per account,
 	// so we can't create it in the CD Pulumi process.
-	registry, _, err := b.driver.Client.Registry.Get(ctx)
+	registry, resp, err := b.driver.Client.Registry.Get(ctx)
 	if err != nil {
-		term.Debug("Registry.Get error:", err) // FIXME: check error
+		if resp.StatusCode != 404 {
+			return err
+		}
+		term.Debug("Creating new registry")
 		// Create registry if it doesn't exist
 		registry, _, err = b.driver.Client.Registry.Create(ctx, &godo.RegistryCreateRequest{
 			Name:                 pkg.RandomID(), // has to be globally unique
@@ -655,6 +641,45 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 	}
 
 	return serviceInfo
+}
+
+func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
+
+	project, err := b.LoadProject(ctx)
+	appLiveURL := ""
+
+	if err != nil {
+		return "", err
+	}
+
+	buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
+	mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
+
+	// If we can get projects working, we can add the project to the list options
+	currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, app := range currentApps {
+		if app.Spec.Name == buildAppName {
+			buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
+		}
+		if app.Spec.Name == mainAppName {
+			mainLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, mainLogs.HistoricURLs)
+			appLiveURL = mainLogs.LiveURL
+		}
+	}
+	return appLiveURL, nil
 }
 
 func readHistoricalLogs(ctx context.Context, urls []string) {
