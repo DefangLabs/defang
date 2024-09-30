@@ -47,10 +47,10 @@ var (
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	cdImageTag   string
-	cdTasks      map[string]ecs.TaskArn
-	driver       *cfn.AwsEcs
-	publicNatIps []string
+	cdImageTag      string
+	cdTasks         map[string]ecs.TaskArn
+	delegationSetId *string
+	driver          *cfn.AwsEcs
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -254,15 +254,15 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}, nil
 }
 
-func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
+func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", byoc.AnnotateAwsError(err)
 	}
 
-	if role != "" {
+	if roleARN != "" {
 		stsClient := sts.NewFromConfig(cfg)
-		creds := stscreds.NewAssumeRoleProvider(stsClient, role)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -271,8 +271,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, er
 	domain = strings.TrimSuffix(domain, ".")
 	domain = strings.ToLower(domain)
 	for {
-		zoneId, err := aws.GetZoneIdFromDomain(ctx, domain, r53Client)
-		if errors.Is(err, aws.ErrNoZoneFound) {
+		zone, err := aws.GetHostedZoneByName(ctx, domain, r53Client)
+		if errors.Is(err, aws.ErrZoneNotFound) {
 			if strings.Count(domain, ".") <= 1 {
 				return "", nil
 			}
@@ -281,35 +281,45 @@ func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, er
 		} else if err != nil {
 			return "", err
 		}
-		return zoneId, nil
+		return *zone.Id, nil
 	}
 }
 
 func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	if b.ProjectDomain == "" {
-		return "", errors.New("custom domain not set")
+		panic("custom domain not set")
 	}
-	domain := b.ProjectDomain
+
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return "", byoc.AnnotateAwsError(err)
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	zoneId, err := aws.GetZoneIdFromDomain(ctx, domain, r53Client)
-	if errors.Is(err, aws.ErrNoZoneFound) {
-		zoneId, err = aws.CreateZone(ctx, domain, r53Client)
-		if err != nil {
-			return "", byoc.AnnotateAwsError(err)
-		}
-	} else if err != nil {
+	zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client)
+	if !errors.Is(err, aws.ErrZoneNotFound) {
 		return "", byoc.AnnotateAwsError(err)
 	}
 
-	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, r53types.RRTypeNs, r53Client)
-	if err != nil {
-		return "", byoc.AnnotateAwsError(err)
+	var nsServers []string
+	if zone == nil {
+		// Get the NS records for the delegation set and let Pulumi create the hosted zone for us
+		delegationSet, err := aws.CreateDelegationSet(ctx, nil, r53Client)
+		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
+		if errors.As(err, &delegationSetAlreadyCreated) {
+			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
+		}
+		if err != nil {
+			return "", byoc.AnnotateAwsError(err)
+		}
+		b.delegationSetId = delegationSet.Id
+		nsServers = delegationSet.NameServers
+	} else {
+		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
+		nsServers, err = aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
+		if err != nil {
+			return "", byoc.AnnotateAwsError(err)
+		}
 	}
 	if len(nsServers) == 0 {
 		return "", errors.New("no NS records found for the subdomain zone")
@@ -381,6 +391,9 @@ func (b *ByocAws) environment() map[string]string {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
+	if b.delegationSetId != nil {
+		env["DELEGATION_SET_ID"] = *b.delegationSetId
+	}
 	env["DEFANG_MODE"] = strings.ToLower(mode.String())
 	if term.DoDebug() {
 		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
@@ -643,7 +656,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		}
 	}
 
-	si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
+	// si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if si.Service.Build != nil {
