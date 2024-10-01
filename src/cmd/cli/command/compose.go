@@ -10,7 +10,6 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -200,7 +199,7 @@ func makeComposeUpCmd() *cobra.Command {
 }
 
 func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
-	if _, isPlayground := provider.(*cliClient.PlaygroundProvider); !nonInteractive && isPlayground {
+	if !nonInteractive {
 		failedServices := []string{errDeploymentFailed.Service}
 		track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 		var aiDebug bool
