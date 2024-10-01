@@ -1,0 +1,11 @@
+name: fromenv
+services:
+  fromenv:
+    environment:
+      FROM_ENV: exposed-from-env
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: fromenv_default

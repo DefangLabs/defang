@@ -1,0 +1,5 @@
+services:
+  fromenv:
+    image: alpine
+    environment:
+      - FROM_ENV
