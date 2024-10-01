@@ -27,7 +27,7 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func GetUnreferencedManagedResources(serviceInfos compose.Services) []string {
+func getUnreferencedManagedResources(serviceInfos compose.Services) []string {
 	managedResources := make([]string, 0)
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
@@ -65,7 +65,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = GetUnreferencedManagedResources(project.Services)
+			var managedResources = getUnreferencedManagedResources(project.Services)
 			if len(managedResources) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
 			}
