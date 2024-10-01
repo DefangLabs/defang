@@ -77,7 +77,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		}
 	}
 
-	data, err := proto.Marshal(&defangv1.ListServicesResponse{
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services: serviceInfos,
 	})
 

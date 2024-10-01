@@ -146,7 +146,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		}
 	}
 
-	data, err := proto.Marshal(&defangv1.ListServicesResponse{
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services: serviceInfos,
 	})
 	if err != nil {
