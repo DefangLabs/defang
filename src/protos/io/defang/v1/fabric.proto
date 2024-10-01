@@ -6,7 +6,6 @@ option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
 package io.defang.v1;
 
 import "google/protobuf/empty.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 service FabricController {
@@ -135,7 +134,7 @@ message DeployRequest {
   repeated Service services = 1 [deprecated = true]; // deprecated; use compose
   string project = 2 [deprecated = true]; // deprecated; use compose.name
   DeploymentMode mode = 3;
-  google.protobuf.Struct compose = 4;
+  string compose = 4; // yaml (or json)
 }
 
 message DeployResponse {
@@ -330,12 +329,11 @@ message ListServicesResponse {
   string project = 2;
 }
 
-// TODO: internal message; move to a separate proto file
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
   string project = 3; // should we use compose.name?
-  google.protobuf.Struct compose = 4;
+  string compose = 4;
 }
 
 enum Platform {
@@ -475,7 +473,21 @@ message Postgres {
   option deprecated = true;
 }
 
+// TODO: internal message; move to a separate proto file; was Event
+message DeployEvent {
+  DeploymentMode mode = 1;
+  string type = 2;        // required
+  string source = 3;
+  string id = 4;          // etag
+  string datacontenttype = 5;
+  string dataschema = 6;
+  string subject = 7; // tenant|stack; also used as SQS group ID
+  google.protobuf.Timestamp time = 8;
+  bytes data = 9;
+}
+
 message Event {
+  option deprecated = true;
   string specversion = 1; // required (but we don't care)
   string type = 2;        // required
   string source = 3;      // required
