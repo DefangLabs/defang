@@ -325,26 +325,23 @@ func validatePort(port compose.ServicePortConfig) error {
 	if !validModes[port.Mode] {
 		return fmt.Errorf("port %d: 'mode' not one of [host ingress]: %v", port.Target, port.Mode)
 	}
-	if port.Published != "" && (port.Mode == "host" || port.Protocol == "udp") {
+	if port.Published != "" {
 		portRange := strings.SplitN(port.Published, "-", 2)
 		start, err := strconv.ParseUint(portRange[0], 10, 16)
 		if err != nil {
-			return fmt.Errorf("port %d: 'published' start must be an integer: %v", port.Target, portRange[0])
-		}
-		if len(portRange) == 2 {
+			term.Warnf("port %d: 'published' range start should be an integer; ignoring 'published: %v'", port.Target, portRange[0])
+		} else if len(portRange) == 2 {
 			end, err := strconv.ParseUint(portRange[1], 10, 16)
 			if err != nil {
-				return fmt.Errorf("port %d: 'published' end must be an integer: %v", port.Target, portRange[1])
-			}
-			if start > end {
-				return fmt.Errorf("port %d: 'published' start must be less than end: %v", port.Target, port.Published)
-			}
-			if port.Target < uint32(start) || port.Target > uint32(end) {
-				return fmt.Errorf("port %d: 'published' range must include 'target': %v", port.Target, port.Published)
+				term.Warnf("port %d: 'published' range end should be an integer; ignoring 'published: %v'", port.Target, portRange[1])
+			} else if start > end {
+				term.Warnf("port %d: 'published' range start should be less than end; ignoring 'published: %v'", port.Target, port.Published)
+			} else if port.Target < uint32(start) || port.Target > uint32(end) {
+				term.Warnf("port %d: 'published' range should include 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		} else {
 			if start != uint64(port.Target) {
-				return fmt.Errorf("port %d: 'published' must be empty or equal to 'target': %v", port.Target, port.Published)
+				term.Warnf("port %d: 'published' should be equal to 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		}
 	}

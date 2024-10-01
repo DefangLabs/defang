@@ -70,14 +70,14 @@ func TestConvertPort(t *testing.T) {
 			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
-			name:    "Host mode and protocol, published range xfail",
-			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1511-2222"},
-			wantErr: "port 1234: 'published' range must include 'target': 1511-2222",
+			name:     "Host mode and protocol, published range xfail",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "1511-2222"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
-			name:    "Host mode and protocol, published range xfail",
-			input:   types.ServicePortConfig{Mode: "host", Target: 1234, Published: "22222"},
-			wantErr: "port 1234: 'published' must be empty or equal to 'target': 22222",
+			name:     "Host mode and protocol, published not equals target",
+			input:    types.ServicePortConfig{Mode: "host", Target: 1234, Published: "22222"},
+			expected: &defangv1.Port{Target: 1234, Mode: defangv1.Mode_HOST},
 		},
 		{
 			name:     "Host mode and protocol, target in published range",
