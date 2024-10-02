@@ -1,0 +1,10 @@
+services:
+  interpolate:
+    image: alpine
+    environment:
+      - NAME=$COMPOSE_PROJECT_NAME
+      - BRACED=${COMPOSE_PROJECT_NAME}
+      - DB=postgres://user:$POSTGRES_PASSWORD@db:5432/db
+      - ${COMPOSE_PROJECT_NAME}=value
+      - NOP=abc$$def # FIXME: this should not get resolved in CD
+      - NOP_BRACED=abc$${def} # FIXME: this should not get resolved in CD
