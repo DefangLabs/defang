@@ -57,6 +57,9 @@ const (
 	FabricControllerGetProcedure = "/io.defang.v1.FabricController/Get"
 	// FabricControllerDeleteProcedure is the fully-qualified name of the FabricController's Delete RPC.
 	FabricControllerDeleteProcedure = "/io.defang.v1.FabricController/Delete"
+	// FabricControllerDestroyProcedure is the fully-qualified name of the FabricController's Destroy
+	// RPC.
+	FabricControllerDestroyProcedure = "/io.defang.v1.FabricController/Destroy"
 	// FabricControllerPublishProcedure is the fully-qualified name of the FabricController's Publish
 	// RPC.
 	FabricControllerPublishProcedure = "/io.defang.v1.FabricController/Publish"
@@ -138,6 +141,8 @@ type FabricControllerClient interface {
 	Get(context.Context, *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
+	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
+	// Deprecated: do not use.
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -228,6 +233,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDeleteProcedure,
 			opts...,
 		),
+		destroy: connect_go.NewClient[v1.DestroyRequest, v1.DestroyResponse](
+			httpClient,
+			baseURL+FabricControllerDestroyProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
 		publish: connect_go.NewClient[v1.PublishRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPublishProcedure,
@@ -307,7 +318,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		deleteConfigs: connect_go.NewClient[v1.DeleteConfigsRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerDeleteConfigsProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		listConfigs: connect_go.NewClient[v1.ListConfigsRequest, v1.ListConfigsResponse](
 			httpClient,
@@ -350,7 +362,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		deleteMe: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerDeleteMeProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 	}
 }
@@ -366,6 +379,7 @@ type fabricControllerClient struct {
 	deploy                   *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
 	get                      *connect_go.Client[v1.ServiceID, v1.ServiceInfo]
 	delete                   *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
+	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices              *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
@@ -440,7 +454,14 @@ func (c *fabricControllerClient) Delete(ctx context.Context, req *connect_go.Req
 	return c.delete.CallUnary(ctx, req)
 }
 
+// Destroy calls io.defang.v1.FabricController.Destroy.
+func (c *fabricControllerClient) Destroy(ctx context.Context, req *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error) {
+	return c.destroy.CallUnary(ctx, req)
+}
+
 // Publish calls io.defang.v1.FabricController.Publish.
+//
+// Deprecated: do not use.
 func (c *fabricControllerClient) Publish(ctx context.Context, req *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.publish.CallUnary(ctx, req)
 }
@@ -574,6 +595,8 @@ type FabricControllerHandler interface {
 	Get(context.Context, *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
+	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
+	// Deprecated: do not use.
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -660,6 +683,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.Delete,
 		opts...,
 	)
+	fabricControllerDestroyHandler := connect_go.NewUnaryHandler(
+		FabricControllerDestroyProcedure,
+		svc.Destroy,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	fabricControllerPublishHandler := connect_go.NewUnaryHandler(
 		FabricControllerPublishProcedure,
 		svc.Publish,
@@ -739,7 +768,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDeleteConfigsHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteConfigsProcedure,
 		svc.DeleteConfigs,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerListConfigsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListConfigsProcedure,
@@ -782,7 +812,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDeleteMeHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteMeProcedure,
 		svc.DeleteMe,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -804,6 +835,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetHandler.ServeHTTP(w, r)
 		case FabricControllerDeleteProcedure:
 			fabricControllerDeleteHandler.ServeHTTP(w, r)
+		case FabricControllerDestroyProcedure:
+			fabricControllerDestroyHandler.ServeHTTP(w, r)
 		case FabricControllerPublishProcedure:
 			fabricControllerPublishHandler.ServeHTTP(w, r)
 		case FabricControllerSubscribeProcedure:
@@ -893,6 +926,10 @@ func (UnimplementedFabricControllerHandler) Get(context.Context, *connect_go.Req
 
 func (UnimplementedFabricControllerHandler) Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Delete is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Destroy is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error) {
