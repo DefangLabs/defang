@@ -1,0 +1,2 @@
+ ! service "interpolate": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
+ ! service "interpolate": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
