@@ -9,10 +9,15 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ComposeDown(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
-	projectName, err := client.LoadProjectName(ctx)
-	if err != nil {
-		return "", err
+func ComposeDown(ctx context.Context, client client.Client, projectName string, names ...string) (types.ETag, error) {
+	if projectName == "" {
+		currentProjectName, err := client.LoadProjectName(ctx)
+		if err != nil {
+			return "", err
+		}
+		projectName = currentProjectName
+	} else {
+		client.SetProjectName(ctx, projectName)
 	}
 
 	term.Debugf("Destroying project %q %q", projectName, names)

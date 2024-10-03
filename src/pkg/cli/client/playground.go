@@ -158,3 +158,7 @@ func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
 	term.Debug("Using default playground project: ", resp.Project)
 	return resp.Project, nil
 }
+
+func (g *PlaygroundClient) SetProjectName(ctx context.Context, projectName string) {
+	g.projectName = projectName
+}

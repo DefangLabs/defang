@@ -56,6 +56,27 @@ func prettyError(err error) error {
 	return err
 }
 
+func interactiveComposeDown(ctx context.Context, c cliClient.Client, projectName string) error {
+	var wantComposeDown bool
+	err := survey.AskOne(&survey.Confirm{
+		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
+	}, &wantComposeDown)
+
+	if err != nil {
+		return err
+	}
+
+	if !wantComposeDown {
+		printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+	} else {
+		term.Info("Deactivating project " + projectName)
+		cli.ComposeDown(ctx, c, projectName)
+		printDefangHint("To try deployment again, do:", "compose up")
+	}
+
+	return nil
+}
+
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -89,8 +110,8 @@ func Execute(ctx context.Context) error {
 			projectName := "<name>"
 			if resp, err := client.GetServices(ctx); err == nil {
 				projectName = resp.Project
+				interactiveComposeDown(ctx, client, projectName)
 			}
-			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
 		var cerr *cli.CancelError
