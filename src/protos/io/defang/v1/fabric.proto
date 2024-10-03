@@ -29,8 +29,13 @@ service FabricController {
   };                                                  // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse){
     option deprecated = true;
-  }; // used by pulumi-defang provider; should use Deploy
-  rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+  }; // used by pulumi-defang provider; should use Deploy or Destroy
+  rpc Destroy(DestroyRequest) returns (DestroyResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc Publish(PublishRequest) returns (google.protobuf.Empty) {
+    option deprecated = true;
+  }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
@@ -65,7 +70,9 @@ service FabricController {
   rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   };
-  rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty);
+  rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
@@ -86,7 +93,17 @@ service FabricController {
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
 
   // Endpoint for GDPR compliance
-  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message DestroyRequest {
+  string project = 1; // defaults to tenant ID
+}
+
+message DestroyResponse {
+  string etag = 1;
 }
 
 message DebugRequest {
