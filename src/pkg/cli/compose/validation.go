@@ -99,7 +99,8 @@ func ValidateProject(project *compose.Project) error {
 		}
 		for name := range svccfg.Networks {
 			if _, ok := project.Networks[name]; !ok {
-				term.Warnf("service %q: network %q is not defined in the top-level networks section", svccfg.Name, name)
+				// This was a warning, but we don't really care and want to reduce the noise
+				term.Debugf("service %q: network %q is not defined in the top-level networks section", svccfg.Name, name)
 			}
 		}
 		if len(svccfg.Volumes) > 0 {
@@ -172,7 +173,8 @@ func ValidateProject(project *compose.Project) error {
 			}
 			// secret.Target will always be automatically constructed by compose-go to "/run/secrets/<source>"
 			if s, ok := project.Secrets[secret.Source]; !ok {
-				term.Warnf("secret %q is not defined in the top-level secrets section", secret.Source)
+				// This was a warning, but we don't really care and want to reduce the noise
+				term.Debugf("secret %q is not defined in the top-level secrets section", secret.Source)
 			} else if s.Name != "" && s.Name != secret.Source {
 				return fmt.Errorf("unsupported secret %q: cannot override name %q", secret.Source, s.Name) // TODO: support custom secret names
 			} else if !s.External {
