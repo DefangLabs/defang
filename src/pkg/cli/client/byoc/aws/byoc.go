@@ -146,7 +146,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		}
 	}
 
-	data, err := proto.Marshal(&defangv1.ListServicesResponse{
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services: serviceInfos,
 	})
 	if err != nil {
@@ -468,21 +468,13 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var err error
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
-	if etag != "" && !pkg.IsValidRandomID(etag) {
-		// Assume "etag" is a task ID
+	stopWhenCDTaskDone := false
+	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
 		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
-
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
-				time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-				cancel(err)
-			}
-		}()
+		stopWhenCDTaskDone = true
 	} else {
 		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
@@ -502,6 +494,18 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
+	}
+	if taskArn != nil {
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
+					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+					cancel(err)
+				}
+			}
+		}()
 	}
 
 	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
