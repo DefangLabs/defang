@@ -42,7 +42,8 @@ func ValidateProject(project *compose.Project) error {
 			term.Warnf("service %q: unsupported compose directive: read_only", svccfg.Name)
 		}
 		if svccfg.Restart == "" {
-			term.Warnf("service %q: missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name)
+			// This was a warning, but we don't really care and want to reduce the noise
+			term.Debugf("service %q: missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name)
 		} else if svccfg.Restart != "always" && svccfg.Restart != "unless-stopped" {
 			term.Warnf("service %q: unsupported compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)", svccfg.Name)
 		}
