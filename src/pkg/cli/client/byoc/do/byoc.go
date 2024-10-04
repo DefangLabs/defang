@@ -18,7 +18,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	"github.com/DefangLabs/defang/src/pkg/local"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
@@ -438,24 +437,25 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 }
 
 func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
-	driver := local.New()
-	if err := driver.SetUp(ctx, []types.Container{{
-		EntryPoint: []string{"npm", "run", "dev"},
-		WorkDir:    dir,
-	}}); err != nil {
-		return err
-	}
-	localEnv := map[string]string{
-		"PATH": os.Getenv("PATH"),
-	}
-	for _, v := range b.environment() {
-		localEnv[v.Key] = v.Value
-	}
-	pid, err := driver.Run(ctx, localEnv, cmd...)
-	if err != nil {
-		return err
-	}
-	return driver.Tail(ctx, pid)
+	return errors.ErrUnsupported // TODO: implement for Windows
+	// driver := local.New()
+	// if err := driver.SetUp(ctx, []types.Container{{
+	// 	EntryPoint: []string{"npm", "run", "dev"},
+	// 	WorkDir:    dir,
+	// }}); err != nil {
+	// 	return err
+	// }
+	// localEnv := map[string]string{
+	// 	"PATH": os.Getenv("PATH"),
+	// }
+	// for _, v := range b.environment() {
+	// 	localEnv[v.Key] = v.Value
+	// }
+	// pid, err := driver.Run(ctx, localEnv, cmd...)
+	// if err != nil {
+	// 	return err
+	// }
+	// return driver.Tail(ctx, pid)
 }
 
 func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
