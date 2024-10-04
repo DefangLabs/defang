@@ -24,9 +24,8 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 		return nil, errors.New("DeployRequest needs Compose or Services")
 	}
 
-	asMap := req.Compose.AsMap()
-	p, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: asMap}}}, func(o *loader.Options) {
-		o.SetProjectName(asMap["name"].(string), true) // HACK: workaround for bug in compose-go where it insists on loading the project name from the file
+	p, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Content: req.Compose}}}, func(o *loader.Options) {
+		o.SetProjectName(req.Project, true) // HACK: workaround for bug in compose-go where it insists on loading the project name from the file
 	})
 	if err != nil {
 		return nil, err

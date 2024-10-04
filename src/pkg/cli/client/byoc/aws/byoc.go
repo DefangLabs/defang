@@ -124,7 +124,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, err
 	}
 
-	p, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Config: req.Compose.AsMap()}}})
+	p, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Content: req.Compose}}})
 	if err != nil {
 		return nil, err
 	}

@@ -9,8 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
-	"google.golang.org/protobuf/types/known/structpb"
-	"gopkg.in/yaml.v3"
 )
 
 type ComposeError struct {
@@ -56,17 +54,6 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, mode defangv1.D
 		return nil, project, ErrDryRun
 	}
 
-	// Unmarshal the project into a map so we can convert it to a structpb.Struct
-	var asMap map[string]any
-	if err := yaml.Unmarshal(bytes, &asMap); err != nil {
-		return nil, project, err
-	}
-
-	strpb, err := structpb.NewStruct(asMap)
-	if err != nil {
-		return nil, project, err
-	}
-
 	for _, service := range project.Services {
 		term.Info("Deploying service", service.Name)
 	}
@@ -74,7 +61,7 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, mode defangv1.D
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
 		Mode:    mode,
 		Project: project.Name,
-		Compose: strpb,
+		Compose: bytes,
 	})
 	if err != nil {
 		return nil, project, err

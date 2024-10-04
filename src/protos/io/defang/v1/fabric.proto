@@ -42,6 +42,10 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
+  rpc Restart(RestartRequest) returns (google.protobuf.Empty);
+  // rpc Start(ServiceID) returns (google.protobuf.Empty);
+  // rpc Stop(ServiceID) returns (google.protobuf.Empty);
+
   rpc GenerateFiles(GenerateFilesRequest) returns (
       GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
   rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
@@ -106,6 +110,11 @@ message DestroyResponse {
   string etag = 1;
 }
 
+message RestartRequest {
+  repeated string services = 1;
+  string project = 2; // defaults to tenant ID
+}
+
 message DebugRequest {
   repeated File files = 1;
   string etag = 2;
@@ -151,7 +160,7 @@ message DeployRequest {
   repeated Service services = 1 [deprecated = true]; // deprecated; use compose
   string project = 2 [deprecated = true]; // deprecated; use compose.name
   DeploymentMode mode = 3;
-  string compose = 4; // yaml (or json)
+  bytes compose = 4; // yaml (or json)
 }
 
 message DeployResponse {
@@ -210,7 +219,7 @@ enum ServiceState {
 }
 
 message ServiceInfo {
-  Service service = 1;
+  ServiceID service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
   string project = 3;            // was: tenant; defaults to tenant ID
   string etag = 4;
@@ -344,13 +353,14 @@ message TailResponse {
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
+  // bytes compose = 3;
 }
 
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string project = 3; // should we use compose.name?
-  string compose = 4;
+  string project = 3 [deprecated = true]; // deprecated; use compose.name
+  bytes compose = 4;
 }
 
 enum Platform {
