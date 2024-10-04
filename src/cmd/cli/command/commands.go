@@ -307,7 +307,7 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn("Digital Ocean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
+				term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			// Ignore any env vars when explicitly using the Defang playground provider

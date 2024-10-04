@@ -277,7 +277,7 @@ func (d DoApp) createS3Client() *s3.Client {
 	id := os.Getenv("SPACES_ACCESS_KEY_ID")
 	key := os.Getenv("SPACES_SECRET_ACCESS_KEY")
 	if id == "" || key == "" {
-		panic("digital ocean SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY must be set")
+		panic("DigitalOcean SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY must be set")
 	}
 
 	cfg := aws.Config{

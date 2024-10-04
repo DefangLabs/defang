@@ -422,7 +422,7 @@ func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	return &defangv1.WhoAmIResponse{
 		Tenant:  b.TenantID,
 		Region:  b.driver.Region.String(),
-		Account: "Digital Ocean",
+		Account: "DigitalOcean",
 	}, nil
 }
 
