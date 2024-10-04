@@ -85,8 +85,12 @@ func Execute(ctx context.Context) error {
 			printDefangHint("To manage sensitive service config, use:", "config")
 		}
 
-		if err.Error() == "resource_exhausted: maximum number of projects reached" {
-			printDefangHint("To deactivate a project, do:", "compose down --project-name <name>")
+		if strings.Contains(err.Error(), "maximum number of projects") {
+			projectName := "<name>"
+			if resp, err := client.GetServices(ctx); err == nil {
+				projectName = resp.Project
+			}
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
 		var cerr *cli.CancelError
@@ -99,7 +103,7 @@ func Execute(ctx context.Context) error {
 			// All AWS errors are wrapped in OperationError
 			var oe *smithy.OperationError
 			if errors.As(err, &oe) {
-				fmt.Println("Could not authenticate to the AWS service. Please check your aws credentials and try again.")
+				fmt.Println("Could not authenticate to the AWS service. Please check your AWS credentials and try again.")
 			} else {
 				printDefangHint("Please use the following command to log in:", "login")
 			}
@@ -129,10 +133,10 @@ func Execute(ctx context.Context) error {
 
 func SetupCommands(version string) {
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; "auto", "always" or "never"`)
+	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; one of [always never]`)
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use; use "aws" for bring-your-own-cloud`)
+	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use for bring-your-own-cloud; one of [defang aws]`)
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -292,12 +296,11 @@ var RootCmd = &cobra.Command{
 		switch provider {
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
-				provider = cliClient.ProviderAWS
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws?")
 			} else if doInEnv() {
-				provider = cliClient.ProviderDO
-			} else {
-				provider = cliClient.ProviderDefang
+				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean?")
 			}
+			provider = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:
 			if !awsInEnv() {
 				term.Warn("AWS provider was selected, but AWS environment variables are not set")
@@ -307,9 +310,7 @@ var RootCmd = &cobra.Command{
 				term.Warn("Digital Ocean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider?")
-			}
+			// Ignore any env vars when explicitly using the Defang playground provider
 		}
 
 		cwd, _ := cmd.Flags().GetString("cwd")
@@ -878,6 +879,7 @@ var bootstrapCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",
+	Hidden:  true,
 }
 
 var bootstrapDestroyCmd = &cobra.Command{

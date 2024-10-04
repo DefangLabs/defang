@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -128,7 +129,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 		serviceInfo.Etag = etag // same etag for all services
 		serviceInfos = append(serviceInfos, serviceInfo)
@@ -145,7 +146,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		}
 	}
 
-	data, err := proto.Marshal(&defangv1.ListServicesResponse{
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services: serviceInfos,
 	})
 	if err != nil {
@@ -411,7 +412,7 @@ func (b *ByocAws) getSecretID(name string) string {
 	return b.stackDir(name) // same as defang_service.ts
 }
 
-func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.SecretValue) error {
+func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
 	if !pkg.IsValidSecretName(secret.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
 	}
@@ -466,12 +467,13 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var err error
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
-	if etag != "" && !pkg.IsValidRandomID(etag) {
-		// Assume "etag" is a task ID
+	stopWhenCDTaskDone := false
+	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debug("Tailing task", etag)
+		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
+		stopWhenCDTaskDone = true
 	} else {
 		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
 		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
@@ -491,6 +493,18 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	}
 	if err != nil {
 		return nil, annotateAwsError(err)
+	}
+	if taskArn != nil {
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
+					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+					cancel(err)
+				}
+			}
+		}()
 	}
 
 	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil

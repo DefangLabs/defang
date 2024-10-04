@@ -11,6 +11,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/errdefs"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/template"
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -64,7 +66,7 @@ func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
-	projOpts, err := c.projectOptions()
+	projOpts, err := c.newProjectOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +88,11 @@ func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
 	return project, nil
 }
 
-func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
-	options := c.options
+func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	optFns := []cli.ProjectOptionsFn{
-		cli.WithWorkingDirectory(options.WorkingDir),
+		cli.WithWorkingDirectory(c.options.WorkingDir),
 		// First apply os.Environment, always win
 		// -- DISABLED -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
@@ -113,7 +114,20 @@ func (c *Loader) projectOptions() (*cli.ProjectOptions, error) {
 		cli.WithDefaultProfiles("defang"),
 		cli.WithDiscardEnvFile,
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
+		cli.WithLoadOptions(func(o *loader.Options) {
+			// Override the interpolation substitution function to leave unresolved variables as is for resolution later by CD
+			o.Interpolate.Substitute = func(templ string, mapping template.Mapping) (string, error) {
+				return template.Substitute(templ, func(key string) (string, bool) {
+					if v, ok := mapping(key); ok {
+						return v, true
+					}
+					// Leave unresolved variables as is
+					term.Debugf("Unresolved variable %q will be resolved during deployment", key)
+					return "${" + key + "}", true
+				})
+			}
+		}),
 	}
 
-	return cli.NewProjectOptions(options.ConfigPaths, optFns...)
+	return cli.NewProjectOptions(c.options.ConfigPaths, optFns...)
 }

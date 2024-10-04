@@ -83,14 +83,15 @@ func NewClient(ctx context.Context, cluster string, provider client.Provider, lo
 
 	switch provider {
 	case client.ProviderAWS:
-		term.Info("Using AWS provider") // '#' hack no logner needed as root command skips new client for competion command now
+		term.Info("Using AWS provider")
 		byocClient := aws.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	case client.ProviderDO:
-		term.Info("Using DO provider")
+		term.Info("Using DigitalOcean provider")
 		byocClient := do.NewByoc(ctx, grpcClient, tenantId)
 		return byocClient
 	default:
+		term.Info("Using Defang Playground; consider using BYOC (https://s.defang.io/byoc)")
 		return &client.PlaygroundClient{GrpcClient: grpcClient}
 	}
 }

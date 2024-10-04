@@ -27,6 +27,18 @@ jobs:
         run: go test -test.short -v ./...
         working-directory: src
 
+      - name: Verify Go modules
+        working-directory: src
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || { echo "Go modules are not up to date"; exit 1; }
+
+      - name: Verify Proto files
+        working-directory: src
+        run: |
+          go run github.com/bufbuild/buf/cmd/buf@v1.31.0 generate protos
+          git diff --exit-code protos || { echo "Proto files are not up to date"; exit 1; }
+
       - name: Build MacOS binary
         run: GOOS=darwin go build ./cmd/cli
         working-directory: src
@@ -34,12 +46,6 @@ jobs:
       - name: Build Windows binary
         run: GOOS=windows go build ./cmd/cli
         working-directory: src
-
-      - name: Verify Go modules
-        working-directory: src
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum || { echo "Go modules are not up to date"; exit 1; }
 
   nix-shell-test:
     runs-on: ubuntu-latest

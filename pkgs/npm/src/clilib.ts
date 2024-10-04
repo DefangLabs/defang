@@ -28,12 +28,10 @@ async function getLatestVersion(): Promise<string> {
 }
 
 async function downloadAppArchive(
-  version: string,
   archiveFilename: string,
   outputPath: string
 ): Promise<string | null> {
-  const repo = "DefangLabs/defang";
-  const downloadUrl = `https://github.com/${repo}/releases/download/v${version}/${archiveFilename}`;
+  const downloadUrl = `https://s.defang.io/${archiveFilename}?x-defang-source=npm`;
   const downloadTargetFile = path.join(outputPath, archiveFilename);
 
   return await downloadFile(downloadUrl, downloadTargetFile);
@@ -291,7 +289,6 @@ export async function install(
     const filename = getAppArchiveFilename(version, os.platform, os.arch);
 
     const archiveFile = await downloadAppArchive(
-      version,
       filename,
       saveDirectory
     );

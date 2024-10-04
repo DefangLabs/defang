@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"slices"
@@ -23,8 +24,55 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var resolver dns.Resolver = dns.RootResolver{}
-var httpClient HTTPClient = http.DefaultClient
+type DNSResult struct {
+	IPs    []net.IPAddr
+	Expiry time.Time
+}
+
+var (
+	resolver         dns.Resolver = dns.RootResolver{}
+	dnsCache                      = make(map[string]DNSResult)
+	dnsCacheDuration              = 1 * time.Minute
+	httpClient       HTTPClient   = &http.Client{
+		// Based on the default transport: https://pkg.go.dev/net/http#RoundTripper
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				cached, ok := dnsCache[host]
+				var ips []net.IPAddr
+				if ok && cached.Expiry.After(time.Now()) {
+					ips = cached.IPs
+				} else {
+					ips, err = resolver.LookupIPAddr(ctx, host)
+					if err != nil {
+						return nil, err
+					}
+					// Keep 1min of dns cache to avoid spamming root dns servers
+					expiry := time.Now().Add(dnsCacheDuration)
+					dnsCache[host] = DNSResult{ips, expiry}
+				}
+
+				dialer := &net.Dialer{}
+				rootAddr := net.JoinHostPort(ips[rand.Intn(len(ips))].String(), port)
+				return dialer.DialContext(ctx, network, rootAddr)
+			},
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			term.Debugf("Redirecting from %v to %v", via[len(via)-1].URL, req.URL)
+			return nil
+		},
+	}
+	httpRetryDelayBase = 5 * time.Second
+)
 
 func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
 	projectName, err := client.LoadProjectName(ctx)
@@ -76,7 +124,10 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 		return
 	}
 	term.Infof("Triggering cert generation for %v", domain)
-	triggerCertGeneration(ctx, domain)
+	if err := triggerCertGeneration(ctx, domain); err != nil {
+		term.Errorf("Error triggering cert generation, please try again")
+		return
+	}
 
 	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
@@ -88,7 +139,7 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 	term.Printf("TLS cert for %v is ready\n", domain)
 }
 
-func triggerCertGeneration(ctx context.Context, domain string) {
+func triggerCertGeneration(ctx context.Context, domain string) error {
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		spinCtx, cancel := context.WithCancel(ctx)
@@ -109,14 +160,17 @@ func triggerCertGeneration(ctx context.Context, domain string) {
 			}
 		}()
 	}
-	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 3); err != nil { // Retry incase of DNS error
+	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
+	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
 		term.Debugf(" - Error triggering cert generation: %v", err)
+		return err
 	}
+	return nil
 }
 
 func waitForTLS(ctx context.Context, domain string) error {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	timeout, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -165,7 +219,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	msgShown := false
@@ -252,7 +306,17 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 }
 
 func checkTLSCert(ctx context.Context, domain string) error {
-	return getWithRetries(ctx, fmt.Sprintf("https://%v", domain), 3)
+	url := fmt.Sprintf("https://%v", domain)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req) // http non 200 errors are not considered as errors
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func getWithRetries(ctx context.Context, url string, tries int) error {
@@ -267,7 +331,6 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 			defer resp.Body.Close()
 			var msg []byte
 			msg, err = io.ReadAll(resp.Body)
-			term.Debugf("Response from %v: %v", url, string(msg))
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
@@ -279,7 +342,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		term.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
 		errs = append(errs, err)
 
-		delay := (100 * time.Millisecond) << i // Simple exponential backoff
+		delay := httpRetryDelayBase << i // Simple exponential backoff
 		if err := pkg.SleepWithContext(ctx, delay); err != nil {
 			return err
 		}

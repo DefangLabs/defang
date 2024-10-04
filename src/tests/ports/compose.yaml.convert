@@ -1,0 +1,84 @@
+[
+  {
+    "name": "long",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 82,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "long-published",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 83,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "short",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 80,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "short-published",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 81,
+        "protocol": 3,
+        "mode": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "short-udp",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 84,
+        "protocol": 1
+      }
+    ],
+    "networks": 1
+  },
+  {
+    "name": "short-udp-published",
+    "image": "bogus",
+    "platform": 2,
+    "internal": true,
+    "ports": [
+      {
+        "target": 85,
+        "protocol": 1
+      }
+    ],
+    "networks": 1
+  }
+]

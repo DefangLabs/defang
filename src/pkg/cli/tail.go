@@ -356,7 +356,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 						prefixLen += l
 					}
 				} else {
-					io.WriteString(buf, strings.Repeat(" ", prefixLen))
+					buf.WriteString(strings.Repeat(" ", prefixLen))
 				}
 				if term.StdoutCanColor() {
 					if !strings.Contains(line, "\033[") {
@@ -365,7 +365,8 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 				} else {
 					line = term.StripAnsi(line)
 				}
-				io.WriteString(buf, line)
+				buf.WriteString(line)
+				buf.WriteRune('\n')
 
 				// Detect end logging event
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
@@ -373,7 +374,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 					return nil
 				}
 			}
-			term.Println(buf.String())
+			term.Print(buf.String())
 		}
 	}
 }

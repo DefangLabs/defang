@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/compose-spec/compose-go/v2/types"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -19,7 +21,15 @@ func ValidateProject(project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
+	// Copy the services map into a slice so we can sort them and have consistent output
+	var services []types.ServiceConfig
 	for _, svccfg := range project.Services {
+		services = append(services, svccfg)
+	}
+	sort.Slice(services, func(i, j int) bool {
+		return services[i].Name < services[j].Name
+	})
+	for _, svccfg := range services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
 			// FIXME: this is too strict; we should allow more characters like underscores and dots
@@ -304,37 +314,34 @@ var validModes = map[string]bool{"": true, "host": true, "ingress": true}
 
 func validatePort(port compose.ServicePortConfig) error {
 	if port.Target < 1 || port.Target > 32767 {
-		return fmt.Errorf("port 'target' must be an integer between 1 and 32767: %v", port.Target)
+		return fmt.Errorf("port %d: 'target' must be an integer between 1 and 32767", port.Target)
 	}
 	if port.HostIP != "" {
-		return errors.New("port 'host_ip' is not supported")
+		return fmt.Errorf("port %d: 'host_ip' is not supported", port.Target)
 	}
 	if !validProtocols[port.Protocol] {
-		return fmt.Errorf("port 'protocol' not one of [tcp udp http http2 grpc]: %v", port.Protocol)
+		return fmt.Errorf("port %d: 'protocol' not one of [tcp udp http http2 grpc]: %v", port.Target, port.Protocol)
 	}
 	if !validModes[port.Mode] {
-		return fmt.Errorf("port 'mode' not one of [host ingress]: %v", port.Mode)
+		return fmt.Errorf("port %d: 'mode' not one of [host ingress]: %v", port.Target, port.Mode)
 	}
-	if port.Published != "" && (port.Mode == "host" || port.Protocol == "udp") {
+	if port.Published != "" {
 		portRange := strings.SplitN(port.Published, "-", 2)
 		start, err := strconv.ParseUint(portRange[0], 10, 16)
 		if err != nil {
-			return fmt.Errorf("port 'published' start must be an integer: %v", portRange[0])
-		}
-		if len(portRange) == 2 {
+			term.Warnf("port %d: 'published' range start should be an integer; ignoring 'published: %v'", port.Target, portRange[0])
+		} else if len(portRange) == 2 {
 			end, err := strconv.ParseUint(portRange[1], 10, 16)
 			if err != nil {
-				return fmt.Errorf("port 'published' end must be an integer: %v", portRange[1])
-			}
-			if start > end {
-				return fmt.Errorf("port 'published' start must be less than end: %v", port.Published)
-			}
-			if port.Target < uint32(start) || port.Target > uint32(end) {
-				return fmt.Errorf("port 'published' range must include 'target': %v", port.Published)
+				term.Warnf("port %d: 'published' range end should be an integer; ignoring 'published: %v'", port.Target, portRange[1])
+			} else if start > end {
+				term.Warnf("port %d: 'published' range start should be less than end; ignoring 'published: %v'", port.Target, port.Published)
+			} else if port.Target < uint32(start) || port.Target > uint32(end) {
+				term.Warnf("port %d: 'published' range should include 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		} else {
 			if start != uint64(port.Target) {
-				return fmt.Errorf("port 'published' must be empty or equal to 'target': %v", port.Published)
+				term.Warnf("port %d: 'published' should be equal to 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		}
 	}

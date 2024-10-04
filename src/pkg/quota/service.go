@@ -71,12 +71,12 @@ func (q ServiceQuotas) Validate(service *defangv1.Service) error {
 					}
 				}
 				if !hasLocalhostUrl {
-					return errors.New("invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`")
+					return errors.New("invalid healthcheck: ingress ports require an HTTP healthcheck on `localhost`, see https://s.defang.io/healthchecks")
 				}
 			}
 		case "NONE": // OK iff there are no ingress ports
 			if hasIngress {
-				return fmt.Errorf("invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck")
+				return fmt.Errorf("invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck, see https://s.defang.io/healthchecks")
 			}
 		default:
 			return fmt.Errorf("unsupported healthcheck: %v", service.Healthcheck.Test) // this will have been caught by compose-go

@@ -235,7 +235,7 @@ func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
 	return getTaskStatus(ctx, region, cluster, taskID)
 }
 
-func isTaskTerminalState(status string) bool {
+func isTaskTerminalStatus(status string) bool {
 	// From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-lifecycle-explanation.html
 	switch status {
 	case "DELETED", "STOPPED", "DEPROVISIONING":
@@ -261,18 +261,18 @@ func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId strin
 		return nil // task doesn't exist yet; TODO: check the actual error from DescribeTasks
 	}
 	task := ti.Tasks[0]
-	if task.LastStatus == nil || !isTaskTerminalState(*task.LastStatus) {
+	if task.LastStatus == nil || !isTaskTerminalStatus(*task.LastStatus) {
 		return nil // still running
 	}
 
 	switch task.StopCode {
 	default:
-		return taskFailure{string(task.StopCode), *task.StoppedReason}
+		return TaskFailure{task.StopCode, *task.StoppedReason}
 	case ecsTypes.TaskStopCodeEssentialContainerExited:
 		for _, c := range task.Containers {
 			if c.ExitCode != nil && *c.ExitCode != 0 {
 				reason := fmt.Sprintf("%s with code %d", *task.StoppedReason, *c.ExitCode)
-				return taskFailure{string(task.StopCode), reason}
+				return TaskFailure{task.StopCode, reason}
 			}
 		}
 		fallthrough

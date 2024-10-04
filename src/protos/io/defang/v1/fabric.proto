@@ -1,10 +1,7 @@
-// protos/v1/fabric.proto
+// protos/io/defang/v1/fabric.proto
 syntax = "proto3";
 
 option go_package = "github.com/DefangLabs/defang/src/protos/io/defang/v1";
-// option java_multiple_files = true;
-// option java_package = "io.defang.fabric";
-// option java_outer_classname = "FabricProto";
 
 package io.defang.v1;
 
@@ -23,13 +20,22 @@ service FabricController {
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   rpc Tail(TailRequest) returns (stream TailResponse);
-  rpc Update(Service) returns (ServiceInfo); // deprecated; use Deploy
+  rpc Update(Service) returns (ServiceInfo) {
+    option deprecated = true;
+  }; // used by pulumi-defang provider; should use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(ServiceID) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };                                                  // should be GetService
-  rpc Delete(DeleteRequest) returns (DeleteResponse); // deprecated; use Deploy
-  rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+  rpc Delete(DeleteRequest) returns (DeleteResponse){
+    option deprecated = true;
+  }; // used by pulumi-defang provider; should use Deploy or Destroy
+  rpc Destroy(DestroyRequest) returns (DestroyResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc Publish(PublishRequest) returns (google.protobuf.Empty) {
+    option deprecated = true;
+  }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
@@ -42,7 +48,7 @@ service FabricController {
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc Debug(DebugRequest) returns (DebugResponse); // TEST
+  rpc Debug(DebugRequest) returns (DebugResponse);
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
@@ -50,11 +56,27 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  rpc PutSecret(SecretValue) returns (google.protobuf.Empty);
-  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty);
+  // deprecate - change to use *Config functions
+  rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
+    option deprecated = true;
+  } // no values
+
+  rpc GetConfigs(GetConfigsRequest) returns (GetConfigsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
+  rpc PutConfig(PutConfigRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  };
+  rpc DeleteConfigs(DeleteConfigsRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
@@ -69,6 +91,19 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
   rpc Track(TrackRequest) returns (google.protobuf.Empty);
+
+  // Endpoint for GDPR compliance
+  rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+message DestroyRequest {
+  string project = 1; // defaults to tenant ID
+}
+
+message DestroyResponse {
+  string etag = 1;
 }
 
 message DebugRequest {
@@ -113,9 +148,10 @@ enum DeploymentMode {
 }
 
 message DeployRequest {
-  repeated Service services = 1;
-  string project = 2;
+  repeated Service services = 1 [deprecated = true]; // deprecated; use compose
+  string project = 2 [deprecated = true]; // deprecated; use compose.name
   DeploymentMode mode = 3;
+  string compose = 4; // yaml (or json)
 }
 
 message DeployResponse {
@@ -180,7 +216,7 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7; // comma-separated list of internal CIDR for the load-balancer
+  repeated string lb_ips = 7; // comma-separated list of internal CIDRs for the load-balancer
   string private_fqdn = 8; // fully qualified domain name (host)
   string public_fqdn = 9;  // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
@@ -189,24 +225,67 @@ message ServiceInfo {
   bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
   reserved 14; // was: string lb_dns
   ServiceState state = 15; // enumerated status of the service
+  string domainname = 16; // domain name for the service
 
   // bool is_function = 5; // true if service is a function
 }
 
-// message Project {
-//   repeated Service services = 1;
-//   repeated SecretValue secrets = 2;
-// }
-
 message Secrets {
+  option deprecated = true;
   repeated string names = 1;
   string project = 2; // defaults to tenant ID
 }
 
 message SecretValue {
+  option deprecated = true;
   string name = 1;
   string value = 2;
   string project = 3; // defaults to tenant ID
+}
+
+enum ConfigType {
+  CONFIGTYPE_UNSPECIFIED = 0;
+  CONFIGTYPE_SENSITIVE = 1;
+}
+
+message Config {
+  string name = 1;
+  string value = 2;
+  string project = 3;
+  ConfigType type = 4;
+}
+
+message ConfigKey {
+  string name = 1;
+  string project = 2; // defaults to tenant ID
+}
+
+message PutConfigRequest {
+  string name = 1;
+  string value = 2;
+  string project = 3;
+  ConfigType type = 4;
+}
+
+message GetConfigsRequest {
+  repeated ConfigKey configs = 1;
+}
+
+message GetConfigsResponse {
+  repeated Config configs = 1;
+}
+
+
+message DeleteConfigsRequest {
+  repeated ConfigKey configs = 1;
+}
+
+message ListConfigsRequest {
+  string project = 1; // defaults to tenant ID
+}
+
+message ListConfigsResponse {
+  repeated ConfigKey configs = 1;
 }
 
 message TokenRequest {
@@ -251,6 +330,7 @@ message LogEntry {
   string service = 4;
   string etag = 5;
   string host = 6;
+  string job = 7;
 }
 
 message TailResponse {
@@ -266,14 +346,15 @@ message ListServicesResponse {
   string project = 2;
 }
 
-// TODO: internal message; move to a separate proto file
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string project = 3;
+  string project = 3; // should we use compose.name?
+  string compose = 4;
 }
 
 enum Platform {
+  option deprecated = true;
   LINUX_AMD64 = 0;
   LINUX_ARM64 = 1;
   LINUX_ANY = 2;
@@ -282,36 +363,28 @@ enum Platform {
 message ServiceID { string name = 1; }
 
 message Device {
+  option deprecated = true;
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
-
-  // repeated string device_ids = 4; // device IDs to reserve
-  // map<string, string> options = 5;
 }
 
-/* placement specifies constraints and preferences for platform to select a
- * physical node to run service containers. */
-// message Placement {
-//   /* constraints defines a REQUIRED property the platform's node MUST fulfill
-//   to run service container. */ map<string, string> constraints = 1;
-//   /* preferences defines a property the platform's node SHOULD fulfill to run
-//   service container. */ map<string, string> preferences = 2;
-// }
-
 message Resource {
+  option deprecated = true;
   float memory = 1;            // in MiB
   float cpus = 2;              // fractional vCPUs
   repeated Device devices = 3; // devices & capabilities
 }
 
 message Resources {
+  option deprecated = true;
   Resource reservations = 1; // requested resources
 
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
+  option deprecated = true;
   uint32 replicas = 1;     // number of initial replicas
   Resources resources = 2; // reservations and limits
 
@@ -326,6 +399,7 @@ message Deploy {
 // }
 
 enum Protocol {
+  option deprecated = true;
   ANY = 0; // unspecified means any protocol
   UDP = 1;
   TCP = 2;
@@ -335,11 +409,13 @@ enum Protocol {
 }
 
 enum Mode {
+  option deprecated = true;
   HOST = 0;    // no load-balancer; suitable for internal services and functions
   INGRESS = 1; // with load-balancer; suitable for public services
 }
 
 message Port {
+  option deprecated = true;
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
@@ -349,54 +425,41 @@ message Port {
 }
 
 message Secret {
+  option deprecated = true;
   string source = 1; // name of the secret
   // string target = 2;
 }
 
 message Build {
+  option deprecated = true;
   string context = 1;           // path or URL to the build context
   string dockerfile = 2;        // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
   float shm_size = 4;           // in MiB
   string target = 5;
-
-  // string dockerfile_inline = 4; // inline Dockerfile
-  // repeated string ssh = 4;
-  // repeated string cache_from = 4;
-  // repeated string cache_to = 4;
-  // repeated string extra_hosts = 4;
-  // string isolation = 4;
-  // bool privileged = 4;
-  // map<string, string> labels = 4;
-  // bool no_cache = 4;
-  // bool pull = 4;
-  // repeated Secret secrets = 4;
-  // repeated string tags = 4;
-  // repeated Platform platforms = 4;
 }
 
 message HealthCheck {
+  option deprecated = true;
   repeated string test = 1;
   uint32 interval = 2; // in seconds
   uint32 timeout = 3;  // in seconds; must be less than interval
   uint32 retries = 4;
-
-  // uint32 start_period = 5;
-  // uint32 start_interval = 5; not supported by ECS
-  // bool disable = 6;
 }
 
 enum Network {
+  option deprecated = true;
   UNSPECIFIED = 0; // was: internal=false
   PRIVATE = 1;     // was: internal=true
   PUBLIC = 2;
 }
 
 message Service {
+  option deprecated = true;
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4; // deprecated: use networks
+  bool internal = 4 [deprecated = true]; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -411,17 +474,37 @@ message Service {
   Network networks = 16;         // currently only 1 network is supported
   Redis redis = 18; // x-defang-redis: use a managed redis
   Postgres postgres = 19; // x-defang-postgres: use a managed
+  string project = 20; // defaults to tenant ID
 }
 
 message StaticFiles {
+  option deprecated = true;
   string folder = 1;
   repeated string redirects = 2;
 }
 
-message Redis {}
-message Postgres {}
+message Redis {
+  option deprecated = true;
+}
+message Postgres {
+  option deprecated = true;
+}
+
+// TODO: internal message; move to a separate proto file; was Event
+message DeployEvent {
+  DeploymentMode mode = 1;
+  string type = 2;        // required
+  string source = 3;
+  string id = 4;          // etag
+  string datacontenttype = 5;
+  string dataschema = 6;
+  string subject = 7; // tenant|stack; also used as SQS group ID
+  google.protobuf.Timestamp time = 8;
+  bytes data = 9;
+}
 
 message Event {
+  option deprecated = true;
   string specversion = 1; // required (but we don't care)
   string type = 2;        // required
   string source = 3;      // required
