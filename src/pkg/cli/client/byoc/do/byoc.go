@@ -523,16 +523,16 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "DIGITALOCEAN_TOKEN",
-			Value: pkg.Getenv("DIGITALOCEAN_TOKEN", ""),
+			Value: os.Getenv("DIGITALOCEAN_TOKEN"),
 		},
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
-			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "SPACES_SECRET_ACCESS_KEY",
-			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
@@ -549,12 +549,12 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions
-			Value: pkg.Getenv("SPACES_ACCESS_KEY_ID", ""),
+			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions
-			Value: pkg.Getenv("SPACES_SECRET_ACCESS_KEY", ""),
+			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
 			Type:  godo.AppVariableType_Secret,
 		},
 	}
