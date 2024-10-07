@@ -247,7 +247,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 				return nil
 			}
 			if !msgShown {
-				Logger.Infof("Please setup CNAME record for %v", domain)
+				Logger.Infof("Please set up a CNAME record for %v", domain)
 				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
 				Logger.Infof("Waiting for CNAME record setup and DNS propagation...")
 				msgShown = true
