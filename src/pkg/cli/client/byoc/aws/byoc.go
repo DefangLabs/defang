@@ -36,6 +36,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var (
+	// Changing this will cause issues if two clients with different versions are using the same account
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:"+byoc.CdImageTag)
+)
+
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
@@ -73,12 +78,12 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			VolumesFrom: []string{
 				cdTaskName,
 			},
-			WorkDir:    ptr.String("/app"),
+			WorkDir:    "/app",
 			DependsOn:  map[string]types.ContainerCondition{cdTaskName: "START"},
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     byoc.CdImage,
+			Image:     CdImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -159,13 +164,13 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		payloadString = base64.StdEncoding.EncodeToString(data)
 		// TODO: consider making this a proper Data URL: "data:application/protobuf;base64,abcd…"
 	} else {
-		url, err := b.driver.CreateUploadURL(ctx, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, etag)
 		if err != nil {
 			return nil, err
 		}
 
 		// Do an HTTP PUT to the generated URL
-		resp, err := http.Put(ctx, url, "application/protobuf", bytes.NewReader(data))
+		resp, err := http.Put(ctx, payloadUrl, "application/protobuf", bytes.NewReader(data))
 		if err != nil {
 			return nil, err
 		}
@@ -173,8 +178,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
-		payloadString = http.RemoveQueryParam(url)
-		// FIXME: this code path didn't work
+		payloadString = http.RemoveQueryParam(payloadUrl)
 	}
 
 	if b.ShouldDelegateSubdomain {
@@ -291,7 +295,7 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 }
 
 func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
+	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 

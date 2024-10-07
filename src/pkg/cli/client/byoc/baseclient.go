@@ -15,13 +15,13 @@ import (
 )
 
 const (
+	// Changing this will cause issues if two clients with different versions are using the same account
+	CdImageTag   = "public-beta"
 	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
-	DefangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
 var (
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
+	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -85,8 +85,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
-	return &defangv1.Version{Fabric: cdVersion}, nil
+	return &defangv1.Version{Fabric: CdImageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
