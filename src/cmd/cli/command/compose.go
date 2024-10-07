@@ -55,7 +55,8 @@ func makeComposeUpCmd() *cobra.Command {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
 					if resp, err2 := client.GetServices(cmd.Context()); err2 == nil {
 						term.Error("Error:", prettyError(err))
-						if err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
+						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
+							term.Debug("ComposeDown failed:", err)
 							printDefangHint("To deactivate a project, do:", "compose down --project-name "+resp.Project)
 						} else {
 							printDefangHint("To try deployment again, do:", "compose up")

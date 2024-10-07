@@ -42,21 +42,20 @@ func ComposeDown(ctx context.Context, client client.Client, projectName string, 
 
 var ErrDoNotComposeDown = errors.New("user did not want to compose down")
 
-func InteractiveComposeDown(ctx context.Context, c client.Client, projectName string) error {
+func InteractiveComposeDown(ctx context.Context, c client.Client, projectName string) (types.ETag, error) {
 	var wantComposeDown bool
 	err := survey.AskOne(&survey.Confirm{
 		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
 	}, &wantComposeDown)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if !wantComposeDown {
-		return ErrDoNotComposeDown
-	} else {
-		term.Info("Deactivating project " + projectName)
-		ComposeDown(ctx, c, projectName)
-		return nil
+		return "", ErrDoNotComposeDown
 	}
+	
+	term.Info("Deactivating project " + projectName)
+	return ComposeDown(ctx, c, projectName)
 }
