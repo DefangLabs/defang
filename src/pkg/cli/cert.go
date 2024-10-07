@@ -295,7 +295,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 			Logger.Debugf("IP for %v is %v", cname, cnameIPAddrs)
 			cnameIPs := dns.IpAddrsToIPs(cnameIPAddrs)
 			if containsAllIPs(albIPs, cnameIPs) {
-				Logger.Warnf("CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
+				Logger.Warnf("CNAME for %v is pointing to %v which has the same IP addresses as the load balancer %v", domain, cname, validCNAMEs)
 				return true
 			}
 		}
