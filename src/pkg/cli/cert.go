@@ -29,6 +29,15 @@ type DNSResult struct {
 	Expiry time.Time
 }
 
+type logger interface {
+	Debugf(format string, args ...any) (int, error)
+	Infof(format string, args ...any) (int, error)
+	Warnf(format string, args ...any) (int, error)
+	Errorf(format string, args ...any) (int, error)
+}
+
+var Logger logger = term.DefaultTerm
+
 var (
 	resolver         dns.Resolver = dns.RootResolver{}
 	dnsCache                      = make(map[string]DNSResult)
@@ -67,7 +76,7 @@ var (
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			term.Debugf("Redirecting from %v to %v", via[len(via)-1].URL, req.URL)
+			Logger.Debugf("Redirecting from %v to %v", via[len(via)-1].URL, req.URL)
 			return nil
 		},
 	}
@@ -79,7 +88,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	if err != nil {
 		return err
 	}
-	term.Debugf("Generating TLS cert for project %q", projectName)
+	Logger.Debugf("Generating TLS cert for project %q", projectName)
 
 	services, err := client.GetServices(ctx)
 	if err != nil {
@@ -96,47 +105,47 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 					targets = append(targets, endpoint)
 				}
 			}
-			term.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
+			Logger.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
 			generateCert(ctx, service.Service.Domainname, targets)
 		}
 	}
 	if cnt == 0 {
-		term.Infof("No services found need to generate TLS cert")
+		Logger.Infof("No services found need to generate TLS cert")
 	}
 
 	return nil
 }
 
 func generateCert(ctx context.Context, domain string, targets []string) {
-	term.Infof("Triggering TLS cert generation for %v", domain)
+	Logger.Infof("Triggering TLS cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets); err != nil {
-		term.Errorf("Error waiting for CNAME: %v", err)
+		Logger.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
 
-	term.Infof("%v DNS is properly configured!", domain)
+	Logger.Infof("%v DNS is properly configured!", domain)
 	if err := checkTLSCert(ctx, domain); err == nil {
-		term.Infof("TLS cert for %v is already ready", domain)
+		Logger.Infof("TLS cert for %v is already ready", domain)
 		return
 	}
 	if err := pkg.SleepWithContext(ctx, 5*time.Second); err != nil { // slight delay to ensure DNS to propagate
-		term.Errorf("Error waiting for DNS propagation: %v", err)
+		Logger.Errorf("Error waiting for DNS propagation: %v", err)
 		return
 	}
-	term.Infof("Triggering cert generation for %v", domain)
+	Logger.Infof("Triggering cert generation for %v", domain)
 	if err := triggerCertGeneration(ctx, domain); err != nil {
-		term.Errorf("Error triggering cert generation, please try again")
+		Logger.Errorf("Error triggering cert generation, please try again")
 		return
 	}
 
-	term.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
+	Logger.Infof("Waiting for TLS cert to be online for %v, this could take a few minutes", domain)
 	if err := waitForTLS(ctx, domain); err != nil {
-		term.Errorf("Error waiting for TLS to be online: %v", err)
+		Logger.Errorf("Error waiting for TLS to be online: %v", err)
 		// FIXME: Add more info on how to debug, possibly provided by the server side to avoid client type detection here
 		return
 	}
 
-	term.Printf("TLS cert for %v is ready\n", domain)
+	Logger.Infof("TLS cert for %v is ready\n", domain)
 }
 
 func triggerCertGeneration(ctx context.Context, domain string) error {
@@ -163,7 +172,7 @@ func triggerCertGeneration(ctx context.Context, domain string) error {
 	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
 	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
-		term.Debugf(" - Error triggering cert generation: %v", err)
+		Logger.Debugf(" - Error triggering cert generation: %v", err)
 		return err
 	}
 	return nil
@@ -189,7 +198,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 			if err := checkTLSCert(timeout, domain); err == nil {
 				return nil
 			} else {
-				term.Debugf("Error checking TLS cert for %v: %v", domain, err)
+				Logger.Debugf("Error checking TLS cert for %v: %v", domain, err)
 			}
 			if doSpinner {
 				fmt.Print(spin.Next())
@@ -234,13 +243,13 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if checkDomainDNSReady(ctx, domain, targets) {
+			if CheckDomainDNSReady(ctx, domain, targets) {
 				return nil
 			}
 			if !msgShown {
-				term.Infof("Please setup CNAME record for %v", domain)
+				Logger.Infof("Please setup CNAME record for %v", domain)
 				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
-				term.Infof("Waiting for CNAME record setup and DNS propagation...")
+				Logger.Infof("Waiting for CNAME record setup and DNS propagation...")
 				msgShown = true
 			}
 			if doSpinner {
@@ -252,41 +261,41 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 
 // The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
 // OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync
-func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string) bool {
+func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string) bool {
 	for i, validCNAME := range validCNAMEs {
 		validCNAMEs[i] = strings.TrimSuffix(validCNAME, ".")
 	}
 	cname, err := getCNAMEInSync(ctx, domain)
-	term.Debugf("CNAME for %v is :'%v', err: %v", domain, cname, err)
+	Logger.Debugf("CNAME for %v is :'%v', err: %v", domain, cname, err)
 	// Ignore other types of DNS errors
 	if err == errDNSNotInSync {
-		term.Debugf("CNAME for %v is not in sync: %v", domain, cname)
+		Logger.Debugf("CNAME for %v is not in sync: %v", domain, cname)
 		return false
 	}
 	cname = strings.TrimSuffix(cname, ".")
 	if slices.Contains(validCNAMEs, cname) {
-		term.Debugf("CNAME for %v is in sync: %v", domain, cname)
+		Logger.Debugf("CNAME for %v is in sync: %v", domain, cname)
 		return true
 	}
 
 	albIPAddrs, err := resolver.LookupIPAddr(ctx, validCNAMEs[0])
 	if err != nil {
-		term.Debugf("Could not resolve A/AAAA record for load balancer %v: %v", validCNAMEs[0], err)
+		Logger.Debugf("Could not resolve A/AAAA record for load balancer %v: %v", validCNAMEs[0], err)
 		return false
 	}
 	albIPs := dns.IpAddrsToIPs(albIPAddrs)
 
 	// In sync CNAME may be pointing to the same IP addresses of the load balancer, considered as valid
-	term.Debugf("Checking CNAME %v", cname)
+	Logger.Debugf("Checking CNAME %v", cname)
 	if cname != "" {
 		cnameIPAddrs, err := resolver.LookupIPAddr(ctx, cname)
 		if err != nil {
-			term.Debugf("Could not resolve A/AAAA record for %v: %v", cname, err)
+			Logger.Debugf("Could not resolve A/AAAA record for %v: %v", cname, err)
 		} else {
-			term.Debugf("IP for %v is %v", cname, cnameIPAddrs)
+			Logger.Debugf("IP for %v is %v", cname, cnameIPAddrs)
 			cnameIPs := dns.IpAddrsToIPs(cnameIPAddrs)
 			if containsAllIPs(albIPs, cnameIPs) {
-				term.Warnf("CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
+				Logger.Warnf("CNAME for %v is pointing to %v which has the same IP addresses of the load balancer %v", domain, cname, validCNAMEs)
 				return true
 			}
 		}
@@ -295,11 +304,11 @@ func checkDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	// Check if an valid A record has been set
 	ips, err := getIPInSync(ctx, domain)
 	if err != nil {
-		term.Debugf("IP for %v not in sync: %v", domain, err)
+		Logger.Debugf("IP for %v not in sync: %v", domain, err)
 		return false
 	}
 	if containsAllIPs(albIPs, ips) {
-		term.Warnf("IP for %v is pointing to the same IP addresses of the load balancer %v", domain, validCNAMEs) // TODO: Better warning message
+		Logger.Debugf("IP for %v is pointing to the same IP addresses of the load balancer %v", domain, validCNAMEs) // TODO: Better warning message
 		return true
 	}
 	return false
@@ -339,7 +348,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 			}
 		}
 
-		term.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
+		Logger.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
 		errs = append(errs, err)
 
 		delay := httpRetryDelayBase << i // Simple exponential backoff
@@ -364,13 +373,13 @@ func getCNAMEInSync(ctx context.Context, domain string) (string, error) {
 	for _, n := range ns {
 		cname, err = dns.ResolverAt(n.Host).LookupCNAME(ctx, domain)
 		if err != nil {
-			term.Debugf("Error looking up CNAME for %v at %v: %v", domain, n, err)
+			Logger.Debugf("Error looking up CNAME for %v at %v: %v", domain, n, err)
 			lookupErr = err
 		}
 		cnames[cname] = true
 	}
 	if len(cnames) > 1 {
-		term.Debugf("CNAMEs for %v are not in sync among NS servers %v: %v", domain, dns.NSHosts(ns), cnames)
+		Logger.Debugf("CNAMEs for %v are not in sync among NS servers %v: %v", domain, dns.NSHosts(ns), cnames)
 		return "", errDNSNotInSync
 	}
 	return cname, lookupErr
@@ -388,7 +397,7 @@ func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
 		var ipAddrs []net.IPAddr
 		ipAddrs, err = dns.ResolverAt(n.Host).LookupIPAddr(ctx, domain)
 		if err != nil {
-			term.Debugf("Error looking up IP for %v at %v: %v", domain, n, err)
+			Logger.Debugf("Error looking up IP for %v at %v: %v", domain, n, err)
 			lookupErr = err
 		}
 		if i == 0 {
@@ -398,7 +407,7 @@ func getIPInSync(ctx context.Context, domain string) ([]net.IP, error) {
 		} else {
 			newFoundIPs := dns.IpAddrsToIPs(ipAddrs)
 			if !dns.SameIPs(results, newFoundIPs) {
-				term.Debugf("IP addresses for %v are not in sync among NS servers %v: %v <> %v", domain, dns.NSHosts(ns), results, newFoundIPs)
+				Logger.Debugf("IP addresses for %v are not in sync among NS servers %v: %v <> %v", domain, dns.NSHosts(ns), results, newFoundIPs)
 				return nil, errDNSNotInSync
 			}
 		}
