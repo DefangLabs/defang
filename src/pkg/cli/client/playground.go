@@ -44,21 +44,25 @@ func (g PlaygroundClient) GetServices(ctx context.Context) (*defangv1.ListServic
 }
 
 func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
+	_, err := g.client.PutConfig(ctx, connect.NewRequest(req))
 	return err
 }
 
-func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
+func (g PlaygroundClient) DeleteConfigs(ctx context.Context, req *defangv1.DeleteConfigsRequest) error {
+	_, err := g.client.DeleteConfigs(ctx, connect.NewRequest(req))
 	return err
 }
 
-func (g PlaygroundClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
+func (g PlaygroundClient) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.ListConfigsResponse, error) {
+	return getMsg(g.client.ListConfigs(ctx, connect.NewRequest(req)))
 }
 
 func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
+}
+
+func (g PlaygroundClient) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	return getMsg(g.client.GetConfigs(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {

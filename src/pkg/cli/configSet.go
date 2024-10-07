@@ -8,16 +8,22 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigSet(ctx context.Context, client client.Client, name string, value string) error {
-	projectName, err := client.LoadProjectName(ctx)
+func ConfigSet(ctx context.Context, client client.Client, name string, value string, isSensitive bool) error {
+	project, err := client.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debugf("Setting config %q in project %q", name, projectName)
+	term.Debugf("Setting config %q in project %q", name, project)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	return client.PutConfig(ctx, &defangv1.PutConfigRequest{Name: name, Value: value})
+	configType := defangv1.ConfigType_CONFIGTYPE_UNSPECIFIED
+	if isSensitive {
+		configType = defangv1.ConfigType_CONFIGTYPE_SENSITIVE
+	}
+
+	config := defangv1.PutConfigRequest{Project: project, Name: name, Value: value, Type: configType}
+	return client.PutConfig(ctx, &config)
 }

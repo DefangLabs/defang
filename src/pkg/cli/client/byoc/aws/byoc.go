@@ -47,6 +47,9 @@ type ByocAws struct {
 	handlersLock     sync.RWMutex
 }
 
+const SENSITIVE_PATH_PART = ""
+const CONFIG_PATH_PART = "config"
+
 var _ client.Client = (*ByocAws)(nil)
 
 func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
@@ -409,32 +412,65 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	return &serviceInfos, nil
 }
 
-func (b *ByocAws) getSecretID(name string) string {
+func (b *ByocAws) getConfigPathID(name string) string {
 	return b.stackDir(name) // same as defang_service.ts
 }
 
-func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
-	if !pkg.IsValidSecretName(secret.Name) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", secret.Name))
+func (b *ByocAws) PutConfig(ctx context.Context, config *defangv1.PutConfigRequest) error {
+	if !pkg.IsValidConfigName(config.Name) {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", config.Name))
 	}
-	fqn := b.getSecretID(secret.Name)
-	term.Debugf("Putting parameter %q", fqn)
-	err := b.driver.PutSecret(ctx, fqn, secret.Value)
+
+	describe := ""
+	if config.Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE {
+		describe = " (sensitive)"
+	}
+
+	term.Debugf("Putting parameter %q%s", config.Name, describe)
+
+	err := b.driver.PutConfig(ctx, b.getConfigPathID(""), config.Name, config.Value, config.Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE)
+
 	return annotateAwsError(err)
 }
 
-func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	prefix := b.getSecretID("")
+func (b *ByocAws) GetConfigs(ctx context.Context, req *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error) {
+	paramNames := []string{}
+	for _, config := range req.Configs {
+		if config.Name != "" {
+			if !pkg.IsValidConfigName(config.Name) {
+				return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid config name; must be alphanumeric or _, cannot start with a number: %q", config.Name))
+			}
+
+			paramNames = append(paramNames, config.Name)
+		}
+	}
+
+	rootPath := b.getConfigPathID("")
+	configValue, err := b.driver.GetConfigs(ctx, rootPath, paramNames...)
+	if err != nil {
+		term.Errorf("error getting config: %v", err)
+		return nil, annotateAwsError(err)
+	}
+
+	results := defangv1.GetConfigsResponse{}
+	results.Configs = configValue.Configs
+	return &results, nil
+}
+
+func (b *ByocAws) ListConfigs(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.ListConfigsResponse, error) {
+	prefix := b.getConfigPathID("")
 	term.Debugf("Listing parameters with prefix %q", prefix)
-	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
+	awsConfigs, err := b.driver.ListConfigsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
-	configs := make([]string, len(awsSecrets))
-	for i, secret := range awsSecrets {
-		configs[i] = strings.TrimPrefix(secret, prefix)
+
+	configs := make([]*defangv1.ConfigKey, len(awsConfigs))
+	for i, name := range awsConfigs {
+		configs[i] = &defangv1.ConfigKey{Project: req.Project, Name: name}
 	}
-	return &defangv1.Secrets{Names: configs}, nil
+
+	return &defangv1.ListConfigsResponse{Configs: configs}, nil
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -590,13 +626,13 @@ func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv
 	if len(secrets) == 0 {
 		return nil, nil // no secrets to check
 	}
-	prefix := b.getSecretID("")
-	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
+	prefix := b.getConfigPathID("")
+	sorted, err := b.driver.ListConfigsByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
 	for _, secret := range secrets {
-		fqn := b.getSecretID(secret.Source)
+		fqn := b.getConfigPathID(secret.Source)
 		if !searchSecret(sorted, fqn) {
 			return secret, nil // secret not found
 		}
@@ -673,13 +709,15 @@ func (b *ByocAws) Destroy(ctx context.Context) (string, error) {
 	return b.BootstrapCommand(ctx, "down")
 }
 
-func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
-	ids := make([]string, len(secrets.Names))
-	for i, name := range secrets.Names {
-		ids[i] = b.getSecretID(name)
+func (b *ByocAws) DeleteConfigs(ctx context.Context, req *defangv1.DeleteConfigsRequest) error {
+	rootPath := b.getConfigPathID("")
+	nameList := make([]string, len(req.Configs))
+	for i, config := range req.Configs {
+		nameList[i] = config.Name
 	}
-	term.Debug("Deleting parameters", ids)
-	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
+
+	term.Debug("Deleting parameters", nameList)
+	if err := b.driver.DeleteConfigs(ctx, rootPath, nameList...); err != nil {
 		return annotateAwsError(err)
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestConvertPort(t *testing.T) {
@@ -154,7 +155,9 @@ func TestConvert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextIgnore)
+
+		project := compose.Project{Name: "proj"}
+		services, err := ConvertServices(context.Background(), client.MockClient{Project: &project}, proj.Services, BuildContextIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}

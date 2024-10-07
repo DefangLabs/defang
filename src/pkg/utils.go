@@ -25,7 +25,7 @@ func IsValidTailName(name string) bool {
 	return len(name) < 64 && validServiceRegex.MatchString(name)
 }
 
-func IsValidSecretName(name string) bool {
+func IsValidConfigName(name string) bool {
 	return validSecretRegex.MatchString(name)
 }
 
@@ -113,4 +113,13 @@ func Contains[T comparable](s []T, v T) bool {
 		}
 	}
 	return false
+}
+
+func StripPath(name string) string {
+	lastIndex := strings.LastIndex(name, "/")
+	if lastIndex >= 0 {
+		return name[lastIndex+1:]
+	} else {
+		return name
+	}
 }

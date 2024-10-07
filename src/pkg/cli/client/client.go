@@ -43,12 +43,13 @@ type Client interface {
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
-	DeleteConfig(context.Context, *defangv1.Secrets) error
+	DeleteConfigs(context.Context, *defangv1.DeleteConfigsRequest) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context) (types.ETag, error)
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
-	ListConfig(context.Context) (*defangv1.Secrets, error)
+	GetConfigs(context.Context, *defangv1.GetConfigsRequest) (*defangv1.GetConfigsResponse, error)
+	ListConfigs(context.Context, *defangv1.ListConfigsRequest) (*defangv1.ListConfigsResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string

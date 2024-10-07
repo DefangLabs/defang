@@ -8,6 +8,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 var (
@@ -40,4 +42,39 @@ func PrintObject(root string, data proto.Message) error {
 	// TODO: add color
 	fmt.Println(string(bytes))
 	return nil
+}
+
+var indentSpaces = "    "
+
+func PrintConfigList(projectname string, configs []*defangv1.ConfigKey) {
+	if len(configs) == 0 {
+		fmt.Printf("No config to list\n")
+		return
+	}
+
+	if projectname != "" {
+		fmt.Printf("Project: %s\n", projectname)
+	}
+
+	fmt.Println("Configs:")
+	for _, config := range configs {
+		fmt.Printf("%s - %s\n", indentSpaces, config.Name)
+	}
+}
+
+func PrintConfigData(projectname string, configs []*defangv1.Config) {
+	if len(configs) == 0 {
+		fmt.Printf("No config values found\n")
+		return
+	}
+
+	fmt.Printf("Project: %s\n", projectname)
+	fmt.Println("Configs:")
+	for _, config := range configs {
+		if (*config).Type == defangv1.ConfigType_CONFIGTYPE_SENSITIVE {
+			fmt.Printf("%s - %s: [hidden]\n", indentSpaces, config.Name)
+		} else {
+			fmt.Printf("%s - %s: %s\n", indentSpaces, config.Name, config.Value)
+		}
+	}
 }

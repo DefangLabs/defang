@@ -198,6 +198,7 @@ func SetupCommands(version string) {
 
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
+	configSetCmd.Flags().BoolP("sensitive", "x", false, "set the config as sensitive")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
@@ -208,6 +209,7 @@ func SetupCommands(version string) {
 	configCmd.AddCommand(configDeleteCmd)
 
 	configCmd.AddCommand(configListCmd)
+	configCmd.AddCommand(configGetCmd)
 
 	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(restartCmd)
@@ -648,7 +650,7 @@ var configCmd = &cobra.Command{
 	Use:     "config", // like Docker
 	Args:    cobra.NoArgs,
 	Aliases: []string{"secrets", "secret"},
-	Short:   "Add, update, or delete service config",
+	Short:   "Add, update, get, or delete service config",
 }
 
 var configSetCmd = &cobra.Command{
@@ -658,6 +660,7 @@ var configSetCmd = &cobra.Command{
 	Aliases:     []string{"set", "add", "put"},
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		isSensitive, _ := cmd.Flags().GetBool("sensitive")
 		fromEnv, _ := cmd.Flags().GetBool("env")
 
 		// Make sure we have a project to set config for before asking for a value
@@ -669,7 +672,7 @@ var configSetCmd = &cobra.Command{
 		parts := strings.SplitN(args[0], "=", 2)
 		name := parts[0]
 
-		if !pkg.IsValidSecretName(name) {
+		if !pkg.IsValidConfigName(name) {
 			return fmt.Errorf("invalid config name: %q", name)
 		}
 
@@ -705,18 +708,18 @@ var configSetCmd = &cobra.Command{
 			value = strings.TrimSuffix(string(bytes), "\n")
 		} else {
 			// Prompt for sensitive value
-			var sensitivePrompt = &survey.Password{
+			var enterValuePrompt = &survey.Password{
 				Message: fmt.Sprintf("Enter value for %q:", name),
-				Help:    "The value will be stored securely and cannot be retrieved later.",
+				Help:    "The value will be stored securely.",
 			}
 
-			err := survey.AskOne(sensitivePrompt, &value)
+			err := survey.AskOne(enterValuePrompt, &value)
 			if err != nil {
 				return err
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), client, name, value, isSensitive); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)
@@ -756,6 +759,18 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.ConfigList(cmd.Context(), client)
+	},
+}
+
+var configGetCmd = &cobra.Command{
+	Use:         "get CONFIG...", // like Docker
+	Annotations: authNeededAnnotation,
+	Args:        cobra.MinimumNArgs(0),
+	Aliases:     []string{"show", "inspect"},
+	Short:       "Show configs",
+	RunE: func(cmd *cobra.Command, names []string) error {
+		_, err := cli.ConfigGet(cmd.Context(), client, names...)
+		return err
 	},
 }
 
