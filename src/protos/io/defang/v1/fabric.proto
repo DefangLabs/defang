@@ -97,7 +97,7 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
 
-  rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (VerifyDNSSetupResponse) {
+  rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -105,10 +105,6 @@ service FabricController {
 message VerifyDNSSetupRequest {
   string domain = 1;
   string target = 2;
-}
-
-message VerifyDNSSetupResponse {
-  bool success = 1;
 }
 
 message DestroyRequest {

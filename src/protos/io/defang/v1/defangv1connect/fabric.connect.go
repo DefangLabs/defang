@@ -176,7 +176,7 @@ type FabricControllerClient interface {
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
-	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[v1.VerifyDNSSetupResponse], error)
+	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -369,7 +369,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 			connect_go.WithClientOptions(opts...),
 		),
-		verifyDNSSetup: connect_go.NewClient[v1.VerifyDNSSetupRequest, v1.VerifyDNSSetupResponse](
+		verifyDNSSetup: connect_go.NewClient[v1.VerifyDNSSetupRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerVerifyDNSSetupProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -413,7 +413,7 @@ type fabricControllerClient struct {
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 	deleteMe                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, v1.VerifyDNSSetupResponse]
+	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -594,7 +594,7 @@ func (c *fabricControllerClient) DeleteMe(ctx context.Context, req *connect_go.R
 }
 
 // VerifyDNSSetup calls io.defang.v1.FabricController.VerifyDNSSetup.
-func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[v1.VerifyDNSSetupResponse], error) {
+func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.verifyDNSSetup.CallUnary(ctx, req)
 }
 
@@ -643,7 +643,7 @@ type FabricControllerHandler interface {
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
-	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[v1.VerifyDNSSetupResponse], error)
+	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1049,6 +1049,6 @@ func (UnimplementedFabricControllerHandler) DeleteMe(context.Context, *connect_g
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteMe is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[v1.VerifyDNSSetupResponse], error) {
+func (UnimplementedFabricControllerHandler) VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.VerifyDNSSetup is not implemented"))
 }
