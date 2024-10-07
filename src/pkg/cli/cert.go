@@ -266,7 +266,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 		validCNAMEs[i] = strings.TrimSuffix(validCNAME, ".")
 	}
 	cname, err := getCNAMEInSync(ctx, domain)
-	Logger.Debugf("CNAME for %v is :'%v', err: %v", domain, cname, err)
+	Logger.Debugf("CNAME for %v is: '%v', err: %v", domain, cname, err)
 	// Ignore other types of DNS errors
 	if err == errDNSNotInSync {
 		Logger.Debugf("CNAME for %v is not in sync: %v", domain, cname)
