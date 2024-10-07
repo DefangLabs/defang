@@ -133,10 +133,10 @@ func Execute(ctx context.Context) error {
 
 func SetupCommands(version string) {
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; one of [always never]`)
+	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use for bring-your-own-cloud; one of [defang aws]`)
+	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -298,7 +298,7 @@ var RootCmd = &cobra.Command{
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
 			} else if doInEnv() {
-				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			provider = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:
@@ -307,7 +307,7 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn("DigitalOcean provider was selected, but DO_PAT environment variable is not set")
+				term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			// Ignore any env vars when explicitly using the Defang playground provider
@@ -1007,5 +1007,5 @@ func awsInEnv() bool {
 }
 
 func doInEnv() bool {
-	return os.Getenv("DO_PAT") != ""
+	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }

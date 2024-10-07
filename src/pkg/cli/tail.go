@@ -187,9 +187,6 @@ func isTransientError(err error) bool {
 }
 
 func tail(ctx context.Context, client client.Client, params TailOptions) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	var since *timestamppb.Timestamp
 	if params.Since.IsZero() {
 		params.Since = time.Now() // this is used to continue from the last timestamp
@@ -200,7 +197,14 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	if err != nil {
 		return err
 	}
-	defer serverStream.Close() // this works because it takes a pointer receiver
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		<-ctx.Done()
+		serverStream.Close() // this works because it takes a pointer receiver
+	}()
 
 	spin := spinner.New()
 	doSpinner := !params.Raw && term.StdoutCanColor() && term.IsTerminal()
