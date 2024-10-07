@@ -85,6 +85,14 @@ func Execute(ctx context.Context) error {
 			printDefangHint("To manage sensitive service config, use:", "config")
 		}
 
+		if strings.Contains(err.Error(), "maximum number of projects") {
+			projectName := "<name>"
+			if resp, err := client.GetServices(ctx); err == nil {
+				projectName = resp.Project
+			}
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+		}
+
 		var cerr *cli.CancelError
 		if errors.As(err, &cerr) {
 			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
