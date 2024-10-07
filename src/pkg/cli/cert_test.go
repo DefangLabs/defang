@@ -18,12 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-type dnsRequest struct {
-	Type   string
-	Domain string
-}
-
-var notFound = errors.New("not found")
+var errNotFound = errors.New("not found")
 
 func TestGetCNAMEInSync(t *testing.T) {
 	t.Cleanup(func() {
@@ -32,7 +27,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 
 	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "web.test.com"}:    {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
-		{Type: "CNAME", Domain: "web.test.com"}: {Records: nil, Error: notFound},
+		{Type: "CNAME", Domain: "web.test.com"}: {Records: nil, Error: errNotFound},
 	}}
 	foundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "web.test.com"}:    {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
@@ -43,7 +38,7 @@ func TestGetCNAMEInSync(t *testing.T) {
 	t.Run("domain not found", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return notFoundResolver }
 		_, err := getCNAMEInSync(context.Background(), "web.test.com")
-		if err != notFound {
+		if err != errNotFound {
 			t.Errorf("Expected NotFound error, got %v", err)
 		}
 	})
@@ -84,7 +79,7 @@ func TestGetIPInSync(t *testing.T) {
 
 	notFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
-		{Type: "A", Domain: "test.com"}:  {Records: nil, Error: notFound},
+		{Type: "A", Domain: "test.com"}:  {Records: nil, Error: errNotFound},
 	}}
 	partialFoundResolver := dns.MockResolver{Records: map[dns.DNSRequest]dns.DNSResponse{
 		{Type: "NS", Domain: "test.com"}: {Records: []string{"ns1.example.com", "ns2.example.com"}, Error: nil},
@@ -99,7 +94,7 @@ func TestGetIPInSync(t *testing.T) {
 	t.Run("domain not found", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return notFoundResolver }
 		_, err := getIPInSync(context.Background(), "test.com")
-		if err != notFound {
+		if err != errNotFound {
 			t.Errorf("Expected NotFound error, got %v", err)
 		}
 	})

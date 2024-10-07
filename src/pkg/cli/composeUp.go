@@ -40,31 +40,28 @@ func ComposeUp(ctx context.Context, c client.Client, force bool, mode defangv1.D
 		return nil, project, &ComposeError{err}
 	}
 
-	services, err := compose.ConvertServices(ctx, c, project.Services, buildContext(force))
+	if err := compose.FixupServices(ctx, c, project.Services, buildContext(force)); err != nil {
+		return nil, project, err
+	}
+
+	bytes, err := project.MarshalYAML()
 	if err != nil {
 		return nil, project, err
 	}
 
-	if len(services) == 0 {
-		return nil, project, &ComposeError{fmt.Errorf("no services found")}
-	}
-
 	if DoDryRun {
-		fmt.Println("Project:", project.Name)
-		for _, service := range services {
-			PrintObject(service.Name, service)
-		}
+		fmt.Println(string(bytes))
 		return nil, project, ErrDryRun
 	}
 
-	for _, service := range services {
+	for _, service := range project.Services {
 		term.Info("Deploying service", service.Name)
 	}
 
 	resp, err := c.Deploy(ctx, &defangv1.DeployRequest{
-		Mode:     mode,
-		Project:  project.Name,
-		Services: services,
+		Mode:    mode,
+		Project: project.Name,
+		Compose: bytes,
 	})
 	if err != nil {
 		return nil, project, err
