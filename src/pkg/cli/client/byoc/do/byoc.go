@@ -410,11 +410,6 @@ func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	}, nil
 }
 
-func (b *ByocDo) GetVersion(context.Context) (*defangv1.Version, error) {
-	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
-	return &defangv1.Version{Fabric: cdVersion}, nil
-}
-
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	//optional
 	return nil, errors.ErrUnsupported

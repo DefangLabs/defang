@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,6 +26,11 @@ import (
 
 const (
 	CDName = "defang-cd"
+)
+
+var (
+	// Changing this will cause issues if two clients with different versions are using the same account
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:"+byoc.CdImageTag)
 )
 
 type DoApp struct {
@@ -90,8 +96,7 @@ func shellQuote(args ...string) string {
 }
 
 func getCdImage() (*godo.ImageSourceSpec, error) {
-	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:latest")
-	image, err := ParseImage(cdImage)
+	image, err := ParseImage(CdImage)
 	if err != nil {
 		return nil, err
 	}

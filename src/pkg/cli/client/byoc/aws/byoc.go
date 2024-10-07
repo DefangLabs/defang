@@ -36,6 +36,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var (
+	// Changing this will cause issues if two clients with different versions are using the same account
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:"+byoc.CdImageTag)
+)
+
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
@@ -78,7 +83,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     byoc.CdImage,
+			Image:     CdImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -290,7 +295,7 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 }
 
 func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := byoc.CdImage[strings.LastIndex(byoc.CdImage, ":")+1:]
+	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
