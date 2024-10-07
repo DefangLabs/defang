@@ -318,18 +318,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: go-release
     steps:
-      - name: Update Windows s.defang.io/defang_win_amd64.zip short link
-        run: |
-          curl --request POST \
-            --url https://api.short.io/links/$DEFANG_WIN_AMD64_LNK \
-            --header "Authorization: $SHORTIO_PK" \
-            --header 'accept: application/json' \
-            --header 'content-type: application/json' \
-            --data "{\"originalURL\":\"https://github.com/DefangLabs/defang/releases/download/${TAG}/defang_${TAG#v}_windows_amd64.zip\"}"
-        env:
-          SHORTIO_PK: ${{ secrets.SHORTIO_PK }}
-          TAG: ${{ github.ref_name }}
-          DEFANG_WIN_AMD64_LNK: "lnk_4vSQ_CDukZ5POEE4o0mMDysr2U"
+      # - name: Update Windows s.defang.io/defang_win_amd64.zip short link
+      #   run: |
+      #     curl --request POST \
+      #       --url https://api.short.io/links/$DEFANG_WIN_AMD64_LNK \
+      #       --header "Authorization: $SHORTIO_PK" \
+      #       --header 'accept: application/json' \
+      #       --header 'content-type: application/json' \
+      #       --data "{\"originalURL\":\"https://github.com/DefangLabs/defang/releases/download/${TAG}/defang_${TAG#v}_windows_amd64.zip\"}"
+      #   env:
+      #     SHORTIO_PK: ${{ secrets.SHORTIO_PK }}
+      #     TAG: ${{ github.ref_name }}
+      #     DEFANG_WIN_AMD64_LNK: "lnk_4vSQ_CDukZ5POEE4o0mMDysr2U"
 
       - name: Trigger CLI Autodoc
         uses: peter-evans/repository-dispatch@v3
@@ -356,7 +356,7 @@ jobs:
           node-version: "20" # same as the version in flake.nix
           registry-url: https://registry.npmjs.org
 
-      - name: Publish to NPM
+      - name: Build npm package
         shell: bash
         working-directory: ./pkgs/npm
         run: |
@@ -376,7 +376,8 @@ jobs:
           # make the cli.js executable
           chmod u+x ./bin/cli.js
 
-          # publish the package
-          npm publish --access public
+      - run: npm publish --access public
+        shell: bash
+        working-directory: ./pkgs/npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_AUTH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
