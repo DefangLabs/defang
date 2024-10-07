@@ -172,7 +172,7 @@ func triggerCertGeneration(ctx context.Context, domain string) error {
 	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
 	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
 		// Ignore possible tls error as cert attachment may take time
-		Logger.Debugf(" - Error triggering cert generation: %v", err)
+		Logger.Debugf("Error triggering cert generation: %v", err)
 		return err
 	}
 	return nil
