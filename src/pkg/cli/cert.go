@@ -110,7 +110,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		}
 	}
 	if cnt == 0 {
-		Logger.Infof("No services found need to generate TLS cert")
+		Logger.Infof("No HTTPS services found; no TLS cert generation needed")
 	}
 
 	return nil
