@@ -296,9 +296,9 @@ var RootCmd = &cobra.Command{
 		switch provider {
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws?")
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
 			} else if doInEnv() {
-				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean?")
+				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			provider = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:

@@ -50,11 +50,23 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
+
 			if err != nil {
-				if !errors.Is(err, types.ErrComposeFileNotFound) {
-					return err
+				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
+					if resp, err2 := client.GetServices(cmd.Context()); err2 == nil {
+						term.Error("Error:", prettyError(err))
+						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
+							term.Debug("ComposeDown failed:", err)
+							printDefangHint("To deactivate a project, do:", "compose down --project-name "+resp.Project)
+						} else {
+							printDefangHint("To try deployment again, do:", "compose up")
+						}
+						return nil
+					}
 				}
-				printDefangHint("To start a new project, do:", "new")
+				if errors.Is(err, types.ErrComposeFileNotFound) {
+					printDefangHint("To start a new project, do:", "new")
+				}
 				return err
 			}
 
@@ -254,7 +266,7 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), client, args...)
+			etag, err := cli.ComposeDown(cmd.Context(), client, "", args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
