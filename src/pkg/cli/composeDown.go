@@ -19,7 +19,7 @@ func ComposeDown(ctx context.Context, client client.Client, projectName string, 
 		}
 		projectName = currentProjectName
 	} else {
-		client.SetProjectName(ctx, projectName)
+		client.SetProjectName(projectName)
 	}
 
 	term.Debugf("Destroying project %q %q", projectName, names)

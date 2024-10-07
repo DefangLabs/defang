@@ -99,7 +99,7 @@ func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, err
 	}
 
 	b.project = project
-	b.SetProjectName(ctx, project.Name)
+	b.SetProjectName(project.Name)
 
 	return project, nil
 }
@@ -117,7 +117,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	b.SetProjectName(ctx, projectName)
+	b.SetProjectName(projectName)
 	return projectName, nil
 }
 
@@ -140,7 +140,7 @@ func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string,
 	}
 	if len(projectNames) == 1 {
 		term.Debug("Using default project: ", projectNames[0])
-		b.SetProjectName(ctx, projectNames[0])
+		b.SetProjectName(projectNames[0])
 		return projectNames[0], nil
 	}
 
@@ -149,7 +149,7 @@ func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string,
 	return "", errors.New("use the --project-name flag to specify a project")
 }
 
-func (b *ByocBaseClient) SetProjectName(ctx context.Context, projectName string) {
+func (b *ByocBaseClient) SetProjectName(projectName string) {
 	b.ProjectName = projectName
 	b.PrivateDomain = DnsSafeLabel(b.ProjectName) + ".internal"
 }

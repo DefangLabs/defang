@@ -36,7 +36,7 @@ func (m MockClient) LoadProjectName(ctx context.Context) (string, error) {
 	return m.Project.Name, nil
 }
 
-func (m MockClient) SetProjectName(ctx context.Context, projectName string) {
+func (m MockClient) SetProjectName(projectName string) {
 	m.Project.Name = projectName
 }
 

@@ -159,6 +159,6 @@ func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
 	return resp.Project, nil
 }
 
-func (g *PlaygroundClient) SetProjectName(ctx context.Context, projectName string) {
+func (g *PlaygroundClient) SetProjectName(projectName string) {
 	g.projectName = projectName
 }

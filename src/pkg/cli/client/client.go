@@ -59,7 +59,7 @@ type Client interface {
 
 	LoadProject(context.Context) (*compose.Project, error)
 	LoadProjectName(context.Context) (string, error)
-	SetProjectName(context.Context, string)
+	SetProjectName(string)
 }
 
 type Property struct {
