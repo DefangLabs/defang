@@ -187,8 +187,10 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
 	_ = composeUpCmd.Flags().MarkHidden("tail")
+	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
+	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
+	_ = composeUpCmd.Flags().MarkHidden("build")
 	return composeUpCmd
 }
 
