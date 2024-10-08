@@ -174,34 +174,34 @@ func TestCheckDomainDNSReady(t *testing.T) {
 
 	t.Run("CNAME and A records not found", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return emptyResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
+		if CheckDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when both CNAME and A records are missing, got true")
 		}
 	})
 
 	t.Run("CNAME setup correctly", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return hasCNAMEResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
+		if CheckDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when CNAME is setup correctly, got false")
 		}
 	})
 
 	t.Run("CNAME setup incorrectly", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return hasCNAMEResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-other-alb.domain.com"}) != false {
+		if CheckDomainDNSReady(context.Background(), "api.test.com", []string{"some-other-alb.domain.com"}) != false {
 			t.Errorf("Expected false when CNAME is setup incorrectly, got true")
 		}
 	})
 
 	t.Run("A record setup correctly", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return hasARecordResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
+		if CheckDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != true {
 			t.Errorf("Expected true when A record is setup correctly, got false")
 		}
 	})
 	t.Run("A record setup incorrectly", func(t *testing.T) {
 		dns.ResolverAt = func(_ string) dns.Resolver { return hasWrongARecordResolver }
-		if checkDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
+		if CheckDomainDNSReady(context.Background(), "api.test.com", []string{"some-alb.domain.com"}) != false {
 			t.Errorf("Expected false when A record is setup incorrectly, got true")
 		}
 	})
