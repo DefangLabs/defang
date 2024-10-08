@@ -124,7 +124,7 @@ func generateCert(ctx context.Context, domain string, targets []string) {
 	}
 
 	Logger.Infof("%v DNS is properly configured!", domain)
-	if err := checkTLSCert(ctx, domain); err == nil {
+	if err := CheckTLSCert(ctx, domain); err == nil {
 		Logger.Infof("TLS cert for %v is already ready", domain)
 		return
 	}
@@ -195,7 +195,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 		case <-timeout.Done():
 			return timeout.Err()
 		case <-ticker.C:
-			if err := checkTLSCert(timeout, domain); err == nil {
+			if err := CheckTLSCert(timeout, domain); err == nil {
 				return nil
 			} else {
 				Logger.Debugf("Error checking TLS cert for %v: %v", domain, err)
@@ -314,7 +314,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 	return false
 }
 
-func checkTLSCert(ctx context.Context, domain string) error {
+func CheckTLSCert(ctx context.Context, domain string) error {
 	url := fmt.Sprintf("https://%v", domain)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
