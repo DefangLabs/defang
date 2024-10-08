@@ -31,6 +31,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "postbuild": "chmod +x bin/cli.js",
     "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm -trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
   },
   "dependencies": {

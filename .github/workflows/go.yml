@@ -373,9 +373,6 @@ jobs:
           # build
           npm run build
 
-          # make the cli.js executable
-          chmod u+x ./bin/cli.js
-
       - run: npm publish --access public
         shell: bash
         working-directory: ./pkgs/npm
