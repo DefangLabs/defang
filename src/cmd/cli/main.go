@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/signal"
@@ -13,7 +14,7 @@ import (
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			command.Track("Panic", command.P{"error", r}, command.P{"stack", string(debug.Stack())})
+			command.Track("Panic", command.P{"error", r}, command.P{"stack", string(skipLines(debug.Stack(), 6))})
 			command.FlushAllTracking()
 			panic(r)
 		}
@@ -44,4 +45,10 @@ func main() {
 		}
 		os.Exit(int(ec))
 	}
+}
+
+// skipLines returns buf with the first n lines removed.
+func skipLines(buf []byte, n int) []byte {
+	lines := bytes.SplitN(buf, []byte{'\n'}, n)
+	return lines[len(lines)-1]
 }
