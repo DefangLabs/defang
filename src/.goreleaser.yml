@@ -9,6 +9,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -trimpath
     hooks:
       post:
         - ./bin/codesign.sh "{{ .Path }}"
@@ -22,6 +24,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -trimpath
 
 source:
   enabled: false
