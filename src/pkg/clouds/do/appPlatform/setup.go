@@ -34,7 +34,6 @@ var (
 )
 
 type DoApp struct {
-	Client      *godo.Client
 	Region      do.Region
 	ProjectName string
 	BucketName  string
@@ -43,24 +42,22 @@ type DoApp struct {
 
 const bucketPrefix = "defang-test" // FIXME: rename
 
-func New(stack string, region do.Region) *DoApp {
-	if stack == "" {
-		panic("stack must be set")
+func New(region do.Region) *DoApp {
+	if region == "" {
+		panic("region must be set")
 	}
-
-	client := newClient(context.TODO())
 
 	return &DoApp{
-		Client: client,
-		Region: region,
-		//ProjectName: stack, // FIXME: stack != project
+		Region:     region,
 		BucketName: os.Getenv("DEFANG_CD_BUCKET"),
 	}
-
 }
 
 func (d *DoApp) SetUp(ctx context.Context) error {
-	s3Client := d.createS3Client()
+	s3Client, err := d.createS3Client()
+	if err != nil {
+		return err
+	}
 
 	lbo, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
@@ -119,7 +116,10 @@ func getCdImage() (*godo.ImageSourceSpec, error) {
 }
 
 func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
-	client := newClient(ctx)
+	client, err := NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	image, err := getCdImage()
 	if err != nil {
@@ -135,7 +135,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 			Envs:             env,
 			Image:            image,
 			InstanceCount:    1,
-			InstanceSizeSlug: "basic-xs",
+			InstanceSizeSlug: "basic-xs", // TODO: this is legacy and we should use new slugs
 			RunCommand:       shellQuote(cmd...),
 		}},
 	}
@@ -218,20 +218,23 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 	return fmt.Errorf("timeout waiting to app (%s) deployment", appID)
 }
 
-func newClient(ctx context.Context) *godo.Client {
-	pat := os.Getenv("DIGITALOCEAN_TOKEN")
-	if pat == "" {
-		panic("DIGITALOCEAN_TOKEN must be set")
+func NewClient(ctx context.Context) (*godo.Client, error) {
+	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
+	if accessToken == "" {
+		return nil, errors.New("DIGITALOCEAN_TOKEN must be set")
 	}
-	tokenSource := &oauth2.Token{AccessToken: pat}
-	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
-	return godo.NewClient(client)
+	tokenSource := &oauth2.Token{AccessToken: accessToken}
+	httpClient := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
+	return godo.NewClient(httpClient), nil
 }
 
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	s3Client := d.createS3Client()
+	s3Client, err := d.createS3Client()
+	if err != nil {
+		return "", err
+	}
 
 	prefix := "uploads/"
 
@@ -262,14 +265,15 @@ func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error)
 }
 
 func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, error) {
-
-	s3Client := d.createS3Client()
+	s3Client, err := d.createS3Client()
+	if err != nil {
+		return "", err
+	}
 
 	req, err := s3.NewPresignClient(s3Client).PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: &d.BucketName,
 		Key:    &name,
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -278,11 +282,11 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 
 }
 
-func (d DoApp) createS3Client() *s3.Client {
+func (d DoApp) createS3Client() (*s3.Client, error) {
 	id := os.Getenv("SPACES_ACCESS_KEY_ID")
 	key := os.Getenv("SPACES_SECRET_ACCESS_KEY")
 	if id == "" || key == "" {
-		panic("DigitalOcean SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY must be set")
+		return nil, errors.New("DigitalOcean SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY must be set")
 	}
 
 	cfg := aws.Config{
@@ -295,7 +299,7 @@ func (d DoApp) createS3Client() *s3.Client {
 		o.UsePathStyle = true
 	})
 
-	return s3Client
+	return s3Client, nil
 }
 
 // var _ types.Driver = (*DoAppPlatform)(nil)
