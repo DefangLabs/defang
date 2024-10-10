@@ -16,8 +16,10 @@ import (
 
 const (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImageTag   = "public-beta"
-	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	CdImageTag       = "public-beta"
+	CdTaskPrefix     = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	CdDefaultVersion = "public-beta"
+	CdLatestVersion  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
 )
 
 var (

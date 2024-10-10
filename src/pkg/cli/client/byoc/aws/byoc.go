@@ -151,8 +151,22 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		}
 	}
 
+	// see if we already have a deployment running
+	resp, err := b.GetServices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// send project update with the current deploy's cd version
+	// latest if new deployment
+	deploymentCd := byoc.CdLatestVersion
+	if len(resp.Services) > 0 {
+		deploymentCd = resp.CdVersion
+	}
+
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services: serviceInfos,
+		Services:  serviceInfos,
+		CdVersion: deploymentCd,
 	})
 	if err != nil {
 		return nil, err
@@ -410,6 +424,13 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
 		return nil, err
 	}
+
+	// older deployments may not have the cd_version field set,
+	// these would have been deployed with public-beta
+	if serviceInfos.CdVersion == "" {
+		serviceInfos.CdVersion = byoc.CdDefaultVersion
+	}
+
 	return &serviceInfos, nil
 }
 
