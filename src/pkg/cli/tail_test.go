@@ -92,18 +92,18 @@ func TestTail(t *testing.T) {
 		ServerStream: &client.MockServerStream{
 			Resps: []*defangv1.TailResponse{
 				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
-					{Message: "e1msg1", Timestamp: timestamppb.New(time.Now())},
-					{Message: "e1msg2", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
-					{Message: "e1msg3", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
-					{Message: "e1msg4", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e1err1", Timestamp: timestamppb.New(time.Now()), Stderr: true},                                                       // Error message should be in stdout too when not raw
+					{Message: "e1msg1", Timestamp: timestamppb.New(time.Now()), Job: "job1"},                                                                     // Test default values
+					{Message: "e1msg2", Timestamp: timestamppb.New(time.Now()), Job: "job1", Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
+					{Message: "e1msg3", Timestamp: timestamppb.New(time.Now()), Job: "job1", Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
+					{Message: "e1msg4", Timestamp: timestamppb.New(time.Now()), Job: "job1", Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+					{Message: "e1err1", Timestamp: timestamppb.New(time.Now()), Job: "job1", Stderr: true},                                                       // Error message should be in stdout too when not raw
 				}},
 				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{ // Test entry etag does not affect the default values from response
-					{Message: "e2err1", Timestamp: timestamppb.New(time.Now()), Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
-					{Message: "e2msg1", Timestamp: timestamppb.New(time.Now()), Etag: "ENTRIES2ETAG"},
-					{Message: "e2msg2", Timestamp: timestamppb.New(time.Now())},
-					{Message: "e2msg3", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e2msg4", Timestamp: timestamppb.New(time.Now())},
+					{Message: "e2err1", Timestamp: timestamppb.New(time.Now()), Job: "job1", Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
+					{Message: "e2msg1", Timestamp: timestamppb.New(time.Now()), Job: "job1", Etag: "ENTRIES2ETAG"},
+					{Message: "e2msg2", Timestamp: timestamppb.New(time.Now()), Job: "job1"},
+					{Message: "e2msg3", Timestamp: timestamppb.New(time.Now()), Job: "job1", Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+					{Message: "e2msg4", Timestamp: timestamppb.New(time.Now()), Job: "job1"},
 				}},
 			},
 		},
@@ -112,16 +112,16 @@ func TestTail(t *testing.T) {
 	Tail(ctx, c, TailOptions{})
 
 	expectedLogs := []string{
-		"SOMEETAG service1 SOMEHOST e1msg1",
-		"SOMEOTHERETAG service1 SOMEHOST e1msg2",
-		"SOMEOTHERETAG2 service1 SOMEOTHERHOST e1msg3",
-		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e1msg4",
-		"SOMEETAG service1 SOMEHOST e1err1",
-		"SOMEOTHERETAG service1 SOMEHOST e2err1",
-		"ENTRIES2ETAG service1 SOMEHOST e2msg1",
-		"SOMEETAG service1 SOMEHOST e2msg2",
-		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e2msg3",
-		"SOMEETAG service1 SOMEHOST e2msg4",
+		"SOMEETAG job1 service1 SOMEHOST e1msg1",
+		"SOMEOTHERETAG job1 service1 SOMEHOST e1msg2",
+		"SOMEOTHERETAG2 job1 service1 SOMEOTHERHOST e1msg3",
+		"SOMEOTHERETAG2 job1 service2 SOMEOTHERHOST e1msg4",
+		"SOMEETAG job1 service1 SOMEHOST e1err1",
+		"SOMEOTHERETAG job1 service1 SOMEHOST e2err1",
+		"ENTRIES2ETAG job1 service1 SOMEHOST e2msg1",
+		"SOMEETAG job1 service1 SOMEHOST e2msg2",
+		"SOMEOTHERETAG2 job1 service2 SOMEOTHERHOST e2msg3",
+		"SOMEETAG job1 service1 SOMEHOST e2msg4",
 	}
 
 	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
