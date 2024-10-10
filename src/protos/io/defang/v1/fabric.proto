@@ -104,7 +104,7 @@ service FabricController {
 
 message VerifyDNSSetupRequest {
   string domain = 1;
-  string target = 2;
+  repeated string targets = 2;
 }
 
 message DestroyRequest {
