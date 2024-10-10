@@ -460,8 +460,8 @@ var generateCmd = &cobra.Command{
 				for _, sample := range sampleList {
 					sampleNames = append(sampleNames, sample.Name)
 					sampleTitles = append(sampleTitles, sample.Title)
-					sampleIndex = append(sampleIndex, sample.Name+" "+sample.Title+" "+
-						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " "))
+					sampleIndex = append(sampleIndex, strings.ToLower(sample.Name+" "+sample.Title+" "+
+						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " ")))
 				}
 
 				if err := survey.AskOne(&survey.Select{
@@ -469,8 +469,7 @@ var generateCmd = &cobra.Command{
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
 					Filter: func(filter string, value string, i int) bool {
-						filter = strings.ToLower(filter)
-						return strings.Contains(strings.ToLower(sampleIndex[i]), filter)
+						return strings.Contains(sampleIndex[i], strings.ToLower(filter))
 					},
 					Description: func(value string, i int) string {
 						return sampleTitles[i]
