@@ -15,7 +15,7 @@
               git
               gnumake
               gnused # force Linux `sed` everywhere
-              go_1_21
+              go_1_22
               goreleaser
               nixfmt
               nodejs_20 # for Pulumi, must match values in package.json
