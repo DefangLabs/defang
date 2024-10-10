@@ -210,12 +210,20 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 		var redis *defangv1.Redis
 		if _, ok := svccfg.Extensions["x-defang-redis"]; ok {
-			redis = &defangv1.Redis{}
+			if _, ok := c.(*client.PlaygroundClient); ok {
+				term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+			} else {
+				redis = &defangv1.Redis{}
+			}
 		}
 
 		var postgres *defangv1.Postgres
 		if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
-			postgres = &defangv1.Postgres{}
+			if _, ok := c.(*client.PlaygroundClient); ok {
+				term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+			} else {
+				postgres = &defangv1.Postgres{}
+			}
 		}
 
 		if redis == nil && postgres == nil && isStatefulImage(svccfg.Image) {
