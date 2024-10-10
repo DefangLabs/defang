@@ -45,23 +45,29 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	apps      map[string]*godo.App
 	buildRepo string
+	client    *godo.Client
 	driver    *appPlatform.DoApp
 }
 
-func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
+func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
-		doRegion = region.SFO3
+		doRegion = region.SFO3 // TODO: change default
+	}
+
+	client, err := appPlatform.NewClient(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	b := &ByocDo{
-		driver: appPlatform.New(byoc.CdTaskPrefix, doRegion),
+		client: client,
+		driver: appPlatform.New(doRegion),
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	b.ProjectName, _ = b.LoadProjectName(ctx)
-	return b
+	return b, nil
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -158,7 +164,7 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 
 	var projectList []string
 
-	projects, _, err := b.driver.Client.Projects.List(ctx, &godo.ListOptions{})
+	projects, _, err := b.client.Projects.List(ctx, &godo.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +218,7 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 		deleteEnvVars(toDelete, &service.Envs)
 	}
 
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return err
 }
@@ -288,7 +294,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 
 	app.Spec.Envs = append(app.Spec.Envs, newSecret)
 
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return err
 }
@@ -299,7 +305,7 @@ func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, erro
 		return "", err
 	}
 
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return pkg.RandomID(), err
 }
@@ -338,14 +344,14 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 	for {
 
-		deploymentInfo, _, err := b.driver.Client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
+		deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
 
 		if err != nil {
 			return nil, err
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, false, 150)
+			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, false, 150)
 			if err != nil {
 				return nil, err
 			}
@@ -362,7 +368,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
 
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 			if err != nil {
 				return nil, err
 			}
@@ -396,17 +402,17 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	_, err = b.driver.Client.Registry.Delete(ctx)
+	_, err = b.client.Registry.Delete(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.driver.Client.Apps.Delete(ctx, app.ID)
+	_, err = b.client.Apps.Delete(ctx, app.ID)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.driver.Client.Projects.Delete(ctx, byoc.CdTaskPrefix)
+	_, err = b.client.Projects.Delete(ctx, byoc.CdTaskPrefix)
 	if err != nil {
 		return err
 	}
@@ -579,14 +585,14 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	// Create the Container Registry here, because DO only allows a single one per account,
 	// so we can't create it in the CD Pulumi process.
-	registry, resp, err := b.driver.Client.Registry.Get(ctx)
+	registry, resp, err := b.client.Registry.Get(ctx)
 	if err != nil {
 		if resp.StatusCode != 404 {
 			return err
 		}
 		term.Debug("Creating new registry")
 		// Create registry if it doesn't exist
-		registry, _, err = b.driver.Client.Registry.Create(ctx, &godo.RegistryCreateRequest{
+		registry, _, err = b.client.Registry.Create(ctx, &godo.RegistryCreateRequest{
 			Name:                 pkg.RandomID(), // has to be globally unique
 			SubscriptionTierSlug: "starter",      // max 1 repo; TODO: make this configurable
 			Region:               b.driver.Region.String(),
@@ -609,7 +615,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		appName = fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
 	}
 
-	apps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+	apps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +657,7 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 	mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
 
 	// If we can get projects working, we can add the project to the list options
-	currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+	currentApps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})
 
 	if err != nil {
 		return "", err
@@ -659,14 +665,14 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 
 	for _, app := range currentApps {
 		if app.Spec.Name == buildAppName {
-			buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
+			buildLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
 			if err != nil {
 				return "", err
 			}
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-			mainLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+			mainLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
 			if err != nil {
 				return "", err
 			}
