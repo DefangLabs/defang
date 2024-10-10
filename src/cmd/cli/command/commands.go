@@ -448,13 +448,6 @@ var generateCmd = &cobra.Command{
 
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
-			if err := survey.AskOne(&survey.Select{
-				Message: "Choose the language you'd like to use:",
-				Options: cli.SupportedLanguages,
-				Help:    "The project code will be in the language you choose here.",
-			}, &language); err != nil {
-				return err
-			}
 			// Fetch the list of samples from the Defang repository
 			if fetchSamplesErr != nil {
 				term.Debug("unable to fetch samples:", fetchSamplesErr)
@@ -462,12 +455,10 @@ var generateCmd = &cobra.Command{
 				const generateWithAI = "Generate with AI"
 
 				sampleNames := []string{generateWithAI}
-				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
 				for _, sample := range sampleList {
-					if slices.ContainsFunc(sample.Languages, func(l string) bool { return strings.EqualFold(l, language) }) {
-						sampleNames = append(sampleNames, sample.Name)
-						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
-					}
+					sampleNames = append(sampleNames, sample.Name)
+					sampleTitles = append(sampleTitles, sample.Title)
 				}
 
 				if err := survey.AskOne(&survey.Select{
@@ -475,12 +466,19 @@ var generateCmd = &cobra.Command{
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
 					Description: func(value string, i int) string {
-						return sampleDescriptions[i]
+						return sampleTitles[i]
 					},
 				}, &sample); err != nil {
 					return err
 				}
 				if sample == generateWithAI {
+					if err := survey.AskOne(&survey.Select{
+						Message: "Choose the language you'd like to use:",
+						Options: cli.SupportedLanguages,
+						Help:    "The project code will be in the language you choose here.",
+					}, &language); err != nil {
+						return err
+					}
 					sample = ""
 					defaultFolder = "project1"
 				} else {
