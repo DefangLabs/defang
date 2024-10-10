@@ -202,22 +202,7 @@ func makeComposeStartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var force, _ = cmd.Flags().GetBool("force")
-
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.DeploymentMode_UNSPECIFIED_MODE)
-			if err != nil {
-				return err
-			}
-
-			printPlaygroundPortalServiceURLs(deploy.Services)
-			printEndpoints(deploy.Services) // TODO: do this at the end
-
-			command := "tail"
-			if deploy.Etag != "" {
-				command += " --etag " + deploy.Etag
-			}
-			printDefangHint("To track the update, do:", command)
-			return nil
+			return fmt.Errorf("Command 'start' is deprecated, use 'up' instead")
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -231,12 +216,7 @@ func makeComposeRestartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			etag, err := cli.ComposeRestart(cmd.Context(), client)
-			if err != nil {
-				return err
-			}
-			term.Info("Restarted services with deployment ID", etag)
-			return nil
+			return fmt.Errorf("Command 'restart' is deprecated, use 'up' instead")
 		},
 	}
 }
@@ -248,12 +228,7 @@ func makeComposeStopCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			etag, err := cli.ComposeStop(cmd.Context(), client)
-			if err != nil {
-				return err
-			}
-			term.Info("Stopped services with deployment ID", etag)
-			return nil
+			return fmt.Errorf("Command 'stop' is deprecated, use 'down' instead")
 		},
 	}
 }
@@ -437,11 +412,12 @@ services:
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
-	composeCmd.AddCommand(makeComposeStartCmd())
-	composeCmd.AddCommand(makeComposeRestartCmd())
-	composeCmd.AddCommand(makeComposeStopCmd())
 	composeCmd.AddCommand(makeComposeLsCmd())
 	composeCmd.AddCommand(makeComposeLogsCmd())
 
+	// deprecated, will be removed in future releases
+	composeCmd.AddCommand(makeComposeStartCmd())
+	composeCmd.AddCommand(makeComposeRestartCmd())
+	composeCmd.AddCommand(makeComposeStopCmd())
 	return composeCmd
 }
