@@ -456,15 +456,22 @@ var generateCmd = &cobra.Command{
 
 				sampleNames := []string{generateWithAI}
 				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
+				sampleIndex := []string{"generate with AI sample language prompt"}
 				for _, sample := range sampleList {
 					sampleNames = append(sampleNames, sample.Name)
 					sampleTitles = append(sampleTitles, sample.Title)
+					sampleIndex = append(sampleIndex, sample.Name+" "+sample.Title+" "+
+						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " "))
 				}
 
 				if err := survey.AskOne(&survey.Select{
 					Message: "Choose a sample service:",
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
+					Filter: func(filter string, value string, i int) bool {
+						filter = strings.ToLower(filter)
+						return strings.Contains(strings.ToLower(sampleIndex[i]), filter)
+					},
 					Description: func(value string, i int) string {
 						return sampleTitles[i]
 					},
