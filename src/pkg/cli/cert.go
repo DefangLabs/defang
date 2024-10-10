@@ -106,7 +106,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 				}
 			}
 			Logger.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
-			generateCert(ctx, service.Service.Domainname, targets)
+			generateCert(ctx, service.Service.Domainname, targets, client)
 		}
 	}
 	if cnt == 0 {
@@ -116,9 +116,9 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	return nil
 }
 
-func generateCert(ctx context.Context, domain string, targets []string) {
+func generateCert(ctx context.Context, domain string, targets []string, client cliClient.Client) {
 	Logger.Infof("Triggering TLS cert generation for %v", domain)
-	if err := waitForCNAME(ctx, domain, targets); err != nil {
+	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		Logger.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
@@ -223,7 +223,7 @@ func containsAllIPs(all []net.IP, subset []net.IP) bool {
 	return true
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string) error {
+func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.Client) error {
 	for i, target := range targets {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}
@@ -232,6 +232,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 	defer ticker.Stop()
 
 	msgShown := false
+	serverSideVerified := false
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		term.HideCursor()
@@ -243,7 +244,17 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if CheckDomainDNSReady(ctx, domain, targets) {
+			if !serverSideVerified {
+				if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
+					Logger.Debugf("Server side DNS verification for %v successful", domain)
+					serverSideVerified = true
+				} else {
+					Logger.Debugf("Server side DNS verification for %v failed: %v", domain, err)
+				}
+			} else {
+				if !CheckDomainDNSReady(ctx, domain, targets) {
+					Logger.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
+				}
 				return nil
 			}
 			if !msgShown {
