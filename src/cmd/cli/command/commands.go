@@ -718,7 +718,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose restart")
+		printDefangHint("To update the deployed values, do:", "compose up")
 		return nil
 	},
 }

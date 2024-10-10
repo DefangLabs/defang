@@ -200,10 +200,9 @@ func makeComposeStartCmd() *cobra.Command {
 		Aliases:     []string{"deploy"},
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Deprecated:  "use `up` instead",
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return fmt.Errorf("Command 'start' is deprecated, use 'up' instead")
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -215,10 +214,9 @@ func makeComposeRestartCmd() *cobra.Command {
 		Use:         "restart",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Deprecated:  "use `up` instead",
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return fmt.Errorf("Command 'restart' is deprecated, use 'up' instead")
 		},
 	}
 }
@@ -228,10 +226,9 @@ func makeComposeStopCmd() *cobra.Command {
 		Use:         "stop",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
-		Deprecated:  "use `down` instead",
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return fmt.Errorf("Command 'stop' is deprecated, use 'down' instead")
 		},
 	}
 }
