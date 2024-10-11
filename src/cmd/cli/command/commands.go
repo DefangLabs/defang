@@ -456,7 +456,7 @@ var generateCmd = &cobra.Command{
 
 				sampleNames := []string{generateWithAI}
 				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
-				sampleIndex := []string{"generate with AI sample language prompt"}
+				sampleIndex := []string{"unused first entry because we always show genAI option"}
 				for _, sample := range sampleList {
 					sampleNames = append(sampleNames, sample.Name)
 					sampleTitles = append(sampleTitles, sample.Title)
@@ -469,7 +469,7 @@ var generateCmd = &cobra.Command{
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
 					Filter: func(filter string, value string, i int) bool {
-						return strings.Contains(sampleIndex[i], strings.ToLower(filter))
+						return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
 					},
 					Description: func(value string, i int) string {
 						return sampleTitles[i]
