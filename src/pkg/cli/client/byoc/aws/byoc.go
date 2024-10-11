@@ -37,14 +37,16 @@ import (
 )
 
 var (
+	CdImageBase = "public.ecr.aws/defang-io/cd"
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:"+byoc.CdLatestVersion)
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestVersion)
 )
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
+	cdImageTag   string
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
@@ -63,14 +65,16 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context, projectCdImage string) error {
-	if b.SetupDone {
+func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
-	if projectCdImage == "" {
-		projectCdImage = CdImage
+	b.cdImageTag = byoc.CdDefaultVersion
+	if projectCdImageTag != "" {
+		b.cdImageTag = projectCdImageTag
 	}
+
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
@@ -87,7 +91,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdImage string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     projectCdImage,
+			Image:     CdImageBase + ":" + b.cdImageTag,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
