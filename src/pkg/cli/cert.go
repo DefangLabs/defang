@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 )
 
 type HTTPClient interface {
@@ -233,6 +234,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 
 	msgShown := false
 	serverSideVerified := false
+	serverVerifyRpcFailure := 0
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		term.HideCursor()
@@ -244,18 +246,30 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if !serverSideVerified {
+			if !serverSideVerified && serverVerifyRpcFailure < 3 {
 				if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
 					Logger.Debugf("Server side DNS verification for %v successful", domain)
 					serverSideVerified = true
 				} else {
-					Logger.Debugf("Server side DNS verification for %v failed: %v", domain, err)
+					if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
+						Logger.Debugf("Server side DNS verification negative result: %v", cerr.Message())
+					} else {
+						Logger.Debugf("Server side DNS verification request for %v failed: %v", domain, err, err)
+						serverVerifyRpcFailure++
+					}
+				}
+				if serverVerifyRpcFailure >= 3 {
+					Logger.Warnf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain)
 				}
 			} else {
-				if !CheckDomainDNSReady(ctx, domain, targets) {
+				locallyVerified := CheckDomainDNSReady(ctx, domain, targets)
+				if serverSideVerified && !locallyVerified {
 					Logger.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
+					return nil
 				}
-				return nil
+				if locallyVerified {
+					return nil
+				}
 			}
 			if !msgShown {
 				Logger.Infof("Please set up a CNAME record for %v", domain)
