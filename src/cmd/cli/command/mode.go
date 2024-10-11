@@ -32,7 +32,7 @@ func allModes() []string {
 	modes := make([]string, 0, len(defangv1.DeploymentMode_name)-1)
 	for i, mode := range defangv1.DeploymentMode_name {
 		if i == 0 {
-			continue
+			continue // skip the "unspecified" mode
 		}
 		modes = append(modes, strings.ToLower(mode))
 	}
