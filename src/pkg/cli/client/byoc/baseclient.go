@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImageTag       = "public-beta"
 	CdTaskPrefix     = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
 	CdDefaultVersion = "public-beta"
 	CdLatestVersion  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
@@ -87,7 +85,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	return &defangv1.Version{Fabric: CdImageTag}, nil
+	return &defangv1.Version{Fabric: CdLatestVersion}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {

@@ -38,7 +38,7 @@ import (
 
 var (
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:"+byoc.CdImageTag)
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:"+byoc.CdLatestVersion)
 )
 
 type ByocAws struct {
@@ -63,9 +63,13 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context) error {
+func (b *ByocAws) setUp(ctx context.Context, projectCdImage string) error {
 	if b.SetupDone {
 		return nil
+	}
+
+	if projectCdImage == "" {
+		projectCdImage = CdImage
 	}
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
@@ -83,7 +87,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     CdImage,
+			Image:     projectCdImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -121,8 +125,30 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	return nil
 }
 
+func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
+	// see if we already have a deployment running
+	resp, err := b.GetServices(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// send project update with the current deploy's cd version
+	// latest if new deployment
+	deploymentCd := byoc.CdLatestVersion
+	if len(resp.Services) > 0 {
+		deploymentCd = resp.CdVersion
+	}
+
+	return deploymentCd, nil
+}
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// note: the CD image is tagged with the major release number, use that for setup
+	if err = b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 
@@ -151,22 +177,9 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		}
 	}
 
-	// see if we already have a deployment running
-	resp, err := b.GetServices(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// send project update with the current deploy's cd version
-	// latest if new deployment
-	deploymentCd := byoc.CdLatestVersion
-	if len(resp.Services) > 0 {
-		deploymentCd = resp.CdVersion
-	}
-
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services:  serviceInfos,
-		CdVersion: deploymentCd,
+		CdVersion: cdVersion,
 	})
 	if err != nil {
 		return nil, err
@@ -365,7 +378,12 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -463,7 +481,12 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 
@@ -477,8 +500,13 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
+	cdVersion, errObj := b.getCdVersion(ctx)
+	if errObj != nil {
+		return nil, errObj
+	}
+
+	if errObj = b.setUp(ctx, cdVersion); errObj != nil {
+		return nil, errObj
 	}
 
 	etag := req.Etag
@@ -684,7 +712,12 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if err = b.setUp(ctx, cdVersion); err != nil {
 		return "", err
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, command)
