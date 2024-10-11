@@ -216,9 +216,6 @@ func SetupCommands(version string) {
 	// Add up/down commands to the root as well
 	RootCmd.AddCommand(makeComposeDownCmd())
 	RootCmd.AddCommand(makeComposeUpCmd())
-	// RootCmd.AddCommand(makeComposeStartCmd())
-	// RootCmd.AddCommand(makeComposeRestartCmd())
-	// RootCmd.AddCommand(makeComposeStopCmd())
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -448,13 +445,6 @@ var generateCmd = &cobra.Command{
 
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
-			if err := survey.AskOne(&survey.Select{
-				Message: "Choose the language you'd like to use:",
-				Options: cli.SupportedLanguages,
-				Help:    "The project code will be in the language you choose here.",
-			}, &language); err != nil {
-				return err
-			}
 			// Fetch the list of samples from the Defang repository
 			if fetchSamplesErr != nil {
 				term.Debug("unable to fetch samples:", fetchSamplesErr)
@@ -462,25 +452,36 @@ var generateCmd = &cobra.Command{
 				const generateWithAI = "Generate with AI"
 
 				sampleNames := []string{generateWithAI}
-				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
+				sampleIndex := []string{"unused first entry because we always show genAI option"}
 				for _, sample := range sampleList {
-					if slices.ContainsFunc(sample.Languages, func(l string) bool { return strings.EqualFold(l, language) }) {
-						sampleNames = append(sampleNames, sample.Name)
-						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
-					}
+					sampleNames = append(sampleNames, sample.Name)
+					sampleTitles = append(sampleTitles, sample.Title)
+					sampleIndex = append(sampleIndex, strings.ToLower(sample.Name+" "+sample.Title+" "+
+						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " ")))
 				}
 
 				if err := survey.AskOne(&survey.Select{
 					Message: "Choose a sample service:",
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
+					Filter: func(filter string, value string, i int) bool {
+						return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
+					},
 					Description: func(value string, i int) string {
-						return sampleDescriptions[i]
+						return sampleTitles[i]
 					},
 				}, &sample); err != nil {
 					return err
 				}
 				if sample == generateWithAI {
+					if err := survey.AskOne(&survey.Select{
+						Message: "Choose the language you'd like to use:",
+						Options: cli.SupportedLanguages,
+						Help:    "The project code will be in the language you choose here.",
+					}, &language); err != nil {
+						return err
+					}
 					sample = ""
 					defaultFolder = "project1"
 				} else {
@@ -721,7 +722,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose restart")
+		printDefangHint("To update the deployed values, do:", "compose up")
 		return nil
 	},
 }

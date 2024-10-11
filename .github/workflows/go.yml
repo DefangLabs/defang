@@ -122,7 +122,7 @@ jobs:
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli compose stop -f tests/sanity/compose.yaml --debug
+        run: go run ./cmd/cli compose down --detach -f tests/sanity/compose.yaml --debug
         working-directory: src
 
   build-and-sign:

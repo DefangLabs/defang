@@ -32,11 +32,12 @@ const (
 )
 
 const (
-	MiB                 = 1024 * 1024
-	ContextFileLimit    = 100
-	ContextSizeLimit    = 10 * MiB
-	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
-	defaultDockerIgnore = `# Default .dockerignore file for Defang
+	MiB                  = 1024 * 1024
+	ContextFileLimit     = 100
+	ContextSizeSoftLimit = 10 * MiB
+	ContextSizeHardLimit = 100 * MiB
+	sourceDateEpoch      = 315532800 // 1980-01-01, same as nix-shell
+	defaultDockerIgnore  = `# Default .dockerignore file for Defang
 **/.DS_Store
 **/.direnv
 **/.envrc
@@ -62,7 +63,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
 	}
-	
+
 	term.Info("Packaging the project files for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
@@ -262,9 +263,13 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			term.Warnf("The build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit)
 		}
 
+		bufLen := buf.Len()
 		_, err = io.Copy(tarWriter, file)
-		if buf.Len() > ContextSizeLimit {
-			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB, use --debug or create .dockerignore to exclude caches and build artifacts", ContextSizeLimit/MiB)
+		if buf.Len() > ContextSizeHardLimit {
+			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB, use --debug or create .dockerignore to exclude caches and build artifacts", ContextSizeHardLimit/MiB)
+		}
+		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
+			term.Warnf("The build context is more than %dMiB; use --debug or create .dockerignore to exclude caches and build artifacts", ContextSizeSoftLimit/MiB)
 		}
 		return err
 	})
