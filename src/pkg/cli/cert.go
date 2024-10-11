@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 )
 
 type HTTPClient interface {
@@ -97,7 +98,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 				}
 			}
 			term.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
-			generateCert(ctx, service.Service.Domainname, targets)
+			generateCert(ctx, service.Service.Domainname, targets, client)
 		}
 	}
 	if cnt == 0 {
@@ -107,9 +108,9 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	return nil
 }
 
-func generateCert(ctx context.Context, domain string, targets []string) {
+func generateCert(ctx context.Context, domain string, targets []string, client cliClient.Client) {
 	term.Infof("Triggering TLS cert generation for %v", domain)
-	if err := waitForCNAME(ctx, domain, targets); err != nil {
+	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
 	}
@@ -198,7 +199,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string) error {
+func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.Client) error {
 	for i, target := range targets {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}
@@ -207,6 +208,8 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 	defer ticker.Stop()
 
 	msgShown := false
+	serverSideVerified := false
+	serverVerifyRpcFailure := 0
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
 	if doSpinner {
 		term.HideCursor()
@@ -218,8 +221,30 @@ func waitForCNAME(ctx context.Context, domain string, targets []string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if dns.CheckDomainDNSReady(ctx, domain, targets) {
-				return nil
+			if !serverSideVerified && serverVerifyRpcFailure < 3 {
+				if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
+					term.Debugf("Server side DNS verification for %v successful", domain)
+					serverSideVerified = true
+				} else {
+					if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
+						term.Debugf("Server side DNS verification negative result: %v", cerr.Message())
+					} else {
+						term.Debugf("Server side DNS verification request for %v failed: %v", domain, err)
+						serverVerifyRpcFailure++
+					}
+				}
+				if serverVerifyRpcFailure >= 3 {
+					term.Warnf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain)
+				}
+			} else {
+				locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
+				if serverSideVerified && !locallyVerified {
+					term.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
+					return nil
+				}
+				if locallyVerified {
+					return nil
+				}
 			}
 			if !msgShown {
 				term.Infof("Please set up a CNAME record for %v", domain)
@@ -264,4 +289,3 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 	}
 	return errors.Join(errs...)
 }
-
