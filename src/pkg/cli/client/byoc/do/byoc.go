@@ -299,17 +299,6 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	return err
 }
 
-func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	app, err := b.getAppByName(ctx, b.ProjectName)
-	if err != nil {
-		return "", err
-	}
-
-	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
-
-	return pkg.RandomID(), err
-}
-
 func (b *ByocDo) ServiceDNS(name string) string {
 	return "localhost"
 }
