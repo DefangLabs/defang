@@ -146,7 +146,7 @@ func (e *TaskStateChangeEvent) Etag() string {
 	return etag
 }
 func (e *TaskStateChangeEvent) Host() string {
-	return "ecs"
+	return "fabric"
 }
 
 func (e *TaskStateChangeEvent) Status() string {
@@ -275,7 +275,7 @@ func (e *ServiceActionEvent) Etag() string {
 	return ""
 }
 func (e *ServiceActionEvent) Host() string {
-	return "ecs"
+	return "fabric"
 }
 func (e *ServiceActionEvent) Status() string {
 	return e.Detail.EventName
@@ -291,7 +291,7 @@ func (e *DeploymentStateChangeEvent) Etag() string {
 	return DeploymentEtags.Get(e.Detail.DeploymentId)
 }
 func (e *DeploymentStateChangeEvent) Host() string {
-	return "ecs"
+	return "fabric"
 }
 func (e *DeploymentStateChangeEvent) Status() string {
 	return e.Detail.EventName
