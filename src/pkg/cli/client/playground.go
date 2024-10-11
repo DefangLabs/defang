@@ -104,11 +104,6 @@ func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) error {
-	_, err := g.client.Restart(ctx, connect.NewRequest(&defangv1.RestartRequest{Services: names}))
-	return err
-}
-
 func (g PlaygroundClient) ServiceDNS(name string) string {
 	return string(g.TenantID) + "-" + name
 }
