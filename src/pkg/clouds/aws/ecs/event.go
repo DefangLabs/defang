@@ -146,21 +146,23 @@ func (e *TaskStateChangeEvent) Etag() string {
 	return etag
 }
 func (e *TaskStateChangeEvent) Host() string {
-	return path.Base(e.Detail.TaskArn)
+	return "ecs"
 }
 
 func (e *TaskStateChangeEvent) Status() string {
-	status := "TASK_" + e.Detail.LastStatus
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "TASK_%s", e.Detail.LastStatus)
 	if e.Detail.StoppedReason != "" {
-		status += " " + e.Detail.StoppedReason
+		fmt.Fprintf(&buf, " %s", e.Detail.StoppedReason)
 	}
+	fmt.Fprintf(&buf, " : %s", path.Base(e.Detail.TaskArn))
 	if e.Detail.LastStatus == "DEPROVISIONING" {
 		exitCode := getTaskExitCode(e.Detail.Overrides.ContainerOverrides[0].Name, e.Detail.Containers)
 		if exitCode != 0 {
-			status += fmt.Sprintf(" (exit code %v)", exitCode)
+			fmt.Fprintf(&buf, " (exit code %v)", exitCode)
 		}
 	}
-	return status
+	return buf.String()
 }
 
 func (e *TaskStateChangeEvent) State() defangv1.ServiceState {
@@ -213,7 +215,7 @@ func (e *KanikoTaskStateChangeEvent) Etag() string {
 	return etag
 }
 func (e *KanikoTaskStateChangeEvent) Host() string {
-	return path.Base(e.Detail.TaskArn)
+	return "kaniko"
 }
 
 func (e *KanikoTaskStateChangeEvent) Status() string {
@@ -222,6 +224,7 @@ func (e *KanikoTaskStateChangeEvent) Status() string {
 	if e.Detail.StoppedReason != "" {
 		fmt.Fprintf(&buf, " : %s", e.Detail.StoppedReason)
 	}
+	fmt.Fprintf(&buf, " : %s", path.Base(e.Detail.TaskArn))
 	override := e.getKanikoOverride()
 	if override != nil {
 		exitCode := getTaskExitCode(override.Name, e.Detail.Containers)
@@ -272,7 +275,7 @@ func (e *ServiceActionEvent) Etag() string {
 	return ""
 }
 func (e *ServiceActionEvent) Host() string {
-	return ""
+	return "ecs"
 }
 func (e *ServiceActionEvent) Status() string {
 	return e.Detail.EventName
@@ -288,7 +291,7 @@ func (e *DeploymentStateChangeEvent) Etag() string {
 	return DeploymentEtags.Get(e.Detail.DeploymentId)
 }
 func (e *DeploymentStateChangeEvent) Host() string {
-	return ""
+	return "ecs"
 }
 func (e *DeploymentStateChangeEvent) Status() string {
 	return e.Detail.EventName
