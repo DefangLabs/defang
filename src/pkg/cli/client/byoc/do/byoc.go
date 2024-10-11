@@ -300,7 +300,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 }
 
 func (b *ByocDo) ServiceDNS(name string) string {
-	return "localhost"
+	return name // FIXME: what name should we use?
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
