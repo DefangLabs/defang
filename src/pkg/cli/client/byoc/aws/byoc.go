@@ -46,7 +46,7 @@ type ByocAws struct {
 	*byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
-	cdImageTag   string
+	cdVersion    string
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
@@ -65,14 +65,14 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
-	if b.SetupDone && b.cdImageTag == projectCdImageTag {
+func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
+	if b.SetupDone && b.cdVersion == projectCdVersion {
 		return nil
 	}
 
-	b.cdImageTag = byoc.CdDefaultVersion
-	if projectCdImageTag != "" {
-		b.cdImageTag = projectCdImageTag
+	b.cdVersion = byoc.CdDefaultVersion
+	if projectCdVersion != "" {
+		b.cdVersion = projectCdVersion
 	}
 
 	cdTaskName := byoc.CdTaskPrefix
@@ -91,7 +91,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     CdImageBase + ":" + b.cdImageTag,
+			Image:     CdImageBase + ":" + b.cdVersion,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -130,20 +130,24 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
 }
 
 func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
+	if b.cdVersion != "" {
+		return b.cdVersion, nil
+	}
+
 	// see if we already have a deployment running
 	resp, err := b.GetServices(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// send project update with the current deploy's cd version
-	// latest if new deployment
-	deploymentCd := byoc.CdLatestVersion
+	// send project update with the current deploy's cd version,
+	// most current version if new deployment
+	deploymentCdVersion := byoc.CdLatestVersion
 	if len(resp.Services) > 0 {
-		deploymentCd = resp.CdVersion
+		deploymentCdVersion = resp.CdVersion
 	}
 
-	return deploymentCd, nil
+	return deploymentCdVersion, nil
 }
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	cdVersion, err := b.getCdVersion(ctx)
