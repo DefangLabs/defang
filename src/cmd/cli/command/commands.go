@@ -216,9 +216,6 @@ func SetupCommands(version string) {
 	// Add up/down commands to the root as well
 	RootCmd.AddCommand(makeComposeDownCmd())
 	RootCmd.AddCommand(makeComposeUpCmd())
-	// RootCmd.AddCommand(makeComposeStartCmd())
-	// RootCmd.AddCommand(makeComposeRestartCmd())
-	// RootCmd.AddCommand(makeComposeStopCmd())
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -725,7 +722,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose restart")
+		printDefangHint("To update the deployed values, do:", "compose up")
 		return nil
 	},
 }
