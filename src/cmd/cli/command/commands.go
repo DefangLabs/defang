@@ -130,10 +130,10 @@ func Execute(ctx context.Context) error {
 
 func SetupCommands(version string) {
 	RootCmd.Version = version
-	RootCmd.PersistentFlags().Var(&colorMode, "color", `colorize output; one of [always never]`)
+	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", `cloud provider to use for bring-your-own-cloud; one of [defang aws]`)
+	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -213,9 +213,6 @@ func SetupCommands(version string) {
 	// Add up/down commands to the root as well
 	RootCmd.AddCommand(makeComposeDownCmd())
 	RootCmd.AddCommand(makeComposeUpCmd())
-	// RootCmd.AddCommand(makeComposeStartCmd())
-	// RootCmd.AddCommand(makeComposeRestartCmd())
-	// RootCmd.AddCommand(makeComposeStopCmd())
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -293,9 +290,9 @@ var RootCmd = &cobra.Command{
 		switch provider {
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws?")
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
 			} else if doInEnv() {
-				term.Warn("Using Defang playground, but DO_PAT environment variable was detected; did you forget --provider=digitalocean?")
+				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			provider = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:
@@ -304,7 +301,7 @@ var RootCmd = &cobra.Command{
 			}
 		case cliClient.ProviderDO:
 			if !doInEnv() {
-				term.Warn("DigitalOcean provider was selected, but DO_PAT environment variable is not set")
+				term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 			}
 		case cliClient.ProviderDefang:
 			// Ignore any env vars when explicitly using the Defang playground provider
@@ -445,13 +442,6 @@ var generateCmd = &cobra.Command{
 
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
-			if err := survey.AskOne(&survey.Select{
-				Message: "Choose the language you'd like to use:",
-				Options: cli.SupportedLanguages,
-				Help:    "The project code will be in the language you choose here.",
-			}, &language); err != nil {
-				return err
-			}
 			// Fetch the list of samples from the Defang repository
 			if fetchSamplesErr != nil {
 				term.Debug("unable to fetch samples:", fetchSamplesErr)
@@ -459,25 +449,36 @@ var generateCmd = &cobra.Command{
 				const generateWithAI = "Generate with AI"
 
 				sampleNames := []string{generateWithAI}
-				sampleDescriptions := []string{"Generate a sample from scratch using a language prompt"}
+				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
+				sampleIndex := []string{"unused first entry because we always show genAI option"}
 				for _, sample := range sampleList {
-					if slices.ContainsFunc(sample.Languages, func(l string) bool { return strings.EqualFold(l, language) }) {
-						sampleNames = append(sampleNames, sample.Name)
-						sampleDescriptions = append(sampleDescriptions, sample.ShortDescription)
-					}
+					sampleNames = append(sampleNames, sample.Name)
+					sampleTitles = append(sampleTitles, sample.Title)
+					sampleIndex = append(sampleIndex, strings.ToLower(sample.Name+" "+sample.Title+" "+
+						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " ")))
 				}
 
 				if err := survey.AskOne(&survey.Select{
 					Message: "Choose a sample service:",
 					Options: sampleNames,
 					Help:    "The project code will be based on the sample you choose here.",
+					Filter: func(filter string, value string, i int) bool {
+						return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
+					},
 					Description: func(value string, i int) string {
-						return sampleDescriptions[i]
+						return sampleTitles[i]
 					},
 				}, &sample); err != nil {
 					return err
 				}
 				if sample == generateWithAI {
+					if err := survey.AskOne(&survey.Select{
+						Message: "Choose the language you'd like to use:",
+						Options: cli.SupportedLanguages,
+						Help:    "The project code will be in the language you choose here.",
+					}, &language); err != nil {
+						return err
+					}
 					sample = ""
 					defaultFolder = "project1"
 				} else {
@@ -718,7 +719,7 @@ var configSetCmd = &cobra.Command{
 		}
 		term.Info("Updated value for", name)
 
-		printDefangHint("To update the deployed values, do:", "compose restart")
+		printDefangHint("To update the deployed values, do:", "compose up")
 		return nil
 	},
 }
@@ -1004,5 +1005,5 @@ func awsInEnv() bool {
 }
 
 func doInEnv() bool {
-	return os.Getenv("DO_PAT") != ""
+	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }

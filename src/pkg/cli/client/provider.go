@@ -25,6 +25,10 @@ var allProviders = []Provider{
 	// ProviderGCP,
 }
 
+func AllProviders() []Provider {
+	return allProviders[1:] // skip "auto"
+}
+
 func (p Provider) String() string {
 	return string(p)
 }
@@ -38,7 +42,7 @@ func (p *Provider) Set(str string) error {
 		}
 	}
 
-	return fmt.Errorf("available providers are: %v", allProviders)
+	return fmt.Errorf("provider not one of %v", allProviders)
 }
 
 func (p Provider) Type() string {

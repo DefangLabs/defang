@@ -23,6 +23,7 @@ type Local struct {
 	cmd        *exec.Cmd
 	outReader  io.ReadCloser
 	errReader  io.ReadCloser
+	workDir    string
 }
 
 var _ types.Driver = (*Local)(nil)
@@ -35,10 +36,8 @@ func (l *Local) SetUp(ctx context.Context, containers []types.Container) error {
 	if len(containers) != 1 {
 		return errors.New("expected exactly one container")
 	}
-	if len(containers[0].EntryPoint) == 0 {
-		return errors.New("entrypoint not set")
-	}
 	l.entrypoint = containers[0].EntryPoint
+	l.workDir = containers[0].WorkDir
 	return nil
 }
 
@@ -54,8 +53,9 @@ func (l *Local) Run(ctx context.Context, env map[string]string, args ...string) 
 	if l.cmd != nil {
 		return nil, errors.New("already running")
 	}
-	args = append(l.entrypoint[1:], args...)
-	cmd := exec.CommandContext(ctx, l.entrypoint[0], args...)
+	args = append(l.entrypoint, args...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd.Dir = l.workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	or, err := cmd.StdoutPipe()
 	if err != nil {
@@ -87,6 +87,7 @@ func (l *Local) Tail(ctx context.Context, taskID PID) error {
 	}
 	go io.Copy(os.Stderr, l.errReader)
 	_, err := io.Copy(os.Stdout, l.outReader)
+	os.Stderr.Close() // close stderr to stop the goroutine before returning
 	return err
 }
 

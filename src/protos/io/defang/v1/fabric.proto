@@ -100,6 +100,15 @@ service FabricController {
   rpc DeleteMe(google.protobuf.Empty) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
+
+  rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message VerifyDNSSetupRequest {
+  string domain = 1;
+  repeated string targets = 2;
 }
 
 message DestroyRequest {

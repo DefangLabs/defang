@@ -117,3 +117,8 @@ func (g GrpcClient) CheckLoginAndToS(ctx context.Context) error {
 	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
+
+func (g GrpcClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSSetupRequest) error {
+	_, err := g.client.VerifyDNSSetup(ctx, connect.NewRequest(req))
+	return err
+}

@@ -5,7 +5,7 @@
   "description": "CLI for the Defang Opinionated Platform",
   "license": "MIT",
   "bin": {
-    "defang": "./bin/cli.js"
+    "defang": "bin/cli.js"
   },
   "keywords": [],
   "homepage": "https://github.com/DefangLabs/defang#readme",
@@ -24,11 +24,14 @@
       "ts",
       "js"
     ],
-    "spec": ["test/**/*.spec.ts"],
+    "spec": [
+      "test/**/*.spec.ts"
+    ],
     "recursive": true
   },
   "scripts": {
     "build": "tsc",
+    "postbuild": "chmod +x bin/cli.js",
     "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm -trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
   },
   "dependencies": {
@@ -44,7 +47,6 @@
     "@babel/preset-env": "^7.24.7",
     "@babel/preset-typescript": "^7.24.7",
     "@types/adm-zip": "^0.5.5",
-    "@types/axios": "^0.14.0",
     "@types/chai": "^4.3.16",
     "@types/chai-as-promised": "^7.1.8",
     "@types/mocha": "^10.0.7",
@@ -56,7 +58,6 @@
     "chai-as-promised": "^8.0.0",
     "cross-env": "^7.0.3",
     "mocha": "^10.6.0",
-    "nyc": "^17.0.0",
     "sinon": "^18.0.0",
     "source-map-support": "^0.5.21",
     "ts-node": "^10.9.2",

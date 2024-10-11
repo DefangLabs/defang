@@ -1,4 +1,5 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+version: 2
 project_name: defang
 builds:
   - id: defang-mac
@@ -9,6 +10,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -trimpath
     hooks:
       post:
         - ./bin/codesign.sh "{{ .Path }}"
@@ -22,6 +25,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - -trimpath
 
 source:
   enabled: false

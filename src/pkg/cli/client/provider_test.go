@@ -45,6 +45,12 @@ func TestProvider(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "valid provider DigitalOcean",
+			provider: "DigitalOcean",
+			want:     ProviderDO,
+			wantErr:  false,
+		},
+		{
 			name:     "valid provider AWS",
 			provider: "AWS",
 			want:     ProviderAWS,
@@ -70,5 +76,11 @@ func TestProvider(t *testing.T) {
 				t.Errorf("Provider.Set() = %v, want %v", p, tt.want)
 			}
 		})
+	}
+}
+
+func TestAllProviders(t *testing.T) {
+	if allProviders[0] != ProviderAuto {
+		t.Errorf("allProviders[0] = %v, want %v", allProviders[0], ProviderAuto)
 	}
 }

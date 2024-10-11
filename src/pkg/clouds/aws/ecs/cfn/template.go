@@ -395,12 +395,14 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 					"awslogs-stream-prefix": awsecs.AwsLogsStreamPrefix,
 				},
 			},
-			VolumesFrom:      volumesFrom,
-			MountPoints:      mountPoints,
-			EntryPoint:       container.EntryPoint,
-			Command:          container.Command,
-			WorkingDirectory: container.WorkDir,
-			DependsOnProp:    dependsOn,
+			VolumesFrom:   volumesFrom,
+			MountPoints:   mountPoints,
+			EntryPoint:    container.EntryPoint,
+			Command:       container.Command,
+			DependsOnProp: dependsOn,
+		}
+		if container.WorkDir != "" {
+			def.WorkingDirectory = ptr.String(container.WorkDir)
 		}
 		containerDefinitions = append(containerDefinitions, def)
 	}

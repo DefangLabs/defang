@@ -1,3 +1,2 @@
- ! service "emptyenv": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "emptyenv": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  * Packaging the project files for emptyenv at .

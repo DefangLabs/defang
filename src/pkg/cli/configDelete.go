@@ -19,5 +19,5 @@ func ConfigDelete(ctx context.Context, client client.Client, names ...string) er
 		return ErrDryRun
 	}
 
-	return client.DeleteConfig(ctx, &defangv1.Secrets{Names: names})
+	return client.DeleteConfig(ctx, &defangv1.Secrets{Names: names, Project: projectName})
 }

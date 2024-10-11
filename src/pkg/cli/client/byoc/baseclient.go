@@ -15,13 +15,13 @@ import (
 )
 
 const (
+	// Changing this will cause issues if two clients with different versions are using the same account
+	CdImageTag   = "public-beta"
 	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
-	DefangPrefix = "Defang"    // prefix for all resources created by Defang
 )
 
 var (
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "public.ecr.aws/defang-io/cd:public-beta")
+	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
@@ -85,8 +85,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
-	return &defangv1.Version{Fabric: cdVersion}, nil
+	return &defangv1.Version{Fabric: CdImageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
@@ -99,7 +98,7 @@ func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, err
 	}
 
 	b.project = project
-	b.setProjectName(project.Name)
+	b.SetProjectName(project.Name)
 
 	return project, nil
 }
@@ -117,7 +116,7 @@ func (b *ByocBaseClient) LoadProjectName(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	b.setProjectName(projectName)
+	b.SetProjectName(projectName)
 	return projectName, nil
 }
 
@@ -140,7 +139,7 @@ func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string,
 	}
 	if len(projectNames) == 1 {
 		term.Debug("Using default project: ", projectNames[0])
-		b.setProjectName(projectNames[0])
+		b.SetProjectName(projectNames[0])
 		return projectNames[0], nil
 	}
 
@@ -149,7 +148,7 @@ func (b *ByocBaseClient) loadProjectNameFromRemote(ctx context.Context) (string,
 	return "", errors.New("use the --project-name flag to specify a project")
 }
 
-func (b *ByocBaseClient) setProjectName(projectName string) {
+func (b *ByocBaseClient) SetProjectName(projectName string) {
 	b.ProjectName = projectName
 	b.PrivateDomain = DnsSafeLabel(b.ProjectName) + ".internal"
 }
