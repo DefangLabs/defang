@@ -51,7 +51,6 @@ type Client interface {
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
-	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)

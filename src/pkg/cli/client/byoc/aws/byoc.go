@@ -689,10 +689,6 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-func (b *ByocAws) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	return "", client.ErrNotImplemented("not yet implemented for BYOC; please use the AWS ECS dashboard") // FIXME: implement this for BYOC
-}
-
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
