@@ -69,9 +69,6 @@ const (
 	// FabricControllerGetServicesProcedure is the fully-qualified name of the FabricController's
 	// GetServices RPC.
 	FabricControllerGetServicesProcedure = "/io.defang.v1.FabricController/GetServices"
-	// FabricControllerRestartProcedure is the fully-qualified name of the FabricController's Restart
-	// RPC.
-	FabricControllerRestartProcedure = "/io.defang.v1.FabricController/Restart"
 	// FabricControllerGenerateFilesProcedure is the fully-qualified name of the FabricController's
 	// GenerateFiles RPC.
 	FabricControllerGenerateFilesProcedure = "/io.defang.v1.FabricController/GenerateFiles"
@@ -153,7 +150,6 @@ type FabricControllerClient interface {
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
-	Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -262,11 +258,6 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerGetServicesProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
-		),
-		restart: connect_go.NewClient[v1.RestartRequest, emptypb.Empty](
-			httpClient,
-			baseURL+FabricControllerRestartProcedure,
-			opts...,
 		),
 		generateFiles: connect_go.NewClient[v1.GenerateFilesRequest, v1.GenerateFilesResponse](
 			httpClient,
@@ -402,7 +393,6 @@ type fabricControllerClient struct {
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
 	getServices              *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
-	restart                  *connect_go.Client[v1.RestartRequest, emptypb.Empty]
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
 	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
@@ -495,11 +485,6 @@ func (c *fabricControllerClient) Subscribe(ctx context.Context, req *connect_go.
 // GetServices calls io.defang.v1.FabricController.GetServices.
 func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error) {
 	return c.getServices.CallUnary(ctx, req)
-}
-
-// Restart calls io.defang.v1.FabricController.Restart.
-func (c *fabricControllerClient) Restart(ctx context.Context, req *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return c.restart.CallUnary(ctx, req)
 }
 
 // GenerateFiles calls io.defang.v1.FabricController.GenerateFiles.
@@ -632,7 +617,6 @@ type FabricControllerHandler interface {
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
 	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
-	Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -737,11 +721,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.GetServices,
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
-	)
-	fabricControllerRestartHandler := connect_go.NewUnaryHandler(
-		FabricControllerRestartProcedure,
-		svc.Restart,
-		opts...,
 	)
 	fabricControllerGenerateFilesHandler := connect_go.NewUnaryHandler(
 		FabricControllerGenerateFilesProcedure,
@@ -887,8 +866,6 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerSubscribeHandler.ServeHTTP(w, r)
 		case FabricControllerGetServicesProcedure:
 			fabricControllerGetServicesHandler.ServeHTTP(w, r)
-		case FabricControllerRestartProcedure:
-			fabricControllerRestartHandler.ServeHTTP(w, r)
 		case FabricControllerGenerateFilesProcedure:
 			fabricControllerGenerateFilesHandler.ServeHTTP(w, r)
 		case FabricControllerStartGenerateProcedure:
@@ -990,10 +967,6 @@ func (UnimplementedFabricControllerHandler) Subscribe(context.Context, *connect_
 
 func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetServices is not implemented"))
-}
-
-func (UnimplementedFabricControllerHandler) Restart(context.Context, *connect_go.Request[v1.RestartRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Restart is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error) {

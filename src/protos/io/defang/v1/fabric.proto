@@ -42,10 +42,6 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
-  rpc Restart(RestartRequest) returns (google.protobuf.Empty);
-  // rpc Start(ServiceID) returns (google.protobuf.Empty);
-  // rpc Stop(ServiceID) returns (google.protobuf.Empty);
-
   rpc GenerateFiles(GenerateFilesRequest) returns (
       GenerateFilesResponse); // deprecated; use StartGenerate/GenerateStatus
   rpc StartGenerate(GenerateFilesRequest) returns (StartGenerateResponse);
@@ -117,11 +113,6 @@ message DestroyRequest {
 
 message DestroyResponse {
   string etag = 1;
-}
-
-message RestartRequest {
-  repeated string services = 1;
-  string project = 2; // defaults to tenant ID
 }
 
 message DebugRequest {
