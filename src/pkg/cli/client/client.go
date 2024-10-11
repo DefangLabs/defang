@@ -34,6 +34,7 @@ type FabricClient interface {
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
+	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error
 }
 
 type Client interface {
