@@ -55,7 +55,9 @@ const (
 **/node_modules
 **/Thumbs.db
 # Ignore our own binary, but only in the root to avoid ignoring subfolders
-defang`
+defang
+# Ignore our project-level state
+.defang`
 )
 
 func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force BuildContext) (string, error) {
