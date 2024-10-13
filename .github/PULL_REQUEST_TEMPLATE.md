@@ -13,18 +13,28 @@ https://ben.balter.com/2015/12/08/types-of-pull-requests/
 ## Description
 
 - Concise description of what this PR is tackling.
-- Linked relevant Github Issues or sub-PRs here.
 
-#### Caveats/Notes (optional)
+## Linked Issues
 
-Talk about things reviewers should be aware about
-(Please include here if you created a new environment variables and ensure you have communicated this secret to the team)
+This section will automatically populate with linked issues.
 
-#### Prompts (optional)
+[To link an issue to this pull request, use one of the following keywords linked here in the pull request description](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue#linking-a-pull-request-to-an-issue-using-a-keyword):
 
-- optional
-- Where would you like the reviewer to focus their energy on?
-- Any particular areas of code that you'd like to reduce complexity, technical debt, risk, or needs further optimization?
+- `close`
+- `closes`
+- `closed`
+- `fix`
+- `fixes`
+- `fixed`
+- `resolve`
+- `resolves`
+- `resolved`
+
+For example:
+
+- `Closes #10`
+- `Fixes octo-org/octo-repo#100`
+- `Resolves #10, resolves #123, resolves octo-org/octo-repo#100`
 
 ### Screenshots (optional)
 
