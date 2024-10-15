@@ -14,11 +14,7 @@ import (
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			command.Track("Panic",
-				command.P{"error", r},
-				command.P{"stack", string(skipLines(debug.Stack(), 6))},
-				command.P{"version", version},
-			)
+			command.Track("Panic", command.P{"error", r}, command.P{"stack", string(skipLines(debug.Stack(), 6))})
 			command.FlushAllTracking()
 			panic(r)
 		}
