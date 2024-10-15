@@ -540,7 +540,7 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(),
 		Project: b.ProjectName,
-		Service: &defangv1.ServiceID{Name: service.Name},
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	//hasIngress := false
@@ -607,7 +607,7 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
-		Service: &defangv1.ServiceID{
+		Service: &defangv1.Service{
 			Name: service.Name,
 			// Image:       service.Image.Digest,
 			// Environment: getServiceEnv(service.Envs),

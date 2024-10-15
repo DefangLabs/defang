@@ -546,7 +546,7 @@ func (b *ByocAws) update(ctx context.Context, service compose.ServiceConfig) (*d
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 		Project: b.ProjectName,  // was: tenant
-		Service: &defangv1.ServiceID{Name: service.Name},
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	hasHost := false

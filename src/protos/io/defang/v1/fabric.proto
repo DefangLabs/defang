@@ -219,7 +219,7 @@ enum ServiceState {
 }
 
 message ServiceInfo {
-  ServiceID service = 1;
+  Service service = 1;
   repeated string endpoints = 2; // list of endpoints, one for each port
   string project = 3;            // was: tenant; defaults to tenant ID
   string etag = 4;

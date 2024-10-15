@@ -34,9 +34,7 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	var services []*defangv1.ServiceInfo
 	for _, service := range p.Services {
 		services = append(services, &defangv1.ServiceInfo{
-			Service: &defangv1.ServiceID{
-				Name: service.Name,
-			},
+			Service: &defangv1.Service{Name: service.Name},
 		})
 	}
 

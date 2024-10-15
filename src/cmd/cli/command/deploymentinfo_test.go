@@ -23,7 +23,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	cluster = cli.DefaultCluster
 	printPlaygroundPortalServiceURLs([]*defangv1.ServiceInfo{
 		{
-			Service: &defangv1.ServiceID{Name: "service1"},
+			Service: &defangv1.Service{Name: "service1"},
 		}})
 	const want = ` * Monitor your services' status in the defang portal
    - https://portal.defang.dev/service/service1
@@ -44,7 +44,7 @@ func TestPrintEndpoints(t *testing.T) {
 
 	printEndpoints([]*defangv1.ServiceInfo{
 		{
-			Service: &defangv1.ServiceID{Name: "service1"},
+			Service: &defangv1.Service{Name: "service1"},
 			Status:  "UNKNOWN",
 			Endpoints: []string{
 				"example.com:443",
