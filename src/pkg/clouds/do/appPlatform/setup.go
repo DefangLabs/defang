@@ -81,18 +81,19 @@ func (d *DoApp) SetUp(ctx context.Context, projectCdVersion string) error {
 		return err
 	}
 
-	buckeName, err := d.GetBucketName(ctx, s3Client)
+	bucketName, err := d.GetBucketName(ctx, s3Client)
 	if err != nil {
 		return err
 	}
 
-	if buckeName == "" {
-		d.BucketName = fmt.Sprintf("%s-%s", bucketPrefix, uuid.NewString())
+	if bucketName == "" {
+		bucketName = fmt.Sprintf("%s-%s", bucketPrefix, uuid.NewString())
 		_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
-			Bucket: &d.BucketName,
+			Bucket: &bucketName,
 		})
 	}
 
+	d.BucketName = bucketName
 	return err
 }
 
