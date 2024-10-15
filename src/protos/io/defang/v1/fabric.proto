@@ -353,7 +353,6 @@ message TailResponse {
 message ListServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
-  // bytes compose = 3;
 }
 
 message ProjectUpdate {
