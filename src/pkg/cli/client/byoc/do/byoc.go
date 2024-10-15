@@ -609,8 +609,6 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 		Etag:    pkg.RandomID(),
 		Service: &defangv1.Service{
 			Name: service.Name,
-			// Image:       service.Image.Digest,
-			// Environment: getServiceEnv(service.Envs),
 		},
 	}
 
