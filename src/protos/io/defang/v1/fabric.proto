@@ -26,8 +26,8 @@ service FabricController {
   rpc Deploy(DeployRequest) returns (DeployResponse);
   rpc Get(ServiceID) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };                                                  // should be GetService
-  rpc Delete(DeleteRequest) returns (DeleteResponse){
+  }; // should be GetService
+  rpc Delete(DeleteRequest) returns (DeleteResponse) {
     option deprecated = true;
   }; // used by pulumi-defang provider; should use Deploy or Destroy
   rpc Destroy(DestroyRequest) returns (DestroyResponse) {
@@ -57,8 +57,12 @@ service FabricController {
   }
 
   // deprecate - change to use *Config functions
-  rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {option deprecated = true;};
-  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {option deprecated = true;};
+  rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {
+    option deprecated = true;
+  };
+  rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
+    option deprecated = true;
+  };
   rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
     option deprecated = true;
@@ -111,9 +115,7 @@ message DestroyRequest {
   string project = 1; // defaults to tenant ID
 }
 
-message DestroyResponse {
-  string etag = 1;
-}
+message DestroyResponse { string etag = 1; }
 
 message DebugRequest {
   repeated File files = 1;
@@ -150,15 +152,16 @@ message TrackRequest {
 }
 
 enum DeploymentMode {
-  UNSPECIFIED_MODE= 0;
+  UNSPECIFIED_MODE = 0;
   DEVELOPMENT = 1;
   STAGING = 2;
   PRODUCTION = 3;
 }
 
 message DeployRequest {
-  repeated Service services = 1 [deprecated = true]; // deprecated; use compose
-  string project = 2 [deprecated = true]; // deprecated; use compose.name
+  repeated Service services = 1
+      [ deprecated = true ];                // deprecated; use compose
+  string project = 2 [ deprecated = true ]; // deprecated; use compose.name
   DeploymentMode mode = 3;
   string compose = 4; // yaml (or json)
 }
@@ -196,7 +199,6 @@ message UploadURLRequest { string digest = 1; }
 
 message UploadURLResponse { string url = 1; }
 
-
 enum ServiceState {
   NOT_SPECIFIED = 0;
 
@@ -225,16 +227,18 @@ message ServiceInfo {
   string etag = 4;
   string status = 5;
   repeated string nat_ips = 6; // comma-separated list of NAT IPs
-  repeated string lb_ips = 7; // comma-separated list of internal CIDRs for the load-balancer
+  repeated string lb_ips =
+      7; // comma-separated list of internal CIDRs for the load-balancer
   string private_fqdn = 8; // fully qualified domain name (host)
   string public_fqdn = 9;  // fully qualified domain name (ingress)
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   string zone_id = 12; // zone ID for byod domain
-  bool use_acme_cert = 13; // If we should setup the facilities to use ACME(let's encrypt) certs
-  reserved 14; // was: string lb_dns
+  bool use_acme_cert =
+      13; // If we should setup the facilities to use ACME(let's encrypt) certs
+  reserved 14;             // was: string lb_dns
   ServiceState state = 15; // enumerated status of the service
-  string domainname = 16; // domain name for the service
+  string domainname = 16;  // domain name for the service
 
   // bool is_function = 5; // true if service is a function
 }
@@ -276,26 +280,17 @@ message PutConfigRequest {
   ConfigType type = 4;
 }
 
-message GetConfigsRequest {
-  repeated ConfigKey configs = 1;
-}
+message GetConfigsRequest { repeated ConfigKey configs = 1; }
 
-message GetConfigsResponse {
-  repeated Config configs = 1;
-}
+message GetConfigsResponse { repeated Config configs = 1; }
 
-
-message DeleteConfigsRequest {
-  repeated ConfigKey configs = 1;
-}
+message DeleteConfigsRequest { repeated ConfigKey configs = 1; }
 
 message ListConfigsRequest {
   string project = 1; // defaults to tenant ID
 }
 
-message ListConfigsResponse {
-  repeated ConfigKey configs = 1;
-}
+message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
 message TokenRequest {
   string tenant = 1;
@@ -360,6 +355,7 @@ message ProjectUpdate {
   string alb_arn = 2;
   string project = 3; // should we use compose.name?
   string compose = 4;
+  string cd_version = 5;
 }
 
 enum Platform {
@@ -468,7 +464,7 @@ message Service {
   string name = 1;
   string image = 2;
   Platform platform = 3;
-  bool internal = 4 [deprecated = true]; // deprecated: use networks
+  bool internal = 4 [ deprecated = true ]; // deprecated: use networks
   Deploy deploy = 5;
   repeated Port ports = 6;
   map<string, string> environment = 7;
@@ -478,12 +474,13 @@ message Service {
   repeated string command = 11;
   string domainname = 12;
   bool init = 13;
-  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to create dns records
+  string dns_role = 14; // x-defang-dns-role: role arn used to access route53 to
+                        // create dns records
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
-  Redis redis = 18; // x-defang-redis: use a managed redis
-  Postgres postgres = 19; // x-defang-postgres: use a managed
-  string project = 20; // defaults to tenant ID
+  Redis redis = 18;              // x-defang-redis: use a managed redis
+  Postgres postgres = 19;        // x-defang-postgres: use a managed
+  string project = 20;           // defaults to tenant ID
 }
 
 message StaticFiles {
@@ -492,19 +489,15 @@ message StaticFiles {
   repeated string redirects = 2;
 }
 
-message Redis {
-  option deprecated = true;
-}
-message Postgres {
-  option deprecated = true;
-}
+message Redis { option deprecated = true; }
+message Postgres { option deprecated = true; }
 
 // TODO: internal message; move to a separate proto file; was Event
 message DeployEvent {
   DeploymentMode mode = 1;
-  string type = 2;        // required
+  string type = 2; // required
   string source = 3;
-  string id = 4;          // etag
+  string id = 4; // etag
   string datacontenttype = 5;
   string dataschema = 6;
   string subject = 7; // tenant|stack; also used as SQS group ID
@@ -533,7 +526,7 @@ message SubscribeRequest {
 }
 
 message SubscribeResponse {
-  ServiceInfo service = 1 [deprecated = true];
+  ServiceInfo service = 1 [ deprecated = true ];
   string name = 2;
   string status = 3;
   ServiceState state = 4;
