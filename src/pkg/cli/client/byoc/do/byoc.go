@@ -121,10 +121,15 @@ func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, 
 		return nil, err
 	}
 
+	if bucketName == "" {
+		return nil, errors.New("no bucket found")
+	}
+
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
 	getObjectOutput, err := client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
-		Key:    &path})
+		Key:    &path,
+	})
 
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
@@ -134,7 +139,6 @@ func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, 
 		return nil, annotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
-
 	pbBytes, err := io.ReadAll(getObjectOutput.Body)
 	if err != nil {
 		return nil, err
