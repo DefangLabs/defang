@@ -1,19 +1,14 @@
 package compose
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestConvertPort(t *testing.T) {
@@ -152,32 +147,7 @@ func TestConvertPort(t *testing.T) {
 	}
 }
 
-func TestComposeBlob(t *testing.T) {
-	var compose structpb.Struct
-	if err := json.Unmarshal([]byte(`{"name":"test","services":{"test":{"image":"nginx"}}}`), &compose); err != nil {
-		t.Fatal(err)
-	}
-
-	asmap := compose.AsMap()
-	t.Log(asmap)
-
-	p, err := loader.LoadWithContext(context.Background(), types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: compose.AsMap()}}}, func(o *loader.Options) {
-		o.SetProjectName(compose.Fields["name"].GetStringValue(), true) // HACK: workaround for a bug in compose-go where it insists on loading the project name from the first file
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(p)
-
-	blob, err := proto.Marshal(&compose)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(blob) != 62 {
-		t.Errorf("expected empty blob, got %v", blob)
-	}
-}
-
+// TODO: remove this (and change the test cases to avoid using the protobuf)
 func convertPort(port compose.ServicePortConfig) *defangv1.Port {
 	pbPort := &defangv1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`

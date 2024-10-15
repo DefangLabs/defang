@@ -24,15 +24,13 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 		return nil, errors.New("DeployRequest needs Compose or Services")
 	}
 
-	p, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Content: req.Compose}}}, func(o *loader.Options) {
-		o.SetProjectName(req.Project, true) // HACK: workaround for bug in compose-go where it insists on loading the project name from the file
-	})
+	project, err := loader.LoadWithContext(ctx, types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Content: req.Compose}}})
 	if err != nil {
 		return nil, err
 	}
 
 	var services []*defangv1.ServiceInfo
-	for _, service := range p.Services {
+	for _, service := range project.Services {
 		services = append(services, &defangv1.ServiceInfo{
 			Service: &defangv1.Service{Name: service.Name},
 		})

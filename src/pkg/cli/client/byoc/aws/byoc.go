@@ -129,18 +129,19 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 		return nil, err
 	}
 
-	p, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Content: req.Compose}}})
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Content: req.Compose}}})
 	if err != nil {
 		return nil, err
 	}
 
 	etag := pkg.RandomID()
-	if len(p.Services) > b.Quota.Services {
+	if len(project.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
 	}
 
 	serviceInfos := []*defangv1.ServiceInfo{}
-	for _, service := range p.Services {
+	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
@@ -203,7 +204,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Service.Name)
+			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname)
 		}
 	}
 
