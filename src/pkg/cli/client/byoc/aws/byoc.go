@@ -39,7 +39,7 @@ import (
 var (
 	CdImageBase = "public.ecr.aws/defang-io/cd"
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestVersion)
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestImageTag)
 )
 
 type ByocAws struct {
@@ -56,6 +56,10 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
+func getCdImage(imageTag string) string {
+	return pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+imageTag)
+}
+
 func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
@@ -70,11 +74,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
 		return nil
 	}
 
-	b.cdVersion = byoc.CdDefaultVersion
-	if projectCdVersion != "" {
-		b.cdVersion = projectCdVersion
-	}
-
+	b.cdVersion = projectCdVersion
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
@@ -91,7 +91,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     CdImageBase + ":" + b.cdVersion,
+			Image:     getCdImage(b.cdVersion),
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -135,16 +135,16 @@ func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
 	}
 
 	// see if we already have a deployment running
-	resp, err := b.GetServices(ctx)
+	projInfo, err := b.getProject(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	// send project update with the current deploy's cd version,
 	// most current version if new deployment
-	deploymentCdVersion := byoc.CdLatestVersion
-	if len(resp.Services) > 0 {
-		deploymentCdVersion = resp.CdVersion
+	deploymentCdVersion := byoc.CdLatestImageTag
+	if len(projInfo.Services) > 0 && projInfo.CdVersion != "" {
+		deploymentCdVersion = projInfo.CdVersion
 	}
 
 	return deploymentCdVersion, nil
@@ -330,7 +330,8 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 }
 
 func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := CdImage[strings.LastIndex(CdImage, ":")+1:]
+	cdVersion := getCdImage(byoc.CdLatestImageTag)
+	cdVersion = cdVersion[strings.LastIndex(cdVersion, ":")+1:]
 	return &defangv1.Version{Fabric: cdVersion}, nil
 }
 
@@ -410,7 +411,8 @@ func (b *ByocAws) stackDir(name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.ProjectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
-func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocAws) getMarshalledProjectInfo(ctx context.Context) (*[]byte, error) {
+
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
@@ -434,11 +436,12 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 		Bucket: &bucketName,
 		Key:    &path,
 	})
-	var serviceInfos defangv1.ListServicesResponse
+
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)
-			return &serviceInfos, nil // no services yet
+			noData := []byte{}
+			return &noData, nil // no services yet
 		}
 		return nil, annotateAwsError(err)
 	}
@@ -447,17 +450,42 @@ func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesRespon
 	if err != nil {
 		return nil, err
 	}
-	if err := proto.Unmarshal(pbBytes, &serviceInfos); err != nil {
+
+	return &pbBytes, nil
+}
+
+func (b *ByocAws) getProject(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+	data, err := b.getMarshalledProjectInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	projUpdate := defangv1.ProjectUpdate{}
+	if err := proto.Unmarshal(*data, &projUpdate); err != nil {
 		return nil, err
 	}
 
 	// older deployments may not have the cd_version field set,
 	// these would have been deployed with public-beta
-	if serviceInfos.CdVersion == "" {
-		serviceInfos.CdVersion = byoc.CdDefaultVersion
+	if projUpdate.CdVersion == "" {
+		projUpdate.CdVersion = byoc.CdDefaultImageTag
 	}
 
-	return &serviceInfos, nil
+	return &projUpdate, nil
+}
+
+func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	data, err := b.getMarshalledProjectInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	listServiceResp := defangv1.ListServicesResponse{}
+	if err := proto.Unmarshal(*data, &listServiceResp); err != nil {
+		return nil, err
+	}
+
+	return &listServiceResp, nil
 }
 
 func (b *ByocAws) getSecretID(name string) string {

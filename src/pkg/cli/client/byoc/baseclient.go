@@ -15,12 +15,13 @@ import (
 )
 
 const (
-	CdTaskPrefix     = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
-	CdDefaultVersion = "public-beta"
-	CdLatestVersion  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
+	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
+	CdDefaultImageTag = "public-beta" // for when a project has no cd version, this would be a old deployment
+	CdLatestImageTag  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
 )
 
 var (
+	CdImageTag   = "public-beta"
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
@@ -85,7 +86,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	return &defangv1.Version{Fabric: CdLatestVersion}, nil
+	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {

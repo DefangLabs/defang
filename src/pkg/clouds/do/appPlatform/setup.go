@@ -29,13 +29,15 @@ const (
 )
 
 var (
+	CdImageBase = "defang-io/cd"
 	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", "defangio/cd:"+byoc.CdLatestVersion)
+	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestImageTag)
 )
 
 type DoApp struct {
 	Region      do.Region
 	ProjectName string
+	CdVersion   string
 	BucketName  string
 	AppID       string
 }
@@ -53,28 +55,38 @@ func New(region do.Region) *DoApp {
 	}
 }
 
-func (d *DoApp) SetUp(ctx context.Context) error {
-	s3Client, err := d.createS3Client()
-	if err != nil {
-		return err
-	}
+func (d *DoApp) GetBucketName(ctx context.Context, s3Client *s3.Client) (string, error) {
+	bucketName := d.BucketName
+	if bucketName == "" {
+		lbo, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
+		if err != nil {
+			return "", err
+		}
 
-	lbo, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
-	if err != nil {
-		return err
-	}
-
-	if d.BucketName == "" {
 		// Find an existing bucket that starts with the bucketPrefix
 		for _, b := range lbo.Buckets {
 			if strings.HasPrefix(*b.Name, bucketPrefix) {
-				d.BucketName = *b.Name
+				bucketName = *b.Name
 				break
 			}
 		}
 	}
 
-	if d.BucketName == "" {
+	return bucketName, nil
+}
+
+func (d *DoApp) SetUp(ctx context.Context, projectCdVersion string) error {
+	s3Client, err := d.CreateS3Client()
+	if err != nil {
+		return err
+	}
+
+	buckeName, err := d.GetBucketName(ctx, s3Client)
+	if err != nil {
+		return err
+	}
+
+	if buckeName == "" {
 		d.BucketName = fmt.Sprintf("%s-%s", bucketPrefix, uuid.NewString())
 		_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 			Bucket: &d.BucketName,
@@ -92,8 +104,12 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
+func getCdImagePath(imageTag string) string {
+	return pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+imageTag)
+}
+
 func getCdImage() (*godo.ImageSourceSpec, error) {
-	image, err := ParseImage(CdImage)
+	image, err := ParseImage(getCdImagePath(byoc.CdLatestImageTag))
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +247,7 @@ func NewClient(ctx context.Context) (*godo.Client, error) {
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
 
 func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	s3Client, err := d.createS3Client()
+	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return "", err
 	}
@@ -265,7 +281,7 @@ func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error)
 }
 
 func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, error) {
-	s3Client, err := d.createS3Client()
+	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return "", err
 	}
@@ -282,7 +298,7 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 
 }
 
-func (d DoApp) createS3Client() (*s3.Client, error) {
+func (d DoApp) CreateS3Client() (*s3.Client, error) {
 	id := os.Getenv("SPACES_ACCESS_KEY_ID")
 	key := os.Getenv("SPACES_SECRET_ACCESS_KEY")
 	if id == "" || key == "" {

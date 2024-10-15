@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/bufbuild/connect-go"
 	"github.com/digitalocean/godo"
 	"github.com/muesli/termenv"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
@@ -46,6 +49,7 @@ type ByocDo struct {
 	*byoc.ByocBaseClient
 
 	buildRepo string
+	cdVersion string
 	client    *godo.Client
 	driver    *appPlatform.DoApp
 }
@@ -70,15 +74,93 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b, nil
 }
 
+func (b *ByocDo) getCdVersion(ctx context.Context) (string, error) {
+	if b.cdVersion != "" {
+		return b.cdVersion, nil
+	}
+
+	projInfo, err := b.getProjectProto(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// send project update with the current deploy's cd version,
+	// most current version if new deployment
+	deploymentCdVersion := byoc.CdLatestImageTag
+	if (projInfo != nil) && (len(projInfo.Services) > 0) && (projInfo.CdVersion != "") {
+		deploymentCdVersion = projInfo.CdVersion
+	}
+
+	return deploymentCdVersion, nil
+}
+
+func annotateAwsError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "get credentials:") {
+		return connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if aws.IsS3NoSuchKeyError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if aws.IsParameterNotFoundError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	return err
+}
+
+func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+	client, err := b.driver.CreateS3Client()
+	if err != nil {
+		return nil, err
+	}
+
+	bucketName, err := b.driver.GetBucketName(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
+	getObjectOutput, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &path})
+
+	if err != nil {
+		if aws.IsS3NoSuchKeyError(err) {
+			term.Debug("s3.GetObject:", err)
+			return nil, nil // no services yet
+		}
+		return nil, annotateAwsError(err)
+	}
+	defer getObjectOutput.Body.Close()
+
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	projUpdate := defangv1.ProjectUpdate{}
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
+		return nil, err
+	}
+
+	return &projUpdate, nil
+}
+
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
-	//var warnings Warnings
 
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
@@ -101,7 +183,8 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services: serviceInfos,
+		Services:  serviceInfos,
+		CdVersion: cdVersion,
 	})
 
 	if err != nil {
@@ -146,11 +229,16 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, command)
+	if err := b.setUp(ctx, cdVersion); err != nil {
+		return "", err
+	}
+
+	_, err = b.runCdCommand(ctx, command)
 	if err != nil {
 		return "", err
 	}
@@ -179,7 +267,12 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 
@@ -242,20 +335,29 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defang
 	return serviceInfo, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.ServiceInfo) (*godo.App, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
 	app, err := b.getAppByName(ctx, b.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-	services := &defangv1.ListServicesResponse{}
 
 	for _, service := range app.Spec.Services {
 		serviceInfo := b.processServiceInfo(service)
-		services.Services = append(services.Services, serviceInfo)
+		*services = append(*services, serviceInfo)
 	}
 
-	return services, nil
+	return app, nil
+}
+
+func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	resp := defangv1.ListServicesResponse{}
+	_, err := b.getProjectInfo(ctx, &resp.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, err
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -315,7 +417,12 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if err := b.setUp(ctx); err != nil {
+	cdVersion, err := b.getCdVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, cdVersion); err != nil {
 		return nil, err
 	}
 
@@ -574,12 +681,12 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 	return si, nil
 }
 
-func (b *ByocDo) setUp(ctx context.Context) error {
-	if b.SetupDone {
+func (b *ByocDo) setUp(ctx context.Context, projectCdVersion string) error {
+	if b.SetupDone && b.cdVersion == projectCdVersion {
 		return nil
 	}
 
-	if err := b.driver.SetUp(ctx); err != nil {
+	if err := b.driver.SetUp(ctx, projectCdVersion); err != nil {
 		return err
 	}
 
