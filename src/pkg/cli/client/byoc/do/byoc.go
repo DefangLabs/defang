@@ -405,19 +405,8 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	return err
 }
 
-func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	app, err := b.getAppByName(ctx, b.ProjectName)
-	if err != nil {
-		return "", err
-	}
-
-	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
-
-	return pkg.RandomID(), err
-}
-
 func (b *ByocDo) ServiceDNS(name string) string {
-	return "localhost"
+	return name // FIXME: what name should we use?
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
@@ -459,22 +448,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 		if err != nil {
 			return nil, err
-		}
-
-		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
-			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, false, 150)
-			if err != nil {
-				return nil, err
-			}
-
-			// Return build and app logs if there are any
-			_, err = b.processServiceLogs(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			readHistoricalLogs(ctx, logs.HistoricURLs)
-			return nil, errors.New("problem deploying app")
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
@@ -783,12 +756,41 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-			mainLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+
+			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
 			}
-			readHistoricalLogs(ctx, mainLogs.HistoricURLs)
-			appLiveURL = mainLogs.LiveURL
+
+			mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+			if resp.StatusCode != 200 {
+				// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
+				// Create our own last deployment and return deployment logs if the deployment failed in the last 2 minutes
+				if deployments[0].Phase == godo.DeploymentPhase_Error && deployments[0].UpdatedAt.After(time.Now().Add(-2*time.Minute)) {
+					failDeployLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, deployments[0].ID, "", godo.AppLogTypeDeploy, true, 50)
+					if err != nil {
+						return "", err
+					}
+					readHistoricalLogs(ctx, failDeployLogs.HistoricURLs)
+				}
+				// Assume no deploy happened, return without an error
+				return "", nil
+			}
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
+
+			mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+			if resp.StatusCode != 200 {
+				// Assume no deploy happened, return without an error
+				return "", nil
+			}
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, mainRunLogs.HistoricURLs)
+			appLiveURL = mainRunLogs.LiveURL
 		}
 	}
 	return appLiveURL, nil

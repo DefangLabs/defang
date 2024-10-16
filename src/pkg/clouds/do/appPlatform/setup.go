@@ -154,6 +154,9 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 			InstanceCount:    1,
 			InstanceSizeSlug: "basic-xs", // TODO: this is legacy and we should use new slugs
 			RunCommand:       shellQuote(cmd...),
+			Termination: &godo.AppJobSpecTermination{
+				GracePeriodSeconds: 600, // max 10mins to avoid killing the job while it's still running
+			},
 		}},
 	}
 

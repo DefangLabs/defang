@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -103,33 +102,6 @@ func (g *PlaygroundClient) TearDown(ctx context.Context) error {
 
 func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
-}
-
-func (g *PlaygroundClient) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	// For now, we'll just get the service info and pass it back to Deploy as-is.
-	resp, err := g.GetServices(ctx)
-	if err != nil {
-		return "", err
-	}
-	existingServices := make(map[string]*defangv1.Service)
-	for _, serviceInfo := range resp.Services {
-		existingServices[serviceInfo.Service.Name] = serviceInfo.Service
-	}
-
-	servicesToUpdate := make([]*defangv1.Service, 0, len(names))
-	for _, name := range names {
-		service, ok := existingServices[name]
-		if !ok {
-			return "", fmt.Errorf("service %s not found", name)
-		}
-		servicesToUpdate = append(servicesToUpdate, service)
-	}
-
-	dr, err := g.Deploy(ctx, &defangv1.DeployRequest{Project: resp.Project, Services: servicesToUpdate})
-	if err != nil {
-		return "", err
-	}
-	return dr.Etag, nil
 }
 
 func (g PlaygroundClient) ServiceDNS(name string) string {
