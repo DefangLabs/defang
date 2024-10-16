@@ -46,7 +46,7 @@ type ByocAws struct {
 	*byoc.ByocBaseClient
 
 	cdTasks      map[string]ecs.TaskArn
-	cdVersion    string
+	cdImageTag   string
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
@@ -69,12 +69,12 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
-	if b.SetupDone && b.cdVersion == projectCdVersion {
+func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
-	b.cdVersion = projectCdVersion
+	b.cdImageTag = projectCdImageTag
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
@@ -91,7 +91,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     getCdImage(b.cdVersion),
+			Image:     getCdImage(b.cdImageTag),
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -129,9 +129,9 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdVersion string) error {
 	return nil
 }
 
-func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
-	if b.cdVersion != "" {
-		return b.cdVersion, nil
+func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
+	if b.cdImageTag != "" {
+		return b.cdImageTag, nil
 	}
 
 	// see if we already have a deployment running
@@ -140,24 +140,24 @@ func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	// send project update with the current deploy's cd version,
+	// send project update with the current deploy's cd image tag,
 	// most current version if new deployment
-	deploymentCdVersion := byoc.CdLatestImageTag
+	deploymentCdImageTag := byoc.CdLatestImageTag
 	if len(projInfo.Services) > 0 && projInfo.CdVersion != "" {
-		deploymentCdVersion = projInfo.CdVersion
+		deploymentCdImageTag = projInfo.CdVersion
 	}
 
 	// possible values are [public-beta, 1, 2,...]
-	return deploymentCdVersion, nil
+	return deploymentCdImageTag, nil
 }
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// note: the CD image is tagged with the major release number, use that for setup
-	if err = b.setUp(ctx, cdVersion); err != nil {
+	if err = b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 
@@ -188,7 +188,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services:  serviceInfos,
-		CdVersion: cdVersion,
+		CdVersion: cdImageTag,
 	})
 	if err != nil {
 		return nil, err
@@ -388,12 +388,12 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -518,12 +518,12 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 
@@ -537,12 +537,12 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	cdVersion, errObj := b.getCdVersion(ctx)
+	cdImageTag, errObj := b.getCdImageTag(ctx)
 	if errObj != nil {
 		return nil, errObj
 	}
 
-	if errObj = b.setUp(ctx, cdVersion); errObj != nil {
+	if errObj = b.setUp(ctx, cdImageTag); errObj != nil {
 		return nil, errObj
 	}
 
@@ -749,12 +749,12 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	if err = b.setUp(ctx, cdVersion); err != nil {
+	if err = b.setUp(ctx, cdImageTag); err != nil {
 		return "", err
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, command)

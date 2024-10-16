@@ -37,7 +37,6 @@ var (
 type DoApp struct {
 	Region      do.Region
 	ProjectName string
-	CdVersion   string
 	BucketName  string
 	AppID       string
 }
@@ -75,7 +74,7 @@ func (d *DoApp) GetBucketName(ctx context.Context, s3Client *s3.Client) (string,
 	return bucketName, nil
 }
 
-func (d *DoApp) SetUp(ctx context.Context, projectCdVersion string) error {
+func (d *DoApp) SetUp(ctx context.Context) error {
 	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return err

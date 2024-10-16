@@ -48,10 +48,10 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	buildRepo string
-	cdVersion string
-	client    *godo.Client
-	driver    *appPlatform.DoApp
+	buildRepo  string
+	cdImageTag string
+	client     *godo.Client
+	driver     *appPlatform.DoApp
 }
 
 func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
@@ -74,9 +74,9 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b, nil
 }
 
-func (b *ByocDo) getCdVersion(ctx context.Context) (string, error) {
-	if b.cdVersion != "" {
-		return b.cdVersion, nil
+func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
+	if b.cdImageTag != "" {
+		return b.cdImageTag, nil
 	}
 
 	projInfo, err := b.getProjectProto(ctx)
@@ -86,13 +86,13 @@ func (b *ByocDo) getCdVersion(ctx context.Context) (string, error) {
 
 	// send project update with the current deploy's cd version,
 	// most current version if new deployment
-	deploymentCdVersion := byoc.CdLatestImageTag
+	deploymentCdImageTag := byoc.CdLatestImageTag
 	if (projInfo != nil) && (len(projInfo.Services) > 0) && (projInfo.CdVersion != "") {
-		deploymentCdVersion = projInfo.CdVersion
+		deploymentCdImageTag = projInfo.CdVersion
 	}
 
 	// possible values are [public-beta, 1, 2, ...]
-	return deploymentCdVersion, nil
+	return deploymentCdImageTag, nil
 }
 
 func annotateAwsError(err error) error {
@@ -154,12 +154,12 @@ func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, 
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 
@@ -189,7 +189,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		Services:  serviceInfos,
-		CdVersion: cdVersion,
+		CdVersion: cdImageTag,
 	})
 
 	if err != nil {
@@ -234,12 +234,12 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return "", err
 	}
 
@@ -272,12 +272,12 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 
@@ -411,12 +411,12 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	cdVersion, err := b.getCdVersion(ctx)
+	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, cdVersion); err != nil {
+	if err := b.setUp(ctx, cdImageTag); err != nil {
 		return nil, err
 	}
 
@@ -659,12 +659,12 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 	return si, nil
 }
 
-func (b *ByocDo) setUp(ctx context.Context, projectCdVersion string) error {
-	if b.SetupDone && b.cdVersion == projectCdVersion {
+func (b *ByocDo) setUp(ctx context.Context, projectCdImageTag string) error {
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
-	if err := b.driver.SetUp(ctx, projectCdVersion); err != nil {
+	if err := b.driver.SetUp(ctx); err != nil {
 		return err
 	}
 
