@@ -24,12 +24,12 @@ type Container struct {
 	Cpus        float32
 	Memory      uint64
 	Platform    string
-	Essential   *bool
+	Essential   *bool // default true
 	Volumes     []TaskVolume
 	VolumesFrom []string // container (default rw), container:rw, or container:ro
 	EntryPoint  []string
 	Command     []string // overridden by Run()
-	WorkDir     *string
+	WorkDir     string
 	DependsOn   map[string]ContainerCondition // container name -> condition
 }
 

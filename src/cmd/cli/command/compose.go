@@ -50,11 +50,23 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
+
 			if err != nil {
-				if !errors.Is(err, types.ErrComposeFileNotFound) {
-					return err
+				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
+					if resp, err2 := client.GetServices(cmd.Context()); err2 == nil {
+						term.Error("Error:", prettyError(err))
+						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
+							term.Debug("ComposeDown failed:", err)
+							printDefangHint("To deactivate a project, do:", "compose down --project-name "+resp.Project)
+						} else {
+							printDefangHint("To try deployment again, do:", "compose up")
+						}
+						return nil
+					}
 				}
-				printDefangHint("To start a new project, do:", "new")
+				if errors.Is(err, types.ErrComposeFileNotFound) {
+					printDefangHint("To start a new project, do:", "new")
+				}
 				return err
 			}
 
@@ -175,8 +187,10 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
-	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
 	_ = composeUpCmd.Flags().MarkHidden("tail")
+	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
+	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
+	_ = composeUpCmd.Flags().MarkHidden("build")
 	return composeUpCmd
 }
 
@@ -188,22 +202,7 @@ func makeComposeStartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var force, _ = cmd.Flags().GetBool("force")
-
-			deploy, _, err := cli.ComposeUp(cmd.Context(), client, force, defangv1.DeploymentMode_UNSPECIFIED_MODE)
-			if err != nil {
-				return err
-			}
-
-			printPlaygroundPortalServiceURLs(deploy.Services)
-			printEndpoints(deploy.Services) // TODO: do this at the end
-
-			command := "tail"
-			if deploy.Etag != "" {
-				command += " --etag " + deploy.Etag
-			}
-			printDefangHint("To track the update, do:", command)
-			return nil
+			return errors.New("Command 'start' is deprecated, use 'up' instead")
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -217,12 +216,7 @@ func makeComposeRestartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			etag, err := cli.ComposeRestart(cmd.Context(), client)
-			if err != nil {
-				return err
-			}
-			term.Info("Restarted services with deployment ID", etag)
-			return nil
+			return errors.New("Command 'restart' is deprecated, use 'up' instead")
 		},
 	}
 }
@@ -234,12 +228,7 @@ func makeComposeStopCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			etag, err := cli.ComposeStop(cmd.Context(), client)
-			if err != nil {
-				return err
-			}
-			term.Info("Stopped services with deployment ID", etag)
-			return nil
+			return errors.New("Command 'stop' is deprecated, use 'down' instead")
 		},
 	}
 }
@@ -254,7 +243,7 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), client, args...)
+			etag, err := cli.ComposeDown(cmd.Context(), client, "", args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -423,11 +412,12 @@ services:
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
-	composeCmd.AddCommand(makeComposeStartCmd())
-	composeCmd.AddCommand(makeComposeRestartCmd())
-	composeCmd.AddCommand(makeComposeStopCmd())
 	composeCmd.AddCommand(makeComposeLsCmd())
 	composeCmd.AddCommand(makeComposeLogsCmd())
 
+	// deprecated, will be removed in future releases
+	composeCmd.AddCommand(makeComposeStartCmd())
+	composeCmd.AddCommand(makeComposeRestartCmd())
+	composeCmd.AddCommand(makeComposeStopCmd())
 	return composeCmd
 }

@@ -1,4 +1,2 @@
- ! service "always": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "always": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "defangonly": missing compose directive: restart; assuming 'unless-stopped' (add 'restart' to silence)
  ! service "defangonly": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
