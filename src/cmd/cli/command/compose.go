@@ -110,10 +110,6 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}()
 
-			for range tailCtx.Done() {
-				term.Warn("done")
-			}
-
 			// show users the current streaming logs
 			tailSource := "all services"
 			if deploy.Etag != "" {
