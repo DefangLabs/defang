@@ -91,6 +91,7 @@ func (b *ByocDo) getCdVersion(ctx context.Context) (string, error) {
 		deploymentCdVersion = projInfo.CdVersion
 	}
 
+	// possible values are [public-beta, 1, 2, ...]
 	return deploymentCdVersion, nil
 }
 

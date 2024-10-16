@@ -147,6 +147,7 @@ func (b *ByocAws) getCdVersion(ctx context.Context) (string, error) {
 		deploymentCdVersion = projInfo.CdVersion
 	}
 
+	// possible values are [public-beta, 1, 2,...]
 	return deploymentCdVersion, nil
 }
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
