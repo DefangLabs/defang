@@ -3,6 +3,7 @@ package do
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -140,7 +141,8 @@ func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, 
 		return nil, annotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
-	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	base64Reader := base64.NewDecoder(base64.StdEncoding, getObjectOutput.Body)
+	pbBytes, err := io.ReadAll(base64Reader)
 	if err != nil {
 		return nil, err
 	}
