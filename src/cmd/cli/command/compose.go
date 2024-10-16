@@ -47,12 +47,23 @@ func makeComposeUpCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
+			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
+
+			ctx := cmd.Context()
+			var waitTimeoutCancel context.CancelFunc
+			if !detach && waitTimeout > 0 { // Checks if wait-timeout is enabled
+				ctx, waitTimeoutCancel = context.WithTimeout(ctx, time.Duration(waitTimeout)*time.Second)
+				defer waitTimeoutCancel()
+			}
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
+			deploy, project, err := cli.ComposeUp(ctx, client, force, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
+					if waitTimeoutCancel != nil {
+						waitTimeoutCancel() // Cancel wait-timeout when user is asked 'compose down' prompt
+					}
 					if resp, err2 := client.GetServices(cmd.Context()); err2 == nil {
 						term.Error("Error:", prettyError(err))
 						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
@@ -88,6 +99,15 @@ func makeComposeUpCmd() *cobra.Command {
 
 			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+
+			if waitTimeoutCancel != nil {
+				go func() {
+					<-ctx.Done() // Handle wait-timeout when timeout is reached
+					if ctx.Err() == context.DeadlineExceeded {
+						cancelTail(ctx.Err())
+					}
+				}()
+			}
 
 			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
@@ -135,10 +155,14 @@ func makeComposeUpCmd() *cobra.Command {
 					return err // any error other than cancelation
 				}
 
-				// The tail was canceled; check if it was because of deployment failure or explicit cancelation
+				// The tail was canceled; check if it was because of deployment failure, explicit cancelation, or wait-timeout reached
 				if errors.Is(context.Cause(tailCtx), context.Canceled) {
 					// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
 					term.Warn("Deployment is not finished. Service(s) might not be running.")
+					return err
+				} else if errors.Is(context.Cause(tailCtx), context.DeadlineExceeded) {
+					// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
+					term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
 					return err
 				}
 
@@ -146,7 +170,9 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
-
+					if waitTimeoutCancel != nil {
+						waitTimeoutCancel() // Cancel wait-timeout when user is asked 'AI debug' prompt
+					}
 					if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
 						failedServices := []string{errDeploymentFailed.Service}
 						Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", context.Cause(tailCtx)})
@@ -191,6 +217,9 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("build")
+	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
+	_ = composeUpCmd.Flags().MarkHidden("wait")
+	composeUpCmd.Flags().IntP("wait-timeout", "t", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
 }
 
