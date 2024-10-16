@@ -131,6 +131,8 @@ func makeComposeUpCmd() *cobra.Command {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
 					<-tailCtx.Done()
+					// Get the actual error from the context so we won't print "Error: missing tail permission"
+					err = context.Cause(tailCtx)
 				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
 					return err // any error other than cancelation
 				}
