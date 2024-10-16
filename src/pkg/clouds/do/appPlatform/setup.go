@@ -30,8 +30,6 @@ const (
 
 var (
 	CdImageBase = "defangio/cd"
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestImageTag)
 )
 
 type DoApp struct {

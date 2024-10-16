@@ -38,8 +38,6 @@ import (
 
 var (
 	CdImageBase = "public.ecr.aws/defang-io/cd"
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImage = pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+byoc.CdLatestImageTag)
 )
 
 type ByocAws struct {
@@ -135,7 +133,7 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 	}
 
 	// see if we already have a deployment running
-	projInfo, err := b.getProject(ctx)
+	projInfo, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -412,7 +410,7 @@ func (b *ByocAws) stackDir(name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, b.ProjectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
-func (b *ByocAws) getMarshalledProjectInfo(ctx context.Context) (*[]byte, error) {
+func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
 
 	bucketName := b.bucketName()
 	if bucketName == "" {
@@ -441,8 +439,7 @@ func (b *ByocAws) getMarshalledProjectInfo(ctx context.Context) (*[]byte, error)
 	if err != nil {
 		if aws.IsS3NoSuchKeyError(err) {
 			term.Debug("s3.GetObject:", err)
-			noData := []byte{}
-			return &noData, nil // no services yet
+			return nil, nil // no services yet
 		}
 		return nil, annotateAwsError(err)
 	}
@@ -452,17 +449,8 @@ func (b *ByocAws) getMarshalledProjectInfo(ctx context.Context) (*[]byte, error)
 		return nil, err
 	}
 
-	return &pbBytes, nil
-}
-
-func (b *ByocAws) getProject(ctx context.Context) (*defangv1.ProjectUpdate, error) {
-	data, err := b.getMarshalledProjectInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	projUpdate := defangv1.ProjectUpdate{}
-	if err := proto.Unmarshal(*data, &projUpdate); err != nil {
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
 		return nil, err
 	}
 
@@ -476,14 +464,15 @@ func (b *ByocAws) getProject(ctx context.Context) (*defangv1.ProjectUpdate, erro
 }
 
 func (b *ByocAws) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
-	data, err := b.getMarshalledProjectInfo(ctx)
+	projUpdate, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	listServiceResp := defangv1.ListServicesResponse{}
-	if err := proto.Unmarshal(*data, &listServiceResp); err != nil {
-		return nil, err
+	if projUpdate != nil {
+		listServiceResp.Services = projUpdate.Services
+		listServiceResp.Project = projUpdate.Project
 	}
 
 	return &listServiceResp, nil
