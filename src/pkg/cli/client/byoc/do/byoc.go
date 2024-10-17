@@ -3,6 +3,7 @@ package do
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/digitalocean/godo"
 	"github.com/muesli/termenv"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
@@ -45,9 +48,10 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	buildRepo string
-	client    *godo.Client
-	driver    *appPlatform.DoApp
+	buildRepo  string
+	cdImageTag string
+	client     *godo.Client
+	driver     *appPlatform.DoApp
 }
 
 func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
@@ -70,6 +74,81 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b, nil
 }
 
+func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
+	if b.cdImageTag != "" {
+		return b.cdImageTag, nil
+	}
+
+	projUpdate, err := b.getProjectUpdate(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// older deployments may not have the cd_version field set,
+	// these would have been deployed with public-beta
+	if projUpdate != nil && projUpdate.CdVersion == "" {
+		projUpdate.CdVersion = byoc.CdDefaultImageTag
+	}
+
+	// send project update with the current deploy's cd version,
+	// most current version if new deployment
+	imagePath := byoc.GetCdImage(appPlatform.CdImageBase, byoc.CdLatestImageTag)
+	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
+	if projUpdate != nil && len(projUpdate.Services) > 0 {
+		deploymentCdImageTag = projUpdate.CdVersion
+	}
+
+	// possible values are [public-beta, 1, 2, ...]
+	return deploymentCdImageTag, nil
+}
+
+func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+	client, err := b.driver.CreateS3Client()
+	if err != nil {
+		return nil, err
+	}
+
+	bucketName, err := b.driver.GetBucketName(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	if bucketName == "" {
+		return nil, errors.New("no bucket found")
+	}
+
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
+	getObjectOutput, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &path,
+	})
+
+	if err != nil {
+		if aws.IsS3NoSuchKeyError(err) {
+			term.Debug("s3.GetObject:", err)
+			return nil, nil // no services yet
+		}
+		return nil, byoc.AnnotateAwsError(err)
+	}
+	defer getObjectOutput.Body.Close()
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: this is to handle older deployment which may have been stored erroneously. Remove in future
+	if decodedBuffer, err := base64.StdEncoding.DecodeString(string(pbBytes)); err == nil {
+		pbBytes = decodedBuffer
+	}
+
+	projUpdate := defangv1.ProjectUpdate{}
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
+		return nil, err
+	}
+
+	return &projUpdate, nil
+}
+
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
@@ -78,7 +157,6 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
-	//var warnings Warnings
 
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
@@ -101,7 +179,8 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services: serviceInfos,
+		CdVersion: b.cdImageTag,
+		Services:  serviceInfos,
 	})
 
 	if err != nil {
@@ -242,20 +321,29 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defang
 	return serviceInfo, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.ServiceInfo) (*godo.App, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
 	app, err := b.getAppByName(ctx, b.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-	services := &defangv1.ListServicesResponse{}
 
 	for _, service := range app.Spec.Services {
 		serviceInfo := b.processServiceInfo(service)
-		services.Services = append(services.Services, serviceInfo)
+		*services = append(*services, serviceInfo)
 	}
 
-	return services, nil
+	return app, nil
+}
+
+func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	resp := defangv1.ListServicesResponse{}
+	_, err := b.getProjectInfo(ctx, &resp.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, err
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -309,7 +397,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	//Look up the CD app directly instead of relying on the etag
-	cdApp, err := b.getAppByName(ctx, appPlatform.CDName)
+	cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +458,7 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	app, err := b.getAppByName(ctx, appPlatform.CDName)
+	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
 	}
@@ -548,7 +636,12 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
-	if b.SetupDone {
+	projectCdImageTag, err := b.getCdImageTag(ctx)
+	if err != nil {
+		return err
+	}
+
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
@@ -577,6 +670,7 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
 
+	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
 
 	return nil
