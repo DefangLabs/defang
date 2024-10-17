@@ -262,6 +262,12 @@ func SetupCommands(version string) {
 	})
 }
 
+var providerDescription = map[cliClient.Provider]string{
+	cliClient.ProviderDefang: "The Defang Playground is a free environment for testing only.",
+	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
+	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+}
+
 var RootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -288,6 +294,29 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(false)
 		case ColorAlways:
 			term.ForceColor(true)
+		}
+
+		if !nonInteractive && provider == cliClient.ProviderAuto {
+			// Prompt the user to choose a provider if in interactive mode
+			options := []string{}
+			for _, p := range cliClient.AllProviders() {
+				options = append(options, p.String())
+			}
+			var optionValue string
+			if err := survey.AskOne(&survey.Select{
+				Message: "Choose a cloud provider:",
+				Options: options,
+				Help:    "The provider you choose will be used for deploying services.",
+				Description: func(value string, i int) string {
+					return providerDescription[cliClient.Provider(value)]
+				},
+			}, &optionValue); err != nil {
+				return err
+			}
+			if err := provider.Set(optionValue); err != nil {
+				panic(err)
+			}
+			term.Printf("To skip this prompt, set the DEFANG_PROVIDER=%s in your environment, or use:\n\n  defang --provider=%s\n\n", optionValue, optionValue)
 		}
 
 		switch provider {
@@ -324,7 +353,7 @@ var RootCmd = &cobra.Command{
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
-				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\ndefang upgrade")
+				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
 			}
 		}
@@ -431,7 +460,7 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var sample, language, defaultFolder string
+		var sample, defaultFolder string
 		if len(args) > 0 {
 			sample = args[0]
 		}
@@ -443,9 +472,9 @@ var generateCmd = &cobra.Command{
 			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
 		}
 
+		// Fetch the list of samples from the Defang repository
 		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
 		if sample == "" {
-			// Fetch the list of samples from the Defang repository
 			if fetchSamplesErr != nil {
 				term.Debug("unable to fetch samples:", fetchSamplesErr)
 			} else if len(sampleList) > 0 {
@@ -475,13 +504,6 @@ var generateCmd = &cobra.Command{
 					return err
 				}
 				if sample == generateWithAI {
-					if err := survey.AskOne(&survey.Select{
-						Message: "Choose the language you'd like to use:",
-						Options: cli.SupportedLanguages,
-						Help:    "The project code will be in the language you choose here.",
-					}, &language); err != nil {
-						return err
-					}
 					sample = ""
 					defaultFolder = "project1"
 				} else {
@@ -491,6 +513,14 @@ var generateCmd = &cobra.Command{
 		}
 
 		var qs = []*survey.Question{
+			{
+				Name: "language",
+				Prompt: &survey.Select{
+					Message: "Choose the language you'd like to use:",
+					Options: cli.SupportedLanguages,
+					Help:    "The project code will be in the language you choose here.",
+				},
+			},
 			{
 				Name: "description",
 				Prompt: &survey.Input{
@@ -514,18 +544,19 @@ var generateCmd = &cobra.Command{
 		}
 
 		if sample != "" {
-			qs = qs[1:] // user picked a sample, so we skip the description question
+			qs = qs[2:] // user picked a sample, so we skip the language and description questions
+
 			sampleExists := slices.ContainsFunc(sampleList, func(s cli.Sample) bool {
 				return s.Name == sample
 			})
-
 			if !sampleExists {
 				return cli.ErrSampleNotFound
 			}
 		}
 
 		prompt := struct {
-			Description string // or you can tag fields to match a specific name
+			Language    string
+			Description string
 			Folder      string
 		}{}
 
@@ -545,7 +576,7 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		Track("Generate Started", P{"language", prompt.Language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
@@ -560,7 +591,7 @@ var generateCmd = &cobra.Command{
 			}
 		} else {
 			term.Info("Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Folder, prompt.Description)
+			_, err := cli.GenerateWithAI(cmd.Context(), client, prompt.Language, prompt.Folder, prompt.Description)
 			if err != nil {
 				return err
 			}
