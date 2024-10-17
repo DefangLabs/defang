@@ -15,13 +15,12 @@ import (
 )
 
 const (
-	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
 	CdDefaultImageTag = "public-beta" // for when a project has no cd version, this would be a old deployment
 	CdLatestImageTag  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
+	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
 )
 
 var (
-	CdImageTag   = "public-beta"
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 

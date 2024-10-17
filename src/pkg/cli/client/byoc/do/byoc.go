@@ -190,8 +190,8 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services:  serviceInfos,
 		CdVersion: cdImageTag,
+		Services:  serviceInfos,
 	})
 
 	if err != nil {

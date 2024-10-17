@@ -36,15 +36,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
+const (
 	CdImageBase = "public.ecr.aws/defang-io/cd"
 )
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	cdTasks      map[string]ecs.TaskArn
 	cdImageTag   string
+	cdTasks      map[string]ecs.TaskArn
 	driver       *cfn.AwsEcs
 	publicNatIps []string
 
@@ -148,6 +148,7 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 	// possible values are [public-beta, 1, 2,...]
 	return deploymentCdImageTag, nil
 }
+
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	cdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
@@ -185,8 +186,8 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services:  serviceInfos,
 		CdVersion: cdImageTag,
+		Services:  serviceInfos,
 	})
 	if err != nil {
 		return nil, err
@@ -329,9 +330,7 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 }
 
 func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	cdVersion := getCdImage(byoc.CdLatestImageTag)
-	cdVersion = cdVersion[strings.LastIndex(cdVersion, ":")+1:]
-	return &defangv1.Version{Fabric: cdVersion}, nil
+	return &defangv1.Version{Fabric: byoc.CdLatestImageTag}, nil
 }
 
 func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {

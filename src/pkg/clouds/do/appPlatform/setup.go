@@ -28,7 +28,7 @@ const (
 	CDName = "defang-cd"
 )
 
-var (
+const (
 	CdImageBase = "defangio/cd"
 )
 
