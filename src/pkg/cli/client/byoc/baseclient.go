@@ -80,12 +80,30 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 	return b
 }
 
+func GetCdImagePath(fullQualifiedImageURI string) string {
+	return pkg.Getenv("DEFANG_CD_IMAGE", fullQualifiedImageURI)
+}
+
+func ExtractImageTag(fullQualifiedImageURI string) string {
+	index := strings.LastIndex(fullQualifiedImageURI, ":")
+	if index >= 0 {
+		return fullQualifiedImageURI[index+1:]
+	}
+
+	return ""
+}
+
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
+	imageTag := ExtractImageTag(GetCdImagePath(CdLatestImageTag))
+	if imageTag == "" {
+		imageTag = CdLatestImageTag
+	}
+
+	return &defangv1.Version{Fabric: imageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {

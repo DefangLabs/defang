@@ -54,10 +54,6 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func getCdImage(imageTag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+imageTag)
-}
-
 func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
@@ -67,7 +63,12 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
+func (b *ByocAws) setUp(ctx context.Context) error {
+	projectCdImageTag, err := b.getCdImageTag(ctx)
+	if err != nil {
+		return err
+	}
+
 	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
@@ -89,7 +90,7 @@ func (b *ByocAws) setUp(ctx context.Context, projectCdImageTag string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     getCdImage(b.cdImageTag),
+			Image:     byoc.GetCdImagePath(CdImageBase + ":" + b.cdImageTag),
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -140,8 +141,9 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 
 	// send project update with the current deploy's cd image tag,
 	// most current version if new deployment
-	deploymentCdImageTag := byoc.CdLatestImageTag
-	if len(projInfo.Services) > 0 && projInfo.CdVersion != "" {
+	imagePath := byoc.GetCdImagePath(CdImageBase + ":" + byoc.CdLatestImageTag)
+	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
+	if (projInfo != nil) && (len(projInfo.Services) > 0) && (projInfo.CdVersion != "") {
 		deploymentCdImageTag = projInfo.CdVersion
 	}
 
@@ -150,13 +152,8 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// note: the CD image is tagged with the major release number, use that for setup
-	if err = b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -186,7 +183,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: cdImageTag,
+		CdVersion: b.cdImageTag,
 		Services:  serviceInfos,
 	})
 	if err != nil {
@@ -385,12 +382,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -506,12 +498,7 @@ func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -525,12 +512,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	cdImageTag, errObj := b.getCdImageTag(ctx)
-	if errObj != nil {
-		return nil, errObj
-	}
-
-	if errObj = b.setUp(ctx, cdImageTag); errObj != nil {
+	if errObj := b.setUp(ctx); errObj != nil {
 		return nil, errObj
 	}
 
@@ -737,12 +719,7 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if err = b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, command)

@@ -25,11 +25,8 @@ import (
 )
 
 const (
-	CDName = "defang-cd"
-)
-
-const (
 	CdImageBase = "defangio/cd"
+	CdName      = "defang-cd"
 )
 
 type DoApp struct {
@@ -102,12 +99,9 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
-func getCdImagePath(imageTag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", CdImageBase+":"+imageTag)
-}
-
-func getCdImage() (*godo.ImageSourceSpec, error) {
-	image, err := ParseImage(getCdImagePath(byoc.CdLatestImageTag))
+func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
+	cdImagePath := byoc.GetCdImagePath(CdImageBase + ":" + byoc.CdLatestImageTag)
+	image, err := ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
 	}
@@ -135,17 +129,17 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		return nil, err
 	}
 
-	image, err := getCdImage()
+	image, err := getImageSourceSpec()
 	if err != nil {
 		return nil, err
 	}
 
 	appJobSpec := &godo.AppSpec{
-		Name:   CDName,
+		Name:   CdName,
 		Region: d.Region.String(),
 		Jobs: []*godo.AppJobSpec{{
 			Kind:             godo.AppJobSpecKind_PreDeploy,
-			Name:             CDName,
+			Name:             CdName,
 			Envs:             env,
 			Image:            image,
 			InstanceCount:    1,
@@ -165,7 +159,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 	}
 
 	for _, app := range appList {
-		if app.Spec.Name == CDName {
+		if app.Spec.Name == CdName {
 			currentCd = app
 		}
 	}
@@ -179,7 +173,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 	} else {
 		term.Debugf("Creating new CD app")
 		project, _, err := client.Projects.Create(ctx, &godo.CreateProjectRequest{
-			Name:    CDName,
+			Name:    CdName,
 			Purpose: "Infrastructure for running Defang commands",
 		})
 

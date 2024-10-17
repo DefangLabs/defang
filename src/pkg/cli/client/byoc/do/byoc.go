@@ -80,16 +80,17 @@ func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
 		return b.cdImageTag, nil
 	}
 
-	projInfo, err := b.getProjectProto(ctx)
+	projUpdate, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	// send project update with the current deploy's cd version,
 	// most current version if new deployment
-	deploymentCdImageTag := byoc.CdLatestImageTag
-	if (projInfo != nil) && (len(projInfo.Services) > 0) && (projInfo.CdVersion != "") {
-		deploymentCdImageTag = projInfo.CdVersion
+	imagePath := byoc.GetCdImagePath(appPlatform.CdImageBase + ":" + byoc.CdLatestImageTag)
+	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
+	if (projUpdate != nil) && (len(projUpdate.Services) > 0) && (projUpdate.CdVersion != "") {
+		deploymentCdImageTag = projUpdate.CdVersion
 	}
 
 	// possible values are [public-beta, 1, 2, ...]
@@ -112,7 +113,7 @@ func annotateAwsError(err error) error {
 	return err
 }
 
-func (b *ByocDo) getProjectProto(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
 	client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -423,7 +424,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	//Look up the CD app directly instead of relying on the etag
-	cdApp, err := b.getAppByName(ctx, appPlatform.CDName)
+	cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +485,7 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	app, err := b.getAppByName(ctx, appPlatform.CDName)
+	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
 	}
