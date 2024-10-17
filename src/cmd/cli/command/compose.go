@@ -49,21 +49,11 @@ func makeComposeUpCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
 
-			ctx := cmd.Context()
-			var waitTimeoutCancel context.CancelFunc
-			if !detach && waitTimeout > 0 { // Checks if wait-timeout is enabled
-				ctx, waitTimeoutCancel = context.WithTimeout(ctx, time.Duration(waitTimeout)*time.Second)
-				defer waitTimeoutCancel()
-			}
-
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(ctx, client, force, mode.Value())
+			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
-					if waitTimeoutCancel != nil {
-						waitTimeoutCancel() // Cancel wait-timeout when user is asked 'compose down' prompt
-					}
 					if resp, err2 := client.GetServices(cmd.Context()); err2 == nil {
 						term.Error("Error:", prettyError(err))
 						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, resp.Project); err != nil {
@@ -99,6 +89,13 @@ func makeComposeUpCmd() *cobra.Command {
 
 			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+
+			ctx := tailCtx
+			var waitTimeoutCancel context.CancelFunc
+			if !detach && waitTimeout > 0 { // Checks if wait-timeout is enabled
+				ctx, waitTimeoutCancel = context.WithTimeout(ctx, time.Duration(waitTimeout)*time.Second)
+				defer waitTimeoutCancel()
+			}
 
 			if waitTimeoutCancel != nil {
 				go func() {
@@ -170,9 +167,6 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
-					if waitTimeoutCancel != nil {
-						waitTimeoutCancel() // Cancel wait-timeout when user is asked 'AI debug' prompt
-					}
 					if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
 						failedServices := []string{errDeploymentFailed.Service}
 						Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", context.Cause(tailCtx)})
