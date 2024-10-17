@@ -7,10 +7,12 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -23,6 +25,22 @@ const (
 var (
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
+
+func AnnotateAwsError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "get credentials:") {
+		return connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if aws.IsS3NoSuchKeyError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if aws.IsParameterNotFoundError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	return err
+}
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func DnsSafeLabel(fqn string) string {
@@ -80,17 +98,13 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 	return b
 }
 
-func GetCdImagePath(fullQualifiedImageURI string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", fullQualifiedImageURI)
+func GetCdImage(repo string, tag string) string {
+	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
 }
 
 func ExtractImageTag(fullQualifiedImageURI string) string {
 	index := strings.LastIndex(fullQualifiedImageURI, ":")
-	if index >= 0 {
-		return fullQualifiedImageURI[index+1:]
-	}
-
-	return ""
+	return fullQualifiedImageURI[index+1:]
 }
 
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
@@ -98,12 +112,8 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	imageTag := ExtractImageTag(GetCdImagePath(CdLatestImageTag))
-	if imageTag == "" {
-		imageTag = CdLatestImageTag
-	}
-
-	return &defangv1.Version{Fabric: imageTag}, nil
+	// we want only the latest version of the CD service this CLI was compiled to expect
+	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {

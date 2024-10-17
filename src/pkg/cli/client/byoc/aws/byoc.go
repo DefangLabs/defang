@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	CdImageBase = "public.ecr.aws/defang-io/cd"
+	CdImageRepo = "public.ecr.aws/defang-io/cd"
 )
 
 type ByocAws struct {
@@ -90,7 +90,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     byoc.GetCdImagePath(CdImageBase + ":" + b.cdImageTag),
+			Image:     byoc.GetCdImage(CdImageRepo, b.cdImageTag),
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -108,7 +108,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 		},
 	}
 	if err := b.driver.SetUp(ctx, containers); err != nil {
-		return annotateAwsError(err)
+		return byoc.AnnotateAwsError(err)
 	}
 
 	if b.ProjectDomain == "" {
@@ -134,17 +134,23 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 	}
 
 	// see if we already have a deployment running
-	projInfo, err := b.getProjectUpdate(ctx)
+	projUpdate, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return "", err
 	}
 
+	// older deployments may not have the cd_version field set,
+	// these would have been deployed with public-beta
+	if projUpdate.CdVersion == "" {
+		projUpdate.CdVersion = byoc.CdDefaultImageTag
+	}
+
 	// send project update with the current deploy's cd image tag,
 	// most current version if new deployment
-	imagePath := byoc.GetCdImagePath(CdImageBase + ":" + byoc.CdLatestImageTag)
+	imagePath := byoc.GetCdImage(CdImageRepo, byoc.CdLatestImageTag)
 	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
-	if (projInfo != nil) && (len(projInfo.Services) > 0) && (projInfo.CdVersion != "") {
-		deploymentCdImageTag = projInfo.CdVersion
+	if (projUpdate != nil) && (len(projUpdate.Services) > 0) && (projUpdate.CdVersion != "") {
+		deploymentCdImageTag = projUpdate.CdVersion
 	}
 
 	// possible values are [public-beta, 1, 2,...]
@@ -239,7 +245,7 @@ func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 func (b *ByocAws) findZone(ctx context.Context, domain, role string) (string, error) {
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return "", annotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 
 	if role != "" {
@@ -274,7 +280,7 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	domain := b.ProjectDomain
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return "", annotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
@@ -282,16 +288,16 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	if errors.Is(err, aws.ErrNoZoneFound) {
 		zoneId, err = aws.CreateZone(ctx, domain, r53Client)
 		if err != nil {
-			return "", annotateAwsError(err)
+			return "", byoc.AnnotateAwsError(err)
 		}
 	} else if err != nil {
-		return "", annotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 
 	// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
 	nsServers, err := aws.GetRecordsValue(ctx, zoneId, domain, r53types.RRTypeNs, r53Client)
 	if err != nil {
-		return "", annotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 	if len(nsServers) == 0 {
 		return "", errors.New("no NS records found for the subdomain zone")
@@ -313,11 +319,11 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 	// Use STS to get the account ID
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	return &defangv1.WhoAmIResponse{
 		Tenant:  b.TenantID,
@@ -384,7 +390,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	// FIXME: this should only delete the services that are specified in the request, not all
 	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, "up", "")
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	etag := ecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
 	b.cdTasks[etag] = taskArn
@@ -402,14 +408,14 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			return nil, annotateAwsError(err)
+			return nil, byoc.AnnotateAwsError(err)
 		}
 		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
@@ -428,7 +434,7 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate
 			term.Debug("s3.GetObject:", err)
 			return nil, nil // no services yet
 		}
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
 	pbBytes, err := io.ReadAll(getObjectOutput.Body)
@@ -439,12 +445,6 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate
 	projUpdate := defangv1.ProjectUpdate{}
 	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
 		return nil, err
-	}
-
-	// older deployments may not have the cd_version field set,
-	// these would have been deployed with public-beta
-	if projUpdate.CdVersion == "" {
-		projUpdate.CdVersion = byoc.CdDefaultImageTag
 	}
 
 	return &projUpdate, nil
@@ -476,7 +476,7 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigReque
 	fqn := b.getSecretID(secret.Name)
 	term.Debugf("Putting parameter %q", fqn)
 	err := b.driver.PutSecret(ctx, fqn, secret.Value)
-	return annotateAwsError(err)
+	return byoc.AnnotateAwsError(err)
 }
 
 func (b *ByocAws) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -508,8 +508,8 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if errObj := b.setUp(ctx); errObj != nil {
-		return nil, errObj
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
 	}
 
 	etag := req.Etag
@@ -549,7 +549,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
 	}
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	if taskArn != nil {
 		var cancel context.CancelCauseFunc
@@ -720,7 +720,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, command string) (string,
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, command)
 	if err != nil || cdTaskArn == nil {
-		return "", annotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 	return ecs.GetTaskID(cdTaskArn), nil
 }
@@ -736,7 +736,7 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	}
 	term.Debug("Deleting parameters", ids)
 	if err := b.driver.DeleteSecrets(ctx, ids...); err != nil {
-		return annotateAwsError(err)
+		return byoc.AnnotateAwsError(err)
 	}
 	return nil
 }
@@ -745,14 +745,14 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
-			return nil, annotateAwsError(err)
+			return nil, byoc.AnnotateAwsError(err)
 		}
 		bucketName = b.bucketName()
 	}
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 
 	s3client := s3.NewFromConfig(cfg)
@@ -764,7 +764,7 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		Prefix: &prefix,
 	})
 	if err != nil {
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	var stacks []string
 	for _, obj := range out.Contents {
@@ -814,23 +814,6 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		stacks = append(stacks, stack)
 	}
 	return stacks, nil
-}
-
-// annotateAwsError translates the AWS error to an error code the CLI client understands
-func annotateAwsError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, err)
-	}
-	if aws.IsS3NoSuchKeyError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	if aws.IsParameterNotFoundError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	return err
 }
 
 func ensure(cond bool, msg string) {

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bufbuild/connect-go"
 	"github.com/digitalocean/godo"
 	"github.com/muesli/termenv"
 
@@ -85,32 +84,22 @@ func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	// older deployments may not have the cd_version field set,
+	// these would have been deployed with public-beta
+	if projUpdate.CdVersion == "" {
+		projUpdate.CdVersion = byoc.CdDefaultImageTag
+	}
+
 	// send project update with the current deploy's cd version,
 	// most current version if new deployment
-	imagePath := byoc.GetCdImagePath(appPlatform.CdImageBase + ":" + byoc.CdLatestImageTag)
+	imagePath := byoc.GetCdImage(appPlatform.CdImageBase, byoc.CdLatestImageTag)
 	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
-	if (projUpdate != nil) && (len(projUpdate.Services) > 0) && (projUpdate.CdVersion != "") {
+	if projUpdate != nil && len(projUpdate.Services) > 0 {
 		deploymentCdImageTag = projUpdate.CdVersion
 	}
 
 	// possible values are [public-beta, 1, 2, ...]
 	return deploymentCdImageTag, nil
-}
-
-func annotateAwsError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, err)
-	}
-	if aws.IsS3NoSuchKeyError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	if aws.IsParameterNotFoundError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	return err
 }
 
 func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
@@ -139,7 +128,7 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 			term.Debug("s3.GetObject:", err)
 			return nil, nil // no services yet
 		}
-		return nil, annotateAwsError(err)
+		return nil, byoc.AnnotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
 	base64Reader := base64.NewDecoder(base64.StdEncoding, getObjectOutput.Body)
@@ -157,12 +146,7 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -191,7 +175,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: cdImageTag,
+		CdVersion: b.cdImageTag,
 		Services:  serviceInfos,
 	})
 
@@ -237,16 +221,11 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
 
-	if err := b.setUp(ctx, cdImageTag); err != nil {
-		return "", err
-	}
-
-	_, err = b.runCdCommand(ctx, command)
+	_, err := b.runCdCommand(ctx, command)
 	if err != nil {
 		return "", err
 	}
@@ -275,12 +254,7 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -414,12 +388,7 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	cdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.setUp(ctx, cdImageTag); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -662,7 +631,12 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 	return si, nil
 }
 
-func (b *ByocDo) setUp(ctx context.Context, projectCdImageTag string) error {
+func (b *ByocDo) setUp(ctx context.Context) error {
+	projectCdImageTag, err := b.getCdImageTag(ctx)
+	if err != nil {
+		return err
+	}
+
 	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}

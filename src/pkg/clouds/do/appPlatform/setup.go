@@ -100,7 +100,7 @@ func shellQuote(args ...string) string {
 }
 
 func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
-	cdImagePath := byoc.GetCdImagePath(CdImageBase + ":" + byoc.CdLatestImageTag)
+	cdImagePath := byoc.GetCdImage(CdImageBase, byoc.CdLatestImageTag)
 	image, err := ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
