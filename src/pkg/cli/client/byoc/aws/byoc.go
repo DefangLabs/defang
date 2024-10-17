@@ -326,10 +326,6 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 	}, nil
 }
 
-func (*ByocAws) GetVersions(context.Context) (*defangv1.Version, error) {
-	return &defangv1.Version{Fabric: byoc.CdLatestImageTag}, nil
-}
-
 func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx)
 	if err != nil {
