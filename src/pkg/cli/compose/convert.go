@@ -140,7 +140,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
 					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead of adjusted service name", svccfg.Name, key)
 				} else {
-					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead.", svccfg.Name, key)
+					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead", svccfg.Name, key)
 				}
 				envFromConfig = append(envFromConfig, key)
 				continue
@@ -155,7 +155,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				if val != *value {
 					term.Warnf("service %q: service name(s) were fixed up, environment variable %q assigned value %q", svccfg.Name, key, val)
 				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: service name(s) in the environment variable %q were not fixed up, only services with port mode set to 'host' will be fixed up.", svccfg.Name, key)
+					term.Warnf("service %q: service name(s) in the environment variable %q were not fixed up, only services with port mode set to 'host' will be fixed up", svccfg.Name, key)
 				}
 			}
 			envs[key] = val
