@@ -7,22 +7,40 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
 const (
-	// Changing this will cause issues if two clients with different versions are using the same account
-	CdImageTag   = "public-beta"
-	CdTaskPrefix = "defang-cd" // WARNING: renaming this practically deletes the Pulumi state
+	CdDefaultImageTag = "public-beta" // for when a project has no cd version, this would be a old deployment
+	CdLatestImageTag  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
+	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
 )
 
 var (
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
+
+func AnnotateAwsError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "get credentials:") {
+		return connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if aws.IsS3NoSuchKeyError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if aws.IsParameterNotFoundError(err) {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+	return err
+}
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func DnsSafeLabel(fqn string) string {
@@ -80,12 +98,22 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 	return b
 }
 
+func GetCdImage(repo string, tag string) string {
+	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
+}
+
+func ExtractImageTag(fullQualifiedImageURI string) string {
+	index := strings.LastIndex(fullQualifiedImageURI, ":")
+	return fullQualifiedImageURI[index+1:]
+}
+
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	return &defangv1.Version{Fabric: CdImageTag}, nil
+	// we want only the latest version of the CD service this CLI was compiled to expect
+	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
 func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {

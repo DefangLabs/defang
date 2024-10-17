@@ -58,7 +58,10 @@ func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 				command = c.Name() + "-" + command
 			}
 		})
-		props = append(props, P{Name: "CalledAs", Value: calledAs})
+		props = append(props,
+			P{Name: "CalledAs", Value: calledAs},
+			P{Name: "version", Value: cmd.Root().Version},
+		)
 		cmd.Flags().Visit(func(f *pflag.Flag) {
 			props = append(props, P{Name: f.Name, Value: f.Value})
 		})

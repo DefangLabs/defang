@@ -58,7 +58,7 @@ Install the Defang CLI from one of the following sources:
   Expand-Archive defang.zip . -Force
   ```
 
-* Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI. For this beta, MacOS users will have to explicitly allow running of downloaded programs in the OS security settings.
+* Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
 
 ## Support
 
@@ -116,3 +116,14 @@ The Defang CLI recognizes the following environment variables:
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 - `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
+
+## Development
+At Defang we use the [Nix package manager](https://nixos.org) for our dev environment, in conjunction with [DirEnv](https://direnv.net).
+
+To get started quickly, install Nix and DirEnv, then create a `.envrc` file to automatically load the Defang developer environment:
+```sh
+echo use flake >> .envrc
+direnv allow
+```
+
+
