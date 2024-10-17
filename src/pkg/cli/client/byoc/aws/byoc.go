@@ -141,7 +141,7 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 
 	// older deployments may not have the cd_version field set,
 	// these would have been deployed with public-beta
-	if projUpdate.CdVersion == "" {
+	if projUpdate != nil && projUpdate.CdVersion == "" {
 		projUpdate.CdVersion = byoc.CdDefaultImageTag
 	}
 

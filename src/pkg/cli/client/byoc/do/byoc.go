@@ -86,7 +86,7 @@ func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
 
 	// older deployments may not have the cd_version field set,
 	// these would have been deployed with public-beta
-	if projUpdate.CdVersion == "" {
+	if projUpdate != nil && projUpdate.CdVersion == "" {
 		projUpdate.CdVersion = byoc.CdDefaultImageTag
 	}
 
@@ -131,10 +131,14 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 		return nil, byoc.AnnotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
-	base64Reader := base64.NewDecoder(base64.StdEncoding, getObjectOutput.Body)
-	pbBytes, err := io.ReadAll(base64Reader)
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO: this is to handle older deployment which may have been stored erroneously. Remove in future
+	if decodedBuffer, err := base64.StdEncoding.DecodeString(string(pbBytes)); err == nil {
+		pbBytes = decodedBuffer
 	}
 
 	projUpdate := defangv1.ProjectUpdate{}
@@ -666,6 +670,7 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
 
+	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
 
 	return nil
