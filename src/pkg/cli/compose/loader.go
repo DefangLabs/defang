@@ -92,7 +92,6 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	optFns := []cli.ProjectOptionsFn{
-		cli.WithWorkingDirectory(c.options.WorkingDir),
 		// First apply os.Environment, always win
 		// -- DISABLED -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
