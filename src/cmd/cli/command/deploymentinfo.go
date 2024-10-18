@@ -1,8 +1,6 @@
 package command
 
 import (
-	"strings"
-
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -35,9 +33,9 @@ func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 		}
 
 		term.Info("Service", serviceInfo.Service.Name, serviceConditionText, andEndpoints)
-		for _, endpoint := range serviceInfo.Endpoints {
-			if url, ok := strings.CutSuffix(endpoint, ":443"); ok {
-				endpoint = "https://" + url
+		for i, endpoint := range serviceInfo.Endpoints {
+			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+				endpoint = "https://" + endpoint
 			}
 			term.Println("   -", endpoint)
 		}
