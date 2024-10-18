@@ -18,6 +18,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type Project = compose.Project
+
+type ServiceConfig = compose.ServiceConfig
+
 type LoaderOptions struct {
 	ConfigPaths []string
 	WorkingDir  string
@@ -61,7 +65,7 @@ func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)

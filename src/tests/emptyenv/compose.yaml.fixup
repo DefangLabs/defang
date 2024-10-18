@@ -1,0 +1,20 @@
+[
+  {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "ARG2": ""
+      }
+    },
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "ENV1": null,
+      "ENV2": ""
+    },
+    "networks": {
+      "default": null
+    }
+  }
+]

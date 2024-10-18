@@ -274,7 +274,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	// Unsupported in DO
-	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
+	return nil, errors.ErrUnsupported
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -312,6 +312,7 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defang
 
 	var serviceInfo *defangv1.ServiceInfo
 
+	// FIXME: read ProjectUpdate from S3
 	for _, service := range app.Spec.Services {
 		if service.Name == s.Name {
 			serviceInfo = b.processServiceInfo(service)
@@ -625,9 +626,9 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
 
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
+		Project: b.ProjectName,
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	//hasIngress := false
@@ -693,18 +694,15 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		}
 	}
 
-	return nil, errors.New(fmt.Sprintf("app not found: %s", appName))
+	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
-
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 		Service: &defangv1.Service{
-			Name:        service.Name,
-			Image:       service.Image.Digest,
-			Environment: getServiceEnv(service.Envs),
+			Name: service.Name,
 		},
 	}
 

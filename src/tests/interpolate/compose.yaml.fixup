@@ -1,0 +1,18 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "BRACED": "interpolate",
+      "DB": "postgres://user:${POSTGRES_PASSWORD}@db:5432/db",
+      "NAME": "interpolate",
+      "NOP": "abc$def",
+      "NOP_BRACED": "abc${def}",
+      "interpolate": "value"
+    },
+    "image": "alpine",
+    "networks": {
+      "default": null
+    }
+  }
+]
