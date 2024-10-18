@@ -987,7 +987,7 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 	}
 
 	// the cli changes to the working directory at the start of the command so just set
-	// the current directory as the working directory
+	// the working directory as the current directory
 	o.WorkingDir, err = os.Getwd()
 	if err != nil {
 		panic(err)
