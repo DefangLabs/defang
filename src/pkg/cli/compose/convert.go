@@ -153,7 +153,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 					return c.ServiceDNS(NormalizeServiceName(serviceName))
 				})
 				if val != *value {
-					term.Warnf("service %q: service name(s) were fixed up, environment variable %q assigned value %q", svccfg.Name, key, val)
+					term.Warnf("service %q: service name was fixed up: environment variable %q assigned value %q", svccfg.Name, key, val)
 				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
 					term.Warnf("service %q: service name(s) in the environment variable %q were not fixed up, only services with port mode set to 'host' will be fixed up", svccfg.Name, key)
 				}
