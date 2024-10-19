@@ -582,7 +582,6 @@ var generateCmd = &cobra.Command{
 
 		// Load the project and check for empty environment variables
 		loaderOptions := compose.LoaderOptions{
-			WorkingDir:  prompt.Folder,
 			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
 		}
 		loader := compose.NewLoaderWithOptions(loaderOptions)
