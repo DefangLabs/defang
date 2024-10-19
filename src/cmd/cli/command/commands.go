@@ -986,11 +986,6 @@ func configureLoader(cmd *cobra.Command) compose.Loader {
 		panic(err)
 	}
 
-	o.WorkingDir, err = f.GetString("cwd")
-	if err != nil {
-		panic(err)
-	}
-
 	o.ProjectName, err = f.GetString("project-name")
 	if err != nil {
 		panic(err)
