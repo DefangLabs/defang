@@ -138,9 +138,9 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
 				if serviceNameRegex != nil && serviceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: environment variable %q needs service name fix-up, but is overridden by config, which will not be fixed up.", svccfg.Name, key)
+					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead of adjusted service name", svccfg.Name, key)
 				} else {
-					term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead", svccfg.Name, key)
 				}
 				envFromConfig = append(envFromConfig, key)
 				continue
@@ -153,9 +153,9 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 					return c.ServiceDNS(NormalizeServiceName(serviceName))
 				})
 				if val != *value {
-					term.Warnf("service %q: service names were fixed up in environment variable %q: %q", svccfg.Name, key, val)
+					term.Warnf("service %q: service name was fixed up: environment variable %q assigned value %q", svccfg.Name, key, val)
 				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: service names in the environment variable %q were not fixed up, only services with port mode set to host will be fixed up.", svccfg.Name, key)
+					term.Warnf("service %q: service name(s) in the environment variable %q were not fixed up, only services with port mode set to 'host' will be fixed up", svccfg.Name, key)
 				}
 			}
 			envs[key] = val
