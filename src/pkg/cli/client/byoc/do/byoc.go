@@ -410,10 +410,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	var appLiveURL string
-	term.Info("Waiting for command to finish gathering logs")
-
-	deploymentID := ""
+	var appLiveURL, deploymentID string
 
 	if cdApp.PendingDeployment != nil {
 		deploymentID = cdApp.PendingDeployment.GetID()
@@ -427,34 +424,32 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, errors.New("no deployments found")
 	}
 
+	term.Info("Waiting for CD command to finish gathering logs")
 	for {
-
 		deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
-
 		if err != nil {
 			return nil, err
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
-
 			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 			if err != nil {
 				return nil, err
 			}
 
 			appLiveURL, err = b.processServiceLogs(ctx)
-
 			if err != nil {
 				return nil, err
 			}
 
 			readHistoricalLogs(ctx, logs.HistoricURLs)
-
 			break
 		}
-		//Sleep for 15 seconds so we dont spam the DO API
-		pkg.SleepWithContext(ctx, (time.Second)*15)
 
+		//Sleep for 15 seconds so we dont spam the DO API
+		if err := pkg.SleepWithContext(ctx, (time.Second)*15); err != nil {
+			return nil, err
+		}
 	}
 
 	return newByocServerStream(ctx, appLiveURL, req.Etag)
@@ -733,7 +728,6 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 
 	// If we can get projects working, we can add the project to the list options
 	currentApps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})
-
 	if err != nil {
 		return "", err
 	}
@@ -770,6 +764,7 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			if err != nil {
 				return "", err
 			}
+
 			readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
 
 			mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)

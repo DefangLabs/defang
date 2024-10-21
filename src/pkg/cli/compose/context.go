@@ -74,15 +74,22 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	}
 
 	var digest string
-	if force == BuildContextDigest {
+	switch force {
+	case BuildContextDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
 		term.Debug("Digest:", digest)
-	}
-
-	if force == BuildContextIgnore || force == BuildContextPreview {
+	case BuildContextIgnore:
+		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
 		return root, nil
+	case BuildContextPreview:
+		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
+		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
+	case BuildContextForce:
+		// Force: always upload the tarball (to a random URL), triggering a new build
+	default:
+		panic("unexpected BuildContext value")
 	}
 
 	term.Info("Uploading the project files for", name)
