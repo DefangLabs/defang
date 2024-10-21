@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -507,6 +508,31 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
+func (b *ByocAws) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	// TODO: get start time from req.Etag
+	sb := strings.Builder{}
+	for _, lgi := range b.getLogGroupInputs(b.cdTasks[req.Etag]) {
+		if err := ecs.Query(ctx, lgi, time.Now().Add(-time.Hour), time.Now(), func(es []ecs.LogEvent) {
+			for _, e := range es {
+				term.Debug("LogEvent", e)
+				// sb.WriteString("stream=")
+				// sb.WriteString(*e.LogStreamName)
+				sb.WriteString(" msg=")
+				sb.WriteString(strconv.Quote(*e.Message))
+				sb.WriteRune('\n')
+			}
+		}); err != nil {
+			return nil, annotateAwsError(err)
+		}
+	}
+	req.Logs = sb.String()
+	return b.GrpcClient.Debug(ctx, req) // TODO: implement this
+}
+
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
@@ -532,21 +558,9 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		etag = "" // no need to filter by etag
 		stopWhenCDTaskDone = true
 	} else {
-		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing services logs", servicesTail.LogGroupARN)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
+		// If we know the CD task ARN, only tail the logstream for the CD task
 		taskArn = b.cdTasks[etag]
-		if taskArn != nil {
-			// If we know the CD task ARN, only tail the logstream for the CD task
-			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
-		}
-		term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(taskArn)...)
 	}
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
@@ -565,6 +579,22 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	}
 
 	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
+}
+
+func (b *ByocAws) getLogGroupInputs(taskArn types.TaskID) []ecs.LogGroupInput {
+	// Tail CD, kaniko, and all services (this requires ProjectName to be set)
+	kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
+	term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
+	servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
+	term.Debug("Tailing services logs", servicesTail.LogGroupARN)
+	ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
+	term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
+	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
+	if taskArn != nil {
+		cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
+	}
+	term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+	return []ecs.LogGroupInput{cdTail, kanikoTail, servicesTail, ecsTail}
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
