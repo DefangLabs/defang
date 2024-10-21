@@ -1,0 +1,17 @@
+services:
+  build1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      shm_size: 2147483648
+      target: test
+      args:
+        - BASE_IMAGE=nginx
+  build2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      shm_size: 2gb
+      target: test
+      args:
+        BASE_IMAGE: alpine
