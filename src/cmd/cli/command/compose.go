@@ -37,6 +37,20 @@ func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []str
 	return managedResources
 }
 
+func startTimer(ctx context.Context, waitTimeoutSec int, onTimeoutHandler func(error)) {
+	if waitTimeoutSec >= 0 { // Checks if wait-timeout value is valid
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(waitTimeoutSec)*time.Second)
+
+		go func() {
+			defer timeoutCancel()
+			<-timeoutCtx.Done()
+			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) { // Handle the timeout when it is reached
+				onTimeoutHandler(timeoutCtx.Err())
+			}
+		}()
+	}
+}
+
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -91,19 +105,8 @@ func makeComposeUpCmd() *cobra.Command {
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
 			ctx := tailCtx
-			var waitTimeoutCancel context.CancelFunc
-			if !detach && waitTimeout > 0 { // Checks if wait-timeout is enabled
-				ctx, waitTimeoutCancel = context.WithTimeout(ctx, time.Duration(waitTimeout)*time.Second)
-				defer waitTimeoutCancel()
-			}
-
-			if waitTimeoutCancel != nil {
-				go func() {
-					<-ctx.Done() // Handle wait-timeout when timeout is reached
-					if ctx.Err() == context.DeadlineExceeded {
-						cancelTail(ctx.Err())
-					}
-				}()
+			if !detach {
+				startTimer(ctx, waitTimeout, cancelTail)
 			}
 
 			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
