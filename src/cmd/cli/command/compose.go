@@ -11,6 +11,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -48,8 +49,13 @@ func makeComposeUpCmd() *cobra.Command {
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
 
+			buildContext := compose.BuildContextDigest
+			if force {
+				buildContext = compose.BuildContextForce
+			}
+
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), client, force, mode.Value())
+			deploy, project, err := cli.ComposeUp(cmd.Context(), client, buildContext, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -297,8 +303,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli.DoDryRun = true // config is like start in a dry run
-			// force=false to calculate the digest
-			if _, _, err := cli.ComposeUp(cmd.Context(), client, false, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, err := cli.ComposeUp(cmd.Context(), client, compose.BuildContextIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil

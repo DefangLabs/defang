@@ -9,7 +9,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-var ErrNoServices = errors.New("No services found")
+var ErrNoServices = errors.New("no services found")
 
 func GetServices(ctx context.Context, client client.Client, long bool) error {
 	projectName, err := client.LoadProjectName(ctx)

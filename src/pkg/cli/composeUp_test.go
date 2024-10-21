@@ -13,9 +13,6 @@ import (
 )
 
 func TestComposeUp(t *testing.T) {
-	DoDryRun = true
-	defer func() { DoDryRun = false }()
-
 	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
 	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
@@ -23,11 +20,11 @@ func TestComposeUp(t *testing.T) {
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK) // same as S3
 	}))
 	defer server.Close()
 
-	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, false, defangv1.DeploymentMode_DEVELOPMENT)
+	_, project, err := ComposeUp(context.Background(), client.MockClient{UploadUrl: server.URL + "/", Project: proj}, compose.BuildContextIgnore, defangv1.DeploymentMode_DEVELOPMENT)
 	if !errors.Is(err, ErrDryRun) {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}

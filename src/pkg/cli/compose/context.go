@@ -26,9 +26,10 @@ import (
 type BuildContext int
 
 const (
-	BuildContextDigest BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
-	BuildContextForce                      // force: always upload the tarball, even if it's the same as a previous one
-	BuildContextIgnore                     // dry-run: don't upload the tarball, just return the path
+	BuildContextDigest  BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
+	BuildContextForce                       // force: always upload the tarball, even if it's the same as a previous one
+	BuildContextIgnore                      // dry-run: don't upload the tarball, just return the path
+	BuildContextPreview                     // preview:, like dry-run but also don't deploy
 )
 
 const (
@@ -80,7 +81,7 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 		term.Debug("Digest:", digest)
 	}
 
-	if force == BuildContextIgnore {
+	if force == BuildContextIgnore || force == BuildContextPreview {
 		return root, nil
 	}
 

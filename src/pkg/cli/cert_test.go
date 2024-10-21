@@ -143,7 +143,7 @@ type MockResolver struct {
 
 func (mr *MockResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	mr.calls++
-	return []net.IPAddr{net.IPAddr{IP: net.ParseIP("127.0.0.1")}}, nil
+	return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
 }
 func (mr *MockResolver) LookupCNAME(ctx context.Context, domain string) (string, error) {
 	mr.calls++
@@ -151,7 +151,7 @@ func (mr *MockResolver) LookupCNAME(ctx context.Context, domain string) (string,
 }
 func (mr *MockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS, error) {
 	mr.calls++
-	return []*net.NS{&net.NS{Host: ""}}, nil
+	return []*net.NS{{Host: ""}}, nil
 }
 
 func TestHttpClient(t *testing.T) {
