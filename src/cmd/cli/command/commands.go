@@ -947,8 +947,11 @@ var cdPreviewCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, _, err := cli.ComposeUp(cmd.Context(), client, compose.BuildContextPreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
-		return err
+		resp, _, err := cli.ComposeUp(cmd.Context(), client, compose.BuildContextPreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		if err != nil {
+			return err
+		}
+		return cli.Tail(cmd.Context(), client, cli.TailOptions{Etag: resp.Etag})
 	},
 }
 

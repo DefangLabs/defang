@@ -150,10 +150,14 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 }
 
 func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return nil, errors.ErrUnsupported
+	return b.deploy(ctx, req, "preview")
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
@@ -217,7 +221,7 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 		return nil, err
 	}
 
-	_, err = b.runCdCommand(ctx, "up", payloadString)
+	_, err = b.runCdCommand(ctx, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +411,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	var appLiveURL string
-	term.Info("Waiting for command to finish to gather logs")
+	term.Info("Waiting for command to finish gathering logs")
 
 	deploymentID := ""
 
@@ -420,7 +424,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	if deploymentID == "" {
-		return nil, errors.New("No deployments found")
+		return nil, errors.New("no deployments found")
 	}
 
 	for {
@@ -697,7 +701,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		}
 	}
 
-	return nil, errors.New(fmt.Sprintf("app not found: %s", appName))
+	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
