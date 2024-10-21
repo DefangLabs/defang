@@ -149,16 +149,16 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Bootstrap command
-	RootCmd.AddCommand(bootstrapCmd)
-	bootstrapCmd.AddCommand(cdDestroyCmd)
-	bootstrapCmd.AddCommand(cdDownCmd)
-	bootstrapCmd.AddCommand(cdRefreshCmd)
+	RootCmd.AddCommand(cdCmd)
+	cdCmd.AddCommand(cdDestroyCmd)
+	cdCmd.AddCommand(cdDownCmd)
+	cdCmd.AddCommand(cdRefreshCmd)
 	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
-	bootstrapCmd.AddCommand(cdTearDownCmd)
+	cdCmd.AddCommand(cdTearDownCmd)
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
-	bootstrapCmd.AddCommand(cdListCmd)
-	bootstrapCmd.AddCommand(cdCancelCmd)
-	bootstrapCmd.AddCommand(cdPreviewCmd)
+	cdCmd.AddCommand(cdListCmd)
+	cdCmd.AddCommand(cdCancelCmd)
+	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
@@ -873,7 +873,7 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
-var bootstrapCmd = &cobra.Command{
+var cdCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",

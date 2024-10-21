@@ -29,7 +29,7 @@ const (
 	BuildContextDigest  BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
 	BuildContextForce                       // force: always upload the tarball, even if it's the same as a previous one
 	BuildContextIgnore                      // dry-run: don't upload the tarball, just return the path
-	BuildContextPreview                     // preview:, like dry-run but also don't deploy
+	BuildContextPreview                     // preview: like dry-run but also don't deploy
 )
 
 const (
