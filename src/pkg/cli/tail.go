@@ -213,6 +213,9 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 		if doSpinner {
 			term.HideCursor()
 			defer term.ShowCursor()
+
+			cancelSpinner := spin.Start(ctx)
+			defer cancelSpinner()
 		}
 
 		if !DoVerbose {
@@ -280,11 +283,6 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			return serverStream.Err() // returns nil on EOF
 		}
 		msg := serverStream.Msg()
-
-		// Show a spinner if we're not in raw mode and have a TTY
-		if doSpinner {
-			fmt.Print(spin.Next())
-		}
 
 		if msg == nil {
 			continue
