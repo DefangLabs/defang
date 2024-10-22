@@ -544,21 +544,31 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		etag = "" // no need to filter by etag
 		stopWhenCDTaskDone = true
 	} else {
-		// Tail CD, kaniko, and all services (this requires ProjectName to be set)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing services logs", servicesTail.LogGroupARN)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
-		term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
-		taskArn = b.cdTasks[etag]
-		if taskArn != nil {
-			// If we know the CD task ARN, only tail the logstream for the CD task
-			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
+		groups := make([]ecs.LogGroupInput, 0, 4)
+		// tail build or service logs (this requires ProjectName to be set)
+		if req.Type == defangv1.LogType_BUILD {
+			// Tail CD and build logs
+			buildTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
+			term.Debug("Tailing build logs", buildTail.LogGroupARN)
+			groups = append(groups, buildTail)
+			cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
+			taskArn = b.cdTasks[etag]
+			if taskArn != nil {
+				// If we know the CD task ARN, only tail the logstream for the CD task
+				cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
+			}
+			term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+			groups = append(groups, cdTail)
+			ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
+			term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
+			groups = append(groups, ecsTail)
+		} else {
+			// Tail service logs
+			servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
+			term.Debug("Tailing services logs", servicesTail.LogGroupARN)
+			groups = append(groups, servicesTail)
 		}
-		term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), groups...)
 	}
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
