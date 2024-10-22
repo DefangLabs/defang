@@ -102,7 +102,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 		}
 	}
 	if cnt == 0 {
-		term.Infof("No HTTPS services found; no TLS cert generation needed")
+		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
 	}
 
 	return nil
