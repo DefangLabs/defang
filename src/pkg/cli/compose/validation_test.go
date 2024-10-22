@@ -18,6 +18,8 @@ func TestValidationAndConvert(t *testing.T) {
 		term.DefaultTerm = oldTerm
 	})
 
+	t.Setenv("NODE_ENV", "test") // for interpolate/compose.yaml
+
 	testRunCompose(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)

@@ -1,3 +1,4 @@
+include: ["compose.${NODE_ENV-dev}.yaml"]
 services:
   interpolate:
     image: alpine
@@ -8,3 +9,5 @@ services:
       - ${COMPOSE_PROJECT_NAME}=value
       - NOP=abc$$def # FIXME: this should not get resolved in CD
       - NOP_BRACED=abc$${def} # FIXME: this should not get resolved in CD
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT:-8080}
