@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -120,8 +121,23 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 					if v, ok := mapping(key); ok {
 						return v, true
 					}
-					// Leave unresolved variables as is
-					term.Debugf("Unresolved variable %q will be resolved during deployment", key)
+					// Check if the variable is defined in the environment to warn the user that it's not used
+					_, inEnv := os.LookupEnv(key)
+					if hasSubstitution(templ, key) {
+						// We don't (yet) support substitution patterns during deployment
+						if inEnv {
+							term.Warnf("Environment variable %q is not used; add it to `.env` if needed", key)
+						} else {
+							term.Debugf("Unresolved variable %s", key)
+						}
+						return "", false
+					}
+					if inEnv {
+						term.Warnf("Environment variable %q is not used; add it to `.env` or it may be resolved from config during deployment", key)
+					} else {
+						term.Debugf("Unresolved variable %q may be resolved from config during deployment", key)
+					}
+					// Leave unresolved variables as-is for resolution later by CD
 					return "${" + key + "}", true
 				})
 			}
@@ -129,4 +145,10 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 	}
 
 	return cli.NewProjectOptions(c.options.ConfigPaths, optFns...)
+}
+
+func hasSubstitution(s, key string) bool {
+	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
+	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
+	return pattern.MatchString(s)
 }

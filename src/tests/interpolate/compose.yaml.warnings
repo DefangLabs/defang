@@ -1,1 +1,3 @@
+ ! Environment variable "NODE_ENV" is not used; add it to `.env` if needed
+ ! Environment variable "NODE_ENV" is not used; add it to `.env` or it may be resolved from config during deployment
  ! service "interpolate": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
