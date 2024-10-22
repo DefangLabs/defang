@@ -134,6 +134,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Etag:  deploy.Etag,
 				Since: since,
 				Raw:   false,
+				Build: true,
 			}
 
 			// blocking call to tail
@@ -292,6 +293,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Since:              since,
 				Raw:                false,
 				EndEventDetectFunc: endLogDetectFunc,
+				Build:              false,
 			}
 
 			err = cli.Tail(cmd.Context(), client, tailParams)
@@ -369,6 +371,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
+			var build, _ = cmd.Flags().GetBool("build")
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -394,6 +397,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
+				Build:    build,
 			}
 
 			return cli.Tail(cmd.Context(), client, tailOptions)

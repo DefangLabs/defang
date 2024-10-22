@@ -70,6 +70,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
+	Build              bool
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -193,7 +194,12 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{
+		Services: params.Services,
+		Etag:     params.Etag,
+		Since:    since,
+		Build:    params.Build,
+	})
 	if err != nil {
 		return err
 	}
