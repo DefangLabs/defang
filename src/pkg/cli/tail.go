@@ -213,6 +213,10 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 		if doSpinner {
 			term.HideCursor()
 			defer term.ShowCursor()
+
+			var cancelSpinner context.CancelFunc
+			_, cancelSpinner = spin.Start(ctx)
+			defer cancelSpinner()
 		}
 
 		if !DoVerbose {
@@ -248,13 +252,6 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 				}()
 			}
 		}
-	}
-
-	//var spinnerCtx context.Context
-	var cancelSpinner context.CancelFunc
-	if doSpinner {
-		_, cancelSpinner = spin.Start(ctx)
-		defer cancelSpinner()
 	}
 
 	skipDuplicate := false

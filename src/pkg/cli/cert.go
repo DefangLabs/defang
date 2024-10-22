@@ -142,10 +142,12 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 
 func triggerCertGeneration(ctx context.Context, domain string) error {
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
+	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
-		spin := spinner.New()
+
+		spin = spinner.New()
 		_, cancel := spin.Start(ctx)
 		defer cancel()
 	}
@@ -165,10 +167,12 @@ func waitForTLS(ctx context.Context, domain string) error {
 	defer cancel()
 
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
+	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
-		spin := spinner.New()
+
+		spin = spinner.New()
 		_, spinnerCancel := spin.Start(ctx)
 		defer spinnerCancel()
 	}
@@ -198,11 +202,16 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	serverSideVerified := false
 	serverVerifyRpcFailure := 0
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
+	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
+
+		spin = spinner.New()
+		_, spinnerCancel := spin.Start(ctx)
+		defer spinnerCancel()
 	}
-	spin := spinner.New()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -238,9 +247,6 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
 				term.Infof("Waiting for CNAME record setup and DNS propagation...")
 				msgShown = true
-			}
-			if doSpinner {
-				fmt.Print(spin.Next())
 			}
 		}
 	}
