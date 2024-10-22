@@ -90,9 +90,10 @@ func makeComposeUpCmd() *cobra.Command {
 			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
+			ctx := tailCtx
 			if !detach && waitTimeout >= 0 {
 				var cancelTimeout context.CancelFunc
-				tailCtx, cancelTimeout = context.WithTimeout(tailCtx, time.Duration(waitTimeout)*time.Second)
+				ctx, cancelTimeout = context.WithTimeout(ctx, time.Duration(waitTimeout)*time.Second)
 				defer cancelTimeout()
 			}
 
@@ -105,7 +106,7 @@ func makeComposeUpCmd() *cobra.Command {
 					services[i] = serviceInfo.Service.Name
 				}
 
-				if err := cli.WaitServiceState(tailCtx, client, targetState, deploy.Etag, services); err != nil {
+				if err := cli.WaitServiceState(ctx, client, targetState, deploy.Etag, services); err != nil {
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
@@ -131,27 +132,30 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// blocking call to tail
-			if err := cli.Tail(tailCtx, client, tailParams); err != nil {
+			if err := cli.Tail(ctx, client, tailParams); err != nil {
 				term.Debugf("Tail failed with %v", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
-					<-tailCtx.Done()
-				} else if errors.Is(context.Cause(tailCtx), context.Canceled) {
+					<-ctx.Done()
+				} else if !(errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
+					return err // any error other than cancelation
+				}
+
+				// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
+				if errors.Is(context.Cause(ctx), context.Canceled) {
 					// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
 					term.Warn("Deployment is not finished. Service(s) might not be running.")
 					return err
-				} else if errors.Is(context.Cause(tailCtx), context.DeadlineExceeded) {
+				} else if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 					// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
 					term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
-					return err
-				} else { // Tail was canceled because of deployment failure
 					return err
 				}
 
 				var errDeploymentFailed cli.ErrDeploymentFailed
-				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+				if errors.As(context.Cause(ctx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
