@@ -593,7 +593,7 @@ var generateCmd = &cobra.Command{
 		}
 
 		if len(envInstructions) > 0 {
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, envInstructions...)
+			printDefangHint("Check the files in your favorite editor.\nTo configure the service, do "+cd, envInstructions...)
 		} else {
 			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
 		}
@@ -621,7 +621,9 @@ func collectUnsetEnvVars(project *proj.Project) []string {
 			}
 		}
 	}
-	return envVars
+	// Deduplicate by sorting and then compacting (uniq)
+	slices.Sort(envVars)
+	return slices.Compact(envVars)
 }
 
 var getVersionCmd = &cobra.Command{
