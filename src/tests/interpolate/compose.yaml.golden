@@ -5,8 +5,10 @@ services:
       BRACED: interpolate
       DB: postgres://user:${POSTGRES_PASSWORD}@db:5432/db
       NAME: interpolate
+      NODE_ENV: ${NODE_ENV}
       NOP: abc$def
       NOP_BRACED: abc${def}
+      PORT: "8080"
       interpolate: value
     image: alpine
     networks:
