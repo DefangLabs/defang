@@ -108,6 +108,7 @@ func TestHasSubstitution(t *testing.T) {
 			input:    "$${var+def}",
 			expected: false,
 		},
+		// following test not supported yet
 		// {
 		// 	name:     "escaped dollar and escaped substitution",
 		// 	input:    "$$${var?def}",
