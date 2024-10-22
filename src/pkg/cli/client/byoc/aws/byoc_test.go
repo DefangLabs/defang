@@ -47,8 +47,8 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByocClient(context.Background(), *grpcClient, tt.TenantID)
+			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}, TenantID: tt.TenantID}
+			b := NewByocClient(context.Background(), *grpcClient)
 			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}

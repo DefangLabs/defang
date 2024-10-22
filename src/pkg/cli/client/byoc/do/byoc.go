@@ -27,7 +27,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -54,7 +53,7 @@ type ByocDo struct {
 	driver     *appPlatform.DoApp
 }
 
-func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
+func NewByocClient(ctx context.Context, grpcClient client.GrpcClient) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -69,7 +68,7 @@ func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId t
 		client: client,
 		driver: appPlatform.New(doRegion),
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, b)
 	b.ProjectName, _ = b.LoadProjectName(ctx)
 	return b, nil
 }
@@ -487,7 +486,7 @@ func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 	}
 
 	return &defangv1.WhoAmIResponse{
-		Tenant:  b.TenantID,
+		Tenant:  string(b.TenantID),
 		Region:  b.driver.Region.String(),
 		Account: "DigitalOcean",
 	}, nil
@@ -549,7 +548,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "DEFANG_ORG",
-			Value: b.TenantID,
+			Value: string(b.TenantID),
 		},
 		{
 			Key:   "DOMAIN",

@@ -84,11 +84,11 @@ func NewClient(ctx context.Context, cluster string, provider client.Provider, lo
 	switch provider {
 	case client.ProviderAWS:
 		term.Info("Using AWS provider")
-		byocClient := aws.NewByocClient(ctx, grpcClient, tenantId)
+		byocClient := aws.NewByocClient(ctx, grpcClient)
 		return byocClient
 	case client.ProviderDO:
 		term.Info("Using DigitalOcean provider")
-		byocClient, err := do.NewByocClient(ctx, grpcClient, tenantId)
+		byocClient, err := do.NewByocClient(ctx, grpcClient)
 		if err != nil {
 			term.Fatal(err)
 		}

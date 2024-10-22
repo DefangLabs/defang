@@ -54,12 +54,12 @@ type ByocAws struct {
 
 var _ client.Client = (*ByocAws)(nil)
 
-func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
+func NewByocClient(ctx context.Context, grpcClient client.GrpcClient) *ByocAws {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
 		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, b)
 	return b
 }
 
@@ -326,7 +326,7 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 		return nil, byoc.AnnotateAwsError(err)
 	}
 	return &defangv1.WhoAmIResponse{
-		Tenant:  b.TenantID,
+		Tenant:  string(b.TenantID),
 		Region:  cfg.Region,
 		Account: *identity.Account,
 	}, nil
@@ -355,7 +355,7 @@ func (b *ByocAws) environment() map[string]string {
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":                 b.TenantID,
+		"DEFANG_ORG":                 string(b.TenantID),
 		"DOMAIN":                     b.ProjectDomain,
 		"PRIVATE_DOMAIN":             b.PrivateDomain,
 		"PROJECT":                    b.ProjectName, // may be empty
@@ -704,7 +704,7 @@ func (b *ByocAws) getProjectDomain(zone string) string {
 		return "" // no project name => no custom domain
 	}
 	projectLabel := byoc.DnsSafeLabel(b.ProjectName)
-	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
+	if projectLabel == byoc.DnsSafeLabel(string(b.TenantID)) {
 		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + byoc.DnsSafe(zone)

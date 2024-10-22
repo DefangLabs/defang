@@ -67,16 +67,14 @@ type ByocBaseClient struct {
 	Quota                   quota.Quotas
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantID                string
 
 	project         *compose.Project
 	bootstrapLister BootstrapLister
 }
 
-func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, bl BootstrapLister) *ByocBaseClient {
 	b := &ByocBaseClient{
 		GrpcClient:  grpcClient,
-		TenantID:    string(tenantID),
 		ProjectName: "",     // To be overwritten by LoadProject
 		PulumiStack: "beta", // TODO: make customizable
 		Quota: quota.Quotas{
