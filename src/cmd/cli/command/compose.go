@@ -37,20 +37,6 @@ func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []str
 	return managedResources
 }
 
-func startTimer(ctx context.Context, waitTimeoutSec int, onTimeoutHandler func(error)) {
-	if waitTimeoutSec >= 0 { // Checks if wait-timeout value is valid
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(waitTimeoutSec)*time.Second)
-
-		go func() {
-			defer timeoutCancel()
-			<-timeoutCtx.Done()
-			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) { // Handle the timeout when it is reached
-				onTimeoutHandler(timeoutCtx.Err())
-			}
-		}()
-	}
-}
-
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -104,9 +90,10 @@ func makeComposeUpCmd() *cobra.Command {
 			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
-			ctx := tailCtx
-			if !detach {
-				startTimer(ctx, waitTimeout, cancelTail)
+			if !detach && waitTimeout >= 0 {
+				var cancelTimeout context.CancelFunc
+				tailCtx, cancelTimeout = context.WithTimeout(tailCtx, time.Duration(waitTimeout)*time.Second)
+				defer cancelTimeout()
 			}
 
 			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
@@ -122,7 +109,7 @@ func makeComposeUpCmd() *cobra.Command {
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
-					} else if !errors.Is(err, context.Canceled) {
+					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
 					}
 				} else {
@@ -151,18 +138,15 @@ func makeComposeUpCmd() *cobra.Command {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
 					<-tailCtx.Done()
-				} else if !errors.Is(tailCtx.Err(), context.Canceled) {
-					return err // any error other than cancelation
-				}
-
-				// The tail was canceled; check if it was because of deployment failure, explicit cancelation, or wait-timeout reached
-				if errors.Is(context.Cause(tailCtx), context.Canceled) {
+				} else if errors.Is(context.Cause(tailCtx), context.Canceled) {
 					// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
 					term.Warn("Deployment is not finished. Service(s) might not be running.")
 					return err
 				} else if errors.Is(context.Cause(tailCtx), context.DeadlineExceeded) {
 					// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
 					term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
+					return err
+				} else { // Tail was canceled because of deployment failure
 					return err
 				}
 
