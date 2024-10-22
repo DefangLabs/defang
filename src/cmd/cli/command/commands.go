@@ -294,7 +294,8 @@ var RootCmd = &cobra.Command{
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-			} else if doInEnv() {
+			}
+			if doInEnv() {
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			provider = cliClient.ProviderDefang
