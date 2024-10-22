@@ -34,6 +34,7 @@ type FabricClient interface {
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
+	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error
 }
 
 type Client interface {
@@ -50,7 +51,6 @@ type Client interface {
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
-	Restart(context.Context, ...string) (types.ETag, error)
 	ServiceDNS(name string) string
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)

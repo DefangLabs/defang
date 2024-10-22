@@ -50,7 +50,7 @@ func (bs *byocServerStream) Err() error {
 	if bs.err == io.EOF {
 		return nil // same as the original gRPC/connect server stream
 	}
-	return annotateAwsError(bs.err)
+	return byoc.AnnotateAwsError(bs.err)
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
@@ -158,7 +158,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 			if err = bs.parseECSEventRecord(event, entry); err != nil {
 				term.Debugf("error parsing ECS event, output raw event log: %v", err)
 			}
-		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, " ** ") {
+		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, logs.ErrorPrefix) {
 			entry.Stderr = true
 		}
 		if entry.Etag != "" && bs.etag != "" && entry.Etag != bs.etag {

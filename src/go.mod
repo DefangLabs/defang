@@ -1,8 +1,8 @@
 module github.com/DefangLabs/defang/src
 
-go 1.21
+go 1.22
 
-toolchain go1.21.10
+toolchain go1.22.3
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7

@@ -54,7 +54,6 @@ func compare(actual []byte, goldenFile string) error {
 }
 
 func diff(actualRaw, goldenRaw string) error {
-
 	if actualRaw == goldenRaw {
 		return nil
 	}
@@ -80,5 +79,48 @@ func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {
 	})
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestHasSubstitution(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "no substitution",
+			input:    "${var}",
+			expected: false,
+		},
+		{
+			name:     "substitution",
+			input:    "${var-def}",
+			expected: true,
+		},
+		{
+			name:     "escaped substitution",
+			input:    "$${var-def}",
+			expected: false,
+		},
+		{
+			name:     "escaped dollar and substitution",
+			input:    "$${var+def}",
+			expected: false,
+		},
+		// following test not supported yet
+		// {
+		// 	name:     "escaped dollar and escaped substitution",
+		// 	input:    "$$${var?def}",
+		// 	expected: true,
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if hasSubstitution(tt.input, "var") != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, !tt.expected)
+			}
+		})
 	}
 }

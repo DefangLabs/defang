@@ -3,6 +3,7 @@ package do
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/digitalocean/godo"
 	"github.com/muesli/termenv"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/appPlatform"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do/region"
@@ -45,23 +48,105 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	apps      map[string]*godo.App
-	buildRepo string
-	driver    *appPlatform.DoApp
+	buildRepo  string
+	cdImageTag string
+	client     *godo.Client
+	driver     *appPlatform.DoApp
 }
 
-func NewByoc(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocDo {
+func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
-		doRegion = region.SFO3
+		doRegion = region.SFO3 // TODO: change default
+	}
+
+	client, err := appPlatform.NewClient(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	b := &ByocDo{
-		driver: appPlatform.New(byoc.CdTaskPrefix, doRegion),
+		client: client,
+		driver: appPlatform.New(doRegion),
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	b.ProjectName, _ = b.LoadProjectName(ctx)
-	return b
+	return b, nil
+}
+
+func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
+	if b.cdImageTag != "" {
+		return b.cdImageTag, nil
+	}
+
+	projUpdate, err := b.getProjectUpdate(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// older deployments may not have the cd_version field set,
+	// these would have been deployed with public-beta
+	if projUpdate != nil && projUpdate.CdVersion == "" {
+		projUpdate.CdVersion = byoc.CdDefaultImageTag
+	}
+
+	// send project update with the current deploy's cd version,
+	// most current version if new deployment
+	imagePath := byoc.GetCdImage(appPlatform.CdImageBase, byoc.CdLatestImageTag)
+	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
+	if projUpdate != nil && len(projUpdate.Services) > 0 {
+		deploymentCdImageTag = projUpdate.CdVersion
+	}
+
+	// possible values are [public-beta, 1, 2, ...]
+	return deploymentCdImageTag, nil
+}
+
+func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+	client, err := b.driver.CreateS3Client()
+	if err != nil {
+		return nil, err
+	}
+
+	bucketName, err := b.driver.GetBucketName(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	if bucketName == "" {
+		return nil, errors.New("no bucket found")
+	}
+
+	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
+	getObjectOutput, err := client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &path,
+	})
+
+	if err != nil {
+		if aws.IsS3NoSuchKeyError(err) {
+			term.Debug("s3.GetObject:", err)
+			return nil, nil // no services yet
+		}
+		return nil, byoc.AnnotateAwsError(err)
+	}
+	defer getObjectOutput.Body.Close()
+	pbBytes, err := io.ReadAll(getObjectOutput.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: this is to handle older deployment which may have been stored erroneously. Remove in future
+	if decodedBuffer, err := base64.StdEncoding.DecodeString(string(pbBytes)); err == nil {
+		pbBytes = decodedBuffer
+	}
+
+	projUpdate := defangv1.ProjectUpdate{}
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
+		return nil, err
+	}
+
+	return &projUpdate, nil
 }
 
 func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -72,7 +157,6 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
-	//var warnings Warnings
 
 	for _, service := range req.Services {
 		serviceInfo, err := b.update(ctx, service)
@@ -95,7 +179,8 @@ func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defa
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		Services: serviceInfos,
+		CdVersion: b.cdImageTag,
+		Services:  serviceInfos,
 	})
 
 	if err != nil {
@@ -158,7 +243,7 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 
 	var projectList []string
 
-	projects, _, err := b.driver.Client.Projects.List(ctx, &godo.ListOptions{})
+	projects, _, err := b.client.Projects.List(ctx, &godo.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +297,7 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 		deleteEnvVars(toDelete, &service.Envs)
 	}
 
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return err
 }
@@ -236,20 +321,29 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defang
 	return serviceInfo, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.ServiceInfo) (*godo.App, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
 	app, err := b.getAppByName(ctx, b.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-	services := &defangv1.ListServicesResponse{}
 
 	for _, service := range app.Spec.Services {
 		serviceInfo := b.processServiceInfo(service)
-		services.Services = append(services.Services, serviceInfo)
+		*services = append(*services, serviceInfo)
 	}
 
-	return services, nil
+	return app, nil
+}
+
+func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+	resp := defangv1.ListServicesResponse{}
+	_, err := b.getProjectInfo(ctx, &resp.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, err
 }
 
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
@@ -288,24 +382,13 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 
 	app.Spec.Envs = append(app.Spec.Envs, newSecret)
 
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
+	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return err
 }
 
-func (b *ByocDo) Restart(ctx context.Context, names ...string) (types.ETag, error) {
-	app, err := b.getAppByName(ctx, b.ProjectName)
-	if err != nil {
-		return "", err
-	}
-
-	_, _, err = b.driver.Client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
-
-	return pkg.RandomID(), err
-}
-
 func (b *ByocDo) ServiceDNS(name string) string {
-	return "localhost"
+	return name // FIXME: what name should we use?
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
@@ -314,7 +397,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 	}
 
 	//Look up the CD app directly instead of relying on the etag
-	cdApp, err := b.getAppByName(ctx, appPlatform.CDName)
+	cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return nil, err
 	}
@@ -338,31 +421,15 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 	for {
 
-		deploymentInfo, _, err := b.driver.Client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
+		deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, cdApp.ID, deploymentID)
 
 		if err != nil {
 			return nil, err
 		}
 
-		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Error {
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, false, 150)
-			if err != nil {
-				return nil, err
-			}
-
-			// Return build and app logs if there are any
-			_, err = b.processServiceLogs(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			readHistoricalLogs(ctx, logs.HistoricURLs)
-			return nil, errors.New("problem deploying app")
-		}
-
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
 
-			logs, _, err := b.driver.Client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 			if err != nil {
 				return nil, err
 			}
@@ -391,22 +458,22 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 		return err
 	}
 
-	app, err := b.getAppByName(ctx, appPlatform.CDName)
+	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.driver.Client.Registry.Delete(ctx)
+	_, err = b.client.Registry.Delete(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.driver.Client.Apps.Delete(ctx, app.ID)
+	_, err = b.client.Apps.Delete(ctx, app.ID)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.driver.Client.Projects.Delete(ctx, byoc.CdTaskPrefix)
+	_, err = b.client.Projects.Delete(ctx, byoc.CdTaskPrefix)
 	if err != nil {
 		return err
 	}
@@ -569,7 +636,12 @@ func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defang
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
-	if b.SetupDone {
+	projectCdImageTag, err := b.getCdImageTag(ctx)
+	if err != nil {
+		return err
+	}
+
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
@@ -579,14 +651,14 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	// Create the Container Registry here, because DO only allows a single one per account,
 	// so we can't create it in the CD Pulumi process.
-	registry, resp, err := b.driver.Client.Registry.Get(ctx)
+	registry, resp, err := b.client.Registry.Get(ctx)
 	if err != nil {
 		if resp.StatusCode != 404 {
 			return err
 		}
 		term.Debug("Creating new registry")
 		// Create registry if it doesn't exist
-		registry, _, err = b.driver.Client.Registry.Create(ctx, &godo.RegistryCreateRequest{
+		registry, _, err = b.client.Registry.Create(ctx, &godo.RegistryCreateRequest{
 			Name:                 pkg.RandomID(), // has to be globally unique
 			SubscriptionTierSlug: "starter",      // max 1 repo; TODO: make this configurable
 			Region:               b.driver.Region.String(),
@@ -598,6 +670,7 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
 
+	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
 
 	return nil
@@ -609,7 +682,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 		appName = fmt.Sprintf("%s-%s-%s-app", DEFANG, name, b.PulumiStack)
 	}
 
-	apps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+	apps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +724,7 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 	mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
 
 	// If we can get projects working, we can add the project to the list options
-	currentApps, _, err := b.driver.Client.Apps.List(ctx, &godo.ListOptions{})
+	currentApps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})
 
 	if err != nil {
 		return "", err
@@ -659,19 +732,48 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 
 	for _, app := range currentApps {
 		if app.Spec.Name == buildAppName {
-			buildLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
+			buildLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
 			if err != nil {
 				return "", err
 			}
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-			mainLogs, _, err := b.driver.Client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+
+			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
 			}
-			readHistoricalLogs(ctx, mainLogs.HistoricURLs)
-			appLiveURL = mainLogs.LiveURL
+
+			mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+			if resp.StatusCode != 200 {
+				// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
+				// Create our own last deployment and return deployment logs if the deployment failed in the last 2 minutes
+				if deployments[0].Phase == godo.DeploymentPhase_Error && deployments[0].UpdatedAt.After(time.Now().Add(-2*time.Minute)) {
+					failDeployLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, deployments[0].ID, "", godo.AppLogTypeDeploy, true, 50)
+					if err != nil {
+						return "", err
+					}
+					readHistoricalLogs(ctx, failDeployLogs.HistoricURLs)
+				}
+				// Assume no deploy happened, return without an error
+				return "", nil
+			}
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
+
+			mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+			if resp.StatusCode != 200 {
+				// Assume no deploy happened, return without an error
+				return "", nil
+			}
+			if err != nil {
+				return "", err
+			}
+			readHistoricalLogs(ctx, mainRunLogs.HistoricURLs)
+			appLiveURL = mainRunLogs.LiveURL
 		}
 	}
 	return appLiveURL, nil
