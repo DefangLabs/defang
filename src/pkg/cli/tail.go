@@ -250,6 +250,13 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 		}
 	}
 
+	//var spinnerCtx context.Context
+	var cancelSpinner context.CancelFunc
+	if doSpinner {
+		_, cancelSpinner = spin.Start(ctx)
+		defer cancelSpinner()
+	}
+
 	skipDuplicate := false
 	for {
 		if !serverStream.Receive() {
@@ -280,11 +287,6 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			return serverStream.Err() // returns nil on EOF
 		}
 		msg := serverStream.Msg()
-
-		// Show a spinner if we're not in raw mode and have a TTY
-		if doSpinner {
-			fmt.Print(spin.Next())
-		}
 
 		if msg == nil {
 			continue
