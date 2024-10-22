@@ -74,6 +74,7 @@ type TailOptions struct {
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
+	LogType            defangv1.LogType
 }
 
 var P = track.P
@@ -198,7 +199,14 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Project: params.Project, Services: params.Services, Etag: params.Etag, Since: since})
+
+	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{
+		Project:  params.Project,
+		Services: params.Services,
+		Etag:     params.Etag,
+		Since:    since,
+		Type:     params.LogType,
+	})
 	if err != nil {
 		return err
 	}

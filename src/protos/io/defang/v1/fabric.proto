@@ -357,6 +357,12 @@ message Version {
   string pulumi_min = 4; // minimum Pulumi provider version
 }
 
+enum LogType {
+  ALL = 0;
+  RUN = 1;
+  BUILD = 2;
+}
+
 message TailRequest {
   repeated string services = 1;
   google.protobuf.Timestamp since = 2;
