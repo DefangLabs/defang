@@ -21,7 +21,6 @@ import (
 
 type LoaderOptions struct {
 	ConfigPaths []string
-	WorkingDir  string
 	ProjectName string
 }
 
