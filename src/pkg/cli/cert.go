@@ -142,14 +142,13 @@ func generateCert(ctx context.Context, domain string, targets []string, client c
 
 func triggerCertGeneration(ctx context.Context, domain string) error {
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
 
-		spin = spinner.New()
-		_, cancel := spin.Start(ctx)
-		defer cancel()
+		spin := spinner.New()
+		cancelSpinner := spin.Start(ctx)
+		defer cancelSpinner()
 	}
 	// Our own retry logic uses the root resolver to prevent cached DNS and retry on all non-200 errors
 	if err := getWithRetries(ctx, fmt.Sprintf("http://%v", domain), 5); err != nil { // Retry incase of DNS error
@@ -167,14 +166,13 @@ func waitForTLS(ctx context.Context, domain string) error {
 	defer cancel()
 
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
 
-		spin = spinner.New()
-		_, spinnerCancel := spin.Start(ctx)
-		defer spinnerCancel()
+		spin := spinner.New()
+		cancelSpinner := spin.Start(ctx)
+		defer cancelSpinner()
 	}
 	for {
 		select {
@@ -202,14 +200,13 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	serverSideVerified := false
 	serverVerifyRpcFailure := 0
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
-	var spin *spinner.Spinner
 	if doSpinner {
 		term.HideCursor()
 		defer term.ShowCursor()
 
-		spin = spinner.New()
-		_, spinnerCancel := spin.Start(ctx)
-		defer spinnerCancel()
+		spin := spinner.New()
+		cancelSpinner := spin.Start(ctx)
+		defer cancelSpinner()
 	}
 
 	for {

@@ -22,7 +22,7 @@ func (s *Spinner) Next() string {
 	return string([]rune{runes[s.cnt%len(runes)], '\b'})
 }
 
-func (s *Spinner) Start(ctx context.Context) (context.Context, context.CancelFunc) {
+func (s *Spinner) Start(ctx context.Context) context.CancelFunc {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	go func(spinnerCtx context.Context) {
 		ticker := time.NewTicker(250 * time.Millisecond)
@@ -37,5 +37,5 @@ func (s *Spinner) Start(ctx context.Context) (context.Context, context.CancelFun
 		}
 	}(cancelCtx)
 
-	return cancelCtx, cancel
+	return cancel
 }

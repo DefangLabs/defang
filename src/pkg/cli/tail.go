@@ -214,8 +214,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			term.HideCursor()
 			defer term.ShowCursor()
 
-			var cancelSpinner context.CancelFunc
-			_, cancelSpinner = spin.Start(ctx)
+			cancelSpinner := spin.Start(ctx)
 			defer cancelSpinner()
 		}
 
