@@ -370,7 +370,6 @@ func makeComposeLogsCmd() *cobra.Command {
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var logTypeFlagValue, _ = cmd.Flags().GetString("type")
-			_ = cmd.Flags().MarkHidden("type")
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -410,6 +409,8 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	logsCmd.Flags().String("type", "ALL", "show logs of type: [ALL RUN BUILD]")
+	logsCmd.Flags().MarkHidden("type")
 	return logsCmd
 }
 
