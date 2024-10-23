@@ -432,7 +432,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		}
 
 		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
-			if req.Type == defangv1.LogType_BUILD {
+			if req.Type == defangv1.LogType_BUILD || req.Type == defangv1.LogType_ALL {
 				// print cd logs
 				logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 				if err != nil {
@@ -728,11 +728,16 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, logType defangv1.LogTyp
 
 	buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
 	mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
-	var build bool
+
+	showBuildLogs := false
+	showRunLogs := false
 	if logType == defangv1.LogType_BUILD {
-		build = true
+		showBuildLogs = true
+	} else if logType == defangv1.LogType_RUN {
+		showRunLogs = true
 	} else {
-		build = false
+		showBuildLogs = true
+		showRunLogs = true
 	}
 
 	// If we can get projects working, we can add the project to the list options
@@ -742,7 +747,7 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, logType defangv1.LogTyp
 	}
 
 	for _, app := range currentApps {
-		if build && app.Spec.Name == buildAppName {
+		if logType == defangv1.LogType_BUILD && app.Spec.Name == buildAppName {
 			buildLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
 			if err != nil {
 				return "", err
@@ -756,7 +761,7 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, logType defangv1.LogTyp
 				return "", err
 			}
 
-			if build {
+			if showBuildLogs {
 				mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
 				if resp.StatusCode != 200 {
 					// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
@@ -775,7 +780,8 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, logType defangv1.LogTyp
 					return "", err
 				}
 				readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
-			} else {
+			}
+			if showRunLogs {
 				mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
 				if resp.StatusCode != 200 {
 					// Assume no deploy happened, return without an error

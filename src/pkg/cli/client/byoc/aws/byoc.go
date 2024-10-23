@@ -546,7 +546,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	} else {
 		groups := make([]ecs.LogGroupInput, 0, 4)
 		// tail build or service logs (this requires ProjectName to be set)
-		if req.Type == defangv1.LogType_BUILD {
+		if req.Type == defangv1.LogType_BUILD || req.Type == defangv1.LogType_ALL {
 			// Tail CD and build logs
 			buildTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
 			term.Debug("Tailing build logs", buildTail.LogGroupARN)
@@ -562,7 +562,8 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
 			term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
 			groups = append(groups, ecsTail)
-		} else {
+		}
+		if req.Type == defangv1.LogType_RUN || req.Type == defangv1.LogType_ALL {
 			// Tail service logs
 			servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
 			term.Debug("Tailing services logs", servicesTail.LogGroupARN)
