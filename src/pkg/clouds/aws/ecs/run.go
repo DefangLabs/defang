@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -32,6 +33,8 @@ func (a *AwsEcs) PopulateVPCandSubnetID(ctx context.Context, vpcID, subnetID str
 	a.SubNetID = subnetID
 	return err
 }
+
+var sanitizeStartedBy = regexp.MustCompile(`[^a-zA-Z0-9_-]+`) // letters (uppercase and lowercase), numbers, hyphens (-), and underscores (_) are allowed
 
 func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) (TaskArn, error) {
 	// a.Refresh(ctx)
@@ -62,6 +65,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
 		Cluster:        ptr.String(a.ClusterName),
+		StartedBy:      ptr.String(sanitizeStartedBy.ReplaceAllLiteralString(os.Getenv("USER"), "_")),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets

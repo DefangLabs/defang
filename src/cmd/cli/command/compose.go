@@ -138,7 +138,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			// blocking call to tail
 			if err := cli.Tail(tailCtx, client, tailParams); err != nil {
-				term.Debugf("Tail failed with %v", err)
+				term.Debug("Tail stopped with", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we wait for the deployment to finish
@@ -381,7 +381,7 @@ func makeComposeLogsCmd() *cobra.Command {
 
 			ts = ts.UTC()
 			sinceStr := ""
-			if !ts.IsZero() {
+			if ts.Year() > 1970 {
 				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 			}
 			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)

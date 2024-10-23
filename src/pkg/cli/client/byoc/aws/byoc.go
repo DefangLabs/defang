@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -298,33 +299,43 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 
 	zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client)
 	if !errors.Is(err, aws.ErrZoneNotFound) {
-		return "", byoc.AnnotateAwsError(err)
+		// return "", byoc.AnnotateAwsError(err)
 	}
 
-	var nsServers []string
-	if zone == nil {
-		// Get the NS records for the delegation set and let Pulumi create the hosted zone for us
-		delegationSet, err := aws.CreateDelegationSet(ctx, nil, r53Client)
-		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
-		if errors.As(err, &delegationSetAlreadyCreated) {
-			term.Debug("Route53 delegation set already created:", err)
-			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
-		}
-		if err != nil {
-			return "", byoc.AnnotateAwsError(err)
-		}
-		term.Debug("Route53 delegation set ID:", delegationSet.Id)
-		b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
-		nsServers = delegationSet.NameServers
-	} else {
-		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-		nsServers, err = aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
-		if err != nil {
-			return "", byoc.AnnotateAwsError(err)
-		}
+	// Get the NS records for the delegation set and let Pulumi create the hosted zone for us
+	var zoneId *string
+	if zone != nil {
+		zoneId = zone.Id
 	}
+	delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
+	var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
+	var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
+	if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
+		term.Debug("Route53 delegation set already created:", err)
+		delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
+	}
+	if err != nil {
+		return "", byoc.AnnotateAwsError(err)
+	}
+	term.Debug("Route53 delegation set ID:", *delegationSet.Id)
+	b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
+	nsServers := delegationSet.NameServers
 	if len(nsServers) == 0 {
 		return "", errors.New("no NS records found for the subdomain zone")
+	}
+
+	if zone != nil {
+		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
+		nsServers2, err := aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
+		if err != nil {
+			return "", byoc.AnnotateAwsError(err)
+		}
+		// Ensure the NS records match the ones from the delegation set
+		sort.Strings(nsServers)
+		sort.Strings(nsServers2)
+		if !slices.Equal(nsServers, nsServers2) {
+			term.Warnf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", nsServers, nsServers2)
+		}
 	}
 
 	req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
@@ -572,7 +583,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			// If we know the CD task ARN, only tail the logstream for the CD task
 			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
-		term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+		term.Debug("Tailing CD logs since", req.Since, cdTail.LogGroupARN, cdTail.LogStreamNames)
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)
 	}
 	if err != nil {
