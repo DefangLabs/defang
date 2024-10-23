@@ -13,6 +13,33 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
+type serviceNameReplacer struct {
+	client                     client.Client
+	nonReplaceServiceNameRegex *regexp.Regexp
+	serviceName                string
+	serviceNameRegex           *regexp.Regexp
+}
+
+func (s *serviceNameReplacer) replaceServiceNameWithDNS(key, value string, showWarnings bool) string {
+	val := value
+	if s.serviceNameRegex != nil {
+		// Replace service names with their actual DNS names; TODO: support public names too
+		val = s.serviceNameRegex.ReplaceAllStringFunc(value, func(serviceName string) string {
+			return s.client.ServiceDNS(NormalizeServiceName(serviceName))
+		})
+
+		if showWarnings {
+			if val != value {
+				term.Warnf("service %q: service name was fixed up: environment variable %q assigned value %q", s.serviceName, key, val)
+			} else if s.nonReplaceServiceNameRegex != nil && s.nonReplaceServiceNameRegex.MatchString(value) {
+				term.Warnf("service %q: service name(s) in the environment variable %q were not updated, only references to other services with port mode set to 'host' will be fixed-up", s.serviceName, key)
+			}
+		}
+	}
+
+	return val
+}
+
 func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, upload UploadMode) ([]*defangv1.Service, error) {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
@@ -48,6 +75,14 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	//
 	var services []*defangv1.Service
 	for _, svccfg := range serviceConfigs {
+
+		nameReplacementService := &serviceNameReplacer{
+			client:                     c,
+			nonReplaceServiceNameRegex: nonReplaceServiceNameRegex,
+			serviceName:                svccfg.Name,
+			serviceNameRegex:           serviceNameRegex,
+		}
+
 		var healthcheck *defangv1.HealthCheck
 		if svccfg.HealthCheck != nil && len(svccfg.HealthCheck.Test) > 0 && !svccfg.HealthCheck.Disable {
 			healthcheck = &defangv1.HealthCheck{
@@ -115,7 +150,8 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 						term.Warnf("service %q: skipping unset build argument %q", svccfg.Name, key)
 						continue
 					}
-					build.Args[key] = *value
+
+					build.Args[key] = nameReplacementService.replaceServiceNameWithDNS(key, *value, false)
 				}
 			}
 		}
@@ -146,19 +182,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				continue
 			}
 
-			val := *value
-			if serviceNameRegex != nil {
-				// Replace service names with their actual DNS names; TODO: support public names too
-				val = serviceNameRegex.ReplaceAllStringFunc(*value, func(serviceName string) string {
-					return c.ServiceDNS(NormalizeServiceName(serviceName))
-				})
-				if val != *value {
-					term.Warnf("service %q: service name was fixed up: environment variable %q assigned value %q", svccfg.Name, key, val)
-				} else if nonReplaceServiceNameRegex != nil && nonReplaceServiceNameRegex.MatchString(*value) {
-					term.Warnf("service %q: service name(s) in the environment variable %q were not fixed up, only services with port mode set to 'host' will be fixed up", svccfg.Name, key)
-				}
-			}
-			envs[key] = val
+			envs[key] = nameReplacementService.replaceServiceNameWithDNS(key, *value, true)
 		}
 
 		// Add unset environment variables as "secrets"
