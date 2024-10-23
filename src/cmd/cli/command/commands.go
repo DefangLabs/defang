@@ -63,7 +63,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
-		if !errors.Is(err, context.Canceled) {
+		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 			term.Error("Error:", prettyError(err))
 		}
 
