@@ -256,7 +256,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	skipDuplicate := false
 	for {
 		if !serverStream.Receive() {
-			if errors.Is(serverStream.Err(), context.Canceled) {
+			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
 				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
 			}
 
