@@ -814,7 +814,6 @@ var deleteCmd = &cobra.Command{
 			Etag:  etag,
 			Since: since,
 			Raw:   false,
-			Build: false,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},
