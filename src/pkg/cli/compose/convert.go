@@ -13,7 +13,7 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
-func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, force BuildContext) ([]*defangv1.Service, error) {
+func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, upload UploadMode) ([]*defangv1.Service, error) {
 	// Create a regexp to detect private service names in environment variable values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
@@ -96,7 +96,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 		var build *defangv1.Build
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, force)
+			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return nil, err
 			}

@@ -20,7 +20,7 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, c client.Client, force compose.BuildContext, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
+func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
 	project, err := c.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
@@ -30,7 +30,7 @@ func ComposeUp(ctx context.Context, c client.Client, force compose.BuildContext,
 		return nil, project, &ComposeError{err}
 	}
 
-	services, err := compose.ConvertServices(ctx, c, project.Services, force)
+	services, err := compose.ConvertServices(ctx, c, project.Services, upload)
 	if err != nil {
 		return nil, project, err
 	}
@@ -39,7 +39,7 @@ func ComposeUp(ctx context.Context, c client.Client, force compose.BuildContext,
 		return nil, project, &ComposeError{fmt.Errorf("no services found")}
 	}
 
-	if force == compose.BuildContextIgnore {
+	if upload == compose.UploadModeIgnore {
 		fmt.Println("Project:", project.Name)
 		for _, service := range services {
 			PrintObject(service.Name, service)
@@ -52,7 +52,7 @@ func ComposeUp(ctx context.Context, c client.Client, force compose.BuildContext,
 	}
 
 	var resp *defangv1.DeployResponse
-	if force == compose.BuildContextPreview {
+	if upload == compose.UploadModePreview {
 		resp, err = c.Preview(ctx, &defangv1.DeployRequest{Mode: mode, Project: project.Name, Services: services})
 	} else {
 		resp, err = c.Deploy(ctx, &defangv1.DeployRequest{Mode: mode, Project: project.Name, Services: services})

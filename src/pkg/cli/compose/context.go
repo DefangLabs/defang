@@ -23,13 +23,13 @@ import (
 	"github.com/moby/patternmatcher/ignorefile"
 )
 
-type BuildContext int
+type UploadMode int
 
 const (
-	BuildContextDigest  BuildContext = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
-	BuildContextForce                       // force: always upload the tarball, even if it's the same as a previous one
-	BuildContextIgnore                      // dry-run: don't upload the tarball, just return the path
-	BuildContextPreview                     // preview: like dry-run but also don't deploy
+	UploadModeDigest  UploadMode = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
+	UploadModeForce                     // force: always upload the tarball, even if it's the same as a previous one
+	UploadModeIgnore                    // dry-run: don't upload the tarball, just return the path
+	UploadModePreview                   // preview: like dry-run but also don't deploy
 )
 
 const (
@@ -61,7 +61,7 @@ defang
 .defang`
 )
 
-func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, force BuildContext) (string, error) {
+func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -74,22 +74,22 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	}
 
 	var digest string
-	switch force {
-	case BuildContextDigest:
+	switch upload {
+	case UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
 		term.Debug("Digest:", digest)
-	case BuildContextIgnore:
+	case UploadModeIgnore:
 		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
 		return root, nil
-	case BuildContextPreview:
+	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
-	case BuildContextForce:
+	case UploadModeForce:
 		// Force: always upload the tarball (to a random URL), triggering a new build
 	default:
-		panic("unexpected BuildContext value")
+		panic("unexpected UploadMode value")
 	}
 
 	term.Info("Uploading the project files for", name)

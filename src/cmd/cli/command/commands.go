@@ -148,7 +148,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Bootstrap command
+	// CD command
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -947,7 +947,7 @@ var cdPreviewCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resp, _, err := cli.ComposeUp(cmd.Context(), client, compose.BuildContextPreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, _, err := cli.ComposeUp(cmd.Context(), client, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
 		}
