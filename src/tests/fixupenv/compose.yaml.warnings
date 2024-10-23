@@ -3,6 +3,8 @@
  ! service "bad-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "env-in-config": environment variable "CONFIG1" will use the 'defang config' value instead of adjusted service name
  ! service "env-in-config": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "fixup-args": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "fixup-args": service name was fixed up: build arg "API_URL" assigned value "http://mock-mistral:8000"
  ! service "ui": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "ui": service name was fixed up: environment variable "API_URL" assigned value "http://mock-mistral:8000"
  ! service "use-bad-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

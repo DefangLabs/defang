@@ -22,6 +22,14 @@ services:
     image: service:latest
     networks:
       default: null
+  fixup-args:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        API_URL: http://Mistral:8000
+    networks:
+      default: null
   ui:
     environment:
       API_URL: http://Mistral:8000
