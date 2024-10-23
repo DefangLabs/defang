@@ -332,6 +332,7 @@ message TailRequest {
   google.protobuf.Timestamp since = 2;
   string etag = 3;
   LogType type = 4;
+  string pattern = 5;
 }
 
 message LogEntry {
