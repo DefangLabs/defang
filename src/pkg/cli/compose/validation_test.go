@@ -38,7 +38,7 @@ func TestValidationAndConvert(t *testing.T) {
 		mockClient := MockClient{
 			configs: []string{"CONFIG1", "CONFIG2"},
 		}
-		if _, err = ConvertServices(context.Background(), mockClient, proj.Services, BuildContextIgnore); err != nil {
+		if _, err = ConvertServices(context.Background(), mockClient, proj.Services, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}

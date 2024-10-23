@@ -154,7 +154,7 @@ func TestConvert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, BuildContextIgnore)
+		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, UploadModeIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}
