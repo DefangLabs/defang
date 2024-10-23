@@ -49,7 +49,7 @@ type ByocAws struct {
 
 	cdImageTag      string
 	cdTasks         map[string]ecs.TaskArn
-	delegationSetId *string
+	delegationSetId string
 	driver          *cfn.AwsEcs
 
 	ecsEventHandlers []ECSEventHandler
@@ -307,12 +307,14 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 		delegationSet, err := aws.CreateDelegationSet(ctx, nil, r53Client)
 		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
 		if errors.As(err, &delegationSetAlreadyCreated) {
+			term.Debug("Route53 delegation set already created:", err)
 			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
 		}
 		if err != nil {
 			return "", byoc.AnnotateAwsError(err)
 		}
-		b.delegationSetId = delegationSet.Id
+		term.Debug("Route53 delegation set ID:", delegationSet.Id)
+		b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
 		nsServers = delegationSet.NameServers
 	} else {
 		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
@@ -391,8 +393,8 @@ func (b *ByocAws) environment() map[string]string {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode, cmd ...string) (ecs.TaskArn, error) {
 	env := b.environment()
-	if b.delegationSetId != nil {
-		env["DELEGATION_SET_ID"] = *b.delegationSetId
+	if b.delegationSetId != "" {
+		env["DELEGATION_SET_ID"] = b.delegationSetId
 	}
 	env["DEFANG_MODE"] = strings.ToLower(mode.String())
 	if term.DoDebug() {
