@@ -70,7 +70,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
-	Build              bool
+	LogType            defangv1.LogType
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -194,18 +194,12 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	var logType defangv1.LogType
-	if params.Build {
-		logType = defangv1.LogType_BUILD
-	} else {
-		logType = defangv1.LogType_RUN
-	}
 
 	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{
 		Services: params.Services,
 		Etag:     params.Etag,
 		Since:    since,
-		Type:     logType,
+		Type:     params.LogType,
 	})
 	if err != nil {
 		return err
