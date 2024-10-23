@@ -6,5 +6,5 @@
  ! service "ui": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "ui": service name was fixed up: environment variable "API_URL" assigned value "http://mock-mistral:8000"
  ! service "use-bad-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "use-bad-service": service name(s) in the environment variable "DB_URL" were not fixed up, only services with port mode set to 'host' will be fixed up
+ ! service "use-bad-service": service name(s) in the environment variable "DB_URL" were not updated, only references to other services with port mode set to 'host' will be fixed-up
  ! service name "Mistral" was normalized to "mistral"
