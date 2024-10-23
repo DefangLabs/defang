@@ -391,7 +391,12 @@ func makeComposeLogsCmd() *cobra.Command {
 				services = strings.Split(name, ",")
 			}
 
-			logType := defangv1.LogType(defangv1.LogType_value[strings.ToUpper(logTypeFlagValue)])
+			logTypeFlagValue = strings.ToUpper(logTypeFlagValue)
+			if logTypeFlagValue != "" && logTypeFlagValue != "ALL" && logTypeFlagValue != "RUN" && logTypeFlagValue != "BUILD" {
+				return fmt.Errorf("invalid log type: %s", logTypeFlagValue)
+			}
+
+			logType := defangv1.LogType(defangv1.LogType_value[logTypeFlagValue])
 
 			tailOptions := cli.TailOptions{
 				Services: services,
