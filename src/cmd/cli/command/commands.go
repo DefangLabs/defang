@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	proj "github.com/compose-spec/compose-go/v2/types"
@@ -147,16 +148,17 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Bootstrap command
-	RootCmd.AddCommand(bootstrapCmd)
-	bootstrapCmd.AddCommand(bootstrapDestroyCmd)
-	bootstrapCmd.AddCommand(bootstrapDownCmd)
-	bootstrapCmd.AddCommand(bootstrapRefreshCmd)
-	bootstrapTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
-	bootstrapCmd.AddCommand(bootstrapTearDownCmd)
-	bootstrapListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
-	bootstrapCmd.AddCommand(bootstrapListCmd)
-	bootstrapCmd.AddCommand(bootstrapCancelCmd)
+	// CD command
+	RootCmd.AddCommand(cdCmd)
+	cdCmd.AddCommand(cdDestroyCmd)
+	cdCmd.AddCommand(cdDownCmd)
+	cdCmd.AddCommand(cdRefreshCmd)
+	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
+	cdCmd.AddCommand(cdTearDownCmd)
+	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
+	cdCmd.AddCommand(cdListCmd)
+	cdCmd.AddCommand(cdCancelCmd)
+	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
@@ -873,14 +875,14 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
-var bootstrapCmd = &cobra.Command{
+var cdCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,
 }
 
-var bootstrapDestroyCmd = &cobra.Command{
+var cdDestroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
@@ -889,7 +891,7 @@ var bootstrapDestroyCmd = &cobra.Command{
 	},
 }
 
-var bootstrapDownCmd = &cobra.Command{
+var cdDownCmd = &cobra.Command{
 	Use:   "down",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
@@ -898,7 +900,7 @@ var bootstrapDownCmd = &cobra.Command{
 	},
 }
 
-var bootstrapRefreshCmd = &cobra.Command{
+var cdRefreshCmd = &cobra.Command{
 	Use:   "refresh",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
@@ -907,7 +909,7 @@ var bootstrapRefreshCmd = &cobra.Command{
 	},
 }
 
-var bootstrapCancelCmd = &cobra.Command{
+var cdCancelCmd = &cobra.Command{
 	Use:   "cancel",
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Cancel the current CD operation",
@@ -916,7 +918,7 @@ var bootstrapCancelCmd = &cobra.Command{
 	},
 }
 
-var bootstrapTearDownCmd = &cobra.Command{
+var cdTearDownCmd = &cobra.Command{
 	Use:   "teardown",
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
@@ -927,7 +929,7 @@ var bootstrapTearDownCmd = &cobra.Command{
 	},
 }
 
-var bootstrapListCmd = &cobra.Command{
+var cdListCmd = &cobra.Command{
 	Use:     "ls",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"list"},
@@ -939,6 +941,19 @@ var bootstrapListCmd = &cobra.Command{
 			return cli.BootstrapCommand(cmd.Context(), client, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), client)
+	},
+}
+
+var cdPreviewCmd = &cobra.Command{
+	Use:   "preview",
+	Args:  cobra.NoArgs,
+	Short: "Preview the changes that will be made by the CD task",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		resp, _, err := cli.ComposeUp(cmd.Context(), client, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		if err != nil {
+			return err
+		}
+		return cli.Tail(cmd.Context(), client, cli.TailOptions{Etag: resp.Etag})
 	},
 }
 

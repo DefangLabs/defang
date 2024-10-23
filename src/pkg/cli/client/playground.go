@@ -30,6 +30,10 @@ func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployReques
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
+func (g PlaygroundClient) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
+}
+
 func (g PlaygroundClient) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
@@ -69,7 +73,7 @@ func (g *PlaygroundClient) Follow(ctx context.Context, req *defangv1.TailRequest
 }
 
 func (g *PlaygroundClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
-	return "", errors.New("the bootstrap command is not valid for the Defang playground; did you forget --provider?")
+	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	projectName, err := g.LoadProjectName(ctx)
