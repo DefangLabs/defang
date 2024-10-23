@@ -40,6 +40,10 @@ const (
 	CdImageRepo = "public.ecr.aws/defang-io/cd"
 )
 
+var (
+	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
+)
+
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
@@ -78,7 +82,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
-			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:latest",
+			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + PulumiVersion,
 			Name:      ecs.ContainerName,
 			Cpus:      2.0,
 			Memory:    2048_000_000, // 2G
