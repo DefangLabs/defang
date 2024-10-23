@@ -76,7 +76,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 	var services []*defangv1.Service
 	for _, svccfg := range serviceConfigs {
 
-		nameReplacementService := &serviceNameReplacer{
+		svcNameReplacer := &serviceNameReplacer{
 			client:                     c,
 			nonReplaceServiceNameRegex: nonReplaceServiceNameRegex,
 			serviceName:                svccfg.Name,
@@ -151,7 +151,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 						continue
 					}
 
-					build.Args[key] = nameReplacementService.replaceServiceNameWithDNS(key, *value, false)
+					build.Args[key] = svcNameReplacer.replaceServiceNameWithDNS(key, *value, false)
 				}
 			}
 		}
@@ -182,7 +182,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				continue
 			}
 
-			envs[key] = nameReplacementService.replaceServiceNameWithDNS(key, *value, true)
+			envs[key] = svcNameReplacer.replaceServiceNameWithDNS(key, *value, true)
 		}
 
 		// Add unset environment variables as "secrets"
