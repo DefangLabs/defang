@@ -194,11 +194,18 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
+	var logType defangv1.LogType
+	if params.Build {
+		logType = defangv1.LogType_BUILD
+	} else {
+		logType = defangv1.LogType_RUN
+	}
+
 	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{
 		Services: params.Services,
 		Etag:     params.Etag,
 		Since:    since,
-		Build:    params.Build,
+		Type:     logType,
 	})
 	if err != nil {
 		return err
