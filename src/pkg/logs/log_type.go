@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type LogType uint8
+type LogType uint32
 
 type InvalidLogTypeError struct {
 	Value string
@@ -17,12 +17,10 @@ func (e InvalidLogTypeError) Error() string {
 
 const (
 	LogTypeUnspecified LogType = 0
-	LogTypeRun         LogType = 1
-	LogTypeBuild       LogType = 2
-	// this value is used as a bitfield
-	// LogTypeNext1 LogType = 4
-	// LogTypeNext2 LogType = 8
-	LogTypeAll LogType = 255
+	LogTypeRun         LogType = 1 << iota
+	LogTypeBuild
+
+	LogTypeAll LogType = 0xFFFFFFFF
 )
 
 var AllLogTypes = []LogType{
@@ -32,29 +30,23 @@ var AllLogTypes = []LogType{
 
 var (
 	LogType_name = map[LogType]string{
-		0: "UNSPECIFIED",
-		1: "RUN",
-		2: "BUILD",
-		// this value is used as a bitfield
-		// 4: "NEXT1",
-		// 8: "NEXT2",
-		255: "ALL",
+		LogTypeUnspecified: "UNSPECIFIED",
+		LogTypeRun:         "RUN",
+		LogTypeBuild:       "BUILD",
+		LogTypeAll:         "ALL",
 	}
 	LogType_value = map[string]LogType{
-		"UNSPECIFIED": 0,
-		"RUN":         1,
-		"BUILD":       2,
-		// this value is used as a bitfield
-		// "NEXT1": 4,
-		// "NEXT2": 8,
-		"ALL": 255,
+		"UNSPECIFIED": LogTypeUnspecified,
+		"RUN":         LogTypeRun,
+		"BUILD":       LogTypeBuild,
+		"ALL":         LogTypeAll,
 	}
 )
 
 func (c *LogType) Set(value string) error {
 	value = strings.TrimSpace(strings.ToUpper(value))
 	if value == "ALL" {
-		*c = LogType(255)
+		*c = LogTypeAll
 		return nil
 	}
 
@@ -103,7 +95,7 @@ func (c LogType) String() string {
 	}
 
 	if len(logTypes) == 0 {
-		return "UNSPECIFIED"
+		return LogType_name[LogTypeUnspecified]
 	}
 
 	return strings.Join(logTypes, ",")
