@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -537,6 +538,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
 	stopWhenCDTaskDone := false
+	logType := logs.LogType(req.LogType)
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
@@ -546,7 +548,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	} else {
 		groups := make([]ecs.LogGroupInput, 0, 4)
 		// tail build or service logs (this requires ProjectName to be set)
-		if req.Type == defangv1.LogType_BUILD || req.Type == defangv1.LogType_ALL {
+		if logType.Has(logs.LogTypeBuild) {
 			// Tail CD and build logs
 			buildTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
 			term.Debug("Tailing build logs", buildTail.LogGroupARN)
@@ -563,7 +565,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
 			groups = append(groups, ecsTail)
 		}
-		if req.Type == defangv1.LogType_RUN || req.Type == defangv1.LogType_ALL {
+		if logType.Has(logs.LogTypeRun) {
 			// Tail service logs
 			servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
 			term.Debug("Tailing services logs", servicesTail.LogGroupARN)

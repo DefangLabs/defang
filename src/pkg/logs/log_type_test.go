@@ -92,3 +92,36 @@ func TestLogTypeSet(t *testing.T) {
 		})
 	}
 }
+
+func TestLogTypeHas(t *testing.T) {
+	tests := []struct {
+		name  string
+		value LogType
+		arg   LogType
+		want  bool
+	}{
+		{"unspecified has unspecified", LogTypeUnspecified, LogTypeUnspecified, false},
+		{"unspecified has run", LogTypeUnspecified, LogTypeRun, false},
+		{"unspecified has build", LogTypeUnspecified, LogTypeBuild, false},
+		{"unspecified has all", LogTypeUnspecified, LogTypeAll, false},
+		{"run has unspecified", LogTypeRun, LogTypeUnspecified, false},
+		{"run has run", LogTypeRun, LogTypeRun, true},
+		{"run has build", LogTypeRun, LogTypeBuild, false},
+		{"run has all", LogTypeRun, LogTypeAll, true},
+		{"build has unspecified", LogTypeBuild, LogTypeUnspecified, false},
+		{"build has run", LogTypeBuild, LogTypeRun, false},
+		{"build has build", LogTypeBuild, LogTypeBuild, true},
+		{"build has all", LogTypeBuild, LogTypeAll, true},
+		{"all has unspecified", LogTypeAll, LogTypeUnspecified, false},
+		{"all has run", LogTypeAll, LogTypeRun, true},
+		{"all has build", LogTypeAll, LogTypeBuild, true},
+		{"all has all", LogTypeAll, LogTypeAll, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.value.Has(tt.arg); got != tt.want {
+				t.Errorf("LogType.Has() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
