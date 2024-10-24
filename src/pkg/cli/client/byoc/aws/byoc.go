@@ -297,46 +297,60 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	var zoneId *string
-	if zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client); err != nil {
+	// There's four cases to consider:
+	//  1. The subdomain zone does not exist: we get NS records from the delegation set and let CD/Pulumi create the hosted zone
+	//  2. The subdomain zone exists:
+	//    a. The zone was created by the older CLI: we need to get the NS records from the existing zone
+	//    b. The zone was created by the new CD/Pulumi: we get the NS records from the delegation set and let CD/Pulumi create the hosted zone
+	//    c. The zone was created another way: the deployment will likely fail with a "zone already exists" error
+
+	var nsServers []string
+	zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client)
+	if err != nil {
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+		// Case 1: The zone doesn't exist: we'll create a delegation set and let CD/Pulumi create the hosted zone
 	} else {
-		zoneId = zone.Id
-	}
-
-	// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
-	delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
-	var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
-	var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
-	if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
-		term.Debug("Route53 delegation set already created:", err)
-		delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
-	}
-	if err != nil {
-		return "", byoc.AnnotateAwsError(err)
-	}
-	term.Debug("Route53 delegation set ID:", *delegationSet.Id)
-	b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
-	nsServers := delegationSet.NameServers
-	if len(nsServers) == 0 {
-		return "", errors.New("no NS records found for the subdomain zone")
-	}
-
-	if zoneId != nil {
-		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-		nsServers2, err := aws.ListResourceRecords(ctx, *zoneId, b.ProjectDomain, r53types.RRTypeNs, r53Client)
+		// Case 2: Get the NS records for the existing subdomain zone
+		nsServers, err = aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
 		if err != nil {
 			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+	}
+
+	if zone == nil || zone.Config.Comment == nil || *zone.Config.Comment != aws.CreateHostedZoneComment {
+		// Case 2b or 2c: The zone does not exist, or was not created by an older version of this CLI.
+		// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
+		var zoneId *string
+		if zone != nil {
+			zoneId = zone.Id
+		}
+		delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
+		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
+		var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
+		if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
+			term.Debug("Route53 delegation set already created:", err)
+			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
+		}
+		if err != nil {
+			return "", byoc.AnnotateAwsError(err)
+		}
+		if len(delegationSet.NameServers) == 0 {
+			return "", errors.New("no NS records found for the delegation set") // should not happen
+		}
+		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
+		b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
+
 		// Ensure the NS records match the ones from the delegation set
 		sort.Strings(nsServers)
-		sort.Strings(nsServers2)
-		if !slices.Equal(nsServers, nsServers2) {
-			b.Track("Compose-Up ListResourceRecords Diff", client.Property{"fromDS", nsServers}, client.Property{"fromZone", nsServers2})
-			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", nsServers, nsServers2)
+		sort.Strings(delegationSet.NameServers)
+		if !slices.Equal(delegationSet.NameServers, nsServers) {
+			b.Track("Compose-Up ListResourceRecords Diff", client.Property{"fromDS", delegationSet.NameServers}, client.Property{"fromZone", nsServers})
+			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
 		}
+
+		nsServers = delegationSet.NameServers
 	}
 
 	req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
