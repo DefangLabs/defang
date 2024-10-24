@@ -59,11 +59,6 @@ func (a *AwsEcs) newClient(ctx context.Context) (*cloudformation.Client, error) 
 	return cloudformation.NewFromConfig(cfg), nil
 }
 
-// update1s is a functional option for cloudformation.StackUpdateCompleteWaiter that sets the MinDelay to 1
-func update1s(o *cloudformation.StackUpdateCompleteWaiterOptions) {
-	o.MinDelay = 1
-}
-
 func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
@@ -105,11 +100,6 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		return err
 	}
 	return a.fillWithOutputs(dso)
-}
-
-// create1s is a functional option for cloudformation.StackCreateCompleteWaiter that sets the MinDelay to 1
-func create1s(o *cloudformation.StackCreateCompleteWaiterOptions) {
-	o.MinDelay = 1
 }
 
 func (a *AwsEcs) createStackAndWait(ctx context.Context, templateBody string) error {
@@ -185,13 +175,12 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 	for _, output := range dso.Stacks[0].Outputs {
 		switch *output.OutputKey {
 		case outputs.SubnetID:
+			// Only set the SubNetID if it's not already set; this allows the user to override the subnet
 			if a.SubNetID == "" {
 				a.SubNetID = *output.OutputValue
 			}
 		case outputs.TaskDefArn:
-			if a.TaskDefARN == "" {
-				a.TaskDefARN = *output.OutputValue
-			}
+			a.TaskDefARN = *output.OutputValue
 		case outputs.ClusterName:
 			a.ClusterName = *output.OutputValue
 		case outputs.LogGroupARN:
@@ -200,8 +189,6 @@ func (a *AwsEcs) fillWithOutputs(dso *cloudformation.DescribeStacksOutput) error
 			a.SecurityGroupID = *output.OutputValue
 		case outputs.BucketName:
 			a.BucketName = *output.OutputValue
-			// default:; TODO: should do this but only for stack the driver created
-			// 	return fmt.Errorf("unknown output key %q", *output.OutputKey)
 		}
 	}
 
@@ -262,9 +249,4 @@ func (a *AwsEcs) TearDown(ctx context.Context) error {
 	return cloudformation.NewStackDeleteCompleteWaiter(cfn, delete1s).Wait(ctx, &cloudformation.DescribeStacksInput{
 		StackName: ptr.String(a.stackName),
 	}, stackTimeout)
-}
-
-// delete1s is a functional option for cloudformation.StackDeleteCompleteWaiter that sets the MinDelay to 1
-func delete1s(o *cloudformation.StackDeleteCompleteWaiterOptions) {
-	o.MinDelay = 1
 }
