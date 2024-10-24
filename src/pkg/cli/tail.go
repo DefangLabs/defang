@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -74,7 +75,7 @@ type TailOptions struct {
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
-	LogType            defangv1.LogType
+	LogType            logs.LogType
 }
 
 var P = track.P
@@ -205,7 +206,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 		Services: params.Services,
 		Etag:     params.Etag,
 		Since:    since,
-		Type:     params.LogType,
+		LogType:  uint32(params.LogType),
 	})
 	if err != nil {
 		return err
