@@ -139,6 +139,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Since:   since,
 				Raw:     false,
 				Verbose: verbose,
+				LogType: logs.LogTypeAll,
 			}
 
 			// blocking call to tail
@@ -289,6 +290,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Raw:                false,
 				EndEventDetectFunc: endLogDetectFunc,
 				Verbose:            verbose,
+				LogType:            logs.LogTypeAll,
 			}
 
 			err = cli.Tail(cmd.Context(), loader, provider, tailParams)

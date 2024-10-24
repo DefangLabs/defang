@@ -155,10 +155,14 @@ func Tail(ctx context.Context, loader client.Loader, provider client.Provider, p
 	if err != nil {
 		return err
 	}
-	term.Debugf("Tailing logs in project %q", projectName)
 	if params.Project == "" {
 		params.Project = projectName
 	}
+	if params.LogType == logs.LogTypeUnspecified {
+		params.LogType = logs.LogTypeRun
+	}
+
+	term.Debugf("Tailing %s logs in project %q", params.LogType, projectName)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
