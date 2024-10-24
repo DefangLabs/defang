@@ -415,6 +415,8 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	logsCmd.Flags().String("type", "", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
 	logsCmd.Flags().MarkHidden("type")
+	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
+	logsCmd.Flags().MarkHidden("pattern")
 	return logsCmd
 }
 
