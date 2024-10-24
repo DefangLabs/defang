@@ -297,16 +297,16 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client)
-	if !errors.Is(err, aws.ErrZoneNotFound) {
-		// return "", byoc.AnnotateAwsError(err)
-	}
-
-	// Get the NS records for the delegation set and let Pulumi create the hosted zone for us
 	var zoneId *string
-	if zone != nil {
+	if zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client); err != nil {
+		if !errors.Is(err, aws.ErrZoneNotFound) {
+			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
+		}
+	} else {
 		zoneId = zone.Id
 	}
+
+	// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
 	delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
 	var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
 	var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
@@ -324,17 +324,18 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 		return "", errors.New("no NS records found for the subdomain zone")
 	}
 
-	if zone != nil {
+	if zoneId != nil {
 		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-		nsServers2, err := aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
+		nsServers2, err := aws.ListResourceRecords(ctx, *zoneId, b.ProjectDomain, r53types.RRTypeNs, r53Client)
 		if err != nil {
-			return "", byoc.AnnotateAwsError(err)
+			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
 		// Ensure the NS records match the ones from the delegation set
 		sort.Strings(nsServers)
 		sort.Strings(nsServers2)
 		if !slices.Equal(nsServers, nsServers2) {
-			term.Warnf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", nsServers, nsServers2)
+			b.Track("Compose-Up ListResourceRecords Diff", client.Property{"fromDS", nsServers}, client.Property{"fromZone", nsServers2})
+			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", nsServers, nsServers2)
 		}
 	}
 
@@ -669,7 +670,6 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		}
 	}
 
-	// si.NatIps = b.publicNatIps // TODO: even internal services use NAT now
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if si.Service.Build != nil {
