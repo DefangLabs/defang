@@ -54,7 +54,7 @@ func NewServiceNameReplacer(client client.Client, services compose.Services) Ser
 	}
 }
 
-func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key, value string, replacementMode ReplacementMode) string {
+func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key, value string, fixupTarget FixupTarget) string {
 	val := value
 	if s.serviceNameRegex != nil && s.nonReplaceServiceNameRegex != nil {
 		// Replace service names with their actual DNS names; TODO: support public names too
@@ -62,10 +62,6 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key,
 			return s.client.ServiceDNS(NormalizeServiceName(serviceName))
 		})
 
-		fixupTarget := "environment variable"
-		if replacementMode == BuildArgs {
-			fixupTarget = "build argument"
-		}
 		if val != value {
 			term.Warnf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
 		} else if s.nonReplaceServiceNameRegex != nil && s.nonReplaceServiceNameRegex.MatchString(value) {
@@ -76,6 +72,6 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key,
 	return val
 }
 
-func (s *ServiceNameReplacer) hasServiceName(name string) bool {
+func (s *ServiceNameReplacer) HasServiceName(name string) bool {
 	return s.serviceNameRegex != nil && s.serviceNameRegex.MatchString(name)
 }

@@ -98,7 +98,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 						continue
 					}
 
-					build.Args[key] = svcNameReplacer.replaceServiceNameWithDNS(svccfg.Name, key, *value, BuildArgs)
+					build.Args[key] = svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, BuildArgs)
 				}
 			}
 		}
@@ -120,7 +120,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.hasServiceName(*value) {
+				if svcNameReplacer.HasServiceName(*value) {
 					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead of adjusted service name", svccfg.Name, key)
 				} else {
 					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead", svccfg.Name, key)
@@ -129,7 +129,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 				continue
 			}
 
-			envs[key] = svcNameReplacer.replaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
+			envs[key] = svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
 		}
 
 		// Add unset environment variables as "secrets"
