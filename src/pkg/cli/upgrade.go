@@ -71,5 +71,6 @@ func homebrewPrefix(ctx context.Context) string {
 }
 
 func printInstructions(cmd string) {
-	term.Info("To upgrade defang, run the following command:\n\n", cmd)
+	term.Info("To upgrade defang, run the following command:")
+	term.Print("\n\n  ", cmd)
 }

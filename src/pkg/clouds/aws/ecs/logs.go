@@ -73,7 +73,7 @@ func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupIn
 	var pendingGroups []LogGroupInput
 
 	sincePending := since
-	if sincePending.IsZero() {
+	if sincePending.Year() <= 1970 {
 		sincePending = time.Now()
 	}
 	for _, lgi := range logGroups {
@@ -216,16 +216,6 @@ func startLiveTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput)
 		return nil, err
 	}
 
-	// if !since.IsZero() {
-	// 	if events, err := Query(ctx, slti.LogGroupIdentifiers[0], since, time.Now()); err == nil {
-	// 		slto.Events <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-	// 			Value: types.LiveTailSessionUpdate{
-	// 				SessionResults: events,
-	// 			},
-	// 		}
-	// 	}
-	// }
-
 	return slto.GetStream(), nil
 }
 
@@ -354,7 +344,7 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		if !since.IsZero() {
+		if since.Year() > 1970 {
 			// Query the logs between the start time and now
 			query := &CWLogGroupQuery{
 				LogGroupInput: lgi,

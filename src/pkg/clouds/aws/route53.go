@@ -12,51 +12,79 @@ import (
 )
 
 var (
-	ErrNoZoneFound   = errors.New("no zone found")
-	ErrNoRecordFound = errors.New("no record found")
+	ErrZoneNotFound         = errors.New("the Route53 hosted zone was not found")
+	ErrNoRecordFound        = errors.New("no Route53 record found in the hosted zone")
+	ErrNoDelegationSetFound = errors.New("no Route53 delegation set found")
 )
 
-func GetZoneIdFromDomain(ctx context.Context, domain string, r53 *route53.Client) (string, error) {
+func CreateDelegationSet(ctx context.Context, zoneId *string, r53 *route53.Client) (*types.DelegationSet, error) {
+	params := &route53.CreateReusableDelegationSetInput{
+		CallerReference: ptr.String("Created by Defang CLI" + time.Now().String()),
+		HostedZoneId:    zoneId,
+	}
+	resp, err := r53.CreateReusableDelegationSet(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return resp.DelegationSet, err
+}
+
+func GetDelegationSet(ctx context.Context, r53 *route53.Client) (*types.DelegationSet, error) {
+	params := &route53.ListReusableDelegationSetsInput{
+		MaxItems: ptr.Int32(1),
+	}
+	resp, err := r53.ListReusableDelegationSets(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.DelegationSets) == 0 {
+		return nil, ErrNoDelegationSetFound
+	}
+	return &resp.DelegationSets[0], nil
+}
+
+func GetHostedZoneByName(ctx context.Context, domain string, r53 *route53.Client) (*types.HostedZone, error) {
 	params := &route53.ListHostedZonesByNameInput{
 		DNSName:  ptr.String(domain),
 		MaxItems: ptr.Int32(1),
 	}
 	resp, err := r53.ListHostedZonesByName(ctx, params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(resp.HostedZones) == 0 {
-		return "", ErrNoZoneFound
+		return nil, ErrZoneNotFound
 	}
 
 	// ListHostedZonesByName returns all zones that is after the specified domain, we need to check the domain is the same
 	zone := resp.HostedZones[0]
 	if !isSameDomain(*zone.Name, domain) {
-		return "", ErrNoZoneFound
+		return nil, ErrZoneNotFound
 	}
 
-	return *zone.Id, nil
+	return &zone, nil
 }
 
-func CreateZone(ctx context.Context, domain string, r53 *route53.Client) (string, error) {
+// Deprecated: let Pulumi create the hosted zone
+func CreateHostedZone(ctx context.Context, domain string, r53 *route53.Client) (*types.HostedZone, error) {
 	params := &route53.CreateHostedZoneInput{
 		Name:            ptr.String(domain),
 		CallerReference: ptr.String(domain + time.Now().String()),
 		HostedZoneConfig: &types.HostedZoneConfig{
-			Comment: ptr.String("Created by defang cli"),
+			Comment: ptr.String("Created by Defang CLI"),
 		},
 	}
 	resp, err := r53.CreateHostedZone(ctx, params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return *resp.HostedZone.Id, nil
+	return resp.HostedZone, nil
 }
 
-func GetRecordsValue(ctx context.Context, zoneId, name string, recordType types.RRType, r53 *route53.Client) ([]string, error) {
+func ListResourceRecords(ctx context.Context, zoneId, recordName string, recordType types.RRType, r53 *route53.Client) ([]string, error) {
 	listInput := &route53.ListResourceRecordSetsInput{
 		HostedZoneId:    ptr.String(zoneId),
-		StartRecordName: ptr.String(name),
+		StartRecordName: ptr.String(recordName),
 		StartRecordType: recordType,
 		MaxItems:        ptr.Int32(1),
 	}

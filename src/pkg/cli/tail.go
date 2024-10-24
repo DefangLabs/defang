@@ -188,7 +188,7 @@ func isTransientError(err error) bool {
 
 func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	var since *timestamppb.Timestamp
-	if params.Since.IsZero() {
+	if params.Since.Year() <= 1970 {
 		params.Since = time.Now() // this is used to continue from the last timestamp
 	} else {
 		since = timestamppb.New(params.Since)
