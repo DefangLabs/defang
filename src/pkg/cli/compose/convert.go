@@ -120,7 +120,7 @@ func ConvertServices(ctx context.Context, c client.Client, serviceConfigs compos
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.hasServiceName(svccfg.Name, *value) {
+				if svcNameReplacer.hasServiceName(*value) {
 					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead of adjusted service name", svccfg.Name, key)
 				} else {
 					term.Warnf("service %q: environment variable %q will use the 'defang config' value instead", svccfg.Name, key)

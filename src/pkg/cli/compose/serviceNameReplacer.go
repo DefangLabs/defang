@@ -25,7 +25,7 @@ type ServiceNameReplacer struct {
 }
 
 func NewServiceNameReplacer(client client.Client, services compose.Services) ServiceNameReplacer {
-	// Create a regexp to detect private service names in environment variable values
+	// Create a regexp to detect private service names in environment variable and build arg values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
 	for _, svccfg := range services {
@@ -56,7 +56,7 @@ func NewServiceNameReplacer(client client.Client, services compose.Services) Ser
 
 func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key, value string, replacementMode ReplacementMode) string {
 	val := value
-	if s.serviceNameRegex != nil {
+	if s.serviceNameRegex != nil && s.nonReplaceServiceNameRegex != nil {
 		// Replace service names with their actual DNS names; TODO: support public names too
 		val = s.serviceNameRegex.ReplaceAllStringFunc(value, func(serviceName string) string {
 			return s.client.ServiceDNS(NormalizeServiceName(serviceName))
@@ -76,6 +76,6 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key,
 	return val
 }
 
-func (s *ServiceNameReplacer) hasServiceName(serviceName string, value string) bool {
-	return s.serviceNameRegex != nil && s.serviceNameRegex.MatchString(value)
+func (s *ServiceNameReplacer) hasServiceName(name string) bool {
+	return s.serviceNameRegex != nil && s.serviceNameRegex.MatchString(name)
 }
