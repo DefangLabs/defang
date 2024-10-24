@@ -11,11 +11,11 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
-type ReplacementMode int
+type FixupTarget string
 
 const (
-	BuildArgs ReplacementMode = iota
-	EnvironmentVars
+	BuildArgs       FixupTarget = "build argument"
+	EnvironmentVars FixupTarget = "environment variable"
 )
 
 type ServiceNameReplacer struct {
@@ -67,9 +67,9 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(serviceName string, key,
 			fixupTarget = "build argument"
 		}
 		if val != value {
-			term.Warnf("service %q: service name was fixed up: %s %q assigned value %q", serviceName, fixupTarget, key, val)
+			term.Warnf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
 		} else if s.nonReplaceServiceNameRegex != nil && s.nonReplaceServiceNameRegex.MatchString(value) {
-			term.Warnf("service %q: service name(s) in the %s %q were not adjusted, only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
+			term.Warnf("service %q: service name in the %s %q was not adjusted, only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
 		}
 	}
 
