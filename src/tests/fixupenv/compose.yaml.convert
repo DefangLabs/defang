@@ -24,6 +24,19 @@
     "networks": 1
   },
   {
+    "name": "fixup-args",
+    "platform": 2,
+    "internal": true,
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "API_URL": "http://mistral:8000"
+      }
+    },
+    "networks": 1
+  },
+  {
     "name": "mistral",
     "image": "mistral:latest",
     "platform": 2,
