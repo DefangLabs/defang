@@ -10,8 +10,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-var deploymentEtags = make(map[string]string)
-
 type byocSubscribeServerStream struct {
 	services []string
 	etag     types.ETag
@@ -66,11 +64,6 @@ func (s *byocSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
 
 func (s *byocSubscribeServerStream) Err() error {
 	return s.err
-}
-
-func (s *byocSubscribeServerStream) error(err error) {
-	s.err = err
-	s.send(nil)
 }
 
 func (s *byocSubscribeServerStream) send(resp *defangv1.SubscribeResponse) {

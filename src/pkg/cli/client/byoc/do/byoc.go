@@ -807,7 +807,7 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 		}
 
 		for _, msg := range tailResp.Entries {
-			Printlogs(tailResp, msg)
+			printlogs(tailResp, msg)
 		}
 	}
 
@@ -821,7 +821,7 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 	return env
 }
 
-func Printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
+func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 	service := msg.Service
 	etag := msg.Etag
 	ts := msg.Timestamp.AsTime()

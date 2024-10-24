@@ -30,6 +30,7 @@ func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
 	}
+	term.Debug("AWS error:", err)
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, err)
 	}

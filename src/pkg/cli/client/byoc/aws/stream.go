@@ -77,10 +77,7 @@ func (bs *byocServerStream) Receive() bool {
 	}
 
 	bs.response, bs.err = bs.parseEvents(evts)
-	if bs.err != nil {
-		return false
-	}
-	return true
+	return bs.err == nil
 }
 
 func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailResponse, error) {
