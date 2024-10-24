@@ -3,6 +3,7 @@ package compose
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -10,6 +11,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/aws/smithy-go/ptr"
+	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestValidationAndConvert(t *testing.T) {
@@ -30,12 +33,12 @@ func TestValidationAndConvert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := ValidateProject(proj); err != nil {
+		if err := ValidateProject(client.MockClient{}, proj); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		mockClient := MockClient{
+		mockClient := validationMockClient{
 			configs: []string{"CONFIG1", "CONFIG2"},
 		}
 		if _, err = ConvertServices(context.Background(), mockClient, proj.Services, UploadModeIgnore); err != nil {
@@ -55,18 +58,79 @@ func TestValidationAndConvert(t *testing.T) {
 	})
 }
 
-type MockClient struct {
+func TestValidateConfig(t *testing.T) {
+	const ENV_VAR = "ENV_VAR"
+
+	ctx := context.Background()
+	mockClient := validationMockClient{}
+
+	testProject := compose.Project{
+		Services: compose.Services{},
+	}
+	t.Run("NOP", func(t *testing.T) {
+		env := map[string]*string{
+			ENV_VAR: ptr.String("blah"),
+		}
+
+		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		if err := validateProjectConfig(ctx, mockClient, &testProject); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("Missing Config", func(t *testing.T) {
+		var missing ErrMissingConfig
+		env := map[string]*string{
+			ENV_VAR: ptr.String("blah"),
+			"ASD":   nil,
+			"BSD":   nil,
+			"CSD":   nil,
+		}
+
+		ctx := context.Background()
+		mockClient := validationMockClient{}
+		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		if err := validateProjectConfig(ctx, mockClient, &testProject); !errors.As(err, &missing) {
+			t.Fatalf("uexpected ErrMissingConfig, got: %v", err)
+		} else {
+			if len(missing) != 3 {
+				t.Fatalf("unexpected error: number of missing, got: %d expected 3", len(missing))
+			}
+
+			for index, name := range []string{"ASD", "BSD", "CSD"} {
+				if missing[index] != name {
+					t.Fatalf("unexpected error: missing, got: %s expected ASD", missing[index])
+				}
+			}
+		}
+	})
+
+	t.Run("Valid Config", func(t *testing.T) {
+		const CONFIG_VAR = "CONFIG_VAR"
+		mockClient.configs = []string{CONFIG_VAR}
+		env := map[string]*string{
+			ENV_VAR:    ptr.String("blah"),
+			CONFIG_VAR: nil,
+		}
+		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		if err := validateProjectConfig(ctx, mockClient, &testProject); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+type validationMockClient struct {
 	client.Client
 	configs []string
 }
 
-func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m validationMockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,
 		Project: "mock-project",
 	}, nil
 }
 
-func (m MockClient) ServiceDNS(name string) string {
+func (m validationMockClient) ServiceDNS(name string) string {
 	return "mock-" + name
 }

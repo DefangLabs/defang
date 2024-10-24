@@ -629,15 +629,6 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		return nil, err
 	}
 
-	// Check to make sure all required secrets are present in the secrets store
-	missing, err := b.checkForMissingSecrets(ctx, service.Secrets)
-	if err != nil {
-		return nil, err
-	}
-	if missing != nil {
-		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
-	}
-
 	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		Service: service,
@@ -694,33 +685,6 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
 	return si, nil
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
-	if len(secrets) == 0 {
-		return nil, nil // no secrets to check
-	}
-	prefix := b.getSecretID("")
-	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
-	if err != nil {
-		return nil, err
-	}
-	for _, secret := range secrets {
-		fqn := b.getSecretID(secret.Source)
-		if !searchSecret(sorted, fqn) {
-			return secret, nil // secret not found
-		}
-	}
-	return nil, nil // all secrets found
-}
-
-// This function was copied from Fabric controller
-func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
-	i := sort.Search(len(sorted), func(i int) bool {
-		return sorted[i] >= fqn
-	})
-	return i < len(sorted) && sorted[i] == fqn
 }
 
 type qualifiedName = string // legacy

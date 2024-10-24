@@ -1,34 +1,47 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/types"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *compose.Project) error {
+type ErrMissingConfig []string
+
+func (e ErrMissingConfig) Error() string {
+	return fmt.Sprintf("missing configs %q", ([]string)(e))
+}
+
+func ValidateProject(client client.Client, project *compose.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
 	// Copy the services map into a slice so we can sort them and have consistent output
-	var services []types.ServiceConfig
+	var services []compose.ServiceConfig
 	for _, svccfg := range project.Services {
 		services = append(services, svccfg)
 	}
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
+
+	if err := validateProjectConfig(context.Background(), client, project); err != nil {
+		return err
+	}
+
 	for _, svccfg := range services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
@@ -347,6 +360,43 @@ func validatePort(port compose.ServicePortConfig) error {
 				term.Warnf("port %d: 'published' should be equal to 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		}
+	}
+
+	return nil
+}
+
+func validateProjectConfig(ctx context.Context, client client.Client, composeProject *compose.Project) error {
+	var names []string
+	// make list of secrets
+	for _, service := range composeProject.Services {
+		for key, value := range service.Environment {
+			if value == nil {
+				names = append(names, key)
+			}
+		}
+	}
+
+	if len(names) == 0 {
+		return nil // no secrets to check
+	}
+
+	configs, err := client.ListConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	slices.Sort(names)
+	names = slices.Compact(names)
+
+	errMissingConfig := ErrMissingConfig{}
+	for _, name := range names {
+		if !slices.Contains(configs.Names, name) {
+			errMissingConfig = append(errMissingConfig, name)
+		}
+	}
+
+	if len(errMissingConfig) > 0 {
+		return errMissingConfig
 	}
 
 	return nil
