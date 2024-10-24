@@ -54,10 +54,10 @@ func TestComposeUp(t *testing.T) {
 		gotContext.Store(true)
 		w.WriteHeader(http.StatusOK) // return 200 OK same as S3
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	d, project, err := ComposeUp(context.Background(), deployMock{MockClient: client.MockClient{UploadUrl: server.URL + "/", Project: proj}}, compose.UploadModeIgnore, defangv1.DeploymentMode_DEVELOPMENT)
-	if err != nil && !errors.Is(err, ErrDryRun) {
+	d, project, err := ComposeUp(context.Background(), deployMock{MockClient: client.MockClient{UploadUrl: server.URL + "/", Project: proj}}, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
 	if project == nil {
