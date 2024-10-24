@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -391,12 +392,10 @@ func makeComposeLogsCmd() *cobra.Command {
 				services = strings.Split(name, ",")
 			}
 
-			logTypeFlagValue = strings.ToUpper(logTypeFlagValue)
-			if logTypeFlagValue != "" && logTypeFlagValue != "ALL" && logTypeFlagValue != "RUN" && logTypeFlagValue != "BUILD" {
-				return fmt.Errorf("invalid log type: %s", logTypeFlagValue)
+			logType, err := logs.ParseLogType(logTypeFlagValue)
+			if err != nil {
+				return fmt.Errorf("unable to parse log type: %w", err)
 			}
-
-			logType := defangv1.LogType(defangv1.LogType_value[logTypeFlagValue])
 
 			tailOptions := cli.TailOptions{
 				Services: services,
@@ -414,7 +413,7 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	logsCmd.Flags().String("type", "ALL", "show logs of type: [ALL RUN BUILD]")
+	logsCmd.Flags().String("type", "", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
 	logsCmd.Flags().MarkHidden("type")
 	return logsCmd
 }
