@@ -7,11 +7,11 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
-type ServiceNameReplacerMockClient struct {
+type serviceNameReplacerMockClient struct {
 	client.Client
 }
 
-func (m ServiceNameReplacerMockClient) ServiceDNS(name string) string {
+func (m serviceNameReplacerMockClient) ServiceDNS(name string) string {
 	return "override-" + name
 }
 
@@ -45,8 +45,9 @@ func setup() ServiceNameReplacer {
 		},
 	}
 
-	return NewServiceNameReplacer(ServiceNameReplacerMockClient{}, services)
+	return NewServiceNameReplacer(serviceNameReplacerMockClient{}, services)
 }
+
 func TestServiceNameReplacer(t *testing.T) {
 	testCases := []struct {
 		service  string
