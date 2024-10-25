@@ -29,19 +29,23 @@ func TestValidationAndConvert(t *testing.T) {
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
-		proj, err := loader.LoadProject(context.Background())
+
+		// this is all the configs that are used in the test compose files
+		mockClient := validationMockClient{
+			configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
+		}
+
+		project, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := ValidateProject(client.MockClient{}, proj); err != nil {
+
+		if err := ValidateProject(mockClient, project); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		mockClient := validationMockClient{
-			configs: []string{"CONFIG1", "CONFIG2"},
-		}
-		if _, err = ConvertServices(context.Background(), mockClient, proj.Services, UploadModeIgnore); err != nil {
+		if _, err = ConvertServices(context.Background(), mockClient, project.Services, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
