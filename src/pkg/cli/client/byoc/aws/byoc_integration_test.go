@@ -15,7 +15,7 @@ import (
 var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "ten ant") // no domain
+	b := NewByocClient(ctx, client.GrpcClient{TenantID: "ten ant"})
 	b.ProjectName = "byoc_integration_test"
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestTail")
+	b := NewByocClient(ctx, client.GrpcClient{TenantID: "TestTail"})
 	b.ProjectName = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
 
@@ -69,7 +69,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestGetServices")
+	b := NewByocClient(ctx, client.GrpcClient{TenantID: "TestGetServices"})
 	b.ProjectName = "byoc_integration_test"
 
 	services, err := b.GetServices(context.Background())
@@ -89,7 +89,7 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestPutSecret")
+	b := NewByocClient(ctx, client.GrpcClient{TenantID: "TestPutSecret"})
 	b.ProjectName = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestListSecrets")
+	b := NewByocClient(ctx, client.GrpcClient{TenantID: "TestListSecrets"})
 	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 
 	t.Run("list", func(t *testing.T) {
