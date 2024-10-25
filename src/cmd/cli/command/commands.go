@@ -45,6 +45,7 @@ var (
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	verbose        = false
 )
 
 func prettyError(err error) error {
@@ -138,7 +139,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
-	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
@@ -814,7 +815,7 @@ var deleteCmd = &cobra.Command{
 			Etag:    etag,
 			Since:   since,
 			Raw:     false,
-			Verbose: cli.DoVerbose,
+			Verbose: verbose,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},
@@ -956,7 +957,7 @@ var cdPreviewCmd = &cobra.Command{
 		}
 		return cli.Tail(cmd.Context(), client, cli.TailOptions{
 			Etag:    resp.Etag,
-			Verbose: cli.DoVerbose,
+			Verbose: verbose,
 		})
 	},
 }
