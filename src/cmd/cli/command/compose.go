@@ -131,9 +131,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 			tailParams := cli.TailOptions{
-				Etag:  deploy.Etag,
-				Since: since,
-				Raw:   false,
+				Etag:    deploy.Etag,
+				Since:   since,
+				Raw:     false,
+				Verbose: cli.DoVerbose,
 			}
 
 			// blocking call to tail
@@ -292,6 +293,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Since:              since,
 				Raw:                false,
 				EndEventDetectFunc: endLogDetectFunc,
+				Verbose:            cli.DoVerbose,
 			}
 
 			err = cli.Tail(cmd.Context(), client, tailParams)
@@ -394,6 +396,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
+				Verbose:  true,
 			}
 
 			return cli.Tail(cmd.Context(), client, tailOptions)

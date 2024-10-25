@@ -811,9 +811,10 @@ var deleteCmd = &cobra.Command{
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Etag:  etag,
-			Since: since,
-			Raw:   false,
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
+			Verbose: cli.DoVerbose,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},
@@ -953,7 +954,10 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), client, cli.TailOptions{Etag: resp.Etag})
+		return cli.Tail(cmd.Context(), client, cli.TailOptions{
+			Etag:    resp.Etag,
+			Verbose: cli.DoVerbose,
+		})
 	},
 }
 

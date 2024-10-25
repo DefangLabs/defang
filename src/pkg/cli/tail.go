@@ -70,6 +70,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
+	Verbose            bool
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -218,7 +219,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			defer cancelSpinner()
 		}
 
-		if !DoVerbose {
+		if !params.Verbose {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
@@ -238,8 +239,8 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 						case 10, 13: // Enter or Return
 							fmt.Println(" ") // empty line, but overwrite the spinner
 						case 'v', 'V':
-							verbose := !DoVerbose
-							DoVerbose = verbose
+							verbose := !params.Verbose
+							params.Verbose = verbose
 							modeStr := "OFF"
 							if verbose {
 								modeStr = "ON"
