@@ -25,12 +25,9 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	proj "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
-
-const DEFANG_PORTAL_HOST = "portal.defang.dev"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -614,7 +611,7 @@ var newCmd = &cobra.Command{
 	RunE:    generateCmd.RunE,
 }
 
-func collectUnsetEnvVars(project *proj.Project) []string {
+func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	var envVars []string
 	if project != nil {
 		for _, service := range project.Services {

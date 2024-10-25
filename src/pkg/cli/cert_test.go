@@ -14,10 +14,6 @@ import (
 	"time"
 )
 
-type dnsRequest struct {
-	Type   string
-	Domain string
-}
 type tryResult struct {
 	result *http.Response
 	err    error

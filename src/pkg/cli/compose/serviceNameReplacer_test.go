@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type serviceNameReplacerMockClient struct {
@@ -16,31 +16,31 @@ func (m serviceNameReplacerMockClient) ServiceDNS(name string) string {
 }
 
 func setup() ServiceNameReplacer {
-	services := compose.Services{}
-	services["host-serviceA"] = compose.ServiceConfig{
+	services := composeTypes.Services{}
+	services["host-serviceA"] = composeTypes.ServiceConfig{
 		Name: "host-serviceA",
-		Ports: []compose.ServicePortConfig{
+		Ports: []composeTypes.ServicePortConfig{
 			{Mode: "host"},
 		},
 	}
 
-	services["host-serviceB"] = compose.ServiceConfig{
+	services["host-serviceB"] = composeTypes.ServiceConfig{
 		Name: "host-serviceB",
-		Ports: []compose.ServicePortConfig{
+		Ports: []composeTypes.ServicePortConfig{
 			{Mode: "host"},
 		},
 	}
 
-	services["ingress-serviceC"] = compose.ServiceConfig{
+	services["ingress-serviceC"] = composeTypes.ServiceConfig{
 		Name: "ingress-serviceC",
-		Ports: []compose.ServicePortConfig{
+		Ports: []composeTypes.ServicePortConfig{
 			{Mode: "ingress"},
 		},
 	}
 
-	services["ingress-serviceD"] = compose.ServiceConfig{
+	services["ingress-serviceD"] = composeTypes.ServiceConfig{
 		Name: "ingress-serviceD",
-		Ports: []compose.ServicePortConfig{
+		Ports: []composeTypes.ServicePortConfig{
 			{Mode: "ingress"},
 		},
 	}

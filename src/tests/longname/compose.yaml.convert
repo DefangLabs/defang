@@ -1,9 +1,0 @@
-[
-  {
-    "name": "averylongservicenamethatisdefinitelytoolongthatwillcauseanerror",
-    "image": "alpine",
-    "platform": 2,
-    "internal": true,
-    "networks": 1
-  }
-]

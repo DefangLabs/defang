@@ -1,15 +1,14 @@
 package compose
 
 import (
-	"context"
-	"encoding/json"
-	"slices"
+	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestConvertPort(t *testing.T) {
@@ -139,6 +138,7 @@ func TestConvertPort(t *testing.T) {
 			if tt.wantErr != "" {
 				t.Errorf("convertPort() expected error: %v", tt.wantErr)
 			}
+			fixupPort(&tt.input)
 			got := convertPort(tt.input)
 			if got.String() != tt.expected.String() {
 				t.Errorf("convertPort() got %v, want %v", got, tt.expected.String())
@@ -147,29 +147,67 @@ func TestConvertPort(t *testing.T) {
 	}
 }
 
-func TestConvert(t *testing.T) {
-	testRunCompose(t, func(t *testing.T, path string) {
-		loader := NewLoaderWithPath(path)
-		proj, err := loader.LoadProject(context.Background())
-		if err != nil {
-			t.Fatal(err)
-		}
-		services, err := ConvertServices(context.Background(), client.MockClient{}, proj.Services, UploadModeIgnore)
-		if err != nil {
-			t.Fatal(err)
-		}
+// TODO: remove this (and change the test cases to avoid using the protobuf)
+func convertPort(port composeTypes.ServicePortConfig) *defangv1.Port {
+	pbPort := &defangv1.Port{
+		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
+		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`
+		// Published string `yaml:",omitempty" json:"published,omitempty"`
+		// Protocol  string `yaml:",omitempty" json:"protocol,omitempty"`
+		Target: port.Target,
+	}
 
-		// The order of the services is not guaranteed, so we sort the services before comparing
-		slices.SortFunc(services, func(i, j *defangv1.Service) int { return strings.Compare(i.Name, j.Name) })
+	// TODO: Use AppProtocol as hint for application protocol
+	// https://github.com/compose-spec/compose-spec/blob/main/05-services.md#long-syntax-3
+	switch port.Protocol {
+	case "":
+		pbPort.Protocol = defangv1.Protocol_ANY // defaults to HTTP in CD
+	case "tcp":
+		pbPort.Protocol = defangv1.Protocol_TCP
+	case "udp":
+		pbPort.Protocol = defangv1.Protocol_UDP
+	case "http": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_HTTP
+	case "http2": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_HTTP2
+	case "grpc": // TODO: not per spec; should use AppProtocol
+		pbPort.Protocol = defangv1.Protocol_GRPC
+	default:
+		panic(fmt.Sprintf("port 'protocol' should have been validated to be one of [tcp udp http http2 grpc] but got: %q", port.Protocol))
+	}
 
-		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
-		actual, err := json.MarshalIndent(services, "", "  ")
-		if err != nil {
-			t.Fatal(err)
-		}
+	switch port.AppProtocol {
+	case "http":
+		pbPort.Protocol = defangv1.Protocol_HTTP
+	case "http2":
+		pbPort.Protocol = defangv1.Protocol_HTTP2
+	case "grpc":
+		pbPort.Protocol = defangv1.Protocol_GRPC
+	}
 
-		if err := compare(actual, path+".convert"); err != nil {
-			t.Error(err)
+	switch port.Mode {
+	case "":
+		// TODO: This never happens now as compose-go set default to "ingress"
+		term.Warnf("No port 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)")
+		fallthrough
+	case "ingress":
+		// This code is unnecessarily complex because compose-go silently converts short port: syntax to ingress+tcp
+		if port.Protocol != "udp" {
+			if port.Published != "" {
+				term.Warnf("Published ports are ignored in ingress mode")
+			}
+			pbPort.Mode = defangv1.Mode_INGRESS
+			if pbPort.Protocol == defangv1.Protocol_TCP {
+				pbPort.Protocol = defangv1.Protocol_HTTP
+			}
+			break
 		}
-	})
+		term.Warnf("UDP ports default to 'host' mode (add 'mode: host' to silence)")
+		fallthrough
+	case "host":
+		pbPort.Mode = defangv1.Mode_HOST
+	default:
+		panic(fmt.Sprintf("port mode should have been validated to be one of [host ingress] but got: %q", port.Mode))
+	}
+	return pbPort
 }

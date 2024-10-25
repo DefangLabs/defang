@@ -1,0 +1,11 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "busybox",
+    "networks": {
+      "default": null
+    },
+    "platform": "LINUX/X86_64"
+  }
+]
