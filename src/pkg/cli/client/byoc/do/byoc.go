@@ -281,8 +281,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// Unsupported in DO
-	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
+	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -628,9 +627,9 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
 
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
+		Project: b.ProjectName,
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	//hasIngress := false
@@ -705,9 +704,9 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 		Service: &defangv1.Service{
-			Name:        service.Name,
-			Image:       service.Image.Digest,
-			Environment: getServiceEnv(service.Envs),
+			Name: service.Name,
+			// Image:       service.Image.Digest,
+			// Environment: getServiceEnv(service.Envs),
 		},
 	}
 
@@ -858,5 +857,4 @@ func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 		io.WriteString(buf, line)
 	}
 	term.Println(buf.String())
-
 }

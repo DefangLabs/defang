@@ -7,7 +7,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -29,7 +28,7 @@ func NewServiceNameReplacer(client client.Client, services compose.Services) Ser
 	var serviceNames []string
 	var nonReplaceServiceNames []string
 	for _, svccfg := range services {
-		if network(&svccfg) == defangv1.Network_PRIVATE && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))

@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -34,6 +35,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	"github.com/compose-spec/compose-go/v2/loader"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -176,12 +179,19 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Content: req.Compose}}})
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
-	if len(req.Services) > b.Quota.Services {
+	if len(project.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
 	}
+
 	serviceInfos := []*defangv1.ServiceInfo{}
-	for _, service := range req.Services {
+	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
@@ -245,7 +255,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname)
 		}
 	}
 
@@ -624,35 +634,38 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	if err := b.Quota.Validate(service); err != nil {
+func (b *ByocAws) update(ctx context.Context, service compose.ServiceConfig) (*defangv1.ServiceInfo, error) {
+	if err := b.Quota.Validate(&service); err != nil {
 		return nil, err
 	}
 
-	// Check to make sure all required secrets are present in the secrets store
-	missing, err := b.checkForMissingSecrets(ctx, service.Secrets)
+	// Check to make sure all required configs are present in the configs store
+	var configs []string
+	for config, value := range service.Environment {
+		if value == nil {
+			configs = append(configs, config)
+		}
+	}
+	err := b.checkForMissingSecrets(ctx, configs)
 	if err != nil {
 		return nil, err
-	}
-	if missing != nil {
-		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
 	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,  // was: tenant
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project: b.ProjectName,  // was: tenant
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if service.StaticFiles == nil {
+	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
 		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
-			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
+			hasIngress = hasIngress || port.Mode == quota.Mode_INGRESS
+			hasHost = hasHost || port.Mode == quota.Mode_HOST
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
 		}
 	} else {
 		si.PublicFqdn = b.getPublicFqdn(fqn)
@@ -666,14 +679,15 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
-	if service.Domainname != "" {
-		if !hasIngress && service.StaticFiles == nil {
+	if service.DomainName != "" {
+		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
 		}
-		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
-		cname, _ := net.LookupCNAME(service.Domainname)
+		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
+		cname, _ := net.LookupCNAME(service.DomainName)
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			zoneId, err := b.findZone(ctx, service.Domainname, service.DnsRole)
+			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
 			if err != nil {
 				return nil, err
 			}
@@ -689,7 +703,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if si.Service.Build != nil {
+	if service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
@@ -697,22 +711,22 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
+func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []string) error {
 	if len(secrets) == 0 {
-		return nil, nil // no secrets to check
+		return nil // no secrets to check
 	}
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, secret := range secrets {
-		fqn := b.getSecretID(secret.Source)
+		fqn := b.getSecretID(secret)
 		if !searchSecret(sorted, fqn) {
-			return secret, nil // secret not found
+			return fmt.Errorf("missing config %q", secret)
 		}
 	}
-	return nil, nil // all secrets found
+	return nil // all secrets found
 }
 
 // This function was copied from Fabric controller
@@ -726,8 +740,8 @@ func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
-	if port.Mode == defangv1.Mode_HOST {
+func (b *ByocAws) getEndpoint(fqn qualifiedName, port *compose.ServicePortConfig) string {
+	if port.Mode == quota.Mode_HOST {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}

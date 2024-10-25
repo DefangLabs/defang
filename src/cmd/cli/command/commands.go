@@ -29,9 +29,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const DEFANG_PORTAL_HOST = "portal.defang.dev"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
-
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 

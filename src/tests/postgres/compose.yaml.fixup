@@ -1,0 +1,26 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    }
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null
+    }
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    }
+  }
+]

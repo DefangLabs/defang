@@ -163,7 +163,7 @@ message DeployRequest {
       [ deprecated = true ];                // deprecated; use compose
   string project = 2 [ deprecated = true ]; // deprecated; use compose.name
   DeploymentMode mode = 3;
-  string compose = 4; // yaml (or json)
+  bytes compose = 4; // yaml (or json)
 }
 
 message DeployResponse {
@@ -352,8 +352,8 @@ message ListServicesResponse {
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string project = 3; // should we use compose.name?
-  string compose = 4;
+  string project = 3 [deprecated = true]; // deprecated; use compose.name
+  bytes compose = 4;
   string cd_version = 5;
 }
 
