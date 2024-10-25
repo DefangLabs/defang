@@ -40,7 +40,16 @@ func TestValidationAndConvert(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := ValidateProject(mockClient, project); err != nil {
+		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+			configs, err := mockClient.ListConfig(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			return configs.Names, nil
+		}
+
+		if err := ValidateProject(project, listConfigNamesFunc); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
