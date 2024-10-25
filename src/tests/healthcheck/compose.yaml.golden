@@ -61,6 +61,9 @@ services:
       test:
         - NONE
         - ignored
+      timeout: 1s
+      interval: 1m0s
+      retries: 3
     image: alpine
     networks:
       default: null

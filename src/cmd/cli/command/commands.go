@@ -25,12 +25,9 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	proj "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
-
-const DEFANG_PORTAL_HOST = "portal.defang.dev"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -45,6 +42,7 @@ var (
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
 	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	verbose        = false
 )
 
 func prettyError(err error) error {
@@ -138,7 +136,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
-	RootCmd.PersistentFlags().BoolVarP(&cli.DoVerbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
+	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
@@ -613,7 +611,7 @@ var newCmd = &cobra.Command{
 	RunE:    generateCmd.RunE,
 }
 
-func collectUnsetEnvVars(project *proj.Project) []string {
+func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	var envVars []string
 	if project != nil {
 		for _, service := range project.Services {
@@ -811,9 +809,10 @@ var deleteCmd = &cobra.Command{
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Etag:  etag,
-			Since: since,
-			Raw:   false,
+			Etag:    etag,
+			Since:   since,
+			Raw:     false,
+			Verbose: verbose,
 		}
 		return cli.Tail(cmd.Context(), client, tailParams)
 	},
@@ -953,7 +952,10 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), client, cli.TailOptions{Etag: resp.Etag})
+		return cli.Tail(cmd.Context(), client, cli.TailOptions{
+			Etag:    resp.Etag,
+			Verbose: verbose,
+		})
 	},
 }
 

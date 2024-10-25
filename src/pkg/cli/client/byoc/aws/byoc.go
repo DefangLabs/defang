@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -34,6 +35,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	"github.com/compose-spec/compose-go/v2/loader"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -176,12 +179,19 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: req.Compose}}})
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
-	if len(req.Services) > b.Quota.Services {
+	if len(project.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
 	}
+
 	serviceInfos := []*defangv1.ServiceInfo{}
-	for _, service := range req.Services {
+	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
@@ -245,7 +255,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname)
 		}
 	}
 
@@ -297,46 +307,63 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	var zoneId *string
-	if zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client); err != nil {
+	// There's four cases to consider:
+	//  1. The subdomain zone does not exist: we get NS records from the delegation set and let CD/Pulumi create the hosted zone
+	//  2. The subdomain zone exists:
+	//    a. The zone was created by the older CLI: we need to get the NS records from the existing zone
+	//    b. The zone was created by the new CD/Pulumi: we get the NS records from the delegation set and let CD/Pulumi create the hosted zone
+	//    c. The zone was created another way: the deployment will likely fail with a "zone already exists" error
+
+	var nsServers []string
+	zone, err := aws.GetHostedZoneByName(ctx, b.ProjectDomain, r53Client)
+	if err != nil {
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+		// Case 1: The zone doesn't exist: we'll create a delegation set and let CD/Pulumi create the hosted zone
 	} else {
-		zoneId = zone.Id
-	}
-
-	// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
-	delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
-	var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
-	var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
-	if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
-		term.Debug("Route53 delegation set already created:", err)
-		delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
-	}
-	if err != nil {
-		return "", byoc.AnnotateAwsError(err)
-	}
-	term.Debug("Route53 delegation set ID:", *delegationSet.Id)
-	b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
-	nsServers := delegationSet.NameServers
-	if len(nsServers) == 0 {
-		return "", errors.New("no NS records found for the subdomain zone")
-	}
-
-	if zoneId != nil {
-		// Get the NS records for the subdomain zone and call DelegateSubdomainZone again
-		nsServers2, err := aws.ListResourceRecords(ctx, *zoneId, b.ProjectDomain, r53types.RRTypeNs, r53Client)
+		// Case 2: Get the NS records for the existing subdomain zone
+		nsServers, err = aws.ListResourceRecords(ctx, *zone.Id, b.ProjectDomain, r53types.RRTypeNs, r53Client)
 		if err != nil {
 			return "", byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+	}
+
+	if zone == nil || zone.Config.Comment == nil || *zone.Config.Comment != aws.CreateHostedZoneComment {
+		// Case 2b or 2c: The zone does not exist, or was not created by an older version of this CLI.
+		// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
+		var zoneId *string
+		if zone != nil {
+			zoneId = zone.Id
+		}
+		delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
+		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
+		var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
+		if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
+			term.Debug("Route53 delegation set already created:", err)
+			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
+		}
+		if err != nil {
+			return "", byoc.AnnotateAwsError(err)
+		}
+		if len(delegationSet.NameServers) == 0 {
+			return "", errors.New("no NS records found for the delegation set") // should not happen
+		}
+		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
+		b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
+
 		// Ensure the NS records match the ones from the delegation set
 		sort.Strings(nsServers)
-		sort.Strings(nsServers2)
-		if !slices.Equal(nsServers, nsServers2) {
-			b.Track("Compose-Up ListResourceRecords Diff", client.Property{"fromDS", nsServers}, client.Property{"fromZone", nsServers2})
-			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", nsServers, nsServers2)
+		sort.Strings(delegationSet.NameServers)
+		if !slices.Equal(delegationSet.NameServers, nsServers) {
+			b.Track("Compose-Up delegateSubdomain diff", client.Property{"fromDS", delegationSet.NameServers}, client.Property{"fromZone", nsServers})
+			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
 		}
+
+		nsServers = delegationSet.NameServers
+	} else {
+		// Case 2a: The zone was created by the older CLI, we'll use the existing NS records; track how many times this happens
+		b.Track("Compose-Up delegateSubdomain old", client.Property{"domain", b.ProjectDomain})
 	}
 
 	req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
@@ -607,35 +634,38 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	if err := b.Quota.Validate(service); err != nil {
+func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
+	if err := b.Quota.Validate(&service); err != nil {
 		return nil, err
 	}
 
-	// Check to make sure all required secrets are present in the secrets store
-	missing, err := b.checkForMissingSecrets(ctx, service.Secrets)
+	// Check to make sure all required configs are present in the configs store
+	var configs []string
+	for config, value := range service.Environment {
+		if value == nil {
+			configs = append(configs, config)
+		}
+	}
+	err := b.checkForMissingSecrets(ctx, configs)
 	if err != nil {
 		return nil, err
-	}
-	if missing != nil {
-		return nil, fmt.Errorf("missing config %q", missing) // retryable CodeFailedPrecondition
 	}
 
 	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,  // was: tenant
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project: b.ProjectName,  // was: tenant
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if service.StaticFiles == nil {
+	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
 		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
-			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
+			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
+			hasHost = hasHost || port.Mode == compose.Mode_HOST
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
 		}
 	} else {
 		si.PublicFqdn = b.getPublicFqdn(fqn)
@@ -649,14 +679,15 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
-	if service.Domainname != "" {
-		if !hasIngress && service.StaticFiles == nil {
+	if service.DomainName != "" {
+		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
 		}
-		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
-		cname, _ := net.LookupCNAME(service.Domainname)
+		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
+		cname, _ := net.LookupCNAME(service.DomainName)
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			zoneId, err := b.findZone(ctx, service.Domainname, service.DnsRole)
+			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
 			if err != nil {
 				return nil, err
 			}
@@ -672,7 +703,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if si.Service.Build != nil {
+	if service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
@@ -680,22 +711,22 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []*defangv1.Secret) (*defangv1.Secret, error) {
+func (b *ByocAws) checkForMissingSecrets(ctx context.Context, secrets []string) error {
 	if len(secrets) == 0 {
-		return nil, nil // no secrets to check
+		return nil // no secrets to check
 	}
 	prefix := b.getSecretID("")
 	sorted, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, secret := range secrets {
-		fqn := b.getSecretID(secret.Source)
+		fqn := b.getSecretID(secret)
 		if !searchSecret(sorted, fqn) {
-			return secret, nil // secret not found
+			return fmt.Errorf("missing config %q", secret)
 		}
 	}
-	return nil, nil // all secrets found
+	return nil // all secrets found
 }
 
 // This function was copied from Fabric controller
@@ -709,8 +740,8 @@ func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
-	if port.Mode == defangv1.Mode_HOST {
+func (b *ByocAws) getEndpoint(fqn qualifiedName, port *composeTypes.ServicePortConfig) string {
+	if port.Mode == compose.Mode_HOST {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}

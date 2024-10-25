@@ -19,19 +19,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func isManagedService(service *defangv1.Service) bool {
-	if service == nil {
+func isManagedService(service compose.ServiceConfig) bool {
+	if service.Extensions == nil {
 		return false
 	}
 
-	return service.StaticFiles != nil || service.Redis != nil || service.Postgres != nil
+	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func GetUnreferencedManagedResources(serviceInfos []*defangv1.ServiceInfo) []string {
+func getUnreferencedManagedResources(serviceInfos compose.Services) []string {
 	managedResources := make([]string, 0)
 	for _, service := range serviceInfos {
-		if isManagedService(service.Service) {
-			managedResources = append(managedResources, service.Service.Name)
+		if isManagedService(service) {
+			managedResources = append(managedResources, service.Name)
 		}
 	}
 
@@ -83,7 +83,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = GetUnreferencedManagedResources(deploy.Services)
+			var managedResources = getUnreferencedManagedResources(project.Services)
 			if len(managedResources) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
 			}
@@ -131,9 +131,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 			tailParams := cli.TailOptions{
-				Etag:  deploy.Etag,
-				Since: since,
-				Raw:   false,
+				Etag:    deploy.Etag,
+				Since:   since,
+				Raw:     false,
+				Verbose: verbose,
 			}
 
 			// blocking call to tail
@@ -292,6 +293,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Since:              since,
 				Raw:                false,
 				EndEventDetectFunc: endLogDetectFunc,
+				Verbose:            verbose,
 			}
 
 			err = cli.Tail(cmd.Context(), client, tailParams)
@@ -394,6 +396,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
+				Verbose:  true, // always verbose for explicit tail command
 			}
 
 			return cli.Tail(cmd.Context(), client, tailOptions)

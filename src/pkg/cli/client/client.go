@@ -5,7 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type ServerStream[Res any] interface {
@@ -17,7 +17,7 @@ type ServerStream[Res any] interface {
 
 type ProjectLoader interface {
 	LoadProjectName(context.Context) (string, error)
-	LoadProject(context.Context) (*compose.Project, error)
+	LoadProject(context.Context) (*composeTypes.Project, error)
 }
 
 type FabricClient interface {
@@ -58,7 +58,7 @@ type Client interface {
 	TearDown(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 
-	LoadProject(context.Context) (*compose.Project, error)
+	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
 	SetProjectName(string)
 }
