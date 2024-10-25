@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -25,8 +26,8 @@ func (q ServiceQuotas) Validate(service *types.ServiceConfig) error {
 		if service.Build.Context == "" {
 			return errors.New("build.context is required") // CodeInvalidArgument
 		}
-		if float32(service.Build.ShmSize)/MiB > q.ShmSizeMiB || service.Build.ShmSize < 0 {
-			return fmt.Errorf("build.shm_size exceeds quota (max %v MiB)", q.ShmSizeMiB) // CodeInvalidArgument
+		if shmSizeMiB := float32(service.Build.ShmSize) / compose.MiB; shmSizeMiB > q.ShmSizeMiB || service.Build.ShmSize < 0 {
+			return fmt.Errorf("build.shm_size %v MiB exceeds quota %v MiB", shmSizeMiB, q.ShmSizeMiB) // CodeInvalidArgument
 		}
 	} else {
 		if service.Image == "" {
@@ -41,9 +42,9 @@ func (q ServiceQuotas) Validate(service *types.ServiceConfig) error {
 		if port.Target < 1 || port.Target > 32767 {
 			return fmt.Errorf("port %d is out of range", port.Target) // CodeInvalidArgument
 		}
-		if port.Mode == Mode_INGRESS {
+		if port.Mode == compose.Mode_INGRESS {
 			hasIngress = true
-			if port.Protocol == Protocol_TCP || port.Protocol == Protocol_UDP {
+			if port.Protocol == compose.Protocol_TCP || port.Protocol == compose.Protocol_UDP {
 				return fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
 			}
 		}
@@ -93,8 +94,8 @@ func (q ServiceQuotas) Validate(service *types.ServiceConfig) error {
 			if float32(service.Deploy.Resources.Reservations.NanoCPUs) > q.Cpus || service.Deploy.Resources.Reservations.NanoCPUs < 0 {
 				return fmt.Errorf("cpus exceeds quota (max %v vCPU)", q.Cpus) // CodeInvalidArgument
 			}
-			if float32(service.Deploy.Resources.Reservations.MemoryBytes/MiB) > q.MemoryMiB || service.Deploy.Resources.Reservations.MemoryBytes < 0 {
-				return fmt.Errorf("memory exceeds quota (max %v MiB)", q.MemoryMiB) // CodeInvalidArgument
+			if memoryMiB := float32(service.Deploy.Resources.Reservations.MemoryBytes) / compose.MiB; memoryMiB > q.MemoryMiB || service.Deploy.Resources.Reservations.MemoryBytes < 0 {
+				return fmt.Errorf("memory %v MiB exceeds quota %v MiB", memoryMiB, q.MemoryMiB) // CodeInvalidArgument
 			}
 			for _, device := range service.Deploy.Resources.Reservations.Devices {
 				if len(device.Capabilities) != 1 || device.Capabilities[0] != "gpu" {
@@ -104,7 +105,7 @@ func (q ServiceQuotas) Validate(service *types.ServiceConfig) error {
 					return errors.New("only nvidia GPU devices are supported") // CodeInvalidArgument
 				}
 				if q.Gpus == 0 || uint32(device.Count) > q.Gpus {
-					return fmt.Errorf("gpu count exceeds quota (max %d)", q.Gpus) // CodeInvalidArgument
+					return fmt.Errorf("gpu count %v exceeds quota %d", device.Count, q.Gpus) // CodeInvalidArgument
 				}
 			}
 		}

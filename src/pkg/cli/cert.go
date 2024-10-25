@@ -14,8 +14,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cert"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -94,7 +94,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 			cnt++
 			targets := []string{serviceInfo.PublicFqdn}
 			for i, endpoint := range serviceInfo.Endpoints {
-				if service.Ports[i].Mode == quota.Mode_INGRESS {
+				if service.Ports[i].Mode == compose.Mode_INGRESS {
 					targets = append(targets, endpoint)
 				}
 			}

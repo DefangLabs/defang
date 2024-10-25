@@ -13,7 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 const (
@@ -70,7 +70,7 @@ type ByocBaseClient struct {
 	ShouldDelegateSubdomain bool
 	TenantID                string
 
-	project         *compose.Project
+	project         *composeTypes.Project
 	bootstrapLister BootstrapLister
 }
 
@@ -117,7 +117,7 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
-func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (b *ByocBaseClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	if b.project != nil {
 		return b.project, nil
 	}

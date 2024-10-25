@@ -14,16 +14,16 @@ import (
 	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-type Project = compose.Project
+type Project = composeTypes.Project
 
-type ServiceConfig = compose.ServiceConfig
+type ServiceConfig = composeTypes.ServiceConfig
 
-type Services = compose.Services
+type Services = composeTypes.Services
 
 type LoaderOptions struct {
 	ConfigPaths []string

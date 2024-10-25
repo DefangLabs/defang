@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestFixup(t *testing.T) {
@@ -23,13 +23,13 @@ func TestFixup(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		var services []compose.ServiceConfig
+		var services []composeTypes.ServiceConfig
 		for _, svc := range proj.Services {
 			services = append(services, svc)
 		}
 
 		// The order of the services is not guaranteed, so we sort the services before comparing
-		slices.SortFunc(services, func(i, j compose.ServiceConfig) int { return strings.Compare(i.Name, j.Name) })
+		slices.SortFunc(services, func(i, j composeTypes.ServiceConfig) int { return strings.Compare(i.Name, j.Name) })
 
 		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
 		actual, err := json.MarshalIndent(services, "", "  ")

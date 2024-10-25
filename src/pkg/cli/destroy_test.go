@@ -10,7 +10,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -62,8 +62,8 @@ type FakeLoader struct {
 	ProjectName string
 }
 
-func (f FakeLoader) LoadProject(ctx context.Context) (*compose.Project, error) {
-	return &compose.Project{Name: f.ProjectName}, nil
+func (f FakeLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+	return &composeTypes.Project{Name: f.ProjectName}, nil
 }
 
 func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {

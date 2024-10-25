@@ -7,7 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type FixupTarget string
@@ -23,12 +23,12 @@ type ServiceNameReplacer struct {
 	serviceNameRegex           *regexp.Regexp
 }
 
-func NewServiceNameReplacer(client client.Client, services compose.Services) ServiceNameReplacer {
+func NewServiceNameReplacer(client client.Client, services composeTypes.Services) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
 	for _, svccfg := range services {
-		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, func(p compose.ServicePortConfig) bool {
+		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, func(p composeTypes.ServicePortConfig) bool {
 			return p.Mode == "host" // only private services with host ports get DNS names
 		}) {
 			serviceNames = append(serviceNames, regexp.QuoteMeta(svccfg.Name))

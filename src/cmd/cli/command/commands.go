@@ -25,7 +25,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
-	proj "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
@@ -610,7 +610,7 @@ var newCmd = &cobra.Command{
 	RunE:    generateCmd.RunE,
 }
 
-func collectUnsetEnvVars(project *proj.Project) []string {
+func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	var envVars []string
 	if project != nil {
 		for _, service := range project.Services {

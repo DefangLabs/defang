@@ -3,62 +3,63 @@ package quota
 import (
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/aws/smithy-go/ptr"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		name    string
-		service *compose.ServiceConfig
+		service *types.ServiceConfig
 		wantErr string
 	}{
 		{
 			name:    "empty service",
-			service: &compose.ServiceConfig{},
+			service: &types.ServiceConfig{},
 			wantErr: "service name is required",
 		},
 		{
 			name:    "no image, no build",
-			service: &compose.ServiceConfig{Name: "test"},
+			service: &types.ServiceConfig{Name: "test"},
 			wantErr: "missing image or build",
 		},
 		{
 			name:    "empty build",
-			service: &compose.ServiceConfig{Name: "test", Build: &compose.BuildConfig{}},
+			service: &types.ServiceConfig{Name: "test", Build: &types.BuildConfig{}},
 			wantErr: "build.context is required",
 		},
 		{
 			name:    "shm size exceeds quota",
-			service: &compose.ServiceConfig{Name: "test", Build: &compose.BuildConfig{Context: ".", ShmSize: 30721 * MiB}},
-			wantErr: "build.shm_size exceeds quota (max 30720 MiB)",
+			service: &types.ServiceConfig{Name: "test", Build: &types.BuildConfig{Context: ".", ShmSize: 30721 * compose.MiB}},
+			wantErr: "build.shm_size 30721 MiB exceeds quota 30720 MiB",
 		},
 		{
 			name:    "port 0 out of range",
-			service: &compose.ServiceConfig{Name: "test", Image: "asdf", Ports: []compose.ServicePortConfig{{Target: 0}}},
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 0}}},
 			wantErr: "port 0 is out of range",
 		},
 		{
 			name:    "port out of range",
-			service: &compose.ServiceConfig{Name: "test", Image: "asdf", Ports: []compose.ServicePortConfig{{Target: 33333}}},
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 33333}}},
 			wantErr: "port 33333 is out of range",
 		},
 		{
 			name:    "ingress with UDP",
-			service: &compose.ServiceConfig{Name: "test", Image: "asdf", Ports: []compose.ServicePortConfig{{Target: 53, Mode: Mode_INGRESS, Protocol: Protocol_UDP}}},
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_UDP}}},
 			wantErr: "mode:INGRESS is not supported by protocol:udp",
 		},
 		{
 			name:    "ingress with UDP",
-			service: &compose.ServiceConfig{Name: "test", Image: "asdf", Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_TCP}}},
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_TCP}}},
 			wantErr: "mode:INGRESS is not supported by protocol:tcp",
 		},
 		{
 			name: "invalid healthcheck interval",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				HealthCheck: &compose.HealthCheckConfig{
+				HealthCheck: &types.HealthCheckConfig{
 					Test:     []string{"CMD-SHELL", "echo 1"},
 					Interval: duration(1),
 					Timeout:  duration(2),
@@ -68,11 +69,11 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "invalid CMD healthcheck",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "echo 1"},
 				},
 			},
@@ -80,11 +81,11 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "CMD without curl or wget",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "echo", "1"},
 				},
 			},
@@ -92,11 +93,11 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "CMD without HTTP URL",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "curl", "1"},
 				},
 			},
@@ -104,10 +105,10 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "NONE with arguments",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				HealthCheck: &compose.HealthCheckConfig{
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"NONE", "echo", "1"},
 				},
 			},
@@ -115,11 +116,11 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "CMD-SHELL with ingress",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD-SHELL", "echo 1"},
 				},
 			},
@@ -127,11 +128,11 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "NONE with ingress",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"NONE"},
 				},
 			},
@@ -139,10 +140,10 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "unsupported healthcheck test",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				HealthCheck: &compose.HealthCheckConfig{
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"BLAH"},
 				},
 			},
@@ -150,10 +151,10 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "too many replicas",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
+				Deploy: &types.DeployConfig{
 					Replicas: ptr.Int(100),
 				},
 			},
@@ -161,12 +162,12 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "too many CPUs",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
 							NanoCPUs: 100,
 						},
 					},
@@ -176,12 +177,12 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "negative cpus",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
 							NanoCPUs: -1,
 						},
 					},
@@ -191,43 +192,43 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "too much memory",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
-							MemoryBytes: MiB * 200000,
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							MemoryBytes: compose.MiB * 200000,
 						},
 					},
 				},
 			},
-			wantErr: "memory exceeds quota (max 65536 MiB)",
+			wantErr: "memory 200000 MiB exceeds quota 65536 MiB",
 		},
 		{
 			name: "negative memory",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
-							MemoryBytes: MiB * -1,
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							MemoryBytes: compose.MiB * -1,
 						},
 					},
 				},
 			},
-			wantErr: "memory exceeds quota (max 65536 MiB)",
+			wantErr: "memory -1 MiB exceeds quota 65536 MiB",
 		},
 		{
 			name: "only GPU",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
-							Devices: []compose.DeviceRequest{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							Devices: []types.DeviceRequest{
 								{Capabilities: []string{"tpu"}},
 							},
 						},
@@ -238,13 +239,13 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "only nvidia GPU",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
-							Devices: []compose.DeviceRequest{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							Devices: []types.DeviceRequest{
 								{Capabilities: []string{"gpu"}, Driver: "amd"},
 							},
 						},
@@ -255,36 +256,36 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "too many GPUs",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
-							Devices: []compose.DeviceRequest{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							Devices: []types.DeviceRequest{
 								{Capabilities: []string{"gpu"}, Driver: "nvidia", Count: 100},
 							},
 						},
 					},
 				},
 			},
-			wantErr: "gpu count exceeds quota (max 8)",
+			wantErr: "gpu count 100 exceeds quota 8",
 		},
 		{
 			name: "valid service",
-			service: &compose.ServiceConfig{
+			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []compose.ServicePortConfig{{Target: 80, Mode: Mode_INGRESS, Protocol: Protocol_HTTP}},
-				HealthCheck: &compose.HealthCheckConfig{
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "curl", "http://localhost"},
 				},
-				Deploy: &compose.DeployConfig{
-					Resources: compose.Resources{
-						Reservations: &compose.Resource{
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
 							NanoCPUs:    1,
-							MemoryBytes: MiB * 1024,
-							Devices: []compose.DeviceRequest{
+							MemoryBytes: compose.MiB * 1024,
+							Devices: []types.DeviceRequest{
 								{
 									Capabilities: []string{"gpu"},
 									Driver:       "nvidia",
@@ -321,6 +322,6 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func duration(d compose.Duration) *compose.Duration {
+func duration(d types.Duration) *types.Duration {
 	return &d
 }

@@ -13,22 +13,22 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
-	port80 := &compose.ServicePortConfig{Mode: quota.Mode_INGRESS, Target: 80}
-	port8080 := &compose.ServicePortConfig{Mode: quota.Mode_INGRESS, Target: 8080}
-	hostModePort := &compose.ServicePortConfig{Mode: quota.Mode_HOST, Target: 80}
+	port80 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 80}
+	port8080 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 8080}
+	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
 	tests := []struct {
 		ProjectName string
 		TenantID    types.TenantID
 		Fqn         string
-		Port        *compose.ServicePortConfig
+		Port        *composeTypes.ServicePortConfig
 		EndPoint    string
 		PublicFqdn  string
 		PrivateFqdn string
@@ -77,8 +77,8 @@ type FakeLoader struct {
 	ProjectName string
 }
 
-func (f FakeLoader) LoadProject(ctx context.Context) (*compose.Project, error) {
-	return &compose.Project{Name: f.ProjectName}, nil
+func (f FakeLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+	return &composeTypes.Project{Name: f.ProjectName}, nil
 }
 
 func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestConvertPort(t *testing.T) {
@@ -148,7 +148,7 @@ func TestConvertPort(t *testing.T) {
 }
 
 // TODO: remove this (and change the test cases to avoid using the protobuf)
-func convertPort(port compose.ServicePortConfig) *defangv1.Port {
+func convertPort(port composeTypes.ServicePortConfig) *defangv1.Port {
 	pbPort := &defangv1.Port{
 		// Mode      string `yaml:",omitempty" json:"mode,omitempty"`
 		// HostIP    string `mapstructure:"host_ip" yaml:"host_ip,omitempty" json:"host_ip,omitempty"`

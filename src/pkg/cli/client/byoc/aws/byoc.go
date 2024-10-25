@@ -19,11 +19,11 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -36,7 +36,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"github.com/compose-spec/compose-go/v2/loader"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -180,7 +180,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
-	project, err := loader.LoadWithContext(ctx, compose.ConfigDetails{ConfigFiles: []compose.ConfigFile{{Content: req.Compose}}})
+	project, err := loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: req.Compose}}})
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +634,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, service compose.ServiceConfig) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
 	if err := b.Quota.Validate(&service); err != nil {
 		return nil, err
 	}
@@ -663,8 +663,8 @@ func (b *ByocAws) update(ctx context.Context, service compose.ServiceConfig) (*d
 	fqn := service.Name
 	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
 		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == quota.Mode_INGRESS
-			hasHost = hasHost || port.Mode == quota.Mode_HOST
+			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
+			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
 		}
 	} else {
@@ -740,8 +740,8 @@ func searchSecret(sorted []qualifiedName, fqn qualifiedName) bool {
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, port *compose.ServicePortConfig) string {
-	if port.Mode == quota.Mode_HOST {
+func (b *ByocAws) getEndpoint(fqn qualifiedName, port *composeTypes.ServicePortConfig) string {
+	if port.Mode == compose.Mode_HOST {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}

@@ -7,13 +7,13 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 // HACK: Use magic network name "public" to determine if the service is public
 const NetworkPublic = "public"
 
-func FixupServices(ctx context.Context, c client.Client, serviceConfigs compose.Services, upload UploadMode) error {
+func FixupServices(ctx context.Context, c client.Client, serviceConfigs composeTypes.Services, upload UploadMode) error {
 
 	svcNameReplacer := NewServiceNameReplacer(c, serviceConfigs)
 
