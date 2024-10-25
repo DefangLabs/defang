@@ -183,7 +183,7 @@ jobs:
         with:
           endpoint: https://wus2.codesigning.azure.net/ # from Azure portal
           trusted-signing-account-name: DefangLabs # from Azure portal
-          certificate-profile-name: signed-binary${{ startsWith(github.ref, 'refs/tags/v') && '' || '-test' }} # from Azure portal
+          certificate-profile-name: signed-binary${{ !startsWith(github.ref, 'refs/tags/v') && '-test' || '' }} # from Azure portal
           files-folder: ${{ github.workspace }}\src\dist
           files-folder-filter: exe # no dll
           files-folder-recurse: true
