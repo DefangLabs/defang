@@ -77,7 +77,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 
 		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
-		if err := validateProjectConfig(ctx, mockClient, &testProject); err != nil {
+		if err := ValidateProjectConfig(ctx, mockClient, &testProject); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -94,7 +94,7 @@ func TestValidateConfig(t *testing.T) {
 		ctx := context.Background()
 		mockClient := validationMockClient{}
 		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
-		if err := validateProjectConfig(ctx, mockClient, &testProject); !errors.As(err, &missing) {
+		if err := ValidateProjectConfig(ctx, mockClient, &testProject); !errors.As(err, &missing) {
 			t.Fatalf("uexpected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 3 {
@@ -117,7 +117,7 @@ func TestValidateConfig(t *testing.T) {
 			CONFIG_VAR: nil,
 		}
 		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
-		if err := validateProjectConfig(ctx, mockClient, &testProject); err != nil {
+		if err := ValidateProjectConfig(ctx, mockClient, &testProject); err != nil {
 			t.Fatal(err)
 		}
 	})

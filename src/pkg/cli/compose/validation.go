@@ -38,7 +38,7 @@ func ValidateProject(client client.Client, project *compose.Project) error {
 		return services[i].Name < services[j].Name
 	})
 
-	if err := validateProjectConfig(context.Background(), client, project); err != nil {
+	if err := ValidateProjectConfig(context.Background(), client, project); err != nil {
 		return err
 	}
 
@@ -365,7 +365,7 @@ func validatePort(port compose.ServicePortConfig) error {
 	return nil
 }
 
-func validateProjectConfig(ctx context.Context, client client.Client, composeProject *compose.Project) error {
+func ValidateProjectConfig(ctx context.Context, client client.Client, composeProject *compose.Project) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
