@@ -243,8 +243,8 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 							if verbose {
 								modeStr = "ON"
 							}
-							if toggleCount++; toggleCount == 4 && !verbose {
-								modeStr += ". I like the way you work it, no verbosity, you gotta bag it, bag it up."
+							if toggleCount++; toggleCount == 2 && !verbose {
+								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
 							go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount})
