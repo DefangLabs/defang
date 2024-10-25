@@ -432,6 +432,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   cleanup-nightly:
+    runs-on: ubuntu-latest
     needs: nighly-release
     steps:
       - name: "Clean up nightly releases"
