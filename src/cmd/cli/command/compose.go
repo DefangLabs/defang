@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -369,6 +370,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
+			var logTypeFlagValue, _ = cmd.Flags().GetString("type")
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -389,11 +391,18 @@ func makeComposeLogsCmd() *cobra.Command {
 			if len(name) > 0 {
 				services = strings.Split(name, ",")
 			}
+
+			logType, err := logs.ParseLogType(logTypeFlagValue)
+			if err != nil {
+				return fmt.Errorf("unable to parse log type: %w", err)
+			}
+
 			tailOptions := cli.TailOptions{
 				Services: services,
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
+				LogType:  logType,
 			}
 
 			return cli.Tail(cmd.Context(), client, tailOptions)
@@ -404,6 +413,10 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	logsCmd.Flags().String("type", "", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
+	logsCmd.Flags().MarkHidden("type")
+	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
+	logsCmd.Flags().MarkHidden("pattern")
 	return logsCmd
 }
 

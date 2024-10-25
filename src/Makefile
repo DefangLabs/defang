@@ -9,6 +9,8 @@ GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
 $(BINARY_NAME): test
 	go build -o $@ $(GOFLAGS) ./cmd/cli
 
+.PHONY: protos
+protos: $(PROTOS)
 $(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
 	cd protos && buf lint
 	buf generate protos

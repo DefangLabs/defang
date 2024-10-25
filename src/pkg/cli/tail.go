@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -70,6 +71,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
+	LogType            logs.LogType
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -193,7 +195,13 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+
+	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{
+		Services: params.Services,
+		Etag:     params.Etag,
+		Since:    since,
+		LogType:  uint32(params.LogType),
+	})
 	if err != nil {
 		return err
 	}

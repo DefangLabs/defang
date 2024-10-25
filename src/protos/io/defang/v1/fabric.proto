@@ -325,6 +325,8 @@ message TailRequest {
   repeated string services = 1;
   google.protobuf.Timestamp since = 2;
   string etag = 3;
+  uint32 log_type = 4;
+  string pattern = 5;
 }
 
 message LogEntry {
