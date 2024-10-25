@@ -31,7 +31,6 @@ const (
 
 var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
-	DoVerbose     = false
 )
 
 type ServiceStatus string
@@ -70,6 +69,7 @@ type TailOptions struct {
 	Since              time.Time
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc
+	Verbose            bool
 }
 
 type P = client.Property // shorthand for tracking properties
@@ -121,21 +121,19 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 }
 
 type CancelError struct {
-	Services []string
-	Etag     string
-	Last     time.Time
+	TailOptions
 	error
 }
 
 func (cerr *CancelError) Error() string {
-	cmd := "tail --since " + cerr.Last.UTC().Format(time.RFC3339Nano)
+	cmd := "tail --since " + cerr.Since.UTC().Format(time.RFC3339Nano)
 	if len(cerr.Services) > 0 {
 		cmd += " --name " + strings.Join(cerr.Services, ",")
 	}
 	if cerr.Etag != "" {
 		cmd += " --etag " + cerr.Etag
 	}
-	if DoVerbose {
+	if cerr.Verbose {
 		cmd += " --verbose"
 	}
 	return cmd
@@ -218,15 +216,16 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 			defer cancelSpinner()
 		}
 
-		if !DoVerbose {
+		if !params.Verbose {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-				term.Info("Press V to toggle verbose mode")
+				term.Info("Showing only build logs and runtime errors. Press V to toggle verbose mode.")
 				input := term.NewNonBlockingStdin()
 				defer input.Close() // abort the read loop
 				go func() {
+					toggleCount := 0
 					var b [1]byte
 					for {
 						if _, err := input.Read(b[:]); err != nil {
@@ -238,14 +237,17 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 						case 10, 13: // Enter or Return
 							fmt.Println(" ") // empty line, but overwrite the spinner
 						case 'v', 'V':
-							verbose := !DoVerbose
-							DoVerbose = verbose
+							verbose := !params.Verbose
+							params.Verbose = verbose
 							modeStr := "OFF"
 							if verbose {
 								modeStr = "ON"
 							}
+							if toggleCount++; toggleCount == 2 && !verbose {
+								modeStr += ". I like the way you work it, no verbosity."
+							}
 							term.Info("Verbose mode", modeStr)
-							go client.Track("Verbose Toggled", P{"verbose", verbose})
+							go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount})
 						}
 					}
 				}()
@@ -257,7 +259,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{Services: params.Services, Etag: params.Etag, Last: params.Since, error: serverStream.Err()}
+				return &CancelError{TailOptions: params, error: serverStream.Err()}
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
@@ -295,7 +297,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 
 			// HACK: skip noisy CI/CD logs (except errors)
 			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
-			onlyErrors := !DoVerbose && isInternal
+			onlyErrors := !params.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
 					cancel() // TODO: stuck on defer Close() if we don't do this
@@ -349,7 +351,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
-					if DoVerbose {
+					if params.Verbose {
 						l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
 						prefixLen += l
 					}
