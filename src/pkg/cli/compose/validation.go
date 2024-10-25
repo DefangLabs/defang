@@ -17,6 +17,10 @@ import (
 	compose "github.com/compose-spec/compose-go/v2/types"
 )
 
+type ListConfigNamesGetter interface {
+	ListConfigNames(context.Context) ([]string, error)
+}
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
 type ErrMissingConfig []string
@@ -38,7 +42,12 @@ func ValidateProject(client client.Client, project *compose.Project) error {
 		return services[i].Name < services[j].Name
 	})
 
-	if err := ValidateProjectConfig(context.Background(), client, project); err != nil {
+	listConfigNamesGetter, ok := client.(ListConfigNamesGetter)
+	if !ok {
+		return fmt.Errorf("client does not implement ListConfigNamesGetter")
+	}
+
+	if err := ValidateProjectConfig(context.Background(), listConfigNamesGetter, project); err != nil {
 		return err
 	}
 
@@ -365,7 +374,7 @@ func validatePort(port compose.ServicePortConfig) error {
 	return nil
 }
 
-func ValidateProjectConfig(ctx context.Context, client client.Client, composeProject *compose.Project) error {
+func ValidateProjectConfig(ctx context.Context, listConfigNamesGetter ListConfigNamesGetter, composeProject *compose.Project) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
@@ -380,7 +389,7 @@ func ValidateProjectConfig(ctx context.Context, client client.Client, composePro
 		return nil // no secrets to check
 	}
 
-	configs, err := client.ListConfig(ctx)
+	configs, err := listConfigNamesGetter.ListConfigNames(ctx)
 	if err != nil {
 		return err
 	}
@@ -390,7 +399,7 @@ func ValidateProjectConfig(ctx context.Context, client client.Client, composePro
 
 	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
-		if !slices.Contains(configs.Names, name) {
+		if !slices.Contains(configs, name) {
 			errMissingConfig = append(errMissingConfig, name)
 		}
 	}

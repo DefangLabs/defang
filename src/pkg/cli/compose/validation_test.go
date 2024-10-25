@@ -128,6 +128,14 @@ type validationMockClient struct {
 	configs []string
 }
 
+func (m validationMockClient) ListConfigNames(ctx context.Context) ([]string, error) {
+	configs, err := m.ListConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return configs.Names, nil
+}
+
 func (m validationMockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,

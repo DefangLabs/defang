@@ -354,6 +354,16 @@ func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 	return &resp, err
 }
 
+func (b *ByocDo) ListConfigNames(ctx context.Context) ([]string, error) {
+	var configs *defangv1.Secrets
+	var err error
+	if configs, err = b.ListConfig(ctx); err != nil {
+		return nil, err
+	}
+
+	return configs.Names, nil
+}
+
 func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	app, err := b.getAppByName(ctx, b.ProjectName)
 	if err != nil {

@@ -171,6 +171,16 @@ func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*de
 	return b.deploy(ctx, req, "preview")
 }
 
+func (b *ByocAws) ListConfigNames(ctx context.Context) ([]string, error) {
+	var configs *defangv1.Secrets
+	var err error
+	if configs, err = b.ListConfig(ctx); err != nil {
+		return nil, err
+	}
+
+	return configs.Names, nil
+}
+
 func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	if err := b.setUp(ctx); err != nil {
 		return nil, err

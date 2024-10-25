@@ -20,6 +20,15 @@ func (m MockClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURL
 	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }
 
+func (m MockClient) ListConfigNames(ctx context.Context) ([]string, error) {
+	configs, err := m.ListConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return configs.Names, nil
+}
+
 func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{Names: []string{"VAR1"}}, nil
 }
