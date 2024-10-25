@@ -44,8 +44,8 @@ func (q ServiceQuotas) Validate(service *types.ServiceConfig) error {
 		}
 		if port.Mode == compose.Mode_INGRESS {
 			hasIngress = true
-			if port.Protocol == compose.Protocol_TCP || port.Protocol == compose.Protocol_UDP {
-				return fmt.Errorf("mode:INGRESS is not supported by protocol:%s", port.Protocol) // CodeInvalidArgument
+			if port.Protocol == compose.Protocol_UDP {
+				return fmt.Errorf("`mode: ingress` is not supported by `protocol: %s`", port.Protocol) // CodeInvalidArgument
 			}
 		}
 		if uniquePorts[port.Target] {
