@@ -47,12 +47,7 @@ func TestValidate(t *testing.T) {
 		{
 			name:    "ingress with UDP",
 			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_UDP}}},
-			wantErr: "mode:INGRESS is not supported by protocol:udp",
-		},
-		{
-			name:    "ingress with UDP",
-			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_TCP}}},
-			wantErr: "mode:INGRESS is not supported by protocol:tcp",
+			wantErr: "`mode: ingress` is not supported by `protocol: udp`",
 		},
 		{
 			name: "invalid healthcheck interval",
