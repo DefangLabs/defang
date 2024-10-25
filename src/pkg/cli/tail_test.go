@@ -72,7 +72,6 @@ func TestTail(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	testTerm := term.NewTerm(&stdout, io.MultiWriter(&stderr))
 	testTerm.ForceColor(true)
-	DoVerbose = true // Output host
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
 	t.Cleanup(func() {
@@ -109,7 +108,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	Tail(ctx, c, TailOptions{})
+	Tail(ctx, c, TailOptions{Verbose: true}) // Output host
 
 	expectedLogs := []string{
 		"SOMEETAG service1 SOMEHOST e1msg1",
