@@ -196,6 +196,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
+		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 
@@ -505,7 +506,7 @@ func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	//optional
-	return nil, errors.ErrUnsupported
+	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
 func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
