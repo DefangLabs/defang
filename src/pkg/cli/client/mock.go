@@ -6,13 +6,13 @@ import (
 	"io"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type MockClient struct {
 	Client
 	UploadUrl    string
-	Project      *compose.Project
+	Project      *composeTypes.Project
 	ServerStream ServerStream[defangv1.TailResponse]
 }
 
@@ -28,7 +28,7 @@ func (m MockClient) ServiceDNS(service string) string {
 	return service
 }
 
-func (m MockClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (m MockClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	return m.Project, nil
 }
 
