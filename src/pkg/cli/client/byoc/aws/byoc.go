@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -34,6 +35,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
+	"github.com/compose-spec/compose-go/v2/loader"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -176,12 +179,19 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: req.Compose}}})
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
-	if len(req.Services) > b.Quota.Services {
+	if len(project.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
 	}
+
 	serviceInfos := []*defangv1.ServiceInfo{}
-	for _, service := range req.Services {
+	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
@@ -245,7 +255,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
-			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Service.Domainname)
+			term.Infof("To activate TLS certificate for %v, run 'defang cert gen'", si.Domainname)
 		}
 	}
 
@@ -624,26 +634,26 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-	if err := b.Quota.Validate(service); err != nil {
+func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
+	if err := b.Quota.Validate(&service); err != nil {
 		return nil, err
 	}
 
 	ensure(b.ProjectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,  // was: tenant
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project: b.ProjectName,  // was: tenant
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if service.StaticFiles == nil {
+	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
 		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == defangv1.Mode_INGRESS
-			hasHost = hasHost || port.Mode == defangv1.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, port))
+			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
+			hasHost = hasHost || port.Mode == compose.Mode_HOST
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
 		}
 	} else {
 		si.PublicFqdn = b.getPublicFqdn(fqn)
@@ -657,14 +667,15 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 		si.PrivateFqdn = b.getPrivateFqdn(fqn)
 	}
 
-	if service.Domainname != "" {
-		if !hasIngress && service.StaticFiles == nil {
+	if service.DomainName != "" {
+		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
 			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
 		}
-		// Do a DNS lookup for Domainname and confirm it's indeed a CNAME to the service's public FQDN
-		cname, _ := net.LookupCNAME(service.Domainname)
+		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
+		cname, _ := net.LookupCNAME(service.DomainName)
 		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
-			zoneId, err := b.findZone(ctx, service.Domainname, service.DnsRole)
+			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
 			if err != nil {
 				return nil, err
 			}
@@ -680,7 +691,7 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if si.Service.Build != nil {
+	if service.Build != nil {
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
@@ -690,8 +701,8 @@ func (b *ByocAws) update(ctx context.Context, service *defangv1.Service) (*defan
 type qualifiedName = string // legacy
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, port *defangv1.Port) string {
-	if port.Mode == defangv1.Mode_HOST {
+func (b *ByocAws) getEndpoint(fqn qualifiedName, port *composeTypes.ServicePortConfig) string {
+	if port.Mode == compose.Mode_HOST {
 		privateFqdn := b.getPrivateFqdn(fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}

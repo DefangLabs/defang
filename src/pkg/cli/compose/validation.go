@@ -15,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
@@ -233,7 +234,7 @@ func ValidateProject(client client.Client, project *compose.Project) error {
 				term.Debugf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 			}
 		}
-		var reservations *compose.Resource
+		var reservations *composeTypes.Resource
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy mode: %q", svccfg.Name, svccfg.Deploy.Mode)
@@ -314,7 +315,7 @@ func ValidateProject(client client.Client, project *compose.Project) error {
 	return nil
 }
 
-func validatePorts(ports []compose.ServicePortConfig) error {
+func validatePorts(ports []composeTypes.ServicePortConfig) error {
 	for _, port := range ports {
 		err := validatePort(port)
 		if err != nil {
@@ -328,7 +329,7 @@ func validatePorts(ports []compose.ServicePortConfig) error {
 var validProtocols = map[string]bool{"": true, "tcp": true, "udp": true, "http": true, "http2": true, "grpc": true}
 var validModes = map[string]bool{"": true, "host": true, "ingress": true}
 
-func validatePort(port compose.ServicePortConfig) error {
+func validatePort(port composeTypes.ServicePortConfig) error {
 	if port.Target < 1 || port.Target > 32767 {
 		return fmt.Errorf("port %d: 'target' must be an integer between 1 and 32767", port.Target)
 	}

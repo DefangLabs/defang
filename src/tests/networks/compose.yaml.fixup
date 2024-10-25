@@ -1,0 +1,34 @@
+[
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "invalid-network-name": {}
+    }
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "public": {}
+    }
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "public": null
+    }
+  },
+  {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "private": null
+    }
+  }
+]

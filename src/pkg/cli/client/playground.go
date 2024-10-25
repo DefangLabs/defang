@@ -8,17 +8,17 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type PlaygroundClient struct {
 	GrpcClient
-	project     *compose.Project
+	project     *composeTypes.Project
 	projectName string
 }
 
-func (g PlaygroundClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (g PlaygroundClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	if g.project != nil {
 		return g.project, nil
 	}
