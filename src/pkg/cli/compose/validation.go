@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/types"
 	compose "github.com/compose-spec/compose-go/v2/types"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type ListConfigNamesFunc func(context.Context) ([]string, error)
@@ -28,7 +27,7 @@ func (e ErrMissingConfig) Error() string {
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+func ValidateProject(project *compose.Project, listConfigNamesFunc ListConfigNamesFunc) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
