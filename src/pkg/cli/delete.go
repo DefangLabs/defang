@@ -9,14 +9,14 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Delete(ctx context.Context, client client.Client, names ...string) (types.ETag, error) {
+func Delete(ctx context.Context, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debug("Deleting service", names)
 
 	if DoDryRun {
 		return "", ErrDryRun
 	}
 
-	resp, err := client.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names})
 	if err != nil {
 		return "", err
 	}

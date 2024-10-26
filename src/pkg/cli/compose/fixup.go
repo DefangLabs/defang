@@ -13,12 +13,12 @@ import (
 // HACK: Use magic network name "public" to determine if the service is public
 const NetworkPublic = "public"
 
-func FixupServices(ctx context.Context, c client.Client, serviceConfigs composeTypes.Services, upload UploadMode) error {
+func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs composeTypes.Services, upload UploadMode) error {
 
-	svcNameReplacer := NewServiceNameReplacer(c, serviceConfigs)
+	svcNameReplacer := NewServiceNameReplacer(provider, serviceConfigs)
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := c.ListConfig(ctx)
+	config, err := provider.ListConfig(ctx)
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
 		config = &defangv1.Secrets{}
@@ -36,7 +36,7 @@ func FixupServices(ctx context.Context, c client.Client, serviceConfigs composeT
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, c, svccfg.Name, svccfg.Build, upload)
+			url, err := getRemoteBuildContext(ctx, provider, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return err
 			}

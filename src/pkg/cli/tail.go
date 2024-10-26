@@ -143,8 +143,8 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, client client.Client, params TailOptions) error {
-	projectName, err := client.LoadProjectName(ctx)
+func Tail(ctx context.Context, provider client.Provider, params TailOptions) error {
+	projectName, err := provider.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		for _, service := range params.Services {
 			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := client.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
 					term.Warn("Service does not exist (yet):", service)
@@ -171,7 +171,7 @@ func Tail(ctx context.Context, client client.Client, params TailOptions) error {
 		return ErrDryRun
 	}
 
-	return tail(ctx, client, params)
+	return tail(ctx, provider, params)
 }
 
 func isTransientError(err error) bool {
@@ -184,14 +184,14 @@ func isTransientError(err error) bool {
 
 }
 
-func tail(ctx context.Context, client client.Client, params TailOptions) error {
+func tail(ctx context.Context, provider client.Provider, params TailOptions) error {
 	var since *timestamppb.Timestamp
 	if params.Since.Year() <= 1970 {
 		params.Since = time.Now() // this is used to continue from the last timestamp
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
-							go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount})
+							// go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount}) // FIXME: Do we need to pass client around to track?
 						}
 					}
 				}()
@@ -270,7 +270,7 @@ func tail(ctx context.Context, client client.Client, params TailOptions) error {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = client.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err

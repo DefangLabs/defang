@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func Whoami(ctx context.Context, client cliClient.Client) (string, error) {
-	resp, err := client.WhoAmI(ctx)
+func Whoami(ctx context.Context, provider client.Provider) (string, error) {
+	resp, err := provider.WhoAmI(ctx)
 	if err != nil {
 		return "", err
 	}

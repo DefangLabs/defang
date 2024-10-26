@@ -18,12 +18,12 @@ const (
 )
 
 type ServiceNameReplacer struct {
-	client                     client.Client
+	provider                   client.Provider
 	nonReplaceServiceNameRegex *regexp.Regexp
 	serviceNameRegex           *regexp.Regexp
 }
 
-func NewServiceNameReplacer(client client.Client, services composeTypes.Services) ServiceNameReplacer {
+func NewServiceNameReplacer(provider client.Provider, services composeTypes.Services) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var serviceNames []string
 	var nonReplaceServiceNames []string
@@ -47,7 +47,7 @@ func NewServiceNameReplacer(client client.Client, services composeTypes.Services
 	}
 
 	return ServiceNameReplacer{
-		client:                     client,
+		provider:                   provider,
 		nonReplaceServiceNameRegex: nonReplaceServiceNameRegex,
 		serviceNameRegex:           serviceNameRegex,
 	}
@@ -58,7 +58,7 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	if s.serviceNameRegex != nil && s.nonReplaceServiceNameRegex != nil {
 		// Replace service names with their actual DNS names; TODO: support public names too
 		val = s.serviceNameRegex.ReplaceAllStringFunc(value, func(serviceName string) string {
-			return s.client.ServiceDNS(NormalizeServiceName(serviceName))
+			return s.provider.ServiceDNS(NormalizeServiceName(serviceName))
 		})
 
 		if val != value {

@@ -24,7 +24,7 @@ func Track(name string, props ...P) {
 		return
 	}
 	trackWG.Add(1)
-	go func(client cliClient.FabricClient) {
+	go func(client cliClient.Client) {
 		if client == nil {
 			client = cli.Connect(cluster, nil)
 		}

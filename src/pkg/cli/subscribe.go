@@ -19,7 +19,7 @@ func (e ErrDeploymentFailed) Error() string {
 	return fmt.Sprintf("deployment failed for service %q", e.Service)
 }
 
-func WaitServiceState(ctx context.Context, client client.Client, targetState defangv1.ServiceState, etag string, services []string) error {
+func WaitServiceState(ctx context.Context, provider client.Provider, targetState defangv1.ServiceState, etag string, services []string) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
 	if DoDryRun {
@@ -28,7 +28,7 @@ func WaitServiceState(ctx context.Context, client client.Client, targetState def
 
 	// Assume "services" are normalized service names
 	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
-	serverStream, err := client.Subscribe(ctx, &subscribeRequest)
+	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func WaitServiceState(ctx context.Context, client client.Client, targetState def
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = client.Subscribe(ctx, &subscribeRequest)
+				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
 					return err
 				}

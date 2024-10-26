@@ -67,7 +67,7 @@ func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
 	return client.NewGrpcClient(host, accessToken, tenantId, loader)
 }
 
-func NewClient(ctx context.Context, cluster string, provider client.Provider, loader client.ProjectLoader) client.Client {
+func NewClient(ctx context.Context, cluster string, providerID client.ProviderID, loader client.ProjectLoader) (client.Client, client.Provider) {
 	grpcClient := Connect(cluster, loader)
 
 	// Determine the current tenant ID
@@ -81,21 +81,21 @@ func NewClient(ctx context.Context, cluster string, provider client.Provider, lo
 		tenantId = types.TenantID(resp.Tenant)
 	}
 
-	switch provider {
+	switch providerID {
 	case client.ProviderAWS:
 		term.Info("Using AWS provider")
-		byocClient := aws.NewByocClient(ctx, grpcClient, tenantId)
-		return byocClient
+		awsProvider := aws.NewByocProvider(ctx, grpcClient, tenantId)
+		return grpcClient, awsProvider
 	case client.ProviderDO:
 		term.Info("Using DigitalOcean provider")
-		byocClient, err := do.NewByocClient(ctx, grpcClient, tenantId)
+		byocProvider, err := do.NewByocProvider(ctx, grpcClient, tenantId)
 		if err != nil {
 			term.Fatal(err)
 		}
-		return byocClient
+		return grpcClient, byocProvider
 	default:
 		term.Info("Using Defang Playground; consider using BYOC (https://s.defang.io/byoc)")
-		return &client.PlaygroundClient{GrpcClient: grpcClient}
+		return grpcClient, &client.PlaygroundClient{GrpcClient: grpcClient}
 	}
 }
 

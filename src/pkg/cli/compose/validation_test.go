@@ -35,7 +35,7 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		mockClient := MockClient{
+		mockClient := MockProvider{
 			configs: []string{"CONFIG1", "CONFIG2"},
 		}
 		if err := FixupServices(context.Background(), mockClient, proj.Services, UploadModeIgnore); err != nil {
@@ -55,18 +55,18 @@ func TestValidationAndConvert(t *testing.T) {
 	})
 }
 
-type MockClient struct {
-	client.Client
+type MockProvider struct {
+	client.Provider
 	configs []string
 }
 
-func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m MockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,
 		Project: "mock-project",
 	}, nil
 }
 
-func (m MockClient) ServiceDNS(name string) string {
+func (m MockProvider) ServiceDNS(name string) string {
 	return "mock-" + name
 }

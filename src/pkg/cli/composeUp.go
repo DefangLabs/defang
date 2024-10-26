@@ -20,8 +20,8 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
-	project, err := c.LoadProject(ctx)
+func ComposeUp(ctx context.Context, provider client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
+	project, err := provider.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
 	}
@@ -30,7 +30,7 @@ func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, 
 		return nil, project, &ComposeError{err}
 	}
 
-	if err := compose.FixupServices(ctx, c, project.Services, upload); err != nil {
+	if err := compose.FixupServices(ctx, provider, project.Services, upload); err != nil {
 		return nil, project, err
 	}
 
@@ -47,9 +47,9 @@ func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, 
 	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes}
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
-		resp, err = c.Preview(ctx, deployRequest)
+		resp, err = provider.Preview(ctx, deployRequest)
 	} else {
-		resp, err = c.Deploy(ctx, deployRequest)
+		resp, err = provider.Deploy(ctx, deployRequest)
 	}
 	if err != nil {
 		return nil, project, err
