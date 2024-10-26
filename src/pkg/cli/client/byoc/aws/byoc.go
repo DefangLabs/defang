@@ -213,6 +213,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
+		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 	if err != nil {

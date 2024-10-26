@@ -29,6 +29,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/loader"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -162,11 +164,17 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: req.Compose}}})
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
 
-	for _, service := range req.Services {
+	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, service)
 		if err != nil {
 			return nil, err
@@ -188,6 +196,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
+		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 
@@ -497,7 +506,7 @@ func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	//optional
-	return nil, errors.ErrUnsupported
+	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
 func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
@@ -624,16 +633,19 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	}
 }
 
-func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-
+func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(),
 		Project: b.ProjectName,
 		Service: &defangv1.Service{Name: service.Name},
 	}
 
-	//hasIngress := false
-	//fqn := service.Name
+	si.Status = "UPDATE_QUEUED"
+	si.State = defangv1.ServiceState_UPDATE_QUEUED
+	if service.Build != nil {
+		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+		si.State = defangv1.ServiceState_BUILD_QUEUED
+	}
 	return si, nil
 }
 
