@@ -2,4 +2,4 @@ services:
   service1:
     image: alpine
     environment:
-      - VAR1=service1 # this is the config returned by the mock client
+      - VAR1=service1test # this is the config returned by the mock client
