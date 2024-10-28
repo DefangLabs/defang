@@ -16,6 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
@@ -166,27 +167,7 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
-					// FIXME: THis should nolonger be working
-					if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
-						failedServices := []string{errDeploymentFailed.Service}
-						Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", context.Cause(tailCtx)})
-						var aiDebug bool
-						if err := survey.AskOne(&survey.Confirm{
-							Message: "Would you like to debug the deployment with AI?",
-							Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
-						}, &aiDebug); err != nil {
-							term.Debugf("failed to ask for AI debug: %v", err)
-							Track("Debug Prompt Failed", P{"etag", deploy.Etag}, P{"reason", err})
-						} else if aiDebug {
-							Track("Debug Prompt Accepted", P{"etag", deploy.Etag})
-							// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-							if err := cli.Debug(cmd.Context(), client, deploy.Etag, project, failedServices); err != nil {
-								term.Warnf("failed to debug deployment: %v", err)
-							}
-						} else {
-							Track("Debug Prompt Skipped", P{"etag", deploy.Etag})
-						}
-					}
+					interactiveAIDebug(cmd.Context(), errDeploymentFailed, deploy, project)
 					return err
 				}
 			}
@@ -215,6 +196,30 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
+	// FIXME: Type Casting client is no longer a viable solution to determine the type of provider
+	if _, isPlayground := client.(*cliClient.PlaygroundClient); !nonInteractive && isPlayground {
+		failedServices := []string{errDeploymentFailed.Service}
+		Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", errDeploymentFailed})
+		var aiDebug bool
+		if err := survey.AskOne(&survey.Confirm{
+			Message: "Would you like to debug the deployment with AI?",
+			Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
+		}, &aiDebug); err != nil {
+			term.Debugf("failed to ask for AI debug: %v", err)
+			Track("Debug Prompt Failed", P{"etag", deploy.Etag}, P{"reason", err})
+		} else if aiDebug {
+			Track("Debug Prompt Accepted", P{"etag", deploy.Etag})
+			// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+			if err := cli.Debug(ctx, client, deploy.Etag, project, failedServices); err != nil {
+				term.Warnf("failed to debug deployment: %v", err)
+			}
+		} else {
+			Track("Debug Prompt Skipped", P{"etag", deploy.Etag})
+		}
+	}
 }
 
 func makeComposeStartCmd() *cobra.Command {

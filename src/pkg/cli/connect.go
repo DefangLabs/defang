@@ -67,7 +67,7 @@ func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
 	return client.NewGrpcClient(host, accessToken, tenantId, loader)
 }
 
-func NewClient(ctx context.Context, cluster string, providerID client.ProviderID, loader client.ProjectLoader) (client.Client, client.Provider) {
+func NewClient(ctx context.Context, cluster string, providerID client.ProviderID, loader client.ProjectLoader) (client.FabricClient, client.Provider) {
 	grpcClient := Connect(cluster, loader)
 
 	// Determine the current tenant ID

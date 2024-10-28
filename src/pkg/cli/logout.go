@@ -8,7 +8,7 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-func Logout(ctx context.Context, client client.Client) error {
+func Logout(ctx context.Context, client client.FabricClient) error {
 	term.Debug("Logging out")
 	err := client.RevokeToken(ctx)
 	// Ignore unauthenticated errors, since we're logging out anyway

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func SendMsg(ctx context.Context, client client.Client, subject, _type, id string, data []byte, contenttype string) error {
+func SendMsg(ctx context.Context, client client.FabricClient, subject, _type, id string, data []byte, contenttype string) error {
 	if subject == "" {
 		return errors.New("subject is required")
 	}

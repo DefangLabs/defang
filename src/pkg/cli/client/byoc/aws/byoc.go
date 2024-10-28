@@ -60,7 +60,7 @@ type ByocAws struct {
 	handlersLock     sync.RWMutex
 }
 
-var _ client.Client = (*ByocAws)(nil)
+var _ client.FabricClient = (*ByocAws)(nil)
 
 func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
@@ -213,7 +213,6 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
-		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 	if err != nil {

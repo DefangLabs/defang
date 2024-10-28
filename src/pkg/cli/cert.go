@@ -77,7 +77,7 @@ var (
 	httpRetryDelayBase = 5 * time.Second
 )
 
-func GenerateLetsEncryptCert(ctx context.Context, client client.Client, provider client.Provider) error {
+func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, provider client.Provider) error {
 	project, err := provider.LoadProject(ctx)
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client client.Client, provider
 	return nil
 }
 
-func generateCert(ctx context.Context, domain string, targets []string, client client.Client) {
+func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
 	term.Infof("Triggering TLS cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
@@ -190,7 +190,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.Client) error {
+func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.FabricClient) error {
 	for i, target := range targets {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}

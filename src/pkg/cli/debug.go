@@ -23,7 +23,7 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func Debug(ctx context.Context, c client.Client, etag string, project *types.Project, services []string) error {
+func Debug(ctx context.Context, c client.FabricClient, etag string, project *types.Project, services []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
 	files := findMatchingProjectFiles(project, services)

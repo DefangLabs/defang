@@ -19,7 +19,7 @@ type ProjectLoader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 }
 
-type Client interface {
+type FabricClient interface {
 	AgreeToS(context.Context) error
 	CheckLoginAndToS(context.Context) error
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)

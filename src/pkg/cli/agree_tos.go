@@ -12,7 +12,7 @@ import (
 
 var ErrTermsNotAgreed = errors.New("You must agree to the Defang terms of service to use this tool")
 
-func InteractiveAgreeToS(ctx context.Context, c client.Client) error {
+func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if client.TermsAccepted() {
 		// The user has already agreed to the terms of service recently
 		if err := nonInteractiveAgreeToS(ctx, c); err != nil {
@@ -39,7 +39,7 @@ func InteractiveAgreeToS(ctx context.Context, c client.Client) error {
 	return NonInteractiveAgreeToS(ctx, c)
 }
 
-func NonInteractiveAgreeToS(ctx context.Context, c client.Client) error {
+func NonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -52,7 +52,7 @@ func NonInteractiveAgreeToS(ctx context.Context, c client.Client) error {
 	return nonInteractiveAgreeToS(ctx, c)
 }
 
-func nonInteractiveAgreeToS(ctx context.Context, c client.Client) error {
+func nonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if err := c.AgreeToS(ctx); err != nil {
 		return err
 	}

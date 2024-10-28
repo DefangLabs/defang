@@ -34,7 +34,7 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 // GLOBALS
 var (
-	client         cliClient.Client
+	client         cliClient.FabricClient
 	provider       cliClient.Provider
 	cluster        string
 	colorMode      = ColorAuto
