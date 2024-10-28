@@ -8,7 +8,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
-func TestValidate(t *testing.T) {
+func TestValidateService(t *testing.T) {
 	tests := []struct {
 		name    string
 		service *types.ServiceConfig
@@ -28,11 +28,6 @@ func TestValidate(t *testing.T) {
 			name:    "empty build",
 			service: &types.ServiceConfig{Name: "test", Build: &types.BuildConfig{}},
 			wantErr: "build.context is required",
-		},
-		{
-			name:    "shm size exceeds quota",
-			service: &types.ServiceConfig{Name: "test", Build: &types.BuildConfig{Context: ".", ShmSize: 30721 * compose.MiB}},
-			wantErr: "build.shm_size 30721 MiB exceeds quota 30720 MiB",
 		},
 		{
 			name:    "port 0 out of range",
@@ -143,6 +138,68 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErr: "unsupported healthcheck: [BLAH]",
+		},
+		{
+			name: "valid service",
+			service: &types.ServiceConfig{
+				Name:  "test",
+				Image: "asdf",
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				HealthCheck: &types.HealthCheckConfig{
+					Test: []string{"CMD", "curl", "http://localhost"},
+				},
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							NanoCPUs:    1,
+							MemoryBytes: compose.MiB * 1024,
+							Devices: []types.DeviceRequest{
+								{
+									Capabilities: []string{"gpu"},
+									Driver:       "nvidia",
+									Count:        1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	byoc := Quotas{
+		ServiceQuotas: ServiceQuotas{
+			Cpus:       16,
+			Gpus:       8,
+			MemoryMiB:  65536,
+			Replicas:   16,
+			ShmSizeMiB: 30720,
+		},
+		Services: 40,
+		Ingress:  10,
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := byoc.ValidateService(tt.service); err != nil && err.Error() != tt.wantErr {
+				t.Errorf("Byoc.ValidateService() = %q, want %q", err, tt.wantErr)
+			} else if err == nil && tt.wantErr != "" {
+				t.Errorf("Byoc.ValidateService() = nil, want %q", tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateQuotas(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *types.ServiceConfig
+		wantErr string
+	}{
+		{
+			name:    "shm size exceeds quota",
+			service: &types.ServiceConfig{Name: "test", Build: &types.BuildConfig{Context: ".", ShmSize: 30721 * compose.MiB}},
+			wantErr: "build.shm_size 30721 MiB exceeds quota 30720 MiB",
 		},
 		{
 			name: "too many replicas",
@@ -308,10 +365,10 @@ func TestValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := byoc.Validate(tt.service); err != nil && err.Error() != tt.wantErr {
-				t.Errorf("Byoc.Validate() = %q, want %q", err, tt.wantErr)
+			if err := byoc.ValidateQuotas(tt.service); err != nil && err.Error() != tt.wantErr {
+				t.Errorf("Byoc.ValidateQuotas() = %q, want %q", err, tt.wantErr)
 			} else if err == nil && tt.wantErr != "" {
-				t.Errorf("Byoc.Validate() = nil, want %q", tt.wantErr)
+				t.Errorf("Byoc.ValidateQuotas() = nil, want %q", tt.wantErr)
 			}
 		})
 	}
