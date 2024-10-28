@@ -26,7 +26,16 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		return nil, project, err
 	}
 
-	if err := compose.ValidateProject(project); err != nil {
+	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+		configs, err := provider.ListConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return configs.Names, nil
+	}
+
+	if err := compose.ValidateProject(project, listConfigNamesFunc); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
