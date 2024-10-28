@@ -27,7 +27,7 @@ func (e ErrMissingConfig) Error() string {
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+func ValidateProject(project *composeTypes.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -39,10 +39,6 @@ func ValidateProject(project *composeTypes.Project, listConfigNamesFunc ListConf
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
-
-	if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
-		return err
-	}
 
 	for _, svccfg := range services {
 		normalized := NormalizeServiceName(svccfg.Name)
