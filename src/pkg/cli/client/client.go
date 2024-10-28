@@ -34,6 +34,7 @@ type FabricClient interface {
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error
+	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
 }
 
 type Property struct {

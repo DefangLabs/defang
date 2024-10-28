@@ -36,9 +36,9 @@ func TestWhoami(t *testing.T) {
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient := Connect(url, nil)
-	client := cliClient.PlaygroundClient{GrpcClient: grpcClient}
+	client := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
-	got, err := Whoami(ctx, &client)
+	got, err := Whoami(ctx, grpcClient, &client)
 	if err != nil {
 		t.Fatal(err)
 	}

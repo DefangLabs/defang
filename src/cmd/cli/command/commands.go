@@ -397,7 +397,7 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		str, err := cli.Whoami(cmd.Context(), provider)
+		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
 		}
@@ -968,8 +968,7 @@ var tosCmd = &cobra.Command{
 	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if we are correctly logged in
-		// FIXME: WhoAmI should be client.Whoami + provider.WhoAmI
-		if _, err := provider.WhoAmI(cmd.Context()); err != nil {
+		if _, err := client.WhoAmI(cmd.Context()); err != nil {
 			return err
 		}
 

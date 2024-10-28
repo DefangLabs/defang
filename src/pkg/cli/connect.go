@@ -95,7 +95,7 @@ func NewClient(ctx context.Context, cluster string, providerID client.ProviderID
 		return grpcClient, byocProvider
 	default:
 		term.Info("Using Defang Playground; consider using BYOC (https://s.defang.io/byoc)")
-		return grpcClient, &client.PlaygroundClient{GrpcClient: grpcClient}
+		return grpcClient, &client.PlaygroundProvider{GrpcClient: grpcClient}
 	}
 }
 

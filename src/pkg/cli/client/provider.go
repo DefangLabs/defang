@@ -71,9 +71,15 @@ type Provider interface {
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
-	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
+	AccountInfo(context.Context) (AccountInfo, error)
 
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
 	SetProjectName(string)
+}
+
+type AccountInfo interface {
+	AccountID() string
+	Region() string
+	Details() string
 }

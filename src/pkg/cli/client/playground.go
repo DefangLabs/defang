@@ -12,13 +12,13 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type PlaygroundClient struct {
+type PlaygroundProvider struct {
 	GrpcClient
 	project     *composeTypes.Project
 	projectName string
 }
 
-func (g PlaygroundClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+func (g PlaygroundProvider) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	if g.project != nil {
 		return g.project, nil
 	}
@@ -26,56 +26,56 @@ func (g PlaygroundClient) LoadProject(ctx context.Context) (*composeTypes.Projec
 	return g.Loader.LoadProject(ctx)
 }
 
-func (g PlaygroundClient) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (g PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (g PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g PlaygroundClient) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (g PlaygroundProvider) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+func (g PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
-func (g PlaygroundClient) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (g PlaygroundProvider) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
 	return getMsg(g.client.GetServices(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g PlaygroundClient) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+func (g PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
 	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
 	return err
 }
 
-func (g PlaygroundClient) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
+func (g PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	_, err := g.client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
 	return err
 }
 
-func (g PlaygroundClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (g PlaygroundProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
-func (g PlaygroundClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+func (g PlaygroundProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundClient) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
+func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
 	return g.client.Subscribe(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundClient) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundClient) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
+func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
-func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
+func (g *PlaygroundProvider) Destroy(ctx context.Context) (types.ETag, error) {
 	projectName, err := g.LoadProjectName(ctx)
 	if err != nil {
 		return "", err
@@ -100,19 +100,19 @@ func (g *PlaygroundClient) Destroy(ctx context.Context) (types.ETag, error) {
 	return resp.Etag, nil
 }
 
-func (g *PlaygroundClient) TearDown(ctx context.Context) error {
+func (g *PlaygroundProvider) TearDown(ctx context.Context) error {
 	return errors.New("the teardown command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundClient) BootstrapList(context.Context) ([]string, error) {
+func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g PlaygroundClient) ServiceDNS(name string) string {
+func (g PlaygroundProvider) ServiceDNS(name string) string {
 	return string(g.TenantID) + "-" + name
 }
 
-func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
+func (g PlaygroundProvider) LoadProjectName(ctx context.Context) (string, error) {
 	if g.projectName != "" {
 		return g.projectName, nil
 	}
@@ -135,6 +135,16 @@ func (g PlaygroundClient) LoadProjectName(ctx context.Context) (string, error) {
 	return resp.Project, nil
 }
 
-func (g *PlaygroundClient) SetProjectName(projectName string) {
+func (g *PlaygroundProvider) SetProjectName(projectName string) {
 	g.projectName = projectName
 }
+
+func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (AccountInfo, error) {
+	return PlaygroundAccountInfo{}, nil
+}
+
+type PlaygroundAccountInfo struct{}
+
+func (g PlaygroundAccountInfo) AccountID() string { return "" }
+func (g PlaygroundAccountInfo) Region() string    { return "" }
+func (g PlaygroundAccountInfo) Details() string   { return "" }
