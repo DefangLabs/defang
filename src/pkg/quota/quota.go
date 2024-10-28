@@ -7,11 +7,3 @@ type Quotas struct {
 	Ingress     int
 	Services    int
 }
-
-func getOrZero[T any](v *T) T {
-	if v == nil {
-		var zero T
-		return zero
-	}
-	return *v
-}
