@@ -12,7 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestValidationAndConvert(t *testing.T) {
@@ -74,8 +74,8 @@ func TestValidateConfig(t *testing.T) {
 	ctx := context.Background()
 	mockClient := validationMockClient{}
 
-	testProject := compose.Project{
-		Services: compose.Services{},
+	testProject := composeTypes.Project{
+		Services: composeTypes.Services{},
 	}
 
 	listConfigsNamesFunc := func(ctx context.Context) ([]string, error) {
@@ -91,7 +91,7 @@ func TestValidateConfig(t *testing.T) {
 			ENV_VAR: ptr.String("blah"),
 		}
 
-		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +107,7 @@ func TestValidateConfig(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); !errors.As(err, &missing) {
 			t.Fatalf("uexpected ErrMissingConfig, got: %v", err)
 		} else {
@@ -130,7 +130,7 @@ func TestValidateConfig(t *testing.T) {
 			ENV_VAR:    ptr.String("blah"),
 			CONFIG_VAR: nil,
 		}
-		testProject.Services["service1"] = compose.ServiceConfig{Environment: env}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); err != nil {
 			t.Fatal(err)
 		}
