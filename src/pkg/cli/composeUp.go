@@ -35,7 +35,11 @@ func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, 
 		return configs.Names, nil
 	}
 
-	if err := compose.ValidateProject(project, listConfigNamesFunc); err != nil {
+	if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+		return nil, project, &ComposeError{err}
+	}
+
+	if err := compose.ValidateProject(project); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 

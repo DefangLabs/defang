@@ -46,7 +46,12 @@ func TestValidationAndConvert(t *testing.T) {
 			return configs.Names, nil
 		}
 
-		if err := ValidateProject(project, listConfigNamesFunc); err != nil {
+		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
+			t.Logf("Project config validation failed: %v", err)
+			logs.WriteString(err.Error() + "\n")
+		}
+
+		if err := ValidateProject(project); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
