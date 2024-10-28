@@ -1,10 +1,12 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,9 +17,17 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
+type ListConfigNamesFunc func(context.Context) ([]string, error)
+
+type ErrMissingConfig []string
+
+func (e ErrMissingConfig) Error() string {
+	return fmt.Sprintf("missing configs %q", ([]string)(e))
+}
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project) error {
+func ValidateProject(project *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -29,6 +39,11 @@ func ValidateProject(project *composeTypes.Project) error {
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
+
+	if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
+		return err
+	}
+
 	for _, svccfg := range services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
@@ -347,6 +362,43 @@ func validatePort(port composeTypes.ServicePortConfig) error {
 				term.Warnf("port %d: 'published' should be equal to 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		}
+	}
+
+	return nil
+}
+
+func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+	var names []string
+	// make list of secrets
+	for _, service := range composeProject.Services {
+		for key, value := range service.Environment {
+			if value == nil {
+				names = append(names, key)
+			}
+		}
+	}
+
+	if len(names) == 0 {
+		return nil // no secrets to check
+	}
+
+	configs, err := listConfigNamesFunc(ctx)
+	if err != nil {
+		return err
+	}
+
+	slices.Sort(names)
+	names = slices.Compact(names)
+
+	errMissingConfig := ErrMissingConfig{}
+	for _, name := range names {
+		if !slices.Contains(configs, name) {
+			errMissingConfig = append(errMissingConfig, name)
+		}
+	}
+
+	if len(errMissingConfig) > 0 {
+		return errMissingConfig
 	}
 
 	return nil
