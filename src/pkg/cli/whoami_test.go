@@ -43,7 +43,8 @@ func TestWhoami(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := `You are logged into playground region us-test-2 with tenant "tenant-1"`
+	// Playground provider is hardcoded to return "us-west-2" as the region
+	want := `You are logged into playground region us-west-2 with tenant "tenant-1"`
 
 	if got != want {
 		t.Errorf("Whoami() = %v, want: %v", got, want)
