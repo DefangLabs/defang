@@ -631,7 +631,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		}()
 	}
 
-	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
+	return newByocServerStream(ctx, eventStream, etag, req.Services, b), nil
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
