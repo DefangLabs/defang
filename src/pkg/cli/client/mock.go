@@ -57,10 +57,7 @@ func (m *MockServerStream) Close() error {
 }
 
 func (m *MockServerStream) Receive() bool {
-	if len(m.Resps) == 0 {
-		return false
-	}
-	return true
+	return len(m.Resps) != 0
 }
 
 func (m *MockServerStream) Msg() *defangv1.TailResponse {
