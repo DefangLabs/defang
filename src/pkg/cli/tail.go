@@ -247,7 +247,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
-							// go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount}) // FIXME: Do we need to pass client around to track?
+							// go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount}) // FIXME: Restore tracking after track package refactoring
 						}
 					}
 				}()
