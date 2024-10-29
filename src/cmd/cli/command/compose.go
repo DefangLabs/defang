@@ -199,8 +199,7 @@ func makeComposeUpCmd() *cobra.Command {
 }
 
 func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
-	// FIXME: Type Casting client is no longer a viable solution to determine the type of provider
-	if _, isPlayground := client.(*cliClient.PlaygroundProvider); !nonInteractive && isPlayground {
+	if _, isPlayground := provider.(*cliClient.PlaygroundProvider); !nonInteractive && isPlayground {
 		failedServices := []string{errDeploymentFailed.Service}
 		Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", errDeploymentFailed})
 		var aiDebug bool
