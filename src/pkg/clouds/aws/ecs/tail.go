@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
-const AwsLogsStreamPrefix = ProjectName
+const AwsLogsStreamPrefix = CrunProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskId := GetTaskID(taskArn)
@@ -61,7 +61,7 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}
-	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetLogStreamForTaskID(taskID)}}
+	lgi := LogGroupInput{LogGroupARN: a.LogGroupARN, LogStreamNames: []string{GetCDLogStreamForTaskID(taskID)}}
 	for {
 		stream, err := TailLogGroup(ctx, lgi)
 		if err != nil {
@@ -85,8 +85,8 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 	}
 }
 
-func GetLogStreamForTaskID(taskID string) string {
-	return path.Join(AwsLogsStreamPrefix, ContainerName, taskID) // per "awslogs" driver
+func GetCDLogStreamForTaskID(taskID string) string {
+	return path.Join(AwsLogsStreamPrefix, CdContainerName, taskID) // per "awslogs" driver
 }
 
 func GetTaskID(taskArn TaskArn) string {

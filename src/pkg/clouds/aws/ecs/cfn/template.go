@@ -30,7 +30,7 @@ const (
 	maxCachePrefixLength = 20   // prefix must be 2-20 characters long; should be 30 https://github.com/hashicorp/terraform-provider-aws/pull/34716
 
 	CreatedByTagKey   = "CreatedBy"
-	CreatedByTagValue = awsecs.ProjectName
+	CreatedByTagValue = awsecs.CrunProjectName
 )
 
 var (
@@ -368,7 +368,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		}
 		name := container.Name
 		if name == "" {
-			name = awsecs.ContainerName // TODO: backwards compat; remove this
+			name = awsecs.CdContainerName // TODO: backwards compat; remove this
 		}
 
 		var dependsOn []ecs.TaskDefinition_ContainerDependency
