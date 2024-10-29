@@ -15,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -72,7 +73,7 @@ type TailOptions struct {
 	Verbose            bool
 }
 
-type P = client.Property // shorthand for tracking properties
+var P = track.P
 
 func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
 	return func(services []string, host string, eventLog string) bool {
@@ -247,7 +248,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
-							// go client.Track("Verbose Toggled", P{"verbose", verbose}, P{"toggleCount", toggleCount}) // FIXME: Restore tracking after track package refactoring
+							track.Evt("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
 						}
 					}
 				}()

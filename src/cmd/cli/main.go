@@ -9,13 +9,14 @@ import (
 
 	"github.com/DefangLabs/defang/src/cmd/cli/command"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			command.Track("Panic", command.P{"version", version}, command.P{"error", r}, command.P{"stack", string(skipLines(debug.Stack(), 6))})
-			command.FlushAllTracking()
+			track.Evt("Panic", track.P("version", version), track.P("error", r), track.P("stack", string(skipLines(debug.Stack(), 6))))
+			track.FlushAllTracking()
 			panic(r)
 		}
 	}()
@@ -29,13 +30,13 @@ func main() {
 		<-sigs
 		signal.Stop(sigs)
 		term.Debug("Received interrupt signal; canceling...")
-		command.Track("User Interrupted", command.P{"version", version})
+		track.Evt("User Interrupted", track.P("version", version))
 		cancel()
 	}()
 
 	command.SetupCommands(version)
 	err := command.Execute(ctx)
-	command.FlushAllTracking() // TODO: track errors/panics
+	track.FlushAllTracking() // TODO: track errors/panics
 
 	if err != nil {
 		// If the error is a command.ExitCode, use its value as the exit code
