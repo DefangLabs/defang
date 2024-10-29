@@ -6,17 +6,21 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
-type P = cliClient.Property // shorthand for tracking properties
+func P(name string, value interface{}) cliClient.Property {
+	return cliClient.Property{Name: name, Value: value}
+}
+
+var Fabric cliClient.FabricClient
 
 // trackWG is used to wait for all tracking to complete.
 var trackWG = sync.WaitGroup{}
-var client cliClient.FabricClient
 
 // Track sends a tracking event to the server in a separate goroutine.
 func NewEvent(name string, props ...cliClient.Property) {
@@ -24,10 +28,14 @@ func NewEvent(name string, props ...cliClient.Property) {
 		return
 	}
 	trackWG.Add(1)
-	go func(client cliClient.FabricClient) {
+	go func() {
 		defer trackWG.Done()
-		_ = client.Track(name, props...)
-	}(client)
+		if Fabric == nil {
+			term.Debugf("No FabricClient to track event: %v", name)
+			return
+		}
+		Fabric.Track(name, props...)
+	}()
 }
 
 // FlushAllTracking waits for all tracking goroutines to complete.
@@ -35,16 +43,16 @@ func FlushAllTracking() {
 	trackWG.Wait()
 }
 
-func IsCompletionCommand(cmd *cobra.Command) bool {
+func isCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
 
 // trackCmd sends a tracking event for a Cobra command and its arguments.
-func trackCmd(cmd *cobra.Command, verb string, props ...P) {
+func Cmd(cmd *cobra.Command, verb string, props ...cliClient.Property) {
 	command := "Implicit"
 	if cmd != nil {
 		// Ignore tracking for shell completion requests
-		if IsCompletionCommand(cmd) {
+		if isCompletionCommand(cmd) {
 			return
 		}
 		command = cmd.Name()
@@ -56,12 +64,12 @@ func trackCmd(cmd *cobra.Command, verb string, props ...P) {
 			}
 		})
 		props = append(props,
-			P{Name: "CalledAs", Value: calledAs},
-			P{Name: "version", Value: cmd.Root().Version},
+			P("CalledAs", calledAs),
+			P("version", cmd.Root().Version),
 		)
 		cmd.Flags().Visit(func(f *pflag.Flag) {
-			props = append(props, P{Name: f.Name, Value: f.Value})
+			props = append(props, P(f.Name, f.Value))
 		})
 	}
-	Track(strings.Title(command+" "+verb), props...)
+	NewEvent(strings.ToTitle(command+" "+verb), props...)
 }

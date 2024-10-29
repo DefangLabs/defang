@@ -13,6 +13,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -201,22 +202,22 @@ func makeComposeUpCmd() *cobra.Command {
 func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
 	if _, isPlayground := provider.(*cliClient.PlaygroundProvider); !nonInteractive && isPlayground {
 		failedServices := []string{errDeploymentFailed.Service}
-		Track("Debug Prompted", P{"failedServices", failedServices}, P{"etag", deploy.Etag}, P{"reason", errDeploymentFailed})
+		track.NewEvent("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 		var aiDebug bool
 		if err := survey.AskOne(&survey.Confirm{
 			Message: "Would you like to debug the deployment with AI?",
 			Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 		}, &aiDebug); err != nil {
 			term.Debugf("failed to ask for AI debug: %v", err)
-			Track("Debug Prompt Failed", P{"etag", deploy.Etag}, P{"reason", err})
+			track.NewEvent("Debug Prompt Failed", P("etag", deploy.Etag), P("reason", err))
 		} else if aiDebug {
-			Track("Debug Prompt Accepted", P{"etag", deploy.Etag})
+			track.NewEvent("Debug Prompt Accepted", P("etag", deploy.Etag))
 			// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 			if err := cli.Debug(ctx, client, deploy.Etag, project, failedServices); err != nil {
 				term.Warnf("failed to debug deployment: %v", err)
 			}
 		} else {
-			Track("Debug Prompt Skipped", P{"etag", deploy.Etag})
+			track.NewEvent("Debug Prompt Skipped", P("etag", deploy.Etag))
 		}
 	}
 }

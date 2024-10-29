@@ -21,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go"
@@ -31,6 +32,10 @@ import (
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
+
+func P(name string, value interface{}) cliClient.Property {
+	return cliClient.Property{Name: name, Value: value}
+}
 
 // GLOBALS
 var (
@@ -147,6 +152,9 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
+	// Setup tracking client
+	track.Fabric = cli.Connect(cluster, nil)
+
 	// CD command
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.AddCommand(cdDestroyCmd)
@@ -258,7 +266,7 @@ func SetupCommands(version string) {
 
 	origHelpFunc := RootCmd.HelpFunc()
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		trackCmd(cmd, "Help", P{"args", args})
+		track.Cmd(cmd, "Help", P("args", args))
 		origHelpFunc(cmd, args)
 	})
 }
@@ -280,7 +288,7 @@ var RootCmd = &cobra.Command{
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
-			trackCmd(cmd, "Invoked", P{"args", args}, P{"err", err}, P{"non-interactive", nonInteractive}, P{"provider", providerID})
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", err), P("non-interactive", nonInteractive), P("provider", providerID))
 		}()
 
 		// Do this first, since any errors will be printed to the console
@@ -345,7 +353,7 @@ var RootCmd = &cobra.Command{
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
 
-				defer func() { trackCmd(nil, "Login", P{"reason", err}) }()
+				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
 					return err
 				}
@@ -361,7 +369,7 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
 				term.Warn(prettyError(err))
 
-				defer func() { trackCmd(nil, "Terms", P{"reason", err}) }()
+				defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 					return err // fatal
 				}
@@ -547,7 +555,7 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		Track("Generate Started", P{"language", language}, P{"sample", sample}, P{"description", prompt.Description}, P{"folder", prompt.Folder})
+		track.NewEvent("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder))
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
@@ -1020,4 +1028,8 @@ func awsInEnv() bool {
 
 func doInEnv() bool {
 	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
+}
+
+func IsCompletionCommand(cmd *cobra.Command) bool {
+	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
