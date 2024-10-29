@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -206,23 +208,23 @@ func ValidateProject(project *composeTypes.Project) error {
 				}
 			}
 		} else {
-			timeout := 30 // default per compose spec
+			timeout := 5.0
 			if svccfg.HealthCheck.Timeout != nil {
-				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
+				timeout = time.Duration(*svccfg.HealthCheck.Timeout).Seconds()
+				if _, frac := math.Modf(timeout); frac != 0 {
 					term.Warnf("service %q: healthcheck timeout must be a multiple of 1s", svccfg.Name)
 				}
-				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
-			interval := 30 // default per compose spec
+			interval := 30.0 // default per compose spec
 			if svccfg.HealthCheck.Interval != nil {
-				if *svccfg.HealthCheck.Interval%1e9 != 0 {
+				interval = time.Duration(*svccfg.HealthCheck.Interval).Seconds()
+				if _, frac := math.Modf(interval); frac != 0 {
 					term.Warnf("service %q: healthcheck interval must be a multiple of 1s", svccfg.Name)
 				}
-				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
 			// Technically this should test for <= but both interval and timeout have 30s as the default value
-			if interval < timeout || timeout <= 0 {
-				return fmt.Errorf("service %q: healthcheck timeout %ds must be positive and smaller than the interval %ds", svccfg.Name, timeout, interval)
+			if interval < timeout || timeout < 0 {
+				return fmt.Errorf("service %q: healthcheck timeout %fs must be positive and smaller than the interval %fs", svccfg.Name, timeout, interval)
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				term.Debugf("service %q: unsupported compose directive: healthcheck start_period", svccfg.Name)
