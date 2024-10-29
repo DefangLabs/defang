@@ -38,7 +38,7 @@ var rootServers = []*net.NS{
 }
 
 func (r RootResolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	for i := 0; i < 10; i++ {
+	for range [10]int{} {
 		ips, err := r.getResolver(ctx, domain).LookupIPAddr(ctx, domain)
 		if err != nil {
 			if cnameErr, ok := err.(ErrCNAMEFound); ok {

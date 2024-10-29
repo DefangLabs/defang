@@ -205,7 +205,7 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 	attempts := 0
 	printNewLineSet := false
 
-	for i := 0; i < maxAttempts; i++ {
+	for range make([]struct{}, maxAttempts) {
 		if attempts != 0 {
 			fmt.Fprint(os.Stderr, ".")
 			if !printNewLineSet {
