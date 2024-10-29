@@ -81,7 +81,7 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 		ProjectName: "",     // To be overwritten by LoadProject
 		PulumiStack: "beta", // TODO: make customizable
 		Quota: quota.Quotas{
-			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+			// These serve mostly to prevent fat-finger errors in the CLI or Compose files
 			ServiceQuotas: quota.ServiceQuotas{
 				Cpus:       16,
 				Gpus:       8,
