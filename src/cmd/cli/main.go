@@ -15,7 +15,7 @@ import (
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			track.NewEvent("Panic", track.P("version", version), track.P("error", r), track.P("stack", string(skipLines(debug.Stack(), 6))))
+			track.Evt("Panic", track.P("version", version), track.P("error", r), track.P("stack", string(skipLines(debug.Stack(), 6))))
 			track.FlushAllTracking()
 			panic(r)
 		}
@@ -30,7 +30,7 @@ func main() {
 		<-sigs
 		signal.Stop(sigs)
 		term.Debug("Received interrupt signal; canceling...")
-		track.NewEvent("User Interrupted", track.P("version", version))
+		track.Evt("User Interrupted", track.P("version", version))
 		cancel()
 	}()
 

@@ -23,7 +23,7 @@ var Fabric cliClient.FabricClient
 var trackWG = sync.WaitGroup{}
 
 // Track sends a tracking event to the server in a separate goroutine.
-func NewEvent(name string, props ...cliClient.Property) {
+func Evt(name string, props ...cliClient.Property) {
 	if disableAnalytics {
 		return
 	}
@@ -71,5 +71,5 @@ func Cmd(cmd *cobra.Command, verb string, props ...cliClient.Property) {
 			props = append(props, P(f.Name, f.Value))
 		})
 	}
-	NewEvent(strings.ToTitle(command+" "+verb), props...)
+	Evt(strings.ToTitle(command+" "+verb), props...)
 }

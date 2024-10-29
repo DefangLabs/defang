@@ -555,7 +555,7 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		track.NewEvent("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder))
+		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder))
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {

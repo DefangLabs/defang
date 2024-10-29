@@ -357,14 +357,14 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 		sort.Strings(nsServers)
 		sort.Strings(delegationSet.NameServers)
 		if !slices.Equal(delegationSet.NameServers, nsServers) {
-			track.NewEvent("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
+			track.Evt("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
 			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
 		}
 
 		nsServers = delegationSet.NameServers
 	} else {
 		// Case 2a: The zone was created by the older CLI, we'll use the existing NS records; track how many times this happens
-		track.NewEvent("Compose-Up delegateSubdomain old", track.P("domain", b.ProjectDomain))
+		track.Evt("Compose-Up delegateSubdomain old", track.P("domain", b.ProjectDomain))
 	}
 
 	req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}

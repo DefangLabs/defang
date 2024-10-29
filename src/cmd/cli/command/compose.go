@@ -202,22 +202,22 @@ func makeComposeUpCmd() *cobra.Command {
 func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
 	if _, isPlayground := provider.(*cliClient.PlaygroundProvider); !nonInteractive && isPlayground {
 		failedServices := []string{errDeploymentFailed.Service}
-		track.NewEvent("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+		track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 		var aiDebug bool
 		if err := survey.AskOne(&survey.Confirm{
 			Message: "Would you like to debug the deployment with AI?",
 			Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 		}, &aiDebug); err != nil {
 			term.Debugf("failed to ask for AI debug: %v", err)
-			track.NewEvent("Debug Prompt Failed", P("etag", deploy.Etag), P("reason", err))
+			track.Evt("Debug Prompt Failed", P("etag", deploy.Etag), P("reason", err))
 		} else if aiDebug {
-			track.NewEvent("Debug Prompt Accepted", P("etag", deploy.Etag))
+			track.Evt("Debug Prompt Accepted", P("etag", deploy.Etag))
 			// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 			if err := cli.Debug(ctx, client, deploy.Etag, project, failedServices); err != nil {
 				term.Warnf("failed to debug deployment: %v", err)
 			}
 		} else {
-			track.NewEvent("Debug Prompt Skipped", P("etag", deploy.Etag))
+			track.Evt("Debug Prompt Skipped", P("etag", deploy.Etag))
 		}
 	}
 }

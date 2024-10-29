@@ -248,7 +248,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
-							track.NewEvent("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
+							track.Evt("Verbose Toggled", P("verbose", verbose), P("toggleCount", toggleCount))
 						}
 					}
 				}()
