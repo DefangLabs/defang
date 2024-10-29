@@ -60,9 +60,9 @@ type ByocAws struct {
 	handlersLock     sync.RWMutex
 }
 
-var _ client.Client = (*ByocAws)(nil)
+var _ client.Provider = (*ByocAws)(nil)
 
-func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
+func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
 		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
@@ -213,7 +213,6 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
-		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 	if err != nil {
@@ -375,11 +374,7 @@ func (b *ByocAws) delegateSubdomain(ctx context.Context) (string, error) {
 	return resp.Zone, nil
 }
 
-func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
-	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
-		return nil, err
-	}
-
+func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	// Use STS to get the account ID
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -389,11 +384,29 @@ func (b *ByocAws) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) 
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
 	}
-	return &defangv1.WhoAmIResponse{
-		Tenant:  b.TenantID,
-		Region:  cfg.Region,
-		Account: *identity.Account,
+	return AWSAccountInfo{
+		region:    cfg.Region,
+		accountID: *identity.Account,
+		arn:       *identity.Arn,
 	}, nil
+}
+
+type AWSAccountInfo struct {
+	accountID string
+	region    string
+	arn       string
+}
+
+func (i AWSAccountInfo) AccountID() string {
+	return i.accountID
+}
+
+func (i AWSAccountInfo) Region() string {
+	return i.region
+}
+
+func (i AWSAccountInfo) Details() string {
+	return i.arn
 }
 
 func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {

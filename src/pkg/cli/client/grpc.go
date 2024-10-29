@@ -21,7 +21,7 @@ type GrpcClient struct {
 	client defangv1connect.FabricControllerClient
 
 	TenantID types.TenantID
-	Loader   ProjectLoader
+	Loader   ProjectLoader // FIXME: This should no longer be needed
 }
 
 func NewGrpcClient(host, accessToken string, tenantID types.TenantID, loader ProjectLoader) GrpcClient {

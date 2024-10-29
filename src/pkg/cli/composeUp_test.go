@@ -16,7 +16,7 @@ import (
 )
 
 type deployMock struct {
-	client.MockClient
+	client.MockProvider
 }
 
 func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -56,7 +56,7 @@ func TestComposeUp(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	d, project, err := ComposeUp(context.Background(), deployMock{MockClient: client.MockClient{UploadUrl: server.URL + "/", Project: proj}}, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(context.Background(), deployMock{MockProvider: client.MockProvider{UploadUrl: server.URL + "/", Project: proj}}, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}

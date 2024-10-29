@@ -9,38 +9,38 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-type MockClient struct {
-	Client
+type MockProvider struct {
+	Provider
 	UploadUrl    string
 	Project      *composeTypes.Project
 	ServerStream ServerStream[defangv1.TailResponse]
 }
 
-func (m MockClient) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+func (m MockProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
 	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }
 
-func (m MockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m MockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{Names: []string{"VAR1"}}, nil
 }
 
-func (m MockClient) ServiceDNS(service string) string {
+func (m MockProvider) ServiceDNS(service string) string {
 	return service
 }
 
-func (m MockClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+func (m MockProvider) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	return m.Project, nil
 }
 
-func (m MockClient) LoadProjectName(ctx context.Context) (string, error) {
+func (m MockProvider) LoadProjectName(ctx context.Context) (string, error) {
 	return m.Project.Name, nil
 }
 
-func (m MockClient) SetProjectName(projectName string) {
+func (m MockProvider) SetProjectName(projectName string) {
 	m.Project.Name = projectName
 }
 
-func (m MockClient) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (m MockProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	if m.ServerStream != nil {
 		return m.ServerStream, nil
 	}
