@@ -954,9 +954,10 @@ var cdListCmd = &cobra.Command{
 }
 
 var cdPreviewCmd = &cobra.Command{
-	Use:   "preview",
-	Args:  cobra.NoArgs,
-	Short: "Preview the changes that will be made by the CD task",
+	Use:         "preview",
+	Args:        cobra.NoArgs,
+	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
+	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resp, _, err := cli.ComposeUp(cmd.Context(), provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
