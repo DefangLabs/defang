@@ -59,6 +59,7 @@ type ByocAws struct {
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
+	lastCdStart      time.Time
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -254,6 +255,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 	b.cdTasks[etag] = taskArn
+	b.lastCdStart = time.Now()
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -594,10 +596,18 @@ func (b *ByocAws) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defan
 		return nil, err
 	}
 
-	// TODO: get start time from req.Etag
+	var service string
+	if len(req.Services) == 1 {
+		service = req.Services[0]
+	}
+
+	since := b.lastCdStart // TODO: get start time from req.Etag
+	if since.IsZero() {
+		since = time.Now().Add(-time.Hour)
+	}
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(b.cdTasks[req.Etag]) {
-		if err := ecs.Query(ctx, lgi, time.Now().Add(-time.Hour), time.Now(), func(es []ecs.LogEvent) {
+	for _, lgi := range b.getLogGroupInputs(req.Etag, service) {
+		if err := ecs.Query(ctx, lgi, since, time.Now(), func(es []ecs.LogEvent) {
 			for _, e := range es {
 				term.Debug("LogEvent", e)
 				// sb.WriteString("stream=")
@@ -611,7 +621,7 @@ func (b *ByocAws) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defan
 		}
 	}
 	req.Logs = sb.String()
-	return b.GrpcClient.Debug(ctx, req) // TODO: implement this
+	return b.GrpcClient.Debug(ctx, req)
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
@@ -639,9 +649,11 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		etag = "" // no need to filter by etag
 		stopWhenCDTaskDone = true
 	} else {
-		// If we know the CD task ARN, only tail the logstream for the CD task
-		taskArn = b.cdTasks[etag]
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(taskArn)...)
+		var service string
+		if len(req.Services) == 1 {
+			service = req.Services[0]
+		}
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, service)...)
 	}
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
@@ -662,16 +674,25 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
 }
 
-func (b *ByocAws) getLogGroupInputs(taskArn types.TaskID) []ecs.LogGroupInput {
+func (b *ByocAws) makeLogGroupARN(name string) string {
+	return b.driver.MakeARN("logs", "log-group:"+name)
+}
+
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, service string) []ecs.LogGroupInput {
+	var logsPrefix string
+	if service != "" {
+		logsPrefix = service + "/" + service + "_" + etag
+	}
 	// Tail CD, kaniko, and all services (this requires ProjectName to be set)
-	kanikoTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("builds"))} // must match logic in ecs/common.ts
+	kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir("builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
 	term.Debug("Tailing kaniko logs", kanikoTail.LogGroupARN)
-	servicesTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("logs"))} // must match logic in ecs/common.ts
+	servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir("logs")), LogStreamNamePrefix: logsPrefix} // must match logic in ecs/common.ts
 	term.Debug("Tailing services logs", servicesTail.LogGroupARN)
-	ecsTail := ecs.LogGroupInput{LogGroupARN: b.driver.MakeARN("logs", "log-group:"+b.stackDir("ecs"))} // must match logic in ecs/common.ts
+	ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir("ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
 	term.Debug("Tailing ecs events logs", ecsTail.LogGroupARN)
-	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN}
-	if taskArn != nil {
+	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
+	// If we know the CD task ARN, only tail the logstream for the CD task
+	if taskArn := b.cdTasks[etag]; taskArn != nil {
 		cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 	}
 	term.Debug("Tailing CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
