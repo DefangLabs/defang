@@ -145,6 +145,6 @@ func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (AccountInfo, erro
 
 type PlaygroundAccountInfo struct{}
 
-func (g PlaygroundAccountInfo) AccountID() string { return "" }
-func (g PlaygroundAccountInfo) Region() string    { return "" }
+func (g PlaygroundAccountInfo) AccountID() string { return "playground" }
+func (g PlaygroundAccountInfo) Region() string    { return "us-west-2" } // Hardcoded for now for prod1
 func (g PlaygroundAccountInfo) Details() string   { return "" }
