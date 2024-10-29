@@ -110,12 +110,18 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 			response.Service = service
 		}
 	} else if strings.Contains(*event.LogStreamName, "-firelens-") {
+
 		// These events are from the Firelens sidecar; try to parse the JSON
 		var record logs.FirelensMessage
 		if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
 			response.Etag = record.Etag
-			response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
-			response.Service = record.ContainerName // TODO: could be service_etag
+			response.Host = record.Host // TODO: use "kaniko" for kaniko logs
+			if record.Service == "" {
+				response.Service = record.ContainerName
+			} else {
+				response.Service = record.Service
+			}
+
 			parseFirelensRecords = true
 		}
 	} else if strings.HasSuffix(*event.LogGroupIdentifier, "/ecs") || strings.HasSuffix(*event.LogGroupIdentifier, "/ecs:*") {
