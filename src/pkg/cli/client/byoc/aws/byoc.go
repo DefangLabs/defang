@@ -87,7 +87,7 @@ func (b *ByocAws) setUp(ctx context.Context) error {
 	containers := []types.Container{
 		{
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + PulumiVersion,
-			Name:      ecs.ContainerName,
+			Name:      ecs.CdContainerName,
 			Cpus:      2.0,
 			Memory:    2048_000_000, // 2G
 			Essential: ptr.Bool(true),
@@ -610,7 +610,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		taskArn = b.cdTasks[etag]
 		if taskArn != nil {
 			// If we know the CD task ARN, only tail the logstream for the CD task
-			cdTail.LogStreamNames = []string{ecs.GetLogStreamForTaskID(ecs.GetTaskID(taskArn))}
+			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(taskArn))}
 		}
 		term.Debug("Tailing CD logs since", req.Since, cdTail.LogGroupARN, cdTail.LogStreamNames)
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), cdTail, kanikoTail, servicesTail, ecsTail)

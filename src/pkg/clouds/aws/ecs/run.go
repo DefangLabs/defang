@@ -79,7 +79,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 			// TaskRoleArn: cred.Arn; TODO: default to caller identity; needs trust + iam:PassRole
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name:        ptr.String(ContainerName),
+					Name:        ptr.String(CdContainerName),
 					Command:     cmd,
 					Environment: pairs,
 					// ResourceRequirements:; TODO: make configurable, support GPUs
