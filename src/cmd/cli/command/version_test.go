@@ -80,13 +80,18 @@ func TestGetLatestVersion(t *testing.T) {
 	rec := httptest.NewRecorder()
 	rec.Header().Add("Content-Type", "application/json")
 	rec.WriteString(fmt.Sprintf(`{"tag_name":"%v"}`, version))
+	response := rec.Result()
 
 	client := ourHttp.DefaultClient
-	t.Cleanup(func() { ourHttp.DefaultClient = client })
+	t.Cleanup(func() {
+		ourHttp.DefaultClient = client
+		response.Body.Close()
+	})
+
 	ourHttp.DefaultClient = &http.Client{Transport: &mockRoundTripper{
 		method: http.MethodGet,
 		url:    "https://api.github.com/repos/DefangLabs/defang/releases/latest",
-		resp:   rec.Result(),
+		resp:   response,
 	}}
 
 	v, err := GetLatestVersion(ctx)
