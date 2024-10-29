@@ -13,7 +13,7 @@ import (
 
 var SupportedLanguages = []string{"Nodejs", "Golang", "Python"}
 
-func GenerateWithAI(ctx context.Context, client client.Client, language, dir, description string) ([]string, error) {
+func GenerateWithAI(ctx context.Context, client client.FabricClient, language, dir, description string) ([]string, error) {
 	if DoDryRun {
 		term.Warn("Dry run, not generating files")
 		return nil, ErrDryRun

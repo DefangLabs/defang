@@ -34,7 +34,7 @@ func TestValidationAndConvert(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		mockClient := validationMockClient{
+		mockClient := validationMockProvider{
 			configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
 		}
 		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
@@ -77,7 +77,7 @@ func TestValidateConfig(t *testing.T) {
 	const ENV_VAR = "ENV_VAR"
 
 	ctx := context.Background()
-	mockClient := validationMockClient{}
+	mockClient := validationMockProvider{}
 
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},
@@ -142,18 +142,18 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
-type validationMockClient struct {
-	client.Client
+type validationMockProvider struct {
+	client.Provider
 	configs []string
 }
 
-func (m validationMockClient) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m validationMockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,
 		Project: "mock-project",
 	}, nil
 }
 
-func (m validationMockClient) ServiceDNS(name string) string {
+func (m validationMockProvider) ServiceDNS(name string) string {
 	return "mock-" + name
 }

@@ -8,8 +8,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigDelete(ctx context.Context, client client.Client, names ...string) error {
-	projectName, err := client.LoadProjectName(ctx)
+func ConfigDelete(ctx context.Context, provider client.Provider, names ...string) error {
+	projectName, err := provider.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
@@ -19,5 +19,5 @@ func ConfigDelete(ctx context.Context, client client.Client, names ...string) er
 		return ErrDryRun
 	}
 
-	return client.DeleteConfig(ctx, &defangv1.Secrets{Names: names, Project: projectName})
+	return provider.DeleteConfig(ctx, &defangv1.Secrets{Names: names, Project: projectName})
 }

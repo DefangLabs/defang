@@ -7,11 +7,11 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-type serviceNameReplacerMockClient struct {
-	client.Client
+type serviceNameReplacerMockProvider struct {
+	client.Provider
 }
 
-func (m serviceNameReplacerMockClient) ServiceDNS(name string) string {
+func (m serviceNameReplacerMockProvider) ServiceDNS(name string) string {
 	return "override-" + name
 }
 
@@ -45,7 +45,7 @@ func setup() ServiceNameReplacer {
 		},
 	}
 
-	return NewServiceNameReplacer(serviceNameReplacerMockClient{}, services)
+	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, services)
 }
 
 func TestServiceNameReplacer(t *testing.T) {
@@ -110,7 +110,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 	}
 
 	s := ServiceNameReplacer{
-		client:           serviceNameReplacerMockClient{},
+		provider:         serviceNameReplacerMockProvider{},
 		hostServiceNames: makeServiceNameRegex([]string{"redis", "postgres"}),
 	}
 	tdt := []struct {

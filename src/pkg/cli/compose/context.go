@@ -61,7 +61,7 @@ defang
 .defang`
 )
 
-func getRemoteBuildContext(ctx context.Context, client client.Client, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -93,13 +93,13 @@ func getRemoteBuildContext(ctx context.Context, client client.Client, name strin
 	}
 
 	term.Info("Uploading the project files for", name)
-	return uploadTarball(ctx, client, buffer, digest)
+	return uploadTarball(ctx, provider, buffer, digest)
 }
 
-func uploadTarball(ctx context.Context, client client.Client, body io.Reader, digest string) (string, error) {
+func uploadTarball(ctx context.Context, provider client.Provider, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
 	ureq := &defangv1.UploadURLRequest{Digest: digest}
-	res, err := client.CreateUploadURL(ctx, ureq)
+	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
 	}

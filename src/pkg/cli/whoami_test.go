@@ -36,14 +36,15 @@ func TestWhoami(t *testing.T) {
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient := Connect(url, nil)
-	client := cliClient.PlaygroundClient{GrpcClient: grpcClient}
+	client := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
-	got, err := Whoami(ctx, &client)
+	got, err := Whoami(ctx, grpcClient, &client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := `You are logged into playground region us-test-2 with tenant "tenant-1"`
+	// Playground provider is hardcoded to return "us-west-2" as the region
+	want := `You are logged into playground region us-west-2 with tenant "tenant-1"`
 
 	if got != want {
 		t.Errorf("Whoami() = %v, want: %v", got, want)

@@ -34,14 +34,15 @@ var authNeededAnnotation = map[string]string{authNeeded: ""}
 
 // GLOBALS
 var (
-	client         cliClient.Client
+	client         cliClient.FabricClient
+	provider       cliClient.Provider
 	cluster        string
 	colorMode      = ColorAuto
 	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
-	provider       = cliClient.Provider(pkg.Getenv("DEFANG_PROVIDER", "auto"))
+	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
 )
 
@@ -86,7 +87,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			if resp, err := client.GetServices(ctx); err == nil {
+			if resp, err := provider.GetServices(ctx); err == nil {
 				projectName = resp.Project
 			}
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
@@ -135,7 +136,7 @@ func SetupCommands(version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().VarP(&provider, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -279,7 +280,7 @@ var RootCmd = &cobra.Command{
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
-			trackCmd(cmd, "Invoked", P{"args", args}, P{"err", err}, P{"non-interactive", nonInteractive}, P{"provider", provider})
+			trackCmd(cmd, "Invoked", P{"args", args}, P{"err", err}, P{"non-interactive", nonInteractive}, P{"provider", providerID})
 		}()
 
 		// Do this first, since any errors will be printed to the console
@@ -290,7 +291,7 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(true)
 		}
 
-		switch provider {
+		switch providerID {
 		case cliClient.ProviderAuto:
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
@@ -298,7 +299,7 @@ var RootCmd = &cobra.Command{
 			if doInEnv() {
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
-			provider = cliClient.ProviderDefang
+			providerID = cliClient.ProviderDefang
 		case cliClient.ProviderAWS:
 			if !awsInEnv() {
 				term.Warn("AWS provider was selected, but AWS environment variables are not set")
@@ -319,7 +320,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		loader := configureLoader(cmd)
-		client = cli.NewClient(cmd.Context(), cluster, provider, loader)
+		client, provider = cli.NewClient(cmd.Context(), cluster, providerID, loader)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -350,8 +351,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client = cli.NewClient(cmd.Context(), cluster, provider, loader) // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil {    // recheck (new token = new user)
+				client, provider = cli.NewClient(cmd.Context(), cluster, providerID, loader) // reconnect with the new token
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil {                // recheck (new token = new user)
 					return nil // success
 				}
 			}
@@ -396,7 +397,7 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		str, err := cli.Whoami(cmd.Context(), client)
+		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
 		}
@@ -418,7 +419,7 @@ var certGenerateCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.GenerateLetsEncryptCert(cmd.Context(), client)
+		err := cli.GenerateLetsEncryptCert(cmd.Context(), client, provider)
 		if err != nil {
 			return err
 		}
@@ -664,7 +665,7 @@ var configSetCmd = &cobra.Command{
 		fromEnv, _ := cmd.Flags().GetBool("env")
 
 		// Make sure we have a project to set config for before asking for a value
-		_, err := client.LoadProjectName(cmd.Context())
+		_, err := provider.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -719,7 +720,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), client, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)
@@ -736,7 +737,7 @@ var configDeleteCmd = &cobra.Command{
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
-		if err := cli.ConfigDelete(cmd.Context(), client, names...); err != nil {
+		if err := cli.ConfigDelete(cmd.Context(), provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(prettyError(err))
@@ -758,7 +759,7 @@ var configListCmd = &cobra.Command{
 	Aliases:     []string{"list"},
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.ConfigList(cmd.Context(), client)
+		return cli.ConfigList(cmd.Context(), provider)
 	},
 }
 
@@ -770,11 +771,12 @@ var debugCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
 
-		project, err := client.LoadProject(cmd.Context())
+		project, err := provider.LoadProject(cmd.Context())
 		if err != nil {
 			return err
 		}
 
+		// FIXME: Does this need provider?
 		return cli.Debug(cmd.Context(), client, etag, project, args)
 	},
 }
@@ -790,7 +792,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), client, names...)
+		etag, err := cli.Delete(cmd.Context(), provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -814,7 +816,7 @@ var deleteCmd = &cobra.Command{
 			Raw:     false,
 			Verbose: verbose,
 		}
-		return cli.Tail(cmd.Context(), client, tailParams)
+		return cli.Tail(cmd.Context(), provider, tailParams)
 	},
 }
 
@@ -886,7 +888,7 @@ var cdDestroyCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "destroy")
+		return cli.BootstrapCommand(cmd.Context(), provider, "destroy")
 	},
 }
 
@@ -895,7 +897,7 @@ var cdDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "down")
+		return cli.BootstrapCommand(cmd.Context(), provider, "down")
 	},
 }
 
@@ -904,7 +906,7 @@ var cdRefreshCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "refresh")
+		return cli.BootstrapCommand(cmd.Context(), provider, "refresh")
 	},
 }
 
@@ -913,7 +915,7 @@ var cdCancelCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.BootstrapCommand(cmd.Context(), client, "cancel")
+		return cli.BootstrapCommand(cmd.Context(), provider, "cancel")
 	},
 }
 
@@ -924,7 +926,7 @@ var cdTearDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 
-		return cli.TearDown(cmd.Context(), client, force)
+		return cli.TearDown(cmd.Context(), provider, force)
 	},
 }
 
@@ -937,9 +939,9 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 
 		if remote {
-			return cli.BootstrapCommand(cmd.Context(), client, "list")
+			return cli.BootstrapCommand(cmd.Context(), provider, "list")
 		}
-		return cli.BootstrapLocalList(cmd.Context(), client)
+		return cli.BootstrapLocalList(cmd.Context(), provider)
 	},
 }
 
@@ -948,11 +950,11 @@ var cdPreviewCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resp, _, err := cli.ComposeUp(cmd.Context(), client, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, _, err := cli.ComposeUp(cmd.Context(), provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), client, cli.TailOptions{
+		return cli.Tail(cmd.Context(), provider, cli.TailOptions{
 			Etag:    resp.Etag,
 			Verbose: verbose,
 		})

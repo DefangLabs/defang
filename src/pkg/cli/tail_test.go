@@ -86,7 +86,7 @@ func TestTail(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := client.MockClient{
+	c := client.MockProvider{
 		Project: proj,
 		ServerStream: &client.MockServerStream{
 			Resps: []*defangv1.TailResponse{

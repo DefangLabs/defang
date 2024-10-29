@@ -46,7 +46,7 @@ func TestDestroy(t *testing.T) {
 	url := strings.TrimPrefix(server.URL, "http://")
 	loader := FakeLoader{ProjectName: "test-project"}
 	grpcClient := Connect(url, loader)
-	client := cliClient.PlaygroundClient{GrpcClient: grpcClient}
+	client := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
 	etag, err := client.Destroy(ctx)
 	if err != nil {

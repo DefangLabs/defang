@@ -56,7 +56,7 @@ type ByocDo struct {
 	driver     *appPlatform.DoApp
 }
 
-func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
+func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -492,16 +492,25 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
-	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
-		return nil, err
-	}
+func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+	return DoAccountInfo{region: b.driver.Region.String()}, nil
+}
 
-	return &defangv1.WhoAmIResponse{
-		Tenant:  b.TenantID,
-		Region:  b.driver.Region.String(),
-		Account: "DigitalOcean",
-	}, nil
+type DoAccountInfo struct {
+	region string
+	// accountID string TODO: Find out the best field to be used as account id from https://docs.digitalocean.com/reference/api/api-reference/#tag/Account
+}
+
+func (i DoAccountInfo) AccountID() string {
+	return "DigitalOcean"
+}
+
+func (i DoAccountInfo) Region() string {
+	return i.region
+}
+
+func (i DoAccountInfo) Details() string {
+	return ""
 }
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {

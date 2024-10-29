@@ -11,14 +11,14 @@ import (
 
 var ErrNoServices = errors.New("no services found")
 
-func GetServices(ctx context.Context, client client.Client, long bool) error {
-	projectName, err := client.LoadProjectName(ctx)
+func GetServices(ctx context.Context, provider client.Provider, long bool) error {
+	projectName, err := provider.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Listing services in project %q", projectName)
 
-	serviceList, err := client.GetServices(ctx)
+	serviceList, err := provider.GetServices(ctx)
 	if err != nil {
 		return err
 	}
