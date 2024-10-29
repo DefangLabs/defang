@@ -14,9 +14,6 @@ import (
 const NetworkPublic = "public"
 
 func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs composeTypes.Services, upload UploadMode) error {
-
-	svcNameReplacer := NewServiceNameReplacer(provider, serviceConfigs)
-
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx)
 	if err != nil {
@@ -24,6 +21,16 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
+
+	for _, svccfg := range serviceConfigs {
+		// Fixup ports (which affects service name replacement by ReplaceServiceNameWithDNS)
+		for i, port := range svccfg.Ports {
+			fixupPort(&port)
+			svccfg.Ports[i] = port
+		}
+	}
+
+	svcNameReplacer := NewServiceNameReplacer(provider, serviceConfigs)
 
 	for _, svccfg := range serviceConfigs {
 		if svccfg.Deploy != nil {
@@ -94,12 +101,6 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 		_, postgres := svccfg.Extensions["x-defang-postgres"]
 		if !redis && !postgres && isStatefulImage(svccfg.Image) {
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
-		}
-
-		// Fixup ports
-		for i, port := range svccfg.Ports {
-			fixupPort(&port)
-			svccfg.Ports[i] = port
 		}
 
 		oldName := svccfg.Name

@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	ContainerName     = "main"
+	CdContainerName   = "main"
 	DockerRegistry    = "docker.io"
 	EcrPublicRegistry = "public.ecr.aws"
-	ProjectName       = types.ProjectName
+	CrunProjectName   = types.ProjectName
 )
 
 type TaskArn = types.TaskID
