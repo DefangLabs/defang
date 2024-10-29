@@ -110,7 +110,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 	}
 
 	s := ServiceNameReplacer{
-		client:           serviceNameReplacerMockClient{},
+		provider:         serviceNameReplacerMockProvider{},
 		hostServiceNames: makeServiceNameRegex([]string{"redis", "postgres"}),
 	}
 	tdt := []struct {
