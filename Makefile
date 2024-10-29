@@ -9,7 +9,20 @@ pre-commit:
 
 .PHONY: pre-push
 pre-push:
+	make lint
 	make -C src test
 
+.PHONY: pre-commit
+pre-commit:
+	make lint
+
+.PHONY: lint
+lint:
+	cd src && ../.bin/golangci-lint run
+
+.PHONY: install-golangci-lint
+install-golangci-lint:
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin v1.61.0
+
 .PHONY: setup
-setup: install-git-hooks
+setup: install-git-hooks install-golangci-lint
