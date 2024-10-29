@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
@@ -69,6 +70,7 @@ func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
 
 func NewClient(ctx context.Context, cluster string, providerID client.ProviderID, loader client.ProjectLoader) (client.FabricClient, client.Provider) {
 	grpcClient := Connect(cluster, loader)
+	track.Fabric = grpcClient // Update track client
 
 	// Determine the current tenant ID
 	resp, err := grpcClient.WhoAmI(ctx)
