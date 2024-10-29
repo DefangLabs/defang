@@ -636,7 +636,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
-	if err := b.Quota.ValidateService(&service); err != nil {
+	if err := compose.ValidateService(&service); err != nil {
 		return nil, err
 	}
 
