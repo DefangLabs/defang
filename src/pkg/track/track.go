@@ -28,14 +28,14 @@ func Evt(name string, props ...cliClient.Property) {
 		return
 	}
 	trackWG.Add(1)
-	go func() {
+	go func(fabric cliClient.FabricClient) {
 		defer trackWG.Done()
-		if Fabric == nil {
+		if fabric == nil {
 			term.Debugf("No FabricClient to track event: %v", name)
 			return
 		}
-		Fabric.Track(name, props...)
-	}()
+		fabric.Track(name, props...)
+	}(Fabric)
 }
 
 // FlushAllTracking waits for all tracking goroutines to complete.
