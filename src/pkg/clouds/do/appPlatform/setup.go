@@ -170,6 +170,10 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec: appJobSpec,
 		})
+
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		term.Debugf("Creating new CD app")
 		project, _, err := client.Projects.Create(ctx, &godo.CreateProjectRequest{
