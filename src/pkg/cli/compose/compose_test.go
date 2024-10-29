@@ -133,7 +133,7 @@ func TestLoadProject(t *testing.T) {
 		}
 	})
 
-	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
+	t.Run("use project name should not be overridden by tenantID", func(t *testing.T) {
 		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
 		p, err := loader.LoadProject(context.Background())
 		if err != nil {

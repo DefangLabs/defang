@@ -59,7 +59,7 @@ func TestGetWithRetries(t *testing.T) {
 			t.Errorf("Expected 1 call, got %v", tc.calls)
 		}
 	})
-	t.Run("success on thrid try", func(t *testing.T) {
+	t.Run("success on third try", func(t *testing.T) {
 		tc := &testClient{tries: []tryResult{
 			{result: nil, err: errors.New("error")},
 			{result: nil, err: errors.New("error")},
