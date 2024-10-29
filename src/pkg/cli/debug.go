@@ -117,7 +117,7 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 		if service.Build != nil {
 			files = append(files, findMatchingFiles(project.WorkingDir, service.Build.Context, service.Build.Dockerfile)...)
 		}
-		// TODO: also consider other files, lke .dockerignore, .env, etc.
+		// TODO: also consider other files, like .dockerignore, .env, etc.
 	}
 
 	return files

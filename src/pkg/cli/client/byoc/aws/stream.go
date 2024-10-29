@@ -151,9 +151,15 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 				}
 			}
 		} else if parseECSEventRecords {
-			var err error
-			if err = bs.parseECSEventRecord(event, entry); err != nil {
+			evt, err := ecs.ParseECSEvent([]byte(*event.Message))
+			if err != nil {
 				term.Debugf("error parsing ECS event, output raw event log: %v", err)
+			} else {
+				bs.ecsEventsHandler.HandleECSEvent(evt)
+				entry.Service = evt.Service()
+				entry.Etag = evt.Etag()
+				entry.Host = evt.Host()
+				entry.Message = evt.Status()
 			}
 		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, logs.ErrorPrefix) {
 			entry.Stderr = true
@@ -171,17 +177,4 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 	}
 	response.Entries = entries
 	return &response, nil
-}
-
-func (bs *byocServerStream) parseECSEventRecord(event ecs.LogEvent, entry *defangv1.LogEntry) error {
-	evt, err := ecs.ParseECSEvent([]byte(*event.Message))
-	if err != nil {
-		return err
-	}
-	bs.ecsEventsHandler.HandleECSEvent(evt)
-	entry.Service = evt.Service()
-	entry.Etag = evt.Etag()
-	entry.Host = evt.Host()
-	entry.Message = evt.Status()
-	return nil
 }
