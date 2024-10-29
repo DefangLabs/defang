@@ -5,20 +5,20 @@ install-git-hooks: $(BINARY_NAME)
 
 .PHONY: pre-commit
 pre-commit:
-	cd src && go fmt ./...
+	make lint
 
 .PHONY: pre-push
 pre-push:
 	make lint
 	make -C src test
 
-.PHONY: pre-commit
-pre-commit:
-	make lint
-
 .PHONY: lint
 lint:
 	cd src && ../.bin/golangci-lint run
+
+.PHONY: lint-fix
+lint-fix:
+	cd src && ../.bin/golangci-lint --fix run
 
 .PHONY: install-golangci-lint
 install-golangci-lint:
