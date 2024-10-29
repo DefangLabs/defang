@@ -55,7 +55,7 @@ func InteractiveComposeDown(ctx context.Context, c client.Client, projectName st
 	if !wantComposeDown {
 		return "", ErrDoNotComposeDown
 	}
-	
+
 	term.Info("Deactivating project " + projectName)
 	return ComposeDown(ctx, c, projectName)
 }
