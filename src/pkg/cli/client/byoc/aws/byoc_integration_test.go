@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -16,9 +15,7 @@ import (
 var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
-	origRegion := os.Getenv("AWS_REGION")
-	os.Setenv("AWS_REGION", "us-west-2")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "ten ant") // no domain
 	if err != nil {
 		t.Fatal(err)
@@ -48,9 +45,7 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	origRegion := os.Getenv("AWS_REGION")
-	os.Setenv("AWS_REGION", "us-west-2")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestTail")
 	if err != nil {
 		t.Fatal(err)
@@ -82,9 +77,7 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	origRegion := os.Getenv("AWS_REGION")
-	os.Setenv("AWS_REGION", "us-west-2")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestGetServices")
 	if err != nil {
 		t.Fatal(err)
@@ -108,9 +101,7 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	origRegion := os.Getenv("AWS_REGION")
-	os.Setenv("AWS_REGION", "us-west-2")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestPutSecret")
 	if err != nil {
 		t.Fatal(err)
@@ -166,9 +157,7 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	origRegion := os.Getenv("AWS_REGION")
-	os.Setenv("AWS_REGION", "us-west-2")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestListSecrets")
 	if err != nil {
 		t.Fatal(err)
