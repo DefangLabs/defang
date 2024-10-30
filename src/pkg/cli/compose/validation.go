@@ -223,7 +223,7 @@ func ValidateProject(project *composeTypes.Project) error {
 				}
 			}
 			// Technically this should test for <= but both interval and timeout have 30s as the default value
-			if interval < timeout || timeout < 0 {
+			if interval < timeout || timeout <= 0 {
 				return fmt.Errorf("service %q: healthcheck timeout %fs must be positive and smaller than the interval %fs", svccfg.Name, timeout, interval)
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
