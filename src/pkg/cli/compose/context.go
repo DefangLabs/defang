@@ -219,7 +219,6 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	}
 
 	return nil
-
 }
 
 func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {

@@ -151,7 +151,6 @@ func (mr *MockResolver) LookupNS(ctx context.Context, domain string) ([]*net.NS,
 }
 
 func TestHttpClient(t *testing.T) {
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
 	}))
@@ -201,5 +200,4 @@ func TestHttpClient(t *testing.T) {
 	if mr.calls != 2 {
 		t.Fatalf("expected 2nd dns lookup after cache expiry, but got %v", mr.calls)
 	}
-
 }

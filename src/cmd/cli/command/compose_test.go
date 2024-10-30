@@ -7,7 +7,6 @@ import (
 )
 
 func TestGetUnreferencedManagedResources(t *testing.T) {
-
 	t.Run("no services", func(t *testing.T) {
 		project := types.Services{}
 

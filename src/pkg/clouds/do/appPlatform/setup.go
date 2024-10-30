@@ -193,7 +193,6 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		if err != nil {
 			return nil, err
 		}
-
 	}
 
 	return currentCd, nil
@@ -294,7 +293,6 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 	}
 
 	return req.URL, nil
-
 }
 
 func (d DoApp) CreateS3Client() (*s3.Client, error) {

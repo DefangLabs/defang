@@ -717,7 +717,6 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
-
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
@@ -732,7 +731,6 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 }
 
 func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
-
 	project, err := b.LoadProject(ctx)
 	appLiveURL := ""
 
@@ -758,7 +756,6 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-
 			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
@@ -827,7 +824,6 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 			printlogs(msg)
 		}
 	}
-
 }
 
 func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused

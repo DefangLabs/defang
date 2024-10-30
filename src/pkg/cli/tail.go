@@ -182,7 +182,6 @@ func isTransientError(err error) bool {
 	return code == connect.CodeUnavailable ||
 		(code == connect.CodeInternal && !connect.IsWireError(err)) ||
 		errors.Is(err, io.ErrUnexpectedEOF)
-
 }
 
 func tail(ctx context.Context, provider client.Provider, params TailOptions) error {

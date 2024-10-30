@@ -56,7 +56,6 @@ func TestLoadProjectName(t *testing.T) {
 			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
 		}
 	})
-
 }
 
 func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
@@ -195,7 +194,6 @@ func TestLoadProject(t *testing.T) {
 }
 
 func TestComposeGoNoDoubleWarningLog(t *testing.T) {
-
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
 		term.DefaultTerm = oldTerm

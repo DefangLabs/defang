@@ -308,7 +308,6 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 			term.Info("Done.")
 			return nil
-
 		},
 	}
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")

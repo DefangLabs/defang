@@ -132,7 +132,6 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 
 func push(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
-
 	if canColor {
 		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
 		l += n

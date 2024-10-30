@@ -40,7 +40,6 @@ func TestIsKanikoError(t *testing.T) {
 }
 
 func TestTermLogFormatter(t *testing.T) {
-
 	logrusDefaultOut := logrus.StandardLogger().Out
 	defaultTerm := term.DefaultTerm
 
@@ -85,7 +84,6 @@ func TestTermLogFormatter(t *testing.T) {
 }
 
 func TestDiscardFormatter(t *testing.T) {
-
 	logrusDefaultOut := logrus.StandardLogger().Out
 	defaultTerm := term.DefaultTerm
 
@@ -115,7 +113,6 @@ func TestDiscardFormatter(t *testing.T) {
 	if termerr.Len() > 0 {
 		t.Errorf("Term stderr output not empty: %q", termerr.String())
 	}
-
 }
 
 func isLogLine(line, msg string, fields ...string) bool {

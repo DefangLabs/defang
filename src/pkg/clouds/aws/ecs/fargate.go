@@ -15,7 +15,6 @@ func makeMinMaxCeil(value float64, minValue, maxValue, step uint) uint {
 		return maxValue
 	}
 	return uint(math.Ceil(value/float64(step))) * step
-
 }
 
 func fixupFargateCPU(vCpu float64) CpuUnits {
