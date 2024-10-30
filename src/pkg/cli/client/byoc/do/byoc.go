@@ -649,6 +649,17 @@ func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig)
 		Service: &defangv1.Service{Name: service.Name},
 	}
 
+	for _, port := range service.Ports {
+		mode := defangv1.Mode_INGRESS
+		if port.Mode == compose.Mode_HOST {
+			mode = defangv1.Mode_HOST
+		}
+		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
+			Target: port.Target,
+			Mode:   mode,
+		})
+	}
+
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if service.Build != nil {
