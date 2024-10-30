@@ -157,3 +157,9 @@ func hasSubstitution(s, key string) bool {
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
 	return pattern.MatchString(s)
 }
+
+func LoadFromContent(ctx context.Context, content []byte) (*Project, error) {
+	return loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: content}}}, func(o *loader.Options) {
+		o.SkipConsistencyCheck = true // this matches the WithConsistency(false) option above
+	})
+}
