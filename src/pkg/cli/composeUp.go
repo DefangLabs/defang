@@ -26,6 +26,10 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		return nil, project, err
 	}
 
+	if DoDryRun {
+		upload = compose.UploadModeIgnore
+	}
+
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
 		configs, err := provider.ListConfig(ctx)
 		if err != nil {
