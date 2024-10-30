@@ -192,7 +192,6 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		}
 		params.NextToken = fleo.NextToken
 	}
-
 }
 
 func newCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {

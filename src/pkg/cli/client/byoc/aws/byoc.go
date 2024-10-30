@@ -633,7 +633,7 @@ func (b *ByocAws) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defan
 			}
 		}); err != nil {
 			term.Warn("CloudWatch query failed:", byoc.AnnotateAwsError(err))
-			// continue reading othe ther log groups
+			// continue reading other log groups
 		}
 	}
 
