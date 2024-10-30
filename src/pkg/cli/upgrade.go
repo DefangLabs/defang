@@ -25,7 +25,8 @@ func Upgrade(ctx context.Context) error {
 	}
 	term.Debugf(" - Evaluated: %s\n", ex)
 
-	if prefix, err := homebrewPrefix(ctx); err == nil && strings.HasPrefix(ex, prefix) {
+	prefix, err := homebrewPrefix(ctx)
+	if err == nil && strings.HasPrefix(ex, prefix) {
 		printInstructions("brew upgrade defang")
 		return nil
 	}
