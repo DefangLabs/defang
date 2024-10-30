@@ -76,16 +76,17 @@ func (bs *byocServerStream) Receive() bool {
 		return false
 	}
 
-	bs.response, bs.err = bs.parseEvents(evts)
-	return bs.err == nil
+	bs.response = bs.parseEvents(evts)
+
+	return true
 }
 
-func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailResponse, error) {
+func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailResponse {
 	var response defangv1.TailResponse
 	if len(events) == 0 {
 		// The original gRPC/connect server stream would never send an empty response.
 		// We could loop around the select, but returning an empty response updates the spinner.
-		return nil, nil
+		return nil
 	}
 	parseFirelensRecords := false
 	parseECSEventRecords := false
@@ -103,7 +104,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 			parts = strings.Split(parts[1], "_")
 			if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
 				// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
-				return nil, nil
+				return nil
 			}
 			service, etag := parts[0], parts[1]
 			response.Etag = etag
@@ -126,11 +127,11 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 
 	// Client-side filtering
 	if bs.etag != "" && bs.etag != response.Etag {
-		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
+		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
 	if len(bs.services) > 0 && !pkg.Contains(bs.services, response.GetService()) {
-		return nil, nil // TODO: filter these out using the AWS StartLiveTail API
+		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
 	entries := make([]*defangv1.LogEntry, 0, len(events))
@@ -173,8 +174,8 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) (*defangv1.TailRe
 		entries = append(entries, entry)
 	}
 	if len(entries) == 0 {
-		return nil, nil
+		return nil
 	}
 	response.Entries = entries
-	return &response, nil
+	return &response
 }

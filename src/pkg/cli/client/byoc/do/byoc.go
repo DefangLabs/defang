@@ -175,10 +175,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	serviceInfos := []*defangv1.ServiceInfo{}
 
 	for _, service := range project.Services {
-		serviceInfo, err := b.update(ctx, service)
-		if err != nil {
-			return nil, err
-		}
+		serviceInfo := b.update(service)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -540,7 +537,7 @@ func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...s
 	// return driver.Tail(ctx, pid)
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) { // nolint:unparam
 	env := b.environment()
 	if term.DoDebug() {
 		debugEnv := " -"
@@ -642,7 +639,7 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	}
 }
 
-func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(),
 		Project: b.ProjectName,
@@ -655,7 +652,7 @@ func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig)
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
-	return si, nil
+	return si
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
@@ -720,7 +717,6 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
-
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
@@ -735,7 +731,6 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 }
 
 func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
-
 	project, err := b.LoadProject(ctx)
 	appLiveURL := ""
 
@@ -761,7 +756,6 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-
 			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
@@ -827,13 +821,12 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 		}
 
 		for _, msg := range tailResp.Entries {
-			printlogs(tailResp, msg)
+			printlogs(msg)
 		}
 	}
-
 }
 
-func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
+func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused
 	env := make(map[string]string)
 	for _, envVar := range envVars {
 		env[envVar.Key] = envVar.Value
@@ -841,7 +834,7 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 	return env
 }
 
-func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
+func printlogs(msg *defangv1.LogEntry) {
 	service := msg.Service
 	etag := msg.Etag
 	ts := msg.Timestamp.AsTime()

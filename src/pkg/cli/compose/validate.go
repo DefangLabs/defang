@@ -67,7 +67,7 @@ func ValidateService(service *types.ServiceConfig) error {
 			}
 		case "NONE": // OK iff there are no ingress ports
 			if hasIngress {
-				return fmt.Errorf("invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck, see https://s.defang.io/healthchecks")
+				return errors.New("invalid healthcheck: ingress ports require a CMD or CMD-SHELL healthcheck, see https://s.defang.io/healthchecks")
 			}
 		default:
 			return fmt.Errorf("unsupported healthcheck: %v", service.HealthCheck.Test) // this will have been caught by compose-go

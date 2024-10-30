@@ -23,7 +23,6 @@ func (g *grpcWhoamiMockHandler) WhoAmI(context.Context, *connect.Request[emptypb
 		Account: "playground",
 		Region:  "us-test-2",
 	}), nil
-
 }
 
 func TestWhoami(t *testing.T) {

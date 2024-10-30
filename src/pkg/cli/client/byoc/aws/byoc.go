@@ -487,7 +487,6 @@ func (b *ByocAws) stackDir(name string) string {
 }
 
 func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
-
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
@@ -795,7 +794,6 @@ func (b *ByocAws) getEndpoint(fqn qualifiedName, port *composeTypes.ServicePortC
 	}
 	safeFqn := byoc.DnsSafeLabel(fqn)
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.ProjectDomain)
-
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
