@@ -123,7 +123,7 @@ func TestOneOrList(t *testing.T) {
 
 func TestRandomID(t *testing.T) {
 	var unique = make(map[string]bool)
-	for range [100]int{} {
+	for range 100 {
 		id := RandomID()
 		if unique[id] {
 			t.Errorf("RandomID() = %v, want unique ID", id)

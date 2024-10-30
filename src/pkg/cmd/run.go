@@ -75,7 +75,7 @@ func Run(ctx context.Context, args RunContainerArgs) error {
 	fmt.Println("Task ID:", *id)
 
 	// Try 10 times to get the public IP address
-	for range [10]int{} {
+	for range 10 {
 		info, err := driver.GetInfo(ctx, id)
 		if err != nil {
 			time.Sleep(time.Second)
