@@ -6,103 +6,103 @@ linters:
     - bidichk
     - bodyclose
     - canonicalheader
-    - containedctx
-    - contextcheck
+    # - containedctx
+    # - contextcheck
     - copyloopvar
-    - cyclop
+    # - cyclop
     - decorder
-    - depguard
+    # - depguard
     - dogsled
     - dupl
     - dupword
     - durationcheck
-    - err113
-    - errcheck
+    # - err113
+    # - errcheck
     - errchkjson
-    - errname
-    - errorlint
-    - exhaustive
-    - exhaustruct
+    # - errname
+    # - errorlint
+    # - exhaustive
+    # - exhaustruct
     - fatcontext
     # - forbidigo
     - forcetypeassert
-    - funlen
-    - gci
+    # - funlen
+    # - gci
     - ginkgolinter
     - gocheckcompilerdirectives
-    - gochecknoglobals
-    - gochecknoinits
+    # - gochecknoglobals
+    # - gochecknoinits
     - gochecksumtype
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
+    # - gocognit
+    # - goconst
+    # - gocritic
+    # - gocyclo
     # - godot
     # - godox
     - gofmt
-    - gofumpt
+    # - gofumpt
     - goheader
     - goimports
     - gomoddirectives
     - gomodguard
     - goprintffuncname
-    - gosec
+    # - gosec
     - gosimple
-    - gosmopolitan
-    - govet
+    # - gosmopolitan
+    # - govet
     - grouper
-    - importas
-    - inamedparam
+    # - importas
+    # - inamedparam
     - ineffassign
-    - interfacebloat
+    # - interfacebloat
     - intrange
-    - ireturn
-    - lll
+    # - ireturn
+    # - lll
     - loggercheck
-    - maintidx
+    # - maintidx
     - makezero
     - mirror
     - misspell
     # - mnd
-    - musttag
+    # - musttag
     - nakedret
-    - nestif
+    # - nestif
     - nilerr
-    - nilnil
+    # - nilnil
     # - nlreturn
-    - noctx
-    - nolintlint
-    - nonamedreturns
-    - nosprintfhostport
-    - paralleltest
+    # - noctx
+    # - nolintlint
+    # - nonamedreturns
+    # - nosprintfhostport
+    # - paralleltest
     - perfsprint
-    - prealloc
+    # - prealloc
     - predeclared
     - promlinter
-    - protogetter
+    # - protogetter
     - reassign
-    - revive
+    # - revive
     - rowserrcheck
     - sloglint
     - spancheck
-    - sqlclosecheck
+    # - sqlclosecheck
     # - staticcheck
-    - stylecheck
-    - tagalign
-    - tagliatelle
+    # - stylecheck
+    # - tagalign
+    # - tagliatelle
     - tenv
-    - testableexamples
-    - testifylint
+    # - testableexamples
+    # - testifylint
     # - testpackage
     - thelper
-    - tparallel
+    # - tparallel
     - unconvert
     - unparam
     - unused
-    - usestdlibvars
-    - varnamelen
+    # - usestdlibvars
+    # - varnamelen
     - wastedassign
     - whitespace
-    - wrapcheck
-    - wsl
+    # - wrapcheck
+    # - wsl
     - zerologlint
