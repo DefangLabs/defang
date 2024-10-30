@@ -359,7 +359,7 @@ jobs:
         with:
           distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
           # version: latest
-          args: continue --merge --skip announce
+          args: continue --merge --nightly --skip announce
           workdir: src
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
