@@ -35,6 +35,7 @@ services:
         - -c
         - import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()
         - http://localhost/
+      timeout: 1s
     image: flask
     networks:
       default: null
@@ -49,6 +50,7 @@ services:
         - python
         - -c
         - import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()
+      interval: 10s
     image: flask
     networks:
       default: null

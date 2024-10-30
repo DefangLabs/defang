@@ -7,11 +7,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
@@ -19,23 +22,49 @@ import (
 const maxFiles = 20
 
 var (
+	ErrDebugSkipped = errors.New("debug skipped")
+
 	errFileLimitReached = errors.New("file limit reached")
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func Debug(ctx context.Context, c client.FabricClient, etag string, project *types.Project, services []string) error {
+func InteractiveDebug(ctx context.Context, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+	var aiDebug bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Would you like to debug the deployment with AI?",
+		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
+	}, &aiDebug); err != nil {
+		term.Debugf("failed to ask for AI debug: %v", err)
+		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err))
+		return err
+	} else if !aiDebug {
+		track.Evt("Debug Prompt Skipped", P("etag", etag))
+		return ErrDebugSkipped
+	}
+
+	track.Evt("Debug Prompt Accepted", P("etag", etag))
+
+	if err := Debug(ctx, p, etag, project, failedServices); err != nil {
+		term.Warnf("Failed to debug deployment: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func Debug(ctx context.Context, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
-	files := findMatchingProjectFiles(project, services)
+	files := findMatchingProjectFiles(project, failedServices)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	resp, err := c.Debug(ctx, &defangv1.DebugRequest{
+	resp, err := p.Debug(ctx, &defangv1.DebugRequest{
 		Etag:     etag,
 		Files:    files,
-		Services: services,
+		Services: failedServices,
 	})
 	if err != nil {
 		return err
@@ -88,12 +117,12 @@ func readFile(basepath, path string) *defangv1.File {
 	}
 }
 
-func getServices(project *types.Project, names []string) types.Services {
+func getServices(project *composeTypes.Project, names []string) composeTypes.Services {
 	// project.GetServices(…) aborts if any service is not found, so we filter them out ourselves
 	if len(names) == 0 {
 		return project.Services
 	}
-	services := types.Services{}
+	services := composeTypes.Services{}
 	for _, s := range names {
 		if svc, err := project.GetService(s); err != nil {
 			term.Debug("skipped for debugging:", err)
@@ -104,7 +133,7 @@ func getServices(project *types.Project, names []string) types.Services {
 	return services
 }
 
-func findMatchingProjectFiles(project *types.Project, services []string) []*defangv1.File {
+func findMatchingProjectFiles(project *composeTypes.Project, services []string) []*defangv1.File {
 	var files []*defangv1.File
 
 	for _, path := range project.ComposeFiles {
@@ -117,7 +146,7 @@ func findMatchingProjectFiles(project *types.Project, services []string) []*defa
 		if service.Build != nil {
 			files = append(files, findMatchingFiles(project.WorkingDir, service.Build.Context, service.Build.Dockerfile)...)
 		}
-		// TODO: also consider other files, lke .dockerignore, .env, etc.
+		// TODO: also consider other files, like .dockerignore, .env, etc.
 	}
 
 	return files

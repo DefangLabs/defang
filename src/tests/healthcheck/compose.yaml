@@ -5,12 +5,14 @@ services:
       - 5000
     healthcheck:
       test: ["CMD", "python", "-c", "import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()", "http://localhost/"]
+      timeout: 1s
   flask2:
     image: flask
     ports:
       - 5000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()"]
+      interval: 10s # OK to only override interval w/o timeout
   wget:
     image: alpine
     ports:
