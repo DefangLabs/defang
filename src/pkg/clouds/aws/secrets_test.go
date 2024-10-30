@@ -4,21 +4,14 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/google/uuid"
 )
-
-func isErrCodeNotFound(err error) bool {
-	var e *types.ParameterNotFound
-	return errors.As(err, &e)
-}
 
 func TestPutSecret(t *testing.T) {
 	a := Aws{Region: Region(pkg.Getenv("AWS_REGION", "us-west-2"))}
@@ -105,13 +98,13 @@ func TestPutSecret(t *testing.T) {
 	_, err = svc.GetParameter(ctx, &ssm.GetParameterInput{
 		Name: &secretId,
 	})
-	if !isErrCodeNotFound(err) {
+	if !IsParameterNotFoundError(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)
 	}
 
 	// Delete the secret again; this should return NotFound
 	err = a.DeleteSecrets(ctx, name)
-	if !isErrCodeNotFound(err) {
+	if !IsParameterNotFoundError(err) {
 		t.Fatalf("expected ErrCodeParameterNotFound, got %v", err)
 	}
 

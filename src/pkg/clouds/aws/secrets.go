@@ -15,6 +15,9 @@ func getSecretID(name string) *string {
 	return ptr.String(name)
 }
 
+type ErrParameterNotFound = types.ParameterNotFound
+
+// Deprecated: use ErrParameterNotFound directly
 func IsParameterNotFoundError(err error) bool {
 	var e *types.ParameterNotFound
 	return errors.As(err, &e)
