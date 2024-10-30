@@ -43,11 +43,15 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		return nil, project, &ComposeError{err}
 	}
 
-	if err := compose.FixupServices(ctx, provider, project.Services, upload); err != nil {
+	// Create a new project with only the necessary resources.
+	// Do not modify the original project, because the caller needs it for debugging.
+	fixedProject := project.WithoutUnnecessaryResources()
+
+	if err := compose.FixupServices(ctx, provider, fixedProject.Services, upload); err != nil {
 		return nil, project, err
 	}
 
-	bytes, err := project.MarshalYAML()
+	bytes, err := fixedProject.MarshalYAML()
 	if err != nil {
 		return nil, project, err
 	}
@@ -70,8 +74,8 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 
 	if term.DoDebug() {
 		fmt.Println("Project:", project.Name)
-		for _, service := range resp.Services {
-			PrintObject(service.Service.Name, service)
+		for _, serviceInfo := range resp.Services {
+			PrintObject(serviceInfo.Service.Name, serviceInfo)
 		}
 	}
 	return resp, project, nil

@@ -784,8 +784,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		// FIXME: Does this need provider?
-		return cli.Debug(cmd.Context(), client, etag, project, args)
+		return cli.Debug(cmd.Context(), provider, etag, project, args)
 	},
 }
 
