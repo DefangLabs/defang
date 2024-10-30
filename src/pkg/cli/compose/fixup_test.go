@@ -13,6 +13,7 @@ import (
 
 func TestFixup(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
+		t.Helper()
 		loader := NewLoaderWithPath(path)
 		proj, err := loader.LoadProject(context.Background())
 		if err != nil {

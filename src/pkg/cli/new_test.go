@@ -39,7 +39,6 @@ func TestInitFromSamples(t *testing.T) {
 		if !errors.Is(err, ErrSampleNotFound) {
 			t.Errorf("Expected error to be %v, got %v", ErrSampleNotFound, err)
 		}
-
 	})
 
 	t.Run("wan", func(t *testing.T) {
@@ -54,6 +53,5 @@ func TestInitFromSamples(t *testing.T) {
 		if !errors.Is(err, ErrSampleNotFound) {
 			t.Errorf("Expected error to be %v, got %v", ErrSampleNotFound, err)
 		}
-
 	})
 }

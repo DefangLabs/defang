@@ -56,7 +56,6 @@ func TestLoadProjectName(t *testing.T) {
 			t.Errorf("LoadProjectName() failed: expected project name to be overwritten by env var, got %q", name)
 		}
 	})
-
 }
 
 func TestLoadProjectNameWithoutComposeFile(t *testing.T) {
@@ -133,7 +132,7 @@ func TestLoadProject(t *testing.T) {
 		}
 	})
 
-	t.Run("use project name should not be overriden by tenantID", func(t *testing.T) {
+	t.Run("use project name should not be overridden by tenantID", func(t *testing.T) {
 		loader := NewLoaderWithPath("../../../tests/testproj/compose.yaml")
 		p, err := loader.LoadProject(context.Background())
 		if err != nil {
@@ -195,7 +194,6 @@ func TestLoadProject(t *testing.T) {
 }
 
 func TestComposeGoNoDoubleWarningLog(t *testing.T) {
-
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
 		term.DefaultTerm = oldTerm

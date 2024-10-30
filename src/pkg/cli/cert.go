@@ -253,7 +253,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 
 func getWithRetries(ctx context.Context, url string, tries int) error {
 	var errs []error
-	for i := 0; i < tries; i++ {
+	for i := range make([]struct{}, tries) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return err // No point retrying if we can't even create the request

@@ -7,7 +7,6 @@ import (
 )
 
 func deleteEnvVars(toDelete string, envVars *[]*godo.AppVariableDefinition) {
-
 	var finalVars []*godo.AppVariableDefinition
 
 	for _, envVar := range *envVars {

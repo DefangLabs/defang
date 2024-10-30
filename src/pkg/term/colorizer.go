@@ -123,7 +123,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	var buf strings.Builder
 	if doColor(w) {
-		append(&buf, doColor(w), c, msg)
+		push(&buf, doColor(w), c, msg)
 		msg = buf.String()
 	}
 	return w.WriteString(msg)
@@ -131,8 +131,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 
 const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 
-func append(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
-
+func push(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 	if canColor {
 		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
 		l += n
@@ -383,5 +382,5 @@ func NewMessageBuilder(canColor bool) *MessageBuilder {
 }
 
 func (b *MessageBuilder) Printc(c Color, v ...any) (int, error) {
-	return append(&b.Builder, b.canColor, c, v...)
+	return push(&b.Builder, b.canColor, c, v...)
 }
