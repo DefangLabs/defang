@@ -244,7 +244,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 							if verbose {
 								modeStr = "ON"
 							}
-							if toggleCount++; toggleCount == 2 && !verbose {
+							if toggleCount++; toggleCount == 4 && !verbose {
 								modeStr += ". I like the way you work it, no verbosity."
 							}
 							term.Info("Verbose mode", modeStr)
