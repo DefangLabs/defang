@@ -63,13 +63,17 @@ type ByocAws struct {
 
 var _ client.Provider = (*ByocAws)(nil)
 
-func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
+func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocAws, error) {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
 		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
-	return b
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		return b, errors.New("AWS_REGION must be set (https://docs.defang.io/docs/providers/aws#region)")
+	}
+	return b, nil
 }
 
 func (b *ByocAws) setUp(ctx context.Context) error {

@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	port8080 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 8080}
 	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
 	tests := []struct {
+		Region      string
 		ProjectName string
 		TenantID    types.TenantID
 		Fqn         string
@@ -33,23 +35,33 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PublicFqdn  string
 		PrivateFqdn string
 	}{
-		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
-		{"project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
-		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
-		{"tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"us-west-2", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"us-west-2", "tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
+		{"us-west-2", "project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"us-west-2", "Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"us-west-2", "project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
+		{"us-west-2", "project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
+		{"us-west-2", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"us-west-2", "tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
+		{"us-west-2", "Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"us-west-2", "Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
+		{"us-west-2", "tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
 	}
 
+	origRegion := os.Getenv("AWS_REGION")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
+			os.Setenv("AWS_REGION", tt.Region)
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByocProvider(context.Background(), *grpcClient, tt.TenantID)
+			b, err := NewByocClient(context.Background(), *grpcClient, tt.TenantID)
+			if err != nil {
+				if tt.Region == "" {
+					return
+				}
+				t.Fatalf("NewByocClient() failed: %v", err)
+			}
 			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}
@@ -161,6 +173,30 @@ func TestSubscribe(t *testing.T) {
 			resp.Close()
 
 			wg.Wait()
+		})
+	}
+}
+
+func TestNewByocClient(t *testing.T) {
+	tests := []struct {
+		Region        string
+		Name          string
+		ExpectedError bool
+	}{
+		{"us-west-2", "AWS Region set", false},
+		{"", "AWS Region not set", true}}
+
+	origRegion := os.Getenv("AWS_REGION")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			os.Setenv("AWS_REGION", tt.Region)
+			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
+			_, err := NewByocClient(context.Background(), *grpcClient, "tenant1")
+			errorOccured := (err != nil)
+			if errorOccured != tt.ExpectedError {
+				t.Fatalf("Failed: expected error to show %t, but got %t", tt.ExpectedError, errorOccured)
+			}
 		})
 	}
 }

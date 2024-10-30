@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,7 +16,13 @@ import (
 var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "ten ant") // no domain
+	origRegion := os.Getenv("AWS_REGION")
+	os.Setenv("AWS_REGION", "us-west-2")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	b, err := NewByocClient(ctx, client.GrpcClient{}, "ten ant") // no domain
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.ProjectName = "byoc_integration_test"
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
@@ -41,7 +48,13 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestTail")
+	origRegion := os.Getenv("AWS_REGION")
+	os.Setenv("AWS_REGION", "us-west-2")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	b, err := NewByocClient(ctx, client.GrpcClient{}, "TestTail")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.ProjectName = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
 
@@ -69,7 +82,13 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestGetServices")
+	origRegion := os.Getenv("AWS_REGION")
+	os.Setenv("AWS_REGION", "us-west-2")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	b, err := NewByocClient(ctx, client.GrpcClient{}, "TestGetServices")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.ProjectName = "byoc_integration_test"
 
 	services, err := b.GetServices(context.Background())
@@ -89,7 +108,13 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestPutSecret")
+	origRegion := os.Getenv("AWS_REGION")
+	os.Setenv("AWS_REGION", "us-west-2")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	b, err := NewByocClient(ctx, client.GrpcClient{}, "TestPutSecret")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.ProjectName = "byoc_integration_test"
 
 	t.Run("delete non-existent", func(t *testing.T) {
@@ -141,7 +166,13 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByocClient(ctx, client.GrpcClient{}, "TestListSecrets")
+	origRegion := os.Getenv("AWS_REGION")
+	os.Setenv("AWS_REGION", "us-west-2")
+	defer func() { os.Setenv("AWS_REGION", origRegion) }()
+	b, err := NewByocClient(ctx, client.GrpcClient{}, "TestListSecrets")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 
 	t.Run("list", func(t *testing.T) {
