@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	help   = pflag.BoolP("help", "h", false, "Show this help message")
+	_      = pflag.BoolP("help", "h", false, "Show this help message")
 	region = pflag.StringP("region", "r", os.Getenv("AWS_REGION"), "Which cloud region to use, or blank for local Docker")
 
 	runFlags = pflag.NewFlagSet(os.Args[0]+" run", pflag.ExitOnError)

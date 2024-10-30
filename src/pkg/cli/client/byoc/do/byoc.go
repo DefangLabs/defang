@@ -830,7 +830,7 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 
 }
 
-func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
+func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused
 	env := make(map[string]string)
 	for _, envVar := range envVars {
 		env[envVar.Key] = envVar.Value

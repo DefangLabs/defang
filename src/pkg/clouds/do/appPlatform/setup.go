@@ -200,7 +200,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 }
 
 // From https://github.com/digitalocean/doctl/blob/7fd3b7b253c7d6847b6b78d400eb26ed9be60796/commands/apps.go#L494
-func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID string, deploymentID string) error {
+func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID string, deploymentID string) error { // nolint: unused
 	const maxAttempts = 180
 	attempts := 0
 	printNewLineSet := false
