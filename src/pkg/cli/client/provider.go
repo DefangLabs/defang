@@ -55,13 +55,16 @@ func (p ProviderID) Type() string {
 }
 
 type Provider interface {
+	AccountInfo(context.Context) (AccountInfo, error)
 	BootstrapCommand(context.Context, string) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
+	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context) (types.ETag, error)
+	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context) (*defangv1.Secrets, error)
@@ -69,9 +72,7 @@ type Provider interface {
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	ServiceDNS(name string) string
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
-	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	TearDown(context.Context) error
-	AccountInfo(context.Context) (AccountInfo, error)
 
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -16,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
 
@@ -167,7 +165,12 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
-					interactiveAIDebug(cmd.Context(), errDeploymentFailed, deploy, project)
+					if !nonInteractive {
+						failedServices := []string{errDeploymentFailed.Service}
+						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+						_ = cli.InteractiveDebug(cmd.Context(), provider, deploy.Etag, project, failedServices)
+					}
 					return err
 				}
 			}
@@ -196,29 +199,6 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
-}
-
-func interactiveAIDebug(ctx context.Context, errDeploymentFailed cli.ErrDeploymentFailed, deploy *defangv1.DeployResponse, project *composeTypes.Project) {
-	if !nonInteractive {
-		failedServices := []string{errDeploymentFailed.Service}
-		track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
-		var aiDebug bool
-		if err := survey.AskOne(&survey.Confirm{
-			Message: "Would you like to debug the deployment with AI?",
-			Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
-		}, &aiDebug); err != nil {
-			term.Debugf("failed to ask for AI debug: %v", err)
-			track.Evt("Debug Prompt Failed", P("etag", deploy.Etag), P("reason", err))
-		} else if aiDebug {
-			track.Evt("Debug Prompt Accepted", P("etag", deploy.Etag))
-			// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-			if err := cli.Debug(ctx, client, deploy.Etag, project, failedServices); err != nil {
-				term.Warnf("failed to debug deployment: %v", err)
-			}
-		} else {
-			track.Evt("Debug Prompt Skipped", P("etag", deploy.Etag))
-		}
-	}
 }
 
 func makeComposeStartCmd() *cobra.Command {
