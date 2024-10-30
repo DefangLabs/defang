@@ -732,11 +732,19 @@ func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
+	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
+			mode := defangv1.Mode_INGRESS
+			if port.Mode == compose.Mode_HOST {
+				mode = defangv1.Mode_HOST
+			}
+			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
+				Target: port.Target,
+				Mode:   mode,
+			})
 		}
 	} else {
 		si.PublicFqdn = b.getPublicFqdn(fqn)
