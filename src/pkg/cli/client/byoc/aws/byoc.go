@@ -490,6 +490,11 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
+			// FillOutputs might fail if the stack is not created yet; return empty update in that case
+			var cfnErr *cfn.ErrStackNotFoundException
+			if errors.As(err, &cfnErr) {
+				return nil, nil // no services yet
+			}
 			return nil, byoc.AnnotateAwsError(err)
 		}
 		bucketName = b.bucketName()
