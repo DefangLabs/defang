@@ -55,12 +55,12 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
 			os.Setenv("AWS_REGION", tt.Region)
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b, err := NewByocClient(context.Background(), *grpcClient, tt.TenantID)
+			b, err := NewByocProvider(context.Background(), *grpcClient, tt.TenantID)
 			if err != nil {
 				if tt.Region == "" {
 					return
 				}
-				t.Fatalf("NewByocClient() failed: %v", err)
+				t.Fatalf("NewByocProvider() failed: %v", err)
 			}
 			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
@@ -177,7 +177,7 @@ func TestSubscribe(t *testing.T) {
 	}
 }
 
-func TestNewByocClient(t *testing.T) {
+func TestNewByocProvider(t *testing.T) {
 	tests := []struct {
 		Region        string
 		Name          string
@@ -192,7 +192,7 @@ func TestNewByocClient(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			os.Setenv("AWS_REGION", tt.Region)
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
-			_, err := NewByocClient(context.Background(), *grpcClient, "tenant1")
+			_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
 			errorOccured := (err != nil)
 			if errorOccured != tt.ExpectedError {
 				t.Fatalf("Failed: expected error to show %t, but got %t", tt.ExpectedError, errorOccured)
