@@ -29,7 +29,7 @@ const (
 	UploadModeDigest  UploadMode = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
 	UploadModeForce                     // force: always upload the tarball, even if it's the same as a previous one
 	UploadModeIgnore                    // dry-run: don't upload the tarball, just return the path
-	UploadModePreview                   // preview: like dry-run but also don't deploy
+	UploadModePreview                   // preview: like dry-run but does start the preview command
 )
 
 const (
