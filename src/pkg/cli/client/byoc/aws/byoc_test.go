@@ -193,9 +193,9 @@ func TestNewByocProvider(t *testing.T) {
 			os.Setenv("AWS_REGION", tt.Region)
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
 			_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
-			errorOccured := (err != nil)
-			if errorOccured != tt.ExpectedError {
-				t.Fatalf("Failed: expected error to show %t, but got %t", tt.ExpectedError, errorOccured)
+			errorOccurred := (err != nil)
+			if errorOccurred != tt.ExpectedError {
+				t.Fatalf("Failed: expected error to show %t, but got %t", tt.ExpectedError, errorOccurred)
 			}
 		})
 	}

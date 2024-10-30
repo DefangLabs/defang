@@ -86,18 +86,18 @@ func NewClient(ctx context.Context, cluster string, providerID client.ProviderID
 	switch providerID {
 	case client.ProviderAWS:
 		term.Info("Using AWS provider")
-		byocProvider, err := aws.NewByocProvider(ctx, grpcClient, tenantId)
+		awsProvider, err := aws.NewByocProvider(ctx, grpcClient, tenantId)
 		if err != nil {
 			term.Fatal(err)
 		}
-		return grpcClient, byocProvider
+		return grpcClient, awsProvider
 	case client.ProviderDO:
 		term.Info("Using DigitalOcean provider")
-		byocProvider, err := do.NewByocProvider(ctx, grpcClient, tenantId)
+		doProvider, err := do.NewByocProvider(ctx, grpcClient, tenantId)
 		if err != nil {
 			term.Fatal(err)
 		}
-		return grpcClient, byocProvider
+		return grpcClient, doProvider
 	default:
 		term.Info("Using Defang Playground; consider using BYOC (https://s.defang.io/byoc)")
 		return grpcClient, &client.PlaygroundProvider{GrpcClient: grpcClient}
