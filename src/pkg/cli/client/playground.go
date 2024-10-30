@@ -18,14 +18,6 @@ type PlaygroundProvider struct {
 	projectName string
 }
 
-func (g PlaygroundProvider) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	if g.project != nil {
-		return g.project, nil
-	}
-
-	return g.Loader.LoadProject(ctx)
-}
-
 func (g PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
@@ -75,12 +67,7 @@ func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailReque
 func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, command string) (types.ETag, error) {
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
-func (g *PlaygroundProvider) Destroy(ctx context.Context) (types.ETag, error) {
-	projectName, err := g.LoadProjectName(ctx)
-	if err != nil {
-		return "", err
-	}
-
+func (g *PlaygroundProvider) Destroy(ctx context.Context, projectName, delegateDomain string) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
 	servicesList, err := g.GetServices(ctx)
 	if err != nil {
@@ -112,19 +99,7 @@ func (g PlaygroundProvider) ServiceDNS(name string) string {
 	return string(g.TenantID) + "-" + name
 }
 
-func (g PlaygroundProvider) LoadProjectName(ctx context.Context) (string, error) {
-	if g.projectName != "" {
-		return g.projectName, nil
-	}
-
-	name, err := g.Loader.LoadProjectName(ctx)
-	if err == nil {
-		return name, nil
-	}
-	if !errors.Is(err, types.ErrComposeFileNotFound) {
-		return "", err
-	}
-
+func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
 	// Hack: Use GetServices to get the current project name
 	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
 	resp, err := g.GetServices(ctx)

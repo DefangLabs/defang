@@ -51,7 +51,7 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, provider, fixedProject.Services, upload); err != nil {
+	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 

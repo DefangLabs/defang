@@ -71,8 +71,8 @@ func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId
 		client: client,
 		driver: appPlatform.New(doRegion),
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
-	b.ProjectName, _ = b.LoadProjectName(ctx)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+	// b.ProjectName, _ = b.LoadProjectName(ctx)
 	return b, nil
 }
 
