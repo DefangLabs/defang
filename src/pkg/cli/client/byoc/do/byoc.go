@@ -514,39 +514,17 @@ func (b *ByocDo) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRe
 	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
 }
 
-func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
-	return errors.ErrUnsupported // TODO: implement for Windows
-	// driver := local.New()
-	// if err := driver.SetUp(ctx, []types.Container{{
-	// 	EntryPoint: []string{"npm", "run", "dev"},
-	// 	WorkDir:    dir,
-	// }}); err != nil {
-	// 	return err
-	// }
-	// localEnv := map[string]string{
-	// 	"PATH": os.Getenv("PATH"),
-	// }
-	// for _, v := range b.environment() {
-	// 	localEnv[v.Key] = v.Value
-	// }
-	// pid, err := driver.Run(ctx, localEnv, cmd...)
-	// if err != nil {
-	// 	return err
-	// }
-	// return driver.Tail(ctx, pid)
-}
-
 func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
 	env := b.environment(projectName, delegateDomain)
 	if term.DoDebug() {
-		debugEnv := " -"
-		for _, v := range env {
-			debugEnv += " " + v.Key + "=" + v.Value
+		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
+		debugEnv := make([]string, len(env))
+		for i, v := range env {
+			debugEnv[i] = v.Key + "=" + v.Value
 		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
-	}
-	if dir := os.Getenv("DEFANG_PULUMI_DIR"); dir != "" {
-		return nil, b.runLocalPulumiCommand(ctx, dir, cmd...)
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+			return nil, err
+		}
 	}
 	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
