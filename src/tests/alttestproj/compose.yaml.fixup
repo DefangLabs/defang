@@ -8,7 +8,7 @@
     "deploy": {
       "replicas": 1,
       "resources": {
-        "reservations": {
+        "limits": {
           "memory": "268435456"
         }
       },

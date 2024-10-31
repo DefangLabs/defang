@@ -5,5 +5,5 @@ services:
     build: .
     deploy:
       resources:
-        reservations:
+        limits:
           memory: 256M
