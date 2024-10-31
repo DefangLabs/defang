@@ -15,7 +15,7 @@ const NetworkPublic = "public"
 
 func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := provider.ListConfig(ctx, project.Name)
+	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
 		config = &defangv1.Secrets{}

@@ -8,7 +8,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type PlaygroundProvider struct {
@@ -17,24 +16,24 @@ type PlaygroundProvider struct {
 
 var _ Provider = (*PlaygroundProvider)(nil)
 
-func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest, projectName string) (*defangv1.DeployResponse, error) {
+func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.ServiceID, projectName string) (*defangv1.ServiceInfo, error) {
+func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
+func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) GetServices(ctx context.Context, projectName string) (*defangv1.ListServicesResponse, error) {
-	return getMsg(g.client.GetServices(ctx, &connect.Request[emptypb.Empty]{}))
+func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+	return getMsg(g.client.GetServices(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
@@ -47,8 +46,8 @@ func (g *PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Sec
 	return err
 }
 
-func (g *PlaygroundProvider) ListConfig(ctx context.Context, projectName string) (*defangv1.Secrets, error) {
-	return getMsg(g.client.ListSecrets(ctx, &connect.Request[emptypb.Empty]{}))
+func (g *PlaygroundProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	return getMsg(g.client.ListSecrets(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -63,12 +62,12 @@ func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailReque
 	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, projectName, delegateDomain, command string) (types.ETag, error) {
+func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, req BootstrapCommandRequest) (types.ETag, error) {
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
-func (g *PlaygroundProvider) Destroy(ctx context.Context, projectName, delegateDomain string) (types.ETag, error) {
+func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
 	// Get all the services in the project and delete them all at once
-	servicesList, err := g.GetServices(ctx, projectName)
+	servicesList, err := g.GetServices(ctx, &defangv1.GetServicesRequest{Project: req.Project})
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +78,7 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, projectName, delegateD
 	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names}, delegateDomain)
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: req.Project, Names: names})
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +100,7 @@ func (g PlaygroundProvider) ServiceDNS(name string) string {
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
 	// Hack: Use GetServices to get the current project name
 	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
-	resp, err := g.GetServices(ctx, "")
+	resp, err := g.GetServices(ctx, &defangv1.GetServicesRequest{})
 	if err != nil {
 		return "", err
 	}

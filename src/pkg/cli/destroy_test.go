@@ -11,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type grpcDestroyMockHandler struct {
@@ -24,7 +23,7 @@ func (g *grpcDestroyMockHandler) Delete(context.Context, *connect.Request[defang
 	}), nil
 }
 
-func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.ListServicesResponse], error) {
+func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.ListServicesResponse], error) {
 	return connect.NewResponse(&defangv1.ListServicesResponse{
 		Project: "tenantx",
 		Services: []*defangv1.ServiceInfo{
@@ -48,7 +47,7 @@ func TestDestroy(t *testing.T) {
 	grpcClient := Connect(url, loader)
 	client := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
-	etag, err := client.Destroy(ctx)
+	etag, err := client.Destroy(ctx, &defangv1.DestroyRequest{Project: "test-project"})
 	if err != nil {
 		t.Fatal(err)
 	}

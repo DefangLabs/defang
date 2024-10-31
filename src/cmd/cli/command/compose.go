@@ -59,7 +59,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
-					if resp, err2 := provider.GetServices(cmd.Context(), project.Name); err2 == nil {
+					if resp, err2 := provider.GetServices(cmd.Context(), &defangv1.GetServicesRequest{Project: project.Name}); err2 == nil {
 						term.Error("Error:", prettyError(err))
 						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, provider, resp.Project); err != nil {
 							term.Debug("ComposeDown failed:", err)

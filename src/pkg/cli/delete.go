@@ -21,7 +21,7 @@ func Delete(ctx context.Context, client client.FabricClient, provider client.Pro
 		term.Debug("Failed to get delegate domain:", err)
 	}
 
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names}, delegateDomain.Zone)
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names, DelegateDomain: delegateDomain.Zone})
 	if err != nil {
 		return "", err
 	}

@@ -151,15 +151,15 @@ func (b *ByocAws) getCdImageTag(ctx context.Context, projectName string) (string
 	return deploymentCdImageTag, nil
 }
 
-func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, delegateDomain, "up")
+func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, delegateDomain, "preview")
+func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose)
 	if err != nil {
@@ -177,7 +177,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, deleg
 
 	serviceInfos := []*defangv1.ServiceInfo{}
 	for _, service := range project.Services {
-		serviceInfo, err := b.update(ctx, project.Name, delegateDomain, service)
+		serviceInfo, err := b.update(ctx, project.Name, req.DelegateDomain, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
@@ -397,8 +397,8 @@ func (i AWSAccountInfo) Details() string {
 	return i.arn
 }
 
-func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID, projectName string) (*defangv1.ServiceInfo, error) {
-	all, err := b.GetServices(ctx, projectName)
+func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: s.Project})
 	if err != nil {
 		return nil, err
 	}
@@ -454,12 +454,15 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 	return b.driver.Run(ctx, env, cmd...)
 }
 
-func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
+func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	if len(req.Names) > 0 {
+		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
+	}
 	if err := b.setUpCD(ctx, req.Project); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, delegateDomain, "up", "")
+	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, req.DelegateDomain, "up", "") // Empty protobuf
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
 	}
@@ -525,8 +528,8 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*de
 	return &projUpdate, nil
 }
 
-func (b *ByocAws) GetServices(ctx context.Context, projectName string) (*defangv1.ListServicesResponse, error) {
-	projUpdate, err := b.getProjectUpdate(ctx, projectName)
+func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +557,8 @@ func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigReque
 	return byoc.AnnotateAwsError(err)
 }
 
-func (b *ByocAws) ListConfig(ctx context.Context, projectName string) (*defangv1.Secrets, error) {
-	prefix := b.getSecretID(projectName, "")
+func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	prefix := b.getSecretID(req.Project, "")
 	term.Debugf("Listing parameters with prefix %q", prefix)
 	awsSecrets, err := b.driver.ListSecretsByPrefix(ctx, prefix)
 	if err != nil {
@@ -817,19 +820,19 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
 }
 
-func (b *ByocAws) BootstrapCommand(ctx context.Context, projectName, delegateDomain string, command string) (string, error) {
-	if err := b.setUpCD(ctx, projectName); err != nil {
+func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+	if err := b.setUpCD(ctx, req.Project); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, projectName, delegateDomain, command)
+	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, "dummy.domain", req.Command) // TODO: make domain optional for defang cd
 	if err != nil || cdTaskArn == nil {
 		return "", byoc.AnnotateAwsError(err)
 	}
 	return ecs.GetTaskID(cdTaskArn), nil
 }
 
-func (b *ByocAws) Destroy(ctx context.Context, projectName, delegateDomain string) (string, error) {
-	return b.BootstrapCommand(ctx, projectName, delegateDomain, "down")
+func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
+	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {

@@ -4,19 +4,18 @@ import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func LoadProjectName(ctx context.Context, loader compose.Loader, provider client.Provider) (string, error) {
-	project, err := loader.LoadProject(ctx)
+func LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+	projectName, err := loader.LoadProjectName(ctx)
 	if err == nil {
-		return project.Name, nil
+		return projectName, nil
 	}
 
 	term.Debug("Failed to load local project:", err)
 	term.Debug("Trying to get the remote project name from the provider")
-	projectName, err := provider.RemoteProjectName(ctx)
+	projectName, err = provider.RemoteProjectName(ctx)
 	if err != nil {
 		return "", err
 	}

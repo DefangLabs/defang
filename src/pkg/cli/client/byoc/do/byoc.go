@@ -153,15 +153,15 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context, projectName string) (*def
 	return &projUpdate, nil
 }
 
-func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, delegateDomain, "preview")
+func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
 }
 
-func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, delegateDomain, "up")
+func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
 }
 
-func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain, cmd string) (*defangv1.DeployResponse, error) {
+func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose)
 	if err != nil {
@@ -229,7 +229,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, delega
 		return nil, err
 	}
 
-	_, err = b.runCdCommand(ctx, project.Name, delegateDomain, cmd, payloadString)
+	_, err = b.runCdCommand(ctx, project.Name, req.DelegateDomain, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -240,12 +240,12 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, delega
 	}, nil
 }
 
-func (b *ByocDo) BootstrapCommand(ctx context.Context, projectName, delegateDomain, command string) (string, error) {
-	if err := b.setUp(ctx, projectName); err != nil {
+func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
+	if err := b.setUp(ctx, req.Project); err != nil {
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, projectName, delegateDomain, command)
+	_, err := b.runCdCommand(ctx, req.Project, "dummy.domain", req.Command)
 	if err != nil {
 		return "", err
 	}
@@ -284,12 +284,12 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 	}, nil
 }
 
-func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
+func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 
-func (b *ByocDo) Destroy(ctx context.Context, projectName, delegateDomain string) (string, error) {
-	return b.BootstrapCommand(ctx, projectName, delegateDomain, "down")
+func (b *ByocDo) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
+	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
@@ -313,10 +313,10 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 	return err
 }
 
-func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID, projectName string) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
 	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
 	//Only used in Tail
-	app, err := b.getAppByName(ctx, projectName)
+	app, err := b.getAppByName(ctx, s.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID, projectN
 
 	for _, service := range app.Spec.Services {
 		if service.Name == s.Name {
-			serviceInfo = b.processServiceInfo(service, projectName)
+			serviceInfo = b.processServiceInfo(service, s.Project)
 		}
 	}
 
@@ -347,9 +347,9 @@ func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.Servi
 	return app, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context, projectName string) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
 	resp := defangv1.ListServicesResponse{}
-	_, err := b.getProjectInfo(ctx, &resp.Services, projectName)
+	_, err := b.getProjectInfo(ctx, &resp.Services, req.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -357,8 +357,8 @@ func (b *ByocDo) GetServices(ctx context.Context, projectName string) (*defangv1
 	return &resp, err
 }
 
-func (b *ByocDo) ListConfig(ctx context.Context, projectName string) (*defangv1.Secrets, error) {
-	app, err := b.getAppByName(ctx, projectName)
+func (b *ByocDo) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	app, err := b.getAppByName(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -396,10 +396,6 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	_, _, err = b.client.Apps.Update(ctx, app.ID, &godo.AppUpdateRequest{Spec: app.Spec})
 
 	return err
-}
-
-func (b *ByocDo) ServiceDNS(name string) string {
-	return name // FIXME: what name should we use?
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {

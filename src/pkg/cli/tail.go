@@ -144,7 +144,7 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, loader compose.Loader, provider client.Provider, params TailOptions) error {
+func Tail(ctx context.Context, loader client.Loader, provider client.Provider, params TailOptions) error {
 	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
@@ -155,7 +155,7 @@ func Tail(ctx context.Context, loader compose.Loader, provider client.Provider, 
 		for _, service := range params.Services {
 			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Name: service}, projectName); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
 					term.Warn("Service does not exist (yet):", service)

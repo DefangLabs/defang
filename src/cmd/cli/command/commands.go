@@ -93,7 +93,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			if resp, err := provider.GetServices(ctx, projectName); err == nil {
+			if resp, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName}); err == nil {
 				projectName = resp.Project
 			}
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)

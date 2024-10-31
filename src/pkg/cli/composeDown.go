@@ -18,17 +18,17 @@ func ComposeDown(ctx context.Context, client client.FabricClient, provider clien
 		return "", ErrDryRun
 	}
 
+	if len(names) == 0 {
+		// If no names are provided, destroy the entire project
+		return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+	}
+
 	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
 	}
 
-	if len(names) == 0 {
-		// If no names are provided, destroy the entire project
-		return provider.Destroy(ctx, projectName, delegateDomain.Zone)
-	}
-
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names}, delegateDomain.Zone)
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
 	if err != nil {
 		return "", err
 	}

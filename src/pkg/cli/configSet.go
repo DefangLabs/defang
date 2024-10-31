@@ -4,12 +4,11 @@ import (
 	"context"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigSet(ctx context.Context, loader compose.Loader, provider client.Provider, name string, value string) error {
+func ConfigSet(ctx context.Context, loader client.Loader, provider client.Provider, name string, value string) error {
 	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
