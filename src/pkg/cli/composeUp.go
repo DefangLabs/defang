@@ -20,7 +20,7 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
+func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
 	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
@@ -31,7 +31,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, client client.FabricCl
 	}
 
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-		configs, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+		configs, err := p.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, client client.FabricCl
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, provider, fixedProject, upload); err != nil {
+	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 
@@ -66,7 +66,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, client client.FabricCl
 	}
 
 	// FIXME: When do we actually do the domain delegation?
-	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
 	}
@@ -74,9 +74,18 @@ func ComposeUp(ctx context.Context, loader client.Loader, client client.FabricCl
 	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes, DelegateDomain: delegateDomain.Zone}
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
-		resp, err = provider.Preview(ctx, deployRequest)
+		resp, err = p.Preview(ctx, deployRequest)
 	} else {
-		resp, err = provider.Deploy(ctx, deployRequest)
+
+		preq := client.DelegateDomainNSServersRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
+		nsServers, err := p.DelegateDomainNSServers(ctx, preq)
+		creq := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+		_, err = c.DelegateSubdomainZone(ctx, creq)
+		if err != nil {
+			return nil, project, err
+		}
+
+		resp, err = p.Deploy(ctx, deployRequest)
 	}
 	if err != nil {
 		return nil, project, err
