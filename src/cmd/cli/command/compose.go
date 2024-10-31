@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -27,15 +26,18 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func getUnreferencedManagedResources(serviceInfos compose.Services) []string {
-	managedResources := make([]string, 0)
+func splitProjectServicesByManageType(serviceInfos compose.Services) ([]string, []string) {
+	managedServices := make([]string, 0)
+	unmanagedServices := make([]string, 0)
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			managedResources = append(managedResources, service.Name)
+			managedServices = append(managedServices, service.Name)
+		} else {
+			unmanagedServices = append(unmanagedServices, service.Name)
 		}
 	}
 
-	return managedResources
+	return managedServices, unmanagedServices
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -83,9 +85,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = getUnreferencedManagedResources(project.Services)
-			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
+			managedServices, unmanagedServices := splitProjectServicesByManageType(project.Services)
+
+			if len(managedServices) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
 			if detach {
@@ -105,27 +108,28 @@ func makeComposeUpCmd() *cobra.Command {
 			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
-			go func() {
-				monitoredServices := make([]string, 0, len(deploy.Services)-len(managedResources))
-				for _, serviceInfo := range deploy.Services {
-
-					// do not monitor managed resources, they do not currently update their status
-					if !slices.Contains(managedResources, serviceInfo.Service.Name) {
-						monitoredServices = append(monitoredServices, serviceInfo.Service.Name)
+			if len(unmanagedServices) > 0 {
+				go func() {
+					if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
+						var errDeploymentFailed cli.ErrDeploymentFailed
+						var errNothingToDeploy cli.ErrNothingToDeploy
+						if errors.As(err, &errDeploymentFailed) {
+							cancelTail(err)
+						} else if errors.As(err, &errNothingToDeploy) {
+							term.Warnf("no services to monitor")
+							cancelTail(err)
+						} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+							term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
+						}
+					} else {
+						cancelTail(errCompleted)
 					}
-				}
-
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, monitoredServices); err != nil {
-					var errDeploymentFailed cli.ErrDeploymentFailed
-					if errors.As(err, &errDeploymentFailed) {
-						cancelTail(err)
-					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
-					}
-				} else {
-					cancelTail(errCompleted)
-				}
-			}()
+				}()
+			} else {
+				term.Warnf("there are no other services to monitor")
+				errMonitoringServices := errors.New("no services to monitor")
+				cancelTail(errMonitoringServices)
+			}
 
 			// show users the current streaming logs
 			tailSource := "all services"
