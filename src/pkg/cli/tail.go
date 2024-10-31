@@ -27,7 +27,7 @@ const (
 	ansiCyan      = "\033[36m"
 	ansiReset     = "\033[0m"
 	replaceString = ansiCyan + "$0" + ansiReset
-	RFC3339Micro  = "2006-01-02T15:04:05.000000Z07:00" // like RFC3339Nano but with 6 digits of precision
+	RFC3339Milli  = "2006-01-02T15:04:05.000Z07:00" // like RFC3339Nano but with 3 digits of precision
 )
 
 var (
@@ -329,7 +329,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 				continue
 			}
 
-			tsString := ts.Local().Format(RFC3339Micro)
+			tsString := ts.Local().Format(RFC3339Milli)
 			tsColor := termenv.ANSIBrightBlack
 			if term.HasDarkBackground() {
 				tsColor = termenv.ANSIWhite
