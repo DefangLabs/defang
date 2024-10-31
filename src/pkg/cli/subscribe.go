@@ -26,6 +26,10 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		return ErrDryRun
 	}
 
+	if len(services) == 0 {
+		return nil
+	}
+
 	// Assume "services" are normalized service names
 	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)

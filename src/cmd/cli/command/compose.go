@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -105,12 +106,16 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				services := make([]string, len(deploy.Services))
-				for i, serviceInfo := range deploy.Services {
-					services[i] = serviceInfo.Service.Name
+				monitoredServices := make([]string, 0, len(deploy.Services)-len(managedResources))
+				for _, serviceInfo := range deploy.Services {
+
+					// do not monitor managed services, they do not currently update their status
+					if !slices.Contains(managedResources, serviceInfo.Service.Name) {
+						monitoredServices = append(monitoredServices, serviceInfo.Service.Name)
+					}
 				}
 
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, services); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, monitoredServices); err != nil {
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
