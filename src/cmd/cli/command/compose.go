@@ -109,7 +109,7 @@ func makeComposeUpCmd() *cobra.Command {
 				monitoredServices := make([]string, 0, len(deploy.Services)-len(managedResources))
 				for _, serviceInfo := range deploy.Services {
 
-					// do not monitor managed services, they do not currently update their status
+					// do not monitor managed resources, they do not currently update their status
 					if !slices.Contains(managedResources, serviceInfo.Service.Name) {
 						monitoredServices = append(monitoredServices, serviceInfo.Service.Name)
 					}
