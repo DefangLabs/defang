@@ -3,6 +3,9 @@ package byoc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -13,7 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 const (
@@ -70,7 +73,7 @@ type ByocBaseClient struct {
 	ShouldDelegateSubdomain bool
 	TenantID                string
 
-	project         *compose.Project
+	project         *composeTypes.Project
 	bootstrapLister BootstrapLister
 }
 
@@ -81,7 +84,7 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 		ProjectName: "",     // To be overwritten by LoadProject
 		PulumiStack: "beta", // TODO: make customizable
 		Quota: quota.Quotas{
-			// These serve mostly to pevent fat-finger errors in the CLI or Compose files
+			// These serve mostly to prevent fat-finger errors in the CLI or Compose files
 			ServiceQuotas: quota.ServiceQuotas{
 				Cpus:       16,
 				Gpus:       8,
@@ -97,6 +100,41 @@ func NewByocBaseClient(ctx context.Context, grpcClient client.GrpcClient, tenant
 		bootstrapLister: bl,
 	}
 	return b
+}
+
+func MakeEnv(key string, value any) string {
+	return fmt.Sprintf("%s=%q", key, value)
+}
+
+func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
+	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
+	command.Dir = dir
+	command.Env = env
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command.Run()
+}
+
+func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
+	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
+	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
+	term.Debug(strings.Join(append(env, localCmd...), " "))
+
+	dir := os.Getenv("DEFANG_PULUMI_DIR")
+	if dir == "" {
+		return nil // show the shell command, but use regular Pulumi command in cloud task
+	}
+
+	// Run the Pulumi command locally
+	env = append([]string{
+		"PATH=" + os.Getenv("PATH"),
+		"USER=" + os.Getenv("USER"), // needed for Pulumi
+	}, env...)
+	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
+		return err
+	}
+	// We always return an error to stop the CLI from "tailing" the cloud logs
+	return errors.New("local pulumi command succeeded; stopping")
 }
 
 func GetCdImage(repo string, tag string) string {
@@ -117,7 +155,7 @@ func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error)
 	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
-func (b *ByocBaseClient) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (b *ByocBaseClient) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
 	if b.project != nil {
 		return b.project, nil
 	}

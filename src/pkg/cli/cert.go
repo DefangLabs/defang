@@ -13,7 +13,9 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cert"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -75,30 +77,30 @@ var (
 	httpRetryDelayBase = 5 * time.Second
 )
 
-func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error {
-	projectName, err := client.LoadProjectName(ctx)
+func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, provider client.Provider) error {
+	project, err := provider.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
-	term.Debugf("Generating TLS cert for project %q", projectName)
+	term.Debugf("Generating TLS cert for project %q", project.Name)
 
-	services, err := client.GetServices(ctx)
+	services, err := provider.GetServices(ctx)
 	if err != nil {
 		return err
 	}
 
 	cnt := 0
-	for _, service := range services.Services {
-		if service.Service != nil && service.Service.Domainname != "" && service.ZoneId == "" {
+	for _, serviceInfo := range services.Services {
+		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
 			cnt++
-			targets := []string{service.PublicFqdn}
-			for i, endpoint := range service.Endpoints {
-				if service.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
+			targets := []string{serviceInfo.PublicFqdn}
+			for i, endpoint := range serviceInfo.Endpoints {
+				if service.Ports[i].Mode == compose.Mode_INGRESS {
 					targets = append(targets, endpoint)
 				}
 			}
-			term.Debugf("Found service %v with domain %v and targets %v", service.Service.Name, service.Service.Domainname, targets)
-			generateCert(ctx, service.Service.Domainname, targets, client)
+			term.Debugf("Found service %v with domain %v and targets %v", service.Name, service.DomainName, targets)
+			generateCert(ctx, service.DomainName, targets, client)
 		}
 	}
 	if cnt == 0 {
@@ -108,7 +110,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client cliClient.Client) error
 	return nil
 }
 
-func generateCert(ctx context.Context, domain string, targets []string, client cliClient.Client) {
+func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
 	term.Infof("Triggering TLS cert generation for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
@@ -188,7 +190,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.Client) error {
+func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.FabricClient) error {
 	for i, target := range targets {
 		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
 	}
@@ -251,7 +253,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 
 func getWithRetries(ctx context.Context, url string, tries int) error {
 	var errs []error
-	for i := 0; i < tries; i++ {
+	for i := range make([]struct{}, tries) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return err // No point retrying if we can't even create the request

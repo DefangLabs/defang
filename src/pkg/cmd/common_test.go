@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 )
 
@@ -43,7 +42,7 @@ func TestParseMemory(t *testing.T) {
 
 func TestParseEnvLine(t *testing.T) {
 	const FROMENV = "blah"
-	os.Setenv("FROMENV", FROMENV)
+	t.Setenv("FROMENV", FROMENV)
 
 	testCases := []struct {
 		line  string

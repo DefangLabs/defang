@@ -2,7 +2,7 @@ name: configoverride
 services:
   service1:
     environment:
-      VAR1: service1
+      VAR1: service1test
     image: alpine
     networks:
       default: null

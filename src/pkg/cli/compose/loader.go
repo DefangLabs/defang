@@ -14,10 +14,16 @@ import (
 	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
+
+type Project = composeTypes.Project
+
+type ServiceConfig = composeTypes.ServiceConfig
+
+type Services = composeTypes.Services
 
 type LoaderOptions struct {
 	ConfigPaths []string
@@ -61,7 +67,7 @@ func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c Loader) LoadProject(ctx context.Context) (*compose.Project, error) {
+func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -150,4 +156,10 @@ func hasSubstitution(s, key string) bool {
 	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
 	return pattern.MatchString(s)
+}
+
+func LoadFromContent(ctx context.Context, content []byte) (*Project, error) {
+	return loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: content}}}, func(o *loader.Options) {
+		o.SkipConsistencyCheck = true // this matches the WithConsistency(false) option above
+	})
 }

@@ -170,6 +170,10 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
 			Spec: appJobSpec,
 		})
+
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		term.Debugf("Creating new CD app")
 		project, _, err := client.Projects.Create(ctx, &godo.CreateProjectRequest{
@@ -189,19 +193,18 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd .
 		if err != nil {
 			return nil, err
 		}
-
 	}
 
 	return currentCd, nil
 }
 
 // From https://github.com/digitalocean/doctl/blob/7fd3b7b253c7d6847b6b78d400eb26ed9be60796/commands/apps.go#L494
-func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID string, deploymentID string) error {
+func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID string, deploymentID string) error { // nolint: unused
 	const maxAttempts = 180
 	attempts := 0
 	printNewLineSet := false
 
-	for i := 0; i < maxAttempts; i++ {
+	for range make([]struct{}, maxAttempts) {
 		if attempts != 0 {
 			fmt.Fprint(os.Stderr, ".")
 			if !printNewLineSet {
@@ -290,7 +293,6 @@ func (d DoApp) CreateS3DownloadUrl(ctx context.Context, name string) (string, er
 	}
 
 	return req.URL, nil
-
 }
 
 func (d DoApp) CreateS3Client() (*s3.Client, error) {

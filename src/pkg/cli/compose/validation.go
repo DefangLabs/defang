@@ -1,23 +1,35 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/compose-spec/compose-go/v2/types"
-	compose "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
+
+type ListConfigNamesFunc func(context.Context) ([]string, error)
+
+type ErrMissingConfig []string
+
+func (e ErrMissingConfig) Error() string {
+	return fmt.Sprintf("missing configs %q", ([]string)(e))
+}
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *compose.Project) error {
+func ValidateProject(project *composeTypes.Project) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -29,6 +41,7 @@ func ValidateProject(project *compose.Project) error {
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
+
 	for _, svccfg := range services {
 		normalized := NormalizeServiceName(svccfg.Name)
 		if !pkg.IsValidServiceName(normalized) {
@@ -195,23 +208,23 @@ func ValidateProject(project *compose.Project) error {
 				}
 			}
 		} else {
-			timeout := 30 // default per compose spec
+			timeout := 5.0
 			if svccfg.HealthCheck.Timeout != nil {
-				if *svccfg.HealthCheck.Timeout%1e9 != 0 {
+				timeout = time.Duration(*svccfg.HealthCheck.Timeout).Seconds()
+				if _, frac := math.Modf(timeout); frac != 0 {
 					term.Warnf("service %q: healthcheck timeout must be a multiple of 1s", svccfg.Name)
 				}
-				timeout = int(*svccfg.HealthCheck.Timeout / 1e9)
 			}
-			interval := 30 // default per compose spec
+			interval := 30.0 // default per compose spec
 			if svccfg.HealthCheck.Interval != nil {
-				if *svccfg.HealthCheck.Interval%1e9 != 0 {
+				interval = time.Duration(*svccfg.HealthCheck.Interval).Seconds()
+				if _, frac := math.Modf(interval); frac != 0 {
 					term.Warnf("service %q: healthcheck interval must be a multiple of 1s", svccfg.Name)
 				}
-				interval = int(*svccfg.HealthCheck.Interval / 1e9)
 			}
 			// Technically this should test for <= but both interval and timeout have 30s as the default value
 			if interval < timeout || timeout <= 0 {
-				return fmt.Errorf("service %q: healthcheck timeout %ds must be positive and smaller than the interval %ds", svccfg.Name, timeout, interval)
+				return fmt.Errorf("service %q: healthcheck timeout %fs must be positive and smaller than the interval %fs", svccfg.Name, timeout, interval)
 			}
 			if svccfg.HealthCheck.StartPeriod != nil {
 				term.Debugf("service %q: unsupported compose directive: healthcheck start_period", svccfg.Name)
@@ -220,7 +233,7 @@ func ValidateProject(project *compose.Project) error {
 				term.Debugf("service %q: unsupported compose directive: healthcheck start_interval", svccfg.Name)
 			}
 		}
-		var reservations *compose.Resource
+		var reservations *composeTypes.Resource
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Mode != "" && svccfg.Deploy.Mode != "replicated" {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy mode: %q", svccfg.Name, svccfg.Deploy.Mode)
@@ -301,7 +314,7 @@ func ValidateProject(project *compose.Project) error {
 	return nil
 }
 
-func validatePorts(ports []compose.ServicePortConfig) error {
+func validatePorts(ports []composeTypes.ServicePortConfig) error {
 	for _, port := range ports {
 		err := validatePort(port)
 		if err != nil {
@@ -315,7 +328,7 @@ func validatePorts(ports []compose.ServicePortConfig) error {
 var validProtocols = map[string]bool{"": true, "tcp": true, "udp": true, "http": true, "http2": true, "grpc": true}
 var validModes = map[string]bool{"": true, "host": true, "ingress": true}
 
-func validatePort(port compose.ServicePortConfig) error {
+func validatePort(port composeTypes.ServicePortConfig) error {
 	if port.Target < 1 || port.Target > 32767 {
 		return fmt.Errorf("port %d: 'target' must be an integer between 1 and 32767", port.Target)
 	}
@@ -347,6 +360,43 @@ func validatePort(port compose.ServicePortConfig) error {
 				term.Warnf("port %d: 'published' should be equal to 'target'; ignoring 'published: %v'", port.Target, port.Published)
 			}
 		}
+	}
+
+	return nil
+}
+
+func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
+	var names []string
+	// make list of secrets
+	for _, service := range composeProject.Services {
+		for key, value := range service.Environment {
+			if value == nil {
+				names = append(names, key)
+			}
+		}
+	}
+
+	if len(names) == 0 {
+		return nil // no secrets to check
+	}
+
+	configs, err := listConfigNamesFunc(ctx)
+	if err != nil {
+		return err
+	}
+
+	slices.Sort(names)
+	names = slices.Compact(names)
+
+	errMissingConfig := ErrMissingConfig{}
+	for _, name := range names {
+		if !slices.Contains(configs, name) {
+			errMissingConfig = append(errMissingConfig, name)
+		}
+	}
+
+	if len(errMissingConfig) > 0 {
+		return errMissingConfig
 	}
 
 	return nil

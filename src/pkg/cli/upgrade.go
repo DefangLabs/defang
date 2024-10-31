@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +25,8 @@ func Upgrade(ctx context.Context) error {
 	}
 	term.Debugf(" - Evaluated: %s\n", ex)
 
-	if strings.HasPrefix(ex, homebrewPrefix(ctx)) {
+	prefix, err := homebrewPrefix(ctx)
+	if err == nil && strings.HasPrefix(ex, prefix) {
 		printInstructions("brew upgrade defang")
 		return nil
 	}
@@ -52,25 +54,23 @@ func Upgrade(ctx context.Context) error {
 	return nil
 }
 
-func homebrewPrefix(ctx context.Context) string {
+func homebrewPrefix(ctx context.Context) (string, error) {
 	output, err := exec.CommandContext(ctx, "brew", "config").Output()
 	if err != nil {
-		return ""
+		return "", err
 	}
-	homebrewPrefix := ""
 	// filter out the line which includes HOMEBREW_PREFIX
+	const HOMEBREW_PREFIX = "HOMEBREW_PREFIX: "
 	for _, line := range strings.Split(string(output), "\n") {
-		config_key := "HOMEBREW_PREFIX: "
-		if strings.HasPrefix(line, config_key) {
-			// remove the prefix from the line
-			homebrewPrefix = strings.TrimPrefix(line, config_key)
-			break
+		// remove the prefix from the line
+		if homebrewPrefix, ok := strings.CutPrefix(line, HOMEBREW_PREFIX); ok {
+			return homebrewPrefix, nil
 		}
 	}
-	return homebrewPrefix
+	return "", errors.New("HOMEBREW_PREFIX not found in brew config")
 }
 
 func printInstructions(cmd string) {
 	term.Info("To upgrade defang, run the following command:")
-	term.Print("\n\n  ", cmd)
+	term.Print("\n  ", cmd, "\n\n")
 }

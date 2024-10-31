@@ -20,6 +20,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
@@ -29,6 +30,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -54,7 +56,7 @@ type ByocDo struct {
 	driver     *appPlatform.DoApp
 }
 
-func NewByocClient(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
+func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -162,15 +164,18 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := compose.LoadFromContent(ctx, req.Compose)
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
 
-	for _, service := range req.Services {
-		serviceInfo, err := b.update(ctx, service)
-		if err != nil {
-			return nil, err
-		}
+	for _, service := range project.Services {
+		serviceInfo := b.update(service)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -188,6 +193,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.cdImageTag,
+		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
 
@@ -281,8 +287,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 }
 
 func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// Unsupported in DO
-	return &defangv1.DeleteResponse{}, errors.ErrUnsupported
+	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 
 func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
@@ -484,56 +489,43 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocDo) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
-	if _, err := b.GrpcClient.WhoAmI(ctx); err != nil {
-		return nil, err
-	}
+func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+	return DoAccountInfo{region: b.driver.Region.String()}, nil
+}
 
-	return &defangv1.WhoAmIResponse{
-		Tenant:  b.TenantID,
-		Region:  b.driver.Region.String(),
-		Account: "DigitalOcean",
-	}, nil
+type DoAccountInfo struct {
+	region string
+	// accountID string TODO: Find out the best field to be used as account id from https://docs.digitalocean.com/reference/api/api-reference/#tag/Account
+}
+
+func (i DoAccountInfo) AccountID() string {
+	return "DigitalOcean"
+}
+
+func (i DoAccountInfo) Region() string {
+	return i.region
+}
+
+func (i DoAccountInfo) Details() string {
+	return ""
 }
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	//optional
-	return nil, errors.ErrUnsupported
+	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
-func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
-	return errors.ErrUnsupported // TODO: implement for Windows
-	// driver := local.New()
-	// if err := driver.SetUp(ctx, []types.Container{{
-	// 	EntryPoint: []string{"npm", "run", "dev"},
-	// 	WorkDir:    dir,
-	// }}); err != nil {
-	// 	return err
-	// }
-	// localEnv := map[string]string{
-	// 	"PATH": os.Getenv("PATH"),
-	// }
-	// for _, v := range b.environment() {
-	// 	localEnv[v.Key] = v.Value
-	// }
-	// pid, err := driver.Run(ctx, localEnv, cmd...)
-	// if err != nil {
-	// 	return err
-	// }
-	// return driver.Tail(ctx, pid)
-}
-
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) { // nolint:unparam
 	env := b.environment()
 	if term.DoDebug() {
-		debugEnv := " -"
-		for _, v := range env {
-			debugEnv += " " + v.Key + "=" + v.Value
+		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
+		debugEnv := make([]string, len(env))
+		for i, v := range env {
+			debugEnv[i] = v.Key + "=" + v.Value
 		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
-	}
-	if dir := os.Getenv("DEFANG_PULUMI_DIR"); dir != "" {
-		return nil, b.runLocalPulumiCommand(ctx, dir, cmd...)
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+			return nil, err
+		}
 	}
 	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
@@ -625,17 +617,31 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	}
 }
 
-func (b *ByocDo) update(ctx context.Context, service *defangv1.Service) (*defangv1.ServiceInfo, error) {
-
+func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
-		Service: service,
-		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
+		Project: b.ProjectName,
+		Service: &defangv1.Service{Name: service.Name},
 	}
 
-	//hasIngress := false
-	//fqn := service.Name
-	return si, nil
+	for _, port := range service.Ports {
+		mode := defangv1.Mode_INGRESS
+		if port.Mode == compose.Mode_HOST {
+			mode = defangv1.Mode_HOST
+		}
+		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
+			Target: port.Target,
+			Mode:   mode,
+		})
+	}
+
+	si.Status = "UPDATE_QUEUED"
+	si.State = defangv1.ServiceState_UPDATE_QUEUED
+	if service.Build != nil {
+		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+		si.State = defangv1.ServiceState_BUILD_QUEUED
+	}
+	return si
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
@@ -700,14 +706,13 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
-
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
 		Service: &defangv1.Service{
-			Name:        service.Name,
-			Image:       service.Image.Digest,
-			Environment: getServiceEnv(service.Envs),
+			Name: service.Name,
+			// Image:       service.Image.Digest,
+			// Environment: getServiceEnv(service.Envs),
 		},
 	}
 
@@ -715,7 +720,6 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 }
 
 func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
-
 	project, err := b.LoadProject(ctx)
 	appLiveURL := ""
 
@@ -741,7 +745,6 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-
 			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
@@ -807,13 +810,12 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 		}
 
 		for _, msg := range tailResp.Entries {
-			printlogs(tailResp, msg)
+			printlogs(msg)
 		}
 	}
-
 }
 
-func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
+func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused
 	env := make(map[string]string)
 	for _, envVar := range envVars {
 		env[envVar.Key] = envVar.Value
@@ -821,7 +823,7 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 	return env
 }
 
-func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
+func printlogs(msg *defangv1.LogEntry) {
 	service := msg.Service
 	etag := msg.Etag
 	ts := msg.Timestamp.AsTime()
@@ -858,5 +860,4 @@ func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
 		io.WriteString(buf, line)
 	}
 	term.Println(buf.String())
-
 }

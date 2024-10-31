@@ -7,13 +7,13 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var _ pflag.Value = (*Provider)(nil)
+var _ pflag.Value = (*ProviderID)(nil)
 
 func TestProvider(t *testing.T) {
 	tests := []struct {
 		name     string
 		provider string
-		want     Provider
+		want     ProviderID
 		wantErr  bool
 	}{
 		{
@@ -65,7 +65,7 @@ func TestProvider(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var p Provider
+			var p ProviderID
 			if err := p.Set(tt.provider); (err != nil) != tt.wantErr {
 				t.Errorf("Provider.Set() error = %v, wantErr %v", err, tt.wantErr)
 			}

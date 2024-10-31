@@ -8,14 +8,13 @@ import (
 type CpuUnits = uint
 type MemoryMiB = uint
 
-func makeMinMaxCeil(value float64, min, max, step uint) uint {
-	if value <= float64(min) || math.IsNaN(value) {
-		return min
-	} else if value >= float64(max) {
-		return max
+func makeMinMaxCeil(value float64, minValue, maxValue, step uint) uint {
+	if value <= float64(minValue) || math.IsNaN(value) {
+		return minValue
+	} else if value >= float64(maxValue) {
+		return maxValue
 	}
 	return uint(math.Ceil(value/float64(step))) * step
-
 }
 
 func fixupFargateCPU(vCpu float64) CpuUnits {

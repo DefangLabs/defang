@@ -151,6 +151,8 @@ func (a *AwsEcs) SetUp(ctx context.Context, containers []types.Container) error 
 	return nil
 }
 
+type ErrStackNotFoundException = cfnTypes.StackNotFoundException
+
 func (a *AwsEcs) FillOutputs(ctx context.Context) error {
 	cfn, err := a.newClient(ctx)
 	if err != nil {
@@ -162,6 +164,11 @@ func (a *AwsEcs) FillOutputs(ctx context.Context) error {
 		StackName: ptr.String(a.stackName),
 	})
 	if err != nil {
+		// Check if the stack doesn't exist (ValidationError); if so, return a nice error; https://github.com/aws/aws-sdk-go-v2/issues/2296
+		var ae smithy.APIError
+		if errors.As(err, &ae) && ae.ErrorCode() == "ValidationError" {
+			return &ErrStackNotFoundException{Message: ptr.String(ae.ErrorMessage())}
+		}
 		return err
 	}
 

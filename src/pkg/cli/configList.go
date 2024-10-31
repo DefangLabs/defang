@@ -7,14 +7,14 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func ConfigList(ctx context.Context, client client.Client) error {
-	projectName, err := client.LoadProjectName(ctx)
+func ConfigList(ctx context.Context, provider client.Provider) error {
+	projectName, err := provider.LoadProjectName(ctx)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Listing config in project %q", projectName)
 
-	config, err := client.ListConfig(ctx)
+	config, err := provider.ListConfig(ctx)
 	if err != nil {
 		return err
 	}

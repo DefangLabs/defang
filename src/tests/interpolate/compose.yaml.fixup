@@ -1,9 +1,7 @@
 [
   {
-    "name": "interpolate",
-    "image": "alpine",
-    "platform": 2,
-    "internal": true,
+    "command": null,
+    "entrypoint": null,
     "environment": {
       "BRACED": "interpolate",
       "DB": "postgres://user:${POSTGRES_PASSWORD}@db:5432/db",
@@ -14,6 +12,9 @@
       "PORT": "8080",
       "interpolate": "value"
     },
-    "networks": 1
+    "image": "alpine",
+    "networks": {
+      "default": null
+    }
   }
 ]

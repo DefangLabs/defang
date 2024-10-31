@@ -65,13 +65,15 @@ func GetHostedZoneByName(ctx context.Context, domain string, r53 *route53.Client
 	return &zone, nil
 }
 
+const CreateHostedZoneComment = "Created by defang cli"
+
 // Deprecated: let Pulumi create the hosted zone
 func CreateHostedZone(ctx context.Context, domain string, r53 *route53.Client) (*types.HostedZone, error) {
 	params := &route53.CreateHostedZoneInput{
 		Name:            ptr.String(domain),
 		CallerReference: ptr.String(domain + time.Now().String()),
 		HostedZoneConfig: &types.HostedZoneConfig{
-			Comment: ptr.String("Created by Defang CLI"),
+			Comment: ptr.String(CreateHostedZoneComment),
 		},
 	}
 	resp, err := r53.CreateHostedZone(ctx, params)
@@ -101,7 +103,7 @@ func ListResourceRecords(ctx context.Context, zoneId, recordName string, recordT
 	records := listResp.ResourceRecordSets[0].ResourceRecords
 	values := make([]string, len(records))
 	for i, record := range records {
-		values[i] = *record.Value
+		values[i] = strings.TrimSuffix(*record.Value, ".") // normalize the value
 	}
 	return values, nil
 }

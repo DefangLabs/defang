@@ -16,6 +16,7 @@ import (
 
 func TestLoader(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
+		t.Helper()
 		loader := NewLoaderWithPath(path)
 		proj, err := loader.LoadProject(context.Background())
 		if err != nil {
@@ -66,13 +67,15 @@ func diff(actualRaw, goldenRaw string) error {
 func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {
 	t.Helper()
 
-	composeRegex := regexp.MustCompile(`^(docker-)?compose.ya?ml$`)
+	composeRegex := regexp.MustCompile(`^(?i)(docker-)?compose.ya?ml$`)
 	err := filepath.WalkDir("../../../tests", func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !composeRegex.MatchString(d.Name()) {
 			return err
 		}
 
 		t.Run(path, func(t *testing.T) {
+			t.Helper()
+			t.Log(path)
 			f(t, path)
 		})
 		return nil

@@ -22,3 +22,7 @@ services:
     image: "service:latest"
     environment:
       - "CONFIG1=http://Mistral:8000"
+  fixup-args:
+    build:
+      args:
+        - "API_URL=http://Mistral:8000"

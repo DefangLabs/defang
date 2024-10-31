@@ -151,66 +151,64 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error)
 	})
 }
 
-type CWLogGroupQuery struct {
-	LogGroupInput LogGroupInput
-	Start, End    time.Time
-
-	nextToken    *string
-	hasDoneQuery bool
+func Query(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent)) error {
+	region := region.FromArn(input.LogGroupARN)
+	cw, err := newCloudWatchLogsClient(ctx, region)
+	if err != nil {
+		return err
+	}
+	return filterLogEvents(ctx, cw, input, start, end, cb)
 }
 
-func (c *CWLogGroupQuery) HasNext() bool {
-	return !c.hasDoneQuery || c.nextToken != nil
+func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent)) error {
+	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
+	params := &cloudwatchlogs.FilterLogEventsInput{
+		StartTime:          ptr.Int64(start.UnixMilli()),
+		EndTime:            ptr.Int64(end.UnixMilli()),
+		LogGroupIdentifier: &logGroupIdentifier,
+		LogStreamNames:     lgi.LogStreamNames,
+	}
+	if lgi.LogStreamNamePrefix != "" {
+		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
+	}
+	for {
+		fleo, err := cw.FilterLogEvents(ctx, params)
+		if err != nil {
+			return err
+		}
+		events := make([]LogEvent, len(fleo.Events))
+		for i, event := range fleo.Events {
+			events[i] = LogEvent{
+				IngestionTime:      event.IngestionTime,
+				LogGroupIdentifier: &logGroupIdentifier,
+				Message:            event.Message,
+				Timestamp:          event.Timestamp,
+				LogStreamName:      event.LogStreamName,
+			}
+		}
+		cb(events)
+		if fleo.NextToken == nil {
+			return nil
+		}
+		params.NextToken = fleo.NextToken
+	}
 }
 
-func (c *CWLogGroupQuery) Next(ctx context.Context) ([]LogEvent, error) {
-	c.hasDoneQuery = true
-	region := region.FromArn(c.LogGroupInput.LogGroupARN)
+func newCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatchlogs.Client, error) {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
 		return nil, err
 	}
-
-	logGroupIdentifier := getLogGroupIdentifier(c.LogGroupInput.LogGroupARN)
-	var prefix *string
-	if c.LogGroupInput.LogStreamNamePrefix != "" {
-		prefix = &c.LogGroupInput.LogStreamNamePrefix
-	}
-	cw := cloudwatchlogs.NewFromConfig(cfg)
-	fleo, err := cw.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
-		StartTime:           ptr.Int64(c.Start.UnixMilli()),
-		EndTime:             ptr.Int64(c.End.UnixMilli()),
-		LogGroupIdentifier:  &logGroupIdentifier,
-		LogStreamNamePrefix: prefix,
-		LogStreamNames:      c.LogGroupInput.LogStreamNames,
-		NextToken:           c.nextToken,
-	})
-	if err != nil {
-		return nil, err
-	}
-	c.nextToken = fleo.NextToken
-	events := make([]LogEvent, len(fleo.Events))
-	for i, e := range fleo.Events {
-		events[i] = LogEvent{
-			IngestionTime:      e.IngestionTime,
-			LogGroupIdentifier: &logGroupIdentifier,
-			Message:            e.Message,
-			Timestamp:          e.Timestamp,
-			LogStreamName:      e.LogStreamName,
-		}
-	}
-	// TODO: handle pagination using NextToken
-	return events, nil
+	return cloudwatchlogs.NewFromConfig(cfg), nil
 }
 
 func startLiveTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput) (EventStream, error) {
 	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
-	cfg, err := aws.LoadDefaultConfig(ctx, region)
+	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
 		return nil, err
 	}
 
-	cw := cloudwatchlogs.NewFromConfig(cfg)
 	slto, err := cw.StartLiveTail(ctx, slti)
 	if err != nil {
 		return nil, err
@@ -346,19 +344,12 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 		defer c.wg.Done()
 		if since.Year() > 1970 {
 			// Query the logs between the start time and now
-			query := &CWLogGroupQuery{
-				LogGroupInput: lgi,
-				Start:         since,
-				End:           time.Now(),
-			}
-			for query.HasNext() {
-				if events, err := query.Next(c.ctx); err != nil {
-					c.errCh <- err // the caller will likely cancel the context
-				} else {
-					c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-						Value: types.LiveTailSessionUpdate{SessionResults: events},
-					}
+			if err := Query(c.ctx, lgi, since, time.Now(), func(events []LogEvent) {
+				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+					Value: types.LiveTailSessionUpdate{SessionResults: events},
 				}
+			}); err != nil {
+				c.errCh <- err // the caller will likely cancel the context
 			}
 		}
 		for {

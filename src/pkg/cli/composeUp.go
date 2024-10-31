@@ -20,42 +20,57 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
-	project, err := c.LoadProject(ctx)
+func ComposeUp(ctx context.Context, provider client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
+	project, err := provider.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
+	}
+
+	if DoDryRun {
+		upload = compose.UploadModeIgnore
+	}
+
+	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+		configs, err := provider.ListConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return configs.Names, nil
+	}
+
+	if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+		return nil, project, &ComposeError{err}
 	}
 
 	if err := compose.ValidateProject(project); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
-	services, err := compose.ConvertServices(ctx, c, project.Services, upload)
+	// Create a new project with only the necessary resources.
+	// Do not modify the original project, because the caller needs it for debugging.
+	fixedProject := project.WithoutUnnecessaryResources()
+
+	if err := compose.FixupServices(ctx, provider, fixedProject.Services, upload); err != nil {
+		return nil, project, err
+	}
+
+	bytes, err := fixedProject.MarshalYAML()
 	if err != nil {
 		return nil, project, err
 	}
 
-	if len(services) == 0 {
-		return nil, project, &ComposeError{fmt.Errorf("no services found")}
-	}
-
 	if upload == compose.UploadModeIgnore {
-		fmt.Println("Project:", project.Name)
-		for _, service := range services {
-			PrintObject(service.Name, service)
-		}
+		fmt.Println(string(bytes))
 		return nil, project, ErrDryRun
 	}
 
-	for _, service := range services {
-		term.Info("Deploying service", service.Name)
-	}
-
+	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes}
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
-		resp, err = c.Preview(ctx, &defangv1.DeployRequest{Mode: mode, Project: project.Name, Services: services})
+		resp, err = provider.Preview(ctx, deployRequest)
 	} else {
-		resp, err = c.Deploy(ctx, &defangv1.DeployRequest{Mode: mode, Project: project.Name, Services: services})
+		resp, err = provider.Deploy(ctx, deployRequest)
 	}
 	if err != nil {
 		return nil, project, err
@@ -63,8 +78,8 @@ func ComposeUp(ctx context.Context, c client.Client, upload compose.UploadMode, 
 
 	if term.DoDebug() {
 		fmt.Println("Project:", project.Name)
-		for _, service := range resp.Services {
-			PrintObject(service.Service.Name, service)
+		for _, serviceInfo := range resp.Services {
+			PrintObject(serviceInfo.Service.Name, serviceInfo)
 		}
 	}
 	return resp, project, nil
