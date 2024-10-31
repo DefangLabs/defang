@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -117,7 +116,7 @@ func (g *PlaygroundProvider) PopulateDebugRequest(ctx context.Context, req *defa
 	return nil
 }
 
-func (g *PlaygroundProvider) DelegateDomainNSServers(ctx context.Context, req client.DelegateDomainNSServersRequest) ([]string, error) {
+func (g *PlaygroundProvider) DelegateDomainNSServers(ctx context.Context, req DelegateDomainNSServersRequest) ([]string, error) {
 	return nil, nil // Playground does not support delegate domains
 }
 

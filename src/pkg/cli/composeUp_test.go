@@ -39,6 +39,10 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	return &defangv1.DeployResponse{Services: services}, nil
 }
 
+func (d deployMock) DelegateDomainNSServers(ctx context.Context, req client.DelegateDomainNSServersRequest) ([]string, error) {
+	return []string{"ns1.example.com", "ns2.example.com"}, nil
+}
+
 func TestComposeUp(t *testing.T) {
 	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
 	proj, err := loader.LoadProject(context.Background())

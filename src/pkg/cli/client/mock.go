@@ -81,6 +81,10 @@ func (m MockFabricClient) DeleteSubdomainZone(ctx context.Context) error {
 	return nil
 }
 
+func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
+}
+
 type MockLoader struct {
 	Project *composeTypes.Project
 }

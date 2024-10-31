@@ -61,7 +61,7 @@ type BootstrapCommandRequest struct {
 
 type DelegateDomainNSServersRequest struct {
 	Project        string
-	DelerateDomain string
+	DelegateDomain string
 }
 
 type Provider interface {

@@ -77,12 +77,17 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 		resp, err = p.Preview(ctx, deployRequest)
 	} else {
 
-		preq := client.DelegateDomainNSServersRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
-		nsServers, err := p.DelegateDomainNSServers(ctx, preq)
-		creq := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
-		_, err = c.DelegateSubdomainZone(ctx, creq)
+		req := client.DelegateDomainNSServersRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
+		nsServers, err := p.DelegateDomainNSServers(ctx, req)
 		if err != nil {
 			return nil, project, err
+		}
+		if len(nsServers) > 0 {
+			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+			_, err = c.DelegateSubdomainZone(ctx, req)
+			if err != nil {
+				return nil, project, err
+			}
 		}
 
 		resp, err = p.Deploy(ctx, deployRequest)
