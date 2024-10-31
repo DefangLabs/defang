@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"encoding/json"
-	"os"
 	"reflect"
 	"testing"
 )
@@ -11,11 +10,11 @@ func TestGetenvBool(t *testing.T) {
 	if GetenvBool("FOO") {
 		t.Errorf("GetenvBool(FOO) = true, want default false")
 	}
-	os.Setenv("FOO", "true")
+	t.Setenv("FOO", "true")
 	if !GetenvBool("FOO") {
 		t.Errorf("GetenvBool(FOO) = false, want true")
 	}
-	os.Setenv("FOO", "false")
+	t.Setenv("FOO", "false")
 	if GetenvBool("FOO") {
 		t.Errorf("GetenvBool(FOO) = true, want false")
 	}
@@ -124,7 +123,7 @@ func TestOneOrList(t *testing.T) {
 
 func TestRandomID(t *testing.T) {
 	var unique = make(map[string]bool)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		id := RandomID()
 		if unique[id] {
 			t.Errorf("RandomID() = %v, want unique ID", id)

@@ -458,14 +458,17 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 	}
 	env["DEFANG_MODE"] = strings.ToLower(mode.String())
 	if term.DoDebug() {
-		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
+		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
+		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
-			debugEnv += fmt.Sprintf(" AWS_PROFILE=%q", awsProfile)
+			debugEnv = append(debugEnv, "AWS_PROFILE="+awsProfile)
 		}
 		for k, v := range env {
-			debugEnv += fmt.Sprintf(" %s=%q", k, v)
+			debugEnv = append(debugEnv, k+"="+v)
 		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+			return nil, err
+		}
 	}
 	return b.driver.Run(ctx, env, cmd...)
 }
@@ -491,10 +494,14 @@ func (b *ByocAws) stackDir(name string) string {
 }
 
 func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
-
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {
+			// FillOutputs might fail if the stack is not created yet; return empty update in that case
+			var cfnErr *cfn.ErrStackNotFoundException
+			if errors.As(err, &cfnErr) {
+				return nil, nil // no services yet
+			}
 			return nil, byoc.AnnotateAwsError(err)
 		}
 		bucketName = b.bucketName()
@@ -638,7 +645,7 @@ func (b *ByocAws) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defan
 			}
 		}); err != nil {
 			term.Warn("CloudWatch query failed:", byoc.AnnotateAwsError(err))
-			// continue reading othe ther log groups
+			// continue reading other log groups
 		}
 	}
 
@@ -737,11 +744,19 @@ func (b *ByocAws) update(ctx context.Context, service composeTypes.ServiceConfig
 	hasHost := false
 	hasIngress := false
 	fqn := service.Name
-	if sf := service.Extensions["x-defang-static-files"]; sf == nil {
+	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, &port))
+			mode := defangv1.Mode_INGRESS
+			if port.Mode == compose.Mode_HOST {
+				mode = defangv1.Mode_HOST
+			}
+			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
+				Target: port.Target,
+				Mode:   mode,
+			})
 		}
 	} else {
 		si.PublicFqdn = b.getPublicFqdn(fqn)
@@ -799,7 +814,6 @@ func (b *ByocAws) getEndpoint(fqn qualifiedName, port *composeTypes.ServicePortC
 	}
 	safeFqn := byoc.DnsSafeLabel(fqn)
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, b.ProjectDomain)
-
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC

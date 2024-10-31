@@ -1,10 +1,22 @@
 .PHONY: install-git-hooks
-install-git-hooks: $(BINARY_NAME)
-	echo "#!/bin/sh\nmake pre-commit" > .git/hooks/pre-commit
+install-git-hooks:
+	printf "#!/bin/sh\nmake pre-commit" > .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	printf "#!/bin/sh\nmake pre-push" > .git/hooks/pre-push
+	chmod +x .git/hooks/pre-push
 
 .PHONY: pre-commit
 pre-commit:
-	cd src && go fmt ./...
+	make lint-fix
 
-.PHONY: setup
-setup: install-git-hooks
+.PHONY: pre-push
+pre-push:
+	make -C src test
+
+.PHONY: lint
+lint:
+	cd src && golangci-lint run
+
+.PHONY: lint-fix
+lint-fix:
+	cd src && golangci-lint run --fix

@@ -175,10 +175,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	serviceInfos := []*defangv1.ServiceInfo{}
 
 	for _, service := range project.Services {
-		serviceInfo, err := b.update(ctx, service)
-		if err != nil {
-			return nil, err
-		}
+		serviceInfo := b.update(service)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -518,39 +515,17 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
-func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
-	return errors.ErrUnsupported // TODO: implement for Windows
-	// driver := local.New()
-	// if err := driver.SetUp(ctx, []types.Container{{
-	// 	EntryPoint: []string{"npm", "run", "dev"},
-	// 	WorkDir:    dir,
-	// }}); err != nil {
-	// 	return err
-	// }
-	// localEnv := map[string]string{
-	// 	"PATH": os.Getenv("PATH"),
-	// }
-	// for _, v := range b.environment() {
-	// 	localEnv[v.Key] = v.Value
-	// }
-	// pid, err := driver.Run(ctx, localEnv, cmd...)
-	// if err != nil {
-	// 	return err
-	// }
-	// return driver.Tail(ctx, pid)
-}
-
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) {
+func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) { // nolint:unparam
 	env := b.environment()
 	if term.DoDebug() {
-		debugEnv := " -"
-		for _, v := range env {
-			debugEnv += " " + v.Key + "=" + v.Value
+		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
+		debugEnv := make([]string, len(env))
+		for i, v := range env {
+			debugEnv[i] = v.Key + "=" + v.Value
 		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
-	}
-	if dir := os.Getenv("DEFANG_PULUMI_DIR"); dir != "" {
-		return nil, b.runLocalPulumiCommand(ctx, dir, cmd...)
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+			return nil, err
+		}
 	}
 	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
@@ -642,11 +617,22 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	}
 }
 
-func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(),
 		Project: b.ProjectName,
 		Service: &defangv1.Service{Name: service.Name},
+	}
+
+	for _, port := range service.Ports {
+		mode := defangv1.Mode_INGRESS
+		if port.Mode == compose.Mode_HOST {
+			mode = defangv1.Mode_HOST
+		}
+		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
+			Target: port.Target,
+			Mode:   mode,
+		})
 	}
 
 	si.Status = "UPDATE_QUEUED"
@@ -655,7 +641,7 @@ func (b *ByocDo) update(ctx context.Context, service composeTypes.ServiceConfig)
 		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
-	return si, nil
+	return si
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
@@ -720,7 +706,6 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 }
 
 func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
-
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: b.ProjectName,
 		Etag:    pkg.RandomID(),
@@ -735,7 +720,6 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 }
 
 func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
-
 	project, err := b.LoadProject(ctx)
 	appLiveURL := ""
 
@@ -761,7 +745,6 @@ func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
 		if app.Spec.Name == mainAppName {
-
 			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
@@ -827,13 +810,12 @@ func readHistoricalLogs(ctx context.Context, urls []string) {
 		}
 
 		for _, msg := range tailResp.Entries {
-			printlogs(tailResp, msg)
+			printlogs(msg)
 		}
 	}
-
 }
 
-func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
+func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string { // nolint:unused
 	env := make(map[string]string)
 	for _, envVar := range envVars {
 		env[envVar.Key] = envVar.Value
@@ -841,7 +823,7 @@ func getServiceEnv(envVars []*godo.AppVariableDefinition) map[string]string {
 	return env
 }
 
-func printlogs(resp *defangv1.TailResponse, msg *defangv1.LogEntry) {
+func printlogs(msg *defangv1.LogEntry) {
 	service := msg.Service
 	etag := msg.Etag
 	ts := msg.Timestamp.AsTime()
