@@ -56,7 +56,9 @@ type ByocDo struct {
 	driver     *appPlatform.DoApp
 }
 
-func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocDo, error) {
+var _ client.Provider = (*ByocDo)(nil)
+
+func NewByocProvider(ctx context.Context, tenantId types.TenantID) (*ByocDo, error) {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -76,12 +78,12 @@ func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId
 	return b, nil
 }
 
-func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
+func (b *ByocDo) getCdImageTag(ctx context.Context, projectName string) (string, error) {
 	if b.cdImageTag != "" {
 		return b.cdImageTag, nil
 	}
 
-	projUpdate, err := b.getProjectUpdate(ctx)
+	projUpdate, err := b.getProjectUpdate(ctx, projectName)
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +106,7 @@ func (b *ByocDo) getCdImageTag(ctx context.Context) (string, error) {
 	return deploymentCdImageTag, nil
 }
 
-func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+func (b *ByocDo) getProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -119,7 +121,7 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 		return nil, errors.New("no bucket found")
 	}
 
-	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
+	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 	getObjectOutput, err := client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &bucketName,
 		Key:    &path,
@@ -151,22 +153,22 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 	return &projUpdate, nil
 }
 
-func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, "preview")
+func (b *ByocDo) Preview(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, delegateDomain, "preview")
 }
 
-func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return b.deploy(ctx, req, "up")
+func (b *ByocDo) Deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain string) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, delegateDomain, "up")
 }
 
-func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
+func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, delegateDomain, cmd string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx, project.Name); err != nil {
 		return nil, err
 	}
 
@@ -175,7 +177,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	serviceInfos := []*defangv1.ServiceInfo{}
 
 	for _, service := range project.Services {
-		serviceInfo := b.update(service)
+		serviceInfo := b.update(service, project.Name)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -227,7 +229,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	_, err = b.runCdCommand(ctx, cmd, payloadString)
+	_, err = b.runCdCommand(ctx, project.Name, delegateDomain, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -238,12 +240,12 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}, nil
 }
 
-func (b *ByocDo) BootstrapCommand(ctx context.Context, command string) (string, error) {
-	if err := b.setUp(ctx); err != nil {
+func (b *ByocDo) BootstrapCommand(ctx context.Context, projectName, delegateDomain, command string) (string, error) {
+	if err := b.setUp(ctx, projectName); err != nil {
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, command)
+	_, err := b.runCdCommand(ctx, projectName, delegateDomain, command)
 	if err != nil {
 		return "", err
 	}
@@ -272,10 +274,6 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
 	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 
 	if err != nil {
@@ -290,8 +288,8 @@ func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defa
 	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 
-func (b *ByocDo) Destroy(ctx context.Context) (string, error) {
-	return b.BootstrapCommand(ctx, "down")
+func (b *ByocDo) Destroy(ctx context.Context, projectName, delegateDomain string) (string, error) {
+	return b.BootstrapCommand(ctx, projectName, delegateDomain, "down")
 }
 
 func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) error {
@@ -315,10 +313,10 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 	return err
 }
 
-func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID, projectName string) (*defangv1.ServiceInfo, error) {
 	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
 	//Only used in Tail
-	app, err := b.getAppByName(ctx, b.ProjectName)
+	app, err := b.getAppByName(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -327,31 +325,31 @@ func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defang
 
 	for _, service := range app.Spec.Services {
 		if service.Name == s.Name {
-			serviceInfo = b.processServiceInfo(service)
+			serviceInfo = b.processServiceInfo(service, projectName)
 		}
 	}
 
 	return serviceInfo, nil
 }
 
-func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.ServiceInfo) (*godo.App, error) {
+func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.ServiceInfo, projectName string) (*godo.App, error) {
 	//Dumps endpoint and tag. Reads the protobuff for all services. Combines with info for g
-	app, err := b.getAppByName(ctx, b.ProjectName)
+	app, err := b.getAppByName(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, service := range app.Spec.Services {
-		serviceInfo := b.processServiceInfo(service)
+		serviceInfo := b.processServiceInfo(service, projectName)
 		*services = append(*services, serviceInfo)
 	}
 
 	return app, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesResponse, error) {
+func (b *ByocDo) GetServices(ctx context.Context, projectName string) (*defangv1.ListServicesResponse, error) {
 	resp := defangv1.ListServicesResponse{}
-	_, err := b.getProjectInfo(ctx, &resp.Services)
+	_, err := b.getProjectInfo(ctx, &resp.Services, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -359,8 +357,8 @@ func (b *ByocDo) GetServices(ctx context.Context) (*defangv1.ListServicesRespons
 	return &resp, err
 }
 
-func (b *ByocDo) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
-	app, err := b.getAppByName(ctx, b.ProjectName)
+func (b *ByocDo) ListConfig(ctx context.Context, projectName string) (*defangv1.Secrets, error) {
+	app, err := b.getAppByName(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -405,10 +403,6 @@ func (b *ByocDo) ServiceDNS(name string) string {
 }
 
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if err := b.setUp(ctx); err != nil {
-		return nil, err
-	}
-
 	//Look up the CD app directly instead of relying on the etag
 	cdApp, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
@@ -442,7 +436,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 				return nil, err
 			}
 
-			appLiveURL, err = b.processServiceLogs(ctx)
+			appLiveURL, err = b.processServiceLogs(ctx, req.Project)
 			if err != nil {
 				return nil, err
 			}
@@ -461,10 +455,11 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	_, err := b.BootstrapCommand(ctx, "down")
-	if err != nil {
-		return err
-	}
+	// FIXME: Do we need this? if so can we get it from remote?
+	// _, err := b.BootstrapCommand(ctx, "down")
+	// if err != nil {
+	// 	return err
+	// }
 
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
@@ -515,6 +510,10 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
+func (b *ByocDo) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRequest) error {
+	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
+}
+
 func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...string) error {
 	return errors.ErrUnsupported // TODO: implement for Windows
 	// driver := local.New()
@@ -537,8 +536,8 @@ func (b *ByocDo) runLocalPulumiCommand(ctx context.Context, dir string, cmd ...s
 	// return driver.Tail(ctx, pid)
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, error) { // nolint:unparam
-	env := b.environment()
+func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
+	env := b.environment(projectName, delegateDomain)
 	if term.DoDebug() {
 		debugEnv := " -"
 		for _, v := range env {
@@ -553,7 +552,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, cmd ...string) (*godo.App, er
 	return app, err
 }
 
-func (b *ByocDo) environment() []*godo.AppVariableDefinition {
+func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVariableDefinition {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return []*godo.AppVariableDefinition{
 		{
@@ -570,15 +569,15 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 		},
 		{
 			Key:   "DOMAIN",
-			Value: b.ProjectDomain,
+			Value: delegateDomain,
 		},
 		{
 			Key:   "PRIVATE_DOMAIN",
-			Value: b.PrivateDomain,
+			Value: byoc.GetPrivateDomain(projectName),
 		},
 		{
 			Key:   "PROJECT",
-			Value: b.ProjectName,
+			Value: projectName,
 		},
 		{
 			Key:   "PULUMI_BACKEND_URL",
@@ -639,10 +638,10 @@ func (b *ByocDo) environment() []*godo.AppVariableDefinition {
 	}
 }
 
-func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInfo {
+func (b *ByocDo) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(),
-		Project: b.ProjectName,
+		Project: projectName,
 		Service: &defangv1.Service{Name: service.Name},
 	}
 
@@ -666,8 +665,8 @@ func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInf
 	return si
 }
 
-func (b *ByocDo) setUp(ctx context.Context) error {
-	projectCdImageTag, err := b.getCdImageTag(ctx)
+func (b *ByocDo) setUp(ctx context.Context, projectName string) error {
+	projectCdImageTag, err := b.getCdImageTag(ctx, projectName)
 	if err != nil {
 		return err
 	}
@@ -727,9 +726,9 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
-func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.ServiceInfo {
+func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
 	serviceInfo := &defangv1.ServiceInfo{
-		Project: b.ProjectName,
+		Project: projectName,
 		Etag:    pkg.RandomID(),
 		Service: &defangv1.Service{
 			Name: service.Name,
@@ -741,16 +740,11 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec) *defangv1.Serv
 	return serviceInfo
 }
 
-func (b *ByocDo) processServiceLogs(ctx context.Context) (string, error) {
-	project, err := b.LoadProject(ctx)
+func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string) (string, error) {
 	appLiveURL := ""
 
-	if err != nil {
-		return "", err
-	}
-
-	buildAppName := fmt.Sprintf("defang-%s-%s-build", project.Name, b.PulumiStack)
-	mainAppName := fmt.Sprintf("defang-%s-%s-app", project.Name, b.PulumiStack)
+	buildAppName := fmt.Sprintf("defang-%s-%s-build", projectName, b.PulumiStack)
+	mainAppName := fmt.Sprintf("defang-%s-%s-app", projectName, b.PulumiStack)
 
 	// If we can get projects working, we can add the project to the list options
 	currentApps, _, err := b.client.Apps.List(ctx, &godo.ListOptions{})

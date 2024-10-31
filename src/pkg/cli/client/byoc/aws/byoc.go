@@ -69,7 +69,7 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	return b
 }
 
-func (b *ByocAws) setUp(ctx context.Context, projectName string) error {
+func (b *ByocAws) setUpCD(ctx context.Context, projectName string) error {
 	// note: the CD image is tagged with the major release number, use that for setup
 	projectCdImageTag, err := b.getCdImageTag(ctx, projectName)
 	if err != nil {
@@ -166,7 +166,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, deleg
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, project.Name); err != nil {
+	if err := b.setUpCD(ctx, project.Name); err != nil {
 		return nil, err
 	}
 
@@ -422,7 +422,7 @@ func (b *ByocAws) environment(projectName, delegateDomain string) map[string]str
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantID,
 		"DOMAIN":                     delegateDomain,
-		"PRIVATE_DOMAIN":             b.getPrivateDomain(projectName),
+		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
@@ -452,7 +452,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	if err := b.setUp(ctx, req.Project); err != nil {
+	if err := b.setUpCD(ctx, req.Project); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -561,11 +561,6 @@ func (b *ByocAws) ListConfig(ctx context.Context, projectName string) (*defangv1
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	// FIXME: Make sure create upload URL does not need a CD task
-	// if err := b.setUp(ctx); err != nil {
-	// 	return nil, err
-	// }
-
 	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 	if err != nil {
 		return nil, err
@@ -576,11 +571,6 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRequest) error {
-	// FIXME: Make sure populate debug request does not need a CD task
-	// if err := b.setUp(ctx); err != nil {
-	// 	return err
-	// }
-
 	// The LogStreamNamePrefix filter can only be used with one service name
 	var service string
 	if len(req.Services) == 1 {
@@ -801,7 +791,7 @@ func (b *ByocAws) getPublicFqdn(projectName, delegateDomain, fqn qualifiedName) 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) getPrivateFqdn(projectName string, fqn qualifiedName) string {
 	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.getPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
+	return fmt.Sprintf("%s.%s", safeFqn, byoc.GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
 }
 
 func (b *ByocAws) getProjectDomain(projectName, zone string) string {
@@ -820,7 +810,7 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, projectName, delegateDomain string, command string) (string, error) {
-	if err := b.setUp(ctx); err != nil {
+	if err := b.setUpCD(ctx, projectName); err != nil {
 		return "", err
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, projectName, delegateDomain, command)
@@ -955,8 +945,4 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	b.handlersLock.Lock()
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
-}
-
-func (b *ByocAws) getPrivateDomain(projectName string) string {
-	return byoc.DnsSafeLabel(projectName) + ".internal"
 }

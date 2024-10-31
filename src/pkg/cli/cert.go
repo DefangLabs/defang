@@ -77,14 +77,14 @@ var (
 	httpRetryDelayBase = 5 * time.Second
 )
 
-func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, provider client.Provider) error {
-	project, err := provider.LoadProject(ctx)
+func GenerateLetsEncryptCert(ctx context.Context, loader compose.Loader, client client.FabricClient, provider client.Provider) error {
+	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Generating TLS cert for project %q", project.Name)
 
-	services, err := provider.GetServices(ctx)
+	services, err := provider.GetServices(ctx, project.Name)
 	if err != nil {
 		return err
 	}

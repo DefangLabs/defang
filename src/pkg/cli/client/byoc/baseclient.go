@@ -145,3 +145,7 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 func (b *ByocBaseClient) GetPrivateDomain(projectName string) string {
 	return DnsSafeLabel(projectName) + ".internal"
 }
+
+func GetPrivateDomain(projectName string) string {
+	return DnsSafeLabel(projectName) + ".internal"
+}

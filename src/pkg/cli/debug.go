@@ -28,7 +28,7 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func InteractiveDebug(ctx context.Context, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
@@ -44,7 +44,7 @@ func InteractiveDebug(ctx context.Context, p client.Provider, etag types.ETag, p
 
 	track.Evt("Debug Prompt Accepted", P("etag", etag))
 
-	if err := Debug(ctx, p, etag, project, failedServices); err != nil {
+	if err := Debug(ctx, c, p, etag, project, failedServices); err != nil {
 		term.Warnf("Failed to debug deployment: %v", err)
 		return err
 	}
@@ -52,7 +52,7 @@ func InteractiveDebug(ctx context.Context, p client.Provider, etag types.ETag, p
 	return nil
 }
 
-func Debug(ctx context.Context, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
 	files := findMatchingProjectFiles(project, failedServices)
@@ -61,11 +61,16 @@ func Debug(ctx context.Context, p client.Provider, etag types.ETag, project *com
 		return ErrDryRun
 	}
 
-	resp, err := p.Debug(ctx, &defangv1.DebugRequest{
+	req := defangv1.DebugRequest{
 		Etag:     etag,
 		Files:    files,
 		Services: failedServices,
-	})
+	}
+	err := p.PopulateDebugRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	resp, err := c.Debug(ctx, &req)
 	if err != nil {
 		return err
 	}

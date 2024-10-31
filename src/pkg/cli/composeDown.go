@@ -11,26 +11,21 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ComposeDown(ctx context.Context, provider client.Provider, projectName string, names ...string) (types.ETag, error) {
-	if projectName == "" {
-		currentProjectName, err := provider.LoadProjectName(ctx)
-		if err != nil {
-			return "", err
-		}
-		projectName = currentProjectName
-	} else {
-		provider.SetProjectName(projectName)
-	}
-
+func ComposeDown(ctx context.Context, client client.FabricClient, provider client.Provider, projectName string, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
 	if DoDryRun {
 		return "", ErrDryRun
 	}
 
+	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	if err != nil {
+		term.Debug("Failed to get delegate domain:", err)
+	}
+
 	if len(names) == 0 {
 		// If no names are provided, destroy the entire project
-		return provider.Destroy(ctx)
+		return provider.Destroy(ctx, projectName, delegateDomain.Zone)
 	}
 
 	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names})
@@ -42,7 +37,7 @@ func ComposeDown(ctx context.Context, provider client.Provider, projectName stri
 
 var ErrDoNotComposeDown = errors.New("user did not want to compose down")
 
-func InteractiveComposeDown(ctx context.Context, provider client.Provider, projectName string) (types.ETag, error) {
+func InteractiveComposeDown(ctx context.Context, client client.FabricClient, provider client.Provider, projectName string) (types.ETag, error) {
 	var wantComposeDown bool
 	err := survey.AskOne(&survey.Confirm{
 		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
@@ -57,5 +52,5 @@ func InteractiveComposeDown(ctx context.Context, provider client.Provider, proje
 	}
 
 	term.Info("Deactivating project " + projectName)
-	return ComposeDown(ctx, provider, projectName)
+	return ComposeDown(ctx, client, provider, projectName)
 }
