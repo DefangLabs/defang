@@ -113,6 +113,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
 - `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, or `defang`
+- `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`

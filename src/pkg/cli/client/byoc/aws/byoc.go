@@ -454,14 +454,17 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 	}
 	env["DEFANG_MODE"] = strings.ToLower(mode.String())
 	if term.DoDebug() {
-		debugEnv := fmt.Sprintf("AWS_REGION=%q", b.driver.Region)
+		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
+		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
-			debugEnv += fmt.Sprintf(" AWS_PROFILE=%q", awsProfile)
+			debugEnv = append(debugEnv, "AWS_PROFILE="+awsProfile)
 		}
 		for k, v := range env {
-			debugEnv += fmt.Sprintf(" %s=%q", k, v)
+			debugEnv = append(debugEnv, k+"="+v)
 		}
-		term.Debug(debugEnv, "npm run dev", strings.Join(cmd, " "))
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+			return nil, err
+		}
 	}
 	return b.driver.Run(ctx, env, cmd...)
 }
