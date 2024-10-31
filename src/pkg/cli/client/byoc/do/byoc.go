@@ -284,7 +284,7 @@ func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLReq
 	}, nil
 }
 
-func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+func (b *ByocDo) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
 	return nil, client.ErrNotImplemented("not implemented for DigitalOcean")
 }
 

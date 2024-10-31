@@ -800,7 +800,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), provider, names...)
+		etag, err := cli.Delete(cmd.Context(), client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found

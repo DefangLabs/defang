@@ -29,7 +29,7 @@ func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.Servi
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
 	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
@@ -79,7 +79,7 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, projectName, delegateD
 	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names})
+	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names}, delegateDomain)
 	if err != nil {
 		return "", err
 	}

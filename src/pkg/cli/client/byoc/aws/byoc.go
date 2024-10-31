@@ -454,12 +454,12 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 	return b.driver.Run(ctx, env, cmd...)
 }
 
-func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest, delegateDomain string) (*defangv1.DeleteResponse, error) {
 	if err := b.setUpCD(ctx, req.Project); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, "up", "")
+	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, delegateDomain, "up", "")
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
 	}

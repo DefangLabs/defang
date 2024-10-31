@@ -58,8 +58,8 @@ type Provider interface {
 	BootstrapCommand(context.Context, string, string, string) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
-	PopulateDebugRequest(context.Context, *defangv1.DebugRequest) error // FIXME: Provider should provide debug context
-	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
+	PopulateDebugRequest(context.Context, *defangv1.DebugRequest) error
+	Delete(context.Context, *defangv1.DeleteRequest, string) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest, string) (*defangv1.DeployResponse, error)
 	Destroy(ctx context.Context, projectName, delegateDomain string) (types.ETag, error)

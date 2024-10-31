@@ -9,14 +9,19 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Delete(ctx context.Context, provider client.Provider, names ...string) (types.ETag, error) {
+func Delete(ctx context.Context, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debug("Deleting service", names)
 
 	if DoDryRun {
 		return "", ErrDryRun
 	}
 
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	if err != nil {
+		term.Debug("Failed to get delegate domain:", err)
+	}
+
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names}, delegateDomain.Zone)
 	if err != nil {
 		return "", err
 	}

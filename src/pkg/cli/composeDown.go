@@ -28,7 +28,7 @@ func ComposeDown(ctx context.Context, client client.FabricClient, provider clien
 		return provider.Destroy(ctx, projectName, delegateDomain.Zone)
 	}
 
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names}, delegateDomain.Zone)
 	if err != nil {
 		return "", err
 	}
