@@ -143,7 +143,7 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 		return b.cdImageTag, nil
 	}
 
-	// see if we already have a deployment running; use the same cd image tag
+	// see if we have a previous deployment; use the same cd image tag
 	projUpdate, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return "", err

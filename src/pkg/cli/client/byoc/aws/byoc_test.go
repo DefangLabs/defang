@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -163,4 +164,33 @@ func TestSubscribe(t *testing.T) {
 			wg.Wait()
 		})
 	}
+}
+
+func TestGetCDImageTag(t *testing.T) {
+	ctx := context.Background()
+	b := NewByocProvider(ctx, client.GrpcClient{}, "tenant1")
+
+	t.Run("no project should use latest", func(t *testing.T) {
+		const expected = byoc.CdLatestImageTag
+		tag, err := b.getCdImageTag(ctx)
+		if err != nil {
+			t.Fatalf("getCdImageTag() failed: %v", err)
+		}
+		if tag != expected {
+			t.Errorf("expected tag %q, got %q", expected, tag)
+		}
+	})
+
+	t.Run("can be overridden by DEFANG_CD_IMAGE", func(t *testing.T) {
+		const expected = "abc"
+		t.Setenv("DEFANG_CD_IMAGE", "defanglabs/cd:"+expected)
+
+		tag, err := b.getCdImageTag(ctx)
+		if err != nil {
+			t.Fatalf("getCdImageTag() failed: %v", err)
+		}
+		if tag != expected {
+			t.Errorf("expected tag %q, got %q", expected, tag)
+		}
+	})
 }
