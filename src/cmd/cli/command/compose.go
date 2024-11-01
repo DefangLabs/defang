@@ -26,15 +26,18 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func getUnreferencedManagedResources(serviceInfos compose.Services) []string {
-	managedResources := make([]string, 0)
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
+	var managedServices []string
+	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			managedResources = append(managedResources, service.Name)
+			managedServices = append(managedServices, service.Name)
+		} else {
+			unmanagedServices = append(unmanagedServices, service.Name)
 		}
 	}
 
-	return managedResources
+	return managedServices, unmanagedServices
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -82,9 +85,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = getUnreferencedManagedResources(project.Services)
-			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
+			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+
+			if len(managedServices) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
 			if detach {
@@ -105,12 +109,7 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				services := make([]string, len(deploy.Services))
-				for i, serviceInfo := range deploy.Services {
-					services[i] = serviceInfo.Service.Name
-				}
-
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, services); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
