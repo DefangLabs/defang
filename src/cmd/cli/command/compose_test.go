@@ -10,7 +10,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 	t.Run("no services", func(t *testing.T) {
 		project := types.Services{}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resources, got %d (%v)", len(managed), managed)
 		}
@@ -27,7 +27,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 1 {
 			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -42,7 +42,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			"service1": types.ServiceConfig{},
 		}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -61,7 +61,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 1 {
 			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -77,7 +77,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			"service2": types.ServiceConfig{},
 		}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -98,7 +98,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := splitProjectServicesByManageType(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 2 {
 			t.Errorf("Expected 2 managed resource, got %d (%s)", len(managed), managed)
 		}
