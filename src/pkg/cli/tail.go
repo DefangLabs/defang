@@ -65,6 +65,7 @@ type EndLogConditional struct {
 type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
 
 type TailOptions struct {
+	Project            string
 	Services           []string
 	Etag               types.ETag
 	Since              time.Time
@@ -150,6 +151,9 @@ func Tail(ctx context.Context, loader client.Loader, provider client.Provider, p
 		return err
 	}
 	term.Debugf("Tailing logs in project %q", projectName)
+	if params.Project == "" {
+		params.Project = projectName
+	}
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
@@ -191,7 +195,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Project: params.Project, Services: params.Services, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
