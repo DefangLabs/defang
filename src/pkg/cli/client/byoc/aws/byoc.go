@@ -51,10 +51,9 @@ var (
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	cdImageTag      string
-	cdTasks         map[string]ecs.TaskArn
-	delegationSetId string
-	driver          *cfn.AwsEcs
+	cdImageTag string
+	cdTasks    map[string]ecs.TaskArn
+	driver     *cfn.AwsEcs
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -231,13 +230,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		payloadString = http.RemoveQueryParam(payloadUrl)
 	}
 
-	// FIXME: Domain delegation should be done by the cli command
-	// if b.ShouldDelegateSubdomain {
-	// 	if _, err := b.delegateSubdomain(ctx); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-	taskArn, err := b.runCdCommand(ctx, req.Mode, cmd, payloadString)
+	cdCommand := cdCmd{
+		mode:           req.Mode,
+		project:        project.Name,
+		delegateDomain: req.DelegateDomain,
+		cmd:            []string{cmd, payloadString},
+	}
+	taskArn, err := b.runCdCommand(ctx, cdCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +286,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 }
 
-func (b *ByocAws) DelegateDomainNSServers(ctx context.Context, req client.DelegateDomainNSServersRequest) ([]string, error) {
+func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	projectDomain := b.getProjectDomain(req.Project, req.DelegateDomain)
 
 	cfg, err := b.driver.LoadConfig(ctx)
@@ -318,6 +317,7 @@ func (b *ByocAws) DelegateDomainNSServers(ctx context.Context, req client.Delega
 		}
 	}
 
+	var resp client.PrepareDomainDelegationResponse
 	if zone == nil || zone.Config.Comment == nil || *zone.Config.Comment != aws.CreateHostedZoneComment {
 		// Case 2b or 2c: The zone does not exist, or was not created by an older version of this CLI.
 		// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
@@ -339,7 +339,7 @@ func (b *ByocAws) DelegateDomainNSServers(ctx context.Context, req client.Delega
 			return nil, errors.New("no NS records found for the delegation set") // should not happen
 		}
 		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
-		b.delegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
+		resp.DelegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
 
 		// Ensure the NS records match the ones from the delegation set
 		sort.Strings(nsServers)
@@ -354,8 +354,9 @@ func (b *ByocAws) DelegateDomainNSServers(ctx context.Context, req client.Delega
 		// Case 2a: The zone was created by the older CLI, we'll use the existing NS records; track how many times this happens
 		track.Evt("Compose-Up delegateSubdomain old", track.P("domain", projectDomain))
 	}
+	resp.NameServers = nsServers
 
-	return nsServers, nil
+	return &resp, nil
 }
 
 func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
@@ -410,30 +411,44 @@ func (b *ByocAws) bucketName() string {
 	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
 }
 
-func (b *ByocAws) environment(projectName, delegateDomain string) map[string]string {
+func (b *ByocAws) environment(projectName string) map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
-		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantID,
-		"DOMAIN":                     delegateDomain,
+		"DEFANG_PREFIX":              byoc.DefangPrefix,
+		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName, // may be empty
 		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
 		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
-		"STACK":                      b.PulumiStack,
-		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
+		"STACK":                      b.PulumiStack,
 	}
 }
 
-func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode, projectName, delegateDomain string, cmd ...string) (ecs.TaskArn, error) {
-	env := b.environment(projectName, delegateDomain)
-	if b.delegationSetId != "" {
-		env["DELEGATION_SET_ID"] = b.delegationSetId
+type cdCmd struct {
+	mode            defangv1.DeploymentMode
+	project         string
+	delegateDomain  string
+	delegationSetId string
+	cmd             []string
+}
+
+func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, error) {
+	// Setup the deployment environment
+	env := b.environment(cmd.project)
+	if cmd.delegationSetId != "" {
+		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
-	env["DEFANG_MODE"] = strings.ToLower(mode.String())
+	if cmd.delegateDomain != "" {
+		env["DOMAIN"] = cmd.delegateDomain
+	} else {
+		env["DOMAIN"] = "dummy.domain"
+	}
+	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
+
 	if term.DoDebug() {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
@@ -443,11 +458,11 @@ func (b *ByocAws) runCdCommand(ctx context.Context, mode defangv1.DeploymentMode
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+		if err := byoc.DebugPulumi(ctx, debugEnv, cmd.cmd...); err != nil {
 			return nil, err
 		}
 	}
-	return b.driver.Run(ctx, env, cmd...)
+	return b.driver.Run(ctx, env, cmd.cmd...)
 }
 
 func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
@@ -458,7 +473,13 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
-	taskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, req.DelegateDomain, "up", "") // Empty protobuf
+	cmd := cdCmd{
+		mode:           defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		project:        req.Project,
+		delegateDomain: req.DelegateDomain,
+		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
+	}
+	taskArn, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
 	}
@@ -820,7 +841,12 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 	if err := b.setUpCD(ctx, req.Project); err != nil {
 		return "", err
 	}
-	cdTaskArn, err := b.runCdCommand(ctx, defangv1.DeploymentMode_UNSPECIFIED_MODE, req.Project, "dummy.domain", req.Command) // TODO: make domain optional for defang cd
+	cmd := cdCmd{
+		mode:    defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		project: req.Project,
+		cmd:     []string{req.Command},
+	}
+	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
 	if err != nil || cdTaskArn == nil {
 		return "", byoc.AnnotateAwsError(err)
 	}

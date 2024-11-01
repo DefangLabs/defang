@@ -59,9 +59,14 @@ type BootstrapCommandRequest struct {
 	Project string
 }
 
-type DelegateDomainNSServersRequest struct {
+type PrepareDomainDelegationRequest struct {
 	Project        string
 	DelegateDomain string
+}
+
+type PrepareDomainDelegationResponse struct {
+	NameServers     []string
+	DelegationSetId string
 }
 
 type Provider interface {
@@ -69,7 +74,7 @@ type Provider interface {
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
-	DelegateDomainNSServers(context.Context, DelegateDomainNSServersRequest) ([]string, error)
+	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)

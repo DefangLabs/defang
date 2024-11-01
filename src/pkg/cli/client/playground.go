@@ -116,7 +116,7 @@ func (g *PlaygroundProvider) PopulateDebugRequest(ctx context.Context, req *defa
 	return nil
 }
 
-func (g *PlaygroundProvider) DelegateDomainNSServers(ctx context.Context, req DelegateDomainNSServersRequest) ([]string, error) {
+func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error) {
 	return nil, nil // Playground does not support delegate domains
 }
 

@@ -165,6 +165,7 @@ message DeployRequest {
   DeploymentMode mode = 3;
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
+  string delegation_set_id = 6;
 }
 
 message DeployResponse {

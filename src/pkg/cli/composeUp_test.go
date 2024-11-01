@@ -39,8 +39,11 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	return &defangv1.DeployResponse{Services: services}, nil
 }
 
-func (d deployMock) DelegateDomainNSServers(ctx context.Context, req client.DelegateDomainNSServersRequest) ([]string, error) {
-	return []string{"ns1.example.com", "ns2.example.com"}, nil
+func (d deployMock) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
+	return &client.PrepareDomainDelegationResponse{
+		NameServers:     []string{"ns1.example.com", "ns2.example.com"},
+		DelegationSetId: "test-delegation-set-id",
+	}, nil
 }
 
 func TestComposeUp(t *testing.T) {

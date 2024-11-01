@@ -510,7 +510,7 @@ func (b *ByocDo) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRe
 	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
 }
 
-func (b *ByocDo) DelegateDomainNSServers(ctx context.Context, req client.DelegateDomainNSServersRequest) ([]string, error) {
+func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	return nil, nil // TODO: implement domain delegation for DO
 }
 

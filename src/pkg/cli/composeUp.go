@@ -65,7 +65,6 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 		return nil, project, ErrDryRun
 	}
 
-	// FIXME: When do we actually do the domain delegation?
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
@@ -76,20 +75,19 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 	if upload == compose.UploadModePreview {
 		resp, err = p.Preview(ctx, deployRequest)
 	} else {
-
-		req := client.DelegateDomainNSServersRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
-		nsServers, err := p.DelegateDomainNSServers(ctx, req)
+		req := client.PrepareDomainDelegationRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
+		delegation, err := p.PrepareDomainDelegation(ctx, req)
 		if err != nil {
 			return nil, project, err
 		}
-		if len(nsServers) > 0 {
-			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: nsServers}
+		if delegation != nil && len(delegation.NameServers) > 0 {
+			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
 			_, err = c.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
+			deployRequest.DelegationSetId = delegation.DelegationSetId
 		}
-
 		resp, err = p.Deploy(ctx, deployRequest)
 	}
 	if err != nil {
