@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     deploy:
       resources:
-        reservations:
+        limits:
           memory: "268435456"
     networks:
       default: null
