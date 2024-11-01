@@ -27,8 +27,8 @@ func isManagedService(service compose.ServiceConfig) bool {
 }
 
 func splitProjectServicesByManageType(serviceInfos compose.Services) ([]string, []string) {
-	managedServices := make([]string, 0)
-	unmanagedServices := make([]string, 0)
+	var managedServices []string
+	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
 			managedServices = append(managedServices, service.Name)
