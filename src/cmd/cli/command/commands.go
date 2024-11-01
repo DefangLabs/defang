@@ -780,12 +780,7 @@ var debugCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
 
-		project, err := loader.LoadProject(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
+		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
 	},
 }
 

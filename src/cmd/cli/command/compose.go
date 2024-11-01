@@ -61,7 +61,7 @@ func makeComposeUpCmd() *cobra.Command {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
 					if resp, err2 := provider.GetServices(cmd.Context(), &defangv1.GetServicesRequest{Project: project.Name}); err2 == nil {
 						term.Error("Error:", prettyError(err))
-						if _, err := cli.InteractiveComposeDown(cmd.Context(), client, provider, resp.Project); err != nil {
+						if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, resp.Project); err != nil {
 							term.Debug("ComposeDown failed:", err)
 							printDefangHint("To deactivate a project, do:", "compose down --project-name "+resp.Project)
 						} else {
@@ -169,7 +169,7 @@ func makeComposeUpCmd() *cobra.Command {
 						failedServices := []string{errDeploymentFailed.Service}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						_ = cli.InteractiveDebug(cmd.Context(), client, provider, deploy.Etag, project, failedServices)
+						_ = cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices)
 					}
 					return err
 				}
@@ -250,7 +250,7 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), client, provider, "", args...)
+			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
