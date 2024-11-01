@@ -198,7 +198,10 @@ message StartGenerateResponse { string uuid = 1; }
 
 message GenerateStatusRequest { string uuid = 1; }
 
-message UploadURLRequest { string digest = 1; }
+message UploadURLRequest { 
+  string digest = 1;
+  string project = 2;
+}
 
 message UploadURLResponse { string url = 1; }
 

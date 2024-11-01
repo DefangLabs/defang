@@ -53,7 +53,7 @@ type ByocAws struct {
 
 	cdImageTag string
 	cdTasks    map[string]ecs.TaskArn
-	driver     *cfn.AwsEcs
+	driver     *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after setUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -589,6 +589,10 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	if err := b.setUpCD(ctx, req.Project); err != nil {
+		return nil, err
+	}
+
 	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 	if err != nil {
 		return nil, err

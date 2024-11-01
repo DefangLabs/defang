@@ -43,7 +43,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, provider, svccfg.Name, svccfg.Build, upload)
+			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return err
 			}

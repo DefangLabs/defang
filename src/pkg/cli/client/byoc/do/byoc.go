@@ -274,6 +274,10 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	if err := b.setUp(ctx, req.Project); err != nil {
+		return nil, err
+	}
+
 	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 
 	if err != nil {
