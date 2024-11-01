@@ -52,21 +52,21 @@ type ByocAws struct {
 	*byoc.ByocBaseClient
 
 	cdImageTag      string
-	cdTasks         map[string]ecs.TaskArn
 	delegationSetId string
 	driver          *cfn.AwsEcs
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
+	lastCdEtag       types.ETag
 	lastCdStart      time.Time
+	lastCdTaskArn    ecs.TaskArn
 }
 
 var _ client.Provider = (*ByocAws)(nil)
 
 func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
-		cdTasks: make(map[string]ecs.TaskArn),
-		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
 	return b
@@ -253,8 +253,9 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	if err != nil {
 		return nil, err
 	}
-	b.cdTasks[etag] = taskArn
+	b.lastCdEtag = etag
 	b.lastCdStart = time.Now()
+	b.lastCdTaskArn = taskArn
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -479,7 +480,9 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, byoc.AnnotateAwsError(err)
 	}
 	etag := ecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
-	b.cdTasks[etag] = taskArn
+	b.lastCdEtag = etag
+	b.lastCdStart = time.Now()
+	b.lastCdTaskArn = taskArn
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
@@ -679,6 +682,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			service = req.Services[0]
 		}
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, service)...)
+		taskArn = b.lastCdTaskArn
 	}
 	if err != nil {
 		return nil, byoc.AnnotateAwsError(err)
@@ -716,9 +720,9 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, service string) []ecs.LogGr
 	ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir("ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 	term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
 	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
-	// If we know the CD task ARN, only tail the logstream for the CD task
-	if taskArn := b.cdTasks[etag]; taskArn != nil {
-		cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(taskArn))}
+	// If we know the CD task ARN, only tail the logstream for that CD task
+	if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
+		cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
 	}
 	term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
 	return []ecs.LogGroupInput{cdTail, kanikoTail, servicesTail, ecsTail} // more or less in chronological order

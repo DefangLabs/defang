@@ -86,7 +86,11 @@ func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, er
 }
 
 func GetCDLogStreamForTaskID(taskID string) string {
-	return path.Join(AwsLogsStreamPrefix, CdContainerName, taskID) // per "awslogs" driver
+	return GetLogStreamForTaskID(CrunProjectName, CdContainerName, taskID)
+}
+
+func GetLogStreamForTaskID(awslogsStreamPrefix, containerName, taskID string) string {
+	return path.Join(awslogsStreamPrefix, containerName, taskID) // per "awslogs" driver
 }
 
 func GetTaskID(taskArn TaskArn) string {
