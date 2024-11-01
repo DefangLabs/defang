@@ -251,7 +251,7 @@ func ValidateProject(project *composeTypes.Project) error {
 				return fmt.Errorf("service %q: unsupported compose directive: deploy endpoint_mode", svccfg.Name)
 			}
 			if svccfg.Deploy.Resources.Limits != nil && svccfg.Deploy.Resources.Reservations == nil {
-				term.Warnf("service %q: no reservations specified; using limits as reservations", svccfg.Name)
+				term.Debugf("service %q: no reservations specified; using limits as reservations", svccfg.Name)
 			}
 			reservations = getResourceReservations(svccfg.Deploy.Resources)
 			if reservations != nil && reservations.NanoCPUs < 0 { // "0" just means "as small as possible"
