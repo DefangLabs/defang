@@ -60,13 +60,7 @@ type BootstrapLister interface {
 }
 
 type ByocBaseClient struct {
-	// client.GrpcClient
 
-	// PrivateDomain           string
-	// PrivateLbIps            []string // TODO: use API to get these
-	// PrivateNatIps           []string // TODO: use API to get these
-	// ProjectDomain           string
-	// ProjectName             string
 	PulumiStack             string
 	Quota                   quota.Quotas
 	SetupDone               bool

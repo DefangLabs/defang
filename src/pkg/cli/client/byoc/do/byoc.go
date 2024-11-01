@@ -74,7 +74,6 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) (*ByocDo, err
 		driver: appPlatform.New(doRegion),
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
-	// b.ProjectName, _ = b.LoadProjectName(ctx)
 	return b, nil
 }
 
@@ -455,12 +454,6 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
-	// FIXME: Do we need this? if so can we get it from remote?
-	// _, err := b.BootstrapCommand(ctx, "down")
-	// if err != nil {
-	// 	return err
-	// }
-
 	app, err := b.getAppByName(ctx, appPlatform.CdName)
 	if err != nil {
 		return err
