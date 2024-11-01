@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -365,6 +366,9 @@ func validatePort(port composeTypes.ServicePortConfig) error {
 	return nil
 }
 
+// Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion
+var interpolationRegex = regexp.MustCompile(`(?i)\$(\$)|\$(?:{([^}]+)}|([_a-z][_a-z0-9]*))|([^$]+)`) // [1] escaped dollar, [2] curly braces, [3] variable name, [4] literal
+
 func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
 	var names []string
 	// make list of secrets
@@ -372,6 +376,16 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 		for key, value := range service.Environment {
 			if value == nil {
 				names = append(names, key)
+				continue
+			}
+			// check for variables used during interpolation
+			for _, match := range interpolationRegex.FindAllStringSubmatch(*value, -1) {
+				if match[2] != "" {
+					names = append(names, match[2])
+				}
+				if match[3] != "" {
+					names = append(names, match[3])
+				}
 			}
 		}
 	}
@@ -385,6 +399,7 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 		return err
 	}
 
+	// Deduplicate (sort + uniq)
 	slices.Sort(names)
 	names = slices.Compact(names)
 
