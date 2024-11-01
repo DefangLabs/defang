@@ -115,7 +115,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		var record logs.FirelensMessage
 		if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
 			response.Etag = record.Etag
-			response.Host = record.Host             // TODO: use "kaniko" for kaniko logs
+			response.Host = record.Host
 			response.Service = record.ContainerName // TODO: could be service_etag
 			parseFirelensRecords = true
 		}
