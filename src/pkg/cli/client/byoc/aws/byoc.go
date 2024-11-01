@@ -143,7 +143,7 @@ func (b *ByocAws) getCdImageTag(ctx context.Context) (string, error) {
 		return b.cdImageTag, nil
 	}
 
-	// see if we already have a deployment running
+	// see if we have a previous deployment; use the same cd image tag
 	projUpdate, err := b.getProjectUpdate(ctx)
 	if err != nil {
 		return "", err
@@ -493,6 +493,10 @@ func (b *ByocAws) stackDir(name string) string {
 }
 
 func (b *ByocAws) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate, error) {
+	if b.ProjectName == "" {
+		return nil, nil // no services yet
+	}
+
 	bucketName := b.bucketName()
 	if bucketName == "" {
 		if err := b.driver.FillOutputs(ctx); err != nil {

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	awsecs "github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn/outputs"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -36,7 +37,8 @@ const (
 var (
 	dockerHubUsername    = os.Getenv("DOCKERHUB_USERNAME") // TODO: support DOCKER_AUTH_CONFIG
 	dockerHubAccessToken = os.Getenv("DOCKERHUB_ACCESS_TOKEN")
-	retainBucket         = true // set to false in unit tests
+	noCache              = pkg.GetenvBool("DEFANG_NO_CACHE") // set to 1/true to disable pull-through cache
+	retainBucket         = true                              // set to false in unit tests
 )
 
 func getCacheRepoPrefix(prefix, suffix string) string {
@@ -132,7 +134,9 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 	images := make([]string, 0, len(containers))
 	for _, task := range containers {
 		image := task.Image
-		if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
+		if noCache {
+			// no pull-through cache
+		} else if repo, ok := strings.CutPrefix(image, awsecs.EcrPublicRegistry); ok {
 			const _pullThroughCache = "PullThroughCache"
 			ecrPublicPrefix := getCacheRepoPrefix(prefix, "ecr-public")
 
