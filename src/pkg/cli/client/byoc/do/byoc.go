@@ -503,7 +503,7 @@ func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.
 	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")
 }
 
-func (b *ByocDo) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocDo) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
 }
 

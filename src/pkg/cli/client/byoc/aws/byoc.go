@@ -602,7 +602,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) PopulateDebugRequest(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	// The LogStreamNamePrefix filter can only be used with one service name
 	var service string
 	if len(req.Services) == 1 {

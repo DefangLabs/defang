@@ -73,7 +73,7 @@ func Debug(ctx context.Context, l client.Loader, c client.FabricClient, p client
 		Files:    files,
 		Services: failedServices,
 	}
-	err := p.PopulateDebugRequest(ctx, &req)
+	err := p.Query(ctx, &req)
 	if err != nil {
 		return err
 	}

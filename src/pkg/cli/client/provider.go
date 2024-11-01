@@ -83,7 +83,7 @@ type Provider interface {
 	GetService(context.Context, *defangv1.ServiceID) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error)
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
-	PopulateDebugRequest(context.Context, *defangv1.DebugRequest) error
+	Query(context.Context, *defangv1.DebugRequest) error
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)
