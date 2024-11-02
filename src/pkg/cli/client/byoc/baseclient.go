@@ -60,7 +60,6 @@ type BootstrapLister interface {
 }
 
 type ByocBaseClient struct {
-
 	PulumiStack             string
 	Quota                   quota.Quotas
 	SetupDone               bool
@@ -165,11 +164,11 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 		return "", errors.New("no projects found")
 	}
 	if len(projectNames) == 1 {
-		term.Debug("Using default project: ", projectNames[0])
+		term.Debug("Using default project:", projectNames[0])
 		return projectNames[0], nil
 	}
 
-	term.Warn("Multiple projects found: ", projectNames)
+	term.Warn("Multiple projects found:", projectNames)
 
 	return "", errors.New("use the --project-name flag to specify a project")
 }

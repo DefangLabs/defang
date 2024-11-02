@@ -21,16 +21,6 @@ const DefaultCluster = "fabric-prod1.defang.dev"
 
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
-// Deprecated: should use grpc to get the tenant ID
-func GetTenantID(cluster string) types.TenantID {
-	if tenantId, _ := SplitTenantHost(cluster); tenantId != types.DEFAULT_TENANT {
-		return tenantId
-	}
-
-	_, tenantId := getExistingTokenAndTenant(cluster)
-	return tenantId
-}
-
 func SplitTenantHost(cluster string) (types.TenantID, string) {
 	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
