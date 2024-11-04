@@ -50,7 +50,6 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		if len(unmanaged) != 1 {
 			t.Errorf("Expected 1 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
 		}
-
 	})
 
 	t.Run("one service unmanaged, one service managed", func(t *testing.T) {

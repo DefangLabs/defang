@@ -117,7 +117,8 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context, projectName string) (*def
 	}
 
 	if bucketName == "" {
-		return nil, errors.New("no bucket found")
+		// bucket is not created yet; return empty update in that case
+		return nil, nil // no services yet
 	}
 
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
@@ -167,7 +168,12 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	if err := b.setUp(ctx, project.Name); err != nil {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	cdImageTag, err := b.getCdImageTag(ctx, project.Name)
+	if err != nil {
 		return nil, err
 	}
 
@@ -193,7 +199,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.cdImageTag,
+		CdVersion: cdImageTag,
 		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
@@ -240,7 +246,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 }
 
 func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if err := b.setUp(ctx, req.Project); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return "", err
 	}
 
@@ -273,7 +279,7 @@ func (b *ByocDo) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocDo) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUp(ctx, req.Project); err != nil {
+	if err := b.setUp(ctx); err != nil {
 		return nil, err
 	}
 
@@ -640,13 +646,8 @@ func (b *ByocDo) update(service composeTypes.ServiceConfig, projectName string) 
 	return si
 }
 
-func (b *ByocDo) setUp(ctx context.Context, projectName string) error {
-	projectCdImageTag, err := b.getCdImageTag(ctx, projectName)
-	if err != nil {
-		return err
-	}
-
-	if b.SetupDone && b.cdImageTag == projectCdImageTag {
+func (b *ByocDo) setUp(ctx context.Context) error {
+	if b.SetupDone {
 		return nil
 	}
 
@@ -674,8 +675,6 @@ func (b *ByocDo) setUp(ctx context.Context, projectName string) error {
 	}
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
-
-	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
 
 	return nil

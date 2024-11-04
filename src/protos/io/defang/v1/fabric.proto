@@ -305,14 +305,12 @@ message TokenRequest {
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
   string anon_id = 6;
-
-  // string refresh_token = 6;
+  string refresh_token = 7;
 }
 
 message TokenResponse {
-  string access_token = 1; // our JWT
-
-  // string refresh_token = 2;
+  string access_token = 1; // short-lived token
+  string refresh_token = 2;
   // string token_type = 3; // "Bearer"
   // uint32 expires_in = 4; // 3600
   // string id_token = 5; // "eyJhbGciOiJSUzI…"
