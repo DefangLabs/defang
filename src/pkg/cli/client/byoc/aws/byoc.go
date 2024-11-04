@@ -445,7 +445,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = cmd.delegateDomain
+		env["DOMAIN"] = b.getProjectDomain(cmd.project, cmd.delegateDomain)
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
