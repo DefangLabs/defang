@@ -116,7 +116,8 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 	}
 
 	if bucketName == "" {
-		return nil, errors.New("no bucket found")
+		// bucket is not created yet; return empty update in that case
+		return nil, nil // no services yet
 	}
 
 	path := fmt.Sprintf("projects/%s/%s/project.pb", b.ProjectName, b.PulumiStack)
