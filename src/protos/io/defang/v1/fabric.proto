@@ -299,8 +299,7 @@ message TokenRequest {
   string assertion = 4;      // jwt-bearer
   uint32 expires_in = 5;     // seconds
   string anon_id = 6;
-
-  // string refresh_token = 6;
+  string refresh_token = 7;
 }
 
 message TokenResponse {
