@@ -116,7 +116,7 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 		})
 	}
 
-	names := make([]string, 0, 10)
+	var names []string
 	var token *string
 	for {
 		res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
