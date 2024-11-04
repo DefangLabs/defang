@@ -644,32 +644,13 @@ func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInf
 	return si
 }
 
-func (b *ByocDo) needsSetup(ctx context.Context) (bool, error) {
-	projectCdImageTag, err := b.getCdImageTag(ctx)
-
-	if err != nil {
-		if strings.Contains(err.Error(), "no bucket found") {
-			return true, nil
-		} else {
-			return true, err
-		}
-	}
-
-	b.cdImageTag = projectCdImageTag
-	if b.SetupDone && b.cdImageTag == projectCdImageTag {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 func (b *ByocDo) setUp(ctx context.Context) error {
-	needsSetup, err := b.needsSetup(ctx)
+	projectCdImageTag, err := b.getCdImageTag(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !needsSetup {
+	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
 
@@ -697,10 +678,6 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	}
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
-	projectCdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return err
-	}
 
 	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
