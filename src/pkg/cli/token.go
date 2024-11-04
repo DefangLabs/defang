@@ -49,5 +49,5 @@ func exchangeCodeForToken(ctx context.Context, client client.FabricClient, code 
 	if err != nil {
 		return "", err
 	}
-	return token.AccessToken, nil
+	return token.RefreshToken, nil
 }

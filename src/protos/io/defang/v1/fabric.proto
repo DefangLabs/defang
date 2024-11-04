@@ -303,8 +303,8 @@ message TokenRequest {
 }
 
 message TokenResponse {
-  string access_token = 1; // short-lived token
-  string refresh_token = 2;
+  string access_token = 1; // short-lived token (was JWT)
+  string refresh_token = 2; // long-lived token
   // string token_type = 3; // "Bearer"
   // uint32 expires_in = 4; // 3600
   // string id_token = 5; // "eyJhbGciOiJSUzI…"

@@ -26,9 +26,9 @@ func GetExistingToken(fabric string) string {
 	if accessToken == "" {
 		tokenFile := getTokenFile(fabric)
 
-		term.Debug("Reading access token from file", tokenFile)
+		term.Debug("Reading token from file", tokenFile)
 		all, _ := os.ReadFile(tokenFile)
-		accessToken = string(all)
+		accessToken = string(all) // FIXME: this is refresh token
 	} else {
 		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	}
@@ -48,11 +48,11 @@ func loginWithGitHub(ctx context.Context, client client.FabricClient, gitHubClie
 	return exchangeCodeForToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
 }
 
-func saveAccessToken(fabric, at string) error {
+func saveRefreshToken(fabric, refreshToken string) error {
 	tokenFile := getTokenFile(fabric)
-	term.Debug("Saving access token to", tokenFile)
+	term.Debug("Saving token to", tokenFile)
 	os.MkdirAll(client.StateDir, 0700)
-	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
+	if err := os.WriteFile(tokenFile, []byte(refreshToken), 0600); err != nil {
 		return err
 	}
 	return nil
@@ -67,7 +67,7 @@ func InteractiveLogin(ctx context.Context, client client.FabricClient, gitHubCli
 	tenant, host := SplitTenantHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := saveAccessToken(fabric, at); err != nil {
+	if err := saveRefreshToken(fabric, at); err != nil {
 		term.Warn("Failed to save access token:", err)
 	}
 	return nil
@@ -87,5 +87,5 @@ func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric
 	if err != nil {
 		return err
 	}
-	return saveAccessToken(fabric, resp.AccessToken)
+	return saveRefreshToken(fabric, resp.RefreshToken)
 }
