@@ -171,6 +171,11 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
+	cdImageTag, err := b.getCdImageTag(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
@@ -193,7 +198,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.cdImageTag,
+		CdVersion: cdImageTag,
 		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
@@ -646,12 +651,7 @@ func (b *ByocDo) update(service composeTypes.ServiceConfig) *defangv1.ServiceInf
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
-	projectCdImageTag, err := b.getCdImageTag(ctx)
-	if err != nil {
-		return err
-	}
-
-	if b.SetupDone && b.cdImageTag == projectCdImageTag {
+	if b.SetupDone {
 		return nil
 	}
 
@@ -679,8 +679,6 @@ func (b *ByocDo) setUp(ctx context.Context) error {
 	}
 
 	b.buildRepo = registry.Name + "/kaniko-build" // TODO: use/add b.PulumiProject but only if !starter
-
-	b.cdImageTag = projectCdImageTag
 	b.SetupDone = true
 
 	return nil
