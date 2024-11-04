@@ -116,6 +116,7 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context) (*defangv1.ProjectUpdate,
 	}
 
 	if bucketName == "" {
+		// bucket is not created yet; return empty update in that case
 		return nil, nil // no services yet
 	}
 
