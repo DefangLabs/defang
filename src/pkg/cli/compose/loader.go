@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/errdefs"
+	"github.com/compose-spec/compose-go/v2/interpolation"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -120,6 +121,7 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithDiscardEnvFile,
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 		cli.WithLoadOptions(func(o *loader.Options) {
+			o.Interpolate = &interpolation.Options{}
 			// Override the interpolation substitution function to leave unresolved variables as is for resolution later by CD
 			o.Interpolate.Substitute = func(templ string, mapping template.Mapping) (string, error) {
 				return template.Substitute(templ, func(key string) (string, bool) {
