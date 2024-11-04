@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -15,10 +16,11 @@ import (
 var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
-	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "ten ant") // no domain
 	if err != nil {
-		t.Fatal(err)
+		if !errors.Is(err, ErrMissingAwsCreds) {
+			t.Fatalf("NewByocProvider() failed: %v", err)
+		}
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -45,10 +47,11 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestTail")
 	if err != nil {
-		t.Fatal(err)
+		if !errors.Is(err, ErrMissingAwsCreds) {
+			t.Fatalf("NewByocProvider() failed: %v", err)
+		}
 	}
 	b.ProjectName = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
@@ -77,10 +80,11 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestGetServices")
 	if err != nil {
-		t.Fatal(err)
+		if !errors.Is(err, ErrMissingAwsCreds) {
+			t.Fatalf("NewByocProvider() failed: %v", err)
+		}
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -101,10 +105,11 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestPutSecret")
 	if err != nil {
-		t.Fatal(err)
+		if !errors.Is(err, ErrMissingAwsCreds) {
+			t.Fatalf("NewByocProvider() failed: %v", err)
+		}
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -157,10 +162,11 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	t.Setenv("AWS_REGION", "us-west-2")
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestListSecrets")
 	if err != nil {
-		t.Fatal(err)
+		if !errors.Is(err, ErrMissingAwsCreds) {
+			t.Fatalf("NewByocProvider() failed: %v", err)
+		}
 	}
 	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 

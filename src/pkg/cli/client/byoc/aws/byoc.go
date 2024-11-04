@@ -63,15 +63,18 @@ type ByocAws struct {
 
 var _ client.Provider = (*ByocAws)(nil)
 
+var ErrMissingAwsCreds error = errors.New("AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)")
+
 func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocAws, error) {
 	b := &ByocAws{
 		cdTasks: make(map[string]ecs.TaskArn),
 		driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, grpcClient, tenantId, b)
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		return b, errors.New("AWS_REGION must be set (https://docs.defang.io/docs/providers/aws#region)")
+
+	_, err := b.AccountInfo(ctx)
+	if err != nil {
+		return b, ErrMissingAwsCreds
 	}
 	return b, nil
 }

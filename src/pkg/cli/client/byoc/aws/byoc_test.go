@@ -6,16 +6,19 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"io"
-	"os"
 	"path"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -26,7 +29,6 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	port8080 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 8080}
 	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
 	tests := []struct {
-		Region      string
 		ProjectName string
 		TenantID    types.TenantID
 		Fqn         string
@@ -35,33 +37,31 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		PublicFqdn  string
 		PrivateFqdn string
 	}{
-		{"us-west-2", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"us-west-2", "tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"us-west-2", "project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"us-west-2", "Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"us-west-2", "project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
-		{"us-west-2", "project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
-		{"us-west-2", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"us-west-2", "tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
-		{"us-west-2", "Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
-		{"us-west-2", "Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
-		{"us-west-2", "tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
-		{"", "tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
+		{"project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "web", hostModePort, "web.project1.internal:80", "web.project1.example.com", "web.project1.internal"},
+		{"project1", "tenant1", "api", port8080, "api--8080.project1.example.com", "api.project1.example.com", "api.project1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", hostModePort, "web.tenant1.internal:80", "web.example.com", "web.tenant1.internal"},
+		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
+		{"Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
+		{"tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
 	}
 
-	origRegion := os.Getenv("AWS_REGION")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			os.Setenv("AWS_REGION", tt.Region)
 			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b, err := NewByocProvider(context.Background(), *grpcClient, tt.TenantID)
-			if err != nil {
-				if tt.Region == "" {
-					return
-				}
-				t.Fatalf("NewByocProvider() failed: %v", err)
+
+			//like calling NewByocProvider(), but without needing real AccountInfo data
+			b := &ByocAws{
+				cdTasks: make(map[string]ecs.TaskArn),
+				driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
+			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), *grpcClient, tt.TenantID, b)
+
 			if _, err := b.LoadProject(context.Background()); err != nil {
 				t.Fatalf("LoadProject() failed: %v", err)
 			}
@@ -178,25 +178,15 @@ func TestSubscribe(t *testing.T) {
 }
 
 func TestNewByocProvider(t *testing.T) {
-	tests := []struct {
-		Region        string
-		Name          string
-		ExpectedError bool
-	}{
-		{"us-west-2", "AWS Region set", false},
-		{"", "AWS Region not set", true}}
-
-	origRegion := os.Getenv("AWS_REGION")
-	defer func() { os.Setenv("AWS_REGION", origRegion) }()
-	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
-			os.Setenv("AWS_REGION", tt.Region)
-			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
-			_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
-			errorOccurred := (err != nil)
-			if errorOccurred != tt.ExpectedError {
-				t.Fatalf("Failed: expected error to show %t, but got %t", tt.ExpectedError, errorOccurred)
+	t.Run("no aws credentials", func(t *testing.T) {
+		grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
+		_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
+		if err != nil {
+			if !errors.Is(err, ErrMissingAwsCreds) {
+				t.Fatalf("NewByocProvider() failed: %v", err)
 			}
-		})
-	}
+		} else {
+			t.Fatal("NewByocProvider() failed: expected MissingAwsCreds error but didn't get one")
+		}
+	})
 }
