@@ -544,7 +544,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		},
 		{
 			Key:   "DOMAIN",
-			Value: delegateDomain,
+			Value: b.GetProjectDomain(projectName, delegateDomain),
 		},
 		{
 			Key:   "PRIVATE_DOMAIN",

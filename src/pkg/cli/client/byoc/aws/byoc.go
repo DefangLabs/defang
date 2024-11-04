@@ -77,8 +77,6 @@ func (b *ByocAws) setUpCD(ctx context.Context, projectName string) error {
 	if err != nil {
 		return err
 	}
-	term.Debugf("~~~~~~~~ Using CD image tag: %s", projectCdImageTag)
-
 	if b.SetupDone && b.cdImageTag == projectCdImageTag {
 		return nil
 	}
@@ -289,7 +287,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 }
 
 func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	projectDomain := b.getProjectDomain(req.Project, req.DelegateDomain)
+	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
 
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -445,7 +443,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}
 	if cmd.delegateDomain != "" {
-		env["DOMAIN"] = b.getProjectDomain(cmd.project, cmd.delegateDomain)
+		env["DOMAIN"] = b.GetProjectDomain(cmd.project, cmd.delegateDomain)
 	} else {
 		env["DOMAIN"] = "dummy.domain"
 	}
@@ -811,7 +809,7 @@ func (b *ByocAws) getEndpoint(fqn qualifiedName, projectName, delegateDomain str
 		privateFqdn := b.getPrivateFqdn(projectName, fqn)
 		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
 	}
-	projectDomain := b.getProjectDomain(projectName, delegateDomain)
+	projectDomain := b.GetProjectDomain(projectName, delegateDomain)
 	if projectDomain == "" {
 		return ":443" // placeholder for the public ALB/distribution
 	}
@@ -825,24 +823,13 @@ func (b *ByocAws) getPublicFqdn(projectName, delegateDomain, fqn qualifiedName) 
 		return "" //b.fqdn
 	}
 	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.getProjectDomain(projectName, delegateDomain))
+	return fmt.Sprintf("%s.%s", safeFqn, b.GetProjectDomain(projectName, delegateDomain))
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b *ByocAws) getPrivateFqdn(projectName string, fqn qualifiedName) string {
 	safeFqn := byoc.DnsSafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, byoc.GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
-}
-
-func (b *ByocAws) getProjectDomain(projectName, zone string) string {
-	if projectName == "" {
-		return "" // no project name => no custom domain
-	}
-	projectLabel := byoc.DnsSafeLabel(projectName)
-	if projectLabel == byoc.DnsSafeLabel(b.TenantID) {
-		return byoc.DnsSafe(zone) // the zone will already have the tenant ID
-	}
-	return projectLabel + "." + byoc.DnsSafe(zone)
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {

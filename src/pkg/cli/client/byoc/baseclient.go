@@ -173,8 +173,15 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	return "", errors.New("use the --project-name flag to specify a project")
 }
 
-func (b *ByocBaseClient) GetPrivateDomain(projectName string) string {
-	return DnsSafeLabel(projectName) + ".internal"
+func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
+	if projectName == "" {
+		return "" // no project name => no custom domain
+	}
+	projectLabel := DnsSafeLabel(projectName)
+	if projectLabel == DnsSafeLabel(b.TenantID) {
+		return DnsSafe(zone) // the zone will already have the tenant ID
+	}
+	return projectLabel + "." + DnsSafe(zone)
 }
 
 func GetPrivateDomain(projectName string) string {
