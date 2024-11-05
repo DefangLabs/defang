@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -102,6 +103,21 @@ func TestGetWithRetries(t *testing.T) {
 		redirectURL, _ := url.Parse("https://example.com")
 		tc := &testClient{tries: []tryResult{
 			{result: &http.Response{StatusCode: 503, Request: &http.Request{URL: redirectURL}, Body: mockBody("Random Error")}, err: nil},
+		}}
+		originalClient := httpClient
+		t.Cleanup(func() { httpClient = originalClient })
+		httpClient = tc
+		err := getWithRetries(context.Background(), "http://example.com", 3)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if tc.calls != 1 {
+			t.Errorf("Expected 1 call, got %v", tc.calls)
+		}
+	})
+	t.Run("TLS error considers success", func(t *testing.T) {
+		tc := &testClient{tries: []tryResult{
+			{result: nil, err: &tls.CertificateVerificationError{Err: errors.New("error")}},
 		}}
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
