@@ -244,9 +244,9 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	if err := verifyDNS(); err == nil {
 		return nil
 	}
-	term.Infof("Please set up a CNAME record for %v", domain)
-	fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
-	term.Infof("Waiting for CNAME record setup and DNS propagation...")
+	term.Infof("Configure a CNAME or ALIAS record for the domain name: %v", domain)
+	fmt.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
+	term.Infof("Awaiting DNS record setup and propagation... This may take a while.")
 
 	for {
 		select {
@@ -283,7 +283,7 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 			}
 		} else if cve := new(tls.CertificateVerificationError); errors.As(err, &cve) {
 			term.Debugf("cert gen request success, received tls error: %v", cve)
-			return nil // tls error indicate a successful cert generation, as it has to be redirected to https
+			return nil // tls error indicate a successful cert gen trigger, as it has to be redirected to https
 		}
 
 		term.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
