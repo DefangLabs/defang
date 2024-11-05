@@ -51,8 +51,7 @@ var (
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
-	cdImageTag string
-	driver     *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after setUpCD
+	driver *cfn.AwsEcs // TODO: ecs is stateful, contains the output of the cd cfn stack after setUpCD
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
@@ -71,17 +70,17 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	return b
 }
 
-func (b *ByocAws) setUpCD(ctx context.Context, projectName string) error {
+func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
+	if b.SetupDone {
+		return "", nil
+	}
+
 	// note: the CD image is tagged with the major release number, use that for setup
 	projectCdImageTag, err := b.getCdImageTag(ctx, projectName)
 	if err != nil {
-		return err
-	}
-	if b.SetupDone && b.cdImageTag == projectCdImageTag {
-		return nil
+		return "", err
 	}
 
-	b.cdImageTag = projectCdImageTag
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
@@ -98,7 +97,7 @@ func (b *ByocAws) setUpCD(ctx context.Context, projectName string) error {
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     byoc.GetCdImage(CdImageRepo, b.cdImageTag),
+			Image:     byoc.GetCdImage(CdImageRepo, projectCdImageTag),
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -116,18 +115,14 @@ func (b *ByocAws) setUpCD(ctx context.Context, projectName string) error {
 		},
 	}
 	if err := b.driver.SetUp(ctx, containers); err != nil {
-		return byoc.AnnotateAwsError(err)
+		return "", byoc.AnnotateAwsError(err)
 	}
 
 	b.SetupDone = true
-	return nil
+	return projectCdImageTag, nil
 }
 
 func (b *ByocAws) getCdImageTag(ctx context.Context, projectName string) (string, error) {
-	if b.cdImageTag != "" {
-		return b.cdImageTag, nil
-	}
-
 	// see if we have a previous deployment; use the same cd image tag
 	projUpdate, err := b.getProjectUpdate(ctx, projectName)
 	if err != nil {
@@ -167,7 +162,8 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	if err := b.setUpCD(ctx, project.Name); err != nil {
+	cdImageTag, err := b.setUpCD(ctx, project.Name)
+	if err != nil {
 		return nil, err
 	}
 
@@ -198,7 +194,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: b.cdImageTag,
+		CdVersion: cdImageTag,
 		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
@@ -474,7 +470,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	if len(req.Names) > 0 {
 		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
 	}
-	if err := b.setUpCD(ctx, req.Project); err != nil {
+	if _, err := b.setUpCD(ctx, req.Project); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -599,7 +595,7 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if err := b.setUpCD(ctx, req.Project); err != nil {
+	if _, err := b.setUpCD(ctx, req.Project); err != nil {
 		return nil, err
 	}
 
@@ -842,7 +838,7 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if err := b.setUpCD(ctx, req.Project); err != nil {
+	if _, err := b.setUpCD(ctx, req.Project); err != nil {
 		return "", err
 	}
 	cmd := cdCmd{

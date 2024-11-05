@@ -50,10 +50,9 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	buildRepo  string
-	cdImageTag string
-	client     *godo.Client
-	driver     *appPlatform.DoApp
+	buildRepo string
+	client    *godo.Client
+	driver    *appPlatform.DoApp
 }
 
 var _ client.Provider = (*ByocDo)(nil)
@@ -78,10 +77,6 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) (*ByocDo, err
 }
 
 func (b *ByocDo) getCdImageTag(ctx context.Context, projectName string) (string, error) {
-	if b.cdImageTag != "" {
-		return b.cdImageTag, nil
-	}
-
 	projUpdate, err := b.getProjectUpdate(ctx, projectName)
 	if err != nil {
 		return "", err
