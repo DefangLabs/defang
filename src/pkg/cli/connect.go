@@ -69,7 +69,7 @@ func NewClient(ctx context.Context, cluster string, providerID client.ProviderID
 	}
 	tenantId := grpcClient.TenantID
 	if resp != nil && string(tenantId) != resp.Tenant {
-		term.Warnf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
+		term.Debugf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
 		tenantId = types.TenantID(resp.Tenant)
 	}
 
