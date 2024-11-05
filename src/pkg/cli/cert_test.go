@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,9 @@ func (c *testClient) Do(req *http.Request) (*http.Response, error) {
 	}
 	tr := c.tries[0]
 	c.tries = c.tries[1:]
+	if tr.result != nil && tr.result.Request == nil {
+		tr.result.Request = req
+	}
 	return tr.result, tr.err
 }
 
@@ -88,11 +92,42 @@ func TestGetWithRetries(t *testing.T) {
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
-		} else if !strings.Contains(err.Error(), "HTTP 503: Random Error") {
-			t.Errorf("Expected HTTP 503: Random Error, got %v", err)
+		} else if !strings.Contains(err.Error(), "HTTP: 503") {
+			t.Errorf("Expected HTTP 503:, got %v", err)
 		}
 		if tc.calls != 3 {
 			t.Errorf("Expected 3 calls, got %v", tc.calls)
+		}
+	})
+	t.Run("redirect to https considers success", func(t *testing.T) {
+		redirectURL, _ := url.Parse("https://example.com")
+		tc := &testClient{tries: []tryResult{
+			{result: &http.Response{StatusCode: 503, Request: &http.Request{URL: redirectURL}, Body: mockBody("Random Error")}, err: nil},
+		}}
+		originalClient := httpClient
+		t.Cleanup(func() { httpClient = originalClient })
+		httpClient = tc
+		err := getWithRetries(context.Background(), "http://example.com", 3)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if tc.calls != 1 {
+			t.Errorf("Expected 1 call, got %v", tc.calls)
+		}
+	})
+	t.Run("TLS error considers success", func(t *testing.T) {
+		tc := &testClient{tries: []tryResult{
+			{result: nil, err: &tls.CertificateVerificationError{Err: errors.New("error")}},
+		}}
+		originalClient := httpClient
+		t.Cleanup(func() { httpClient = originalClient })
+		httpClient = tc
+		err := getWithRetries(context.Background(), "http://example.com", 3)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if tc.calls != 1 {
+			t.Errorf("Expected 1 call, got %v", tc.calls)
 		}
 	})
 	t.Run("handles all http errors", func(t *testing.T) {
@@ -107,7 +142,7 @@ func TestGetWithRetries(t *testing.T) {
 		err := getWithRetries(context.Background(), "http://example.com", 3)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
-		} else if !strings.Contains(err.Error(), "HTTP 404: Random Error") || !strings.Contains(err.Error(), "HTTP 502: Random Error") || !strings.Contains(err.Error(), "HTTP 503: Random Error") {
+		} else if !strings.Contains(err.Error(), "HTTP: 404") || !strings.Contains(err.Error(), "HTTP: 502") || !strings.Contains(err.Error(), "HTTP: 503") {
 			t.Errorf("Expected HTTP 404,502,503 erros, got %v", err)
 		}
 		if tc.calls != 3 {
