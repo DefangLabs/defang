@@ -111,7 +111,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, pr
 }
 
 func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
-	term.Infof("Triggering TLS cert generation for %v", domain)
+	term.Infof("Checking DNS setup for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
@@ -261,13 +261,15 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		resp, err := httpClient.Do(req)
 		if err == nil {
 			defer resp.Body.Close()
-			var msg []byte
-			msg, err = io.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
+			if resp.Request.URL.Scheme == "https" {
+				return nil // Indicate a successful TLS cert generation, request has been redirected to HTTPS
+			}
 			if err == nil {
-				err = fmt.Errorf("HTTP %v: %v", resp.StatusCode, string(msg))
+				err = fmt.Errorf("HTTP: %v", resp.StatusCode)
 			}
 		}
 
