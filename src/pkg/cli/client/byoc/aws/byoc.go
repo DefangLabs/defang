@@ -230,10 +230,11 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	cdCommand := cdCmd{
-		mode:           req.Mode,
-		project:        project.Name,
-		delegateDomain: req.DelegateDomain,
-		cmd:            []string{cmd, payloadString},
+		mode:            req.Mode,
+		project:         project.Name,
+		delegateDomain:  req.DelegateDomain,
+		delegationSetId: req.DelegationSetId,
+		cmd:             []string{cmd, payloadString},
 	}
 	taskArn, err := b.runCdCommand(ctx, cdCommand)
 	if err != nil {
@@ -308,6 +309,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return nil, byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+		term.Debugf("Zone %q not foundi, delegation set will be created", projectDomain)
 		// Case 1: The zone doesn't exist: we'll create a delegation set and let CD/Pulumi create the hosted zone
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
@@ -315,6 +317,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		if err != nil {
 			return nil, byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
+		term.Debugf("Zone %q found, NS records: %v", projectDomain, nsServers)
 	}
 
 	var resp client.PrepareDomainDelegationResponse
@@ -341,12 +344,14 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
 		resp.DelegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
 
-		// Ensure the NS records match the ones from the delegation set
-		sort.Strings(nsServers)
-		sort.Strings(delegationSet.NameServers)
-		if !slices.Equal(delegationSet.NameServers, nsServers) {
-			track.Evt("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
-			term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
+		// Ensure the NS records match the ones from the delegation set if the zone already exists
+		if zoneId != nil {
+			sort.Strings(nsServers)
+			sort.Strings(delegationSet.NameServers)
+			if !slices.Equal(delegationSet.NameServers, nsServers) {
+				track.Evt("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
+				term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
+			}
 		}
 
 		nsServers = delegationSet.NameServers
