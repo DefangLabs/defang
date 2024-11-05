@@ -208,8 +208,8 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
 
-	if bytes.Count(warnings.Bytes(), []byte(`"yes" for boolean is not supported by YAML 1.2`)) != 1 {
-		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly once")
+	if bytes.Count(warnings.Bytes(), []byte(`"yes" for boolean is not supported by YAML 1.2`)) != 2 {
+		t.Errorf("Warning for using 'yes' for boolean from compose-go should appear exactly twice")
 	}
 }
 

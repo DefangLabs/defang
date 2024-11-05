@@ -35,6 +35,8 @@ type Loader struct {
 	options LoaderOptions
 }
 
+var interpolationConfig = composeTypes.ConfigDetails{}
+
 func NewLoaderWithOptions(options LoaderOptions) Loader {
 	// if no --project-name is provided, try to get it from the environment
 	// https://docs.docker.com/compose/project-name/#set-a-project-name
@@ -78,7 +80,21 @@ func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
 		return nil, err
 	}
 
+	// Load project to get the environment variables
 	project, err := projOpts.LoadProject(ctx)
+	if err != nil {
+		if errors.Is(err, errdefs.ErrNotFound) {
+			return nil, types.ErrComposeFileNotFound
+		}
+
+		return nil, err
+	}
+
+	// set interpolation config for interpolation
+	interpolationConfig.Environment = project.Environment
+
+	// load second time with the interpolation config now populated with env variables
+	project, err = projOpts.LoadProject(ctx)
 	if err != nil {
 		if errors.Is(err, errdefs.ErrNotFound) {
 			return nil, types.ErrComposeFileNotFound
@@ -122,6 +138,8 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 		cli.WithLoadOptions(func(o *loader.Options) {
 			o.Interpolate = &interpolation.Options{}
+			o.Interpolate.LookupValue = interpolationConfig.LookupEnv
+
 			// Override the interpolation substitution function to leave unresolved variables as is for resolution later by CD
 			o.Interpolate.Substitute = func(templ string, mapping template.Mapping) (string, error) {
 				return template.Substitute(templ, func(key string) (string, bool) {
