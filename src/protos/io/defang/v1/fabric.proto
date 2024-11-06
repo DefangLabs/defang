@@ -541,7 +541,7 @@ message SubscribeResponse {
 }
 
 message GetServicesRequest {
-  string project = 2;
+  string project = 1;
 }
 
 message DelegateSubdomainZoneRequest {
