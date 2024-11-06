@@ -591,10 +591,7 @@ var generateCmd = &cobra.Command{
 		}
 
 		// Load the project and check for empty environment variables
-		loaderOptions := compose.LoaderOptions{
-			ConfigPaths: []string{filepath.Join(prompt.Folder, "compose.yaml")},
-		}
-		loader := compose.NewLoaderWithOptions(loaderOptions)
+		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
 		project, _ := loader.LoadProject(cmd.Context())
 
 		var envInstructions []string
@@ -1006,20 +1003,16 @@ var upgradeCmd = &cobra.Command{
 }
 
 func configureLoader(cmd *cobra.Command) compose.Loader {
-	f := cmd.Flags()
-	o := compose.LoaderOptions{}
-	var err error
-
-	o.ConfigPaths, err = f.GetStringArray("file")
+	configPaths, err := cmd.Flags().GetStringArray("file")
 	if err != nil {
 		panic(err)
 	}
 
-	o.ProjectName, err = f.GetString("project-name")
+	projectName, err := cmd.Flags().GetString("project-name")
 	if err != nil {
 		panic(err)
 	}
-	return compose.NewLoaderWithOptions(o)
+	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
 }
 
 func awsInEnv() bool {

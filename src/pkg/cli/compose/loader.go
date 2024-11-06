@@ -34,7 +34,26 @@ type Loader struct {
 	options LoaderOptions
 }
 
-func NewLoaderWithOptions(options LoaderOptions) Loader {
+type LoaderOption func(*LoaderOptions)
+
+func WithPath(paths ...string) LoaderOption {
+	return func(o *LoaderOptions) {
+		o.ConfigPaths = paths
+	}
+}
+
+func WithProjectName(name string) LoaderOption {
+	return func(o *LoaderOptions) {
+		o.ProjectName = name
+	}
+}
+
+func NewLoader(opts ...LoaderOption) Loader {
+	options := LoaderOptions{}
+	for _, o := range opts {
+		o(&options)
+	}
+
 	// if no --project-name is provided, try to get it from the environment
 	// https://docs.docker.com/compose/project-name/#set-a-project-name
 	if options.ProjectName == "" {
@@ -44,14 +63,6 @@ func NewLoaderWithOptions(options LoaderOptions) Loader {
 	}
 
 	return Loader{options: options}
-}
-
-func NewLoaderWithPath(path string) Loader {
-	configPaths := []string{}
-	if path != "" {
-		configPaths = append(configPaths, path)
-	}
-	return NewLoaderWithOptions(LoaderOptions{ConfigPaths: configPaths})
 }
 
 func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
@@ -156,10 +167,4 @@ func hasSubstitution(s, key string) bool {
 	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
 	return pattern.MatchString(s)
-}
-
-func LoadFromContent(ctx context.Context, content []byte) (*Project, error) {
-	return loader.LoadWithContext(ctx, composeTypes.ConfigDetails{ConfigFiles: []composeTypes.ConfigFile{{Content: content}}}, func(o *loader.Options) {
-		o.SkipConsistencyCheck = true // this matches the WithConsistency(false) option above
-	})
 }

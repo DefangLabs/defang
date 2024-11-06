@@ -36,7 +36,6 @@ func TestValidationAndConvert(t *testing.T) {
 	}
 
 	testRunCompose(t, func(t *testing.T, path string) {
-		t.Helper()
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 
