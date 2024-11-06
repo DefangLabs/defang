@@ -48,7 +48,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 		term.Debug("Unable to validate tenant ID with server:", err)
 	} else if string(tenantId) != resp.Tenant {
 		if tenantId != types.DEFAULT_TENANT {
-			term.Warnf("Overriding TenantID %q with server provided value %q", tenantId, resp.Tenant)
+			term.Debugf("Overriding TenantID %q with server provided value %q", tenantId, resp.Tenant)
 		}
 		grpcClient.TenantID = types.TenantID(resp.Tenant)
 	}
