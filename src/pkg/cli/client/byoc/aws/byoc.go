@@ -305,7 +305,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		if !errors.Is(err, aws.ErrZoneNotFound) {
 			return nil, byoc.AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
 		}
-		term.Debugf("Zone %q not foundi, delegation set will be created", projectDomain)
+		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
 		// Case 1: The zone doesn't exist: we'll create a delegation set and let CD/Pulumi create the hosted zone
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
