@@ -58,6 +58,11 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			since := time.Now()
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
 
 			if err != nil {
@@ -248,6 +253,11 @@ func makeComposeDownCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {
@@ -300,6 +310,11 @@ func makeComposeConfigCmd() *cobra.Command {
 		Args:  cobra.NoArgs, // TODO: takes optional list of service names
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
 			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
@@ -318,8 +333,13 @@ func makeComposeLsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
 
-			err := cli.GetServices(cmd.Context(), loader, provider, long)
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
 			if err != nil {
+				return err
+			}
+
+			if err := cli.GetServices(cmd.Context(), loader, provider, long); err != nil {
 				if !errors.Is(err, cli.ErrNoServices) {
 					return err
 				}
@@ -381,6 +401,11 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  true, // always verbose for explicit tail command
 			}
 
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
 			return cli.Tail(cmd.Context(), loader, provider, tailOptions)
 		},
 	}

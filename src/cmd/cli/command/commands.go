@@ -39,9 +39,7 @@ func P(name string, value interface{}) cliClient.Property {
 
 // GLOBALS
 var (
-	client         cliClient.FabricClient
-	provider       cliClient.Provider
-	loader         compose.Loader
+	client         cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
 	doDebug        = false
@@ -93,6 +91,10 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
+			provider, err := getProvider(ctx)
+			if err != nil {
+				return err
+			}
 			if resp, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName}); err == nil {
 				projectName = resp.Project
 			}
@@ -137,7 +139,7 @@ func Execute(ctx context.Context) error {
 	return nil
 }
 
-func SetupCommands(version string) {
+func SetupCommands(ctx context.Context, version string) {
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
@@ -154,7 +156,7 @@ func SetupCommands(version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Setup tracking client
-	track.Fabric = cli.Connect(cluster, nil)
+	track.Fabric = cli.NewGrpcClient(ctx, cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -300,27 +302,6 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(true)
 		}
 
-		switch providerID {
-		case cliClient.ProviderAuto:
-			if awsInEnv() {
-				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
-			}
-			if doInEnv() {
-				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
-			}
-			providerID = cliClient.ProviderDefang
-		case cliClient.ProviderAWS:
-			if !awsInEnv() {
-				term.Warn("AWS provider was selected, but AWS environment variables are not set")
-			}
-		case cliClient.ProviderDO:
-			if !doInEnv() {
-				term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
-			}
-		case cliClient.ProviderDefang:
-			// Ignore any env vars when explicitly using the Defang playground provider
-		}
-
 		cwd, _ := cmd.Flags().GetString("cwd")
 		if cwd != "" {
 			// Change directory before running the command
@@ -328,14 +309,13 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
-		loader = configureLoader(cmd)
-		client, provider = cli.NewClient(cmd.Context(), cluster, providerID, loader)
+		client := cli.NewGrpcClient(cmd.Context(), cluster)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
-				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\ndefang upgrade")
+				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
 			}
 		}
@@ -359,9 +339,8 @@ var RootCmd = &cobra.Command{
 					return err
 				}
 
-				// FIXME: the new login might have changed the tenant, so we should reload the project
-				client, provider = cli.NewClient(cmd.Context(), cluster, providerID, loader) // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil {                // recheck (new token = new user)
+				client := cli.NewGrpcClient(cmd.Context(), cluster)           // reconnect with the new token
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
 			}
@@ -406,6 +385,10 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
@@ -428,8 +411,13 @@ var certGenerateCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := cli.GenerateLetsEncryptCert(cmd.Context(), loader, client, provider)
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
 		if err != nil {
+			return err
+		}
+
+		if err := cli.GenerateLetsEncryptCert(cmd.Context(), loader, client, provider); err != nil {
 			return err
 		}
 		return nil
@@ -674,8 +662,13 @@ var configSetCmd = &cobra.Command{
 		fromEnv, _ := cmd.Flags().GetBool("env")
 
 		// Make sure we have a project to set config for before asking for a value
-		_, err := cli.LoadProjectName(cmd.Context(), loader, provider)
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
 		if err != nil {
+			return err
+		}
+
+		if _, err := cli.LoadProjectName(cmd.Context(), loader, provider); err != nil {
 			return err
 		}
 
@@ -746,6 +739,11 @@ var configDeleteCmd = &cobra.Command{
 	Aliases:     []string{"del", "delete", "remove"},
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -768,6 +766,11 @@ var configListCmd = &cobra.Command{
 	Aliases:     []string{"list"},
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.ConfigList(cmd.Context(), loader, provider)
 	},
 }
@@ -780,6 +783,11 @@ var debugCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
 
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
 	},
 }
@@ -794,6 +802,11 @@ var deleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, names []string) error {
 		var tail, _ = cmd.Flags().GetBool("tail")
 
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
 		if err != nil {
@@ -891,6 +904,11 @@ var cdDestroyCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
 	},
 }
@@ -900,6 +918,11 @@ var cdDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
 	},
 }
@@ -909,6 +932,11 @@ var cdRefreshCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
 	},
 }
@@ -918,6 +946,11 @@ var cdCancelCmd = &cobra.Command{
 	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
 	},
 }
@@ -929,6 +962,10 @@ var cdTearDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		return cli.TearDown(cmd.Context(), provider, force)
 	},
 }
@@ -941,6 +978,11 @@ var cdListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		remote, _ := cmd.Flags().GetBool("remote")
 
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		if remote {
 			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
 		}
@@ -954,6 +996,11 @@ var cdPreviewCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context())
+		if err != nil {
+			return err
+		}
 		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
@@ -1028,4 +1075,60 @@ func doInEnv() bool {
 
 func IsCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
+}
+
+var providerDescription = map[cliClient.ProviderID]string{
+	cliClient.ProviderDefang: "The Defang Playground is a free environment for testing only.",
+	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
+	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+}
+
+func getProvider(ctx context.Context) (cliClient.Provider, error) {
+	switch providerID {
+	case cliClient.ProviderAuto:
+		if !nonInteractive {
+			// Prompt the user to choose a provider if in interactive mode
+			options := []string{}
+			for _, p := range cliClient.AllProviders() {
+				options = append(options, p.String())
+			}
+			var optionValue string
+			if err := survey.AskOne(&survey.Select{
+				Message: "Choose a cloud provider:",
+				Options: options,
+				Help:    "The provider you choose will be used for deploying services.",
+				Description: func(value string, i int) string {
+					return providerDescription[cliClient.ProviderID(value)]
+				},
+			}, &optionValue); err != nil {
+				return nil, err
+			}
+			if err := providerID.Set(optionValue); err != nil {
+				panic(err)
+			}
+			term.Printf("To skip this prompt, set the DEFANG_PROVIDER=%s in your environment, or use:\n\n  defang --provider=%s\n\n", optionValue, optionValue)
+		} else {
+			// Defaults to defang provider in non-interactive mode
+			if awsInEnv() {
+				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
+			}
+			if doInEnv() {
+				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
+			}
+			providerID = cliClient.ProviderDefang
+		}
+	case cliClient.ProviderAWS:
+		if !awsInEnv() {
+			term.Warn("AWS provider was selected, but AWS environment variables are not set")
+		}
+	case cliClient.ProviderDO:
+		if !doInEnv() {
+			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
+		}
+	case cliClient.ProviderDefang:
+		// Ignore any env vars when explicitly using the Defang playground provider
+	}
+
+	provider := cli.NewProvider(ctx, providerID, client)
+	return provider, nil
 }

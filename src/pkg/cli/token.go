@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -29,7 +28,7 @@ func Token(ctx context.Context, client client.FabricClient, clientId string, ten
 	}
 
 	term.Printc(term.BrightCyan, "Scoped access token: ")
-	fmt.Println(at)
+	term.Println(at)
 	return nil
 }
 
