@@ -3,6 +3,7 @@ package do
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -90,6 +91,14 @@ func (bs *byocServerStream) Receive() bool {
 }
 
 func (bs *byocServerStream) Err() error {
+	var closeErr *websocket.CloseError
+	ok := errors.As(bs.err, &closeErr)
+	if !ok {
+		return bs.err
+	}
+	if closeErr.Text == "unexpected EOF" {
+		return nil
+	}
 	return bs.err
 }
 

@@ -21,7 +21,7 @@ func TestValidationAndConvert(t *testing.T) {
 		term.DefaultTerm = oldTerm
 	})
 
-	t.Setenv("NODE_ENV", "test") // for interpolate/compose.yaml
+	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
 	mockClient := validationMockProvider{
 		configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
@@ -36,7 +36,6 @@ func TestValidationAndConvert(t *testing.T) {
 	}
 
 	testRunCompose(t, func(t *testing.T, path string) {
-		t.Helper()
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 

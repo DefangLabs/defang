@@ -47,7 +47,7 @@ func (d deployMock) PrepareDomainDelegation(ctx context.Context, req client.Prep
 }
 
 func TestComposeUp(t *testing.T) {
-	loader := compose.NewLoaderWithPath("../../tests/testproj/compose.yaml")
+	loader := compose.NewLoader(compose.WithPath("../../tests/testproj/compose.yaml"))
 	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
