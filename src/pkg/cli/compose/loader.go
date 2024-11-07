@@ -108,9 +108,10 @@ func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
 func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
-	optFns := []cli.ProjectOptionsFn{
+	return cli.NewProjectOptions(c.options.ConfigPaths,
+		cli.WithEnv([]string{"COMPOSE_PROFILES=defang"}),
 		// First apply os.Environment, always win
-		// -- DISABLED -- cli.WithOsEnv,
+		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
 		// Load PWD/.env if present and no explicit --env-file has been set
 		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		// read dot env file to populate project environment
@@ -119,18 +120,22 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithConfigFileEnv,
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
-		cli.WithName(c.options.ProjectName),
-
-		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call
+		// Calling the 2 functions below the 2nd time as the loaded env in first call modifies the behavior of the 2nd call:
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
 		cli.WithEnvFiles(), // TODO: Support --env-file to be added as param to this call
 		cli.WithDotEnv,
-
+		// eventually COMPOSE_PROFILES should have been set
+		// cli.WithDefaultProfiles(c.Profiles...), TODO: Support --profile to be added as param to this call
+		cli.WithName(c.options.ProjectName),
 		// DEFANG SPECIFIC OPTIONS
 		cli.WithDefaultProfiles("defang"),
 		cli.WithDiscardEnvFile,
 		cli.WithConsistency(false), // TODO: check fails if secrets are used but top-level 'secrets:' is missing
 		cli.WithLoadOptions(func(o *loader.Options) {
+			// As suggested by https://github.com/compose-spec/compose-go/issues/710#issuecomment-2462287043, we'll be called again once the project is loaded
+			if o.Interpolate == nil {
+				return
+			}
 			// Override the interpolation substitution function to leave unresolved variables as is for resolution later by CD
 			o.Interpolate.Substitute = func(templ string, mapping template.Mapping) (string, error) {
 				return template.Substitute(templ, func(key string) (string, bool) {
@@ -158,9 +163,7 @@ func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
 				})
 			}
 		}),
-	}
-
-	return cli.NewProjectOptions(c.options.ConfigPaths, optFns...)
+	)
 }
 
 func hasSubstitution(s, key string) bool {
