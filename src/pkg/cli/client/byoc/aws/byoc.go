@@ -181,7 +181,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
-	project, err := compose.LoadFromContent(ctx, req.Compose)
+	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
 		return nil, err
 	}
