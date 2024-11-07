@@ -18,9 +18,11 @@ var ctx = context.Background()
 func TestDeploy(t *testing.T) {
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "ten ant") // no domain
 	if err != nil {
-		if !errors.Is(err, ErrMissingAwsCreds) {
-			t.Fatalf("NewByocProvider() failed: %v", err)
+		var credErr ErrMissingAwsCreds
+		if errors.As(err, &credErr) {
+			t.Skip("skipping test; not authenticated")
 		}
+		t.Fatalf("unexpected error: %v", err)
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -49,9 +51,11 @@ func TestDeploy(t *testing.T) {
 func TestTail(t *testing.T) {
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestTail")
 	if err != nil {
-		if !errors.Is(err, ErrMissingAwsCreds) {
-			t.Fatalf("NewByocProvider() failed: %v", err)
+		var credErr ErrMissingAwsCreds
+		if errors.As(err, &credErr) {
+			t.Skip("skipping test; not authenticated")
 		}
+		t.Fatalf("unexpected error: %v", err)
 	}
 	b.ProjectName = "byoc_integration_test"
 	b.ProjectDomain = "example.com" // avoid rpc call
@@ -59,10 +63,10 @@ func TestTail(t *testing.T) {
 	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
-		if connect.CodeOf(err) != connect.CodeUnauthenticated {
-			t.Fatal(err)
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			t.Skip("skipping test; not authorized")
 		}
-		t.Skip("skipping test; not authorized")
+		t.Fatalf("unexpected error: %v", err)
 	}
 	defer ss.Close()
 
@@ -82,9 +86,11 @@ func TestTail(t *testing.T) {
 func TestGetServices(t *testing.T) {
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestGetServices")
 	if err != nil {
-		if !errors.Is(err, ErrMissingAwsCreds) {
-			t.Fatalf("NewByocProvider() failed: %v", err)
+		var credErr ErrMissingAwsCreds
+		if errors.As(err, &credErr) {
+			t.Skip("skipping test; not authenticated")
 		}
+		t.Fatalf("unexpected error: %v", err)
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -94,7 +100,7 @@ func TestGetServices(t *testing.T) {
 			t.Skip("skipping test; not authorized")
 		}
 		// the only acceptable error is "unauthorized"
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(services.Services) != 0 {
@@ -107,9 +113,11 @@ func TestPutSecret(t *testing.T) {
 
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestPutSecret")
 	if err != nil {
-		if !errors.Is(err, ErrMissingAwsCreds) {
-			t.Fatalf("NewByocProvider() failed: %v", err)
+		var credErr ErrMissingAwsCreds
+		if errors.As(err, &credErr) {
+			t.Skip("skipping test; not authenticated")
 		}
+		t.Fatalf("unexpected error: %v", err)
 	}
 	b.ProjectName = "byoc_integration_test"
 
@@ -164,9 +172,11 @@ func TestPutSecret(t *testing.T) {
 func TestListSecrets(t *testing.T) {
 	b, err := NewByocProvider(ctx, client.GrpcClient{}, "TestListSecrets")
 	if err != nil {
-		if !errors.Is(err, ErrMissingAwsCreds) {
-			t.Fatalf("NewByocProvider() failed: %v", err)
+		var credErr ErrMissingAwsCreds
+		if errors.As(err, &credErr) {
+			t.Skip("skipping test; not authenticated")
 		}
+		t.Fatalf("unexpected error: %v", err)
 	}
 	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
 

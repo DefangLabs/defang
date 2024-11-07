@@ -63,7 +63,17 @@ type ByocAws struct {
 
 var _ client.Provider = (*ByocAws)(nil)
 
-var ErrMissingAwsCreds error = errors.New("AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)")
+type ErrMissingAwsCreds struct {
+	err error
+}
+
+func (e ErrMissingAwsCreds) Error() string {
+	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+}
+
+func (e ErrMissingAwsCreds) Unwrap() error {
+	return e.err
+}
 
 func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId types.TenantID) (*ByocAws, error) {
 	b := &ByocAws{
@@ -74,7 +84,7 @@ func NewByocProvider(ctx context.Context, grpcClient client.GrpcClient, tenantId
 
 	_, err := b.AccountInfo(ctx)
 	if err != nil {
-		return b, ErrMissingAwsCreds
+		return b, ErrMissingAwsCreds{err: err}
 	}
 	return b, nil
 }

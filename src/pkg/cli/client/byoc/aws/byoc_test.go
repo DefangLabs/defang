@@ -182,7 +182,8 @@ func TestNewByocProvider(t *testing.T) {
 		grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
 		_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
 		if err != nil {
-			if !errors.Is(err, ErrMissingAwsCreds) {
+			var credErr ErrMissingAwsCreds
+			if !errors.As(err, &credErr) {
 				t.Fatalf("NewByocProvider() failed: %v", err)
 			}
 		} else {
