@@ -146,6 +146,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 			if err := json.Unmarshal([]byte(entry.Message), &record); err == nil {
 				entry.Message = record.Log
 				if record.ContainerName == "kaniko" {
+					entry.Service = record.Service
 					entry.Stderr = logs.IsLogrusError(entry.Message)
 				} else {
 					entry.Stderr = record.Source == logs.SourceStderr
