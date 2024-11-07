@@ -98,7 +98,21 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 		}
 
 		_, redis := svccfg.Extensions["x-defang-redis"]
+		if redis {
+			if _, ok := provider.(*client.PlaygroundProvider); ok {
+				term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+				delete(svccfg.Extensions, "x-defang-redis")
+			}
+		}
+
 		_, postgres := svccfg.Extensions["x-defang-postgres"]
+		if postgres {
+			if _, ok := provider.(*client.PlaygroundProvider); ok {
+				term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+				delete(svccfg.Extensions, "x-defang-postgres")
+			}
+		}
+
 		if !redis && !postgres && isStatefulImage(svccfg.Image) {
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}

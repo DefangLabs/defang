@@ -71,6 +71,7 @@ func NewClient(ctx context.Context, cluster string, providerID client.ProviderID
 	if resp != nil && string(tenantId) != resp.Tenant {
 		term.Debugf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
 		tenantId = types.TenantID(resp.Tenant)
+		grpcClient.TenantID = tenantId
 	}
 
 	switch providerID {
