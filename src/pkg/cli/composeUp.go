@@ -30,17 +30,21 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		upload = compose.UploadModeIgnore
 	}
 
-	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-		configs, err := provider.ListConfig(ctx)
-		if err != nil {
-			return nil, err
+	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
+	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
+	if upload != compose.UploadModeIgnore {
+		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+			configs, err := provider.ListConfig(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			return configs.Names, nil
 		}
 
-		return configs.Names, nil
-	}
-
-	if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
-		return nil, project, &ComposeError{err}
+		if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+			return nil, project, &ComposeError{err}
+		}
 	}
 
 	if err := compose.ValidateProject(project); err != nil {
