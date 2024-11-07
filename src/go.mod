@@ -19,7 +19,7 @@ require (
 	github.com/aws/smithy-go v1.20.2
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
-	github.com/compose-spec/compose-go/v2 v2.1.4
+	github.com/compose-spec/compose-go/v2 v2.4.3
 	github.com/digitalocean/godo v1.118.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/google/uuid v1.6.0
