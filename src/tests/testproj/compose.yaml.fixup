@@ -13,7 +13,7 @@
       "replicas": 1,
       "resources": {
         "limits": {
-          "cpus": 0.5,
+          "cpus": 2,
           "memory": "536870912"
         },
         "reservations": {
