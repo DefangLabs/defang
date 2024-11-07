@@ -421,8 +421,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 		return nil, err
 	}
 
-	var appLiveURL, deploymentID string
-
+	var deploymentID string
 	if cdApp.PendingDeployment != nil {
 		deploymentID = cdApp.PendingDeployment.GetID()
 	}
@@ -442,28 +441,39 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			return nil, err
 		}
 
-		if deploymentInfo.GetPhase() == godo.DeploymentPhase_Active {
+		term.Debugf("Deployment phase: %s", deploymentInfo.GetPhase())
+		switch deploymentInfo.GetPhase() {
+		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy, godo.DeploymentPhase_Deploying:
+			// Do nothing; check again in 10 seconds
+
+		case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
 			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 			if err != nil {
 				return nil, err
 			}
+			readHistoricalLogs(ctx, logs.HistoricURLs)
+			return nil, errors.New("deployment failed")
 
-			appLiveURL, err = b.processServiceLogs(ctx)
+		case godo.DeploymentPhase_Active:
+			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+			if err != nil {
+				return nil, err
+			}
+			readHistoricalLogs(ctx, logs.HistoricURLs)
+
+			appLiveURL, err := b.processServiceLogs(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			readHistoricalLogs(ctx, logs.HistoricURLs)
-			break
+			return newByocServerStream(ctx, appLiveURL, req.Etag)
 		}
 
-		//Sleep for 15 seconds so we dont spam the DO API
-		if err := pkg.SleepWithContext(ctx, (time.Second)*15); err != nil {
+		// Sleep for 10 seconds so we dont spam the DO API
+		if err := pkg.SleepWithContext(ctx, 10*time.Second); err != nil {
 			return nil, err
 		}
 	}
-
-	return newByocServerStream(ctx, appLiveURL, req.Etag)
 }
 
 func (b *ByocDo) TearDown(ctx context.Context) error {
