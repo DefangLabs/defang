@@ -139,7 +139,7 @@ func TestValidateQuotas(t *testing.T) {
 					},
 				},
 			},
-			wantErr: "gpu count 100 exceeds quota 8",
+			wantErr: "gpu count 100 exceeds quota 8.00",
 		},
 		{
 			name: "valid service",

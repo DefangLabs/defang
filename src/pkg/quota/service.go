@@ -10,7 +10,7 @@ import (
 
 type ServiceQuotas struct {
 	Cpus       float32
-	Gpus       uint32
+	Gpus       float32
 	MemoryMiB  float32
 	Replicas   int
 	ShmSizeMiB float32
@@ -38,11 +38,17 @@ func (q ServiceQuotas) ValidateQuotas(service *types.ServiceConfig) error {
 				if len(device.Capabilities) != 1 || device.Capabilities[0] != "gpu" {
 					return errors.New("only GPU devices are supported") // CodeInvalidArgument
 				}
+
 				if device.Driver != "" && device.Driver != "nvidia" {
 					return errors.New("only nvidia GPU devices are supported") // CodeInvalidArgument
 				}
-				if q.Gpus == 0 || uint32(device.Count) > q.Gpus {
-					return fmt.Errorf("gpu count %v exceeds quota %d", device.Count, q.Gpus) // CodeInvalidArgument
+
+				if q.Gpus == 0 {
+					return errors.New("provider not configured for GPUs") // CodeInvalidArgument
+				}
+
+				if float32(device.Count) > q.Gpus {
+					return fmt.Errorf("gpu count %v exceeds quota %.2f", device.Count, q.Gpus) // CodeInvalidArgument
 				}
 			}
 		}
