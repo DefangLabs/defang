@@ -1,9 +1,7 @@
 ## Description:
 
-- Detailed explanation of the bug or issue.
-- If this is a feature request please answering the following points under the description section:
-  - Brief explanation of the desired feature.
-  - Use cases and benefits.
+<!-- Detailed explanation of the bug or issue. -->
+<!-- If this is a feature request, describe the feature briefly along with use-cases and benefits -->
 
 ## Steps to reproduce the problem.
 
@@ -13,15 +11,10 @@
 
 ## Environment:
 
-- Operating system (e.g., Windows, macOS, Linux).
-- Browser (if applicable).
-- Version of Defang or relevant software.
-- Any relevant dependencies.
+- Defang Version (`defang version`):
+- Operating system: (e.g., Windows, macOS, Linux)
+- Shell (or Browser, if applicable):
 
-## Screenshots/Logs:
-
-- Attach any relevant screenshots, error messages, or log files.
-
-## Additional Information:
+## Additional Information, Relevant dependencies, Screenshots, Logs, Etc...
 
 Any other relevant details that might be helpful.
