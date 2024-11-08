@@ -38,7 +38,7 @@ service FabricController {
   }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(google.protobuf.Empty) returns (ListServicesResponse) {
+  rpc GetServices(GetServicesRequest) returns (ListServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
@@ -63,7 +63,7 @@ service FabricController {
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
     option deprecated = true;
   };
-  rpc ListSecrets(google.protobuf.Empty) returns (Secrets) {
+  rpc ListSecrets(ListConfigsRequest) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
     option deprecated = true;
   } // no values
@@ -164,6 +164,8 @@ message DeployRequest {
   string project = 2 [ deprecated = true ]; // deprecated; use compose.name
   DeploymentMode mode = 3;
   bytes compose = 4; // yaml (or json)
+  string delegate_domain = 5;
+  string delegation_set_id = 6;
 }
 
 message DeployResponse {
@@ -174,6 +176,7 @@ message DeployResponse {
 message DeleteRequest {
   repeated string names = 1;
   string project = 2; // defaults to tenant ID
+  string delegate_domain = 3;
 }
 
 message DeleteResponse { string etag = 1; }
@@ -195,7 +198,10 @@ message StartGenerateResponse { string uuid = 1; }
 
 message GenerateStatusRequest { string uuid = 1; }
 
-message UploadURLRequest { string digest = 1; }
+message UploadURLRequest { 
+  string digest = 1;
+  string project = 2;
+}
 
 message UploadURLResponse { string url = 1; }
 
@@ -323,6 +329,7 @@ message TailRequest {
   repeated string services = 1;
   google.protobuf.Timestamp since = 2;
   string etag = 3;
+  string project = 4;
 }
 
 message LogEntry {
@@ -362,7 +369,10 @@ enum Platform {
   LINUX_ANY = 2;
 }
 
-message ServiceID { string name = 1; }
+message ServiceID { 
+  string name = 1; 
+  string project = 2;
+}
 
 message Device {
   option deprecated = true;
@@ -520,6 +530,7 @@ message PublishRequest { Event event = 1; }
 message SubscribeRequest {
   repeated string services = 1;
   string etag = 2;
+  string project = 3;
 }
 
 message SubscribeResponse {
@@ -527,6 +538,10 @@ message SubscribeResponse {
   string name = 2;
   string status = 3;
   ServiceState state = 4;
+}
+
+message GetServicesRequest {
+  string project = 1;
 }
 
 message DelegateSubdomainZoneRequest {

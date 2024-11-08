@@ -32,6 +32,7 @@ type LoaderOptions struct {
 
 type Loader struct {
 	options LoaderOptions
+	cached  *Project
 }
 
 type LoaderOption func(*LoaderOptions)
@@ -48,7 +49,7 @@ func WithProjectName(name string) LoaderOption {
 	}
 }
 
-func NewLoader(opts ...LoaderOption) Loader {
+func NewLoader(opts ...LoaderOption) *Loader {
 	options := LoaderOptions{}
 	for _, o := range opts {
 		o(&options)
@@ -62,10 +63,10 @@ func NewLoader(opts ...LoaderOption) Loader {
 		}
 	}
 
-	return Loader{options: options}
+	return &Loader{options: options}
 }
 
-func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
+func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 	if c.options.ProjectName != "" {
 		return c.options.ProjectName, nil
 	}
@@ -78,7 +79,10 @@ func (c Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
+func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
+	if c.cached != nil {
+		return c.cached, nil
+	}
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -102,6 +106,7 @@ func (c Loader) LoadProject(ctx context.Context) (*Project, error) {
 		fmt.Println(string(b))
 	}
 
+	c.cached = project
 	return project, nil
 }
 

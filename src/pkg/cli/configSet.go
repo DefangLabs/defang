@@ -8,8 +8,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigSet(ctx context.Context, provider client.Provider, name string, value string) error {
-	projectName, err := provider.LoadProjectName(ctx)
+func ConfigSet(ctx context.Context, loader client.Loader, provider client.Provider, name string, value string) error {
+	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
 	}

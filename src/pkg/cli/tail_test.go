@@ -86,8 +86,8 @@ func TestTail(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := client.MockProvider{
-		Project: proj,
+	l := client.MockLoader{Project: proj}
+	p := client.MockProvider{
 		ServerStream: &client.MockServerStream{
 			Resps: []*defangv1.TailResponse{
 				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
@@ -108,7 +108,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	Tail(ctx, c, TailOptions{Verbose: true}) // Output host
+	Tail(ctx, l, p, TailOptions{Verbose: true}) // Output host
 
 	expectedLogs := []string{
 		"SOMEETAG service1 SOMEHOST e1msg1",

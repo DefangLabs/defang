@@ -12,7 +12,6 @@ import (
 type MockProvider struct {
 	Provider
 	UploadUrl    string
-	Project      *composeTypes.Project
 	ServerStream ServerStream[defangv1.TailResponse]
 }
 
@@ -20,24 +19,12 @@ func (m MockProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadU
 	return &defangv1.UploadURLResponse{Url: m.UploadUrl + req.Digest}, nil
 }
 
-func (m MockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m MockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{Names: []string{"VAR1"}}, nil
 }
 
 func (m MockProvider) ServiceDNS(service string) string {
 	return service
-}
-
-func (m MockProvider) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	return m.Project, nil
-}
-
-func (m MockProvider) LoadProjectName(ctx context.Context) (string, error) {
-	return m.Project.Name, nil
-}
-
-func (m MockProvider) SetProjectName(projectName string) {
-	m.Project.Name = projectName
 }
 
 func (m MockProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
@@ -79,4 +66,33 @@ func (m *MockServerStream) Err() error {
 	err := m.Errs[0]
 	m.Errs = m.Errs[1:]
 	return err
+}
+
+type MockFabricClient struct {
+	FabricClient
+	DelegateDomain string
+}
+
+func (m MockFabricClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
+	return &defangv1.DelegateSubdomainZoneResponse{Zone: m.DelegateDomain}, nil
+}
+
+func (m MockFabricClient) DeleteSubdomainZone(ctx context.Context) error {
+	return nil
+}
+
+func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
+}
+
+type MockLoader struct {
+	Project *composeTypes.Project
+}
+
+func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
+	return m.Project, nil
+}
+
+func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
+	return m.Project.Name, nil
 }

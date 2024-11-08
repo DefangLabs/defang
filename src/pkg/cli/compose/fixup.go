@@ -7,22 +7,22 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 // HACK: Use magic network name "public" to determine if the service is public
 const NetworkPublic = "public"
 
-func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs composeTypes.Services, upload UploadMode) error {
+func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := provider.ListConfig(ctx)
+	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
 		term.Debugf("failed to load config: %v", err)
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
 
-	for _, svccfg := range serviceConfigs {
+	for _, svccfg := range project.Services {
 		// Fixup ports (which affects service name replacement by ReplaceServiceNameWithDNS)
 		for i, port := range svccfg.Ports {
 			fixupPort(&port)
@@ -30,9 +30,9 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 		}
 	}
 
-	svcNameReplacer := NewServiceNameReplacer(provider, serviceConfigs)
+	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
 
-	for _, svccfg := range serviceConfigs {
+	for _, svccfg := range project.Services {
 		if svccfg.Deploy != nil {
 			if svccfg.Deploy.Replicas == nil {
 				one := 1 // default to one replica per service; allow the user to override this to 0
@@ -43,7 +43,7 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, provider, svccfg.Name, svccfg.Build, upload)
+			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return err
 			}
@@ -119,7 +119,7 @@ func FixupServices(ctx context.Context, provider client.Provider, serviceConfigs
 
 		oldName := svccfg.Name
 		svccfg.Name = NormalizeServiceName(svccfg.Name)
-		serviceConfigs[oldName] = svccfg
+		project.Services[oldName] = svccfg
 	}
 	return nil
 }

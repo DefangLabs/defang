@@ -65,6 +65,7 @@ type EndLogConditional struct {
 type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
 
 type TailOptions struct {
+	Project            string
 	Services           []string
 	Etag               types.ETag
 	Since              time.Time
@@ -144,18 +145,21 @@ func (cerr *CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, provider client.Provider, params TailOptions) error {
-	projectName, err := provider.LoadProjectName(ctx)
+func Tail(ctx context.Context, loader client.Loader, provider client.Provider, params TailOptions) error {
+	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Tailing logs in project %q", projectName)
+	if params.Project == "" {
+		params.Project = projectName
+	}
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
 			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Name: service}); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Project: params.Project, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
 					term.Warn("Service does not exist (yet):", service)
@@ -191,7 +195,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: since})
+	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Project: params.Project, Services: params.Services, Etag: params.Etag, Since: since})
 	if err != nil {
 		return err
 	}
