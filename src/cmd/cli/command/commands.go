@@ -1045,7 +1045,7 @@ var upgradeCmd = &cobra.Command{
 	},
 }
 
-func configureLoader(cmd *cobra.Command) compose.Loader {
+func configureLoader(cmd *cobra.Command) *compose.Loader {
 	configPaths, err := cmd.Flags().GetStringArray("file")
 	if err != nil {
 		panic(err)
