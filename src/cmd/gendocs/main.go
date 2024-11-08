@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/DefangLabs/defang/src/cmd/cli/command"
@@ -18,7 +19,7 @@ func main() {
 
 	_ = os.Mkdir(docsPath, 0755)
 
-	command.SetupCommands("")
+	command.SetupCommands(context.Background(), "")
 
 	err := doc.GenMarkdownTree(command.RootCmd, docsPath)
 	if err != nil {

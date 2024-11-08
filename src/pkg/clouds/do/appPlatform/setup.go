@@ -30,10 +30,9 @@ const (
 )
 
 type DoApp struct {
-	Region      do.Region
-	ProjectName string
-	BucketName  string
-	AppID       string
+	Region     do.Region
+	BucketName string
+	AppID      string
 }
 
 const bucketPrefix = "defang-test" // FIXME: rename
