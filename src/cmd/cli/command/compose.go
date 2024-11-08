@@ -340,11 +340,11 @@ func makeComposeLsCmd() *cobra.Command {
 			}
 
 			if err := cli.GetServices(cmd.Context(), loader, provider, long); err != nil {
-				if !errors.Is(err, cli.ErrNoServices) {
+				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
 
-				term.Warn("No services found")
+				term.Warn(err)
 
 				printDefangHint("To start a new project, do:", "new")
 				return nil
