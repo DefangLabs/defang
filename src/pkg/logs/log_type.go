@@ -77,10 +77,6 @@ func (c LogType) Type() string {
 	return "log-type"
 }
 
-func (c LogType) Has(logType LogType) bool {
-	return c&logType != 0
-}
-
 func (c LogType) Value() string {
 	return c.String()
 }
