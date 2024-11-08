@@ -8,8 +8,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigDelete(ctx context.Context, provider client.Provider, names ...string) error {
-	projectName, err := provider.LoadProjectName(ctx)
+func ConfigDelete(ctx context.Context, loader client.Loader, provider client.Provider, names ...string) error {
+	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
 	}

@@ -11,15 +11,10 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ComposeDown(ctx context.Context, provider client.Provider, projectName string, names ...string) (types.ETag, error) {
-	if projectName == "" {
-		currentProjectName, err := provider.LoadProjectName(ctx)
-		if err != nil {
-			return "", err
-		}
-		projectName = currentProjectName
-	} else {
-		provider.SetProjectName(projectName)
+func ComposeDown(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
+	projectName, err := LoadProjectName(ctx, loader, provider)
+	if err != nil {
+		return "", err
 	}
 
 	term.Debugf("Destroying project %q %q", projectName, names)
@@ -30,10 +25,15 @@ func ComposeDown(ctx context.Context, provider client.Provider, projectName stri
 
 	if len(names) == 0 {
 		// If no names are provided, destroy the entire project
-		return provider.Destroy(ctx)
+		return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
 	}
 
-	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Names: names})
+	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	if err != nil {
+		term.Debug("Failed to get delegate domain:", err)
+	}
+
+	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
 	if err != nil {
 		return "", err
 	}
@@ -44,11 +44,9 @@ var ErrDoNotComposeDown = errors.New("user did not want to compose down")
 
 func InteractiveComposeDown(ctx context.Context, provider client.Provider, projectName string) (types.ETag, error) {
 	var wantComposeDown bool
-	err := survey.AskOne(&survey.Confirm{
+	if err := survey.AskOne(&survey.Confirm{
 		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
-	}, &wantComposeDown)
-
-	if err != nil {
+	}, &wantComposeDown); err != nil {
 		return "", err
 	}
 
@@ -57,5 +55,5 @@ func InteractiveComposeDown(ctx context.Context, provider client.Provider, proje
 	}
 
 	term.Info("Deactivating project " + projectName)
-	return ComposeDown(ctx, provider, projectName)
+	return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
 }
