@@ -61,6 +61,9 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient c
 	case client.ProviderAWS:
 		term.Info("Using AWS provider")
 		awsProvider := aws.NewByocProvider(ctx, grpcClient.TenantID)
+		if _, err := awsProvider.AccountInfo(ctx); err != nil {
+			term.Fatal(err)
+		}
 		return awsProvider
 	case client.ProviderDO:
 		term.Info("Using DigitalOcean provider")
