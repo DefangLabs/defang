@@ -180,7 +180,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	quotas := quota.NewAwsServiceQuotas(ctx, cfg)
 	if err := quotas.Initialize(ctx, cfg); err != nil {
-		term.Warn("Failed to initialize quotas:", err)
+		term.Warnf("failed to initialize quotas: %v", err)
 	}
 
 	serviceInfos := []*defangv1.ServiceInfo{}
@@ -674,7 +674,6 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
