@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	gpuQuotaCodes = []string{"L-7212CCBC", "L-3819A6DF"} // these are the GPU quota codes from cd 
+	gpuQuotaCodes = []string{"L-7212CCBC", "L-3819A6DF"} // these are the GPU quota codes from cd
 	serviceCode   = "ec2"
 )
 
@@ -46,8 +46,10 @@ func (q *AwsServiceQuotas) Initialize(ctx context.Context, cfg aws.Config) error
 	for _, v := range accountQuota {
 		cpuCount = append(cpuCount, v)
 	}
-	sort.Slice(cpuCount, func(i, j int) bool { return cpuCount[i] < cpuCount[j] })
-	q.Gpus = float32(cpuCount[0])
+
+	// sort descending
+	sort.Slice(cpuCount, func(i, j int) bool { return cpuCount[i] > cpuCount[j] })
+	q.Gpus = float32(cpuCount[0]) // get the largest GPU quota across all instances
 
 	return nil
 }

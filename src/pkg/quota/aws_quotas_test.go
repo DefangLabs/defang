@@ -126,6 +126,18 @@ func TestInitialize(t *testing.T) {
 				},
 			},
 			err:      nil,
+			wantGpus: 8,
+			wantErr:  "",
+		},
+		{
+			name: "has GPUs",
+			quotas: servicequotas.ListServiceQuotasOutput{
+				Quotas: []types.ServiceQuota{
+					{QuotaName: aws.String("quotaA"), Value: aws.Float64(8)},
+					{QuotaName: aws.String("quotaA"), Value: aws.Float64(2)},
+				},
+			},
+			err:      nil,
 			wantGpus: 2,
 			wantErr:  "",
 		},
