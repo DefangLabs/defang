@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -53,31 +54,26 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-
 			//like calling NewByocProvider(), but without needing real AccountInfo data
 			b := &ByocAws{
 				cdTasks: make(map[string]ecs.TaskArn),
 				driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), *grpcClient, tt.TenantID, b)
+			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantID, b)
+      
+			const delegateDomain = "example.com"
 
-			if _, err := b.LoadProject(context.Background()); err != nil {
-				t.Fatalf("LoadProject() failed: %v", err)
-			}
-			b.ProjectDomain = b.getProjectDomain("example.com")
-
-			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
+			endpoint := b.getEndpoint(tt.Fqn, tt.ProjectName, delegateDomain, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.getPublicFqdn(tt.Fqn)
+			publicFqdn := b.getPublicFqdn(tt.ProjectName, delegateDomain, tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.getPrivateFqdn(tt.Fqn)
+			privateFqdn := b.getPrivateFqdn(tt.ProjectName, tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}
@@ -179,8 +175,7 @@ func TestSubscribe(t *testing.T) {
 
 func TestNewByocProvider(t *testing.T) {
 	t.Run("no aws credentials", func(t *testing.T) {
-		grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: "project1"}}
-		_, err := NewByocProvider(context.Background(), *grpcClient, "tenant1")
+		_, err := NewByocProvider(context.Background(), "tenant1")
 		if err != nil {
 			var credErr ErrMissingAwsCreds
 			if !errors.As(err, &credErr) {
@@ -188,6 +183,41 @@ func TestNewByocProvider(t *testing.T) {
 			}
 		} else {
 			t.Fatal("NewByocProvider() failed: expected MissingAwsCreds error but didn't get one")
+    }
+  }
+}
+
+func TestGetCDImageTag(t *testing.T) {
+	ctx := context.Background()
+  
+  //like calling NewByocProvider(), but without needing real AccountInfo data
+  b := &ByocAws{
+    cdTasks: make(map[string]ecs.TaskArn),
+    driver:  cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+  }
+  b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), "tenant1", b)
+
+	t.Run("no project should use latest", func(t *testing.T) {
+		const expected = byoc.CdLatestImageTag
+		tag, err := b.getCdImageTag(ctx, "")
+		if err != nil {
+			t.Fatalf("getCdImageTag() failed: %v", err)
+		}
+		if tag != expected {
+			t.Errorf("expected tag %q, got %q", expected, tag)
+		}
+	})
+
+	t.Run("can be overridden by DEFANG_CD_IMAGE", func(t *testing.T) {
+		const expected = "abc"
+		t.Setenv("DEFANG_CD_IMAGE", "defanglabs/cd:"+expected)
+
+		tag, err := b.getCdImageTag(ctx, "")
+		if err != nil {
+			t.Fatalf("getCdImageTag() failed: %v", err)
+		}
+		if tag != expected {
+			t.Errorf("expected tag %q, got %q", expected, tag)
 		}
 	})
 }

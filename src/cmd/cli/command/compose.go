@@ -26,15 +26,18 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func getUnreferencedManagedResources(serviceInfos compose.Services) []string {
-	managedResources := make([]string, 0)
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
+	var managedServices []string
+	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			managedResources = append(managedResources, service.Name)
+			managedServices = append(managedServices, service.Name)
+		} else {
+			unmanagedServices = append(unmanagedServices, service.Name)
 		}
 	}
 
-	return managedResources
+	return managedServices, unmanagedServices
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -55,11 +58,16 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			deploy, project, err := cli.ComposeUp(cmd.Context(), provider, upload, mode.Value())
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
+			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
-					if resp, err2 := provider.GetServices(cmd.Context()); err2 == nil {
+					if resp, err2 := provider.GetServices(cmd.Context(), &defangv1.GetServicesRequest{Project: project.Name}); err2 == nil {
 						term.Error("Error:", prettyError(err))
 						if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, resp.Project); err != nil {
 							term.Debug("ComposeDown failed:", err)
@@ -82,9 +90,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
 
-			var managedResources = getUnreferencedManagedResources(project.Services)
-			if len(managedResources) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedResources)
+			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+
+			if len(managedServices) > 0 {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
 			if detach {
@@ -105,12 +114,7 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				services := make([]string, len(deploy.Services))
-				for i, serviceInfo := range deploy.Services {
-					services[i] = serviceInfo.Service.Name
-				}
-
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, services); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
 					var errDeploymentFailed cli.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
@@ -137,7 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// blocking call to tail
-			if err := cli.Tail(tailCtx, provider, tailParams); err != nil {
+			if err := cli.Tail(tailCtx, loader, provider, tailParams); err != nil {
 				term.Debug("Tail stopped with", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -169,7 +173,7 @@ func makeComposeUpCmd() *cobra.Command {
 						failedServices := []string{errDeploymentFailed.Service}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						_ = cli.InteractiveDebug(cmd.Context(), provider, deploy.Etag, project, failedServices)
+						_ = cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices)
 					}
 					return err
 				}
@@ -249,8 +253,13 @@ func makeComposeDownCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), provider, "", args...)
+			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -281,7 +290,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Verbose:            verbose,
 			}
 
-			err = cli.Tail(cmd.Context(), provider, tailParams)
+			err = cli.Tail(cmd.Context(), loader, provider, tailParams)
 			if err != nil {
 				return err
 			}
@@ -301,7 +310,12 @@ func makeComposeConfigCmd() *cobra.Command {
 		Args:  cobra.NoArgs, // TODO: takes optional list of service names
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, _, err := cli.ComposeUp(cmd.Context(), provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
@@ -319,13 +333,18 @@ func makeComposeLsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			long, _ := cmd.Flags().GetBool("long")
 
-			err := cli.GetServices(cmd.Context(), provider, long)
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
 			if err != nil {
-				if !errors.Is(err, cli.ErrNoServices) {
+				return err
+			}
+
+			if err := cli.GetServices(cmd.Context(), loader, provider, long); err != nil {
+				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
 
-				term.Warn("No services found")
+				term.Warn(err)
 
 				printDefangHint("To start a new project, do:", "new")
 				return nil
@@ -382,7 +401,12 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  true, // always verbose for explicit tail command
 			}
 
-			return cli.Tail(cmd.Context(), provider, tailOptions)
+			loader := configureLoader(cmd)
+			provider, err := getProvider(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return cli.Tail(cmd.Context(), loader, provider, tailOptions)
 		},
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service")

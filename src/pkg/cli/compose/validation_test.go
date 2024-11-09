@@ -21,10 +21,21 @@ func TestValidationAndConvert(t *testing.T) {
 		term.DefaultTerm = oldTerm
 	})
 
-	t.Setenv("NODE_ENV", "test") // for interpolate/compose.yaml
+	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
+
+	mockClient := validationMockProvider{
+		configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
+	}
+	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
+		if err != nil {
+			return nil, err
+		}
+
+		return configs.Names, nil
+	}
 
 	testRunCompose(t, func(t *testing.T, path string) {
-		t.Helper()
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 
@@ -33,18 +44,6 @@ func TestValidationAndConvert(t *testing.T) {
 		project, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		mockClient := validationMockProvider{
-			configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
-		}
-		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-			configs, err := mockClient.ListConfig(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			return configs.Names, nil
 		}
 
 		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
@@ -57,7 +56,7 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := FixupServices(context.Background(), mockClient, project.Services, UploadModeIgnore); err != nil {
+		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
@@ -74,48 +73,42 @@ func TestValidationAndConvert(t *testing.T) {
 	})
 }
 
-func TestValidateConfig(t *testing.T) {
-	const ENV_VAR = "ENV_VAR"
+func makeListConfigNamesFunc(configs ...string) func(context.Context) ([]string, error) {
+	return func(context.Context) ([]string, error) {
+		return configs, nil
+	}
+}
 
+func TestValidateConfig(t *testing.T) {
 	ctx := context.Background()
-	mockClient := validationMockProvider{}
 
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},
 	}
 
-	listConfigsNamesFunc := func(ctx context.Context) ([]string, error) {
-		configs, err := mockClient.ListConfig(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		return configs.Names, nil
-	}
 	t.Run("NOP", func(t *testing.T) {
 		env := map[string]*string{
-			ENV_VAR: ptr.String("blah"),
+			"ENV_VAR": ptr.String("blah"),
 		}
-
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
-		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); err != nil {
+
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("Missing Config", func(t *testing.T) {
-		var missing ErrMissingConfig
 		env := map[string]*string{
-			ENV_VAR: ptr.String("blah"),
-			"ASD":   nil,
-			"BSD":   nil,
-			"CSD":   nil,
+			"ENV_VAR": ptr.String("blah"),
+			"ASD":     nil,
+			"BSD":     nil,
+			"CSD":     nil,
 		}
-
-		ctx := context.Background()
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
-		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); !errors.As(err, &missing) {
-			t.Fatalf("uexpected ErrMissingConfig, got: %v", err)
+
+		var missing ErrMissingConfig
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingConfig, got: %v", err)
 		} else {
 			if len(missing) != 3 {
 				t.Fatalf("unexpected error: number of missing, got: %d expected 3", len(missing))
@@ -131,14 +124,34 @@ func TestValidateConfig(t *testing.T) {
 
 	t.Run("Valid Config", func(t *testing.T) {
 		const CONFIG_VAR = "CONFIG_VAR"
-		mockClient.configs = []string{CONFIG_VAR}
 		env := map[string]*string{
-			ENV_VAR:    ptr.String("blah"),
+			"ENV_VAR":  ptr.String("blah"),
 			CONFIG_VAR: nil,
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
-		if err := ValidateProjectConfig(ctx, &testProject, listConfigsNamesFunc); err != nil {
+
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc(CONFIG_VAR)); err != nil {
 			t.Fatal(err)
+		}
+	})
+
+	t.Run("Missing interpolated variable", func(t *testing.T) {
+		env := map[string]*string{
+			"interpolated": ptr.String(`${CONFIG_VAR}`),
+		}
+		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
+
+		var missing ErrMissingConfig
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingConfig, got: %v", err)
+		} else {
+			if len(missing) != 1 {
+				t.Fatalf("unexpected error: number of missing, got: %d expected 1", len(missing))
+			}
+
+			if missing[0] != "CONFIG_VAR" {
+				t.Fatalf("unexpected error: missing, got: %s expected CONFIG_VAR", missing[0])
+			}
 		}
 	})
 }
@@ -148,7 +161,7 @@ type validationMockProvider struct {
 	configs []string
 }
 
-func (m validationMockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,
 		Project: "mock-project",

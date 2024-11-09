@@ -17,7 +17,7 @@ func TestVersion(t *testing.T) {
 
 func testCommand(args []string) error {
 	ctx := context.Background()
-	SetupCommands("test")
+	SetupCommands(ctx, "test")
 	RootCmd.SetArgs(args)
 	return RootCmd.ExecuteContext(ctx)
 }

@@ -61,7 +61,7 @@ defang
 .defang`
 )
 
-func getRemoteBuildContext(ctx context.Context, provider client.Provider, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -87,18 +87,18 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, name s
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
 	case UploadModeForce:
-		// Force: always upload the tarball (to a random URL), triggering a new build
+		// Force: always upload the tarball (to a random URL), triggering a new buil
 	default:
 		panic("unexpected UploadMode value")
 	}
 
 	term.Info("Uploading the project files for", name)
-	return uploadTarball(ctx, provider, buffer, digest)
+	return uploadTarball(ctx, provider, project, buffer, digest)
 }
 
-func uploadTarball(ctx context.Context, provider client.Provider, body io.Reader, digest string) (string, error) {
+func uploadTarball(ctx context.Context, provider client.Provider, project string, body io.Reader, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
-	ureq := &defangv1.UploadURLRequest{Digest: digest}
+	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
 		return "", err
