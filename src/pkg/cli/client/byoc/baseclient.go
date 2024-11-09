@@ -29,13 +29,25 @@ var (
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
+type ErrMissingCred struct {
+	err error
+}
+
+func (e ErrMissingCred) Error() string{
+	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+}
+
+func (e ErrMissingCred) Unwrap() error {
+	return err
+}
+
 func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
 	}
 	term.Debug("AWS error:", err)
 	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, err)
+		return connect.NewError(connect.CodeUnauthenticated, ErrMissingCrd{err})
 	}
 	if aws.IsS3NoSuchKeyError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
