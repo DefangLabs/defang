@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	gpuQuotaCodes = []string{"L-7212CCBC", "L-3819A6DF"}
+	gpuQuotaCodes = []string{"L-7212CCBC", "L-3819A6DF"} // these are the GPU quota codes from cd 
 	serviceCode   = "ec2"
 )
 
