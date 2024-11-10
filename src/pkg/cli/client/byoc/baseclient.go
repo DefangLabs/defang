@@ -16,7 +16,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 const (
@@ -66,7 +65,6 @@ type ByocBaseClient struct {
 	ShouldDelegateSubdomain bool
 	TenantID                string
 
-	project         *composeTypes.Project
 	bootstrapLister BootstrapLister
 }
 
