@@ -6,8 +6,7 @@ install-git-hooks:
 	chmod +x .git/hooks/pre-push
 
 .PHONY: pre-commit
-pre-commit:
-	make lint-fix
+pre-commit: lint-fix
 
 .PHONY: pre-push
 pre-push:
@@ -15,8 +14,8 @@ pre-push:
 
 .PHONY: lint
 lint:
-	cd src && golangci-lint run
+	make -C src lint
 
 .PHONY: lint-fix
 lint-fix:
-	cd src && golangci-lint run --fix
+	make -C src lint-fix
