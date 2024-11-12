@@ -56,12 +56,14 @@ const (
 	ServiceFailed    ServiceStatus = "FAILED"
 )
 
+// Deprecated: use Subscribe instead #851
 type EndLogConditional struct {
 	Service  string
 	Host     string
 	EventLog string
 }
 
+// Deprecated: use Subscribe instead #851
 type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
 
 type TailOptions struct {
@@ -70,12 +72,13 @@ type TailOptions struct {
 	Etag               types.ETag
 	Since              time.Time
 	Raw                bool
-	EndEventDetectFunc TailDetectStopEventFunc
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
 }
 
 var P = track.P
 
+// Deprecated: use Subscribe instead #851
 func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
 	return func(services []string, host string, eventLog string) bool {
 		for _, conditional := range conditionals {
