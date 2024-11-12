@@ -62,12 +62,29 @@ type ByocAws struct {
 
 var _ client.Provider = (*ByocAws)(nil)
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
+type ErrMissingAwsCreds struct {
+	err error
+}
+
+func (e ErrMissingAwsCreds) Error() string {
+	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+}
+
+func (e ErrMissingAwsCreds) Unwrap() error {
+	return e.err
+}
+
+func NewByocProvider(ctx context.Context, tenantId types.TenantID) (*ByocAws, error) {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
-	return b
+
+	_, err := b.AccountInfo(ctx)
+	if err != nil {
+		return b, ErrMissingAwsCreds{err: err}
+	}
+	return b, nil
 }
 
 func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
