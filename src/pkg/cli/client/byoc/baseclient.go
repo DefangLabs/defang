@@ -29,16 +29,16 @@ var (
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
 
-type ErrMissingCred struct {
+type ErrMissingAwsCred struct {
 	err error
 }
 
-func (e ErrMissingCred) Error() string{
+func (e ErrMissingAwsCred) Error() string {
 	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
 }
 
-func (e ErrMissingCred) Unwrap() error {
-	return err
+func (e ErrMissingAwsCred) Unwrap() error {
+	return e.err
 }
 
 func AnnotateAwsError(err error) error {
@@ -46,8 +46,18 @@ func AnnotateAwsError(err error) error {
 		return nil
 	}
 	term.Debug("AWS error:", err)
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingCrd{err})
+	//in this case, it doesn't check for if the error is "missing REGION" since it doesn't contain that keyword
+	//but i'm not sure if changing the logic in this case makes sense, because of the other functions
+	//that will use it, what if they depend on only "get credentials" but not the "missing REGION" error?
+	//Either i can change the if statement to include "REGION", or abandon my change
+
+	//also, this change is so that,
+	//assuming accountinfo is checked for in the NewProvider, instead of NewByocProvider,
+	//when AccountInfo uses AnnotateAwsError to return an error,
+	// i can directly make AnnotateAwsError return a custom error only for the creds
+	// and then allow other errors like network errors to shine through
+	if strings.Contains(err.Error(), "REGION") {
+		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCred{err})
 	}
 	if aws.IsS3NoSuchKeyError(err) {
 		return connect.NewError(connect.CodeNotFound, err)
