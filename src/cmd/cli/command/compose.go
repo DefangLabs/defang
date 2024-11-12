@@ -373,6 +373,11 @@ func makeComposeLogsCmd() *cobra.Command {
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
+			var verbose, _ = cmd.Flags().GetBool("verbose")
+
+			if !cmd.Flags().Changed("verbose") {
+				verbose = true // default verbose for explicit tail command
+			}
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -398,7 +403,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
-				Verbose:  true, // always verbose for explicit tail command
+				Verbose:  verbose,
 			}
 
 			loader := configureLoader(cmd)
