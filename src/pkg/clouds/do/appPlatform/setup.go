@@ -234,7 +234,7 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 func NewClient(ctx context.Context) (*godo.Client, error) {
 	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
 	if accessToken == "" {
-		return nil, errors.New("DIGITALOCEAN_TOKEN must be set")
+		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://docs.defang.io/docs/providers/digitalocean#getting-started)")
 	}
 	tokenSource := &oauth2.Token{AccessToken: accessToken}
 	httpClient := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
