@@ -17,4 +17,4 @@
 
 ## Additional Information, Relevant dependencies, Screenshots, Logs, Etc...
 
-Any other relevant details that might be helpful.
+<!--Any other relevant details that might be helpful. -->

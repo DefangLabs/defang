@@ -1,4 +1,3 @@
-
 ## Description
 
 <!-- Concise description of what this PR is tackling. -->
@@ -11,5 +10,5 @@
 
 - [ ] I have performed a self-review of my code
 - [ ] I have added appropriate tests
-- [ ] I have updated the Defang CLI help-text to reflect my changes, if necessary
+- [ ] I have updated the Defang CLI docs and/or README to reflect my changes, if necessary
 
