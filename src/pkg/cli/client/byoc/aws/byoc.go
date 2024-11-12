@@ -191,6 +191,10 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 
 	serviceInfos := []*defangv1.ServiceInfo{}
 	for _, service := range project.Services {
+		if err = ValidateGPUResources(service); err != nil {
+			return nil, err
+		}
+
 		serviceInfo, err := b.update(ctx, project.Name, req.DelegateDomain, service)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", service.Name, err)
