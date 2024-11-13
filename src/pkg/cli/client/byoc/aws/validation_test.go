@@ -33,7 +33,6 @@ var ctx = context.Background()
 var mockQuotaClient = &MockQuotaClientApi{}
 
 func TestValidateGPUResources(t *testing.T) {
-
 	t.Run("No service quuota received", func(t *testing.T) {
 		testService := composeTypes.ServiceConfig{
 			Deploy: &composeTypes.DeployConfig{
@@ -122,6 +121,40 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 	})
 
+	t.Run("gpu quota exists but requesting one", func(t *testing.T) {
+		testService := composeTypes.ServiceConfig{
+			Deploy: &composeTypes.DeployConfig{
+				Resources: composeTypes.Resources{
+					Reservations: &composeTypes.Resource{
+						Devices: []composeTypes.DeviceRequest{
+							{Capabilities: []string{"gpu"}, Count: 24},
+						},
+					},
+				},
+			},
+		}
+		project := composeTypes.Project{
+			Services: map[string]composeTypes.ServiceConfig{
+				"test": testService,
+			},
+		}
+
+		quotaClient = mockQuotaClient
+		mockQuotaClient.err = nil
+		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
+			Quotas: []quotaTypes.ServiceQuota{
+				{
+					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
+					Value:     awssdk.Float64(1),
+				},
+			},
+		}
+		err := ValidateGPUResources(ctx, &project)
+		if err != nil {
+			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
+		}
+	})
+
 	t.Run("unable to get AWS gpu quota", func(t *testing.T) {
 		testService := composeTypes.ServiceConfig{
 			Deploy: &composeTypes.DeployConfig{
@@ -147,7 +180,6 @@ func TestValidateGPUResources(t *testing.T) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
-
 }
 
 func TestDeployValidateGPUResources(t *testing.T) {

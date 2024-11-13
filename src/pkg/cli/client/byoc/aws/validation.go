@@ -66,7 +66,7 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 		}
 	}
 
-	return true, nil
+	return false, nil
 }
 
 func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
