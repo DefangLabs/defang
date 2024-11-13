@@ -1079,27 +1079,27 @@ var providerDescription = map[cliClient.ProviderID]string{
 }
 
 func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {
-	state, source, err := getLocalStateAndUpdateProviderID(ctx, loader)
-	if err != nil {
-		return nil, err
-	}
 	extraMsg := ""
+	source := ""
+
+	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
+		// Sanitize the provider value from the environment variable
+		if err := providerID.Set(val); err != nil {
+			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
+		}
+		source = "environment variable"
+	}
+
+	if RootCmd.PersistentFlags().Changed("provider") {
+		source = "command line flag"
+	}
+
 	switch providerID {
 	case cliClient.ProviderAuto:
 		if !nonInteractive {
-			if err := promptForProviderID(); err != nil {
+			var err error
+			if source, err = determineProviderID(ctx, loader); err != nil {
 				return nil, err
-			}
-			source = "interactive prompt"
-			if state != nil {
-				state.Provider = providerID
-				if err := state.Write(); err != nil {
-					term.Warn("Failed to save the provider to the local state file:", err)
-				} else {
-					term.Printf("Provider has been set to %s and saved to the local state file %s", providerID, state.StateFilePath())
-				}
-			} else {
-				term.Printf("To skip this prompt, set the DEFANG_PROVIDER=%s in your environment, or use:\n\n  defang --provider=%s\n\n", providerID, providerID)
 			}
 		} else {
 			// Defaults to defang provider in non-interactive mode
@@ -1132,7 +1132,23 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 	return provider, nil
 }
 
-func promptForProviderID() error {
+func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
+	proj, err := loader.LoadProject(ctx)
+	if err != nil {
+		term.Warn("Unable to load project:", err)
+	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: proj.Name})
+		if err != nil {
+			term.Warn("Unable to get selected provider:", err)
+		} else if resp.Provider != "" {
+			if err := providerID.Set(resp.Provider); err != nil {
+				term.Warn("Invalid provider from fabric:", err)
+			} else {
+				return "defang server", nil
+			}
+		}
+	}
+
 	// Prompt the user to choose a provider if in interactive mode
 	options := []string{}
 	for _, p := range cliClient.AllProviders() {
@@ -1147,54 +1163,19 @@ func promptForProviderID() error {
 			return providerDescription[cliClient.ProviderID(value)]
 		},
 	}, &optionValue); err != nil {
-		return err
+		return "", err
 	}
 	if err := providerID.Set(optionValue); err != nil {
 		panic(err)
 	}
-	return nil
-}
 
-func getLocalStateAndUpdateProviderID(ctx context.Context, loader *compose.Loader) (*LocalState, string, error) {
-	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
-		// Sanitize the provider value from the environment variable
-		if err := providerID.Set(val); err != nil {
-			return nil, "", fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
+	// Save the selected provider to the fabric
+	if proj != nil {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: proj.Name, Provider: providerID.String()}); err != nil {
+			term.Warn("Unable to save selected provider to defang server:", err)
+		} else {
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, proj.Name)
 		}
-		return nil, "environment variable", nil
 	}
-
-	if RootCmd.PersistentFlags().Changed("provider") {
-		return nil, "command line flag", nil
-	}
-
-	if loader == nil {
-		return nil, "", nil
-	}
-	proj, err := loader.LoadProject(ctx)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if val, ok := proj.Extensions["x-defang-provider"]; ok {
-		str, ok := val.(string)
-		if !ok {
-			return nil, "", fmt.Errorf("invalid provider '%v' in compose file, supported providers are: %v", val, cliClient.AllProviders())
-		}
-		if err := providerID.Set(str); err != nil {
-			return nil, "", fmt.Errorf("invalid provider '%v' in compose file, supported providers are: %v", val, cliClient.AllProviders())
-		}
-		return nil, "compose file", nil
-	}
-	state := &LocalState{WorkingDir: proj.WorkingDir}
-
-	if err := state.Read(); err != nil {
-		if os.IsNotExist(err) {
-			return state, "", nil
-		}
-		term.Warn("Failed to read the local state file:", err)
-		return nil, "", nil
-	}
-	providerID = state.Provider
-	return state, fmt.Sprintf("local state file %v", state.StateFilePath()), nil
+	return "interactive prompt", nil
 }
