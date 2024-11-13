@@ -94,7 +94,7 @@ linters:
     # - testableexamples
     # - testifylint
     # - testpackage
-    - thelper
+    # - thelper - more trouble than it's worth
     # - tparallel
     - unconvert
     - unparam

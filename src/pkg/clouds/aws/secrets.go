@@ -116,18 +116,27 @@ func (a *Aws) ListSecretsByPrefix(ctx context.Context, prefix string) ([]string,
 		})
 	}
 
-	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
-		// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
-		ParameterFilters: filters,
-	})
-	if err != nil {
-		return nil, err
+	var names []string
+	var token *string
+	for {
+		res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
+			// MaxResults: ptr.Int64(10); TODO: limit the output depending on quotas
+			ParameterFilters: filters,
+			NextToken:        token,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range res.Parameters {
+			names = append(names, *p.Name)
+		}
+
+		if token = res.NextToken; token == nil {
+			break
+		}
 	}
 
-	names := make([]string, 0, len(res.Parameters))
-	for _, p := range res.Parameters {
-		names = append(names, *p.Name)
-	}
 	sort.Strings(names) // make sure the output is deterministic
 	return names, nil
 }

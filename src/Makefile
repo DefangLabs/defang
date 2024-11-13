@@ -20,11 +20,11 @@ install: $(BINARY_NAME)
 .PHONY: test
 test: $(PROTOS)
 	go mod tidy
-	go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
+	set -o pipefail ; go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: integ
 integ: $(PROTOS)
-	go test -v -tags=integration ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
+	set -o pipefail ; go test -v -tags=integration ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: linux-amd64
 linux-amd64: test
@@ -61,3 +61,11 @@ pull:
 release: pull test no-diff
 	git tag $$(git tag -l 'v*' --sort=-v:refname | head -n1 | awk -F. '{$$NF = $$NF + 1;} 1' OFS=.)
 	git push --follow-tags --tags
+
+.PHONY: lint
+lint:
+	golangci-lint run
+
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run --fix

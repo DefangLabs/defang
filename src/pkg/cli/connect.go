@@ -2,9 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"net"
 	"strings"
 
@@ -36,75 +33,40 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 	return tenant, cluster
 }
 
-func getExistingTokenAndTenant(cluster string) (string, types.TenantID) {
+func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 	var tenantId types.TenantID
-	accessToken := GetExistingToken(cluster)
-	if accessToken != "" {
-		// HACK: don't rely on info in token
-		tenantId, _, _ = tenantFromAccessToken(accessToken)
-	}
-	return accessToken, tenantId
-}
-
-func Connect(cluster string, loader client.ProjectLoader) client.GrpcClient {
-	accessToken, tenantId := getExistingTokenAndTenant(cluster)
-
 	tenant, host := SplitTenantHost(cluster)
 	if tenant != types.DEFAULT_TENANT {
 		tenantId = tenant
 	}
+	accessToken := GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantId, "for cluster", host)
+	grpcClient := client.NewGrpcClient(host, accessToken, tenantId)
 
-	return client.NewGrpcClient(host, accessToken, tenantId, loader)
-}
-
-func NewClient(ctx context.Context, cluster string, providerID client.ProviderID, loader client.ProjectLoader) (client.FabricClient, client.Provider) {
-	grpcClient := Connect(cluster, loader)
-	track.Fabric = grpcClient // Update track client
-
-	// Determine the current tenant ID
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
 		term.Debug("Unable to validate tenant ID with server:", err)
-	}
-	tenantId := grpcClient.TenantID
-	if resp != nil && string(tenantId) != resp.Tenant {
-		term.Warnf("Overriding locally cached TenantID %q with server provided value %q", tenantId, resp.Tenant)
-		tenantId = types.TenantID(resp.Tenant)
-	}
-
-	switch providerID {
-	case client.ProviderAWS:
-		term.Info("Using AWS provider")
-		awsProvider := aws.NewByocProvider(ctx, grpcClient, tenantId)
-		return grpcClient, awsProvider
-	case client.ProviderDO:
-		term.Info("Using DigitalOcean provider")
-		byocProvider, err := do.NewByocProvider(ctx, grpcClient, tenantId)
-		if err != nil {
-			term.Fatal(err)
+	} else if string(tenantId) != resp.Tenant {
+		if tenantId != types.DEFAULT_TENANT {
+			term.Debugf("Overriding TenantID %q with server provided value %q", tenantId, resp.Tenant)
 		}
-		return grpcClient, byocProvider
-	default:
-		term.Info("Using Defang Playground; consider using BYOC (https://s.defang.io/byoc)")
-		return grpcClient, &client.PlaygroundProvider{GrpcClient: grpcClient}
+		grpcClient.TenantID = types.TenantID(resp.Tenant)
 	}
+	track.Fabric = grpcClient // Update track client
+	return grpcClient
 }
 
-// Deprecated: don't rely on info in token
-func tenantFromAccessToken(at string) (types.TenantID, string, error) {
-	parts := strings.Split(at, ".")
-	if len(parts) != 3 {
-		return "", "", errors.New("not a JWT")
+func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient client.GrpcClient) (client.Provider, error) {
+	var provider client.Provider
+	term.Debugf("Creating provider %q", providerID)
+	switch providerID {
+	case client.ProviderAWS:
+		provider = aws.NewByocProvider(ctx, grpcClient.TenantID)
+	case client.ProviderDO:
+		provider = do.NewByocProvider(ctx, grpcClient.TenantID)
+	default:
+		provider = &client.PlaygroundProvider{GrpcClient: grpcClient}
 	}
-	var claims struct {
-		Iss string `json:"iss"`
-		Sub string `json:"sub"`
-	}
-	bytes, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", "", err
-	}
-	err = json.Unmarshal(bytes, &claims)
-	return types.TenantID(claims.Sub), claims.Iss, err
+	_, err := provider.AccountInfo(ctx)
+	return provider, err
 }

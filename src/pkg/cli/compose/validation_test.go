@@ -21,13 +21,13 @@ func TestValidationAndConvert(t *testing.T) {
 		term.DefaultTerm = oldTerm
 	})
 
-	t.Setenv("NODE_ENV", "test") // for interpolate/compose.yaml
+	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
 	mockClient := validationMockProvider{
 		configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
 	}
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-		configs, err := mockClient.ListConfig(ctx)
+		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +36,6 @@ func TestValidationAndConvert(t *testing.T) {
 	}
 
 	testRunCompose(t, func(t *testing.T, path string) {
-		t.Helper()
 		logs := new(bytes.Buffer)
 		term.DefaultTerm = term.NewTerm(logs, logs)
 
@@ -57,7 +56,7 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := FixupServices(context.Background(), mockClient, project.Services, UploadModeIgnore); err != nil {
+		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
@@ -162,7 +161,7 @@ type validationMockProvider struct {
 	configs []string
 }
 
-func (m validationMockProvider) ListConfig(ctx context.Context) (*defangv1.Secrets, error) {
+func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
 	return &defangv1.Secrets{
 		Names:   m.configs,
 		Project: "mock-project",

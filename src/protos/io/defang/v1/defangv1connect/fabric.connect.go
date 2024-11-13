@@ -129,6 +129,12 @@ const (
 	// FabricControllerVerifyDNSSetupProcedure is the fully-qualified name of the FabricController's
 	// VerifyDNSSetup RPC.
 	FabricControllerVerifyDNSSetupProcedure = "/io.defang.v1.FabricController/VerifyDNSSetup"
+	// FabricControllerGetSelectedProviderProcedure is the fully-qualified name of the
+	// FabricController's GetSelectedProvider RPC.
+	FabricControllerGetSelectedProviderProcedure = "/io.defang.v1.FabricController/GetSelectedProvider"
+	// FabricControllerSetSelectedProviderProcedure is the fully-qualified name of the
+	// FabricController's SetSelectedProvider RPC.
+	FabricControllerSetSelectedProviderProcedure = "/io.defang.v1.FabricController/SetSelectedProvider"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -149,7 +155,7 @@ type FabricControllerClient interface {
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
+	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -163,7 +169,7 @@ type FabricControllerClient interface {
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
-	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
+	ListSecrets(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Secrets], error)
 	GetConfigs(context.Context, *connect_go.Request[v1.GetConfigsRequest]) (*connect_go.Response[v1.GetConfigsResponse], error)
 	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -177,6 +183,8 @@ type FabricControllerClient interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
+	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -253,7 +261,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerSubscribeProcedure,
 			opts...,
 		),
-		getServices: connect_go.NewClient[emptypb.Empty, v1.ListServicesResponse](
+		getServices: connect_go.NewClient[v1.GetServicesRequest, v1.ListServicesResponse](
 			httpClient,
 			baseURL+FabricControllerGetServicesProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -301,7 +309,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDeleteSecretsProcedure,
 			opts...,
 		),
-		listSecrets: connect_go.NewClient[emptypb.Empty, v1.Secrets](
+		listSecrets: connect_go.NewClient[v1.ListConfigsRequest, v1.Secrets](
 			httpClient,
 			baseURL+FabricControllerListSecretsProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -375,6 +383,18 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		getSelectedProvider: connect_go.NewClient[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse](
+			httpClient,
+			baseURL+FabricControllerGetSelectedProviderProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
+		setSelectedProvider: connect_go.NewClient[v1.SetSelectedProviderRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerSetSelectedProviderProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -392,7 +412,7 @@ type fabricControllerClient struct {
 	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
-	getServices              *connect_go.Client[emptypb.Empty, v1.ListServicesResponse]
+	getServices              *connect_go.Client[v1.GetServicesRequest, v1.ListServicesResponse]
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
 	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
@@ -401,7 +421,7 @@ type fabricControllerClient struct {
 	checkToS                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	putSecret                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
 	deleteSecrets            *connect_go.Client[v1.Secrets, emptypb.Empty]
-	listSecrets              *connect_go.Client[emptypb.Empty, v1.Secrets]
+	listSecrets              *connect_go.Client[v1.ListConfigsRequest, v1.Secrets]
 	getConfigs               *connect_go.Client[v1.GetConfigsRequest, v1.GetConfigsResponse]
 	putConfig                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
 	deleteConfigs            *connect_go.Client[v1.DeleteConfigsRequest, emptypb.Empty]
@@ -414,6 +434,8 @@ type fabricControllerClient struct {
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 	deleteMe                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
+	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
+	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -483,7 +505,7 @@ func (c *fabricControllerClient) Subscribe(ctx context.Context, req *connect_go.
 }
 
 // GetServices calls io.defang.v1.FabricController.GetServices.
-func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error) {
+func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error) {
 	return c.getServices.CallUnary(ctx, req)
 }
 
@@ -534,7 +556,7 @@ func (c *fabricControllerClient) DeleteSecrets(ctx context.Context, req *connect
 // ListSecrets calls io.defang.v1.FabricController.ListSecrets.
 //
 // Deprecated: do not use.
-func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error) {
+func (c *fabricControllerClient) ListSecrets(ctx context.Context, req *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Secrets], error) {
 	return c.listSecrets.CallUnary(ctx, req)
 }
 
@@ -598,6 +620,16 @@ func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connec
 	return c.verifyDNSSetup.CallUnary(ctx, req)
 }
 
+// GetSelectedProvider calls io.defang.v1.FabricController.GetSelectedProvider.
+func (c *fabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error) {
+	return c.getSelectedProvider.CallUnary(ctx, req)
+}
+
+// SetSelectedProvider calls io.defang.v1.FabricController.SetSelectedProvider.
+func (c *fabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.setSelectedProvider.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -616,7 +648,7 @@ type FabricControllerHandler interface {
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error)
+	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -630,7 +662,7 @@ type FabricControllerHandler interface {
 	// Deprecated: do not use.
 	DeleteSecrets(context.Context, *connect_go.Request[v1.Secrets]) (*connect_go.Response[emptypb.Empty], error)
 	// Deprecated: do not use.
-	ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error)
+	ListSecrets(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Secrets], error)
 	GetConfigs(context.Context, *connect_go.Request[v1.GetConfigsRequest]) (*connect_go.Response[v1.GetConfigsResponse], error)
 	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -644,6 +676,8 @@ type FabricControllerHandler interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
+	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -838,6 +872,18 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerGetSelectedProviderHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetSelectedProviderProcedure,
+		svc.GetSelectedProvider,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
+	fabricControllerSetSelectedProviderHandler := connect_go.NewUnaryHandler(
+		FabricControllerSetSelectedProviderProcedure,
+		svc.SetSelectedProvider,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -908,6 +954,10 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteMeHandler.ServeHTTP(w, r)
 		case FabricControllerVerifyDNSSetupProcedure:
 			fabricControllerVerifyDNSSetupHandler.ServeHTTP(w, r)
+		case FabricControllerGetSelectedProviderProcedure:
+			fabricControllerGetSelectedProviderHandler.ServeHTTP(w, r)
+		case FabricControllerSetSelectedProviderProcedure:
+			fabricControllerSetSelectedProviderHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -965,7 +1015,7 @@ func (UnimplementedFabricControllerHandler) Subscribe(context.Context, *connect_
 	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Subscribe is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.ListServicesResponse], error) {
+func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetServices is not implemented"))
 }
 
@@ -1001,7 +1051,7 @@ func (UnimplementedFabricControllerHandler) DeleteSecrets(context.Context, *conn
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteSecrets is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Secrets], error) {
+func (UnimplementedFabricControllerHandler) ListSecrets(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.Secrets], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListSecrets is not implemented"))
 }
 
@@ -1051,4 +1101,12 @@ func (UnimplementedFabricControllerHandler) DeleteMe(context.Context, *connect_g
 
 func (UnimplementedFabricControllerHandler) VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.VerifyDNSSetup is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetSelectedProvider is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SetSelectedProvider is not implemented"))
 }

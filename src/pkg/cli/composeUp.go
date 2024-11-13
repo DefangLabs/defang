@@ -20,8 +20,8 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, provider client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
-	project, err := provider.LoadProject(ctx)
+func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *types.Project, error) {
+	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		return nil, project, err
 	}
@@ -30,17 +30,21 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		upload = compose.UploadModeIgnore
 	}
 
-	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
-		configs, err := provider.ListConfig(ctx)
-		if err != nil {
-			return nil, err
+	// Validate the project configuration against the provider's configuration, but only if we are going to deploy.
+	// FIXME: should not need to validate configs if we are doing preview, but preview will fail on missing configs.
+	if upload != compose.UploadModeIgnore {
+		listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
+			configs, err := p.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+			if err != nil {
+				return nil, err
+			}
+
+			return configs.Names, nil
 		}
 
-		return configs.Names, nil
-	}
-
-	if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
-		return nil, project, &ComposeError{err}
+		if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+			return nil, project, &ComposeError{err}
+		}
 	}
 
 	if err := compose.ValidateProject(project); err != nil {
@@ -51,7 +55,7 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, provider, fixedProject.Services, upload); err != nil {
+	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 
@@ -65,12 +69,31 @@ func ComposeUp(ctx context.Context, provider client.Provider, upload compose.Upl
 		return nil, project, ErrDryRun
 	}
 
-	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes}
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
+	if err != nil {
+		term.Debug("Failed to get delegate domain:", err)
+	}
+
+	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes, DelegateDomain: delegateDomain.Zone}
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
-		resp, err = provider.Preview(ctx, deployRequest)
+		resp, err = p.Preview(ctx, deployRequest)
 	} else {
-		resp, err = provider.Deploy(ctx, deployRequest)
+		req := client.PrepareDomainDelegationRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
+		var delegation *client.PrepareDomainDelegationResponse
+		delegation, err = p.PrepareDomainDelegation(ctx, req)
+		if err != nil {
+			return nil, project, err
+		}
+		if delegation != nil && len(delegation.NameServers) > 0 {
+			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
+			_, err = c.DelegateSubdomainZone(ctx, req)
+			if err != nil {
+				return nil, project, err
+			}
+			deployRequest.DelegationSetId = delegation.DelegationSetId
+		}
+		resp, err = p.Deploy(ctx, deployRequest)
 	}
 	if err != nil {
 		return nil, project, err

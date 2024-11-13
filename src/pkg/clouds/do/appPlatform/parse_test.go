@@ -29,6 +29,15 @@ func TestParseImage(t *testing.T) {
 				Digest:   "sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
 			},
 		},
+		{
+			image: "docker.io/pulumi/pulumi:latest@sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
+			want: Image{
+				Registry: "docker.io",
+				Repo:     "pulumi/pulumi",
+				Tag:      "latest",
+				Digest:   "sha256:2e671c45664af2a40cc9e78dfbf3c985c7f89746b8a62712273c158f3436266a",
+			},
+		},
 	}
 
 	for _, tt := range tests {

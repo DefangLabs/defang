@@ -2,29 +2,34 @@ package cli
 
 import (
 	"context"
-	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-var ErrNoServices = errors.New("no services found")
+type ErrNoServices struct {
+	ProjectName string // may be empty
+}
 
-func GetServices(ctx context.Context, provider client.Provider, long bool) error {
-	projectName, err := provider.LoadProjectName(ctx)
+func (e ErrNoServices) Error() string {
+	return "no services found in project " + e.ProjectName
+}
+
+func GetServices(ctx context.Context, loader client.Loader, provider client.Provider, long bool) error {
+	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Listing services in project %q", projectName)
 
-	serviceList, err := provider.GetServices(ctx)
+	serviceList, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
 		return err
 	}
 
 	if len(serviceList.Services) == 0 {
-		return ErrNoServices
+		return ErrNoServices{ProjectName: projectName}
 	}
 
 	if !long {

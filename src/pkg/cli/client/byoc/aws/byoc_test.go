@@ -12,10 +12,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -45,28 +46,30 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 		{"Project1", "tenant1", "web", port80, "web--80.project1.example.com", "web.project1.example.com", "web.project1.internal"},
 		{"Tenant2", "tenant1", "web", port80, "web--80.tenant2.example.com", "web.tenant2.example.com", "web.tenant2.internal"},
 		{"tenant1", "tenAnt1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
+		{"tenant1", "tenant1", "web", port80, "web--80.example.com", "web.example.com", "web.tenant1.internal"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
-			grpcClient := &client.GrpcClient{Loader: FakeLoader{ProjectName: tt.ProjectName}}
-			b := NewByocProvider(context.Background(), *grpcClient, tt.TenantID)
-			if _, err := b.LoadProject(context.Background()); err != nil {
-				t.Fatalf("LoadProject() failed: %v", err)
+			//like calling NewByocProvider(), but without needing real AccountInfo data
+			b := &ByocAws{
+				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ProjectDomain = b.getProjectDomain("example.com")
+			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantID, b)
 
-			endpoint := b.getEndpoint(tt.Fqn, tt.Port)
+			const delegateDomain = "example.com"
+
+			endpoint := b.getEndpoint(tt.Fqn, tt.ProjectName, delegateDomain, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.getPublicFqdn(tt.Fqn)
+			publicFqdn := b.getPublicFqdn(tt.ProjectName, delegateDomain, tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.getPrivateFqdn(tt.Fqn)
+			privateFqdn := b.getPrivateFqdn(tt.ProjectName, tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}
@@ -168,11 +171,16 @@ func TestSubscribe(t *testing.T) {
 
 func TestGetCDImageTag(t *testing.T) {
 	ctx := context.Background()
-	b := NewByocProvider(ctx, client.GrpcClient{}, "tenant1")
+
+	//like calling NewByocProvider(), but without needing real AccountInfo data
+	b := &ByocAws{
+		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
+	}
+	b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), "tenant1", b)
 
 	t.Run("no project should use latest", func(t *testing.T) {
 		const expected = byoc.CdLatestImageTag
-		tag, err := b.getCdImageTag(ctx)
+		tag, err := b.getCdImageTag(ctx, "")
 		if err != nil {
 			t.Fatalf("getCdImageTag() failed: %v", err)
 		}
@@ -185,7 +193,7 @@ func TestGetCDImageTag(t *testing.T) {
 		const expected = "abc"
 		t.Setenv("DEFANG_CD_IMAGE", "defanglabs/cd:"+expected)
 
-		tag, err := b.getCdImageTag(ctx)
+		tag, err := b.getCdImageTag(ctx, "")
 		if err != nil {
 			t.Fatalf("getCdImageTag() failed: %v", err)
 		}

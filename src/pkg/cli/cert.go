@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -77,14 +78,14 @@ var (
 	httpRetryDelayBase = 5 * time.Second
 )
 
-func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, provider client.Provider) error {
-	project, err := provider.LoadProject(ctx)
+func GenerateLetsEncryptCert(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider) error {
+	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		return err
 	}
 	term.Debugf("Generating TLS cert for project %q", project.Name)
 
-	services, err := provider.GetServices(ctx)
+	services, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name})
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func GenerateLetsEncryptCert(ctx context.Context, client client.FabricClient, pr
 }
 
 func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
-	term.Infof("Triggering TLS cert generation for %v", domain)
+	term.Infof("Checking DNS setup for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {
 		term.Errorf("Error waiting for CNAME: %v", err)
 		return
@@ -198,7 +199,6 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	msgShown := false
 	serverSideVerified := false
 	serverVerifyRpcFailure := 0
 	doSpinner := term.StdoutCanColor() && term.IsTerminal()
@@ -211,41 +211,50 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 		defer cancelSpinner()
 	}
 
+	verifyDNS := func() error {
+		if !serverSideVerified && serverVerifyRpcFailure < 3 {
+			if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
+				term.Debugf("Server side DNS verification for %v successful", domain)
+				serverSideVerified = true
+			} else {
+				if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
+					term.Debugf("Server side DNS verification negative result: %v", cerr.Message())
+				} else {
+					term.Debugf("Server side DNS verification request for %v failed: %v", domain, err)
+					serverVerifyRpcFailure++
+				}
+			}
+			if serverVerifyRpcFailure >= 3 {
+				term.Warnf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain)
+			}
+		}
+		if serverSideVerified || serverVerifyRpcFailure >= 3 {
+			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
+			if serverSideVerified && !locallyVerified {
+				term.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
+				return nil
+			}
+			if locallyVerified {
+				return nil
+			}
+		}
+		return errors.New("not verified")
+	}
+
+	if err := verifyDNS(); err == nil {
+		return nil
+	}
+	term.Infof("Configure a CNAME or ALIAS record for the domain name: %v", domain)
+	fmt.Printf("  %v  -> %v\n", domain, strings.Join(targets, " or "))
+	term.Infof("Awaiting DNS record setup and propagation... This may take a while.")
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if !serverSideVerified && serverVerifyRpcFailure < 3 {
-				if err := client.VerifyDNSSetup(ctx, &defangv1.VerifyDNSSetupRequest{Domain: domain, Targets: targets}); err == nil {
-					term.Debugf("Server side DNS verification for %v successful", domain)
-					serverSideVerified = true
-				} else {
-					if cerr := new(connect.Error); errors.As(err, &cerr) && cerr.Code() == connect.CodeFailedPrecondition {
-						term.Debugf("Server side DNS verification negative result: %v", cerr.Message())
-					} else {
-						term.Debugf("Server side DNS verification request for %v failed: %v", domain, err)
-						serverVerifyRpcFailure++
-					}
-				}
-				if serverVerifyRpcFailure >= 3 {
-					term.Warnf("Server side DNS verification for %v failed multiple times, skipping server side DNS verification.", domain)
-				}
-			} else {
-				locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
-				if serverSideVerified && !locallyVerified {
-					term.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
-					return nil
-				}
-				if locallyVerified {
-					return nil
-				}
-			}
-			if !msgShown {
-				term.Infof("Please set up a CNAME record for %v", domain)
-				fmt.Printf("  %v  CNAME or as an alias to [ %v ]\n", domain, strings.Join(targets, " or "))
-				term.Infof("Waiting for CNAME record setup and DNS propagation...")
-				msgShown = true
+			if err := verifyDNS(); err == nil {
+				return nil
 			}
 		}
 	}
@@ -261,14 +270,20 @@ func getWithRetries(ctx context.Context, url string, tries int) error {
 		resp, err := httpClient.Do(req)
 		if err == nil {
 			defer resp.Body.Close()
-			var msg []byte
-			msg, err = io.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body) // Read the body to ensure the request is not swallowed by alb
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
-			if err == nil {
-				err = fmt.Errorf("HTTP %v: %v", resp.StatusCode, string(msg))
+			if resp != nil && resp.Request != nil && resp.Request.URL.Scheme == "https" {
+				term.Debugf("cert gen request success, received redirect to %v", resp.Request.URL)
+				return nil // redirect to https indicate a successful cert generation
 			}
+			if err == nil {
+				err = fmt.Errorf("HTTP: %v", resp.StatusCode)
+			}
+		} else if cve := new(tls.CertificateVerificationError); errors.As(err, &cve) {
+			term.Debugf("cert gen request success, received tls error: %v", cve)
+			return nil // tls error indicate a successful cert gen trigger, as it has to be redirected to https
 		}
 
 		term.Debugf("Error fetching %v: %v, tries left %v", url, err, tries-i-1)
