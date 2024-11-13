@@ -2,12 +2,48 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type ShowAccountData struct {
+	Provider       string
+	Details        string
+	Region         string
+	SubscriberTier string
+	Tenant         string
+}
+
+func showAccountInfo(showData ShowAccountData) (string, error) {
+	if showData.Provider == "" {
+		showData.Provider = "Defang"
+	}
+	outputText := "WhoAmI - \n\tProvider: " + showData.Provider
+
+	if showData.Tenant != "" {
+		outputText += "\n\tTenant: " + showData.Tenant
+	}
+
+	if showData.SubscriberTier != pkg.SubscriptionTierToString(defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED) {
+		outputText += "\n\tSubscription: " + showData.SubscriberTier
+	}
+
+	if showData.Region != "" {
+		outputText += "\n\tRegion: " + showData.Region
+	}
+
+	if showData.Details != "" {
+		outputText += "\n\tDetails: " + showData.Details
+	}
+
+	return outputText, nil
+}
+
 func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider) (string, error) {
+	showData := ShowAccountData{}
+
 	resp, err := fabric.WhoAmI(ctx)
 	if err != nil {
 		return "", err
@@ -18,23 +54,23 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return "", err
 	}
 
-	accountID := resp.Account
+	showData.Provider = resp.Account
 	if account.AccountID() != "" {
-		accountID = account.AccountID()
+		showData.Provider = account.AccountID()
 	}
 
-	region := resp.Region
+	showData.Region = resp.Region
 	if account.Region() != "" {
-		region = account.Region()
+		showData.Region = account.Region()
 	}
 
-	if account.Details() != "" {
-		accountID += " (" + account.Details() + ")"
+	showData.Tenant = resp.Tenant
+	showData.Details = account.Details()
+
+	showData.SubscriberTier = pkg.SubscriptionTierToString(defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED)
+	if account.SubscriptionTier() != defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED {
+		showData.SubscriberTier = pkg.SubscriptionTierToString(account.SubscriptionTier())
 	}
 
-	// TODO: Add provider name here?
-	return fmt.Sprintf(
-		"You are logged into %s region %s with tenant %q",
-		accountID, region, resp.Tenant,
-	), nil
+	return showAccountInfo(showData)
 }

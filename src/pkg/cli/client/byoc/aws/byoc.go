@@ -409,17 +409,20 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+
 	return AWSAccountInfo{
-		region:    cfg.Region,
-		accountID: *identity.Account,
-		arn:       *identity.Arn,
+		region:           cfg.Region,
+		accountID:        *identity.Account,
+		arn:              *identity.Arn,
+		subscriptionTier: defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED,
 	}, nil
 }
 
 type AWSAccountInfo struct {
-	accountID string
-	region    string
-	arn       string
+	accountID        string
+	region           string
+	arn              string
+	subscriptionTier defangv1.SubscriptionTier
 }
 
 func (i AWSAccountInfo) AccountID() string {
@@ -432,6 +435,10 @@ func (i AWSAccountInfo) Region() string {
 
 func (i AWSAccountInfo) Details() string {
 	return i.arn
+}
+
+func (i AWSAccountInfo) SubscriptionTier() defangv1.SubscriptionTier {
+	return i.subscriptionTier
 }
 
 func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {

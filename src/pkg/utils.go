@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 var (
@@ -113,4 +115,8 @@ func Contains[T comparable](s []T, v T) bool {
 		}
 	}
 	return false
+}
+
+func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
+	return defangv1.SubscriptionTier_name[int32(tier)]
 }

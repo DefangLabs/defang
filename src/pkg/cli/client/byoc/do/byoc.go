@@ -515,6 +515,10 @@ func (i DoAccountInfo) Details() string {
 	return ""
 }
 
+func (i DoAccountInfo) SubscriptionTier() defangv1.SubscriptionTier {
+	return defangv1.SubscriptionTier_PERSONAL
+}
+
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	//optional
 	return nil, errors.New("please check the Activity tab in the DigitalOcean App Platform console")

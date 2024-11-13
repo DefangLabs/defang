@@ -135,8 +135,9 @@ type Provider interface {
 
 type AccountInfo interface {
 	AccountID() string
-	Region() string
 	Details() string
+	Region() string
+	SubscriptionTier() defangv1.SubscriptionTier
 }
 
 type Loader interface {
