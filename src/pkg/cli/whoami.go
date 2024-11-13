@@ -5,11 +5,11 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type ShowAccountData struct {
 	Provider       string
+	AccountID      string
 	Details        string
 	Region         string
 	SubscriberTier string
@@ -22,12 +22,16 @@ func showAccountInfo(showData ShowAccountData) (string, error) {
 	}
 	outputText := "WhoAmI - \n\tProvider: " + showData.Provider
 
+	if showData.AccountID != "" {
+		outputText += "\n\tAccountID: " + showData.AccountID
+	}
+
 	if showData.Tenant != "" {
 		outputText += "\n\tTenant: " + showData.Tenant
 	}
 
-	if showData.SubscriberTier != pkg.SubscriptionTierToString(defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED) {
-		outputText += "\n\tSubscription: " + showData.SubscriberTier
+	if showData.SubscriberTier != "" {
+		outputText += "\n\tSubscription Tier: " + showData.SubscriberTier
 	}
 
 	if showData.Region != "" {
@@ -54,9 +58,8 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return "", err
 	}
 
-	showData.Provider = resp.Account
 	if account.AccountID() != "" {
-		showData.Provider = account.AccountID()
+		showData.AccountID = account.AccountID()
 	}
 
 	showData.Region = resp.Region
@@ -64,13 +67,10 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		showData.Region = account.Region()
 	}
 
-	showData.Tenant = resp.Tenant
 	showData.Details = account.Details()
-
-	showData.SubscriberTier = pkg.SubscriptionTierToString(defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED)
-	if account.SubscriptionTier() != defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED {
-		showData.SubscriberTier = pkg.SubscriptionTierToString(account.SubscriptionTier())
-	}
+	showData.Provider = account.Provider()
+	showData.SubscriberTier = pkg.SubscriptionTierToString(resp.Tier)
+	showData.Tenant = resp.Tenant
 
 	return showAccountInfo(showData)
 }
