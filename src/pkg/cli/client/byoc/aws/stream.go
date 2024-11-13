@@ -50,7 +50,7 @@ func (bs *byocServerStream) Err() error {
 	if bs.err == io.EOF {
 		return nil // same as the original gRPC/connect server stream
 	}
-	return byoc.AnnotateAwsError(bs.err)
+	return AnnotateAwsError(bs.err)
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {

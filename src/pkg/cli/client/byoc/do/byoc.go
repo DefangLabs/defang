@@ -20,6 +20,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -57,23 +58,20 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) (*ByocDo, error) {
+func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
 	}
 
-	client, err := appPlatform.NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
+	client := appPlatform.NewClient(ctx)
 
 	b := &ByocDo{
 		client: client,
 		driver: appPlatform.New(doRegion),
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
-	return b, nil
+	return b
 }
 
 func (b *ByocDo) getCdImageTag(ctx context.Context, projectName string) (string, error) {
@@ -127,7 +125,7 @@ func (b *ByocDo) getProjectUpdate(ctx context.Context, projectName string) (*def
 			term.Debug("s3.GetObject:", err)
 			return nil, nil // no services yet
 		}
-		return nil, byoc.AnnotateAwsError(err)
+		return nil, awsbyoc.AnnotateAwsError(err)
 	}
 	defer getObjectOutput.Body.Close()
 	pbBytes, err := io.ReadAll(getObjectOutput.Body)
@@ -489,16 +487,24 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
-	return DoAccountInfo{region: b.driver.Region.String()}, nil
+	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
+	if accessToken == "" {
+		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://docs.defang.io/docs/providers/digitalocean#getting-started)")
+	}
+	account, _, err := b.client.Account.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return DoAccountInfo{region: b.driver.Region.String(), accountID: account.Email}, nil
 }
 
 type DoAccountInfo struct {
-	region string
-	// accountID string TODO: Find out the best field to be used as account id from https://docs.digitalocean.com/reference/api/api-reference/#tag/Account
+	region    string
+	accountID string
 }
 
 func (i DoAccountInfo) AccountID() string {
-	return "DigitalOcean"
+	return i.accountID
 }
 
 func (i DoAccountInfo) Region() string {

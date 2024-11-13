@@ -123,10 +123,7 @@ func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 }
 
 func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
-	client, err := NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
+	client := NewClient(ctx)
 
 	image, err := getImageSourceSpec()
 	if err != nil {
@@ -231,14 +228,11 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 	return fmt.Errorf("timeout waiting to app (%s) deployment", appID)
 }
 
-func NewClient(ctx context.Context) (*godo.Client, error) {
+func NewClient(ctx context.Context) *godo.Client {
 	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
-	if accessToken == "" {
-		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://docs.defang.io/docs/providers/digitalocean#getting-started)")
-	}
 	tokenSource := &oauth2.Token{AccessToken: accessToken}
 	httpClient := oauth2.NewClient(ctx, oauth2.StaticTokenSource(tokenSource))
-	return godo.NewClient(httpClient), nil
+	return godo.NewClient(httpClient)
 }
 
 var s3InvalidCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9!_.*'()-]`)
