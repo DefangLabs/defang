@@ -79,7 +79,7 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) er
 			for _, device := range service.Deploy.Resources.Reservations.Devices {
 				if slices.Contains(device.Capabilities, "gpu") {
 					if device.Count == 0 {
-						return nil
+						continue
 					}
 
 					// if there was an error getting the quota
