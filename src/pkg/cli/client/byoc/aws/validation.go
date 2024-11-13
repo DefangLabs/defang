@@ -22,7 +22,7 @@ type QuotaClientAPI interface {
 var quotaClient QuotaClientAPI
 
 var ErrAWSNoConnection = errors.New("no connect to AWS service quotas")
-var ErrGPUQuotaZero = errors.New("GPU quota is 0, no GPUs allowed")
+var ErrGPUQuotaZero = errors.New("no GPUs enabled. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu")
 var ErrNoQuotasReceived = errors.New("no service quotas received")
 
 func NewServiceQuotasClient(ctx context.Context, cfg aws.Config) *servicequotas.Client {
