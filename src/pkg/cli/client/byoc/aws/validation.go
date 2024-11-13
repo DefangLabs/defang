@@ -21,8 +21,8 @@ type QuotaClientAPI interface {
 
 var quotaClient QuotaClientAPI
 
-var ErrGPUQuotaZero = errors.New("GPU quota is 0, no GPUs allowed")
 var ErrAWSNoConnection = errors.New("no connect to AWS service quotas")
+var ErrGPUQuotaZero = errors.New("GPU quota is 0, no GPUs allowed")
 var ErrNoQuotasReceived = errors.New("no service quotas received")
 
 func NewServiceQuotasClient(ctx context.Context, cfg aws.Config) *servicequotas.Client {
@@ -59,18 +59,18 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 			}
 
 			token = quotas.NextToken
-
 			if token == nil {
 				break
 			}
 		}
 	}
 
+	// if we've reached this point, no GPU quota was found or all quotas were zero
 	return false, nil
 }
 
 func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
-	// throw error below only if actually requesting GPUs
+	// return after checking if there are actually non-zero GPUs requested
 	hasGPUs, quotaErr := hasGPUQuota(ctx)
 
 	for _, service := range project.Services {
@@ -96,5 +96,6 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) er
 			}
 		}
 	}
+
 	return nil
 }
