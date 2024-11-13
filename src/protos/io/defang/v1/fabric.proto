@@ -104,6 +104,38 @@ service FabricController {
   rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  rpc GetSelectedProvider(GetSelectedProviderRequest)
+      returns (GetSelectedProviderResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc SetSelectedProvider(SetSelectedProviderRequest)
+      returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  DEFANG = 1;
+  AWS = 2;
+  DIGITALOCEAN = 3;
+  GCP = 4;
+}
+
+message GetSelectedProviderRequest {
+  string project = 1;
+}
+
+message GetSelectedProviderResponse {
+  Provider provider = 1;
+}
+
+message SetSelectedProviderRequest {
+  string project = 1;
+  Provider provider = 2;
 }
 
 message VerifyDNSSetupRequest {

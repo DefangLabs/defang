@@ -91,7 +91,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := getProvider(ctx)
+			provider, err := getProvider(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -385,7 +385,8 @@ var whoamiCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		provider, err := getProvider(cmd.Context())
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -412,7 +413,7 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -660,7 +661,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -737,7 +738,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -764,7 +765,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -781,7 +782,7 @@ var debugCmd = &cobra.Command{
 		etag, _ := cmd.Flags().GetString("etag")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -800,7 +801,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -902,7 +903,7 @@ var cdDestroyCmd = &cobra.Command{
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -916,7 +917,7 @@ var cdDownCmd = &cobra.Command{
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -930,7 +931,7 @@ var cdRefreshCmd = &cobra.Command{
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -944,7 +945,7 @@ var cdCancelCmd = &cobra.Command{
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -959,7 +960,8 @@ var cdTearDownCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 
-		provider, err := getProvider(cmd.Context())
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -976,7 +978,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -994,7 +996,7 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context())
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -1076,30 +1078,29 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
 }
 
-func getProvider(ctx context.Context) (cliClient.Provider, error) {
+func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {
+	extraMsg := ""
+	source := ""
+
+	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
+		// Sanitize the provider value from the environment variable
+		if err := providerID.Set(val); err != nil {
+			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
+		}
+		source = "environment variable"
+	}
+
+	if RootCmd.PersistentFlags().Changed("provider") {
+		source = "command line flag"
+	}
+
 	switch providerID {
 	case cliClient.ProviderAuto:
 		if !nonInteractive {
-			// Prompt the user to choose a provider if in interactive mode
-			options := []string{}
-			for _, p := range cliClient.AllProviders() {
-				options = append(options, p.String())
-			}
-			var optionValue string
-			if err := survey.AskOne(&survey.Select{
-				Message: "Choose a cloud provider:",
-				Options: options,
-				Help:    "The provider you choose will be used for deploying services.",
-				Description: func(value string, i int) string {
-					return providerDescription[cliClient.ProviderID(value)]
-				},
-			}, &optionValue); err != nil {
+			var err error
+			if source, err = determineProviderID(ctx, loader); err != nil {
 				return nil, err
 			}
-			if err := providerID.Set(optionValue); err != nil {
-				panic(err)
-			}
-			term.Printf("To skip this prompt, set the DEFANG_PROVIDER=%s in your environment, or use:\n\n  defang --provider=%s\n\n", optionValue, optionValue)
 		} else {
 			// Defaults to defang provider in non-interactive mode
 			if awsInEnv() {
@@ -1120,8 +1121,58 @@ func getProvider(ctx context.Context) (cliClient.Provider, error) {
 		}
 	case cliClient.ProviderDefang:
 		// Ignore any env vars when explicitly using the Defang playground provider
+		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 
-	provider := cli.NewProvider(ctx, providerID, client)
+	term.Infof("Using %s provider from %s%s", providerID.Name(), source, extraMsg)
+	provider, err := cli.NewProvider(ctx, providerID, client)
+	if err != nil {
+		return nil, err
+	}
 	return provider, nil
+}
+
+func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
+	projName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		term.Warn("Unable to load project:", err)
+	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+		if err != nil {
+			term.Warn("Unable to get selected provider:", err)
+		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+			providerID.SetEnumValue(resp.Provider)
+			return "defang server", nil
+		}
+	}
+
+	// Prompt the user to choose a provider if in interactive mode
+	options := []string{}
+	for _, p := range cliClient.AllProviders() {
+		options = append(options, p.String())
+	}
+	var optionValue string
+	if err := survey.AskOne(&survey.Select{
+		Message: "Choose a cloud provider:",
+		Options: options,
+		Help:    "The provider you choose will be used for deploying services.",
+		Description: func(value string, i int) string {
+			return providerDescription[cliClient.ProviderID(value)]
+		},
+	}, &optionValue); err != nil {
+		return "", err
+	}
+	if err := providerID.Set(optionValue); err != nil {
+		panic(err)
+	}
+
+	// Save the selected provider to the fabric
+	if projName != "" {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
+			term.Warn("Unable to save selected provider to defang server:", err)
+		} else {
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projName)
+		}
+	}
+	return "interactive prompt", nil
 }

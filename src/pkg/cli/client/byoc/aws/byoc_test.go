@@ -6,7 +6,6 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
-	"errors"
 	"io"
 	"path"
 	"strings"
@@ -168,20 +167,6 @@ func TestSubscribe(t *testing.T) {
 			wg.Wait()
 		})
 	}
-}
-
-func TestNewByocProvider(t *testing.T) {
-	t.Run("no aws credentials", func(t *testing.T) {
-		_, err := NewByocProvider(context.Background(), "tenant1")
-		if err != nil {
-			var credErr ErrMissingAwsCreds
-			if !errors.As(err, &credErr) {
-				t.Fatalf("NewByocProvider() failed: %v", err)
-			}
-		} else {
-			t.Fatal("NewByocProvider() failed: expected MissingAwsCreds error but didn't get one")
-		}
-	})
 }
 
 func TestGetCDImageTag(t *testing.T) {
