@@ -17,8 +17,8 @@ const (
 	ProviderDefang ProviderID = "defang"
 	ProviderAWS    ProviderID = "aws"
 	ProviderDO     ProviderID = "digitalocean"
-	// ProviderAzure  Provider = "azure"
 	// ProviderGCP    Provider = "gcp"
+	// ProviderAzure  Provider = "azure"
 )
 
 var allProviders = []ProviderID{
@@ -26,8 +26,8 @@ var allProviders = []ProviderID{
 	ProviderDefang,
 	ProviderAWS,
 	ProviderDO,
-	// ProviderAzure,
 	// ProviderGCP,
+	// ProviderAzure,
 }
 
 func AllProviders() []ProviderID {
@@ -53,6 +53,19 @@ func (p ProviderID) Name() string {
 	}
 }
 
+func (p ProviderID) EnumValue() defangv1.Provider {
+	switch p {
+	case ProviderDefang:
+		return defangv1.Provider_DEFANG
+	case ProviderAWS:
+		return defangv1.Provider_AWS
+	case ProviderDO:
+		return defangv1.Provider_DIGITALOCEAN
+	default:
+		return defangv1.Provider_PROVIDER_UNSPECIFIED
+	}
+}
+
 func (p *ProviderID) Set(str string) error {
 	str = strings.ToLower(str)
 	for _, provider := range allProviders {
@@ -63,6 +76,19 @@ func (p *ProviderID) Set(str string) error {
 	}
 
 	return fmt.Errorf("provider not one of %v", allProviders)
+}
+
+func (p *ProviderID) SetEnumValue(val defangv1.Provider) {
+	switch val {
+	case defangv1.Provider_DEFANG:
+		*p = ProviderDefang
+	case defangv1.Provider_AWS:
+		*p = ProviderAWS
+	case defangv1.Provider_DIGITALOCEAN:
+		*p = ProviderDO
+	default:
+		*p = ProviderAuto
+	}
 }
 
 func (p ProviderID) Type() string {

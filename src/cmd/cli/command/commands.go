@@ -1133,19 +1133,16 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 }
 
 func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
-	proj, err := loader.LoadProject(ctx)
+	projName, err := loader.LoadProjectName(ctx)
 	if err != nil {
 		term.Warn("Unable to load project:", err)
 	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: proj.Name})
+		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
 		if err != nil {
 			term.Warn("Unable to get selected provider:", err)
-		} else if resp.Provider != "" {
-			if err := providerID.Set(resp.Provider); err != nil {
-				term.Warn("Invalid provider from fabric:", err)
-			} else {
-				return "defang server", nil
-			}
+		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+			providerID.SetEnumValue(resp.Provider)
+			return "defang server", nil
 		}
 	}
 
@@ -1170,11 +1167,11 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 	}
 
 	// Save the selected provider to the fabric
-	if proj != nil {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: proj.Name, Provider: providerID.String()}); err != nil {
+	if projName != "" {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
 			term.Warn("Unable to save selected provider to defang server:", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, proj.Name)
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projName)
 		}
 	}
 	return "interactive prompt", nil

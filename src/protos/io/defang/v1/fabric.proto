@@ -117,17 +117,25 @@ service FabricController {
 
 }
 
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  DEFANG = 1;
+  AWS = 2;
+  DIGITALOCEAN = 3;
+  GCP = 4;
+}
+
 message GetSelectedProviderRequest {
   string project = 1;
 }
 
 message GetSelectedProviderResponse {
-  string provider = 1;
+  Provider provider = 1;
 }
 
 message SetSelectedProviderRequest {
   string project = 1;
-  string provider = 2;
+  Provider provider = 2;
 }
 
 message VerifyDNSSetupRequest {
