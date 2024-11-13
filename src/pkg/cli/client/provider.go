@@ -38,6 +38,21 @@ func (p ProviderID) String() string {
 	return string(p)
 }
 
+func (p ProviderID) Name() string {
+	switch p {
+	case ProviderAuto:
+		return "Auto"
+	case ProviderDefang:
+		return "Defang Playground"
+	case ProviderAWS:
+		return "AWS"
+	case ProviderDO:
+		return "DigitalOcean"
+	default:
+		return p.String()
+	}
+}
+
 func (p *ProviderID) Set(str string) error {
 	str = strings.ToLower(str)
 	for _, provider := range allProviders {

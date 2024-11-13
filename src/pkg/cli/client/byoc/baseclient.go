@@ -10,12 +10,10 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 )
 
 const (
@@ -27,23 +25,6 @@ const (
 var (
 	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 )
-
-func AnnotateAwsError(err error) error {
-	if err == nil {
-		return nil
-	}
-	term.Debug("AWS error:", err)
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, err)
-	}
-	if aws.IsS3NoSuchKeyError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	if aws.IsParameterNotFoundError(err) {
-		return connect.NewError(connect.CodeNotFound, err)
-	}
-	return err
-}
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func DnsSafeLabel(fqn string) string {
