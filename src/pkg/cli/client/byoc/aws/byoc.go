@@ -185,6 +185,11 @@ func (b *ByocAws) Preview(ctx context.Context, req *defangv1.DeployRequest) (*de
 }
 
 func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd string) (*defangv1.DeployResponse, error) {
+	cfg, err := b.driver.LoadConfig(ctx)
+	if err != nil {
+		return nil, byoc.AnnotateAwsError(err)
+	}
+
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -199,6 +204,11 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	etag := pkg.RandomID()
 	if len(project.Services) > b.Quota.Services {
 		return nil, errors.New("maximum number of services reached")
+	}
+
+	quotaClient = NewServiceQuotasClient(ctx, cfg)
+	if err = ValidateGPUResources(ctx, project); err != nil {
+		return nil, err
 	}
 
 	serviceInfos := []*defangv1.ServiceInfo{}
