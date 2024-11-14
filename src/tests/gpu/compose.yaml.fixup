@@ -1,0 +1,25 @@
+[
+  {
+    "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "reservations": {
+          "devices": [
+            {
+              "capabilities": [
+                "gpu"
+              ],
+              "count": -1
+            }
+          ]
+        }
+      },
+      "placement": {}
+    },
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  }
+]
