@@ -80,7 +80,8 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 		resp, err = p.Preview(ctx, deployRequest)
 	} else {
 		req := client.PrepareDomainDelegationRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
-		delegation, err := p.PrepareDomainDelegation(ctx, req)
+		var delegation *client.PrepareDomainDelegationResponse
+		delegation, err = p.PrepareDomainDelegation(ctx, req)
 		if err != nil {
 			return nil, project, err
 		}

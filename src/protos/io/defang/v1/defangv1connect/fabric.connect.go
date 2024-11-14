@@ -129,6 +129,12 @@ const (
 	// FabricControllerVerifyDNSSetupProcedure is the fully-qualified name of the FabricController's
 	// VerifyDNSSetup RPC.
 	FabricControllerVerifyDNSSetupProcedure = "/io.defang.v1.FabricController/VerifyDNSSetup"
+	// FabricControllerGetSelectedProviderProcedure is the fully-qualified name of the
+	// FabricController's GetSelectedProvider RPC.
+	FabricControllerGetSelectedProviderProcedure = "/io.defang.v1.FabricController/GetSelectedProvider"
+	// FabricControllerSetSelectedProviderProcedure is the fully-qualified name of the
+	// FabricController's SetSelectedProvider RPC.
+	FabricControllerSetSelectedProviderProcedure = "/io.defang.v1.FabricController/SetSelectedProvider"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -177,6 +183,8 @@ type FabricControllerClient interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
+	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -375,6 +383,18 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		getSelectedProvider: connect_go.NewClient[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse](
+			httpClient,
+			baseURL+FabricControllerGetSelectedProviderProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
+		setSelectedProvider: connect_go.NewClient[v1.SetSelectedProviderRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerSetSelectedProviderProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -414,6 +434,8 @@ type fabricControllerClient struct {
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 	deleteMe                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
+	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
+	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -598,6 +620,16 @@ func (c *fabricControllerClient) VerifyDNSSetup(ctx context.Context, req *connec
 	return c.verifyDNSSetup.CallUnary(ctx, req)
 }
 
+// GetSelectedProvider calls io.defang.v1.FabricController.GetSelectedProvider.
+func (c *fabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error) {
+	return c.getSelectedProvider.CallUnary(ctx, req)
+}
+
+// SetSelectedProvider calls io.defang.v1.FabricController.SetSelectedProvider.
+func (c *fabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.setSelectedProvider.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -644,6 +676,8 @@ type FabricControllerHandler interface {
 	// Endpoint for GDPR compliance
 	DeleteMe(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
+	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -838,6 +872,18 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerGetSelectedProviderHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetSelectedProviderProcedure,
+		svc.GetSelectedProvider,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
+	fabricControllerSetSelectedProviderHandler := connect_go.NewUnaryHandler(
+		FabricControllerSetSelectedProviderProcedure,
+		svc.SetSelectedProvider,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -908,6 +954,10 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteMeHandler.ServeHTTP(w, r)
 		case FabricControllerVerifyDNSSetupProcedure:
 			fabricControllerVerifyDNSSetupHandler.ServeHTTP(w, r)
+		case FabricControllerGetSelectedProviderProcedure:
+			fabricControllerGetSelectedProviderHandler.ServeHTTP(w, r)
+		case FabricControllerSetSelectedProviderProcedure:
+			fabricControllerSetSelectedProviderHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1051,4 +1101,12 @@ func (UnimplementedFabricControllerHandler) DeleteMe(context.Context, *connect_g
 
 func (UnimplementedFabricControllerHandler) VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.VerifyDNSSetup is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetSelectedProvider is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SetSelectedProvider is not implemented"))
 }

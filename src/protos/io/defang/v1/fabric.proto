@@ -104,6 +104,38 @@ service FabricController {
   rpc VerifyDNSSetup(VerifyDNSSetupRequest) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  rpc GetSelectedProvider(GetSelectedProviderRequest)
+      returns (GetSelectedProviderResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc SetSelectedProvider(SetSelectedProviderRequest)
+      returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  DEFANG = 1;
+  AWS = 2;
+  DIGITALOCEAN = 3;
+  GCP = 4;
+}
+
+message GetSelectedProviderRequest {
+  string project = 1;
+}
+
+message GetSelectedProviderResponse {
+  Provider provider = 1;
+}
+
+message SetSelectedProviderRequest {
+  string project = 1;
+  Provider provider = 2;
 }
 
 message VerifyDNSSetupRequest {
@@ -198,7 +230,7 @@ message StartGenerateResponse { string uuid = 1; }
 
 message GenerateStatusRequest { string uuid = 1; }
 
-message UploadURLRequest { 
+message UploadURLRequest {
   string digest = 1;
   string project = 2;
 }
@@ -369,8 +401,8 @@ enum Platform {
   LINUX_ANY = 2;
 }
 
-message ServiceID { 
-  string name = 1; 
+message ServiceID {
+  string name = 1;
   string project = 2;
 }
 
@@ -550,9 +582,18 @@ message DelegateSubdomainZoneRequest {
 
 message DelegateSubdomainZoneResponse { string zone = 1; }
 
+enum SubscriptionTier {
+  SUBSCRIPTION_TIER_UNSPECIFIED = 0;
+  PERSONAL = 1;
+  BASIC = 2;
+  PRO = 3;
+  TEAM = 4;
+}
+
 message WhoAmIResponse {
   string tenant = 1;
   string account = 2;
   string region = 3;
   string user_id = 4;
+  SubscriptionTier tier = 5;
 }

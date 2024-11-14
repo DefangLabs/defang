@@ -121,3 +121,12 @@ func (g GrpcClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSS
 	_, err := g.client.VerifyDNSSetup(ctx, connect.NewRequest(req))
 	return err
 }
+
+func (g GrpcClient) GetSelectedProvider(ctx context.Context, req *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error) {
+	return getMsg(g.client.GetSelectedProvider(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error {
+	_, err := g.client.SetSelectedProvider(ctx, connect.NewRequest(req))
+	return err
+}

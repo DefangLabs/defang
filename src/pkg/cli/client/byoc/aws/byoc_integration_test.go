@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
@@ -15,13 +14,13 @@ import (
 var ctx = context.Background()
 
 func TestDeploy(t *testing.T) {
-	b := NewByocProvider(ctx, client.GrpcClient{}, "ten ant") // no domain
-	b.ProjectName = "byoc_integration_test"
+	b := NewByocProvider(ctx, "ten ant") // no domain
 
 	t.Run("multiple ingress without domain", func(t *testing.T) {
 		t.Skip("skipping test: delegation enabled")
 
 		_, err := b.Deploy(context.Background(), &defangv1.DeployRequest{
+			Project: "byoc_integration_test",
 			Services: []*defangv1.Service{{
 				Name:  "test",
 				Image: "docker.io/library/nginx:latest",
@@ -41,17 +40,15 @@ func TestDeploy(t *testing.T) {
 }
 
 func TestTail(t *testing.T) {
-	b := NewByocProvider(ctx, client.GrpcClient{}, "TestTail")
-	b.ProjectName = "byoc_integration_test"
-	b.ProjectDomain = "example.com" // avoid rpc call
+	b := NewByocProvider(ctx, "TestTail")
 
-	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{})
+	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
-		if connect.CodeOf(err) != connect.CodeUnauthenticated {
-			t.Fatal(err)
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			t.Skip("skipping test; not authorized")
 		}
-		t.Skip("skipping test; not authorized")
+		t.Fatalf("unexpected error: %v", err)
 	}
 	defer ss.Close()
 
@@ -69,16 +66,15 @@ func TestTail(t *testing.T) {
 }
 
 func TestGetServices(t *testing.T) {
-	b := NewByocProvider(ctx, client.GrpcClient{}, "TestGetServices")
-	b.ProjectName = "byoc_integration_test"
+	b := NewByocProvider(ctx, "TestGetServices")
 
-	services, err := b.GetServices(context.Background())
+	services, err := b.GetServices(context.Background(), &defangv1.GetServicesRequest{Project: "byoc_integration_test"})
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			t.Skip("skipping test; not authorized")
 		}
 		// the only acceptable error is "unauthorized"
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(services.Services) != 0 {
@@ -89,11 +85,10 @@ func TestGetServices(t *testing.T) {
 func TestPutSecret(t *testing.T) {
 	const secretName = "hello"
 
-	b := NewByocProvider(ctx, client.GrpcClient{}, "TestPutSecret")
-	b.ProjectName = "byoc_integration_test"
+	b := NewByocProvider(ctx, "TestPutSecret")
 
 	t.Run("delete non-existent", func(t *testing.T) {
-		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+		err := b.DeleteConfig(context.Background(), &defangv1.Secrets{Project: "byoc_integration_test", Names: []string{secretName}})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -113,7 +108,7 @@ func TestPutSecret(t *testing.T) {
 	})
 
 	t.Run("put", func(t *testing.T) {
-		err := b.PutConfig(context.Background(), &defangv1.PutConfigRequest{Name: secretName, Value: "world"})
+		err := b.PutConfig(context.Background(), &defangv1.PutConfigRequest{Project: "byoc_integration_test", Name: secretName, Value: "world"})
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -122,10 +117,10 @@ func TestPutSecret(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		t.Cleanup(func() {
-			b.DeleteConfig(context.Background(), &defangv1.Secrets{Names: []string{secretName}})
+			b.DeleteConfig(context.Background(), &defangv1.Secrets{Project: "byoc_integration_test", Names: []string{secretName}})
 		})
 		// Check that the secret is in the list
-		prefix := "/Defang/" + b.ProjectName + "/beta/"
+		prefix := "/Defang/byoc_integration_test/beta/"
 		secrets, err := b.driver.ListSecretsByPrefix(context.Background(), prefix)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -141,11 +136,10 @@ func TestPutSecret(t *testing.T) {
 }
 
 func TestListSecrets(t *testing.T) {
-	b := NewByocProvider(ctx, client.GrpcClient{}, "TestListSecrets")
-	b.ProjectName = "byoc_integration_test2" // ensure we don't accidentally see the secrets from the other test
+	b := NewByocProvider(ctx, "TestListSecrets")
 
 	t.Run("list", func(t *testing.T) {
-		secrets, err := b.ListConfig(context.Background())
+		secrets, err := b.ListConfig(context.Background(), &defangv1.ListConfigsRequest{Project: "byoc_integration_test2"}) // ensure we don't accidentally see the secrets from the other test
 		if err != nil {
 			// the only acceptable error is "unauthorized"
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {

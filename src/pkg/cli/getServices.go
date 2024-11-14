@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -10,11 +9,11 @@ import (
 )
 
 type ErrNoServices struct {
-	ProjectName string
+	ProjectName string // may be empty
 }
 
 func (e ErrNoServices) Error() string {
-	return fmt.Sprintf("no services found in project %q", e.ProjectName)
+	return "no services found in project " + e.ProjectName
 }
 
 func GetServices(ctx context.Context, loader client.Loader, provider client.Provider, long bool) error {
