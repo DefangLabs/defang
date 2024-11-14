@@ -1,0 +1,15 @@
+name: gpu
+services:
+  mistral:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+                - gpu
+              count: -1
+    networks:
+      default: null
+networks:
+  default:
+    name: gpu_default

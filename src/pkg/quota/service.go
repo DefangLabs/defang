@@ -41,7 +41,13 @@ func (q ServiceQuotas) ValidateQuotas(service *types.ServiceConfig) error {
 				if device.Driver != "" && device.Driver != "nvidia" {
 					return errors.New("only nvidia GPU devices are supported") // CodeInvalidArgument
 				}
-				if q.Gpus == 0 || uint32(device.Count) > q.Gpus {
+				var deviceCount uint32
+				if device.Count == -1 {
+					deviceCount = 1
+				} else {
+					deviceCount = uint32(device.Count)
+				}
+				if q.Gpus == 0 || deviceCount > q.Gpus {
 					return fmt.Errorf("gpu count %v exceeds quota %d", device.Count, q.Gpus) // CodeInvalidArgument
 				}
 			}

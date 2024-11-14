@@ -1,0 +1,7 @@
+services:
+  mistral:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
