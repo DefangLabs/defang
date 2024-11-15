@@ -496,17 +496,15 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 		return nil, err
 	}
 	return DoAccountInfo{
-			accountID:        account.Email,
-			region:           b.driver.Region.String(),
-			subscriptionTier: defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED,
+			accountID: account.Email,
+			region:    b.driver.Region.String(),
 		},
 		nil
 }
 
 type DoAccountInfo struct {
-	accountID        string
-	region           string
-	subscriptionTier defangv1.SubscriptionTier
+	accountID string
+	region    string
 }
 
 func (i DoAccountInfo) AccountID() string {
@@ -523,10 +521,6 @@ func (i DoAccountInfo) Region() string {
 
 func (i DoAccountInfo) Details() string {
 	return ""
-}
-
-func (i DoAccountInfo) SubscriptionTier() defangv1.SubscriptionTier {
-	return i.subscriptionTier
 }
 
 func (b *ByocDo) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {

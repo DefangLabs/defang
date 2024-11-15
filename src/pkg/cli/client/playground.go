@@ -126,6 +126,3 @@ func (g PlaygroundAccountInfo) AccountID() string { return "" }
 func (g PlaygroundAccountInfo) Details() string   { return "" }
 func (g PlaygroundAccountInfo) Provider() string  { return "playground" }
 func (g PlaygroundAccountInfo) Region() string    { return "us-west-2" } // Hardcoded for now for prod1
-func (g PlaygroundAccountInfo) SubscriptionTier() defangv1.SubscriptionTier {
-	return defangv1.SubscriptionTier_PERSONAL
-}
