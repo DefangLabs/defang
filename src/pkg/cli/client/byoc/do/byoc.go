@@ -511,8 +511,8 @@ func (i DoAccountInfo) AccountID() string {
 	return i.accountID
 }
 
-func (i DoAccountInfo) Provider() string {
-	return "Digital Ocean"
+func (i DoAccountInfo) Provider() client.ProviderID {
+	return client.ProviderDO
 }
 
 func (i DoAccountInfo) Region() string {

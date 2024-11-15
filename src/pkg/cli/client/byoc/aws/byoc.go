@@ -427,8 +427,8 @@ func (i AWSAccountInfo) AccountID() string {
 	return i.accountID
 }
 
-func (i AWSAccountInfo) Provider() string {
-	return "AWS"
+func (i AWSAccountInfo) Provider() client.ProviderID {
+	return client.ProviderAWS
 }
 
 func (i AWSAccountInfo) Region() string {

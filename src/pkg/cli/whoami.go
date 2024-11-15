@@ -68,7 +68,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 	}
 
 	showData.Details = account.Details()
-	showData.Provider = account.Provider()
+	showData.Provider = account.Provider().Name()
 	showData.SubscriberTier = pkg.SubscriptionTierToString(resp.Tier)
 	showData.Tenant = resp.Tenant
 

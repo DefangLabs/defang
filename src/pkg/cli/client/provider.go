@@ -136,7 +136,7 @@ type Provider interface {
 type AccountInfo interface {
 	AccountID() string
 	Details() string
-	Provider() string
+	Provider() ProviderID
 	Region() string
 }
 
