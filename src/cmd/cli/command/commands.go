@@ -1140,7 +1140,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 			term.Warn("Unable to get selected provider:", err)
 		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 			providerID.SetEnumValue(resp.Provider)
-			return "defang server", nil
+			return "stored preference", nil
 		}
 	}
 
