@@ -149,6 +149,20 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 			},
 			expected: []string{"config", "CONFIG"},
 		},
+		{
+			name: "Service with interpolated var",
+			project: &types.Project{
+				Services: map[string]types.ServiceConfig{
+					"service1": {
+						Name: "service1",
+						Environment: types.MappingWithEquals{
+							"ENV1": stringPtr("${ENV2}"),
+						},
+					},
+				},
+			},
+			expected: []string{"ENV2"},
+		},
 	}
 
 	for _, tt := range tests {
