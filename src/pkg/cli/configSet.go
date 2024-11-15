@@ -19,5 +19,5 @@ func ConfigSet(ctx context.Context, loader client.Loader, provider client.Provid
 		return ErrDryRun
 	}
 
-	return provider.PutConfig(ctx, &defangv1.PutConfigRequest{Name: name, Value: value})
+	return provider.PutConfig(ctx, &defangv1.PutConfigRequest{Project: projectName, Name: name, Value: value})
 }
