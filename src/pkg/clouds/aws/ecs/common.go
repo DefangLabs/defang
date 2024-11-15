@@ -56,6 +56,7 @@ func (a *AwsEcs) GetVpcID() string {
 }
 
 func (a *AwsEcs) getAccountID() string {
+	// TaskDefARN was set by a call to FillOutputs
 	return aws.GetAccountID(a.TaskDefARN)
 }
 
