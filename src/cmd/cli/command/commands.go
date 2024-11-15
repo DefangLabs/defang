@@ -608,19 +608,17 @@ var newCmd = &cobra.Command{
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {
-	var envVars []string
-	if project != nil {
-		for _, service := range project.Services {
-			for key, value := range service.Environment {
-				if value == nil {
-					envVars = append(envVars, key)
-				}
-			}
-		}
+	if project == nil {
+		return nil // in case loading failed
 	}
-	// Deduplicate by sorting and then compacting (uniq)
-	slices.Sort(envVars)
-	return slices.Compact(envVars)
+	err := compose.ValidateProjectConfig(context.TODO(), project, func(ctx context.Context) ([]string, error) {
+		return nil, nil // assume no config
+	})
+	var missingConfig compose.ErrMissingConfig
+	if errors.As(err, &missingConfig) {
+		return missingConfig
+	}
+	return nil
 }
 
 var getVersionCmd = &cobra.Command{

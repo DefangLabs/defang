@@ -78,6 +78,8 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyR
 	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
+
+	// FIXME: use Destroy rpc instead of Delete rpc
 	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: req.Project, Names: names})
 	if err != nil {
 		return "", err
