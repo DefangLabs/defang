@@ -150,7 +150,7 @@ func TestCollectUnsetEnvVars(t *testing.T) {
 			expected: []string{"config", "CONFIG"},
 		},
 		{
-			name: "Service with interpolcated var",
+			name: "Service with interpolated var",
 			project: &types.Project{
 				Services: map[string]types.ServiceConfig{
 					"service1": {
