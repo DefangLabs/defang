@@ -29,7 +29,7 @@ Install the Defang CLI from one of the following sources:
 
 * Using a shell script:
   ```
-  . <(curl -Ls https://s.defang.io/install)
+  curl -Ls https://s.defang.io/install | bash
   ```
 
 * Using [Go](https://go.dev):
