@@ -15,6 +15,22 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
+type validationMockProvider struct {
+	client.Provider
+	configs []string
+}
+
+func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	return &defangv1.Secrets{
+		Names:   m.configs,
+		Project: "mock-project",
+	}, nil
+}
+
+func (m validationMockProvider) ServiceDNS(name string) string {
+	return "mock-" + name
+}
+
 func TestValidationAndConvert(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
@@ -156,18 +172,7 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
-type validationMockProvider struct {
-	client.Provider
-	configs []string
-}
-
-func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{
-		Names:   m.configs,
-		Project: "mock-project",
-	}, nil
-}
-
-func (m validationMockProvider) ServiceDNS(name string) string {
-	return "mock-" + name
+func TestXDefangPostgres(t *testing.T) {
+	t.Run("sanity verify full definition", func(t *testing.T) {
+	})
 }
