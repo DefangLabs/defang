@@ -11,7 +11,6 @@ import (
 )
 
 func (gcp Gcp) EnsureBucketExists(ctx context.Context, projectID, prefix string) (string, error) {
-
 	existing, err := gcp.GetBucketWithPrefix(ctx, projectID, prefix)
 	if err != nil {
 		return "", fmt.Errorf("GetBucketWithPrefix: %w", err)
@@ -31,8 +30,8 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, projectID, prefix string)
 
 	bucket := client.Bucket(newBucketName)
 	if err := bucket.Create(ctx, projectID, &storage.BucketAttrs{
-		Location:     gcp.Region, // Specify your desired location
-		StorageClass: "STANDARD", // Specify storage class if needed
+		Location:     gcp.Region,
+		StorageClass: "STANDARD", // No minimum storage duration
 	}); err != nil {
 		return "", fmt.Errorf("bucket.Create: %w", err)
 	}
@@ -48,7 +47,7 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, projectID, prefix string
 	defer client.Close()
 
 	// List all buckets in the specified project
-	it := client.Buckets(ctx, prefix)
+	it := client.Buckets(ctx, projectID)
 	it.Prefix = prefix
 	for {
 		attrs, err := it.Next()

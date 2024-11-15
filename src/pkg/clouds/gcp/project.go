@@ -97,7 +97,8 @@ func (id ProjectId) Suffix() string {
 }
 
 type Gcp struct {
-	Region string
+	Region    string
+	ProjectId string
 }
 
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcepb.Project, error) {
