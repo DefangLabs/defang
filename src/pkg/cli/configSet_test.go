@@ -16,8 +16,7 @@ func TestConfigSet(t *testing.T) {
 	provider := MustHaveProjectNamePutConfigProvider{}
 	err := ConfigSet(ctx, loader, provider, "test_name", "test_value")
 	if err != nil {
-		t.Errorf("ConfigSet() error = %v", err)
-		return
+		t.Fatalf("ConfigSet() error = %v", err)
 	}
 }
 
