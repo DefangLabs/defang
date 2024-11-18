@@ -409,6 +409,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+
 	return AWSAccountInfo{
 		region:    cfg.Region,
 		accountID: *identity.Account,
@@ -424,6 +425,10 @@ type AWSAccountInfo struct {
 
 func (i AWSAccountInfo) AccountID() string {
 	return i.accountID
+}
+
+func (i AWSAccountInfo) Provider() client.ProviderID {
+	return client.ProviderAWS
 }
 
 func (i AWSAccountInfo) Region() string {

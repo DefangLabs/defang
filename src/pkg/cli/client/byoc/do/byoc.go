@@ -495,16 +495,24 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return DoAccountInfo{region: b.driver.Region.String(), accountID: account.Email}, nil
+	return DoAccountInfo{
+			accountID: account.Email,
+			region:    b.driver.Region.String(),
+		},
+		nil
 }
 
 type DoAccountInfo struct {
-	region    string
 	accountID string
+	region    string
 }
 
 func (i DoAccountInfo) AccountID() string {
 	return i.accountID
+}
+
+func (i DoAccountInfo) Provider() client.ProviderID {
+	return client.ProviderDO
 }
 
 func (i DoAccountInfo) Region() string {
