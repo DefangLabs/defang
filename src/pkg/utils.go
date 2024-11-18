@@ -17,6 +17,38 @@ var (
 	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`) // alphanumeric+underscore 1 ≤ len ≤ 64
 )
 
+type DayOfWeek string
+
+const (
+	DayOfWeek_SUNDAY    DayOfWeek = "Sunday"
+	DayOfWeek_MONDAY    DayOfWeek = "Monday"
+	DayOfWeek_TUESDAY   DayOfWeek = "Tuesday"
+	DayOfWeek_WEDNESDAY DayOfWeek = "Wednesday"
+	DayOfWeek_THURSDAY  DayOfWeek = "Thursday"
+	DayOfWeek_FRIDAY    DayOfWeek = "Friday"
+	DayOfWeek_SATURDAY  DayOfWeek = "Saturday"
+)
+
+var DAYS = [7]DayOfWeek{DayOfWeek_SUNDAY, DayOfWeek_MONDAY, DayOfWeek_TUESDAY, DayOfWeek_WEDNESDAY, DayOfWeek_THURSDAY, DayOfWeek_FRIDAY, DayOfWeek_SATURDAY}
+
+func (d *DayOfWeek) Name() string {
+	return string(*d)
+}
+
+func IsDayOfWeek(day any) bool {
+	dayOfWeek, ok := day.(string)
+	if !ok {
+		return false
+	}
+
+	for _, d := range []DayOfWeek{DayOfWeek_SUNDAY, DayOfWeek_MONDAY, DayOfWeek_TUESDAY, DayOfWeek_WEDNESDAY, DayOfWeek_THURSDAY, DayOfWeek_FRIDAY, DayOfWeek_SATURDAY} {
+		if strings.EqualFold(d.Name(), dayOfWeek) {
+			return true
+		}
+	}
+	return false
+}
+
 func IsValidServiceName(name string) bool {
 	return len(name) < 20 && validServiceRegex.MatchString(name) // HACK to avoid long target group names
 }
@@ -113,4 +145,13 @@ func Contains[T comparable](s []T, v T) bool {
 		}
 	}
 	return false
+}
+
+func IsNumber(value any) bool {
+	switch value.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return true
+	default:
+		return false
+	}
 }

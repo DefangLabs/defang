@@ -173,6 +173,205 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestXDefangPostgres(t *testing.T) {
-	t.Run("sanity verify full definition", func(t *testing.T) {
+	t.Run("verify empty definition", func(t *testing.T) {
+		service := composeTypes.ServiceConfig{
+			Extensions: map[string]interface{}{
+				"x-defang-postgres": nil,
+			}}
+
+		postgres, ok := service.Extensions["x-defang-postgres"]
+		if !ok {
+			t.Fatal("x-defang-postgres extension not found")
+		}
+
+		if err := ValidatePostgres(postgres); err != nil {
+			t.Fatalf("ValidateProtgresService() failed: %v", err)
+		}
 	})
+
+	t.Run("verify bool value", func(t *testing.T) {
+		service := composeTypes.ServiceConfig{
+			Extensions: map[string]interface{}{
+				"x-defang-postgres": true,
+			}}
+
+		postgres, ok := service.Extensions["x-defang-postgres"]
+		if !ok {
+			t.Fatal("x-defang-postgres extension not found")
+		}
+
+		if err := ValidatePostgres(postgres); err != nil {
+			t.Fatalf("ValidateProtgresService() failed: %v", err)
+		}
+	})
+
+	t.Run("verify full definition", func(t *testing.T) {
+		service := composeTypes.ServiceConfig{
+			Extensions: composeTypes.Extensions{
+				"x-defang-postgres": map[string]any{
+					"maintenance": map[string]any{
+						"day-of-week": "Thursday",
+						"duration":    1,
+						"start-time":  "00:00",
+					},
+					"retention": map[string]any{
+						"number-of-days-to-keep": 7,
+						"restore-on-startup":     true,
+						"save-on-deprovisioning": true,
+					},
+				},
+			}}
+
+		postgres, ok := service.Extensions["x-defang-postgres"]
+		if !ok {
+			t.Fatal("x-defang-postgres extension not found")
+		}
+
+		if err := ValidatePostgres(postgres); err != nil {
+			t.Fatalf("ValidateProtgresService() failed: %v", err)
+		}
+	})
+}
+
+func TestXDefangPostgresParams(t *testing.T) {
+	tests := []struct {
+		name      string
+		extension map[string]any
+		errors    []string
+	}{
+		{
+			name: "invalid maintentance and retention",
+			extension: map[string]any{
+				"maintenance": "abc",
+				"retention":   123,
+			},
+			errors: []string{"'maintenance' must contain 'day-of-week', 'duration', and 'start-time' fields",
+				"'retention' must contain 'number-of-days-to-keep', 'restore-on-startup', and 'save-on-deprovisioning' fields"},
+		},
+		{
+			name: "invalid day",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thurs", "duration": 1, "start-time": "00:00"},
+				"retention":   nil,
+			},
+			errors: []string{"'day-of-week' must be a day of the week"},
+		},
+		{
+			name: "invalid duration: not a number",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": "A", "start-time": "00:00"},
+				"retention":   nil,
+			},
+			errors: []string{"'duration' must be a number"},
+		},
+		{
+			name: "invalid start-time",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 1, "start-time": "25:77"},
+				"retention":   nil,
+			},
+			errors: []string{"'start-time' must be a valid time in \"HH:MM\" format"},
+		},
+		{
+			name: "invalid start-time type",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 1, "start-time": 123},
+				"retention":   nil,
+			},
+			errors: []string{"'start-time' must be a valid time in \"HH:MM\" format"},
+		},
+		{
+			name: "missing day-of-week",
+			extension: map[string]any{
+				"maintenance": map[string]any{"duration": 1, "start-time": "20:30"},
+				"retention":   nil,
+			},
+			errors: []string{"missing 'day-of-week' field"},
+		},
+		{
+			name: "missing duration",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thursday", "start-time": "20:30"},
+				"retention":   nil,
+			},
+			errors: []string{"missing 'duration' field"},
+		},
+		{
+			name: "missing start-time",
+			extension: map[string]any{
+				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 2},
+				"retention":   nil,
+			},
+			errors: []string{"missing 'start-time' field"},
+		},
+		{
+			name: "missing day-of-week and start-time",
+			extension: map[string]any{
+				"maintenance": map[string]any{"duration": 2, "start-time": "00:00"},
+				"retention":   nil,
+			},
+			errors: []string{"missing 'day-of-week' field"},
+		},
+		{
+			name: "invalid number-of-days-to-keep",
+			extension: map[string]any{
+				"maintenance": nil,
+				"retention":   map[string]any{"number-of-days-to-keep": "A", "restore-on-startup": true, "save-on-deprovisioning": true},
+			},
+			errors: []string{"'number-of-days-to-keep' must be a number"},
+		},
+		{
+			name: "invalid restore-on-startup",
+			extension: map[string]any{
+				"maintenance": nil,
+				"retention":   map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": "abc", "save-on-deprovisioning": true},
+			},
+			errors: []string{"'restore-on-startup' must be set to true or false"},
+		},
+		{
+			name: "invalid save-on-deprovisioning",
+			extension: map[string]any{
+				"maintenance": nil,
+				"retention":   map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": true, "save-on-deprovisioning": "abc"},
+			},
+			errors: []string{"'save-on-deprovisioning' must be set to true or false"},
+		},
+		{
+			name: "missing number-of-days-to-keep",
+			extension: map[string]any{
+				"maintenance": nil,
+				"retention":   map[string]any{"restore-on-startup": true, "save-on-deprovisioning": true},
+			},
+			errors: []string{"missing 'number-of-days-to-keep' field"},
+		},
+		{
+			name: "missing number-of-days-to-keep and restore-on-startup",
+			extension: map[string]any{
+				"maintenance": nil,
+				"retention":   map[string]any{"save-on-deprovisioning": true},
+			},
+			errors: []string{"missing 'number-of-days-to-keep' field", "missing 'restore-on-startup' field"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidatePostgres(tt.extension); err != nil {
+				var errPostgres *ErrPostgresParam
+				if !errors.As(err, &errPostgres) {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				for _, errMsg := range tt.errors {
+					if !slices.Contains(*errPostgres, errMsg) {
+						t.Fatalf("ValidatePostgresParams() = %v, want %v", errPostgres.Error(), tt.errors)
+					}
+				}
+
+				if len(tt.errors) != len(*errPostgres) {
+					t.Fatalf("expected %d errors but got %d", len(tt.errors), len(*errPostgres))
+				}
+			}
+		})
+	}
 }

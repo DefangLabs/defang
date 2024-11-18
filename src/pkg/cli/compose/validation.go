@@ -16,7 +16,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/types"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -28,6 +27,18 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
 }
 
+type ErrPostgresParam []string
+
+func (e *ErrPostgresParam) Add(err string) {
+	*e = append(*e, err)
+}
+
+func (e *ErrPostgresParam) Error() string {
+	return fmt.Sprintf("%d errors found: %s", len(*e), strings.Join(*e, ", "))
+}
+
+type PostgresProps map[string]any
+
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
 func ValidateProject(project *composeTypes.Project) error {
@@ -35,7 +46,7 @@ func ValidateProject(project *composeTypes.Project) error {
 		return errors.New("no project found")
 	}
 	// Copy the services map into a slice so we can sort them and have consistent output
-	var services []types.ServiceConfig
+	var services []composeTypes.ServiceConfig
 	for _, svccfg := range project.Services {
 		services = append(services, svccfg)
 	}
@@ -291,11 +302,15 @@ func ValidateProject(project *composeTypes.Project) error {
 			}
 		}
 
-		if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+		if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
 			// Ensure the image is a valid Postgres image
 			repo := strings.SplitN(svccfg.Image, ":", 2)[0]
 			if !strings.HasSuffix(repo, "postgres") {
 				term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
+			}
+
+			if err = ValidatePostgres(postgresExtension); err != nil {
+				return err
 			}
 		}
 
@@ -415,4 +430,148 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 	}
 
 	return nil
+}
+
+func ValidatePostgres(postgres any) error {
+	if postgres == nil || postgres == true || postgres == false {
+		return nil
+	}
+
+	errPostgres := ErrPostgresParam{}
+
+	postgresProps, ok := postgres.(map[string]any)
+	if !ok {
+		errPostgres.Add("postgres must be an object")
+		return &errPostgres
+	}
+
+	for _, key := range []string{"maintenance", "retention"} {
+		switch key {
+		case "maintenance":
+			if maintenance, ok := postgresProps[key]; ok {
+				// maintenance is optional
+				if maintenance == nil {
+					continue
+				}
+
+				maintProps, ok := maintenance.(map[string]any)
+				if !ok {
+					errPostgres.Add("'maintenance' must contain 'day-of-week', 'duration', and 'start-time' fields")
+					continue
+				}
+
+				err := ValidateMaintentance(maintProps)
+				errPostgres = append(errPostgres, err...)
+			}
+		case "retention":
+			if retention, ok := postgresProps[key]; ok {
+				// retention is optional
+				if retention == nil {
+					continue
+				}
+
+				retentionProps, ok := retention.(map[string]any)
+				if !ok {
+					errPostgres.Add("'retention' must contain 'number-of-days-to-keep', 'restore-on-startup', and 'save-on-deprovisioning' fields")
+					continue
+				}
+				err := ValidateRetention(retentionProps)
+				errPostgres = append(errPostgres, err...)
+			}
+		default:
+			return fmt.Errorf("unsupported postgres property: %q", key)
+		}
+	}
+
+	if len(errPostgres) > 0 {
+		return &errPostgres
+	}
+	return nil
+}
+
+func ValidateMaintentance(maintenance map[string]any) ErrPostgresParam {
+	startTimeRegx := regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d$`)
+	errPostgres := ErrPostgresParam{}
+	for _, key := range []string{"day-of-week", "duration", "start-time"} {
+		switch key {
+		case "day-of-week":
+			dayOfWeek, ok := maintenance[key]
+			if !ok {
+				errPostgres.Add("missing 'day-of-week' field")
+				continue
+			}
+			if _, ok := dayOfWeek.(string); !ok {
+				errPostgres.Add("day-of-week must be a string")
+				continue
+			}
+			if !pkg.IsDayOfWeek(dayOfWeek) {
+				errPostgres.Add("'day-of-week' must be a day of the week")
+				continue
+			}
+		case "duration":
+			duration, ok := maintenance[key]
+			if !ok {
+				errPostgres.Add("missing 'duration' field")
+				continue
+			}
+
+			if !pkg.IsNumber(duration) {
+				errPostgres.Add("'duration' must be a number")
+				continue
+			}
+		case "start-time":
+			startTimeValue, ok := maintenance[key]
+			if !ok {
+				errPostgres.Add("missing 'start-time' field")
+				continue
+			}
+
+			startTimeStr, ok := startTimeValue.(string)
+			if !ok {
+				errPostgres.Add("'start-time' must be a valid time in \"HH:MM\" format")
+				continue
+			}
+
+			matched := startTimeRegx.MatchString(startTimeStr)
+			if !matched {
+				errPostgres.Add("'start-time' must be a valid time in \"HH:MM\" format")
+				continue
+			}
+		}
+	}
+
+	return errPostgres
+}
+
+func ValidateRetention(retention map[string]any) ErrPostgresParam {
+	errPostgres := ErrPostgresParam{}
+
+	for _, key := range []string{"restore-on-startup", "save-on-deprovisioning", "number-of-days-to-keep"} {
+		switch key {
+		case "restore-on-startup", "save-on-deprovisioning":
+			value, ok := retention[key]
+			if !ok {
+				errPostgres.Add(fmt.Sprintf("missing '%s' field", key))
+				continue
+			}
+
+			if _, ok := value.(bool); !ok {
+				errPostgres.Add(fmt.Sprintf("'%s' must be set to true or false", key))
+				continue
+			}
+		case "number-of-days-to-keep":
+			value, ok := retention[key]
+			if !ok {
+				errPostgres.Add(fmt.Sprintf("missing '%s' field", key))
+				continue
+			}
+
+			if !pkg.IsNumber(value) {
+				errPostgres.Add(fmt.Sprintf("'%s' must be a number", key))
+				continue
+			}
+		}
+	}
+
+	return errPostgres
 }

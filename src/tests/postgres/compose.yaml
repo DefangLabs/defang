@@ -2,14 +2,14 @@ services:
   x:
     image: postgres
     x-defang-postgres:
-      retention:
-        restore-on-startup: true
-        save-on-deprovisioning: true
-        retention-period: 30
       maintenance:
         day-of-week: Thursday
-        start-time: 2020-01-01T00:00:00Z
-        duration:
+        duration: 1
+        start-time: "23:00"
+      retention:
+        number-of-days-to-keep: 30
+        restore-on-startup: true
+        save-on-deprovisioning: true
 
   y:
     image: example

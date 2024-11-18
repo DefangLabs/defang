@@ -4,7 +4,15 @@ services:
     image: postgres
     networks:
       default: null
-    x-defang-postgres: null
+    x-defang-postgres:
+      maintenance:
+        day-of-week: Thursday
+        duration: 1
+        start-time: "23:00"
+      retention:
+        number-of-days-to-keep: 30
+        restore-on-startup: true
+        save-on-deprovisioning: true
   "y":
     image: example
     networks:
