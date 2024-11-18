@@ -445,23 +445,18 @@ func ValidatePostgres(postgres any) error {
 		return &errPostgres
 	}
 
-	for _, key := range []string{"maintenance", "retention"} {
+	for _, key := range []string{"maintenance-window", "retention"} {
 		switch key {
-		case "maintenance":
+		case "maintenance-window":
 			if maintenance, ok := postgresProps[key]; ok {
 				// maintenance is optional
 				if maintenance == nil {
 					continue
 				}
 
-				maintProps, ok := maintenance.(map[string]any)
-				if !ok {
-					errPostgres.Add("'maintenance' must contain 'day-of-week', 'duration', and 'start-time' fields")
-					continue
+				if err := ValidateMaintentance(maintenance); err != nil {
+					errPostgres = append(errPostgres, err...)
 				}
-
-				err := ValidateMaintentance(maintProps)
-				errPostgres = append(errPostgres, err...)
 			}
 		case "retention":
 			if retention, ok := postgresProps[key]; ok {
@@ -489,58 +484,20 @@ func ValidatePostgres(postgres any) error {
 	return nil
 }
 
-func ValidateMaintentance(maintenance map[string]any) ErrPostgresParam {
-	startTimeRegx := regexp.MustCompile(`^(?:[01]\d|2[0-3]):[0-5]\d$`)
-	errPostgres := ErrPostgresParam{}
-	for _, key := range []string{"day-of-week", "duration", "start-time"} {
-		switch key {
-		case "day-of-week":
-			dayOfWeek, ok := maintenance[key]
-			if !ok {
-				errPostgres.Add("missing 'day-of-week' field")
-				continue
-			}
-			if _, ok := dayOfWeek.(string); !ok {
-				errPostgres.Add("day-of-week must be a string")
-				continue
-			}
-			if !pkg.IsDayOfWeek(dayOfWeek) {
-				errPostgres.Add("'day-of-week' must be a day of the week")
-				continue
-			}
-		case "duration":
-			duration, ok := maintenance[key]
-			if !ok {
-				errPostgres.Add("missing 'duration' field")
-				continue
-			}
+func ValidateMaintentance(maintenance any) ErrPostgresParam {
+	pattern := `^(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)-(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)$`
+	regex := regexp.MustCompile(pattern)
 
-			if !pkg.IsNumber(duration) {
-				errPostgres.Add("'duration' must be a number")
-				continue
-			}
-		case "start-time":
-			startTimeValue, ok := maintenance[key]
-			if !ok {
-				errPostgres.Add("missing 'start-time' field")
-				continue
-			}
-
-			startTimeStr, ok := startTimeValue.(string)
-			if !ok {
-				errPostgres.Add("'start-time' must be a valid time in \"HH:MM\" format")
-				continue
-			}
-
-			matched := startTimeRegx.MatchString(startTimeStr)
-			if !matched {
-				errPostgres.Add("'start-time' must be a valid time in \"HH:MM\" format")
-				continue
-			}
-		}
+	maintWindow, ok := maintenance.(string)
+	if !ok {
+		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
 	}
 
-	return errPostgres
+	if !regex.MatchString(maintWindow) {
+		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
+	}
+
+	return nil
 }
 
 func ValidateRetention(retention map[string]any) ErrPostgresParam {

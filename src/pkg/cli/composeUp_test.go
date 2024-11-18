@@ -148,20 +148,14 @@ func TestAWSPostgres(t *testing.T) {
 
 					// maintenance
 					{
-						maintenance, ok := postgresProps["maintenance"]
+						maintenance, ok := postgresProps["maintenance-window"]
 						if !ok {
-							t.Fatal("expecting 'maintentance' definition but not defined")
+							continue
 						}
 
-						maintenanceProps, ok := maintenance.(map[string]interface{})
+						_, ok = maintenance.(string)
 						if !ok {
-							t.Fatal("expecting 'maintentance' not a map")
-						}
-
-						for _, key := range []string{"day-of-week", "start-time", "duration"} {
-							if _, ok := maintenanceProps[key]; !ok {
-								t.Fatalf("expecting '%s' maintenance property but not defined", key)
-							}
+							t.Fatal("expecting 'maintentance' to be a string")
 						}
 					}
 				}

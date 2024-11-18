@@ -209,11 +209,7 @@ func TestXDefangPostgres(t *testing.T) {
 		service := composeTypes.ServiceConfig{
 			Extensions: composeTypes.Extensions{
 				"x-defang-postgres": map[string]any{
-					"maintenance": map[string]any{
-						"day-of-week": "Thursday",
-						"duration":    1,
-						"start-time":  "00:00",
-					},
+					"maintenance-window": "Mon:23:00-Tue:01:00",
 					"retention": map[string]any{
 						"number-of-days-to-keep": 7,
 						"restore-on-startup":     true,
@@ -242,113 +238,57 @@ func TestXDefangPostgresParams(t *testing.T) {
 		{
 			name: "invalid maintentance and retention",
 			extension: map[string]any{
-				"maintenance": "abc",
-				"retention":   123,
+				"maintenance-window": "abc",
+				"retention":          123,
 			},
-			errors: []string{"'maintenance' must contain 'day-of-week', 'duration', and 'start-time' fields",
+			errors: []string{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'",
 				"'retention' must contain 'number-of-days-to-keep', 'restore-on-startup', and 'save-on-deprovisioning' fields"},
 		},
 		{
 			name: "invalid day",
 			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thurs", "duration": 1, "start-time": "00:00"},
-				"retention":   nil,
+				"maintenance-window": "Mon:23:00-Tue:01:00",
+				"retention":          nil,
 			},
 			errors: []string{"'day-of-week' must be a day of the week"},
 		},
 		{
-			name: "invalid duration: not a number",
-			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": "A", "start-time": "00:00"},
-				"retention":   nil,
-			},
-			errors: []string{"'duration' must be a number"},
-		},
-		{
-			name: "invalid start-time",
-			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 1, "start-time": "25:77"},
-				"retention":   nil,
-			},
-			errors: []string{"'start-time' must be a valid time in \"HH:MM\" format"},
-		},
-		{
-			name: "invalid start-time type",
-			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 1, "start-time": 123},
-				"retention":   nil,
-			},
-			errors: []string{"'start-time' must be a valid time in \"HH:MM\" format"},
-		},
-		{
-			name: "missing day-of-week",
-			extension: map[string]any{
-				"maintenance": map[string]any{"duration": 1, "start-time": "20:30"},
-				"retention":   nil,
-			},
-			errors: []string{"missing 'day-of-week' field"},
-		},
-		{
-			name: "missing duration",
-			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thursday", "start-time": "20:30"},
-				"retention":   nil,
-			},
-			errors: []string{"missing 'duration' field"},
-		},
-		{
-			name: "missing start-time",
-			extension: map[string]any{
-				"maintenance": map[string]any{"day-of-week": "Thursday", "duration": 2},
-				"retention":   nil,
-			},
-			errors: []string{"missing 'start-time' field"},
-		},
-		{
-			name: "missing day-of-week and start-time",
-			extension: map[string]any{
-				"maintenance": map[string]any{"duration": 2, "start-time": "00:00"},
-				"retention":   nil,
-			},
-			errors: []string{"missing 'day-of-week' field"},
-		},
-		{
 			name: "invalid number-of-days-to-keep",
 			extension: map[string]any{
-				"maintenance": nil,
-				"retention":   map[string]any{"number-of-days-to-keep": "A", "restore-on-startup": true, "save-on-deprovisioning": true},
+				"maintenance-window": nil,
+				"retention":          map[string]any{"number-of-days-to-keep": "A", "restore-on-startup": true, "save-on-deprovisioning": true},
 			},
 			errors: []string{"'number-of-days-to-keep' must be a number"},
 		},
 		{
 			name: "invalid restore-on-startup",
 			extension: map[string]any{
-				"maintenance": nil,
-				"retention":   map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": "abc", "save-on-deprovisioning": true},
+				"maintenance-window": nil,
+				"retention":          map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": "abc", "save-on-deprovisioning": true},
 			},
 			errors: []string{"'restore-on-startup' must be set to true or false"},
 		},
 		{
 			name: "invalid save-on-deprovisioning",
 			extension: map[string]any{
-				"maintenance": nil,
-				"retention":   map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": true, "save-on-deprovisioning": "abc"},
+				"maintenance-window": nil,
+				"retention":          map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": true, "save-on-deprovisioning": "abc"},
 			},
 			errors: []string{"'save-on-deprovisioning' must be set to true or false"},
 		},
 		{
 			name: "missing number-of-days-to-keep",
 			extension: map[string]any{
-				"maintenance": nil,
-				"retention":   map[string]any{"restore-on-startup": true, "save-on-deprovisioning": true},
+				"maintenance-window": nil,
+				"retention":          map[string]any{"restore-on-startup": true, "save-on-deprovisioning": true},
 			},
 			errors: []string{"missing 'number-of-days-to-keep' field"},
 		},
 		{
 			name: "missing number-of-days-to-keep and restore-on-startup",
 			extension: map[string]any{
-				"maintenance": nil,
-				"retention":   map[string]any{"save-on-deprovisioning": true},
+				"maintenance-window": nil,
+				"retention":          map[string]any{"save-on-deprovisioning": true},
 			},
 			errors: []string{"missing 'number-of-days-to-keep' field", "missing 'restore-on-startup' field"},
 		},
