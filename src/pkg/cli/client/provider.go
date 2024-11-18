@@ -135,8 +135,9 @@ type Provider interface {
 
 type AccountInfo interface {
 	AccountID() string
-	Region() string
 	Details() string
+	Provider() ProviderID
+	Region() string
 }
 
 type Loader interface {

@@ -22,6 +22,7 @@ func (g *grpcWhoamiMockHandler) WhoAmI(context.Context, *connect.Request[emptypb
 		Tenant:  "tenant-1",
 		Account: "playground",
 		Region:  "us-test-2",
+		Tier:    defangv1.SubscriptionTier_PRO,
 	}), nil
 }
 
@@ -43,9 +44,9 @@ func TestWhoami(t *testing.T) {
 	}
 
 	// Playground provider is hardcoded to return "us-west-2" as the region
-	want := `You are logged into playground region us-west-2 with tenant "tenant-1"`
+	want := "WhoAmI - \n\tProvider: Defang Playground\n\tTenant: tenant-1\n\tSubscription Tier: Pro\n\tRegion: us-west-2"
 
 	if got != want {
-		t.Errorf("Whoami() = %v, want: %v", got, want)
+		t.Errorf("Whoami() = %v, \nwant: %v", got, want)
 	}
 }
