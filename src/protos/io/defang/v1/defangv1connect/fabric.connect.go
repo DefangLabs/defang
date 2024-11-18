@@ -147,7 +147,7 @@ type FabricControllerClient interface {
 	// Deprecated: do not use.
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
-	Get(context.Context, *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error)
+	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
@@ -234,7 +234,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDeployProcedure,
 			opts...,
 		),
-		get: connect_go.NewClient[v1.ServiceID, v1.ServiceInfo](
+		get: connect_go.NewClient[v1.GetRequest, v1.ServiceInfo](
 			httpClient,
 			baseURL+FabricControllerGetProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -407,7 +407,7 @@ type fabricControllerClient struct {
 	tail                     *connect_go.Client[v1.TailRequest, v1.TailResponse]
 	update                   *connect_go.Client[v1.Service, v1.ServiceInfo]
 	deploy                   *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
-	get                      *connect_go.Client[v1.ServiceID, v1.ServiceInfo]
+	get                      *connect_go.Client[v1.GetRequest, v1.ServiceInfo]
 	delete                   *connect_go.Client[v1.DeleteRequest, v1.DeleteResponse]
 	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
@@ -476,7 +476,7 @@ func (c *fabricControllerClient) Deploy(ctx context.Context, req *connect_go.Req
 }
 
 // Get calls io.defang.v1.FabricController.Get.
-func (c *fabricControllerClient) Get(ctx context.Context, req *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error) {
+func (c *fabricControllerClient) Get(ctx context.Context, req *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error) {
 	return c.get.CallUnary(ctx, req)
 }
 
@@ -640,7 +640,7 @@ type FabricControllerHandler interface {
 	// Deprecated: do not use.
 	Update(context.Context, *connect_go.Request[v1.Service]) (*connect_go.Response[v1.ServiceInfo], error)
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
-	Get(context.Context, *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error)
+	Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error)
 	// Deprecated: do not use.
 	Delete(context.Context, *connect_go.Request[v1.DeleteRequest]) (*connect_go.Response[v1.DeleteResponse], error)
 	Destroy(context.Context, *connect_go.Request[v1.DestroyRequest]) (*connect_go.Response[v1.DestroyResponse], error)
@@ -995,7 +995,7 @@ func (UnimplementedFabricControllerHandler) Deploy(context.Context, *connect_go.
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Deploy is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) Get(context.Context, *connect_go.Request[v1.ServiceID]) (*connect_go.Response[v1.ServiceInfo], error) {
+func (UnimplementedFabricControllerHandler) Get(context.Context, *connect_go.Request[v1.GetRequest]) (*connect_go.Response[v1.ServiceInfo], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Get is not implemented"))
 }
 
