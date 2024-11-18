@@ -5,6 +5,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type ShowAccountData struct {
@@ -12,7 +14,7 @@ type ShowAccountData struct {
 	AccountID      string
 	Details        string
 	Region         string
-	SubscriberTier string
+	SubscriberTier defangv1.SubscriptionTier
 	Tenant         string
 }
 
@@ -30,9 +32,7 @@ func showAccountInfo(showData ShowAccountData) (string, error) {
 		outputText += "\n\tTenant: " + showData.Tenant
 	}
 
-	if showData.SubscriberTier != "" {
-		outputText += "\n\tSubscription Tier: " + showData.SubscriberTier
-	}
+	outputText += "\n\tSubscription Tier: " + pkg.SubscriptionTierToString(showData.SubscriberTier)
 
 	if showData.Region != "" {
 		outputText += "\n\tRegion: " + showData.Region
@@ -69,7 +69,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 
 	showData.Details = account.Details()
 	showData.Provider = account.Provider().Name()
-	showData.SubscriberTier = pkg.SubscriptionTierToString(resp.Tier)
+	showData.SubscriberTier = resp.Tier
 	showData.Tenant = resp.Tenant
 
 	return showAccountInfo(showData)
