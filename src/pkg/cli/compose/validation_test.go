@@ -211,9 +211,10 @@ func TestXDefangPostgres(t *testing.T) {
 				"x-defang-postgres": map[string]any{
 					"maintenance-window": "Mon:23:00-Tue:01:00",
 					"retention": map[string]any{
-						"number-of-days-to-keep": 7,
-						"restore-on-startup":     true,
-						"save-on-deprovisioning": true,
+						"backup-window":               "23:30-00:30",
+						"retention-period":            7,
+						"final-snapshot-name":         "final-snapshot",
+						"snapshot-to-load-on-startup": "load-snapsot",
 					},
 				},
 			}}
@@ -242,55 +243,78 @@ func TestXDefangPostgresParams(t *testing.T) {
 				"retention":          123,
 			},
 			errors: []string{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'",
-				"'retention' must contain 'number-of-days-to-keep', 'restore-on-startup', and 'save-on-deprovisioning' fields"},
+				"'retention' should contain 'backup-window', 'retention-period', 'final-snapshot-name', or 'snapshot-to-load-on-startup' fields"},
 		},
 		{
-			name: "invalid day",
+			name: "valid maintenance-window",
 			extension: map[string]any{
 				"maintenance-window": "Mon:23:00-Tue:01:00",
 				"retention":          nil,
 			},
-			errors: []string{"'day-of-week' must be a day of the week"},
+			errors: []string{},
 		},
 		{
-			name: "invalid number-of-days-to-keep",
+			name: "invalid backup-window",
 			extension: map[string]any{
 				"maintenance-window": nil,
-				"retention":          map[string]any{"number-of-days-to-keep": "A", "restore-on-startup": true, "save-on-deprovisioning": true},
+				"retention": map[string]any{
+					"backup-window":               "23:30-23:00",
+					"retention-period":            7,
+					"final-snapshot-name":         "final-snapshot",
+					"snapshot-to-load-on-startup": "old-snapshot",
+				},
 			},
-			errors: []string{"'number-of-days-to-keep' must be a number"},
+			errors: []string{"'backup-window' must be in \"HH:MM-HH:MM\" format"},
 		},
 		{
-			name: "invalid restore-on-startup",
+			name: "invalid retention-period",
 			extension: map[string]any{
 				"maintenance-window": nil,
-				"retention":          map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": "abc", "save-on-deprovisioning": true},
+				"retention": map[string]any{
+					"backup-window":               "23:30-00:30",
+					"retention-period":            "A",
+					"final-snapshot-name":         "final-snapshot",
+					"snapshot-to-load-on-startup": "old-snapshot",
+				},
 			},
-			errors: []string{"'restore-on-startup' must be set to true or false"},
+			errors: []string{"'retention-period' must be a number"},
 		},
 		{
-			name: "invalid save-on-deprovisioning",
+			name: "invalid final-snapshot-name",
 			extension: map[string]any{
 				"maintenance-window": nil,
-				"retention":          map[string]any{"number-of-days-to-keep": 1, "restore-on-startup": true, "save-on-deprovisioning": "abc"},
+				"retention": map[string]any{
+					"backup-window":               "23:30-00:30",
+					"retention-period":            7,
+					"final-snapshot-name":         1234,
+					"snapshot-to-load-on-startup": "old-snapshot",
+				},
 			},
-			errors: []string{"'save-on-deprovisioning' must be set to true or false"},
+			errors: []string{"'final-snapshot-name' must be a string"},
 		},
 		{
-			name: "missing number-of-days-to-keep",
+			name: "invalid snapshot-to-load-on-startup",
 			extension: map[string]any{
 				"maintenance-window": nil,
-				"retention":          map[string]any{"restore-on-startup": true, "save-on-deprovisioning": true},
+				"retention": map[string]any{
+					"backup-window":               "23:30-00:30",
+					"retention-period":            7,
+					"final-snapshot-name":         "final-snapshot",
+					"snapshot-to-load-on-startup": 123,
+				},
 			},
-			errors: []string{"missing 'number-of-days-to-keep' field"},
+			errors: []string{"'snapshot-to-load-on-startup' must be a string"},
 		},
 		{
-			name: "missing number-of-days-to-keep and restore-on-startup",
+			name: "missing retention-period and backup-window",
 			extension: map[string]any{
 				"maintenance-window": nil,
-				"retention":          map[string]any{"save-on-deprovisioning": true},
+				"retention": map[string]any{
+					"final-snapshot-name":         "final-snapshot",
+					"snapshot-to-load-on-startup": "load-snapshot",
+				},
 			},
-			errors: []string{"missing 'number-of-days-to-keep' field", "missing 'restore-on-startup' field"},
+			errors: []string{"missing 'backup-window' field", "missing 'retention-period' field"},
 		},
 	}
 

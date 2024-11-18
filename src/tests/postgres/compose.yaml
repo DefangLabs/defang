@@ -2,12 +2,12 @@ services:
   x:
     image: postgres
     x-defang-postgres:
-      maintenance-window: "Mon:00:00-Mon:01:00"
+      maintenance-window: Mon:00:00-Mon:01:00
       retention:
-        number-of-days-to-keep: 30
-        restore-on-startup: true
-        save-on-deprovisioning: true
-
+        backup-window: 23:30-00:30
+        retention-period: 30
+        final-snapshot-name: final-snapshot
+        snapshot-to-load-on-startup: old-snapshot
   y:
     image: example
     x-defang-postgres:

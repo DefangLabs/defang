@@ -467,7 +467,7 @@ func ValidatePostgres(postgres any) error {
 
 				retentionProps, ok := retention.(map[string]any)
 				if !ok {
-					errPostgres.Add("'retention' must contain 'number-of-days-to-keep', 'restore-on-startup', and 'save-on-deprovisioning' fields")
+					errPostgres.Add("'retention' should contain 'backup-window', 'retention-period', 'final-snapshot-name', or 'snapshot-to-load-on-startup' fields")
 					continue
 				}
 				err := ValidateRetention(retentionProps)
@@ -486,14 +486,14 @@ func ValidatePostgres(postgres any) error {
 
 func ValidateMaintentance(maintenance any) ErrPostgresParam {
 	pattern := `^(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)-(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)$`
-	regex := regexp.MustCompile(pattern)
+	maintWindowRegex := regexp.MustCompile(pattern)
 
 	maintWindow, ok := maintenance.(string)
 	if !ok {
 		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
 	}
 
-	if !regex.MatchString(maintWindow) {
+	if !maintWindowRegex.MatchString(maintWindow) {
 		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
 	}
 
@@ -501,22 +501,43 @@ func ValidateMaintentance(maintenance any) ErrPostgresParam {
 }
 
 func ValidateRetention(retention map[string]any) ErrPostgresParam {
+	pattern := `^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$`
+	backupRegex := regexp.MustCompile(pattern)
+
 	errPostgres := ErrPostgresParam{}
 
-	for _, key := range []string{"restore-on-startup", "save-on-deprovisioning", "number-of-days-to-keep"} {
+	for _, key := range []string{"backup-window", "retention-period", "final-snapshot-name", "snapshot-to-load-on-startup"} {
 		switch key {
-		case "restore-on-startup", "save-on-deprovisioning":
+		case "backup-window":
 			value, ok := retention[key]
 			if !ok {
 				errPostgres.Add(fmt.Sprintf("missing '%s' field", key))
 				continue
 			}
 
-			if _, ok := value.(bool); !ok {
-				errPostgres.Add(fmt.Sprintf("'%s' must be set to true or false", key))
+			backupStr, ok := value.(string)
+			if !ok {
+				errPostgres.Add(fmt.Sprintf("'%s' must be a string", key))
 				continue
 			}
-		case "number-of-days-to-keep":
+
+			if !backupRegex.MatchString(backupStr) {
+				errPostgres.Add(fmt.Sprintf("'%s' must be in \"HH:MM-HH:MM\" format", key))
+				continue
+			}
+
+		case "final-snapshot-name", "snapshot-to-load-on-startup":
+			value, ok := retention[key]
+			if !ok {
+				errPostgres.Add(fmt.Sprintf("missing '%s' field", key))
+				continue
+			}
+
+			if _, ok := value.(string); !ok {
+				errPostgres.Add(fmt.Sprintf("'%s' must be a string", key))
+				continue
+			}
+		case "retention-period":
 			value, ok := retention[key]
 			if !ok {
 				errPostgres.Add(fmt.Sprintf("missing '%s' field", key))
