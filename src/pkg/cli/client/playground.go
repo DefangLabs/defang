@@ -16,6 +16,10 @@ type PlaygroundProvider struct {
 
 var _ Provider = (*PlaygroundProvider)(nil)
 
+func (g *PlaygroundProvider) DriverName() string {
+	return "playground"
+}
+
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
