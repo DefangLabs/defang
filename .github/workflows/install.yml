@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Install defang (latest)
-        run: . <(curl -Ls https://s.defang.io/install)
+        run: eval "$(curl -Ls https://s.defang.io/install)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # avoid rate limiting
 
@@ -24,7 +24,7 @@ jobs:
         run: defang --version
 
       - name: Install defang (specific version)
-        run: . <(curl -Ls https://s.defang.io/install)
+        run: eval "$(curl -Ls https://s.defang.io/install)"
         env:
           DEFANG_INSTALL_VERSION: v0.5.36
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # alt name
