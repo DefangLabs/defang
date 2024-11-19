@@ -350,8 +350,8 @@ func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.Servi
 	return app, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
-	resp := defangv1.ListServicesResponse{}
+func (b *ByocDo) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	resp := defangv1.GetServicesResponse{}
 	_, err := b.getProjectInfo(ctx, &resp.Services, req.Project)
 	if err != nil {
 		return nil, err

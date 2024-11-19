@@ -122,7 +122,7 @@ type Provider interface {
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
-	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error)
+	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	Query(context.Context, *defangv1.DebugRequest) error
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
