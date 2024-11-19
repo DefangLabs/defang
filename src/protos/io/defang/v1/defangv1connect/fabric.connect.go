@@ -155,7 +155,7 @@ type FabricControllerClient interface {
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest]) (*connect_go.ServerStreamForClient[v1.SubscribeResponse], error)
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error)
+	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -261,7 +261,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerSubscribeProcedure,
 			opts...,
 		),
-		getServices: connect_go.NewClient[v1.GetServicesRequest, v1.ListServicesResponse](
+		getServices: connect_go.NewClient[v1.GetServicesRequest, v1.GetServicesResponse](
 			httpClient,
 			baseURL+FabricControllerGetServicesProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -412,7 +412,7 @@ type fabricControllerClient struct {
 	destroy                  *connect_go.Client[v1.DestroyRequest, v1.DestroyResponse]
 	publish                  *connect_go.Client[v1.PublishRequest, emptypb.Empty]
 	subscribe                *connect_go.Client[v1.SubscribeRequest, v1.SubscribeResponse]
-	getServices              *connect_go.Client[v1.GetServicesRequest, v1.ListServicesResponse]
+	getServices              *connect_go.Client[v1.GetServicesRequest, v1.GetServicesResponse]
 	generateFiles            *connect_go.Client[v1.GenerateFilesRequest, v1.GenerateFilesResponse]
 	startGenerate            *connect_go.Client[v1.GenerateFilesRequest, v1.StartGenerateResponse]
 	generateStatus           *connect_go.Client[v1.GenerateStatusRequest, v1.GenerateFilesResponse]
@@ -505,7 +505,7 @@ func (c *fabricControllerClient) Subscribe(ctx context.Context, req *connect_go.
 }
 
 // GetServices calls io.defang.v1.FabricController.GetServices.
-func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error) {
+func (c *fabricControllerClient) GetServices(ctx context.Context, req *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error) {
 	return c.getServices.CallUnary(ctx, req)
 }
 
@@ -648,7 +648,7 @@ type FabricControllerHandler interface {
 	Publish(context.Context, *connect_go.Request[v1.PublishRequest]) (*connect_go.Response[emptypb.Empty], error)
 	Subscribe(context.Context, *connect_go.Request[v1.SubscribeRequest], *connect_go.ServerStream[v1.SubscribeResponse]) error
 	// rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error)
+	GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error)
 	GenerateFiles(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
 	StartGenerate(context.Context, *connect_go.Request[v1.GenerateFilesRequest]) (*connect_go.Response[v1.StartGenerateResponse], error)
 	GenerateStatus(context.Context, *connect_go.Request[v1.GenerateStatusRequest]) (*connect_go.Response[v1.GenerateFilesResponse], error)
@@ -1015,7 +1015,7 @@ func (UnimplementedFabricControllerHandler) Subscribe(context.Context, *connect_
 	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Subscribe is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.ListServicesResponse], error) {
+func (UnimplementedFabricControllerHandler) GetServices(context.Context, *connect_go.Request[v1.GetServicesRequest]) (*connect_go.Response[v1.GetServicesResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetServices is not implemented"))
 }
 

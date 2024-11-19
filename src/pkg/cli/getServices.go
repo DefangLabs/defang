@@ -23,21 +23,21 @@ func GetServices(ctx context.Context, loader client.Loader, provider client.Prov
 	}
 	term.Debugf("Listing services in project %q", projectName)
 
-	serviceList, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
+	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
 		return err
 	}
 
-	if len(serviceList.Services) == 0 {
+	if len(servicesResponse.Services) == 0 {
 		return ErrNoServices{ProjectName: projectName}
 	}
 
 	if !long {
-		for _, si := range serviceList.Services {
+		for _, si := range servicesResponse.Services {
 			*si = defangv1.ServiceInfo{Service: &defangv1.Service{Name: si.Service.Name}}
 		}
 	}
 
-	PrintObject("", serviceList)
+	PrintObject("", servicesResponse)
 	return nil
 }

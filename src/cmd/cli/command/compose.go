@@ -326,7 +326,7 @@ func makeComposeConfigCmd() *cobra.Command {
 	}
 }
 
-func makeComposeLsCmd() *cobra.Command {
+func makeComposePsCmd() *cobra.Command {
 	getServicesCmd := &cobra.Command{
 		Use:         "ps",
 		Annotations: authNeededAnnotation,
@@ -464,7 +464,7 @@ services:
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
-	composeCmd.AddCommand(makeComposeLsCmd())
+	composeCmd.AddCommand(makeComposePsCmd())
 	composeCmd.AddCommand(makeComposeLogsCmd())
 
 	// deprecated, will be removed in future releases

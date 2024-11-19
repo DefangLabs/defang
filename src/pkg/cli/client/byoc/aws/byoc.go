@@ -611,13 +611,13 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*de
 	return &projUpdate, nil
 }
 
-func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
 
-	listServiceResp := defangv1.ListServicesResponse{}
+	listServiceResp := defangv1.GetServicesResponse{}
 	if projUpdate != nil {
 		listServiceResp.Services = projUpdate.Services
 		listServiceResp.Project = projUpdate.Project

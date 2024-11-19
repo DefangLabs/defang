@@ -22,8 +22,8 @@ func (g *grpcDestroyMockHandler) Delete(context.Context, *connect.Request[defang
 	}), nil
 }
 
-func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.ListServicesResponse], error) {
-	return connect.NewResponse(&defangv1.ListServicesResponse{
+func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
+	return connect.NewResponse(&defangv1.GetServicesResponse{
 		Project: "tenantx",
 		Services: []*defangv1.ServiceInfo{
 			{
