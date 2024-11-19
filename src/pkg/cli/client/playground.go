@@ -24,7 +24,7 @@ func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRe
 	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
@@ -32,7 +32,7 @@ func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteReq
 	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	return getMsg(g.client.GetServices(ctx, connect.NewRequest(req)))
 }
 
@@ -78,6 +78,8 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyR
 	for _, service := range servicesList.Services {
 		names = append(names, service.Service.Name)
 	}
+
+	// FIXME: use Destroy rpc instead of Delete rpc
 	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: req.Project, Names: names})
 	if err != nil {
 		return "", err
@@ -122,6 +124,7 @@ func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req Pr
 
 type PlaygroundAccountInfo struct{}
 
-func (g PlaygroundAccountInfo) AccountID() string { return "playground" }
-func (g PlaygroundAccountInfo) Region() string    { return "us-west-2" } // Hardcoded for now for prod1
-func (g PlaygroundAccountInfo) Details() string   { return "" }
+func (g PlaygroundAccountInfo) AccountID() string    { return "" }
+func (g PlaygroundAccountInfo) Details() string      { return "" }
+func (g PlaygroundAccountInfo) Provider() ProviderID { return ProviderDefang }
+func (g PlaygroundAccountInfo) Region() string       { return "us-west-2" } // Hardcoded for now for prod1

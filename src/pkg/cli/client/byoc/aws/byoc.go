@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -74,6 +75,18 @@ func (e ErrMissingAwsCreds) Unwrap() error {
 	return e.err
 }
 
+type ErrMissingAwsRegion struct {
+	err error
+}
+
+func (e ErrMissingAwsRegion) Error() string {
+	return "missing AWS region: set AWS_REGION or edit your AWS profile (https://docs.defang.io/docs/providers/aws#region)"
+}
+
+func (e ErrMissingAwsRegion) Unwrap() error {
+	return e.err
+}
+
 func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
@@ -81,6 +94,9 @@ func AnnotateAwsError(err error) error {
 	term.Debug("AWS error:", err)
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCreds{err})
+	}
+	if strings.Contains(err.Error(), "missing AWS region:") {
+		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsRegion{err})
 	}
 	if cerr := new(aws.ErrNoSuchKey); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
@@ -409,6 +425,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
+
 	return AWSAccountInfo{
 		region:    cfg.Region,
 		accountID: *identity.Account,
@@ -426,6 +443,10 @@ func (i AWSAccountInfo) AccountID() string {
 	return i.accountID
 }
 
+func (i AWSAccountInfo) Provider() client.ProviderID {
+	return client.ProviderAWS
+}
+
 func (i AWSAccountInfo) Region() string {
 	return i.region
 }
@@ -434,7 +455,7 @@ func (i AWSAccountInfo) Details() string {
 	return i.arn
 }
 
-func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) GetService(ctx context.Context, s *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: s.Project})
 	if err != nil {
 		return nil, err
@@ -590,13 +611,13 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*de
 	return &projUpdate, nil
 }
 
-func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
 
-	listServiceResp := defangv1.ListServicesResponse{}
+	listServiceResp := defangv1.GetServicesResponse{}
 	if projUpdate != nil {
 		listServiceResp.Services = projUpdate.Services
 		listServiceResp.Project = projUpdate.Project
@@ -661,7 +682,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service) {
+	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
 		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
 		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) {
 			for _, event := range logEvents {
@@ -696,6 +717,11 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	// FillOutputs is needed to get the CD task ARN
+	if err := b.driver.FillOutputs(ctx); err != nil {
+		return nil, AnnotateAwsError(err)
+	}
+
 	etag := req.Etag
 	// if etag == "" && req.Service == "cd" {
 	// 	etag = awsecs.GetTaskID(b.cdTaskArn); TODO: find the last CD task
@@ -709,6 +735,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
 	stopWhenCDTaskDone := false
+	logType := logs.LogType(req.LogType)
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
@@ -720,7 +747,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service)...)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, logType)...)
 		taskArn = b.lastCdTaskArn
 	}
 	if err != nil {
@@ -746,25 +773,34 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service string) []ecs.LogGroupInput {
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service string, logType logs.LogType) []ecs.LogGroupInput {
+	var groups []ecs.LogGroupInput
 	var serviceLogsPrefix string
 	if service != "" {
 		serviceLogsPrefix = service + "/" + service + "_" + etag
 	}
-	// Tail CD, kaniko, and all services (this requires ProjectName to be set)
-	kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
-	term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
-	servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
-	term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
-	ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-	term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
-	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
-	// If we know the CD task ARN, only tail the logstream for that CD task
-	if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
-		cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+	// Tail CD and kaniko
+	if logType.Has(logs.LogTypeBuild) {
+		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
+		// If we know the CD task ARN, only tail the logstream for that CD task
+		if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
+			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+		}
+		groups = append(groups, cdTail)
+		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
+		groups = append(groups, kanikoTail)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
+		groups = append(groups, ecsTail)
 	}
-	term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-	return []ecs.LogGroupInput{cdTail, kanikoTail, servicesTail, ecsTail} // more or less in chronological order
+	if logType.Has(logs.LogTypeRun) {
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
+		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
+		groups = append(groups, servicesTail)
+	}
+	return groups
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
