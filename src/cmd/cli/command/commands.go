@@ -20,6 +20,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -199,7 +200,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
-	lsCommand := makeComposeLsCmd()
+	lsCommand := makeComposePsCmd()
 	lsCommand.Use = "services"
 	// TODO: when we add multi-project support to the playground, differentiate
 	// between ls and ps
@@ -828,6 +829,7 @@ var deleteCmd = &cobra.Command{
 			Since:   since,
 			Raw:     false,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), loader, provider, tailParams)
 	},
@@ -1006,6 +1008,7 @@ var cdPreviewCmd = &cobra.Command{
 		return cli.Tail(cmd.Context(), loader, provider, cli.TailOptions{
 			Etag:    resp.Etag,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		})
 	},
 }
