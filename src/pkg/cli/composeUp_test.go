@@ -39,6 +39,10 @@ func (d deployMock) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*d
 	return &defangv1.DeployResponse{Services: services}, nil
 }
 
+func (b deployMock) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+	return client.PlaygroundAccountInfo{}, nil
+}
+
 func (d deployMock) DriverName() string {
 	return "mock"
 }
