@@ -74,6 +74,18 @@ func (e ErrMissingAwsCreds) Unwrap() error {
 	return e.err
 }
 
+type ErrMissingAwsRegion struct {
+	err error
+}
+
+func (e ErrMissingAwsRegion) Error() string {
+	return "missing AWS region: set AWS_REGION or edit your AWS profile (https://docs.defang.io/docs/providers/aws#region)"
+}
+
+func (e ErrMissingAwsRegion) Unwrap() error {
+	return e.err
+}
+
 func AnnotateAwsError(err error) error {
 	if err == nil {
 		return nil
@@ -81,6 +93,9 @@ func AnnotateAwsError(err error) error {
 	term.Debug("AWS error:", err)
 	if strings.Contains(err.Error(), "get credentials:") {
 		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCreds{err})
+	}
+	if strings.Contains(err.Error(), "missing AWS region:") {
+		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsRegion{err})
 	}
 	if cerr := new(aws.ErrNoSuchKey); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
