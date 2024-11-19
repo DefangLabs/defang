@@ -32,7 +32,7 @@ func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteReq
 	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
-func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	return getMsg(g.client.GetServices(ctx, connect.NewRequest(req)))
 }
 

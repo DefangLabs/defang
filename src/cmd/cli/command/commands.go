@@ -198,7 +198,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
-	lsCommand := makeComposeLsCmd()
+	lsCommand := makeComposePsCmd()
 	lsCommand.Use = "services"
 	// TODO: when we add multi-project support to the playground, differentiate
 	// between ls and ps

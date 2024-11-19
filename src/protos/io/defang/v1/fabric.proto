@@ -38,7 +38,7 @@ service FabricController {
   }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(GetServicesRequest) returns (ListServicesResponse) {
+  rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
@@ -378,9 +378,10 @@ message TailResponse {
   string host = 5;
 }
 
-message ListServicesResponse {
+message GetServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
+  google.protobuf.Timestamp expires_at = 3;
 }
 
 message ProjectUpdate {
