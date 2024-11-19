@@ -104,7 +104,7 @@ func Execute(ctx context.Context) error {
 
 		var cerr *cli.CancelError
 		if errors.As(err, &cerr) {
-			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
+			printDefangHint("To continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
