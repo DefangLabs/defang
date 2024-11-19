@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -138,6 +139,7 @@ func makeComposeUpCmd() *cobra.Command {
 				Since:   since,
 				Raw:     false,
 				Verbose: verbose,
+				LogType: logs.LogTypeAll,
 			}
 
 			// blocking call to tail
@@ -288,6 +290,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Raw:                false,
 				EndEventDetectFunc: endLogDetectFunc,
 				Verbose:            verbose,
+				LogType:            logs.LogTypeAll,
 			}
 
 			err = cli.Tail(cmd.Context(), loader, provider, tailParams)
@@ -378,6 +381,8 @@ func makeComposeLogsCmd() *cobra.Command {
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
 			}
+			var logType logs.LogType
+			cmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -398,12 +403,20 @@ func makeComposeLogsCmd() *cobra.Command {
 			if len(name) > 0 {
 				services = strings.Split(name, ",")
 			}
+
+			if logType == logs.LogTypeUnspecified {
+				logType = logs.LogTypeRun
+			}
+
+			term.Debug("logType", logType)
+
 			tailOptions := cli.TailOptions{
 				Services: services,
 				Etag:     etag,
 				Since:    ts,
 				Raw:      raw,
 				Verbose:  verbose,
+				LogType:  logType,
 			}
 
 			loader := configureLoader(cmd)
@@ -419,6 +432,10 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	var logType logs.LogType
+	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
+	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
+	logsCmd.Flags().MarkHidden("pattern")
 	return logsCmd
 }
 
