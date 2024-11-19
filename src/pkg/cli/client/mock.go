@@ -7,6 +7,7 @@ import (
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type MockProvider struct {
@@ -83,6 +84,24 @@ func (m MockFabricClient) DeleteSubdomainZone(ctx context.Context) error {
 
 func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
+}
+
+func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.Deployment) error {
+	return nil
+}
+
+func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
+	return &defangv1.ListDeploymentsResponse{
+		Deployments: []*defangv1.Deployment{
+			{
+				Id:                "a1b2c3",
+				Project:           "test",
+				Provider:          "aws",
+				ProviderAccountId: "1234567890",
+				Timestamp:         timestamppb.Now(),
+			},
+		},
+	}, nil
 }
 
 type MockLoader struct {
