@@ -478,22 +478,6 @@ func ValidatePostgres(postgres any) error {
 	return nil
 }
 
-func ValidateMaintentance(maintenance any) ErrPostgresParam {
-	pattern := `^(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)-(Mon|Tue|Wed|Thu|Fri|Sat|Sun):([01]\d|2[0-3]):([0-5]\d)$`
-	maintWindowRegex := regexp.MustCompile(pattern)
-
-	maintWindow, ok := maintenance.(string)
-	if !ok {
-		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
-	}
-
-	if !maintWindowRegex.MatchString(maintWindow) {
-		return ErrPostgresParam{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'"}
-	}
-
-	return nil
-}
-
 func ValidateRetention(retention map[string]any) ErrPostgresParam {
 	pattern := `^\d+d$`
 	retentionDaysRegex := regexp.MustCompile(pattern)
