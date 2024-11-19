@@ -544,8 +544,8 @@ func ValidateRetention(retention map[string]any) ErrPostgresParam {
 				continue
 			}
 
-			if !pkg.IsNumber(value) {
-				errPostgres.Add(fmt.Sprintf("'%s' must be a number", key))
+			if _, ok = value.(int); !ok {
+				errPostgres.Add(fmt.Sprintf("'%s' must be number of whole days", key))
 				continue
 			}
 		}

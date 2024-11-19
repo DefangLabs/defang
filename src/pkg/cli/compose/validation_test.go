@@ -277,7 +277,7 @@ func TestXDefangPostgresParams(t *testing.T) {
 					"snapshot-to-load-on-startup": "old-snapshot",
 				},
 			},
-			errors: []string{"'retention-period' must be a number"},
+			errors: []string{"'retention-period' must be number of whole days"},
 		},
 		{
 			name: "invalid final-snapshot-name",
