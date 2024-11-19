@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -827,6 +828,7 @@ var deleteCmd = &cobra.Command{
 			Since:   since,
 			Raw:     false,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), loader, provider, tailParams)
 	},
@@ -1005,6 +1007,7 @@ var cdPreviewCmd = &cobra.Command{
 		return cli.Tail(cmd.Context(), loader, provider, cli.TailOptions{
 			Etag:    resp.Etag,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		})
 	},
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -681,7 +682,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service) {
+	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
 		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
 		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) {
 			for _, event := range logEvents {
@@ -734,6 +735,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	var taskArn ecs.TaskArn
 	var eventStream ecs.EventStream
 	stopWhenCDTaskDone := false
+	logType := logs.LogType(req.LogType)
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		eventStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
@@ -745,7 +747,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service)...)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, logType)...)
 		taskArn = b.lastCdTaskArn
 	}
 	if err != nil {
@@ -771,25 +773,34 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service string) []ecs.LogGroupInput {
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service string, logType logs.LogType) []ecs.LogGroupInput {
+	var groups []ecs.LogGroupInput
 	var serviceLogsPrefix string
 	if service != "" {
 		serviceLogsPrefix = service + "/" + service + "_" + etag
 	}
-	// Tail CD, kaniko, and all services (this requires ProjectName to be set)
-	kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
-	term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
-	servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
-	term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
-	ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-	term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
-	cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
-	// If we know the CD task ARN, only tail the logstream for that CD task
-	if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
-		cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+	// Tail CD and kaniko
+	if logType.Has(logs.LogTypeBuild) {
+		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
+		// If we know the CD task ARN, only tail the logstream for that CD task
+		if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
+			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+		}
+		groups = append(groups, cdTail)
+		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
+		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
+		groups = append(groups, kanikoTail)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
+		groups = append(groups, ecsTail)
 	}
-	term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-	return []ecs.LogGroupInput{cdTail, kanikoTail, servicesTail, ecsTail} // more or less in chronological order
+	if logType.Has(logs.LogTypeRun) {
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
+		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
+		groups = append(groups, servicesTail)
+	}
+	return groups
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
