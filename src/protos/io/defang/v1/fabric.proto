@@ -81,6 +81,11 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
 
+  rpc PutDeployment(Deployment) returns (google.protobuf.Empty);
+  rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
@@ -325,6 +330,29 @@ message ListConfigsRequest {
 }
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
+
+enum DeploymentState {
+  DEPLOYMENT_STATE_UNKNOWN = 0;
+  DEPLOYMENT_STATE_STARTED = 1;
+  DEPLOYMENT_STATE_COMPLETED = 2;
+  DEPLOYMENT_STATE_FAILED = 3;
+}
+
+message ListDeploymentsRequest {
+  string project = 1;
+}
+
+message Deployment {
+  string id = 1;
+  string project = 2;
+  string provider = 3;
+  string provider_account_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message ListDeploymentsResponse {
+  repeated Deployment deployments = 1;
+}
 
 message TokenRequest {
   string tenant = 1;
