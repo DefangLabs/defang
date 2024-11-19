@@ -454,7 +454,7 @@ func (i AWSAccountInfo) Details() string {
 	return i.arn
 }
 
-func (b *ByocAws) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocAws) GetService(ctx context.Context, s *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: s.Project})
 	if err != nil {
 		return nil, err
