@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -1110,7 +1111,7 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 			providerID = cliClient.ProviderDefang
 		}
 	case cliClient.ProviderAWS:
-		if !awsInEnv() {
+		if !awsInEnv() && !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment variables are not set")
 		}
 	case cliClient.ProviderDO:
@@ -1128,6 +1129,11 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 	return provider, nil
+}
+
+func awsInConfig(ctx context.Context) bool {
+	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
+	return err == nil
 }
 
 func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
