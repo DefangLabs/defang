@@ -209,10 +209,9 @@ func TestXDefangPostgres(t *testing.T) {
 		service := composeTypes.ServiceConfig{
 			Extensions: composeTypes.Extensions{
 				"x-defang-postgres": map[string]any{
-					"maintenance-window": "Mon:23:00-Tue:01:00",
+					"allow-downtime": true,
 					"retention": map[string]any{
-						"backup-window":               "23:30-00:30",
-						"retention-period":            7,
+						"retention-period":            "7d",
 						"final-snapshot-name":         "final-snapshot",
 						"snapshot-to-load-on-startup": "load-snapsot",
 					},
@@ -239,53 +238,47 @@ func TestXDefangPostgresParams(t *testing.T) {
 		{
 			name: "invalid maintentance and retention",
 			extension: map[string]any{
-				"maintenance-window": "abc",
-				"retention":          123,
+				"allow-downtime": "abc",
+				"retention":      123,
 			},
-			errors: []string{"'maintenance-window' must be a string in the format 'ddd:HH:MM-ddd:HH:MM'",
-				"'retention' should contain 'backup-window', 'retention-period', 'final-snapshot-name', or 'snapshot-to-load-on-startup' fields"},
+			errors: []string{"'allow-downtime' must be a boolean",
+				"'retention' should contain 'retention-period', 'final-snapshot-name', and/or 'snapshot-to-load-on-startup' fields"},
 		},
 		{
-			name: "valid maintenance-window",
+			name: "valid allow-downtime",
 			extension: map[string]any{
-				"maintenance-window": "Mon:23:00-Tue:01:00",
-				"retention":          nil,
+				"allow-downtime": false,
+				"retention":      nil,
 			},
 			errors: []string{},
 		},
 		{
-			name: "invalid backup-window",
+			name: "invalid retention-period as number",
 			extension: map[string]any{
-				"maintenance-window": nil,
 				"retention": map[string]any{
-					"backup-window":               "23:30-23:00",
 					"retention-period":            7,
 					"final-snapshot-name":         "final-snapshot",
 					"snapshot-to-load-on-startup": "old-snapshot",
 				},
 			},
-			errors: []string{"'backup-window' must be in \"HH:MM-HH:MM\" format"},
+			errors: []string{"'retention-period' must be string in the format of '<number of days>d'"},
 		},
 		{
 			name: "invalid retention-period",
 			extension: map[string]any{
-				"maintenance-window": nil,
 				"retention": map[string]any{
-					"backup-window":               "23:30-00:30",
-					"retention-period":            "A",
+					"retention-period":            "a",
 					"final-snapshot-name":         "final-snapshot",
 					"snapshot-to-load-on-startup": "old-snapshot",
 				},
 			},
-			errors: []string{"'retention-period' must be number of whole days"},
+			errors: []string{"'retention-period' must be string in the format of '<number of days>d'"},
 		},
 		{
 			name: "invalid final-snapshot-name",
 			extension: map[string]any{
-				"maintenance-window": nil,
 				"retention": map[string]any{
-					"backup-window":               "23:30-00:30",
-					"retention-period":            7,
+					"retention-period":            "7d",
 					"final-snapshot-name":         1234,
 					"snapshot-to-load-on-startup": "old-snapshot",
 				},
@@ -295,10 +288,8 @@ func TestXDefangPostgresParams(t *testing.T) {
 		{
 			name: "invalid snapshot-to-load-on-startup",
 			extension: map[string]any{
-				"maintenance-window": nil,
 				"retention": map[string]any{
-					"backup-window":               "23:30-00:30",
-					"retention-period":            7,
+					"retention-period":            "7d",
 					"final-snapshot-name":         "final-snapshot",
 					"snapshot-to-load-on-startup": 123,
 				},
@@ -306,15 +297,30 @@ func TestXDefangPostgresParams(t *testing.T) {
 			errors: []string{"'snapshot-to-load-on-startup' must be a string"},
 		},
 		{
-			name: "missing retention-period and backup-window",
+			name: "missing retention-period",
 			extension: map[string]any{
-				"maintenance-window": nil,
 				"retention": map[string]any{
 					"final-snapshot-name":         "final-snapshot",
 					"snapshot-to-load-on-startup": "load-snapshot",
 				},
 			},
-			errors: []string{"missing 'backup-window' field", "missing 'retention-period' field"},
+			errors: []string{"'retention-period' should be defined when 'final-snapshot-name' is set"},
+		},
+		{
+			name: "no fields",
+			extension: map[string]any{
+				"retention": map[string]any{},
+			},
+			errors: []string{},
+		},
+		{
+			name: "missing final-snapshot-name and snapshot-to-load-on-startup",
+			extension: map[string]any{
+				"retention": map[string]any{
+					"retention-period": "7d",
+				},
+			},
+			errors: []string{},
 		},
 	}
 
@@ -333,7 +339,7 @@ func TestXDefangPostgresParams(t *testing.T) {
 				}
 
 				if len(tt.errors) != len(*errPostgres) {
-					t.Fatalf("expected %d errors but got %d", len(tt.errors), len(*errPostgres))
+					t.Fatalf("expected %d errors but got %d - error: %s", len(tt.errors), len(*errPostgres), *errPostgres)
 				}
 			}
 		})

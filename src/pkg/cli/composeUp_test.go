@@ -139,23 +139,23 @@ func TestAWSPostgres(t *testing.T) {
 							t.Fatal("expecting 'retention' not a map")
 						}
 
-						for _, key := range []string{"backup-window", "retention-period", "final-snapshot-name", "snapshot-to-load-on-startup"} {
+						for _, key := range []string{"retention-period", "final-snapshot-name", "snapshot-to-load-on-startup"} {
 							if _, ok := snapshotsProps[key]; !ok {
 								t.Fatalf("expecting '%s' retention property but not defined", key)
 							}
 						}
 					}
 
-					// maintenance
+					// downtime
 					{
-						maintenance, ok := postgresProps["maintenance-window"]
+						downtime, ok := postgresProps["allow-downtime"]
 						if !ok {
 							continue
 						}
 
-						_, ok = maintenance.(string)
+						_, ok = downtime.(bool)
 						if !ok {
-							t.Fatal("expecting 'maintentance' to be a string")
+							t.Fatal("expecting 'allow-downtime' to be a boolean")
 						}
 					}
 				}
