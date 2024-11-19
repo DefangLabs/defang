@@ -6,6 +6,17 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
+func TestInitializeTailCmd(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		for _, cmd := range RootCmd.Commands() {
+			if cmd.Use == "logs" {
+				cmd.Execute()
+				return
+			}
+		}
+	})
+}
+
 func TestGetUnreferencedManagedResources(t *testing.T) {
 	t.Run("no services", func(t *testing.T) {
 		project := types.Services{}

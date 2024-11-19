@@ -381,8 +381,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
 			}
-			var logType logs.LogType
-			cmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
+			logType := cmd.Flag("type").Value.(*logs.LogType) // nolint:forcetypeassert
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -404,8 +403,8 @@ func makeComposeLogsCmd() *cobra.Command {
 				services = strings.Split(name, ",")
 			}
 
-			if logType == logs.LogTypeUnspecified {
-				logType = logs.LogTypeRun
+			if *logType == logs.LogTypeUnspecified {
+				*logType = logs.LogTypeRun
 			}
 
 			term.Debug("logType", logType)
@@ -416,7 +415,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Since:    ts,
 				Raw:      raw,
 				Verbose:  verbose,
-				LogType:  logType,
+				LogType:  *logType,
 			}
 
 			loader := configureLoader(cmd)
