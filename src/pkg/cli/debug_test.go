@@ -2,13 +2,15 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func TestDebug(t *testing.T) {
+func TestFindMathingProjectFiles(t *testing.T) {
 	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -32,4 +34,48 @@ func TestDebug(t *testing.T) {
 			t.Errorf("expected file content %q, got: %q", expected[i].Content, file.Content)
 		}
 	}
+}
+
+type MustHaveProjectNameQueryProvider struct {
+	client.Provider
+}
+
+func (m MustHaveProjectNameQueryProvider) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+	if req.Project == "" {
+		return errors.New("project name is missing")
+	}
+	return nil
+}
+
+type MockDebugFabricClient struct {
+	client.FabricClient
+}
+
+func (m MockDebugFabricClient) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
+	return &defangv1.DebugResponse{}, nil
+}
+
+func TestQueryHasProject(t *testing.T) {
+	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider := MustHaveProjectNameQueryProvider{}
+	fabricClient := MockDebugFabricClient{}
+
+	if err := Debug(context.Background(), compose.NewLoader(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	project.Name = ""
+
+	if err := Debug(context.Background(), compose.NewLoader(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
+		t.Error("expected error, got nil")
+	} else {
+		if err.Error() != "project name is missing" {
+			t.Errorf("expected error %q, got %q", "project name is missing", err.Error())
+		}
+	}
+
 }
