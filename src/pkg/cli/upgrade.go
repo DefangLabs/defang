@@ -49,7 +49,7 @@ func Upgrade(ctx context.Context) error {
 	}
 
 	// Default to the shell script
-	printInstructions(`eval "$(curl -fsSL https://s.defang.io/install)"`)
+	printInstructions(`eval "$(curl -fsSL s.defang.io/install)"`)
 
 	return nil
 }
