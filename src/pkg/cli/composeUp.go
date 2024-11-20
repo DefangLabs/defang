@@ -75,6 +75,18 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 	}
 
 	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes, DelegateDomain: delegateDomain.Zone}
+
+	delegation, err := p.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
+		DelegateDomain: delegateDomain.Zone,
+		Preview:        upload == compose.UploadModePreview,
+		Project:        project.Name,
+	})
+	if err != nil {
+		return nil, project, err
+	} else if delegation != nil {
+		deployRequest.DelegationSetId = delegation.DelegationSetId
+	}
+
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
 		resp, err = p.Preview(ctx, deployRequest)
@@ -82,19 +94,12 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 			return nil, project, err
 		}
 	} else {
-		req := client.PrepareDomainDelegationRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
-		var delegation *client.PrepareDomainDelegationResponse
-		delegation, err = p.PrepareDomainDelegation(ctx, req)
-		if err != nil {
-			return nil, project, err
-		}
 		if delegation != nil && len(delegation.NameServers) > 0 {
 			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
 			_, err = c.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
-			deployRequest.DelegationSetId = delegation.DelegationSetId
 		}
 		resp, err = p.Deploy(ctx, deployRequest)
 		if err != nil {

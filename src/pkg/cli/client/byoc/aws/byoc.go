@@ -379,6 +379,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		if zone != nil {
 			zoneId = zone.Id
 		}
+		// TODO: avoid creating the delegation set if we're in preview mode
 		delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
 		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
 		var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
