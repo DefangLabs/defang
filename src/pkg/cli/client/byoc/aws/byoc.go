@@ -823,7 +823,7 @@ func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(projectName, delegateDomain, fqn, &port))
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, projectName, delegateDomain, &port))
 			mode := defangv1.Mode_INGRESS
 			if port.Mode == compose.Mode_HOST {
 				mode = defangv1.Mode_HOST
