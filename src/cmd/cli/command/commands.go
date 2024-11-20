@@ -839,43 +839,15 @@ var deleteCmd = &cobra.Command{
 	},
 }
 
-type Deployment struct {
-	Id         string
-	Provider   string
-	DeployedAt string
-}
-
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
 	Annotations: authNeededAnnotation,
 	Hidden:      true,
 	Short:       "list deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
 		ctx := cmd.Context()
-		projectName, err := loader.LoadProjectName(ctx)
-		if err != nil {
-			return err
-		}
-
-		response, err := client.ListDeployments(cmd.Context(), &defangv1.ListDeploymentsRequest{
-			Project: projectName,
-		})
-		if err != nil {
-			return err
-		}
-
-		// map to Deployment struct
-		deployments := make([]Deployment, 0, len(response.Deployments))
-		for _, d := range response.Deployments {
-			deployments = append(deployments, Deployment{
-				Id:         d.Id,
-				Provider:   d.Provider,
-				DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-			})
-		}
-
-		return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
+		loader := configureLoader(cmd)
+		return cli.DeploymentsList(ctx, loader, client)
 	},
 }
 
