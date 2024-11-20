@@ -251,6 +251,7 @@ enum ServiceState {
   DEPLOYMENT_FAILED = 10;
 
   BUILD_FAILED = 11;
+  DEPLOYMENT_SCALED_IN = 12;
 }
 
 message ServiceInfo {
