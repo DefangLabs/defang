@@ -839,6 +839,12 @@ var deleteCmd = &cobra.Command{
 	},
 }
 
+type Deployment struct {
+	Id         string
+	Provider   string
+	DeployedAt string
+}
+
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
 	Annotations: authNeededAnnotation,
@@ -859,9 +865,17 @@ var deploymentsCmd = &cobra.Command{
 			return err
 		}
 
-		cli.PrintObject("", response)
+		// map to Deployment struct
+		deployments := make([]Deployment, 0, len(response.Deployments))
+		for _, d := range response.Deployments {
+			deployments = append(deployments, Deployment{
+				Id:         d.Id,
+				Provider:   d.Provider,
+				DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
+			})
+		}
 
-		return nil
+		return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
 	},
 }
 

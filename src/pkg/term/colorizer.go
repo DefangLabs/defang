@@ -28,11 +28,12 @@ var DefaultTerm = NewTerm(os.Stdout, os.Stderr)
 type Color = termenv.ANSIColor
 
 const (
-	BrightCyan = termenv.ANSIBrightCyan
-	InfoColor  = termenv.ANSIBrightMagenta
-	ErrorColor = termenv.ANSIBrightRed
-	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
-	DebugColor = termenv.ANSIBrightBlack // Gray
+	BrightCyan    = termenv.ANSIBrightCyan
+	InfoColor     = termenv.ANSIBrightMagenta
+	ErrorColor    = termenv.ANSIBrightRed
+	WarnColor     = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
+	DebugColor    = termenv.ANSIBrightBlack // Gray
+	ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 )
 
 func NewTerm(stdout, stderr io.Writer) *Term {
@@ -128,8 +129,6 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	return w.WriteString(msg)
 }
-
-const ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 
 func push(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 	if canColor {
