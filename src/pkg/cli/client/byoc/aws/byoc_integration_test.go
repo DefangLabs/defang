@@ -11,8 +11,6 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-var ctx = context.Background()
-
 func TestDeploy(t *testing.T) {
 	b := NewByocProvider(ctx, "ten ant") // no domain
 
