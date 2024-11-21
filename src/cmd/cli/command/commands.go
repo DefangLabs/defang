@@ -1076,6 +1076,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderDefang: "The Defang Playground is a free environment for testing only.",
 	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
 	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
+	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
 func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {

@@ -31,7 +31,6 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		return fmt.Errorf("failed to list enabled services: %w", err)
 	}
 
-	fmt.Printf("Enabling services: %v\n", apis)
 	if len(apis) == 0 {
 		return nil
 	}

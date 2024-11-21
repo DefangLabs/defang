@@ -10,16 +10,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, projectID, location, repoName string) (string, error) {
+func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string) (string, error) {
 	client, err := artifactregistry.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("artifactregistry.NewClient: %w", err)
 	}
 
-	parent := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
+	parent := fmt.Sprintf("projects/%s/locations/%s", gcp.ProjectId, gcp.Region)
 	fullRepoName := fmt.Sprintf("%s/repositories/%s", parent, repoName)
 	if resp, err := client.GetRepository(ctx, &artifactregistrypb.GetRepositoryRequest{Name: fullRepoName}); err != nil {
-		if grpcErr, ok := status.FromError(err); ok && grpcErr.Code() != codes.NotFound {
+		if IsNotFound(err) {
 			return "", fmt.Errorf("artifactregistry.GetRepository: %w", err)
 		}
 	} else if resp != nil {
@@ -45,4 +45,11 @@ func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, projectID, loca
 	}
 
 	return resp.Name, nil
+}
+
+func IsNotFound(err error) bool {
+	if grpcErr, ok := status.FromError(err); ok {
+		return grpcErr.Code() == codes.NotFound
+	}
+	return false
 }

@@ -148,12 +148,10 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 		if err != nil {
 			return nil, fmt.Errorf("client.CreateProject: %w", err)
 		}
-		fmt.Println("Creating project")
-		project, err := projectOp.Wait(ctx)
+		project, err = projectOp.Wait(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("projectOp.Wait: %w", err)
 		}
-		fmt.Println("Created project: ", project.ProjectId, project.DisplayName)
 	}
 
 	return project, nil

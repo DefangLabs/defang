@@ -28,7 +28,7 @@ func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 
 	token, err := creds.TokenSource.Token()
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve token: %v", err)
+		return "", fmt.Errorf("failed to retrieve token: %w", err)
 	}
 	idToken, ok := token.Extra("id_token").(string)
 	if !ok {
