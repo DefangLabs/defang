@@ -181,7 +181,7 @@ type resourceWithIAMPolicyClient interface {
 }
 
 func ensureServiceAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, serviceAccount string, roles []string) error {
-	serviceAccountMember := "serviceAccount:%s"+ serviceAccount
+	serviceAccountMember := "serviceAccount:%s" + serviceAccount
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for resource %s: %w", resource, err)
