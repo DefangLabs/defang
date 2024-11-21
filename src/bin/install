@@ -44,8 +44,8 @@ fi
 echo "Fetching the ${RELEASE_PATH#tags/} release of defang..."
 # Download the release information from GitHub, using the token if available, but falling back to anonymous access
 RELEASE_JSON=$([[ -n "$AUTH_HEADER" ]] &&
-    curl -sfL -H "$AUTH_HEADER" https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH ||
-    curl -sfL https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
+    curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH ||
+    curl -fsSL https://api.github.com/repos/DefangLabs/defang/releases/$RELEASE_PATH)
 
 # Check for curl failure
 if [ -z "$RELEASE_JSON" ]; then
@@ -92,7 +92,7 @@ elif [ "$OS" = "Linux" ]; then
 fi
 
 # Download the file
-if ! curl -sfL "$DOWNLOAD_URL" -o "$FILENAME"; then
+if ! curl -fsSL "$DOWNLOAD_URL" -o "$FILENAME"; then
     echo "Download failed. Please check your internet connection and try again."
     return 4
 fi
