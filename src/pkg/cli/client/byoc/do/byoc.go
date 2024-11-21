@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	awsbyoc "github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
@@ -315,7 +316,7 @@ func (b *ByocDo) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) er
 	return err
 }
 
-func (b *ByocDo) GetService(ctx context.Context, s *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocDo) GetService(ctx context.Context, s *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	//Dumps endpoint and tag. Reads the protobuff for that service. Combines with info from get app.
 	//Only used in Tail
 	app, err := b.getAppByName(ctx, s.Project)
@@ -349,8 +350,8 @@ func (b *ByocDo) getProjectInfo(ctx context.Context, services *[]*defangv1.Servi
 	return app, nil
 }
 
-func (b *ByocDo) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
-	resp := defangv1.ListServicesResponse{}
+func (b *ByocDo) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	resp := defangv1.GetServicesResponse{}
 	_, err := b.getProjectInfo(ctx, &resp.Services, req.Project)
 	if err != nil {
 		return nil, err
@@ -427,27 +428,33 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 			return nil, err
 		}
 
+		logType := logs.LogType(req.LogType)
+
 		term.Debugf("Deployment phase: %s", deploymentInfo.GetPhase())
 		switch deploymentInfo.GetPhase() {
 		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy, godo.DeploymentPhase_Deploying:
 			// Do nothing; check again in 10 seconds
 
 		case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
-			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
-			if err != nil {
-				return nil, err
+			if logType.Has(logs.LogTypeBuild) {
+				logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+				if err != nil {
+					return nil, err
+				}
+				readHistoricalLogs(ctx, logs.HistoricURLs)
 			}
-			readHistoricalLogs(ctx, logs.HistoricURLs)
 			return nil, errors.New("deployment failed")
 
 		case godo.DeploymentPhase_Active:
-			logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
-			if err != nil {
-				return nil, err
+			if logType.Has(logs.LogTypeBuild) {
+				logs, _, err := b.client.Apps.GetLogs(ctx, cdApp.ID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
+				if err != nil {
+					return nil, err
+				}
+				readHistoricalLogs(ctx, logs.HistoricURLs)
 			}
-			readHistoricalLogs(ctx, logs.HistoricURLs)
 
-			appLiveURL, err := b.processServiceLogs(ctx, req.Project)
+			appLiveURL, err := b.processServiceLogs(ctx, req.Project, logType)
 			if err != nil {
 				return nil, err
 			}
@@ -495,16 +502,24 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return DoAccountInfo{region: b.driver.Region.String(), accountID: account.Email}, nil
+	return DoAccountInfo{
+			accountID: account.Email,
+			region:    b.driver.Region.String(),
+		},
+		nil
 }
 
 type DoAccountInfo struct {
-	region    string
 	accountID string
+	region    string
 }
 
 func (i DoAccountInfo) AccountID() string {
 	return i.accountID
+}
+
+func (i DoAccountInfo) Provider() client.ProviderID {
+	return client.ProviderDO
 }
 
 func (i DoAccountInfo) Region() string {
@@ -725,7 +740,7 @@ func (b *ByocDo) processServiceInfo(service *godo.AppServiceSpec, projectName st
 	return serviceInfo
 }
 
-func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string) (string, error) {
+func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string, logType logs.LogType) (string, error) {
 	appLiveURL := ""
 
 	buildAppName := fmt.Sprintf("defang-%s-%s-build", projectName, b.PulumiStack)
@@ -738,49 +753,52 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string) (st
 	}
 
 	for _, app := range currentApps {
-		if app.Spec.Name == buildAppName {
+		if logType.Has(logs.LogTypeBuild) && app.Spec.Name == buildAppName {
 			buildLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, false, 50)
 			if err != nil {
 				return "", err
 			}
 			readHistoricalLogs(ctx, buildLogs.HistoricURLs)
 		}
+
 		if app.Spec.Name == mainAppName {
 			deployments, _, err := b.client.Apps.ListDeployments(ctx, app.ID, &godo.ListOptions{})
 			if err != nil {
 				return "", err
 			}
 
-			mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
-			if resp.StatusCode != 200 {
-				// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
-				// Create our own last deployment and return deployment logs if the deployment failed in the last 2 minutes
-				if deployments[0].Phase == godo.DeploymentPhase_Error && deployments[0].UpdatedAt.After(time.Now().Add(-2*time.Minute)) {
-					failDeployLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, deployments[0].ID, "", godo.AppLogTypeDeploy, true, 50)
-					if err != nil {
-						return "", err
+			if logType.Has(logs.LogTypeBuild) {
+				mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+				if resp.StatusCode != 200 {
+					// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
+					// Create our own last deployment and return deployment logs if the deployment failed in the last 2 minutes
+					if deployments[0].Phase == godo.DeploymentPhase_Error && deployments[0].UpdatedAt.After(time.Now().Add(-2*time.Minute)) {
+						failDeployLogs, _, err := b.client.Apps.GetLogs(ctx, app.ID, deployments[0].ID, "", godo.AppLogTypeDeploy, true, 50)
+						if err != nil {
+							return "", err
+						}
+						readHistoricalLogs(ctx, failDeployLogs.HistoricURLs)
 					}
-					readHistoricalLogs(ctx, failDeployLogs.HistoricURLs)
+					// Assume no deploy happened, return without an error
+					return "", nil
 				}
-				// Assume no deploy happened, return without an error
-				return "", nil
+				if err != nil {
+					return "", err
+				}
+				readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
 			}
-			if err != nil {
-				return "", err
+			if logType.Has(logs.LogTypeRun) {
+				mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+				if resp.StatusCode != 200 {
+					// Assume no deploy happened, return without an error
+					return "", nil
+				}
+				if err != nil {
+					return "", err
+				}
+				readHistoricalLogs(ctx, mainRunLogs.HistoricURLs)
+				appLiveURL = mainRunLogs.LiveURL
 			}
-
-			readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
-
-			mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
-			if resp.StatusCode != 200 {
-				// Assume no deploy happened, return without an error
-				return "", nil
-			}
-			if err != nil {
-				return "", err
-			}
-			readHistoricalLogs(ctx, mainRunLogs.HistoricURLs)
-			appLiveURL = mainRunLogs.LiveURL
 		}
 	}
 	return appLiveURL, nil

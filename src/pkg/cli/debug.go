@@ -72,6 +72,7 @@ func Debug(ctx context.Context, l client.Loader, c client.FabricClient, p client
 		Etag:     etag,
 		Files:    files,
 		Services: failedServices,
+		Project:  project.Name,
 	}
 	err := p.Query(ctx, &req)
 	if err != nil {

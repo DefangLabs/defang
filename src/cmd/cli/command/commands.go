@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -198,7 +199,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
-	lsCommand := makeComposeLsCmd()
+	lsCommand := makeComposePsCmd()
 	lsCommand.Use = "services"
 	// TODO: when we add multi-project support to the playground, differentiate
 	// between ls and ps
@@ -608,19 +609,17 @@ var newCmd = &cobra.Command{
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {
-	var envVars []string
-	if project != nil {
-		for _, service := range project.Services {
-			for key, value := range service.Environment {
-				if value == nil {
-					envVars = append(envVars, key)
-				}
-			}
-		}
+	if project == nil {
+		return nil // in case loading failed
 	}
-	// Deduplicate by sorting and then compacting (uniq)
-	slices.Sort(envVars)
-	return slices.Compact(envVars)
+	err := compose.ValidateProjectConfig(context.TODO(), project, func(ctx context.Context) ([]string, error) {
+		return nil, nil // assume no config
+	})
+	var missingConfig compose.ErrMissingConfig
+	if errors.As(err, &missingConfig) {
+		return missingConfig
+	}
+	return nil
 }
 
 var getVersionCmd = &cobra.Command{
@@ -829,6 +828,7 @@ var deleteCmd = &cobra.Command{
 			Since:   since,
 			Raw:     false,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), loader, provider, tailParams)
 	},
@@ -1007,6 +1007,7 @@ var cdPreviewCmd = &cobra.Command{
 		return cli.Tail(cmd.Context(), loader, provider, cli.TailOptions{
 			Etag:    resp.Etag,
 			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		})
 	},
 }
@@ -1143,7 +1144,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 			term.Warn("Unable to get selected provider:", err)
 		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 			providerID.SetEnumValue(resp.Provider)
-			return "defang server", nil
+			return "stored preference", nil
 		}
 	}
 

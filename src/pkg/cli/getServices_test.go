@@ -18,8 +18,8 @@ func (mockGetServicesProvider) LoadProjectName(ctx context.Context) (string, err
 	return "TestGetServices", nil
 }
 
-func (mockGetServicesProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
-	return &defangv1.ListServicesResponse{}, nil
+func (mockGetServicesProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
+	return &defangv1.GetServicesResponse{}, nil
 }
 
 func TestGetServices(t *testing.T) {

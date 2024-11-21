@@ -2,12 +2,52 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type ShowAccountData struct {
+	Provider       string
+	AccountID      string
+	Details        string
+	Region         string
+	SubscriberTier defangv1.SubscriptionTier
+	Tenant         string
+}
+
+func showAccountInfo(showData ShowAccountData) (string, error) {
+	if showData.Provider == "" {
+		showData.Provider = "Defang"
+	}
+	outputText := "WhoAmI - \n\tProvider: " + showData.Provider
+
+	if showData.AccountID != "" {
+		outputText += "\n\tAccountID: " + showData.AccountID
+	}
+
+	if showData.Tenant != "" {
+		outputText += "\n\tTenant: " + showData.Tenant
+	}
+
+	outputText += "\n\tSubscription Tier: " + pkg.SubscriptionTierToString(showData.SubscriberTier)
+
+	if showData.Region != "" {
+		outputText += "\n\tRegion: " + showData.Region
+	}
+
+	if showData.Details != "" {
+		outputText += "\n\tDetails: " + showData.Details
+	}
+
+	return outputText, nil
+}
+
 func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider) (string, error) {
+	showData := ShowAccountData{}
+
 	resp, err := fabric.WhoAmI(ctx)
 	if err != nil {
 		return "", err
@@ -18,23 +58,19 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return "", err
 	}
 
-	accountID := resp.Account
 	if account.AccountID() != "" {
-		accountID = account.AccountID()
+		showData.AccountID = account.AccountID()
 	}
 
-	region := resp.Region
+	showData.Region = resp.Region
 	if account.Region() != "" {
-		region = account.Region()
+		showData.Region = account.Region()
 	}
 
-	if account.Details() != "" {
-		accountID += " (" + account.Details() + ")"
-	}
+	showData.Details = account.Details()
+	showData.Provider = account.Provider().Name()
+	showData.SubscriberTier = resp.Tier
+	showData.Tenant = resp.Tenant
 
-	// TODO: Add provider name here?
-	return fmt.Sprintf(
-		"You are logged into %s region %s with tenant %q",
-		accountID, region, resp.Tenant,
-	), nil
+	return showAccountInfo(showData)
 }

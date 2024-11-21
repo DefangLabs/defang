@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -74,6 +75,7 @@ type TailOptions struct {
 	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
+	LogType            logs.LogType
 }
 
 var P = track.P
@@ -153,16 +155,20 @@ func Tail(ctx context.Context, loader client.Loader, provider client.Provider, p
 	if err != nil {
 		return err
 	}
-	term.Debugf("Tailing logs in project %q", projectName)
 	if params.Project == "" {
 		params.Project = projectName
 	}
+	if params.LogType == logs.LogTypeUnspecified {
+		params.LogType = logs.LogTypeRun
+	}
+
+	term.Debugf("Tailing %s logs in project %q", params.LogType, projectName)
 
 	if len(params.Services) > 0 {
 		for _, service := range params.Services {
 			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.ServiceID{Project: params.Project, Name: service}); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: params.Project, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
 					term.Warn("Service does not exist (yet):", service)
@@ -198,7 +204,14 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	} else {
 		since = timestamppb.New(params.Since)
 	}
-	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{Project: params.Project, Services: params.Services, Etag: params.Etag, Since: since})
+
+	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{
+		Project:  params.Project,
+		Services: params.Services,
+		Etag:     params.Etag,
+		Since:    since,
+		LogType:  uint32(params.LogType),
+	})
 	if err != nil {
 		return err
 	}

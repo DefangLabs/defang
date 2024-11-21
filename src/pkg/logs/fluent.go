@@ -19,4 +19,5 @@ type FirelensMessage struct {
 	EcsCluster        string `json:"ecs_cluster,omitempty"`         // ECS metadata
 	Etag              string `json:"etag,omitempty"`                // added by us
 	Host              string `json:"host,omitempty"`                // added by us
+	Service           string `json:"service,omitempty"`             // added by us
 }

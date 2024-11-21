@@ -24,7 +24,7 @@ service FabricController {
     option deprecated = true;
   }; // used by pulumi-defang provider; should use Deploy
   rpc Deploy(DeployRequest) returns (DeployResponse);
-  rpc Get(ServiceID) returns (ServiceInfo) {
+  rpc Get(GetRequest) returns (ServiceInfo) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be GetService
   rpc Delete(DeleteRequest) returns (DeleteResponse) {
@@ -38,7 +38,7 @@ service FabricController {
   }
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   // rpc Promote(google.protobuf.Empty) returns (google.protobuf.Empty);
-  rpc GetServices(GetServicesRequest) returns (ListServicesResponse) {
+  rpc GetServices(GetServicesRequest) returns (GetServicesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // should be ListServices
 
@@ -114,7 +114,6 @@ service FabricController {
       returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
-
 }
 
 enum Provider {
@@ -125,13 +124,9 @@ enum Provider {
   GCP = 4;
 }
 
-message GetSelectedProviderRequest {
-  string project = 1;
-}
+message GetSelectedProviderRequest { string project = 1; }
 
-message GetSelectedProviderResponse {
-  Provider provider = 1;
-}
+message GetSelectedProviderResponse { Provider provider = 1; }
 
 message SetSelectedProviderRequest {
   string project = 1;
@@ -256,6 +251,7 @@ enum ServiceState {
   DEPLOYMENT_FAILED = 10;
 
   BUILD_FAILED = 11;
+  DEPLOYMENT_SCALED_IN = 12;
 }
 
 message ServiceInfo {
@@ -362,6 +358,8 @@ message TailRequest {
   google.protobuf.Timestamp since = 2;
   string etag = 3;
   string project = 4;
+  uint32 log_type = 5;
+  string pattern = 6;
 }
 
 message LogEntry {
@@ -381,70 +379,66 @@ message TailResponse {
   string host = 5;
 }
 
-message ListServicesResponse {
+message GetServicesResponse {
   repeated ServiceInfo services = 1;
   string project = 2;
+  google.protobuf.Timestamp expires_at = 3;
 }
 
 message ProjectUpdate {
   repeated ServiceInfo services = 1;
   string alb_arn = 2;
-  string project = 3 [deprecated = true]; // deprecated; use compose.name
+  string project = 3 [ deprecated = true ]; // deprecated; use compose.name
   bytes compose = 4;
   string cd_version = 5;
 }
 
 enum Platform {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   LINUX_AMD64 = 0;
   LINUX_ARM64 = 1;
   LINUX_ANY = 2;
 }
 
-message ServiceID {
+message GetRequest { // was GetRequest
   string name = 1;
   string project = 2;
 }
 
 message Device {
-  option deprecated = true;
+  option deprecated = true;         // still used by pulumi-defang provider
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
 }
 
 message Resource {
-  option deprecated = true;
+  option deprecated = true;    // still used by pulumi-defang provider
   float memory = 1;            // in MiB
   float cpus = 2;              // fractional vCPUs
   repeated Device devices = 3; // devices & capabilities
 }
 
 message Resources {
-  option deprecated = true;
+  option deprecated = true;  // still used by pulumi-defang provider
   Resource reservations = 1; // requested resources
 
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
-  option deprecated = true;
-  uint32 replicas = 1;     // number of initial replicas
-  Resources resources = 2; // reservations and limits
+  option deprecated = true; // still used by pulumi-defang provider
+  uint32 replicas = 1;      // number of initial replicas
+  Resources resources = 2;  // reservations and limits
 
   // Placement placement = 3;
   // EndpointMode endpoint_mode
   // Mode mode
 }
 
-// message Range {
-//   uint32 from = 1;
-//   uint32 to = 2;
-// }
-
 enum Protocol {
-  option deprecated = true;
-  ANY = 0; // unspecified means any protocol
+  option deprecated = true; // still used by pulumi-defang provider
+  ANY = 0;                  // unspecified means any protocol
   UDP = 1;
   TCP = 2;
   HTTP = 3;
@@ -453,13 +447,13 @@ enum Protocol {
 }
 
 enum Mode {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   HOST = 0;    // no load-balancer; suitable for internal services and functions
   INGRESS = 1; // with load-balancer; suitable for public services
 }
 
 message Port {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
@@ -469,13 +463,13 @@ message Port {
 }
 
 message Secret {
-  option deprecated = true;
-  string source = 1; // name of the secret
+  option deprecated = true; // still used by pulumi-defang provider
+  string source = 1;        // name of the secret
   // string target = 2;
 }
 
 message Build {
-  option deprecated = true;
+  option deprecated = true;     // still used by pulumi-defang provider
   string context = 1;           // path or URL to the build context
   string dockerfile = 2;        // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
@@ -484,7 +478,7 @@ message Build {
 }
 
 message HealthCheck {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   repeated string test = 1;
   uint32 interval = 2; // in seconds
   uint32 timeout = 3;  // in seconds; must be less than interval
@@ -492,14 +486,14 @@ message HealthCheck {
 }
 
 enum Network {
-  option deprecated = true;
-  UNSPECIFIED = 0; // was: internal=false
-  PRIVATE = 1;     // was: internal=true
+  option deprecated = true; // still used by pulumi-defang provider
+  UNSPECIFIED = 0;          // was: internal=false
+  PRIVATE = 1;              // was: internal=true
   PUBLIC = 2;
 }
 
 message Service {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   string name = 1;
   string image = 2;
   Platform platform = 3;
@@ -517,19 +511,18 @@ message Service {
                         // create dns records
   StaticFiles static_files = 15; // x-defang-static-files: use a managed CDN
   Network networks = 16;         // currently only 1 network is supported
-  Redis redis = 18;              // x-defang-redis: use a managed redis
-  Postgres postgres = 19;        // x-defang-postgres: use a managed
-  string project = 20;           // defaults to tenant ID
+  repeated string aliases = 17;
+  Redis redis = 18;    // x-defang-redis: use a managed redis
+  string project = 20; // defaults to tenant ID
 }
 
 message StaticFiles {
-  option deprecated = true;
+  option deprecated = true; // still used by pulumi-defang provider
   string folder = 1;
   repeated string redirects = 2;
 }
 
 message Redis { option deprecated = true; }
-message Postgres { option deprecated = true; }
 
 // TODO: internal message; move to a separate proto file; was Event
 message DeployEvent {
@@ -572,9 +565,7 @@ message SubscribeResponse {
   ServiceState state = 4;
 }
 
-message GetServicesRequest {
-  string project = 1;
-}
+message GetServicesRequest { string project = 1; }
 
 message DelegateSubdomainZoneRequest {
   repeated string name_server_records = 1;
