@@ -239,7 +239,8 @@ _install_completion_script() {
 }
 
 _install_completion_script $SHELL || true
-[[ $0 != $SHELL ]] && _install_completion_script $0 || true
+CURRENT_SHELL=${0#-}
+[[ $CURRENT_SHELL != $SHELL ]] && _install_completion_script $CURRENT_SHELL || true
 
 # Cleanup: Remove the temporary directory
 echo "Cleaning up..."
