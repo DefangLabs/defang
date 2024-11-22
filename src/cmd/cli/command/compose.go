@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -64,6 +65,16 @@ func makeComposeUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			hasPerm, err := permissions.HasPermission(whoami.Tier, "deploy", providerID.String(), "")
+			if err != nil {
+				return err
+			}
+
+			if !hasPerm {
+				return ErrNoPermission(fmt.Sprintf("deploy to %s", providerID.String()))
+			}
+
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
 
 			if err != nil {

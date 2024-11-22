@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -48,6 +49,13 @@ const (
 var (
 	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 )
+
+type StsProviderAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
+}
+
+var StsClient StsProviderAPI
 
 type ByocAws struct {
 	*byoc.ByocBaseClient
@@ -107,13 +115,23 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
+type NewByocInterface func(ctx context.Context, tenantId types.TenantID) *ByocAws
+
+func newByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+
+	if StsClient == nil {
+		cfg := aws.PanicOnError(b.driver.LoadConfig(ctx))
+		StsClient = sts.NewFromConfig(cfg)
+	}
+
 	return b
 }
+
+var NewByocProvider NewByocInterface = newByocProvider
 
 func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
 	if b.SetupDone {
@@ -314,8 +332,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		stsClient := sts.NewFromConfig(cfg)
-		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
+		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -422,7 +439,7 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}

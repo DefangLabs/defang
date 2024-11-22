@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -30,6 +31,12 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 )
+
+type ErrNoPermission string
+
+func (e ErrNoPermission) Error() string {
+	return fmt.Sprintf("insufficient permissions to perform this action: %s", string(e))
+}
 
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
@@ -49,6 +56,7 @@ var (
 	nonInteractive = !hasTty
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
+	whoami         *defangv1.WhoAmIResponse
 )
 
 func prettyError(err error) error {
@@ -59,6 +67,20 @@ func prettyError(err error) error {
 		err = errors.Unwrap(cerr)
 	}
 	return err
+}
+
+func initWhoAmI(ctx context.Context, client cliClient.GrpcClient) error {
+	if whoami != nil {
+		return nil
+	}
+
+	resp, err := client.WhoAmI(ctx)
+	if err != nil {
+		return err
+	}
+	whoami = resp
+
+	return nil
 }
 
 func Execute(ctx context.Context) error {
@@ -327,6 +349,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
+
 			if nonInteractive {
 				return err
 			}
@@ -342,7 +365,7 @@ var RootCmd = &cobra.Command{
 
 				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
-					return nil // success
+					return initWhoAmI(cmd.Context(), client)
 				}
 			}
 
@@ -356,6 +379,11 @@ var RootCmd = &cobra.Command{
 				}
 			}
 		}
+
+		if err == nil {
+			return initWhoAmI(cmd.Context(), client)
+		}
+
 		return err
 	},
 }
@@ -665,6 +693,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
+		permissions.HasPermission(whoami.Tier, "config", providerID.String(), "")
 		if _, err := cli.LoadProjectName(cmd.Context(), loader, provider); err != nil {
 			return err
 		}
