@@ -7,6 +7,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type ErrNoPermission string
+
+func (e ErrNoPermission) Error() string {
+	return "insufficient permissions to perform this action: " + string(e)
+}
+
 type ActionPermission map[string]bool
 type PermissionQuota struct {
 	ResourceQuota float64
@@ -49,43 +55,97 @@ func createPermissionMap(rolesMap *RolesMap, role defangv1.SubscriptionTier, res
 
 func init() {
 	// Personal
-	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "deploy", false)
-	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "deploy", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "compose-down", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "compose-up", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "write-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "delete-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "delete-service", false)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "compose-down", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "compose-up", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "write-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "delete-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "delete-service", false)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "postgres", 0, "compose-up", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "compose-up", false)
 
 	// Basic
-	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 1, "deploy", true)
-	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "gpu", 0, "deploy", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "aws", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "defang", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "defang", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "defang", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "defang", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "defang", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "compose-down", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "compose-up", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "write-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "delete-config", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "delete-service", false)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "postgres", 0, "compose-up", false)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_BASIC, "gpu", 0, "compose-up", false)
 
 	// Pro
-	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 1, "deploy", true)
-	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "gpu", 1, "deploy", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "aws", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "defang", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "defang", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "defang", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "defang", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "defang", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "compose-down", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "write-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "delete-config", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "delete-service", true)
+
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "postgres", 1, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_PRO, "gpu", 1, "compose-up", true)
 
 	// Team
-	createPermissionMap(&roles, defangv1.SubscriptionTier_TEAM, "aws", 1, "deploy", true)
-	createPermissionMap(&roles, defangv1.SubscriptionTier_TEAM, "gpu", 1, "deploy", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_TEAM, "aws", 1, "compose-up", true)
+	createPermissionMap(&roles, defangv1.SubscriptionTier_TEAM, "gpu", 1, "compose-up", true)
 }
 
-func hasPermission(action ActionRequest) (bool, error) {
+func hasPermission(action ActionRequest, errorText string) error {
 	resourceMapping, ok := roles[action.role]
 	if !ok {
-		return false, fmt.Errorf("unknown subscription tier: %s", action.role)
+		return fmt.Errorf("unknown subscription tier: %s", action.role)
 	}
 
 	actionMapping, ok := resourceMapping[action.resource]
 	if !ok {
-		return false, fmt.Errorf("unknown resource: %s", action.resource)
+		return fmt.Errorf("unknown resource: %s", action.resource)
 	}
 
 	isAllowed, ok := actionMapping.Permission[action.action]
 	if !ok {
-		return false, fmt.Errorf("unknown %s user action: %s for resource %s", action.role, action.action, action.resource)
+		return fmt.Errorf("unknown %s user action: %s for resource %s", action.role, action.action, action.resource)
 	}
 
 	hasMetQuota := true
 	if len(action.detail) > 0 {
 		reqResourceAmount, err := strconv.ParseFloat(action.detail, 32)
 		if err != nil {
-			return false, fmt.Errorf("unknown %s user quota: %s for resource %s", action.role, action.detail, action.resource)
+			return fmt.Errorf("unknown %s user quota: %s for resource %s", action.role, action.detail, action.resource)
 		}
 
 		// zero resource request is always allowed
@@ -96,10 +156,14 @@ func hasPermission(action ActionRequest) (bool, error) {
 		hasMetQuota = reqResourceAmount <= actionMapping.ResourceQuota
 	}
 
-	return isAllowed && hasMetQuota, nil
+	if isAllowed && hasMetQuota {
+		return nil
+	}
+
+	return ErrNoPermission(errorText)
 }
 
-func HasPermission(role defangv1.SubscriptionTier, action string, resource string, detail string) (bool, error) {
+func HasPermission(role defangv1.SubscriptionTier, action string, resource string, detail string, errorText string) error {
 	actionReq := ActionRequest{
 		role:     role,
 		action:   action,
@@ -107,5 +171,5 @@ func HasPermission(role defangv1.SubscriptionTier, action string, resource strin
 		detail:   detail,
 	}
 
-	return hasPermission(actionReq)
+	return hasPermission(actionReq, errorText)
 }

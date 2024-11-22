@@ -66,13 +66,9 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			hasPerm, err := permissions.HasPermission(whoami.Tier, "deploy", providerID.String(), "")
-			if err != nil {
+			errorText := "no compose up to " + providerID.String()
+			if err := permissions.HasPermission(whoami.Tier, "compose-up", providerID.String(), "", errorText); err != nil {
 				return err
-			}
-
-			if !hasPerm {
-				return ErrNoPermission(fmt.Sprintf("deploy to %s", providerID.String()))
 			}
 
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
@@ -271,6 +267,12 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			errorText := "no compose down on " + providerID.String()
+			if err := permissions.HasPermission(whoami.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+				return err
+			}
+
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {

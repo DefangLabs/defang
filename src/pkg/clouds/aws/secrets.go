@@ -5,10 +5,30 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/aws/smithy-go/ptr"
 )
+
+type SsmParametersAPI interface {
+	DescribeParameters(ctx context.Context, params *ssm.DescribeParametersInput, optFns ...func(*ssm.Options)) (*ssm.DescribeParametersOutput, error)
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+	DeleteParameters(ctx context.Context, params *ssm.DeleteParametersInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParametersOutput, error)
+	GetParameters(ctx context.Context, params *ssm.GetParametersInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersOutput, error)
+	GetParametersByPath(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error)
+}
+
+var longRetryCfg = PanicOnError(config.LoadDefaultConfig(context.Background(),
+	config.WithRetryer(func() aws.Retryer {
+		// Try up to 5 times, reaching default max delay of 20s with exponential backk off on the 5th retry
+		return retry.AddWithMaxAttempts(retry.NewStandard(), 5)
+	},
+	)))
+
+var SsmClient SsmParametersAPI = ssm.NewFromConfig(longRetryCfg)
 
 // TODO: this function is pretty useless, but it's here for consistency
 func getSecretID(name string) *string {
@@ -24,14 +44,7 @@ func IsParameterNotFoundError(err error) bool {
 }
 
 func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
-	cfg, err := a.LoadConfig(ctx)
-	if err != nil {
-		return err
-	}
-
-	svc := ssm.NewFromConfig(cfg)
-
-	o, err := svc.DeleteParameters(ctx, &ssm.DeleteParametersInput{
+	o, err := SsmClient.DeleteParameters(ctx, &ssm.DeleteParametersInput{
 		Names: names, // works because getSecretID is a no-op
 	})
 	if err != nil {
@@ -44,16 +57,8 @@ func (a *Aws) DeleteSecrets(ctx context.Context, names ...string) error {
 }
 
 func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
-	cfg, err := a.LoadConfig(ctx)
-	if err != nil {
-		return false, err
-	}
-
 	secretId := getSecretID(name)
-
-	svc := ssm.NewFromConfig(cfg)
-
-	res, err := svc.DescribeParameters(ctx, &ssm.DescribeParametersInput{
+	res, err := SsmClient.DescribeParameters(ctx, &ssm.DescribeParametersInput{
 		MaxResults: ptr.Int32(1),
 		ParameterFilters: []types.ParameterStringFilter{
 			{
@@ -70,18 +75,11 @@ func (a *Aws) IsValidSecret(ctx context.Context, name string) (bool, error) {
 }
 
 func (a *Aws) PutSecret(ctx context.Context, name, value string) error {
-	cfg, err := a.LoadConfig(ctx)
-	if err != nil {
-		return err
-	}
-
 	secretId := getSecretID(name)
 	secretString := ptr.String(value)
 
-	svc := ssm.NewFromConfig(cfg)
-
 	// Call ssm:PutParameter
-	_, err = svc.PutParameter(ctx, &ssm.PutParameterInput{
+	_, err := SsmClient.PutParameter(ctx, &ssm.PutParameterInput{
 		Overwrite: ptr.Bool(true),
 		Type:      types.ParameterTypeSecureString,
 		Name:      secretId,

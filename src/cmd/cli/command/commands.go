@@ -32,12 +32,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ErrNoPermission string
-
-func (e ErrNoPermission) Error() string {
-	return fmt.Sprintf("insufficient permissions to perform this action: %s", string(e))
-}
-
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
@@ -693,7 +687,11 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		permissions.HasPermission(whoami.Tier, "config", providerID.String(), "")
+		errorText := "no writing to config"
+		if err := permissions.HasPermission(whoami.Tier, "write-config", providerID.String(), "", errorText); err != nil {
+			return err
+		}
+
 		if _, err := cli.LoadProjectName(cmd.Context(), loader, provider); err != nil {
 			return err
 		}
@@ -770,6 +768,12 @@ var configDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		errorText := "deleting config"
+		if err := permissions.HasPermission(whoami.Tier, "delete-config", providerID.String(), "", errorText); err != nil {
+			return err
+		}
+
 		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -833,6 +837,12 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		var errorText = "no compose down on " + providerID.String()
+		if err := permissions.HasPermission(whoami.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+			return err
+		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
 		if err != nil {
