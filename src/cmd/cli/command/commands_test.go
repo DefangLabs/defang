@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
@@ -204,7 +205,7 @@ func TestCommandPermission(t *testing.T) {
 	for _, testGroup := range []cmdPermTests{proTests, personalTests, basicTests} {
 		for _, tt := range testGroup {
 			t.Run(tt.name, func(t *testing.T) {
-				whoami = &defangv1.WhoAmIResponse{
+				store.UserWhoAmI = &defangv1.WhoAmIResponse{
 					Account: "test-account",
 					Region:  "us-test-2",
 					Tier:    tt.userTier,

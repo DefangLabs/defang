@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -50,7 +51,6 @@ var (
 	nonInteractive = !hasTty
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
-	whoami         *defangv1.WhoAmIResponse
 )
 
 func prettyError(err error) error {
@@ -63,17 +63,13 @@ func prettyError(err error) error {
 	return err
 }
 
-func initWhoAmI(ctx context.Context, client cliClient.GrpcClient) error {
-	if whoami != nil {
-		return nil
-	}
-
+func loadWhoAmIToStore(ctx context.Context, client cliClient.GrpcClient) error {
 	resp, err := client.WhoAmI(ctx)
 	if err != nil {
 		return err
 	}
-	whoami = resp
 
+	store.UserWhoAmI = resp
 	return nil
 }
 
@@ -359,7 +355,7 @@ var RootCmd = &cobra.Command{
 
 				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
-					return initWhoAmI(cmd.Context(), client)
+					return loadWhoAmIToStore(cmd.Context(), client)
 				}
 			}
 
@@ -374,8 +370,8 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		if err == nil {
-			return initWhoAmI(cmd.Context(), client)
+		if err == nil && store.UserWhoAmI == nil {
+			return loadWhoAmIToStore(cmd.Context(), client)
 		}
 
 		return err
@@ -688,7 +684,7 @@ var configSetCmd = &cobra.Command{
 		}
 
 		errorText := "no writing to config"
-		if err := permissions.HasPermission(whoami.Tier, "write-config", providerID.String(), "", errorText); err != nil {
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "write-config", providerID.String(), "", errorText); err != nil {
 			return err
 		}
 
@@ -770,7 +766,7 @@ var configDeleteCmd = &cobra.Command{
 		}
 
 		errorText := "deleting config"
-		if err := permissions.HasPermission(whoami.Tier, "delete-config", providerID.String(), "", errorText); err != nil {
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "delete-config", providerID.String(), "", errorText); err != nil {
 			return err
 		}
 
@@ -839,7 +835,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		var errorText = "no compose down on " + providerID.String()
-		if err := permissions.HasPermission(whoami.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
 			return err
 		}
 

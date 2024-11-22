@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -67,7 +68,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			errorText := "no compose up to " + providerID.String()
-			if err := permissions.HasPermission(whoami.Tier, "compose-up", providerID.String(), "", errorText); err != nil {
+			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", providerID.String(), "", errorText); err != nil {
 				return err
 			}
 
@@ -269,7 +270,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			errorText := "no compose down on " + providerID.String()
-			if err := permissions.HasPermission(whoami.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
 				return err
 			}
 
