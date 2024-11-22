@@ -50,7 +50,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 	// If the role does not exist, create it
 	if IsNotFound(err) {
 		req := &iamadmpb.CreateRoleRequest{
-			Parent: "projects/%s" + gcp.ProjectId,
+			Parent: "projects/" + gcp.ProjectId,
 			RoleId: roleId,
 			Role: &iamadmpb.Role{
 				Title:               title,
@@ -104,7 +104,7 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 				DisplayName: displayName,
 				Description: description,
 			},
-			Name: "projects/%s" + gcp.ProjectId,
+			Name: "projects/" + gcp.ProjectId,
 		}
 		account, err := client.CreateServiceAccount(ctx, req)
 		if err != nil {
@@ -126,7 +126,7 @@ func (gcp Gcp) EnsureServiceAccountHasRoles(ctx context.Context, serviceAccount 
 	}
 	defer client.Close()
 
-	projectResource := "projects/%s" + gcp.ProjectId
+	projectResource := "projects/" + gcp.ProjectId
 	return ensureServiceAccountHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
 }
 
@@ -139,7 +139,7 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 
 	// Get the bucket's IAM policy
 	bucket := client.Bucket(bucketName)
-	serviceAccountMember := "serviceAccount:%s" + serviceAccount
+	serviceAccountMember := "serviceAccount:" + serviceAccount
 	policy, err := bucket.IAM().Policy(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for bucket %s: %w", bucketName, err)
@@ -181,7 +181,7 @@ type resourceWithIAMPolicyClient interface {
 }
 
 func ensureServiceAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, serviceAccount string, roles []string) error {
-	serviceAccountMember := "serviceAccount:%s" + serviceAccount
+	serviceAccountMember := "serviceAccount:" + serviceAccount
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for resource %s: %w", resource, err)

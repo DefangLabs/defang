@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
@@ -40,41 +42,68 @@ protoPayload.resourceName="namespaces/%v/executions/%v"`, t.projectId, execution
 	return t.AddFilter(ctx, execFilter)
 }
 
-func (t *Tailer) AddServiceStatusUpdate(ctx context.Context, service, etag string) error {
+func (t *Tailer) AddServiceStatusUpdate(ctx context.Context, project, etag string, services []string) error {
 	serviceFilter := `logName:"cloudaudit.googleapis.com"
 protoPayload.serviceName="run.googleapis.com"
 protoPayload.methodName="google.cloud.run.v1.Services.CreateService" OR "/Services.CreateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
 
-	if service != "" { // FIXME: Be more specific with the service name suffix, maybe regex
+	if project != "" {
 		serviceFilter += fmt.Sprintf(`
-protoPayload.resourceName=~"^namespaces/%v/services/%v-[a-z0-9]{7}$"`, t.projectId, service)
+protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
 	}
 
 	if etag != "" {
 		serviceFilter += fmt.Sprintf(`
 protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
 	}
+
+	if len(services) > 0 {
+		serviceFilter += fmt.Sprintf(`
+protoPayload.resourceName=~"^namespaces/%v/services/(%v)-[a-z0-9]{7}$"`, t.projectId, strings.Join(services, "|"))
+	}
+
 	return t.AddFilter(ctx, serviceFilter)
 }
 
-func (t *Tailer) AddJobLog(ctx context.Context, executionName string) error {
+func (t *Tailer) AddJobLog(ctx context.Context, project, executionName string, services []string, since time.Time) error {
+	// FIXME: project support: Signature change might be needed
+	//   - CD job: filtering on protoPayload.response.spec.template.spec.containers.env.value for CD image, execution name should be good for now
+	//   - Kaniko job: ~~filtering on the container spec command override~~, kaniko jobs are per-project, we can filter on the kaniko job name
 	serviceFilter := fmt.Sprintf(`resource.type = "cloud_run_job"
-labels."run.googleapis.com/execution_name" = "%v"
-resource.labels.project_id = "%v"`, executionName, t.projectId)
+resource.labels.project_id = "%v"`, t.projectId)
+
+	if executionName != "" {
+		serviceFilter += fmt.Sprintf(`
+labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	}
+
+	if !since.IsZero() {
+		serviceFilter += fmt.Sprintf(`
+timestamp >= "%v"`, since.Format(time.RFC3339)) // Nano?
+	}
+
 	return t.AddFilter(ctx, serviceFilter)
 }
 
-func (t *Tailer) AddServiceLog(ctx context.Context, service, etag string) error {
+func (t *Tailer) AddServiceLog(ctx context.Context, project, etag string, services []string, since time.Time) error {
 	serviceFilter := fmt.Sprintf(`resource.type="cloud_run_revision"
 resource.labels.project_id="%v"`, t.projectId)
-	if service != "" {
-		serviceFilter += fmt.Sprintf(`
-resource.labels.service_name=~"^%v-[a-z0-9]{7}$"`, service)
-	}
+
 	if etag != "" {
 		serviceFilter += fmt.Sprintf(`
 labels."defang-etag"="%v"`, etag)
 	}
+
+	if len(services) > 0 {
+		serviceFilter += fmt.Sprintf(`
+resource.labels.service_name=~"^(%v)-[a-z0-9]{7}$"`, strings.Join(services, "|"))
+	}
+
+	if !since.IsZero() {
+		serviceFilter += fmt.Sprintf(`
+timestamp >= "%v"`, since.Format(time.RFC3339)) // Nano?
+	}
+
 	return t.AddFilter(ctx, serviceFilter)
 }
 
@@ -83,7 +112,6 @@ func (t *Tailer) AddFilter(ctx context.Context, filter string) error {
 		ResourceNames: []string{"projects/" + t.projectId},
 		Filter:        filter,
 	}
-	fmt.Printf("Adding Filter:\n%v\n\n", filter)
 	if err := t.tleClient.Send(req); err != nil {
 		return fmt.Errorf("failed to send tail log entries request: %w", err)
 	}

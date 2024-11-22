@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -16,6 +17,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
@@ -82,13 +84,23 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 
 	// 1. Enable required APIs
 	apis := []string{
-		"storage.googleapis.com",          // Cloud Storage API
-		"artifactregistry.googleapis.com", // Artifact Registry API
-		"run.googleapis.com",              // Cloud Run API
-		"iam.googleapis.com",              // IAM API
+		"storage.googleapis.com",              // Cloud Storage API
+		"artifactregistry.googleapis.com",     // Artifact Registry API
+		"run.googleapis.com",                  // Cloud Run API
+		"iam.googleapis.com",                  // IAM API
+		"cloudresourcemanager.googleapis.com", // For service account and role management
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
-		return err
+		if strings.Contains(err.Error(), "Service Usage API has not been used in project") {
+			term.Warn("Service Usage API has not been used in project, we cannot verify if the needed APIs are enabled. Please enable the APIs manually.")
+			start := strings.Index(err.Error(), "https://console.developers.google.com")
+			end := strings.Index(err.Error(), "Details:") - 1
+			if start >= 0 && end >= 0 {
+				term.Warn("To enable service usage API, " + err.Error()[start:end])
+			}
+		} else {
+			return err
+		}
 	}
 
 	// 2. Setup cd bucket
@@ -128,8 +140,6 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	if err := b.driver.EnsureServiceAccountHasArtifactRegistryRoles(ctx, b.registry, b.serviceAccount, []string{"roles/artifactregistry.repoAdmin"}); err != nil {
 		return err
 	}
-
-	fmt.Printf("BYOC GCP: %+v\n", b)
 
 	// 5. Setup Cloud Run Job
 	serviceAccount := path.Base(b.serviceAccount)
@@ -193,6 +203,10 @@ func (g GcpAccountInfo) Details() string {
 	return g.projectId
 }
 
+func (g GcpAccountInfo) Provider() client.ProviderID {
+	return client.ProviderGCP
+}
+
 func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
 	if err := b.setUpCD(ctx); err != nil {
 		return "", err
@@ -209,8 +223,9 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 }
 
 type cdCommand struct {
-	Project string
-	Command []string
+	Project     string
+	Command     []string
+	EnvOverride map[string]string
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -224,14 +239,19 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
 		"DEFANG_PREFIX":            "defang",
-		"NO_COLOR":                 "true", // FIXME:  Remove later
+		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 	}
+
+	for k, v := range cmd.EnvOverride {
+		env[k] = v
+	}
+
 	execution, err := b.driver.Run(ctx, "defang-cd", env, cmd.Command...)
 	if err != nil {
 		return "", err
 	}
 	b.lastCdExecution = execution
-	fmt.Printf("CD Execution: %s\n", execution)
+	// fmt.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
 
@@ -298,8 +318,9 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	cmd := cdCommand{
-		Project: project.Name,
-		Command: []string{"up", payload},
+		Project:     project.Name,
+		Command:     []string{"up", payload},
+		EnvOverride: map[string]string{"DEFANG_ETAG": etag},
 	}
 
 	if _, err := b.runCdCommand(ctx, cmd); err != nil {
@@ -338,34 +359,52 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string)
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	ss := NewSubscribeStream(ctx, b.driver)
-	if err := ss.AddJobExecutionUpdate(ctx, path.Base(b.lastCdExecution)); err != nil {
-		return nil, err
+	if req.Etag == b.lastCdEtag {
+		if err := ss.AddJobExecutionUpdate(ctx, path.Base(b.lastCdExecution)); err != nil {
+			return nil, err
+		}
 	}
-	if err := ss.AddServiceStatusUpdate(ctx, "", b.lastCdEtag); err != nil { // ALl services of the etag
+	if err := ss.AddServiceStatusUpdate(ctx, req.Project, req.Etag, req.Services); err != nil { // ALl services of the etag
 		return nil, err
 	}
 	return ss, nil
 }
 
-func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.ServiceID) (*defangv1.ServiceInfo, error) {
+func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	ls := NewLogStream(ctx, b.driver)
+	if req.Etag == b.lastCdEtag {
+		// Note: project is not supported in the CD logs yet
+		if err := ls.AddJobLog(ctx, req.Project, path.Base(b.lastCdExecution), nil, req.Since.AsTime()); err != nil {
+			return nil, err
+		}
+	}
+
+	// FIXME: Support kaniko build logs
+	var kanikoBuilds []string
+	for _, service := range req.Services {
+		_ = service
+		// TODO: Deduce kaniko build job name and add to kanikoBuilds
+	}
+	if len(kanikoBuilds) > 0 {
+		if err := ls.AddJobLog(ctx, req.Project, "", kanikoBuilds, req.Since.AsTime()); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := ls.AddServiceLog(ctx, req.Project, req.Etag, req.Services, req.Since.AsTime()); err != nil {
+		return nil, err
+	}
+	return ls, nil
+}
+
+func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	// FIXME: implement
 	return nil, client.ErrNotImplemented("GCP GetService")
 }
 
-func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.ListServicesResponse, error) {
+func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
 	// FIXME: implement
 	return nil, client.ErrNotImplemented("GCP GetServices")
-}
-
-func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	ls := NewLogStream(ctx, b.driver)
-	if err := ls.AddJobLog(ctx, path.Base(b.lastCdExecution)); err != nil {
-		return nil, err
-	}
-	if err := ls.AddServiceLog(ctx, "", b.lastCdEtag); err != nil { // ALl services of the etag
-		return nil, err
-	}
-	return ls, nil
 }
 
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================

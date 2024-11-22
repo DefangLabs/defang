@@ -2,10 +2,10 @@ package gcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -122,7 +122,6 @@ func (gcp Gcp) Run(ctx context.Context, jobId string, env map[string]string, cmd
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Running job %q '%v'\n", op.Name(), cmd)
 
 	var execName string
 	for {
@@ -146,56 +145,37 @@ func (gcp Gcp) Run(ctx context.Context, jobId string, env map[string]string, cmd
 	return execName, nil
 }
 
-type JobStatus int32
-
-const (
-	JobStatusUnknown JobStatus = iota
-	JobStatusPending
-	JobStatusRunning
-	JobStatusSucceeded
-	JobStatusFailed
-)
-
-func (gcp Gcp) GetExecutionStatus(ctx context.Context, executionName string) (JobStatus, error) {
+func (gcp Gcp) GetExecutionEnv(ctx context.Context, executionName string) (map[string]string, error) {
 	client, err := run.NewExecutionsClient(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create cloud run executions client: %v\n", err)
 	}
 	defer client.Close()
 
-	req := &runpb.GetExecutionRequest{Name: executionName}
+	executionName = path.Base(executionName)
+	if len(executionName) < 6 {
+		return nil, fmt.Errorf("invalid execution name %q", executionName)
+	}
+	jobName := executionName[:len(executionName)-6]
+
+	fullExecutionName := fmt.Sprintf("projects/%s/locations/%s/jobs/%v/executions/%s", gcp.ProjectId, gcp.Region, jobName, executionName)
+	req := &runpb.GetExecutionRequest{Name: fullExecutionName}
 	exec, err := client.GetExecution(ctx, req)
 	if err != nil {
-		return JobStatusUnknown, err
+		return nil, err
 	}
 
-	cmap := make(map[string]*runpb.Condition)
-	for _, condition := range exec.Conditions {
-		cmap[condition.Type] = condition
+	if len(exec.Template.Containers) == 0 {
+		return nil, fmt.Errorf("no containers found in execution %q", executionName)
 	}
 
-	if cmap["Completed"] == nil {
-		return JobStatusUnknown, errors.New("missing Completed condition")
-	}
-
-	completedCondition := cmap["Completed"]
-	switch completedCondition.State {
-	case runpb.Condition_STATE_UNSPECIFIED:
-		return JobStatusUnknown, nil
-	case runpb.Condition_CONDITION_SUCCEEDED:
-		return JobStatusSucceeded, nil
-	case runpb.Condition_CONDITION_FAILED:
-		return JobStatusFailed, fmt.Errorf("job execution failed: %s (%v)", completedCondition.Message, completedCondition.Reasons)
-	case runpb.Condition_CONDITION_PENDING:
-		return JobStatusPending, nil
-	case runpb.Condition_CONDITION_RECONCILING:
-		if cmap["Started"] != nil && cmap["Started"].State == runpb.Condition_CONDITION_SUCCEEDED {
-			return JobStatusRunning, nil
+	envs := make(map[string]string)
+	for _, containerEnvs := range exec.Template.Containers {
+		for _, env := range containerEnvs.Env {
+			envs[env.Name] = env.GetValue()
 		}
-		return JobStatusPending, nil
-	default:
-		return JobStatusUnknown, fmt.Errorf("unknown job execution state: %v", completedCondition.State)
 	}
+	return envs, nil
 }
 
 // FIXME: Add tests

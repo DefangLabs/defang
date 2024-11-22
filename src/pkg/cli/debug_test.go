@@ -77,5 +77,4 @@ func TestQueryHasProject(t *testing.T) {
 			t.Errorf("expected error %q, got %q", "project name is missing", err.Error())
 		}
 	}
-
 }

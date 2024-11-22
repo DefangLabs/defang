@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/api/serviceusage/v1"
 )
 
@@ -27,7 +28,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		}
 		return nil
 	})
-	if err != nil {
+	if err != nil { // Ignore service usage API not being used
 		return fmt.Errorf("failed to list enabled services: %w", err)
 	}
 
@@ -35,6 +36,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		return nil
 	}
 
+	term.Info("Enabling services: %v\n", apis)
 	req := &serviceusage.BatchEnableServicesRequest{
 		ServiceIds: apis,
 	}
