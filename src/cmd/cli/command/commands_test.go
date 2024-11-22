@@ -215,7 +215,6 @@ func TestCommandPermission(t *testing.T) {
 				err := testCommand(tt.command)
 
 				if err != nil && tt.wantError == "" {
-
 					if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
 						t.Fatalf("Unexpected error: %v", err)
 					}
