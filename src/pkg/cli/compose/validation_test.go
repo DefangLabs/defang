@@ -172,64 +172,67 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
-func TestXDefangPostgres(t *testing.T) {
-	t.Run("verify empty definition", func(t *testing.T) {
-		service := composeTypes.ServiceConfig{
-			Extensions: map[string]interface{}{
-				"x-defang-postgres": nil,
-			}}
+func TestXDefangManaged(t *testing.T) {
+	var serviceExtensionName = []string{"x-defang-post", "x-defang-redis"}
+	for _, extensionName := range serviceExtensionName {
+		t.Run("verify empty definition", func(t *testing.T) {
+			service := composeTypes.ServiceConfig{
+				Extensions: map[string]interface{}{
+					extensionName: nil,
+				}}
 
-		postgres, ok := service.Extensions["x-defang-postgres"]
-		if !ok {
-			t.Fatal("x-defang-postgres extension not found")
-		}
+			redis, ok := service.Extensions[extensionName]
+			if !ok {
+				t.Fatalf("%s extension not found", extensionName)
+			}
 
-		if err := ValidatePostgres(postgres); err != nil {
-			t.Fatalf("ValidateProtgresService() failed: %v", err)
-		}
-	})
+			if err := ValidateManagedStore(redis); err != nil {
+				t.Fatalf("ValidateRedis() failed: %v", err)
+			}
+		})
 
-	t.Run("verify bool value", func(t *testing.T) {
-		service := composeTypes.ServiceConfig{
-			Extensions: map[string]interface{}{
-				"x-defang-postgres": true,
-			}}
+		t.Run("verify bool value", func(t *testing.T) {
+			service := composeTypes.ServiceConfig{
+				Extensions: map[string]interface{}{
+					extensionName: true,
+				}}
 
-		postgres, ok := service.Extensions["x-defang-postgres"]
-		if !ok {
-			t.Fatal("x-defang-postgres extension not found")
-		}
+			redis, ok := service.Extensions[extensionName]
+			if !ok {
+				t.Fatalf("%s extension not found", extensionName)
+			}
 
-		if err := ValidatePostgres(postgres); err != nil {
-			t.Fatalf("ValidateProtgresService() failed: %v", err)
-		}
-	})
+			if err := ValidateManagedStore(redis); err != nil {
+				t.Fatalf("ValidateRedis() failed: %v", err)
+			}
+		})
 
-	t.Run("verify full definition", func(t *testing.T) {
-		service := composeTypes.ServiceConfig{
-			Extensions: composeTypes.Extensions{
-				"x-defang-postgres": map[string]any{
-					"allow-downtime": true,
-					"retention": map[string]any{
-						"retention-period":            "7d",
-						"final-snapshot-name":         "final-snapshot",
-						"snapshot-to-load-on-startup": "load-snapsot",
+		t.Run("verify full definition", func(t *testing.T) {
+			service := composeTypes.ServiceConfig{
+				Extensions: composeTypes.Extensions{
+					extensionName: map[string]any{
+						"allow-downtime": true,
+						"retention": map[string]any{
+							"retention-period":            "7d",
+							"final-snapshot-name":         "final-snapshot",
+							"snapshot-to-load-on-startup": "load-snapsot",
+						},
 					},
-				},
-			}}
+				}}
 
-		postgres, ok := service.Extensions["x-defang-postgres"]
-		if !ok {
-			t.Fatal("x-defang-postgres extension not found")
-		}
+			postgres, ok := service.Extensions[extensionName]
+			if !ok {
+				t.Fatalf("%s extension not found", extensionName)
+			}
 
-		if err := ValidatePostgres(postgres); err != nil {
-			t.Fatalf("ValidateProtgresService() failed: %v", err)
-		}
-	})
+			if err := ValidateManagedStore(postgres); err != nil {
+				t.Fatalf("ValidateRedis() failed: %v", err)
+			}
+		})
+	}
 }
 
-func TestXDefangPostgresParams(t *testing.T) {
+func TestManagedStoreParams(t *testing.T) {
 	tests := []struct {
 		name      string
 		extension map[string]any
@@ -326,8 +329,8 @@ func TestXDefangPostgresParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidatePostgres(tt.extension); err != nil {
-				var errPostgres *ErrPostgresParam
+			if err := ValidateManagedStore(tt.extension); err != nil {
+				var errPostgres *ErrManagedStoreParam
 				if !errors.As(err, &errPostgres) {
 					t.Fatalf("unexpected error: %v", err)
 				}

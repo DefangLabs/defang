@@ -27,13 +27,13 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
 }
 
-type ErrPostgresParam []string
+type ErrManagedStoreParam []string
 
-func (e *ErrPostgresParam) Add(err string) {
+func (e *ErrManagedStoreParam) Add(err string) {
 	*e = append(*e, err)
 }
 
-func (e *ErrPostgresParam) Error() string {
+func (e *ErrManagedStoreParam) Error() string {
 	return fmt.Sprintf("%d errors found: %s", len(*e), strings.Join(*e, ", "))
 }
 
@@ -294,11 +294,15 @@ func ValidateProject(project *composeTypes.Project) error {
 			}
 		}
 
-		if _, ok := svccfg.Extensions["x-defang-redis"]; ok {
+		if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
 			// Ensure the image is a valid Redis image
 			repo := strings.SplitN(svccfg.Image, ":", 2)[0]
 			if !strings.HasSuffix(repo, "redis") {
 				term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
+			}
+
+			if err = ValidateManagedStore(redisExtension); err != nil {
+				return err
 			}
 		}
 
@@ -309,7 +313,7 @@ func ValidateProject(project *composeTypes.Project) error {
 				term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 			}
 
-			if err = ValidatePostgres(postgresExtension); err != nil {
+			if err = ValidateManagedStore(postgresExtension); err != nil {
 				return err
 			}
 		}
@@ -432,14 +436,14 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 	return nil
 }
 
-func ValidatePostgres(postgres any) error {
-	if postgres == nil || postgres == true || postgres == false {
+func ValidateManagedStore(managedStore any) error {
+	if managedStore == nil || managedStore == true || managedStore == false {
 		return nil
 	}
 
-	errPostgres := ErrPostgresParam{}
+	errPostgres := ErrManagedStoreParam{}
 
-	postgresProps, ok := postgres.(map[string]any)
+	postgresProps, ok := managedStore.(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -478,11 +482,11 @@ func ValidatePostgres(postgres any) error {
 	return nil
 }
 
-func ValidateRetention(retention map[string]any) ErrPostgresParam {
+func ValidateRetention(retention map[string]any) ErrManagedStoreParam {
 	pattern := `^\d+d$`
 	retentionDaysRegex := regexp.MustCompile(pattern)
 
-	errPostgres := ErrPostgresParam{}
+	errPostgres := ErrManagedStoreParam{}
 
 	for _, key := range []string{"retention-period", "final-snapshot-name", "snapshot-to-load-on-startup"} {
 		switch key {
