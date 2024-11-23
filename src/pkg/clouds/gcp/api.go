@@ -36,7 +36,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 		return nil
 	}
 
-	term.Info("Enabling services: %v\n", apis)
+	term.Infof("Enabling services: %v\n", apis)
 	req := &serviceusage.BatchEnableServicesRequest{
 		ServiceIds: apis,
 	}

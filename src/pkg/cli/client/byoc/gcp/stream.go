@@ -275,7 +275,7 @@ func ParseActivityEntry(entry *loggingpb.LogEntry) (*defangv1.SubscribeResponse,
 		if executionName == "defang-cd" && auditLog.GetStatus().GetCode() != 0 {
 			return nil, errors.New("defang CD task failed: " + auditLog.GetStatus().GetMessage())
 		}
-		// TODO: Handle kaniko build task status
+		// FIXME: Handle kaniko build task status
 		return nil, nil // Ignore success cd status
 	default:
 		return nil, errors.New("unexpected resource type : " + entry.Resource.Type)

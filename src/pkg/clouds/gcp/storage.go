@@ -3,10 +3,12 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/google/uuid"
 
 	"google.golang.org/api/iterator"
 )
@@ -70,6 +72,23 @@ func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName string, objectNam
 		return "", fmt.Errorf("storage.NewClient: %w", err)
 	}
 	defer client.Close()
+
+	if objectName == "" {
+		objectName = uuid.NewString()
+	} else { // Sanitize object name according to https://cloud.google.com/storage/docs/objects
+		if len(objectName) > 1024 {
+			return "", fmt.Errorf("object name %q is too long", objectName)
+		}
+		if strings.ContainsAny(objectName, "\n\r") {
+			return "", fmt.Errorf("object name %q cannot contain newline characters", objectName)
+		}
+		if strings.HasPrefix(objectName, ".well-known/acme-challenge/") {
+			return "", fmt.Errorf("object name %q is reserved", objectName)
+		}
+		if objectName == "." || objectName == ".." {
+			return "", fmt.Errorf("object name %q is reserved", objectName)
+		}
+	}
 
 	bucket := client.Bucket(bucketName)
 	opts := &storage.SignedURLOptions{

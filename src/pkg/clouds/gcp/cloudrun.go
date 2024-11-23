@@ -28,7 +28,7 @@ func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, conta
 
 	runContainers := make([]*runpb.Container, 0, len(containers))
 	for _, container := range containers {
-		cpu, memory := fixupGcpConfig(container.Cpus, container.Memory/1024/1024)
+		cpu, memory := FixupGcpConfig(container.Cpus, container.Memory/1024/1024)
 
 		runContainer := &runpb.Container{
 			Name:    container.Name,
@@ -179,7 +179,7 @@ func (gcp Gcp) GetExecutionEnv(ctx context.Context, executionName string) (map[s
 }
 
 // FIXME: Add tests
-func fixupGcpConfig(vCpu float32, memoryMiB uint64) (cpu float64, memory uint) {
+func FixupGcpConfig(vCpu float32, memoryMiB uint64) (cpu float64, memory uint) {
 	// Fixup CPU value and minimum memory according to
 	// https://cloud.google.com/run/docs/configuring/jobs/cpu
 	cpu = math.Trunc(float64(vCpu)*100) / 100 // Cpu value below 1 should be in increments of 0.01

@@ -53,7 +53,8 @@ func TestParseAcitivityEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseActivityEntry() failed: %v", err)
 	}
-	if resp == nil {
-		t.Fatal("ParseActivityEntry() returned nil response")
+
+	if resp != nil {
+		t.Fatal("ParseActivityEntry() should returned nil response for cd success execution update")
 	}
 }
