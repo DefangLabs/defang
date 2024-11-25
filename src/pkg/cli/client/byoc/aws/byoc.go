@@ -115,10 +115,6 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	return b
 }
 
-func (b *ByocAws) DriverName() string {
-	return "aws"
-}
-
 func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
 	if b.SetupDone {
 		return "", nil

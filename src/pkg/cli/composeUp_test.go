@@ -43,10 +43,6 @@ func (b deployMock) AccountInfo(ctx context.Context) (client.AccountInfo, error)
 	return client.PlaygroundAccountInfo{}, nil
 }
 
-func (d deployMock) DriverName() string {
-	return "mock"
-}
-
 func (d deployMock) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	return &client.PrepareDomainDelegationResponse{
 		NameServers:     []string{"ns1.example.com", "ns2.example.com"},

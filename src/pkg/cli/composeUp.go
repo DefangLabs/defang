@@ -123,7 +123,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 		err = c.PutDeployment(ctx, &defangv1.Deployment{
 			Id:                resp.Etag,
 			Project:           project.Name,
-			Provider:          p.DriverName(),
+			Provider:          string(accountInfo.Provider()),
 			ProviderAccountId: accountInfo.AccountID(),
 			Timestamp:         timestamppb.New(timestamp),
 		})

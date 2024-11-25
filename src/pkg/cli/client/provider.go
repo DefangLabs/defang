@@ -121,7 +121,6 @@ type Provider interface {
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
-	DriverName() string
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)

@@ -75,10 +75,6 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocDo {
 	return b
 }
 
-func (b *ByocDo) DriverName() string {
-	return "do"
-}
-
 func (b *ByocDo) getCdImageTag(ctx context.Context, projectName string) (string, error) {
 	projUpdate, err := b.getProjectUpdate(ctx, projectName)
 	if err != nil {
