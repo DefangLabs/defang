@@ -331,13 +331,6 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
-enum DeploymentState {
-  DEPLOYMENT_STATE_UNKNOWN = 0;
-  DEPLOYMENT_STATE_STARTED = 1;
-  DEPLOYMENT_STATE_COMPLETED = 2;
-  DEPLOYMENT_STATE_FAILED = 3;
-}
-
 message ListDeploymentsRequest {
   string project = 1;
 }
