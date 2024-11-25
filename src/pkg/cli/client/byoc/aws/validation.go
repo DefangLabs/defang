@@ -5,6 +5,8 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
+	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -85,6 +87,10 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) er
 					// if there was an error getting the quota
 					if quotaErr != nil {
 						return quotaErr
+					}
+
+					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "deploy", "gpu", "", "no GPUs permitted at current subscription tier"); err != nil {
+						return err
 					}
 
 					if !hasGPUs {

@@ -17,7 +17,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "no permission for gpu",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_PERSONAL,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "compose-up",
 				resource: "gpu",
 			},
@@ -26,7 +26,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "have permission for gpu",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_PRO,
+				tier:     defangv1.SubscriptionTier_PRO,
 				action:   "compose-up",
 				resource: "gpu",
 				detail:   "1",
@@ -36,7 +36,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "have permission gpu 0",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_BASIC,
+				tier:     defangv1.SubscriptionTier_BASIC,
 				action:   "compose-up",
 				resource: "gpu",
 				detail:   "0",
@@ -46,7 +46,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "no permission gpu 1",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_BASIC,
+				tier:     defangv1.SubscriptionTier_BASIC,
 				action:   "compose-up",
 				resource: "gpu",
 				detail:   "1",
@@ -57,7 +57,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "has permission provider aws",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_PERSONAL,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "compose-up",
 				resource: "aws",
 			},
@@ -66,7 +66,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "unknown permission check errors",
 			action: ActionRequest{
-				role:     defangv1.SubscriptionTier_PERSONAL,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "do",
 				resource: "random",
 			},
@@ -76,7 +76,7 @@ func TestPermission(t *testing.T) {
 
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HasPermission(tt.action.role, tt.action.action, tt.action.resource, tt.action.detail, tt.expectedErrorText)
+			err := HasPermission(tt.action.tier, tt.action.action, tt.action.resource, tt.action.detail, tt.expectedErrorText)
 			if err != nil {
 				if !strings.Contains(err.Error(), tt.expectedErrorText) {
 					t.Fatalf("unexpected error: %v", err)

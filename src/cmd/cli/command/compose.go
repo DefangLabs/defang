@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,12 +30,20 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
-	var managedServices []string
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string]int, []string) {
+	var managedServices = map[string]int{
+		"x-defang-static-files": 0,
+		"x-defang-redis":        0,
+		"x-defang-postgres":     0,
+	}
 	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			managedServices = append(managedServices, service.Name)
+			for key := range service.Extensions {
+				if _, ok := managedServices[key]; ok {
+					managedServices[key]++
+				}
+			}
 		} else {
 			unmanagedServices = append(unmanagedServices, service.Name)
 		}
@@ -101,10 +110,25 @@ func makeComposeUpCmd() *cobra.Command {
 
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
+			for key, count := range managedServices {
+				err = nil
+				switch key {
+				case "x-defang-redis":
+					err = permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "redis", strconv.Itoa(count), "no managed redis enabled at current subscription tier")
+				case "x-defang-postgres":
+					err = permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "postgres", strconv.Itoa(count), "no managed postgres enabled at current subscription tier")
+				}
+
+				if err != nil {
+					return err
+				}
+			}
+
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
+			permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "service", "", "no services permitted at current subscription tier")
 			if detach {
 				term.Info("Detached.")
 				return nil

@@ -63,15 +63,15 @@ func prettyError(err error) error {
 	return err
 }
 
-func loadWhoAmIToStore(ctx context.Context, client cliClient.GrpcClient) error {
-	resp, err := client.WhoAmI(ctx)
-	if err != nil {
-		return err
-	}
+// func loadWhoAmIToStore(ctx context.Context, client cliClient.GrpcClient) error {
+// 	resp, err := client.WhoAmI(ctx)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	store.UserWhoAmI = resp
-	return nil
-}
+// 	store.UserWhoAmI = resp
+// 	return nil
+// }
 
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
@@ -354,8 +354,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
-					return loadWhoAmIToStore(cmd.Context(), client)
+				if err = client.CheckLoginAndToS(cmd.Context()); err != nil { // recheck (new token = new user)
+					return err
 				}
 			}
 
@@ -370,9 +370,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		if err == nil && store.UserWhoAmI == nil {
-			return loadWhoAmIToStore(cmd.Context(), client)
-		}
+		// if err == nil && store.UserWhoAmI == nil {
+		// 	return loadWhoAmIToStore(cmd.Context(), client)
+		// }
 
 		return err
 	},
