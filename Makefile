@@ -7,7 +7,7 @@ install-git-hooks:
 
 .PHONY: pre-commit
 pre-commit:
-	make -C src lint-fix
+	make -C src lint
 
 .PHONY: pre-push
 pre-push:
