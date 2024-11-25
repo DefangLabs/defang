@@ -249,6 +249,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
+	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// Send Command
@@ -841,13 +842,18 @@ var deleteCmd = &cobra.Command{
 
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
+	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
 	Annotations: authNeededAnnotation,
-	Hidden:      true,
-	Short:       "list deployments",
+}
+
+var deploymentsListCmd = &cobra.Command{
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Args:    cobra.NoArgs,
+	Short:   "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
 		loader := configureLoader(cmd)
-		return cli.DeploymentsList(ctx, loader, client)
+		return cli.DeploymentsList(cmd.Context(), loader, client)
 	},
 }
 
