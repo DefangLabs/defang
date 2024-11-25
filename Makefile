@@ -6,16 +6,9 @@ install-git-hooks:
 	chmod +x .git/hooks/pre-push
 
 .PHONY: pre-commit
-pre-commit: lint-fix
+pre-commit:
+	make -C src lint-fix
 
 .PHONY: pre-push
 pre-push:
 	make -C src test
-
-.PHONY: lint
-lint:
-	make -C src lint
-
-.PHONY: lint-fix
-lint-fix:
-	make -C src lint-fix
