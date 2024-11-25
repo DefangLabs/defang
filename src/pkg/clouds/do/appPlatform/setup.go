@@ -100,6 +100,7 @@ func shellQuote(args ...string) string {
 
 func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 	cdImagePath := byoc.GetCdImage(CdImageBase, byoc.CdLatestImageTag)
+	term.Debugf("Using CD image: %s", cdImagePath)
 	image, err := ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
@@ -108,7 +109,11 @@ func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 		image.Registry = path.Dir(image.Repo)
 		image.Repo = path.Base(image.Repo)
 	}
-	if image.Tag == "" && image.Digest == "" {
+	if image.Digest != "" {
+		// only one of jobs.image.tag or jobs.image.digest can be specified; digest takes precedence
+		image.Tag = ""
+	} else if image.Tag == "" {
+		// default to tag "latest"
 		image.Tag = "latest"
 	}
 	return &godo.ImageSourceSpec{
