@@ -575,8 +575,8 @@ message DelegateSubdomainZoneResponse { string zone = 1; }
 
 enum SubscriptionTier {
   SUBSCRIPTION_TIER_UNSPECIFIED = 0;
-  PERSONAL = 1;
-  BASIC = 2;
+  HOBBY = 1;
+  PERSONAL = 2;
   PRO = 3;
   TEAM = 4;
 }
