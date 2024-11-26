@@ -52,6 +52,9 @@ var (
 	nonInteractive = !hasTty
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
+
+	// testing overrides
+	overrideLastUseProviderID cliClient.ProviderID = cliClient.ProviderAuto
 )
 
 func prettyError(err error) error {
@@ -64,16 +67,57 @@ func prettyError(err error) error {
 	return err
 }
 
-// func loadWhoAmIToStore(ctx context.Context, client cliClient.GrpcClient) error {
-// 	resp, err := client.WhoAmI(ctx)
-// 	if err != nil {
-// 		return err
-// 	}
+const CLOUD_PROVIDER_PROJECT = "last-cloud-deployed-project"
 
-// 	store.UserWhoAmI = resp
-// 	return nil
-// }
+func canUseProvider(ctx context.Context) (bool, error) {
+	var req = &defangv1.GetSelectedProviderRequest{
+		Project: CLOUD_PROVIDER_PROJECT,
+	}
 
+	resp := &defangv1.GetSelectedProviderResponse{
+		Provider: overrideLastUseProviderID.EnumValue(),
+	}
+
+	if overrideLastUseProviderID == cliClient.ProviderAuto {
+		var err error
+		resp, err = client.GetSelectedProvider(ctx, req)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_BASIC {
+		if resp.Provider.String() != providerID.String() {
+			return false, permissions.ErrNoPermission("basic tier on supports one cloud provider at a time")
+		}
+	}
+
+	return true, nil
+}
+
+func setLastUserProvider(ctx context.Context, provider cliClient.Provider) error {
+	if providerID != cliClient.ProviderDefang {
+		projects, err := provider.BootstrapList(ctx)
+		if err != nil {
+			return err
+		}
+
+		// only update to provider to Auto if no projects exist
+		if len(projects) == 0 {
+			var req = &defangv1.SetSelectedProviderRequest{
+				Project:  CLOUD_PROVIDER_PROJECT,
+				Provider: cliClient.ProviderAuto.EnumValue(),
+			}
+
+			overrideLastUseProviderID = cliClient.ProviderAuto
+			if err := client.SetSelectedProvider(ctx, req); err != nil {
+				return fmt.Errorf("failed to set the last cloud deployment provider: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -684,6 +728,10 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
+		if _, err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		errorText := fmt.Sprintf("write config on %s provider", providerID.String())
 		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 			return err
@@ -763,6 +811,10 @@ var configDeleteCmd = &cobra.Command{
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
+			return err
+		}
+
+		if _, err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -943,6 +995,11 @@ var cdDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if _, err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
 	},
 }
@@ -957,6 +1014,11 @@ var cdDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if _, err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
 	},
 }
@@ -971,6 +1033,11 @@ var cdRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if _, err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
 	},
 }
@@ -1001,6 +1068,11 @@ var cdTearDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if _, err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.TearDown(cmd.Context(), provider, force)
 	},
 }

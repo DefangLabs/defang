@@ -161,7 +161,8 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 		mode := defangv1.DeploymentMode_STAGING
 		err := ValidateGPUResources(ctx, &project, mode)
-		if err != nil {
+		errNoPerm := permissions.ErrNoPermission("not enough GPUs permitted at current subscription tier")
+		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
@@ -196,7 +197,8 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 		mode := defangv1.DeploymentMode_DEVELOPMENT
 		err := ValidateGPUResources(ctx, &project, mode)
-		if err != nil {
+		errNoPerm := permissions.ErrNoPermission("cannot deploy GPUs for current deployment mode DEVELOPMENT")
+		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})

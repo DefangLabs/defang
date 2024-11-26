@@ -104,14 +104,20 @@ func init() {
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "gpu", float64(ServiceQuotas.Gpus), "use-gpu", true)
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "postgres", float64(managedQuotas.Postgres), "use-managed", true)
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "redis", float64(managedQuotas.Redis), "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "mode", float64(defangv1.DeploymentMode_PRODUCTION), "use-gpu", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "mode", float64(defangv1.DeploymentMode_STAGING), "use-gpu", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "mode", float64(defangv1.DeploymentMode_DEVELOPMENT), "use-gpu", false)
 
 	// Team
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "use-provider", true)
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "gpu", float64(ServiceQuotas.Gpus), "use-managed", true)
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "postgres", float64(managedQuotas.Postgres), "use-managed", true)
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "redis", float64(managedQuotas.Redis), "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "mode", float64(defangv1.DeploymentMode_PRODUCTION), "use-gpu", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "mode", float64(defangv1.DeploymentMode_STAGING), "use-gpu", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "mode", float64(defangv1.DeploymentMode_DEVELOPMENT), "use-gpu", false)
 }
 
 func hasPermission(action ActionRequest, errorText string) error {
@@ -122,12 +128,12 @@ func hasPermission(action ActionRequest, errorText string) error {
 
 	actionMapping, ok := resourceMapping[action.resource]
 	if !ok {
-		return fmt.Errorf("unknown resource: %s", action.resource)
+		return ErrNoPermission("unknown resource: " + action.resource)
 	}
 
 	isAllowed, ok := actionMapping.Permission[action.action]
 	if !ok {
-		return fmt.Errorf("unknown %s user action: %s for resource %s", action.tier, action.action, action.resource)
+		return ErrNoPermission(fmt.Sprintf("unknown %s user action: %s for resource %s", action.tier, action.action, action.resource))
 	}
 
 	hasMetQuota := true

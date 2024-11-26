@@ -75,6 +75,10 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
+			if ok, err := canUseProvider(cmd.Context()); err != nil || !ok {
+				return err
+			}
+
 			errorText := fmt.Sprintf("no compose up on %s provider", providerID.String())
 			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 				return err
@@ -103,6 +107,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 			if len(deploy.Services) == 0 {
 				return errors.New("no services being deployed")
+			}
+
+			if err := setLastUserProvider(cmd.Context(), provider); err != nil {
+				term.Warn(prettyError(err))
 			}
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
@@ -303,6 +311,10 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
+			if ok, err := canUseProvider(cmd.Context()); err != nil || !ok {
+				return err
+			}
+
 			errorText := fmt.Sprintf("no compose down on %s provider", providerID.String())
 			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 				return err
@@ -317,6 +329,10 @@ func makeComposeDownCmd() *cobra.Command {
 					return nil
 				}
 				return err
+			}
+
+			if err := setLastUserProvider(cmd.Context(), provider); err != nil {
+				term.Warn(prettyError(err))
 			}
 
 			term.Info("Deleted services, deployment ID", etag)

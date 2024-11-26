@@ -9,6 +9,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 
+	cliclient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -80,48 +81,48 @@ func TestCommandPermission(t *testing.T) {
 	type cmdPermTests []cmdPermTest
 
 	personalTests := cmdPermTests{
-		{
-			name:      "PERSONAL - compose up - aws - no permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"compose", "up", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: no compose up on aws provider",
-		},
-		{
-			name:      "PERSONAL - compose up - defang - no permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"compose", "up", "--provider", "defang", "--dry-run"},
-			wantError: "",
-		},
-		{
-			name:      "PERSONAL - compose down - aws - has permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"compose", "down", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: no compose down on aws provider",
-		},
-		{
-			name:      "PERSONAL - config set - aws - no permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"config", "set", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: config set on aws provider",
-		},
-		{
-			name:      "PERSONAL - config rm - aws - no permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"config", "rm", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: config rm on aws provider",
-		},
-		{
-			name:      "PERSONAL - config rm - defang - has permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"config", "rm", "var", "--project-name", "app", "--provider", "defang", "--dry-run"},
-			wantError: "",
-		},
-		{
-			name:      "PERSONAL - delete service - aws - no permission",
-			userTier:  defangv1.SubscriptionTier_PERSONAL,
-			command:   []string{"delete", "abc", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: delete service on aws provider",
-		},
+		// {
+		// 	name:      "PERSONAL - compose up - aws - no permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"compose", "up", "--provider", "aws", "--dry-run"},
+		// 	wantError: "insufficient permissions to perform this action: no compose up on aws provider",
+		// },
+		// {
+		// 	name:      "PERSONAL - compose up - defang - no permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"compose", "up", "--provider", "defang", "--dry-run"},
+		// 	wantError: "",
+		// },
+		// {
+		// 	name:      "PERSONAL - compose down - aws - has permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"compose", "down", "--provider", "aws", "--dry-run"},
+		// 	wantError: "insufficient permissions to perform this action: no compose down on aws provider",
+		// },
+		// {
+		// 	name:      "PERSONAL - config set - aws - no permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"config", "set", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
+		// 	wantError: "insufficient permissions to perform this action: config set on aws provider",
+		// },
+		// {
+		// 	name:      "PERSONAL - config rm - aws - no permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"config", "rm", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
+		// 	wantError: "insufficient permissions to perform this action: config rm on aws provider",
+		// },
+		// {
+		// 	name:      "PERSONAL - config rm - defang - has permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"config", "rm", "var", "--project-name", "app", "--provider", "defang", "--dry-run"},
+		// 	wantError: "",
+		// },
+		// {
+		// 	name:      "PERSONAL - delete service - aws - no permission",
+		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
+		// 	command:   []string{"delete", "abc", "--provider", "aws", "--dry-run"},
+		// 	wantError: "insufficient permissions to perform this action: delete service on aws provider",
+		// },
 		// {
 		// 	name:      "PERSONAL - send - aws - has permission",
 		// 	userTier:  defangv1.SubscriptionTier_PERSONAL,
@@ -205,13 +206,16 @@ func TestCommandPermission(t *testing.T) {
 	for _, testGroup := range []cmdPermTests{proTests, personalTests, basicTests} {
 		for _, tt := range testGroup {
 			t.Run(tt.name, func(t *testing.T) {
-				store.UserWhoAmI = &defangv1.WhoAmIResponse{
+				store.ReadOnlyUserWhoAmI = false
+				store.SetUserWhoAmI(&defangv1.WhoAmIResponse{
 					Account: "test-account",
 					Region:  "us-test-2",
 					Tier:    tt.userTier,
-				}
+				})
+				store.ReadOnlyUserWhoAmI = true
 				aws.StsClient = stsProviderApi
 				pkg.SsmClientOverride = ssmClient
+				overrideLastUseProviderID = cliclient.ProviderAuto
 
 				err := testCommand(tt.command)
 

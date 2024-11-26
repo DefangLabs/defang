@@ -94,7 +94,8 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project, mo
 						return err
 					}
 
-					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), "not enough GPUs permitted at current subscription tier"); err != nil {
+					errorText := "cannot deploy GPUs for current deployment mode " + mode.String()
+					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), errorText); err != nil {
 						return err
 					}
 
