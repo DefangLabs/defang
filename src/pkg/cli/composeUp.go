@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -101,6 +102,13 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 				return nil, project, err
 			}
 		}
+		go func() {
+			<-ctx.Done()
+
+			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				term.Warn("Deployment will not be cancelled.")
+			}
+		}()
 		resp, err = p.Deploy(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
