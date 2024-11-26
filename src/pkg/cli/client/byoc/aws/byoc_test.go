@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -179,6 +180,8 @@ func TestGetCDImageTag(t *testing.T) {
 	b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), "tenant1", b)
 
 	t.Run("no project should use latest", func(t *testing.T) {
+		os.Unsetenv("DEFANG_CD_IMAGE")
+
 		const expected = byoc.CdLatestImageTag
 		tag, err := b.getCdImageTag(ctx, "")
 		if err != nil {
