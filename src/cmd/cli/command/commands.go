@@ -1062,8 +1062,17 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	}
 	// Avoid common mistakes: using -p with a provider name instead of -P
 	var prov cliClient.ProviderID
-	if prov.Set(projectName) == nil {
-		term.Warnf("Did you mean to use -P%s instead of -p?", projectName)
+	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
+		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
+		if !nonInteractive {
+			var confirm bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: "Continue with project: " + projectName + "?",
+			}, &nonInteractive)
+			if err == nil && !confirm {
+				os.Exit(1)
+			}
+		}
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
 }
