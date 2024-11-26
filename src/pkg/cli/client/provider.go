@@ -109,6 +109,7 @@ type BootstrapCommandRequest struct {
 type PrepareDomainDelegationRequest struct {
 	Project        string
 	DelegateDomain string
+	Preview        bool
 }
 
 type PrepareDomainDelegationResponse struct {
