@@ -66,7 +66,7 @@ release: pull test no-diff
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run || (echo "Run 'make lint-fix' to try to fix the linting errors" && exit 1)
 
 .PHONY: lint-fix
 lint-fix:
