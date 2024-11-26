@@ -20,6 +20,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/store"
@@ -1104,6 +1105,11 @@ func doInEnv() bool {
 	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }
 
+func awsInConfig(ctx context.Context) bool {
+	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
+	return err == nil
+}
+
 func IsCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
@@ -1148,7 +1154,7 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 			providerID = cliClient.ProviderDefang
 		}
 	case cliClient.ProviderAWS:
-		if !awsInEnv() {
+		if !awsInConfig(ctx) {
 			term.Warn("AWS provider was selected, but AWS environment variables are not set")
 		}
 	case cliClient.ProviderDO:
