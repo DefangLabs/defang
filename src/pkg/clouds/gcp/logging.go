@@ -37,8 +37,31 @@ type Tailer struct {
 func (t *Tailer) AddJobExecutionUpdate(ctx context.Context, executionId string) error {
 	execFilter := fmt.Sprintf(`logName:"cloudaudit.googleapis.com"
 protoPayload.serviceName="run.googleapis.com"
-protoPayload.methodName="/Jobs.RunJob"
+protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"
 protoPayload.resourceName="namespaces/%v/executions/%v"`, t.projectId, executionId)
+	return t.AddFilter(ctx, execFilter)
+}
+
+func (t *Tailer) AddJobStatusUpdate(ctx context.Context, project, etag string, services []string) error {
+	execFilter := `logName:"cloudaudit.googleapis.com"
+protoPayload.serviceName="run.googleapis.com"
+protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
+
+	if project != "" {
+		execFilter += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-project"="%v"`, project)
+	}
+
+	if etag != "" {
+		execFilter += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-etag"="%v"`, etag)
+	}
+
+	if len(services) > 0 {
+		execFilter += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+	}
+
 	return t.AddFilter(ctx, execFilter)
 }
 
@@ -66,15 +89,22 @@ protoPayload.resourceName=~"^namespaces/%v/services/(%v)-[a-z0-9]{7}$"`, t.proje
 }
 
 func (t *Tailer) AddJobLog(ctx context.Context, project, executionName string, services []string, since time.Time) error {
-	// FIXME: project support: Signature change might be needed
-	//   - CD job: filtering on protoPayload.response.spec.template.spec.containers.env.value for CD image, execution name should be good for now
-	//   - Kaniko job: ~~filtering on the container spec command override~~, kaniko jobs are per-project, we can filter on the kaniko job name
 	serviceFilter := fmt.Sprintf(`resource.type = "cloud_run_job"
 resource.labels.project_id = "%v"`, t.projectId)
 
 	if executionName != "" {
 		serviceFilter += fmt.Sprintf(`
 labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	}
+
+	if project != "" {
+		serviceFilter += fmt.Sprintf(`
+labels."defang-project" = "%v"`, project)
+	}
+
+	if len(services) > 0 {
+		serviceFilter += fmt.Sprintf(`
+labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
 	if !since.IsZero() {

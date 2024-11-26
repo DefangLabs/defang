@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	credentials "cloud.google.com/go/iam/credentials/apiv1"
+	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/google/uuid"
@@ -66,7 +68,7 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 	return "", nil
 }
 
-func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName string, objectName string) (string, error) {
+func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("storage.NewClient: %w", err)
@@ -92,8 +94,12 @@ func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName string, objectNam
 
 	bucket := client.Bucket(bucketName)
 	opts := &storage.SignedURLOptions{
-		Scheme:  storage.SigningSchemeV4,
-		Method:  "PUT",
+		Scheme:         storage.SigningSchemeV4,
+		Method:         "PUT",
+		GoogleAccessID: serviceAccount,
+		SignBytes: func(b []byte) ([]byte, error) {
+			return gcp.SignBytes(ctx, b, serviceAccount)
+		},
 		Expires: time.Now().Add(15 * time.Minute),
 	}
 
@@ -102,4 +108,21 @@ func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName string, objectNam
 		return "", fmt.Errorf("Bucket(%q).Object(%q).SignedURL: %w", bucketName, objectName, err)
 	}
 	return u, nil
+}
+
+func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, error) {
+	credSvc, err := credentials.NewIamCredentialsClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &credentialspb.SignBlobRequest{
+		Payload: b,
+		Name:    name,
+	}
+	resp, err := credSvc.SignBlob(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.SignedBlob, err
 }

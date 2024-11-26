@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -32,8 +33,9 @@ const (
 )
 
 var (
-	DefaultCDTags = map[string]string{"created-by": "defang"}
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
+	DefaultCDTags    = map[string]string{"created-by": "defang"}
+	PulumiVersion    = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
+	DefangGcpCdImage = pkg.Getenv("DEFANG_GCP_CD_IMAGE", "edwardrf/gcpcd:test")
 
 	//TODO: Adjust permissions
 	cdPermissions = []string{
@@ -58,11 +60,12 @@ type ByocGcp struct {
 
 	driver *gcp.Gcp
 
-	bucket         string
-	registry       string
-	role           string
-	serviceAccount string
-	setupDone      bool
+	bucket               string
+	cdServiceAccount     string
+	registry             string
+	role                 string
+	setupDone            bool
+	uploadServiceAccount string
 
 	lastCdExecution string
 	lastCdEtag      string
@@ -117,33 +120,66 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		b.registry = registry
 	}
 
-	// 4. Setup Service Account and its permissions to be used by the CD job
+	// 4. Setup Service Accounts and its permissions to be used by the CD job and pre-signed URL generation
 	//   4.1 CD role should be able to work with cloudrun services
 	if role, err := b.driver.EnsureRoleExists(ctx, "defang_cd_role", "defang CD", "defang CD deployment role", cdPermissions); err != nil {
 		return err
 	} else {
 		b.role = role
 	}
-	if serviceAccount, err := b.driver.EnsureServiceAccountExists(ctx, "defang-cd", "defang CD", "Service account for defang CD"); err != nil {
+	if cdServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, "defang-cd", "defang CD", "Service account for defang CD"); err != nil {
 		return err
 	} else {
-		b.serviceAccount = path.Base(serviceAccount)
+		b.cdServiceAccount = path.Base(cdServiceAccount)
 	}
-	if err := b.driver.EnsureServiceAccountHasRoles(ctx, b.serviceAccount, []string{b.role, "roles/iam.serviceAccountAdmin"}); err != nil {
+	if err := b.driver.EnsureServiceAccountHasRoles(ctx, b.cdServiceAccount, []string{b.role, "roles/iam.serviceAccountAdmin"}); err != nil {
 		return err
 	}
 	//  4.2 Give cd role access to cd bucket
-	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.serviceAccount, []string{"roles/storage.objectAdmin"}); err != nil {
+	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.cdServiceAccount, []string{"roles/storage.objectAdmin"}); err != nil {
 		return err
 	}
 	//  4.3 Give cd role access to artifact registry
-	if err := b.driver.EnsureServiceAccountHasArtifactRegistryRoles(ctx, b.registry, b.serviceAccount, []string{"roles/artifactregistry.repoAdmin"}); err != nil {
+	if err := b.driver.EnsureServiceAccountHasArtifactRegistryRoles(ctx, b.registry, b.cdServiceAccount, []string{"roles/artifactregistry.repoAdmin"}); err != nil {
 		return err
+	}
+	//  4.4 Setup service account for upload
+	if uploadServiceAccount, err := b.driver.EnsureServiceAccountExists(ctx, "defang-upload", "defang upload", "Service account for defang cli to generate pre-signed URL to upload artifacts"); err != nil {
+		return err
+	} else {
+		b.uploadServiceAccount = path.Base(uploadServiceAccount)
+	}
+	//  4.5 Give upload service account access to cd bucket
+	if err := b.driver.EnsureServiceAccountHasBucketRoles(ctx, b.bucket, b.uploadServiceAccount, []string{"roles/storage.objectUser"}); err != nil {
+		return err
+	}
+	//  4.6 Give current user the token creator role on the upload service account
+	user, err := b.driver.GetCurrentAccountEmail(ctx)
+	if err != nil {
+		return err
+	}
+	if err := b.driver.EnsureUserHasServiceAccountRoles(ctx, user, b.uploadServiceAccount, []string{"roles/iam.serviceAccountTokenCreator"}); err != nil {
+		return err
+	}
+	start := time.Now()
+	for {
+		if _, err := b.driver.SignBytes(ctx, []byte("testdata"), b.uploadServiceAccount); err != nil {
+			if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
+				if time.Since(start) > 5*time.Minute {
+					return errors.New("Could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
+				}
+				pkg.SleepWithContext(ctx, 30*time.Second)
+				continue
+			}
+			return err
+		} else {
+			break
+		}
 	}
 
 	// 5. Setup Cloud Run Job
-	serviceAccount := path.Base(b.serviceAccount)
-	err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
+	serviceAccount := path.Base(b.cdServiceAccount)
+	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
 		{
 			Image:     "us-central1-docker.pkg.dev/defang-cd-idhk6xblr21o/defang-cd/gcpcd:test",
 			Name:      ecs.CdContainerName,
@@ -155,8 +191,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 			// DependsOn:  map[string]types.ContainerCondition{cdTaskName: "START"},
 			// EntryPoint: []string{"node", "lib/index.js"},
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -226,6 +261,7 @@ type cdCommand struct {
 	Project     string
 	Command     []string
 	EnvOverride map[string]string
+	Mode        defangv1.DeploymentMode
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -240,6 +276,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"STACK":                    "beta",
 		"DEFANG_PREFIX":            "defang",
 		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
+		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 	}
 
 	for k, v := range cmd.EnvOverride {
@@ -260,8 +297,11 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, b.bucket, req.Digest)
+	url, err := b.driver.CreateUploadURL(ctx, b.bucket, req.Digest, b.uploadServiceAccount)
 	if err != nil {
+		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
+			return nil, errors.New("Current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
+		}
 		return nil, err
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
@@ -301,7 +341,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, etag)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, etag, b.uploadServiceAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -318,6 +358,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	cmd := cdCommand{
+		Mode:        req.Mode,
 		Project:     project.Name,
 		Command:     []string{"up", payload},
 		EnvOverride: map[string]string{"DEFANG_ETAG": etag},
@@ -364,6 +405,11 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 			return nil, err
 		}
 	}
+
+	if err := ss.AddJobStatusUpdate(ctx, req.Project, req.Etag, req.Services); err != nil {
+		return nil, err
+	}
+
 	if err := ss.AddServiceStatusUpdate(ctx, req.Project, req.Etag, req.Services); err != nil { // ALl services of the etag
 		return nil, err
 	}
@@ -373,22 +419,20 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	ls := NewLogStream(ctx, b.driver)
 	if req.Etag == b.lastCdEtag {
-		// Note: project is not supported in the CD logs yet
-		if err := ls.AddJobLog(ctx, req.Project, path.Base(b.lastCdExecution), nil, req.Since.AsTime()); err != nil {
+		// Note: project is not supported in the CD logs yet, this send empty string
+		if err := ls.AddJobLog(ctx, "", path.Base(b.lastCdExecution), nil, req.Since.AsTime()); err != nil {
 			return nil, err
 		}
+	} else if req.Etag == b.lastCdExecution { // Execution ID passed in as etag: only for CD logs
+		if err := ls.AddJobLog(ctx, "", path.Base(b.lastCdExecution), nil, req.Since.AsTime()); err != nil {
+			return nil, err
+		}
+		return ls, nil
 	}
 
 	// FIXME: Support kaniko build logs
-	var kanikoBuilds []string
-	for _, service := range req.Services {
-		_ = service
-		// TODO: Deduce kaniko build job name and add to kanikoBuilds
-	}
-	if len(kanikoBuilds) > 0 {
-		if err := ls.AddJobLog(ctx, req.Project, "", kanikoBuilds, req.Since.AsTime()); err != nil {
-			return nil, err
-		}
+	if err := ls.AddJobLog(ctx, req.Project, "", req.Services, req.Since.AsTime()); err != nil {
+		return nil, err
 	}
 
 	if err := ls.AddServiceLog(ctx, req.Project, req.Etag, req.Services, req.Since.AsTime()); err != nil {

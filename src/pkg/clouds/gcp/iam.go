@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strings"
 
 	artifactregistry "cloud.google.com/go/artifactregistry/apiv1"
 	"cloud.google.com/go/iam"
+	admin "cloud.google.com/go/iam/admin/apiv1"
 	iamadm "cloud.google.com/go/iam/admin/apiv1"
 	iamadmpb "cloud.google.com/go/iam/admin/apiv1/adminpb"
 	"cloud.google.com/go/iam/apiv1/iampb"
@@ -127,7 +129,7 @@ func (gcp Gcp) EnsureServiceAccountHasRoles(ctx context.Context, serviceAccount 
 	defer client.Close()
 
 	projectResource := "projects/" + gcp.ProjectId
-	return ensureServiceAccountHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
+	return ensureAccountHasRolesWithResource(ctx, client, projectResource, serviceAccount, roles)
 }
 
 func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketName, serviceAccount string, roles []string) error {
@@ -172,7 +174,46 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 	}
 	defer client.Close()
 
-	return ensureServiceAccountHasRolesWithResource(ctx, client, repo, serviceAccount, roles)
+	return ensureAccountHasRolesWithResource(ctx, client, repo, serviceAccount, roles)
+}
+
+// TODO: Investigate if this can be merged with EnsureServiceAccountHasRoles
+func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, serviceAccount string, roles []string) error {
+	client, err := admin.NewIamClient(ctx)
+	if err != nil {
+		log.Fatalf("failed to create artifact registry client: %v", err)
+	}
+	defer client.Close()
+
+	resource := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccount)
+	member := "user:" + user
+
+	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
+	if err != nil {
+		return fmt.Errorf("failed to get IAM policy for service account %s: %w", serviceAccount, err)
+	}
+
+	needUpdate := false
+	for _, roleStr := range roles {
+		role := iam.RoleName(roleStr)
+		memebers := policy.Members(role)
+		if !slices.Contains(memebers, member) {
+			policy.Add(member, role)
+			needUpdate = true
+		}
+	}
+
+	if !needUpdate {
+		return nil
+	}
+
+	if _, err := client.SetIamPolicy(ctx, &admin.SetIamPolicyRequest{
+		Resource: resource,
+		Policy:   policy,
+	}); err != nil {
+		return fmt.Errorf("failed to set IAM policy for service account %s: %w", serviceAccount, err)
+	}
+	return nil
 }
 
 type resourceWithIAMPolicyClient interface {
@@ -180,8 +221,13 @@ type resourceWithIAMPolicyClient interface {
 	SetIamPolicy(context.Context, *iampb.SetIamPolicyRequest, ...gax.CallOption) (*iamv1.Policy, error)
 }
 
-func ensureServiceAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, serviceAccount string, roles []string) error {
-	serviceAccountMember := "serviceAccount:" + serviceAccount
+func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, account string, roles []string) error {
+	var member string
+	if strings.HasSuffix(account, ".gserviceaccount.com") {
+		member = "serviceAccount:" + account
+	} else {
+		member = "user:" + account
+	}
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for resource %s: %w", resource, err)
@@ -192,10 +238,10 @@ func ensureServiceAccountHasRolesWithResource(ctx context.Context, client resour
 	for _, binding := range policy.Bindings {
 		if slices.Contains(roles, binding.Role) {
 			rolesFound = append(rolesFound, binding.Role)
-			if slices.Contains(binding.Members, serviceAccountMember) {
+			if slices.Contains(binding.Members, member) {
 				continue
 			}
-			binding.Members = append(binding.Members, serviceAccountMember)
+			binding.Members = append(binding.Members, member)
 			bindingNeedsUpdate = true
 		}
 	}
@@ -206,7 +252,7 @@ func ensureServiceAccountHasRolesWithResource(ctx context.Context, client resour
 			rolesNotFound = append(rolesNotFound, role)
 			policy.Bindings = append(policy.Bindings, &iamv1.Binding{
 				Role:    role,
-				Members: []string{serviceAccountMember},
+				Members: []string{member},
 			})
 		}
 	}

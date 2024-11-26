@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
@@ -146,6 +147,18 @@ func (s *SubscribeStream) AddJobExecutionUpdate(ctx context.Context, executionNa
 	return nil
 }
 
+func (s *SubscribeStream) AddJobStatusUpdate(ctx context.Context, project, etag string, services []string) error {
+	tailer, err := s.gcp.NewTailer(ctx)
+	if err != nil {
+		return err
+	}
+	if err := tailer.AddJobStatusUpdate(ctx, project, etag, services); err != nil {
+		return err
+	}
+	s.ServerStream.AddTailer(tailer)
+	return nil
+}
+
 func (s *SubscribeStream) AddServiceStatusUpdate(ctx context.Context, project, etag string, services []string) error {
 	tailer, err := s.gcp.NewTailer(ctx)
 	if err != nil {
@@ -170,6 +183,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
+		executionName := entry.Labels["run.googleapis.com/execution_name"]
 		// Log from service
 		if serviceName != "" {
 			etag = entry.Labels["defang-etag"]
@@ -177,8 +191,10 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			if len(host) > 8 {
 				host = host[:8]
 			}
+			if regexp.MustCompile(`-build-[a-z0-9]{7}-[a-z0-9]{8}$`).MatchString(executionName) {
+				serviceName += "-image"
+			}
 		} else {
-			executionName := entry.Labels["run.googleapis.com/execution_name"]
 			if executionName == "" {
 				fmt.Printf("Entry: %+v\n", entry)
 				return nil, errors.New("missing both execution name and defang-service in log entry")
@@ -200,7 +216,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			}
 
 			etag = env["DEFANG_ETAG"]
-			host = executionName
+			host = "pulumi" // Hardcoded to match end condition detector in cmd/cli/command/compose.go
 		}
 
 		return &defangv1.TailResponse{
@@ -235,35 +251,74 @@ func ParseActivityEntry(entry *loggingpb.LogEntry) (*defangv1.SubscribeResponse,
 	}
 
 	switch entry.Resource.Type {
-	case "cloud_run_revision": // Service status update
-		serviceName := path.Base(auditLog.GetResourceName())
-		if serviceName == "" {
-			return nil, errors.New("missing resource name in audit log")
+	case "cloud_run_revision": // Service status
+		if request := auditLog.GetRequest(); request != nil { // Activity log: service update requests
+			serviceName := GetValueInStruct(request, "service.spec.template.metadata.labels.defang-service")
+			return &defangv1.SubscribeResponse{
+				Name:   serviceName,
+				State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
+				Status: GetValueInStruct(request, "methodName"),
+			}, nil
+		} else if response := auditLog.GetResponse(); response != nil { // System log: service status update
+			serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
+			status := auditLog.GetStatus()
+			if status == nil {
+				return nil, errors.New("missing status in audit log for service " + serviceName)
+			}
+			var state defangv1.ServiceState
+			if status.GetCode() == 0 {
+				state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+			} else {
+				state = defangv1.ServiceState_DEPLOYMENT_FAILED
+			}
+			return &defangv1.SubscribeResponse{
+				Name:   serviceName,
+				State:  state,
+				Status: status.GetMessage(),
+			}, nil
+		} else {
+			return nil, errors.New("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
 		}
-		if len(serviceName) <= 8 {
-			return nil, errors.New("Invalid resource name in audit log : " + serviceName)
-		}
-		serviceName = serviceName[:len(serviceName)-8] // Remove the random suffix
+
 		// etag is at protoPayload.response.spec.template.metadata.labels.defang-etag
 		// etag := getValueInStruct(auditLog.GetResponse(), "spec.template.metadata.labels.defang-etag") // etag not needed
-		status := auditLog.GetStatus()
-		if status == nil {
-			return nil, errors.New("missing status in audit log")
-		}
-		var state defangv1.ServiceState
-		if status.GetCode() == 0 {
-			state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-		} else {
-			state = defangv1.ServiceState_DEPLOYMENT_FAILED
-		}
-
-		return &defangv1.SubscribeResponse{
-			Name:   serviceName,
-			State:  state,
-			Status: status.GetMessage(),
-		}, nil
+		// service.spec.template.metadata.labels."defang-service"
 
 	case "cloud_run_job": // Job execution update
+		if request := auditLog.GetRequest(); request != nil { // Acitivity log: job creation
+			serviceName := GetValueInStruct(request, "job.template.labels.defang-service")
+			if serviceName != "" {
+				return &defangv1.SubscribeResponse{
+					Name:   serviceName,
+					State:  defangv1.ServiceState_BUILD_ACTIVATING,
+					Status: "Building job creating",
+				}, nil
+			}
+		} else if response := auditLog.GetResponse(); response != nil { // System log: job status update
+			serviceName := GetValueInStruct(response, "metadata.labels.defang-service")
+			status := auditLog.GetStatus()
+			if status == nil {
+				return nil, errors.New("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+			}
+			var state defangv1.ServiceState
+			if status.GetCode() == 0 {
+				if strings.Contains(status.GetMessage(), "Ready condition status changed to True") { // TODO: Is it better to scan though the conditions instead?
+					state = defangv1.ServiceState_BUILD_RUNNING
+				} else {
+					state = defangv1.ServiceState_BUILD_STOPPING
+				}
+			} else {
+				state = defangv1.ServiceState_DEPLOYMENT_FAILED
+			}
+			if serviceName != "" {
+				return &defangv1.SubscribeResponse{
+					Name:   serviceName,
+					State:  state,
+					Status: status.GetMessage(),
+				}, nil
+			}
+		}
+		// CD job
 		executionName := path.Base(auditLog.GetResourceName())
 		if executionName == "" {
 			return nil, errors.New("missing resource name in audit log")
@@ -272,11 +327,15 @@ func ParseActivityEntry(entry *loggingpb.LogEntry) (*defangv1.SubscribeResponse,
 			return nil, errors.New("Invalid resource name in audit log : " + executionName)
 		}
 		executionName = executionName[:len(executionName)-6] // Remove the random suffix
-		if executionName == "defang-cd" && auditLog.GetStatus().GetCode() != 0 {
-			return nil, errors.New("defang CD task failed: " + auditLog.GetStatus().GetMessage())
+		if executionName == "defang-cd" {
+			if auditLog.GetStatus().GetCode() != 0 {
+				return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+			}
+			fmt.Println("Ignored successful cd run")
+			return nil, nil // Ignore success cd status
+		} else {
+			return nil, errors.New("unexpected execution name in audit log : " + executionName)
 		}
-		// FIXME: Handle kaniko build task status
-		return nil, nil // Ignore success cd status
 	default:
 		return nil, errors.New("unexpected resource type : " + entry.Resource.Type)
 	}
