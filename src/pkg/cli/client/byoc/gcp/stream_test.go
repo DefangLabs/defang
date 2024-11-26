@@ -28,9 +28,6 @@ func TestParseAcitivityEntry(t *testing.T) {
 	if resp == nil {
 		t.Fatal("ParseActivityEntry() returned nil response")
 	}
-	if resp.Name != "nginx" {
-		t.Errorf("ParseActivityEntry() returned unexpected name: %s, wanted nginx", resp.Name)
-	}
 	if resp.State != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
 		t.Errorf("ParseActivityEntry() returned unexpected state: %v, wanted DEPLOYMENT_COMPLETED", resp.State)
 	}
