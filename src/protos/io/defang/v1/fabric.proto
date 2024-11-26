@@ -81,7 +81,7 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
 
-  rpc PutDeployment(Deployment) returns (google.protobuf.Empty);
+  rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty);
   rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
@@ -331,16 +331,20 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
-message ListDeploymentsRequest {
-  string project = 1;
-}
-
 message Deployment {
   string id = 1;
   string project = 2;
   string provider = 3;
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
+}
+
+message PutDeploymentRequest {
+  Deployment deployment = 1;
+}
+
+message ListDeploymentsRequest {
+  string project = 1;
 }
 
 message ListDeploymentsResponse {

@@ -29,7 +29,7 @@ type FabricClient interface {
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
-	PutDeployment(context.Context, *defangv1.Deployment) error
+	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	RevokeToken(context.Context) error
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)

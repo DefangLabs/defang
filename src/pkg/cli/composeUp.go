@@ -120,12 +120,14 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 			return nil, project, err
 		}
 
-		err = c.PutDeployment(ctx, &defangv1.Deployment{
-			Id:                resp.Etag,
-			Project:           project.Name,
-			Provider:          string(accountInfo.Provider()),
-			ProviderAccountId: accountInfo.AccountID(),
-			Timestamp:         timestamppb.New(timestamp),
+		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+			Deployment: &defangv1.Deployment{
+				Id:                resp.Etag,
+				Project:           project.Name,
+				Provider:          string(accountInfo.Provider()),
+				ProviderAccountId: accountInfo.AccountID(),
+				Timestamp:         timestamppb.New(timestamp),
+			},
 		})
 		if err != nil {
 			return nil, project, err

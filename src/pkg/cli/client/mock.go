@@ -86,7 +86,7 @@ func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.Deleg
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
 }
 
-func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.Deployment) error {
+func (m MockFabricClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
 	return nil
 }
 
