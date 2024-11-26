@@ -2,12 +2,38 @@ package permissions
 
 import (
 	"fmt"
-	"strconv"
 
+	"github.com/DefangLabs/defang/src/pkg/quota"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 type ErrNoPermission string
+
+var ServiceQuotas = quota.ServiceQuotas{
+	Cpus:       16,
+	Gpus:       8,
+	MemoryMiB:  65536,
+	Replicas:   16,
+	ShmSizeMiB: 30720,
+}
+
+type ManagedQuotas struct {
+	Postgres uint32
+	Redis    uint32
+}
+
+var managedQuotas = ManagedQuotas{
+	Postgres: 1,
+	Redis:    1,
+}
+
+var ProjectQuota = quota.Quotas{
+	ServiceQuotas: ServiceQuotas,
+	ConfigCount:   20,   // TODO: add validation for this
+	ConfigSize:    4096, // TODO: add validation for this
+	Ingress:       10,   // TODO: add validation for this
+	Services:      40,
+}
 
 func (e ErrNoPermission) Error() string {
 	return "insufficient permissions to perform this action: " + string(e)
@@ -30,7 +56,7 @@ type ActionRequest struct {
 	tier     defangv1.SubscriptionTier
 	action   string
 	resource string
-	detail   string
+	count    float64
 }
 
 func createPermissionMap(rolesMap *RolesMap, role defangv1.SubscriptionTier, resource string, quota float64, action string, allowed bool) {
@@ -56,95 +82,36 @@ func createPermissionMap(rolesMap *RolesMap, role defangv1.SubscriptionTier, res
 
 func init() {
 	// Personal
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "compose-down", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "write-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "delete-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "delete-service", false)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "compose-down", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "write-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "delete-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "delete-service", false)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "postgres", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "compose-up", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "use-provider", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "use-provider", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "use-gpu", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "postgres", 0, "use-managed", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "redis", 0, "use-managed", false)
 
 	// Basic
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "compose-down", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "write-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "delete-config", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "delete-service", false)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "gpu", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "postgres", 0, "compose-up", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "redis", 0, "compose-up", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "gpu", 0, "use-gpu", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "postgres", 0, "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "redis", 0, "use-managed", true)
 
 	// Pro
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "gpu", 1, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "postgres", 1, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "redis", 1, "compose-up", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "gpu", float64(ServiceQuotas.Gpus), "use-gpu", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "postgres", float64(managedQuotas.Postgres), "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "redis", float64(managedQuotas.Redis), "use-managed", true)
 
 	// Team
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "aws", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "defang", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "compose-down", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "write-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "delete-config", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "digitalocean", 0, "delete-service", true)
-
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "gpu", 1, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "postgres", 1, "compose-up", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "redis", 1, "compose-up", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "digitalocean", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "gpu", float64(ServiceQuotas.Gpus), "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "postgres", float64(managedQuotas.Postgres), "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "redis", float64(managedQuotas.Redis), "use-managed", true)
 }
 
 func hasPermission(action ActionRequest, errorText string) error {
@@ -164,18 +131,8 @@ func hasPermission(action ActionRequest, errorText string) error {
 	}
 
 	hasMetQuota := true
-	if len(action.detail) > 0 {
-		reqResourceAmount, err := strconv.ParseFloat(action.detail, 32)
-		if err != nil {
-			return fmt.Errorf("unknown %s user quota: %s for resource %s", action.tier, action.detail, action.resource)
-		}
-
-		// zero resource request is always allowed
-		if reqResourceAmount == 0.0 {
-			isAllowed = true
-		}
-
-		hasMetQuota = reqResourceAmount <= actionMapping.ResourceQuota
+	if action.count > 0 {
+		hasMetQuota = action.count <= actionMapping.ResourceQuota
 	}
 
 	if isAllowed && hasMetQuota {
@@ -185,10 +142,10 @@ func hasPermission(action ActionRequest, errorText string) error {
 	return ErrNoPermission(errorText)
 }
 
-func HasPermission(tier defangv1.SubscriptionTier, action string, resource string, detail string, errorText string) error {
+func HasPermission(tier defangv1.SubscriptionTier, action string, resource string, count float64, errorText string) error {
 	actionReq := ActionRequest{
 		action:   action,
-		detail:   detail,
+		count:    count,
 		resource: resource,
 		tier:     tier,
 	}

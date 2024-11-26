@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -76,8 +75,8 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			errorText := "no compose up to " + providerID.String()
-			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", providerID.String(), "", errorText); err != nil {
+			errorText := fmt.Sprintf("no compose up on %s provider", providerID.String())
+			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 				return err
 			}
 
@@ -110,25 +109,36 @@ func makeComposeUpCmd() *cobra.Command {
 
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
+			var hasManagedServices bool = false
 			for key, count := range managedServices {
-				err = nil
 				switch key {
 				case "x-defang-redis":
-					err = permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "redis", strconv.Itoa(count), "no managed redis enabled at current subscription tier")
+					err = permissions.HasPermission(store.UserWhoAmI.Tier, "use-managed", "redis", float64(count), "no managed redis enabled at current subscription tier")
 				case "x-defang-postgres":
-					err = permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "postgres", strconv.Itoa(count), "no managed postgres enabled at current subscription tier")
+					err = permissions.HasPermission(store.UserWhoAmI.Tier, "use-managed", "postgres", float64(count), "no managed postgres enabled at current subscription tier")
+				default:
+					continue
 				}
 
 				if err != nil {
 					return err
 				}
+
+				hasManagedServices = true
 			}
 
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			permissions.HasPermission(store.UserWhoAmI.Tier, "compose-up", "service", "", "no services permitted at current subscription tier")
+			if hasManagedServices {
+				if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_PERSONAL {
+					if mode != Mode(defangv1.DeploymentMode_DEVELOPMENT) {
+						return permissions.ErrNoPermission("managed services supported by this tier only in development mode")
+					}
+				}
+			}
+
 			if detach {
 				term.Info("Detached.")
 				return nil
@@ -293,8 +303,8 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			errorText := "no compose down on " + providerID.String()
-			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+			errorText := fmt.Sprintf("no compose down on %s provider", providerID.String())
+			if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 				return err
 			}
 

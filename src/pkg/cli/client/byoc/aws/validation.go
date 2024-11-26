@@ -7,6 +7,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/store"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -71,7 +72,7 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
+func ValidateGPUResources(ctx context.Context, project *composeTypes.Project, mode defangv1.DeploymentMode) error {
 	// return after checking if there are actually non-zero GPUs requested
 	hasGPUs, quotaErr := hasGPUQuota(ctx)
 
@@ -89,7 +90,11 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) er
 						return quotaErr
 					}
 
-					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "deploy", "gpu", "", "no GPUs permitted at current subscription tier"); err != nil {
+					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "gpu", float64(device.Count), "not enough GPUs permitted at current subscription tier"); err != nil {
+						return err
+					}
+
+					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), "not enough GPUs permitted at current subscription tier"); err != nil {
 						return err
 					}
 

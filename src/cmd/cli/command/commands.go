@@ -683,8 +683,8 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		errorText := "no writing to config"
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "write-config", providerID.String(), "", errorText); err != nil {
+		errorText := fmt.Sprintf("write config on %s provider", providerID.String())
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 			return err
 		}
 
@@ -765,8 +765,8 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		errorText := "deleting config"
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "delete-config", providerID.String(), "", errorText); err != nil {
+		errorText := fmt.Sprintf("deleting config on %s provider", providerID.String())
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 			return err
 		}
 
@@ -834,8 +834,8 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		var errorText = "no compose down on " + providerID.String()
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "compose-down", providerID.String(), "", errorText); err != nil {
+		var errorText = fmt.Sprintf("no compose down on %s provider", providerID.String())
+		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
 			return err
 		}
 
@@ -875,7 +875,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("Command 'restart' is deprecated, use 'up' instead")
+		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 

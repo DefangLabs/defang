@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -51,22 +52,9 @@ type ByocBaseClient struct {
 
 func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
 	b := &ByocBaseClient{
-		TenantID:    string(tenantID),
-		PulumiStack: "beta", // TODO: make customizable
-		Quota: quota.Quotas{
-			// These serve mostly to prevent fat-finger errors in the CLI or Compose files
-			ServiceQuotas: quota.ServiceQuotas{
-				Cpus:       16,
-				Gpus:       8,
-				MemoryMiB:  65536,
-				Replicas:   16,
-				ShmSizeMiB: 30720,
-			},
-			ConfigCount: 20,   // TODO: add validation for this
-			ConfigSize:  4096, // TODO: add validation for this
-			Ingress:     10,   // TODO: add validation for this
-			Services:    40,
-		},
+		TenantID:        string(tenantID),
+		PulumiStack:     "beta", // TODO: make customizable
+		Quota:           permissions.ProjectQuota,
 		bootstrapLister: bl,
 	}
 	return b

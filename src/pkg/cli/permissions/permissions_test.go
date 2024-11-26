@@ -15,10 +15,28 @@ func TestPermission(t *testing.T) {
 		expectedErrorText string
 	}{
 		{
+			name: "no permission for provider = aws",
+			action: ActionRequest{
+				tier:     defangv1.SubscriptionTier_PERSONAL,
+				action:   "use-provider",
+				resource: "aws",
+			},
+			expectedErrorText: "aws not supported by this tier",
+		},
+		{
+			name: "has permission for provider = aws",
+			action: ActionRequest{
+				tier:     defangv1.SubscriptionTier_BASIC,
+				action:   "use-provider",
+				resource: "aws",
+			},
+			expectedErrorText: "",
+		},
+		{
 			name: "no permission for gpu",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "compose-up",
+				action:   "use-gpu",
 				resource: "gpu",
 			},
 			expectedErrorText: "gpus not supported by this tier",
@@ -27,9 +45,9 @@ func TestPermission(t *testing.T) {
 			name: "have permission for gpu",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PRO,
-				action:   "compose-up",
+				action:   "use-gpu",
 				resource: "gpu",
-				detail:   "1",
+				count:    1,
 			},
 			expectedErrorText: "",
 		},
@@ -37,9 +55,9 @@ func TestPermission(t *testing.T) {
 			name: "have permission gpu 0",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_BASIC,
-				action:   "compose-up",
+				action:   "use-gpu",
 				resource: "gpu",
-				detail:   "0",
+				count:    0,
 			},
 			expectedErrorText: "",
 		},
@@ -47,21 +65,32 @@ func TestPermission(t *testing.T) {
 			name: "no permission gpu 1",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_BASIC,
-				action:   "compose-up",
+				action:   "use-gpu",
 				resource: "gpu",
-				detail:   "1",
+				count:    1,
 			},
 			expectedResult:    false,
 			expectedErrorText: "gpus not supported by this tier",
 		},
 		{
-			name: "has permission provider aws",
+			name: "have permission managed postgres",
 			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "compose-up",
-				resource: "aws",
+				tier:     defangv1.SubscriptionTier_PRO,
+				action:   "use-managed",
+				resource: "postgres",
+				count:    1,
 			},
-			expectedErrorText: "deploy to aws",
+			expectedErrorText: "",
+		},
+		{
+			name: "have permission managed redis",
+			action: ActionRequest{
+				tier:     defangv1.SubscriptionTier_PRO,
+				action:   "use-managed",
+				resource: "redis",
+				count:    1,
+			},
+			expectedErrorText: "",
 		},
 		{
 			name: "unknown permission check errors",
@@ -76,7 +105,7 @@ func TestPermission(t *testing.T) {
 
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HasPermission(tt.action.tier, tt.action.action, tt.action.resource, tt.action.detail, tt.expectedErrorText)
+			err := HasPermission(tt.action.tier, tt.action.action, tt.action.resource, tt.action.count, tt.expectedErrorText)
 			if err != nil {
 				if !strings.Contains(err.Error(), tt.expectedErrorText) {
 					t.Fatalf("unexpected error: %v", err)

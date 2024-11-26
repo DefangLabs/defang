@@ -241,7 +241,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	quotaClient = NewServiceQuotasClient(ctx, cfg)
-	if err = ValidateGPUResources(ctx, project); err != nil {
+	if err = ValidateGPUResources(ctx, project, req.GetMode()); err != nil {
 		return nil, err
 	}
 

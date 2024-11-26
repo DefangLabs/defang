@@ -84,7 +84,7 @@ func TestCommandPermission(t *testing.T) {
 			name:      "PERSONAL - compose up - aws - no permission",
 			userTier:  defangv1.SubscriptionTier_PERSONAL,
 			command:   []string{"compose", "up", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: no compose up to aws",
+			wantError: "insufficient permissions to perform this action: no compose up on aws provider",
 		},
 		{
 			name:      "PERSONAL - compose up - defang - no permission",
@@ -96,19 +96,19 @@ func TestCommandPermission(t *testing.T) {
 			name:      "PERSONAL - compose down - aws - has permission",
 			userTier:  defangv1.SubscriptionTier_PERSONAL,
 			command:   []string{"compose", "down", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: no compose down to aws",
+			wantError: "insufficient permissions to perform this action: no compose down on aws provider",
 		},
 		{
 			name:      "PERSONAL - config set - aws - no permission",
 			userTier:  defangv1.SubscriptionTier_PERSONAL,
 			command:   []string{"config", "set", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: config set on aws",
+			wantError: "insufficient permissions to perform this action: config set on aws provider",
 		},
 		{
 			name:      "PERSONAL - config rm - aws - no permission",
 			userTier:  defangv1.SubscriptionTier_PERSONAL,
 			command:   []string{"config", "rm", "var", "--project-name", "app", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: config rm on aws",
+			wantError: "insufficient permissions to perform this action: config rm on aws provider",
 		},
 		{
 			name:      "PERSONAL - config rm - defang - has permission",
@@ -120,7 +120,7 @@ func TestCommandPermission(t *testing.T) {
 			name:      "PERSONAL - delete service - aws - no permission",
 			userTier:  defangv1.SubscriptionTier_PERSONAL,
 			command:   []string{"delete", "abc", "--provider", "aws", "--dry-run"},
-			wantError: "insufficient permissions to perform this action: delete service on aws",
+			wantError: "insufficient permissions to perform this action: delete service on aws provider",
 		},
 		// {
 		// 	name:      "PERSONAL - send - aws - has permission",
@@ -211,7 +211,7 @@ func TestCommandPermission(t *testing.T) {
 					Tier:    tt.userTier,
 				}
 				aws.StsClient = stsProviderApi
-				pkg.SsmClient = ssmClient
+				pkg.SsmClientOverride = ssmClient
 
 				err := testCommand(tt.command)
 

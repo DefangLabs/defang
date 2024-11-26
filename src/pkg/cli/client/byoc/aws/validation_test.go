@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
 	aws "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/store"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 
@@ -33,7 +35,12 @@ var ctx = context.Background()
 var mockQuotaClient = &MockQuotaClientApi{}
 
 func TestValidateGPUResources(t *testing.T) {
-	t.Run("No service quuota received", func(t *testing.T) {
+	originalWhoAmI := store.UserWhoAmI
+	store.UserWhoAmI = &defangv1.WhoAmIResponse{
+		Tier: defangv1.SubscriptionTier_PRO,
+	}
+
+	t.Run("No service quota received", func(t *testing.T) {
 		testService := composeTypes.ServiceConfig{
 			Deploy: &composeTypes.DeployConfig{
 				Resources: composeTypes.Resources{
@@ -50,12 +57,12 @@ func TestValidateGPUResources(t *testing.T) {
 				"test": testService,
 			},
 		}
-
 		quotaClient = mockQuotaClient
 		mockQuotaClient.output = nil
 		mockQuotaClient.err = ErrNoQuotasReceived
+		mode := defangv1.DeploymentMode_STAGING
 
-		err := ValidateGPUResources(ctx, &project)
+		err := ValidateGPUResources(ctx, &project, mode)
 		if err != nil && errors.Is(err, ErrNoQuotasReceived) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected errors %v", err)
 		}
@@ -81,13 +88,14 @@ func TestValidateGPUResources(t *testing.T) {
 
 		quotaClient = nil
 		mockQuotaClient.err = nil
-		err := ValidateGPUResources(ctx, &project)
+		mode := defangv1.DeploymentMode_STAGING
+		err := ValidateGPUResources(ctx, &project, mode)
 		if err != nil {
 			t.Fatalf("ValidateGPUResources() failed: expected no errors but got %v", err)
 		}
 	})
 
-	t.Run("no gpu quota but requesting one", func(t *testing.T) {
+	t.Run("zero gpu quota but requesting 24", func(t *testing.T) {
 		testService := composeTypes.ServiceConfig{
 			Deploy: &composeTypes.DeployConfig{
 				Resources: composeTypes.Resources{
@@ -115,13 +123,15 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		err := ValidateGPUResources(ctx, &project)
-		if err != nil && !errors.Is(err, ErrGPUQuotaZero) {
+		mode := defangv1.DeploymentMode_STAGING
+		err := ValidateGPUResources(ctx, &project, mode)
+		errNoPerm := permissions.ErrNoPermission("not enough GPUs permitted at current subscription tier")
+		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
 
-	t.Run("gpu quota exists but requesting one", func(t *testing.T) {
+	t.Run("gpu quota exists and requesting more", func(t *testing.T) {
 		testService := composeTypes.ServiceConfig{
 			Deploy: &composeTypes.DeployConfig{
 				Resources: composeTypes.Resources{
@@ -149,7 +159,43 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		err := ValidateGPUResources(ctx, &project)
+		mode := defangv1.DeploymentMode_STAGING
+		err := ValidateGPUResources(ctx, &project, mode)
+		if err != nil {
+			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
+		}
+	})
+
+	t.Run("gpu quota exists and requesting one but fail because in developer deployment mode", func(t *testing.T) {
+		testService := composeTypes.ServiceConfig{
+			Deploy: &composeTypes.DeployConfig{
+				Resources: composeTypes.Resources{
+					Reservations: &composeTypes.Resource{
+						Devices: []composeTypes.DeviceRequest{
+							{Capabilities: []string{"gpu"}, Count: 1},
+						},
+					},
+				},
+			},
+		}
+		project := composeTypes.Project{
+			Services: map[string]composeTypes.ServiceConfig{
+				"test": testService,
+			},
+		}
+
+		quotaClient = mockQuotaClient
+		mockQuotaClient.err = nil
+		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
+			Quotas: []quotaTypes.ServiceQuota{
+				{
+					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
+					Value:     awssdk.Float64(1),
+				},
+			},
+		}
+		mode := defangv1.DeploymentMode_DEVELOPMENT
+		err := ValidateGPUResources(ctx, &project, mode)
 		if err != nil {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
@@ -175,11 +221,14 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 
 		quotaClient = nil
-		err := ValidateGPUResources(ctx, &project)
+		mode := defangv1.DeploymentMode_STAGING
+		err := ValidateGPUResources(ctx, &project, mode)
 		if err != nil && !errors.Is(err, ErrAWSNoConnection) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
+
+	store.UserWhoAmI = originalWhoAmI
 }
 
 func TestDeployValidateGPUResources(t *testing.T) {
