@@ -203,6 +203,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
+	RootCmd.Flag("provider").NoOptDefVal = "auto"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -1166,6 +1167,20 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	if err != nil {
 		panic(err)
 	}
+	// Avoid common mistakes: using -p with a provider name instead of -P
+	var prov cliClient.ProviderID
+	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
+		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
+		if !nonInteractive {
+			var confirm bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: "Continue with project: " + projectName + "?",
+			}, &nonInteractive)
+			if err == nil && !confirm {
+				os.Exit(1)
+			}
+		}
+	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
 }
 
@@ -1187,7 +1202,7 @@ func IsCompletionCommand(cmd *cobra.Command) bool {
 }
 
 var providerDescription = map[cliClient.ProviderID]string{
-	cliClient.ProviderDefang: "The Defang Playground is a free environment for testing only.",
+	cliClient.ProviderDefang: "The Defang Playground is a free platform intended for testing purposes only.",
 	cliClient.ProviderAWS:    "Deploy to AWS using the AWS_* environment variables or the AWS CLI configuration.",
 	cliClient.ProviderDO:     "Deploy to DigitalOcean using the DIGITALOCEAN_TOKEN, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY environment variables.",
 }
@@ -1265,8 +1280,16 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 	for _, p := range cliClient.AllProviders() {
 		options = append(options, p.String())
 	}
+	// Default to the provider in the environment if available
+	var defaultOption any // not string!
+	if awsInEnv() {
+		defaultOption = cliClient.ProviderAWS.String()
+	} else if doInEnv() {
+		defaultOption = cliClient.ProviderDO.String()
+	}
 	var optionValue string
 	if err := survey.AskOne(&survey.Select{
+		Default: defaultOption,
 		Message: "Choose a cloud provider:",
 		Options: options,
 		Help:    "The provider you choose will be used for deploying services.",
