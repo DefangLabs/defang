@@ -5,7 +5,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
+	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/store"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -90,12 +90,12 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project, mo
 						return quotaErr
 					}
 
-					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "gpu", float64(device.Count), "not enough GPUs permitted at current subscription tier"); err != nil {
+					if err := gating.HasAuthorization(store.UserWhoAmI.Tier, "use-gpu", "gpu", float64(device.Count), "not enough GPUs permitted at current subscription tier"); err != nil {
 						return err
 					}
 
 					errorText := "cannot deploy GPUs for current deployment mode " + mode.String()
-					if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), errorText); err != nil {
+					if err := gating.HasAuthorization(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), errorText); err != nil {
 						return err
 					}
 

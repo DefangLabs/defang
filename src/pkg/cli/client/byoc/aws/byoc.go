@@ -23,7 +23,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
-
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -67,6 +66,8 @@ type ByocAws struct {
 	lastCdEtag       types.ETag
 	lastCdStart      time.Time
 	lastCdTaskArn    ecs.TaskArn
+
+	stsClient StsProviderAPI
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -123,15 +124,17 @@ func newByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
 
-	if StsClient == nil {
-		cfg := aws.PanicOnError(b.driver.LoadConfig(ctx))
-		StsClient = sts.NewFromConfig(cfg)
-	}
-
 	return b
 }
 
 var NewByocProvider NewByocInterface = newByocProvider
+
+func (b *ByocAws) initStsClient(cfg awssdk.Config) {
+	b.stsClient = StsClient
+	if b.stsClient == nil {
+		b.stsClient = sts.NewFromConfig(cfg)
+	}
+}
 
 func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
 	if b.SetupDone {
@@ -332,7 +335,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
+		b.initStsClient(cfg)
+		creds := stscreds.NewAssumeRoleProvider(b.stsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -439,7 +443,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	b.initStsClient(cfg)
+
+	identity, err := b.stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}

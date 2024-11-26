@@ -16,16 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type UserInfo struct {
-	Account string
-	Region  string
-	UserId  string
-	Tier    defangv1.SubscriptionTier
-}
-
 type GrpcClient struct {
-	anonID   string
-	client   defangv1connect.FabricControllerClient
+	anonID string
+	client defangv1connect.FabricControllerClient
+
 	TenantID types.TenantID
 }
 

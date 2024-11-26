@@ -1,4 +1,4 @@
-package permissions
+package gating
 
 import (
 	"strings"
@@ -7,7 +7,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func TestPermission(t *testing.T) {
+func TestAccessGates(t *testing.T) {
 	test := []struct {
 		name              string
 		action            ActionRequest
@@ -17,7 +17,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "no permission for provider = aws",
 			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_PERSONAL,
+				tier:     defangv1.SubscriptionTier_HOBBY,
 				action:   "use-provider",
 				resource: "aws",
 			},
@@ -26,7 +26,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "has permission for provider = aws",
 			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_BASIC,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "use-provider",
 				resource: "aws",
 			},
@@ -54,7 +54,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "have permission gpu 0",
 			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_BASIC,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "use-gpu",
 				resource: "gpu",
 				count:    0,
@@ -64,7 +64,7 @@ func TestPermission(t *testing.T) {
 		{
 			name: "no permission gpu 1",
 			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_BASIC,
+				tier:     defangv1.SubscriptionTier_PERSONAL,
 				action:   "use-gpu",
 				resource: "gpu",
 				count:    1,
@@ -105,7 +105,7 @@ func TestPermission(t *testing.T) {
 
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HasPermission(tt.action.tier, tt.action.action, tt.action.resource, tt.action.count, tt.expectedErrorText)
+			err := HasAuthorization(tt.action.tier, tt.action.action, tt.action.resource, tt.action.count, tt.expectedErrorText)
 			if err != nil {
 				if !strings.Contains(err.Error(), tt.expectedErrorText) {
 					t.Fatalf("unexpected error: %v", err)

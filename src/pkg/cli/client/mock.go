@@ -71,7 +71,6 @@ func (m *MockServerStream) Err() error {
 type MockFabricClient struct {
 	FabricClient
 	DelegateDomain string
-	ProviderID     defangv1.Provider
 }
 
 func (m MockFabricClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
@@ -84,14 +83,6 @@ func (m MockFabricClient) DeleteSubdomainZone(ctx context.Context) error {
 
 func (m MockFabricClient) DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: "example.com"}, nil
-}
-
-func (m MockFabricClient) GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error) {
-	return &defangv1.GetSelectedProviderResponse{Provider: m.ProviderID}, nil
-}
-
-func (m MockFabricClient) SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error {
-	return nil
 }
 
 type MockLoader struct {

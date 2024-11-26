@@ -1,4 +1,4 @@
-package permissions
+package gating
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ var ProjectQuota = quota.Quotas{
 }
 
 func (e ErrNoPermission) Error() string {
-	return "insufficient permissions to perform this action: " + string(e)
+	return "current tier does not allow this action: " + string(e)
 }
 
 type ActionPermission map[string]bool
@@ -46,10 +46,10 @@ type PermissionQuota struct {
 }
 
 type ResourceMapping map[string]PermissionQuota
-type RolesMap map[defangv1.SubscriptionTier]ResourceMapping
+type TiersMap map[defangv1.SubscriptionTier]ResourceMapping
 
 var (
-	tiers = RolesMap{}
+	tiers = TiersMap{}
 )
 
 type ActionRequest struct {
@@ -59,11 +59,11 @@ type ActionRequest struct {
 	count    float64
 }
 
-func createPermissionMap(rolesMap *RolesMap, role defangv1.SubscriptionTier, resource string, quota float64, action string, allowed bool) {
-	resourceMapping, ok := (*rolesMap)[role]
+func createPermissionMap(tierMap *TiersMap, tier defangv1.SubscriptionTier, resource string, quota float64, action string, allowed bool) {
+	resourceMapping, ok := (*tierMap)[tier]
 	if !ok {
-		(*rolesMap)[role] = ResourceMapping{}
-		resourceMapping = (*rolesMap)[role]
+		(*tierMap)[tier] = ResourceMapping{}
+		resourceMapping = (*tierMap)[tier]
 	}
 
 	actionMapping, ok := resourceMapping[resource]
@@ -82,20 +82,20 @@ func createPermissionMap(rolesMap *RolesMap, role defangv1.SubscriptionTier, res
 
 func init() {
 	// Personal
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "use-provider", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "use-provider", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "use-gpu", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "postgres", 0, "use-managed", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "redis", 0, "use-managed", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "aws", 0, "use-provider", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "digitalocean", 0, "use-provider", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "gpu", 0, "use-gpu", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "postgres", 0, "use-managed", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_HOBBY, "redis", 0, "use-managed", false)
 
 	// Basic
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "aws", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "defang", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "digitalocean", 0, "use-provider", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "gpu", 0, "use-gpu", false)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "postgres", 0, "use-managed", true)
-	createPermissionMap(&tiers, defangv1.SubscriptionTier_BASIC, "redis", 0, "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "aws", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "defang", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "digitalocean", 0, "use-provider", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "gpu", 0, "use-gpu", false)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "postgres", 0, "use-managed", true)
+	createPermissionMap(&tiers, defangv1.SubscriptionTier_PERSONAL, "redis", 0, "use-managed", true)
 
 	// Pro
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_PRO, "aws", 0, "use-provider", true)
@@ -120,7 +120,7 @@ func init() {
 	createPermissionMap(&tiers, defangv1.SubscriptionTier_TEAM, "mode", float64(defangv1.DeploymentMode_DEVELOPMENT), "use-gpu", false)
 }
 
-func hasPermission(action ActionRequest, errorText string) error {
+func hasAuthorization(action ActionRequest, errorText string) error {
 	resourceMapping, ok := tiers[action.tier]
 	if !ok {
 		return fmt.Errorf("unknown subscription tier: %s", action.tier)
@@ -148,7 +148,7 @@ func hasPermission(action ActionRequest, errorText string) error {
 	return ErrNoPermission(errorText)
 }
 
-func HasPermission(tier defangv1.SubscriptionTier, action string, resource string, count float64, errorText string) error {
+func HasAuthorization(tier defangv1.SubscriptionTier, action string, resource string, count float64, errorText string) error {
 	actionReq := ActionRequest{
 		action:   action,
 		count:    count,
@@ -156,5 +156,5 @@ func HasPermission(tier defangv1.SubscriptionTier, action string, resource strin
 		tier:     tier,
 	}
 
-	return hasPermission(actionReq, errorText)
+	return hasAuthorization(actionReq, errorText)
 }

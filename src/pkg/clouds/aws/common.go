@@ -21,14 +21,6 @@ func (r Region) String() string {
 	return string(r)
 }
 
-// implementation copy from fabric
-func PanicOnError(cfg aws.Config, err error) aws.Config {
-	if err != nil {
-		panic(err)
-	}
-	return cfg
-}
-
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, a.Region)
 	if err != nil {

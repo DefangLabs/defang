@@ -19,7 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/cli/permissions"
+	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
@@ -69,7 +69,7 @@ func prettyError(err error) error {
 
 const CLOUD_PROVIDER_PROJECT = "last-cloud-deployed-project"
 
-func canUseProvider(ctx context.Context) (bool, error) {
+func canUseProvider(ctx context.Context) error {
 	var req = &defangv1.GetSelectedProviderRequest{
 		Project: CLOUD_PROVIDER_PROJECT,
 	}
@@ -82,17 +82,22 @@ func canUseProvider(ctx context.Context) (bool, error) {
 		var err error
 		resp, err = client.GetSelectedProvider(ctx, req)
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 
-	if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_BASIC {
-		if resp.Provider.String() != providerID.String() {
-			return false, permissions.ErrNoPermission("basic tier on supports one cloud provider at a time")
+	if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_PERSONAL {
+		if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED && strings.ToLower(resp.Provider.String()) != providerID.String() {
+			return gating.ErrNoPermission("basic tier only supports one cloud provider at a time")
 		}
 	}
 
-	return true, nil
+	var errorText = fmt.Sprintf("no access to use %s provider", providerID.String())
+	if err := gating.HasAuthorization(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func setLastUserProvider(ctx context.Context, provider cliClient.Provider) error {
@@ -103,21 +108,24 @@ func setLastUserProvider(ctx context.Context, provider cliClient.Provider) error
 		}
 
 		// only update to provider to Auto if no projects exist
+		overrideLastUseProviderID = providerID
 		if len(projects) == 0 {
-			var req = &defangv1.SetSelectedProviderRequest{
-				Project:  CLOUD_PROVIDER_PROJECT,
-				Provider: cliClient.ProviderAuto.EnumValue(),
-			}
-
 			overrideLastUseProviderID = cliClient.ProviderAuto
-			if err := client.SetSelectedProvider(ctx, req); err != nil {
-				return fmt.Errorf("failed to set the last cloud deployment provider: %v", err)
-			}
+		}
+
+		var req = &defangv1.SetSelectedProviderRequest{
+			Project:  CLOUD_PROVIDER_PROJECT,
+			Provider: overrideLastUseProviderID.EnumValue(),
+		}
+
+		if err := client.SetSelectedProvider(ctx, req); err != nil {
+			return fmt.Errorf("failed to set the last cloud deployment provider: %v", err)
 		}
 	}
 
 	return nil
 }
+
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -385,7 +393,6 @@ var RootCmd = &cobra.Command{
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
-
 			if nonInteractive {
 				return err
 			}
@@ -400,8 +407,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err != nil { // recheck (new token = new user)
-					return err
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
+					return nil // success
 				}
 			}
 
@@ -415,10 +422,6 @@ var RootCmd = &cobra.Command{
 				}
 			}
 		}
-
-		// if err == nil && store.UserWhoAmI == nil {
-		// 	return loadWhoAmIToStore(cmd.Context(), client)
-		// }
 
 		return err
 	},
@@ -455,6 +458,11 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
@@ -480,6 +488,10 @@ var certGenerateCmd = &cobra.Command{
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
+			return err
+		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -729,12 +741,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
-			return err
-		}
-
-		errorText := fmt.Sprintf("write config on %s provider", providerID.String())
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -815,12 +822,7 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
-			return err
-		}
-
-		errorText := fmt.Sprintf("deleting config on %s provider", providerID.String())
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -851,6 +853,11 @@ var configListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.ConfigList(cmd.Context(), loader, provider)
 	},
 }
@@ -868,6 +875,7 @@ var debugCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
 	},
 }
@@ -888,8 +896,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		var errorText = fmt.Sprintf("no compose down on %s provider", providerID.String())
-		if err := permissions.HasPermission(store.UserWhoAmI.Tier, "use-provider", providerID.String(), 0, errorText); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -929,7 +936,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("command 'restart' is deprecated, use 'up' instead")
+		return errors.New("Command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
@@ -959,6 +966,10 @@ var tokenCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
 
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
@@ -997,7 +1008,7 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1016,7 +1027,7 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1035,7 +1046,7 @@ var cdRefreshCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1053,6 +1064,11 @@ var cdCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
 	},
 }
@@ -1070,7 +1086,7 @@ var cdTearDownCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := canUseProvider(cmd.Context()); err != nil {
+		if err := canUseProvider(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1091,6 +1107,11 @@ var cdListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		if remote {
 			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
 		}
@@ -1109,6 +1130,11 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		if err := canUseProvider(cmd.Context()); err != nil {
+			return err
+		}
+
 		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
