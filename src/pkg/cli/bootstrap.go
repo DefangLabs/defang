@@ -40,6 +40,9 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	if err != nil {
 		return err
 	}
+	if len(stacks) == 0 {
+		fmt.Println("No projects found.")
+	}
 	for _, stack := range stacks {
 		fmt.Println(" -", stack)
 	}
