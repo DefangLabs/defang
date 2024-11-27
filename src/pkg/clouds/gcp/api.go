@@ -33,6 +33,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	}
 
 	if len(apis) == 0 {
+		term.Debugf("All services already enabled\n")
 		return nil
 	}
 

@@ -20,10 +20,10 @@ import (
 type LogParser[T any] func(*loggingpb.LogEntry) (T, error)
 
 type ServerStream[T any] struct {
-	ctx     context.Context
-	gcp     *gcp.Gcp
-	parse   LogParser[T]
-	tailers []*gcp.Tailer
+	ctx    context.Context
+	gcp    *gcp.Gcp
+	parse  LogParser[T]
+	tailer *gcp.Tailer
 
 	lastResp T
 	lastErr  error
@@ -32,25 +32,25 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) *ServerStream[T] {
+func NewStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) (*ServerStream[T], error) {
+	tailer, err := gcp.NewTailer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:   streamCtx,
-		gcp:   gcp,
-		parse: parse,
+		ctx:    streamCtx,
+		gcp:    gcp,
+		parse:  parse,
+		tailer: tailer,
 
 		respCh: make(chan T),
 		errCh:  make(chan error),
 		cancel: cancel,
-	}
+	}, nil
 }
 
 func (s *ServerStream[T]) Close() error {
-	for _, t := range s.tailers {
-		if err := t.Close(); err != nil {
-			return err
-		}
-	}
 	s.cancel() // TODO: investigate if we need to close the tailer
 	return nil
 }
@@ -64,11 +64,13 @@ func (s *ServerStream[T]) Receive() bool {
 	}
 }
 
-func (s *ServerStream[T]) AddTailer(t *gcp.Tailer) {
-	s.tailers = append(s.tailers, t)
+func (s *ServerStream[T]) Start() error {
+	if err := s.tailer.Start(s.ctx); err != nil {
+		return err
+	}
 	go func() {
 		for {
-			entry, err := t.Next(s.ctx)
+			entry, err := s.tailer.Next(s.ctx)
 			if err != nil {
 				s.errCh <- err
 				return
@@ -81,6 +83,7 @@ func (s *ServerStream[T]) AddTailer(t *gcp.Tailer) {
 			s.respCh <- resp
 		}
 	}()
+	return nil
 }
 
 func (s *ServerStream[T]) Err() error {
@@ -95,80 +98,136 @@ type LogStream struct {
 	*ServerStream[*defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcp *gcp.Gcp) *LogStream {
-	return &LogStream{
-		ServerStream: NewStream(ctx, gcp, getLogEntryParser(ctx, gcp)),
+func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
+	ss, err := NewStream(ctx, gcp, getLogEntryParser(ctx, gcp))
+	if err != nil {
+		return nil, err
 	}
+	return &LogStream{ServerStream: ss}, nil
 }
 
-func (s *LogStream) AddJobLog(ctx context.Context, project, executionName string, services []string, since time.Time) error {
-	tailer, err := s.gcp.NewTailer(ctx)
-	if err != nil {
-		return err
+func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
+	query := fmt.Sprintf(`
+resource.type = "cloud_run_job"
+labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+
+	if !since.IsZero() {
+		query += fmt.Sprintf(`
+timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 	}
-	if err := tailer.AddJobLog(ctx, project, executionName, services, since); err != nil {
-		return err
-	}
-	s.ServerStream.AddTailer(tailer)
-	return nil
+
+	s.tailer.AddQuerySet(query)
 }
 
-func (s *LogStream) AddServiceLog(ctx context.Context, project, etag string, services []string, since time.Time) error {
-	tailer, err := s.gcp.NewTailer(ctx)
-	if err != nil {
-		return err
+func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
+	query := `
+resource.type = "cloud_run_job"`
+
+	if project != "" {
+		query += fmt.Sprintf(`
+labels."defang-project" = "%v"`, project)
 	}
-	if err := tailer.AddServiceLog(ctx, project, etag, services, since); err != nil {
-		return err
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+labels."defang-etag"="%v"`, etag)
 	}
-	s.ServerStream.AddTailer(tailer)
-	return nil
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+	}
+
+	if !since.IsZero() {
+		query += fmt.Sprintf(`
+timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
+	}
+
+	s.tailer.AddQuerySet(query)
+}
+
+func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
+	query := `
+resource.type="cloud_run_revision"`
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+labels."defang-etag"="%v"`, etag)
+	}
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+	}
+
+	if !since.IsZero() {
+		query += fmt.Sprintf(`
+timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
+	}
+
+	s.tailer.AddQuerySet(query)
 }
 
 type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp) *SubscribeStream {
-	return &SubscribeStream{
-		ServerStream: NewStream(ctx, gcp, ParseActivityEntry),
+func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp) (*SubscribeStream, error) {
+	ss, err := NewStream(ctx, gcp, ParseActivityEntry)
+	if err != nil {
+		return nil, err
 	}
+	ss.tailer.SetBaseQuery(`logName:"cloudaudit.googleapis.com" AND protoPayload.serviceName="run.googleapis.com"`)
+	return &SubscribeStream{ServerStream: ss}, nil
 }
 
-func (s *SubscribeStream) AddJobExecutionUpdate(ctx context.Context, executionName string) error {
-	tailer, err := s.gcp.NewTailer(ctx)
-	if err != nil {
-		return err
-	}
-	if err := tailer.AddJobExecutionUpdate(ctx, executionName); err != nil {
-		return err
-	}
-	s.ServerStream.AddTailer(tailer)
-	return nil
+func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
+	query := fmt.Sprintf(`
+labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	s.tailer.AddQuerySet(query)
 }
 
-func (s *SubscribeStream) AddJobStatusUpdate(ctx context.Context, project, etag string, services []string) error {
-	tailer, err := s.gcp.NewTailer(ctx)
-	if err != nil {
-		return err
+func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
+	query := `
+protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
+
+	if project != "" {
+		query += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-project"="%v"`, project)
 	}
-	if err := tailer.AddJobStatusUpdate(ctx, project, etag, services); err != nil {
-		return err
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-etag"="%v"`, etag)
 	}
-	s.ServerStream.AddTailer(tailer)
-	return nil
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+protoPayload.response.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+	}
+
+	s.tailer.AddQuerySet(query)
 }
 
-func (s *SubscribeStream) AddServiceStatusUpdate(ctx context.Context, project, etag string, services []string) error {
-	tailer, err := s.gcp.NewTailer(ctx)
-	if err != nil {
-		return err
+func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
+	query := `
+protoPayload.methodName="google.cloud.run.v1.Services.CreateService" OR "/Services.CreateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
+
+	if project != "" {
+		query += fmt.Sprintf(`
+protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
 	}
-	if err := tailer.AddServiceStatusUpdate(ctx, project, etag, services); err != nil {
-		return err
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
 	}
-	s.ServerStream.AddTailer(tailer)
-	return nil
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+	}
+	s.tailer.AddQuerySet(query)
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)

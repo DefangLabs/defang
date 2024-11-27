@@ -6,6 +6,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	artifactregistry "cloud.google.com/go/artifactregistry/apiv1"
 	"cloud.google.com/go/iam"
@@ -16,6 +17,8 @@ import (
 	iamv1 "cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"cloud.google.com/go/storage"
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	gax "github.com/googleapis/gax-go/v2"
 )
 
@@ -37,14 +40,17 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 			role.GetTitle() == title &&
 			role.GetDescription() == description &&
 			role.Stage == iamadmpb.Role_GA {
+			term.Debugf("Role %s already exists", roleId)
 			return role.Name, nil
 		}
 
+		// Update the role
 		role.IncludedPermissions = permissions
 		role.Title = title
 		role.Description = description
 		role.Stage = iamadmpb.Role_GA
-		if _, err := client.UpdateRole(ctx, &iamadmpb.UpdateRoleRequest{Role: role}); err != nil {
+		term.Infof("Updating role %s", roleId)
+		if _, err := client.UpdateRole(ctx, &iamadmpb.UpdateRoleRequest{Name: roleName, Role: role}); err != nil {
 			return "", fmt.Errorf("failed to update role: %w", err)
 		}
 	}
@@ -61,17 +67,27 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 				Stage:               iamadmpb.Role_GA, // TODO: investigate stage
 			},
 		}
-		role, err := client.CreateRole(ctx, req)
+		term.Infof("Creating role %s", roleId)
+		role, err = client.CreateRole(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("failed to create role: %w", err)
 		}
-
-		log.Printf("Role %s created successfully.", roleId)
-		return role.Name, nil
+		term.Debugf("Role %s created successfully.", roleId)
 	}
 
-	// Handle unexpected errors
-	return "", fmt.Errorf("failed to check role existence: %w", err)
+	// Wait for the role to be created or updated
+	for start := time.Now(); time.Since(start) < 5*time.Minute; {
+		role, err = client.GetRole(ctx, &iamadmpb.GetRoleRequest{Name: role.Name})
+		if err != nil {
+			if IsNotFound(err) {
+				pkg.SleepWithContext(ctx, 3*time.Second)
+				continue
+			}
+			return "", fmt.Errorf("failed to verify role creation: %w", err)
+		}
+		return role.Name, nil
+	}
+	return "", fmt.Errorf("timed out waiting for creation of role %s", roleId)
 }
 
 func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId, displayName, description string) (string, error) {
@@ -88,11 +104,13 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 	if err == nil {
 		if account.GetDisplayName() == displayName &&
 			account.GetDescription() == description {
+			term.Debugf("Service account %s already exists", serviceAccountId)
 			return account.Name, nil
 		}
 
 		account.DisplayName = displayName
 		account.Description = description
+		term.Infof("Updating service account %s", serviceAccountId)
 		if _, err := client.UpdateServiceAccount(ctx, &iamadmpb.ServiceAccount{Name: account.Name, DisplayName: displayName, Description: description}); err != nil {
 			return "", fmt.Errorf("failed to update service account: %w", err)
 		}
@@ -108,13 +126,26 @@ func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId,
 			},
 			Name: "projects/" + gcp.ProjectId,
 		}
+		term.Infof("Creating service account %s", serviceAccountId)
 		account, err := client.CreateServiceAccount(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("failed to create service account: %w", err)
 		}
 
-		log.Printf("Service account %s created successfully.", serviceAccountId)
-		return account.Name, nil
+		term.Debugf("Service account %s created successfully.", serviceAccountId)
+		accountName := account.Name
+		for start := time.Now(); time.Since(start) < 5*time.Minute; {
+			account, err = client.GetServiceAccount(ctx, &iamadmpb.GetServiceAccountRequest{Name: accountName})
+			if err != nil {
+				if IsNotFound(err) {
+					pkg.SleepWithContext(ctx, 3*time.Second)
+					continue
+				}
+				return "", fmt.Errorf("failed to verify service account creation: %w", err)
+			}
+			return account.Name, nil
+		}
+		return "", fmt.Errorf("timed out waiting for creation of service account %s", serviceAccountId)
 	}
 
 	// Handle unexpected errors
@@ -158,13 +189,32 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	}
 
 	if !needUpdate {
+		term.Debugf("Service account %s already has roles %v on bucket %s", serviceAccount, roles, bucketName)
 		return nil
 	}
 
+	term.Infof("Updating IAM policy for service account %s on bucket %s", serviceAccount, bucketName)
 	if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
 		return fmt.Errorf("failed to set IAM policy for bucket %s: %w", bucketName, err)
 	}
-	return nil
+
+	for start := time.Now(); time.Since(start) < 5*time.Minute; {
+		vp, err := bucket.IAM().Policy(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to verify IAM policy for service account %s on bucket %s: %w", serviceAccount, bucketName, err)
+		}
+
+		for _, roleStr := range roles {
+			role := iam.RoleName(roleStr)
+			memebers := vp.Members(role)
+			if !slices.Contains(memebers, serviceAccountMember) {
+				pkg.SleepWithContext(ctx, 3*time.Second)
+				continue
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("timed out waiting for IAM policy update on bucket %s", bucketName)
 }
 
 func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context, repo, serviceAccount string, roles []string) error {
@@ -207,13 +257,30 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 		return nil
 	}
 
+	term.Infof("Updating IAM policy for %s on service account %s", user, serviceAccount)
 	if _, err := client.SetIamPolicy(ctx, &admin.SetIamPolicyRequest{
 		Resource: resource,
 		Policy:   policy,
 	}); err != nil {
 		return fmt.Errorf("failed to set IAM policy for service account %s: %w", serviceAccount, err)
 	}
-	return nil
+
+	for start := time.Now(); time.Since(start) < 5*time.Minute; {
+		vp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
+		if err != nil {
+			return fmt.Errorf("failed to verify IAM policy for user %v on service account %s: %w", user, serviceAccount, err)
+		}
+		for _, roleStr := range roles {
+			role := iam.RoleName(roleStr)
+			memebers := vp.Members(role)
+			if !slices.Contains(memebers, member) {
+				pkg.SleepWithContext(ctx, 3*time.Second)
+				continue
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("timed out waiting for IAM policy update on service account %s", serviceAccount)
 }
 
 type resourceWithIAMPolicyClient interface {
@@ -258,10 +325,30 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 	}
 
 	if !bindingNeedsUpdate && len(rolesNotFound) == 0 {
+		term.Debugf("%s already has roles %v on resource %s", member, roles, resource)
 		return nil
 	}
+	term.Infof("Updating IAM policy for resource %s", resource)
 	if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
 		return fmt.Errorf("failed to set IAM policy for resource %s: %w", resource, err)
 	}
-	return nil
+
+	for start := time.Now(); time.Since(start) < 5*time.Minute; {
+		vp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
+		if err != nil {
+			return fmt.Errorf("failed to verify IAM policy for resource %s: %w", resource, err)
+		}
+		var rolesSet []string
+		for _, binding := range vp.Bindings {
+			if slices.Contains(roles, binding.Role) && slices.Contains(binding.Members, member) {
+				rolesSet = append(rolesSet, binding.Role)
+			}
+		}
+		if len(rolesSet) < len(roles) {
+			pkg.SleepWithContext(ctx, 3*time.Second)
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("timed out waiting for IAM policy update on resource %s", resource)
 }

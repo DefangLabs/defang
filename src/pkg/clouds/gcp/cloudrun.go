@@ -86,10 +86,8 @@ func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, conta
 		}
 		if op.Done() {
 			return nil
-		} else {
-			fmt.Printf("Waiting for job to complete...\n")
 		}
-		pkg.SleepWithContext(ctx, 10*time.Millisecond)
+		pkg.SleepWithContext(ctx, 1*time.Second)
 	}
 }
 

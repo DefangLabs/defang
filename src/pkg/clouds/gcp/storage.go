@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/google/uuid"
 
 	"google.golang.org/api/iterator"
@@ -21,6 +22,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 		return "", fmt.Errorf("GetBucketWithPrefix: %w", err)
 	}
 	if existing != "" {
+		term.Debugf("Bucket %q already exists\n", existing)
 		return existing, nil
 	}
 
@@ -31,6 +33,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 	defer client.Close()
 
 	newBucketName := fmt.Sprintf("%s-%s", prefix, pkg.RandomID())
+	term.Infof("Creating defang cd bucket %q", newBucketName)
 
 	bucket := client.Bucket(newBucketName)
 	if err := bucket.Create(ctx, gcp.ProjectId, &storage.BucketAttrs{

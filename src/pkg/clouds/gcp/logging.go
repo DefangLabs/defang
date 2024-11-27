@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
@@ -32,115 +30,28 @@ type Tailer struct {
 	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
 
 	cache []*loggingpb.LogEntry
+	query string
 }
 
-func (t *Tailer) AddJobExecutionUpdate(ctx context.Context, executionId string) error {
-	execFilter := fmt.Sprintf(`logName:"cloudaudit.googleapis.com"
-protoPayload.serviceName="run.googleapis.com"
-protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"
-protoPayload.resourceName="namespaces/%v/executions/%v"`, t.projectId, executionId)
-	return t.AddFilter(ctx, execFilter)
+func (t *Tailer) SetBaseQuery(query string) {
+	t.query = query
 }
 
-func (t *Tailer) AddJobStatusUpdate(ctx context.Context, project, etag string, services []string) error {
-	execFilter := `logName:"cloudaudit.googleapis.com"
-protoPayload.serviceName="run.googleapis.com"
-protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
-
-	if project != "" {
-		execFilter += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-project"="%v"`, project)
+func (t *Tailer) AddQuerySet(query string) {
+	if len(t.query) > 0 {
+		if t.query[len(t.query)-1] == ')' {
+			t.query += " OR "
+		} else {
+			t.query += " AND "
+		}
 	}
-
-	if etag != "" {
-		execFilter += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		execFilter += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	return t.AddFilter(ctx, execFilter)
+	t.query += "(" + query + "\n)"
 }
 
-func (t *Tailer) AddServiceStatusUpdate(ctx context.Context, project, etag string, services []string) error {
-	serviceFilter := `logName:"cloudaudit.googleapis.com"
-protoPayload.serviceName="run.googleapis.com"
-protoPayload.methodName="google.cloud.run.v1.Services.CreateService" OR "/Services.CreateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
-
-	if project != "" {
-		serviceFilter += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		serviceFilter += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		serviceFilter += fmt.Sprintf(`
-protoPayload.resourceName=~"^namespaces/%v/services/(%v)-[a-z0-9]{7}$"`, t.projectId, strings.Join(services, "|"))
-	}
-
-	return t.AddFilter(ctx, serviceFilter)
-}
-
-func (t *Tailer) AddJobLog(ctx context.Context, project, executionName string, services []string, since time.Time) error {
-	serviceFilter := fmt.Sprintf(`resource.type = "cloud_run_job"
-resource.labels.project_id = "%v"`, t.projectId)
-
-	if executionName != "" {
-		serviceFilter += fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
-	}
-
-	if project != "" {
-		serviceFilter += fmt.Sprintf(`
-labels."defang-project" = "%v"`, project)
-	}
-
-	if len(services) > 0 {
-		serviceFilter += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() {
-		serviceFilter += fmt.Sprintf(`
-timestamp >= "%v"`, since.Format(time.RFC3339)) // Nano?
-	}
-
-	return t.AddFilter(ctx, serviceFilter)
-}
-
-func (t *Tailer) AddServiceLog(ctx context.Context, project, etag string, services []string, since time.Time) error {
-	serviceFilter := fmt.Sprintf(`resource.type="cloud_run_revision"
-resource.labels.project_id="%v"`, t.projectId)
-
-	if etag != "" {
-		serviceFilter += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		serviceFilter += fmt.Sprintf(`
-resource.labels.service_name=~"^(%v)-[a-z0-9]{7}$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() {
-		serviceFilter += fmt.Sprintf(`
-timestamp >= "%v"`, since.Format(time.RFC3339)) // Nano?
-	}
-
-	return t.AddFilter(ctx, serviceFilter)
-}
-
-func (t *Tailer) AddFilter(ctx context.Context, filter string) error {
+func (t *Tailer) Start(ctx context.Context) error {
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
-		Filter:        filter,
+		Filter:        t.query,
 	}
 	if err := t.tleClient.Send(req); err != nil {
 		return fmt.Errorf("failed to send tail log entries request: %w", err)
