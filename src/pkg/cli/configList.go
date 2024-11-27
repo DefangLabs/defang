@@ -8,6 +8,10 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+type PrintConfig struct {
+	Name string
+}
+
 func ConfigList(ctx context.Context, loader client.Loader, provider client.Provider) error {
 	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
@@ -20,5 +24,10 @@ func ConfigList(ctx context.Context, loader client.Loader, provider client.Provi
 		return err
 	}
 
-	return PrintObject("", config)
+	configNames := make([]PrintConfig, 0, len(config.Names))
+	for _, c := range config.Names {
+		configNames = append(configNames, PrintConfig{Name: c})
+	}
+
+	return term.Table(configNames, []string{"Name"})
 }
