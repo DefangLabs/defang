@@ -248,6 +248,10 @@ func SetupCommands(ctx context.Context, version string) {
 	deleteCmd.Flags().Bool("tail", false, "tail the service logs after deleting")
 	RootCmd.AddCommand(deleteCmd)
 
+	// Deployments Command
+	deploymentsCmd.AddCommand(deploymentsListCmd)
+	RootCmd.AddCommand(deploymentsCmd)
+
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
 	sendCmd.Flags().StringP("type", "t", "", "type of message to send (required)")
@@ -833,6 +837,23 @@ var deleteCmd = &cobra.Command{
 			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), loader, provider, tailParams)
+	},
+}
+
+var deploymentsCmd = &cobra.Command{
+	Use:         "deployments",
+	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
+	Annotations: authNeededAnnotation,
+}
+
+var deploymentsListCmd = &cobra.Command{
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Args:    cobra.NoArgs,
+	Short:   "List deployments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		return cli.DeploymentsList(cmd.Context(), loader, client)
 	},
 }
 
