@@ -16,6 +16,14 @@ func (e ErrNoServices) Error() string {
 	return "no services found in project " + e.ProjectName
 }
 
+type PrintService struct {
+	Name        string
+	Etag        string
+	PublicFqdn  string
+	PrivateFqdn string
+	Status      string
+}
+
 func GetServices(ctx context.Context, loader client.Loader, provider client.Provider, long bool) error {
 	projectName, err := LoadProjectName(ctx, loader, provider)
 	if err != nil {
@@ -32,12 +40,21 @@ func GetServices(ctx context.Context, loader client.Loader, provider client.Prov
 		return ErrNoServices{ProjectName: projectName}
 	}
 
-	if !long {
-		for _, si := range servicesResponse.Services {
-			*si = defangv1.ServiceInfo{Service: &defangv1.Service{Name: si.Service.Name}}
+	if long {
+		return PrintObject("", servicesResponse)
+	} else {
+		printServices := make([]PrintService, 0, len(servicesResponse.Services))
+		for i, si := range servicesResponse.Services {
+			printServices = append(printServices, PrintService{
+				Name:        si.Service.Name,
+				Etag:        si.Etag,
+				PublicFqdn:  si.PublicFqdn,
+				PrivateFqdn: si.PrivateFqdn,
+				Status:      si.Status,
+			})
+			servicesResponse.Services[i] = nil
 		}
-	}
 
-	PrintObject("", servicesResponse)
-	return nil
+		return term.Table(printServices, []string{"Name", "Etag", "PublicFqdn", "PrivateFqdn", "Status"})
+	}
 }

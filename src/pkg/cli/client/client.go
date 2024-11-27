@@ -30,6 +30,8 @@ type FabricClient interface {
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
+	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
+	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	RevokeToken(context.Context) error
 	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
