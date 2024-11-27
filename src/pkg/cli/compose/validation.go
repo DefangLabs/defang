@@ -27,14 +27,10 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
 }
 
-type ErrManagedStoreParam []string
+type ErrManagedStoreParam string
 
-func (e *ErrManagedStoreParam) Add(err string) {
-	*e = append(*e, err)
-}
-
-func (e *ErrManagedStoreParam) Error() string {
-	return fmt.Sprintf("%d errors found: %s", len(*e), strings.Join(*e, ", "))
+func (e ErrManagedStoreParam) Error() string {
+	return "error found: " + string(e)
 }
 
 type PostgresProps map[string]any
@@ -441,7 +437,7 @@ func ValidateManagedStore(managedStore any) error {
 		return nil
 	}
 
-	errPostgres := ErrManagedStoreParam{}
+	aggErrPostgres := []error{}
 
 	postgresProps, ok := managedStore.(map[string]any)
 	if !ok {
@@ -453,7 +449,7 @@ func ValidateManagedStore(managedStore any) error {
 		case "allow-downtime":
 			if downtime, ok := postgresProps[key]; ok {
 				if _, ok := downtime.(bool); !ok {
-					errPostgres.Add("'allow-downtime' must be a boolean")
+					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'allow-downtime' must be a boolean"))
 				}
 			}
 		case "retention":
@@ -465,64 +461,27 @@ func ValidateManagedStore(managedStore any) error {
 
 				retentionProps, ok := retention.(map[string]any)
 				if !ok {
-					errPostgres.Add("'retention' should contain 'retention-period', 'final-snapshot-name', and/or 'snapshot-to-load-on-startup' fields")
+					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'retention' should contain 'final-snapshot-name' field"))
 					continue
 				}
-				err := ValidateRetention(retentionProps)
-				errPostgres = append(errPostgres, err...)
+
+				key := "last-snapshot-name"
+				value, ok := retentionProps[key]
+				if !ok {
+					continue
+				}
+
+				if _, ok := value.(string); !ok {
+					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam(fmt.Sprintf("'%s' must be a string", key)))
+				}
 			}
 		default:
 			return fmt.Errorf("unsupported postgres property: %q", key)
 		}
 	}
 
-	if len(errPostgres) > 0 {
-		return &errPostgres
+	if len(aggErrPostgres) > 0 {
+		return errors.Join(aggErrPostgres...)
 	}
 	return nil
-}
-
-func ValidateRetention(retention map[string]any) ErrManagedStoreParam {
-	pattern := `^\d+d$`
-	retentionDaysRegex := regexp.MustCompile(pattern)
-
-	errPostgres := ErrManagedStoreParam{}
-
-	for _, key := range []string{"retention-period", "final-snapshot-name", "snapshot-to-load-on-startup"} {
-		switch key {
-		case "final-snapshot-name", "snapshot-to-load-on-startup":
-			value, ok := retention[key]
-			if !ok {
-				continue
-			}
-
-			if _, ok := value.(string); !ok {
-				errPostgres.Add(fmt.Sprintf("'%s' must be a string", key))
-			}
-
-		case "retention-period":
-			value, ok := retention[key]
-			if !ok {
-				continue
-			}
-
-			retentionDaysStr, ok := value.(string)
-			if !ok {
-				errPostgres.Add(fmt.Sprintf("'%s' must be string in the format of '<number of days>d'", key))
-				continue
-			}
-
-			if !retentionDaysRegex.MatchString(retentionDaysStr) {
-				errPostgres.Add(fmt.Sprintf("'%s' must be string in the format of '<number of days>d'", key))
-			}
-		}
-	}
-
-	_, hasRetentionPeriod := retention["retention-period"]
-	_, hasFinalSnapshot := retention["final-snapshot-name"]
-	if hasFinalSnapshot && !hasRetentionPeriod {
-		errPostgres.Add("'retention-period' should be defined when 'final-snapshot-name' is set")
-	}
-
-	return errPostgres
 }

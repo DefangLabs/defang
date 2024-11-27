@@ -244,8 +244,8 @@ func TestManagedStoreParams(t *testing.T) {
 				"allow-downtime": "abc",
 				"retention":      123,
 			},
-			errors: []string{"'allow-downtime' must be a boolean",
-				"'retention' should contain 'retention-period', 'final-snapshot-name', and/or 'snapshot-to-load-on-startup' fields"},
+			errors: []string{"error found: 'allow-downtime' must be a boolean",
+				"error found: 'retention' should contain 'final-snapshot-name' field"},
 		},
 		{
 			name: "valid allow-downtime",
@@ -330,19 +330,10 @@ func TestManagedStoreParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := ValidateManagedStore(tt.extension); err != nil {
-				var errPostgres *ErrManagedStoreParam
-				if !errors.As(err, &errPostgres) {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
 				for _, errMsg := range tt.errors {
-					if !slices.Contains(*errPostgres, errMsg) {
-						t.Fatalf("ValidatePostgresParams() = %v, want %v", errPostgres.Error(), tt.errors)
+					if !strings.Contains(err.Error(), errMsg) {
+						t.Fatalf("ValidatePostgresParams() = %v, want %v", err.Error(), tt.errors)
 					}
-				}
-
-				if len(tt.errors) != len(*errPostgres) {
-					t.Fatalf("expected %d errors but got %d - error: %s", len(tt.errors), len(*errPostgres), *errPostgres)
 				}
 			}
 		})
