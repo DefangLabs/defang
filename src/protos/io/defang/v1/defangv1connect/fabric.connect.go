@@ -350,7 +350,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		putDeployment: connect_go.NewClient[v1.PutDeploymentRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutDeploymentProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		listDeployments: connect_go.NewClient[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse](
 			httpClient,
@@ -864,7 +865,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerPutDeploymentHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutDeploymentProcedure,
 		svc.PutDeployment,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerListDeploymentsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListDeploymentsProcedure,

@@ -81,7 +81,9 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
 
-  rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty);
+  rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  };
   rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
