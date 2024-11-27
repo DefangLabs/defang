@@ -213,9 +213,7 @@ func TestXDefangManaged(t *testing.T) {
 					extensionName: map[string]any{
 						"allow-downtime": true,
 						"retention": map[string]any{
-							"retention-period":            "7d",
-							"final-snapshot-name":         "final-snapshot",
-							"snapshot-to-load-on-startup": "load-snapsot",
+							"final-snapshot-name": "final-snapshot",
 						},
 					},
 				}}
@@ -239,13 +237,11 @@ func TestManagedStoreParams(t *testing.T) {
 		errors    []string
 	}{
 		{
-			name: "invalid maintentance and retention",
+			name: "invalid downtime",
 			extension: map[string]any{
 				"allow-downtime": "abc",
-				"retention":      123,
 			},
-			errors: []string{"error found: 'allow-downtime' must be a boolean",
-				"error found: 'retention' should contain 'final-snapshot-name' field"},
+			errors: []string{"error found: 'allow-downtime' must be a boolean"},
 		},
 		{
 			name: "valid allow-downtime",
@@ -256,72 +252,18 @@ func TestManagedStoreParams(t *testing.T) {
 			errors: []string{},
 		},
 		{
-			name: "invalid retention-period as number",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"retention-period":            7,
-					"final-snapshot-name":         "final-snapshot",
-					"snapshot-to-load-on-startup": "old-snapshot",
-				},
-			},
-			errors: []string{"'retention-period' must be string in the format of '<number of days>d'"},
-		},
-		{
-			name: "invalid retention-period",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"retention-period":            "a",
-					"final-snapshot-name":         "final-snapshot",
-					"snapshot-to-load-on-startup": "old-snapshot",
-				},
-			},
-			errors: []string{"'retention-period' must be string in the format of '<number of days>d'"},
-		},
-		{
 			name: "invalid final-snapshot-name",
 			extension: map[string]any{
 				"retention": map[string]any{
-					"retention-period":            "7d",
-					"final-snapshot-name":         1234,
-					"snapshot-to-load-on-startup": "old-snapshot",
+					"final-snapshot-name": 1234,
 				},
 			},
 			errors: []string{"'final-snapshot-name' must be a string"},
 		},
 		{
-			name: "invalid snapshot-to-load-on-startup",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"retention-period":            "7d",
-					"final-snapshot-name":         "final-snapshot",
-					"snapshot-to-load-on-startup": 123,
-				},
-			},
-			errors: []string{"'snapshot-to-load-on-startup' must be a string"},
-		},
-		{
-			name: "missing retention-period",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"final-snapshot-name":         "final-snapshot",
-					"snapshot-to-load-on-startup": "load-snapshot",
-				},
-			},
-			errors: []string{"'retention-period' should be defined when 'final-snapshot-name' is set"},
-		},
-		{
 			name: "no fields",
 			extension: map[string]any{
 				"retention": map[string]any{},
-			},
-			errors: []string{},
-		},
-		{
-			name: "missing final-snapshot-name and snapshot-to-load-on-startup",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"retention-period": "7d",
-				},
 			},
 			errors: []string{},
 		},
