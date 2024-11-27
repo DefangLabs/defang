@@ -244,6 +244,15 @@ func TestDeployValidateGPUResources(t *testing.T) {
 	b.ByocBaseClient.SetupDone = true
 
 	t.Run("no errors", func(t *testing.T) {
+
+		store.ReadOnlyUserWhoAmI = false
+		store.SetUserWhoAmI(&defangv1.WhoAmIResponse{
+			Account: "test-account",
+			Region:  "us-test-2",
+			Tier:    defangv1.SubscriptionTier_PRO,
+		})
+		store.ReadOnlyUserWhoAmI = true
+
 		testDeploy := defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project
