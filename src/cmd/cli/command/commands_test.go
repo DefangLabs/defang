@@ -72,6 +72,10 @@ func TestVersion(t *testing.T) {
 }
 
 func TestCommandGates(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	type cmdPermTest struct {
 		name         string
 		userTier     defangv1.SubscriptionTier
