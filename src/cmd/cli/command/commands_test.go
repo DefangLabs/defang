@@ -34,7 +34,9 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 	}, nil
 }
 
-var mockCanUseProviderResponse error = nil
+var mockCanUseProviderResponse = defangv1.CanUseProviderResponse{
+	Gates: map[string]bool{},
+}
 
 var mockWhoAmIResponse = &defangv1.WhoAmIResponse{
 	Tenant:  "default",
@@ -43,8 +45,8 @@ var mockWhoAmIResponse = &defangv1.WhoAmIResponse{
 	Tier:    defangv1.SubscriptionTier_HOBBY,
 }
 
-func (m *MockGrpcClientApi) CanUseProvider(ctx context.Context, canUseReq *defangv1.CanUseProviderRequest) error {
-	return mockCanUseProviderResponse
+func (m *MockGrpcClientApi) CanUseProvider(ctx context.Context, canUseReq *defangv1.CanUseProviderRequest) (*defangv1.CanUseProviderResponse, error) {
+	return &mockCanUseProviderResponse, nil
 }
 
 func (m *MockGrpcClientApi) GetVersions(ctx context.Context) (*defangv1.Version, error) {
@@ -175,10 +177,10 @@ func TestCommandGates(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				aws.StsClient = stsProviderApi
 				pkg.SsmClientOverride = ssmClient
-				mockCanUseProviderResponse = nil
-				if !tt.accessAllowed {
-					mockCanUseProviderResponse = errors.New("no access")
-				}
+				mockCanUseProviderResponse.Gates[string(gating.ResourceProvider)] = tt.accessAllowed
+				mockCanUseProviderResponse.Gates[string(gating.ResourceGPU)] = tt.accessAllowed
+				mockCanUseProviderResponse.Gates[string(gating.ResourcePostgres)] = tt.accessAllowed
+				mockCanUseProviderResponse.Gates[string(gating.ResourceRedis)] = tt.accessAllowed
 
 				err := testCommand(tt.command)
 

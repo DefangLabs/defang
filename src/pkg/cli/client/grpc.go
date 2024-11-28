@@ -140,7 +140,6 @@ func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSe
 	return err
 }
 
-func (g GrpcClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) error {
-	_, err := g.client.CanUseProvider(ctx, connect.NewRequest(req))
-	return err
+func (g GrpcClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) (*defangv1.CanUseProviderResponse, error) {
+	return getMsg(g.client.CanUseProvider(ctx, connect.NewRequest(req)))
 }

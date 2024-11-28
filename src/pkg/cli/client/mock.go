@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -74,8 +75,14 @@ type MockFabricClient struct {
 	DelegateDomain string
 }
 
-func (m MockFabricClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) error {
-	return nil
+func (m MockFabricClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) (*defangv1.CanUseProviderResponse, error) {
+	gates := map[string]bool{}
+	gates[string(gating.ResourceGPU)] = true
+	gates[string(gating.ResourcePostgres)] = true
+	gates[string(gating.ResourceRedis)] = true
+	gates[string(gating.ResourceProvider)] = true
+
+	return &defangv1.CanUseProviderResponse{Gates: gates}, nil
 }
 
 func (m MockFabricClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
