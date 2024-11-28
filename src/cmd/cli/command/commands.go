@@ -41,7 +41,7 @@ func P(name string, value interface{}) cliClient.Property {
 }
 
 type GrpcClientApi interface {
-	CanUseProvider(ctx context.Context, canUseReq *defangv1.CanUseProviderRequest) error
+	CanIUse(ctx context.Context, canUseReq *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
 	GetVersions(ctx context.Context) (*defangv1.Version, error)
 	CheckLoginAndToS(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
@@ -74,16 +74,17 @@ func prettyError(err error) error {
 }
 
 func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) error {
-	canUseReq := defangv1.CanUseProviderRequest{
+	canUseReq := defangv1.CanIUseRequest{
 		Project:  projectName,
 		Provider: providerID.EnumValue(),
 	}
 
-	err := localClient.CanUseProvider(ctx, &canUseReq)
+	resp, err := localClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
 		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
 
+	gating.Gates = resp.Gates
 	return nil
 }
 

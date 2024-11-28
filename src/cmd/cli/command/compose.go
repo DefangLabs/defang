@@ -50,22 +50,22 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string
 	return managedServices, unmanagedServices
 }
 
-func canUseManagedServices(managedServices map[string]int, userTier defangv1.SubscriptionTier) (bool, error) {
+func canUseManagedServices(managedServices map[string]int) (bool, error) {
 	var hasManagedServices bool = false
 	for key := range managedServices {
 		var err error
-		var resourceName string
+		var resource gating.Resources
 		switch key {
 		case "x-defang-redis":
-			resourceName = string(gating.ResourceRedis)
+			resource = gating.ResourceRedis
 		case "x-defang-postgres":
-			resourceName = string(gating.ResourcePostgres)
+			resource = gating.ResourcePostgres
 		default:
 			continue
 		}
 
-		if resourceName != "" && managedServices[key] > 0 {
-			if err = gating.HasAuthorization(userTier, gating.ActionUseManaged, resourceName, "usage of managed storage"); err != nil {
+		if resource != "" && managedServices[key] > 0 {
+			if err = gating.HasAuthorization(resource, "usage of managed storage"); err != nil {
 				return true, err
 			}
 		}
@@ -105,15 +105,10 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			resp, err := client.WhoAmI(cmd.Context())
-			if err != nil {
-				return err
-			}
-
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
 			var hasManagedServices bool
-			if hasManagedServices, err = canUseManagedServices(managedServices, resp.Tier); err != nil {
+			if hasManagedServices, err = canUseManagedServices(managedServices); err != nil {
 				return err
 			}
 
@@ -123,7 +118,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
 			if numGPUS > 0 {
-				if err := gating.HasAuthorization(resp.Tier, gating.ActionUseGPU, string(gating.ResourceGPU), "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
+				if err := gating.HasAuthorization(gating.ResourceGPU, "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
 					return err
 				}
 			}

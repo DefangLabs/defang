@@ -21,7 +21,7 @@ type ProjectLoader interface {
 
 type FabricClient interface {
 	AgreeToS(context.Context) error
-	CanUseProvider(context.Context, *defangv1.CanUseProviderRequest) error
+	CanIUse(context.Context, *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
 	CheckLoginAndToS(context.Context) error
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
