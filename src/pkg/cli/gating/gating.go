@@ -7,10 +7,12 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
+const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
+
 type ErrNoPermission string
 
 func (e ErrNoPermission) Error() string {
-	return "current tier does not allow this action: " + string(e)
+	return TIER_ERROR_MESSAGE + string(e)
 }
 
 type Resources string

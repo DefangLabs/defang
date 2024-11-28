@@ -54,17 +54,20 @@ func canUseManagedServices(managedServices map[string]int, userTier defangv1.Sub
 	var hasManagedServices bool = false
 	for key := range managedServices {
 		var err error
+		var resourceName string
 		switch key {
 		case "x-defang-redis":
-			err = gating.HasAuthorization(userTier, gating.ActionUseManaged, string(gating.ResourceRedis), "no managed redis enabled at current subscription tier")
+			resourceName = string(gating.ResourceRedis)
 		case "x-defang-postgres":
-			err = gating.HasAuthorization(userTier, gating.ActionUseManaged, string(gating.ResourceRedis), "no managed postgres enabled at current subscription tier")
+			resourceName = string(gating.ResourcePostgres)
 		default:
 			continue
 		}
 
-		if err != nil {
-			return false, err
+		if resourceName != "" && managedServices[key] > 0 {
+			if err = gating.HasAuthorization(userTier, gating.ActionUseManaged, resourceName, "usage of managed storage"); err != nil {
+				return true, err
+			}
 		}
 
 		hasManagedServices = true
@@ -144,7 +147,9 @@ func makeComposeUpCmd() *cobra.Command {
 
 			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
 			if numGPUS > 0 {
-				gating.HasAuthorization(resp.Tier, gating.ActionUseGPU, string(gating.ResourceGPU), "no GPUs enabled. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu")
+				if err := gating.HasAuthorization(resp.Tier, gating.ActionUseGPU, string(gating.ResourceGPU), "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
+					return err
+				}
 			}
 
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
@@ -292,7 +297,7 @@ func makeComposeStartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'start' is deprecated, use 'up' instead")
+			return errors.New("command 'start' is deprecated, use 'up' instead")
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -306,7 +311,7 @@ func makeComposeRestartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'restart' is deprecated, use 'up' instead")
+			return errors.New("command 'restart' is deprecated, use 'up' instead")
 		},
 	}
 }
@@ -318,7 +323,7 @@ func makeComposeStopCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'stop' is deprecated, use 'down' instead")
+			return errors.New("command 'stop' is deprecated, use 'down' instead")
 		},
 	}
 }

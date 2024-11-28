@@ -130,7 +130,7 @@ func TestCommandGates(t *testing.T) {
 			name:          "compose up - aws - no access",
 			command:       []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
-			wantError:     "current tier does not allow this action: no access to use aws provider",
+			wantError:     gating.TIER_ERROR_MESSAGE + "no access to use aws provider",
 		},
 		{
 			name:          "compose up - defang - has access",
@@ -142,19 +142,19 @@ func TestCommandGates(t *testing.T) {
 			name:          "compose down - aws - no access",
 			command:       []string{"compose", "down", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
-			wantError:     "current tier does not allow this action: no access to use aws provider",
+			wantError:     gating.TIER_ERROR_MESSAGE + "no access to use aws provider",
 		},
 		{
 			name:          "config set - aws - no access",
 			command:       []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
-			wantError:     "current tier does not allow this action: no access to use aws provider",
+			wantError:     gating.TIER_ERROR_MESSAGE + "no access to use aws provider",
 		},
 		{
 			name:          "config rm - aws - no access",
 			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
-			wantError:     "current tier does not allow this action: no access to use aws provider",
+			wantError:     gating.TIER_ERROR_MESSAGE + "no access to use aws provider",
 		},
 		{
 			name:          "config rm - defang - has access",
@@ -166,7 +166,7 @@ func TestCommandGates(t *testing.T) {
 			name:          "delete service - aws - no access",
 			command:       []string{"delete", "abc", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
-			wantError:     "current tier does not allow this action: no access to use aws provider",
+			wantError:     gating.TIER_ERROR_MESSAGE + "no access to use aws provider",
 		},
 	}
 

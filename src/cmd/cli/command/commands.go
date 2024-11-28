@@ -902,7 +902,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("Command 'restart' is deprecated, use 'up' instead")
+		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
