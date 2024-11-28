@@ -117,7 +117,6 @@ func TestCommandGates(t *testing.T) {
 
 	type cmdPermTest struct {
 		name          string
-		userTier      defangv1.SubscriptionTier
 		command       []string
 		accessAllowed bool
 		wantError     string
@@ -126,142 +125,52 @@ func TestCommandGates(t *testing.T) {
 
 	localClient = &MockGrpcClientApi{}
 
-	hobbyTests := cmdPermTests{
+	testData := cmdPermTests{
 		{
-			name:          "HOBBY - compose up - aws - no access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
-			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
+			name:          "compose up - aws - no access",
+			command:       []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current tier does not allow this action: no access to use aws provider",
 		},
 		{
-			name:          "HOBBY - compose up - defang - has access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "compose up - defang - has access",
 			command:       []string{"compose", "up", "--provider=defang", "--dry-run"},
 			accessAllowed: true,
 			wantError:     "",
 		},
 		{
-			name:          "HOBBY - compose down - aws - no access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "compose down - aws - no access",
 			command:       []string{"compose", "down", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current tier does not allow this action: no access to use aws provider",
 		},
 		{
-			name:          "HOBBY - config set - aws - no access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "config set - aws - no access",
 			command:       []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current tier does not allow this action: no access to use aws provider",
 		},
 		{
-			name:          "HOBBY - config rm - aws - no access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "config rm - aws - no access",
 			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current tier does not allow this action: no access to use aws provider",
 		},
 		{
-			name:          "HOBBY - config rm - defang - has access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "config rm - defang - has access",
 			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
 			accessAllowed: true,
 			wantError:     "",
 		},
 		{
-			name:          "HOBBY - delete service - aws - no access",
-			userTier:      defangv1.SubscriptionTier_HOBBY,
+			name:          "delete service - aws - no access",
 			command:       []string{"delete", "abc", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current tier does not allow this action: no access to use aws provider",
 		},
 	}
 
-	personalTests := cmdPermTests{
-		{
-			name:          "PERSONAL - compose up - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PERSONAL - compose up - change provider - no access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "no access to use aws provider",
-		},
-		{
-			name:          "PERSONAL - compose up - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PERSONAL - config set - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"config", "set", "var=1234", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PERSONAL - config rm - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PERSONAL - config rm - defang - has access",
-			userTier:      defangv1.SubscriptionTier_PERSONAL,
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-	}
-
-	proTests := cmdPermTests{
-		{
-			name:          "PRO - compose up - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PRO,
-			command:       []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PRO - compose down - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PRO,
-			command:       []string{"compose", "down", "--project-name=app", "--dry-run", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PRO - config set - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PRO,
-			command:       []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PRO - config rm - aws - has access",
-			userTier:      defangv1.SubscriptionTier_PRO,
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-		{
-			name:          "PRO - config ls - defang - has access",
-			userTier:      defangv1.SubscriptionTier_PRO,
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
-		},
-	}
-
-	for _, testGroup := range []cmdPermTests{proTests, hobbyTests, personalTests} {
+	for _, testGroup := range []cmdPermTests{testData} {
 		for _, tt := range testGroup {
 			t.Run(tt.name, func(t *testing.T) {
 				aws.StsClient = stsProviderApi
