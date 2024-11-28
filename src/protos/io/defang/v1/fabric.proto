@@ -84,7 +84,8 @@ service FabricController {
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   };
-  rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse) {
+  rpc ListDeployments(ListDeploymentsRequest)
+      returns (ListDeploymentsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
 
@@ -120,6 +121,10 @@ service FabricController {
   rpc SetSelectedProvider(SetSelectedProviderRequest)
       returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc CanUseProvider(CanUseProviderRequest) returns (CanUseProviderResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
 
@@ -190,6 +195,12 @@ enum DeploymentMode {
   DEVELOPMENT = 1;
   STAGING = 2;
   PRODUCTION = 3;
+}
+
+message CanUseProviderRequest { Provider provider = 1; }
+message CanUseProviderResponse {
+  bool can_use = 1;
+  int32 deployments_remaining = 2;
 }
 
 message DeployRequest {
@@ -341,17 +352,11 @@ message Deployment {
   google.protobuf.Timestamp timestamp = 5;
 }
 
-message PutDeploymentRequest {
-  Deployment deployment = 1;
-}
+message PutDeploymentRequest { Deployment deployment = 1; }
 
-message ListDeploymentsRequest {
-  string project = 1;
-}
+message ListDeploymentsRequest { string project = 1; }
 
-message ListDeploymentsResponse {
-  repeated Deployment deployments = 1;
-}
+message ListDeploymentsResponse { repeated Deployment deployments = 1; }
 
 message TokenRequest {
   string tenant = 1;
