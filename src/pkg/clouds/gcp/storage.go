@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -128,4 +129,21 @@ func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, er
 		return nil, err
 	}
 	return resp.SignedBlob, err
+}
+
+func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("storage.NewClient: %w", err)
+	}
+	defer client.Close()
+
+	bucket := client.Bucket(bucketName)
+	r, err := bucket.Object(objectName).NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bucket.Object(%q).NewReader: %w", objectName, err)
+	}
+	defer r.Close()
+
+	return io.ReadAll(r)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
+	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/protobuf/proto"
@@ -321,8 +322,12 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	etag := pkg.RandomID()
 	var serviceInfos []*defangv1.ServiceInfo
+	projectNumber, err := b.driver.GetProjectNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name)
+		serviceInfo := b.update(service, project.Name, projectNumber)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -370,7 +375,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
 	// TODO: Copied from DO provider, double check if more is needed
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
@@ -382,6 +387,8 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string)
 		if port.Mode == compose.Mode_HOST {
 			mode = defangv1.Mode_HOST
 		}
+
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("TODO_SERVICE_NAME-%v.%v.run.app", projectNumber, b.driver.Region))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
@@ -433,13 +440,31 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP GetService")
+	all, err := b.GetServices(ctx, &defangv1.GetServicesRequest{Project: req.Project})
+	if err != nil {
+		return nil, err
+	}
+	for _, service := range all.Services {
+		if service.Service.Name == req.Name {
+			return service, nil
+		}
+	}
+	return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("service %q not found", req.Name))
 }
 
 func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP GetServices")
+	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
+	if err != nil {
+		return nil, err
+	}
+
+	listServiceResp := defangv1.GetServicesResponse{}
+	if projUpdate != nil {
+		listServiceResp.Services = projUpdate.Services
+		listServiceResp.Project = projUpdate.Project
+	}
+
+	return &listServiceResp, nil
 }
 
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
@@ -528,4 +553,32 @@ func GetGoogleAPIErrorDetail(detail interface{}, path string) string {
 	}
 	key, rest, _ := strings.Cut(path, ".")
 	return GetGoogleAPIErrorDetail(dm[key], rest)
+}
+
+func (b *ByocGcp) getProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+	if projectName == "" {
+		return nil, nil
+	}
+	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
+	if err != nil {
+		return nil, annotateGcpError(err)
+	}
+	if bucketName == "" {
+		return nil, errors.New("No defang cd bucket found")
+	}
+
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
+	term.Debug("Getting services from bucket:", bucketName, path)
+	pbBytes, err := b.driver.GetBucketObject(ctx, bucketName, path)
+	if err != nil {
+		return nil, err
+	}
+
+	projUpdate := defangv1.ProjectUpdate{}
+	if err := proto.Unmarshal(pbBytes, &projUpdate); err != nil {
+		return nil, err
+	}
+
+	return &projUpdate, nil
 }

@@ -581,7 +581,7 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
 	ensure(projectName != "", "ProjectName not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 

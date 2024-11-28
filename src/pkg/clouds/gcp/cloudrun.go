@@ -121,6 +121,7 @@ func (gcp Gcp) Run(ctx context.Context, jobId string, env map[string]string, cmd
 		return "", err
 	}
 
+	// Poll the operation until the execution is created
 	var execName string
 	for {
 		if _, err = op.Poll(ctx); err != nil {
