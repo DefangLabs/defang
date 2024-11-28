@@ -141,9 +141,9 @@ const (
 	// FabricControllerSetSelectedProviderProcedure is the fully-qualified name of the
 	// FabricController's SetSelectedProvider RPC.
 	FabricControllerSetSelectedProviderProcedure = "/io.defang.v1.FabricController/SetSelectedProvider"
-	// FabricControllerCanUseProviderProcedure is the fully-qualified name of the FabricController's
-	// CanUseProvider RPC.
-	FabricControllerCanUseProviderProcedure = "/io.defang.v1.FabricController/CanUseProvider"
+	// FabricControllerCanIUseProcedure is the fully-qualified name of the FabricController's CanIUse
+	// RPC.
+	FabricControllerCanIUseProcedure = "/io.defang.v1.FabricController/CanIUse"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -196,7 +196,7 @@ type FabricControllerClient interface {
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
-	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
+	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -419,9 +419,9 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 			connect_go.WithClientOptions(opts...),
 		),
-		canUseProvider: connect_go.NewClient[v1.CanUseProviderRequest, emptypb.Empty](
+		canIUse: connect_go.NewClient[v1.CanIUseRequest, v1.CanIUseResponse](
 			httpClient,
-			baseURL+FabricControllerCanUseProviderProcedure,
+			baseURL+FabricControllerCanIUseProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
@@ -468,7 +468,7 @@ type fabricControllerClient struct {
 	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
 	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
 	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
-	canUseProvider           *connect_go.Client[v1.CanUseProviderRequest, emptypb.Empty]
+	canIUse                  *connect_go.Client[v1.CanIUseRequest, v1.CanIUseResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -673,9 +673,9 @@ func (c *fabricControllerClient) SetSelectedProvider(ctx context.Context, req *c
 	return c.setSelectedProvider.CallUnary(ctx, req)
 }
 
-// CanUseProvider calls io.defang.v1.FabricController.CanUseProvider.
-func (c *fabricControllerClient) CanUseProvider(ctx context.Context, req *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return c.canUseProvider.CallUnary(ctx, req)
+// CanIUse calls io.defang.v1.FabricController.CanIUse.
+func (c *fabricControllerClient) CanIUse(ctx context.Context, req *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error) {
+	return c.canIUse.CallUnary(ctx, req)
 }
 
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
@@ -728,7 +728,7 @@ type FabricControllerHandler interface {
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
-	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
+	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -947,9 +947,9 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 		connect_go.WithHandlerOptions(opts...),
 	)
-	fabricControllerCanUseProviderHandler := connect_go.NewUnaryHandler(
-		FabricControllerCanUseProviderProcedure,
-		svc.CanUseProvider,
+	fabricControllerCanIUseHandler := connect_go.NewUnaryHandler(
+		FabricControllerCanIUseProcedure,
+		svc.CanIUse,
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
@@ -1031,8 +1031,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerGetSelectedProviderHandler.ServeHTTP(w, r)
 		case FabricControllerSetSelectedProviderProcedure:
 			fabricControllerSetSelectedProviderHandler.ServeHTTP(w, r)
-		case FabricControllerCanUseProviderProcedure:
-			fabricControllerCanUseProviderHandler.ServeHTTP(w, r)
+		case FabricControllerCanIUseProcedure:
+			fabricControllerCanIUseHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1194,6 +1194,6 @@ func (UnimplementedFabricControllerHandler) SetSelectedProvider(context.Context,
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SetSelectedProvider is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CanUseProvider is not implemented"))
+func (UnimplementedFabricControllerHandler) CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CanIUse is not implemented"))
 }
