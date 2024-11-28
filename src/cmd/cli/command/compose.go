@@ -50,7 +50,7 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string
 	return managedServices, unmanagedServices
 }
 
-func canUseManagedServices(managedServices map[string]int, userTier defangv1.SubscriptionTier, mode defangv1.DeploymentMode) (bool, error) {
+func canUseManagedServices(managedServices map[string]int, userTier defangv1.SubscriptionTier) (bool, error) {
 	var hasManagedServices bool = false
 	for key := range managedServices {
 		var err error
@@ -73,19 +73,7 @@ func canUseManagedServices(managedServices map[string]int, userTier defangv1.Sub
 		hasManagedServices = true
 	}
 
-	if len(managedServices) > 0 {
-		term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
-	}
-
-	if hasManagedServices {
-		if userTier == defangv1.SubscriptionTier_PERSONAL {
-			if mode != defangv1.DeploymentMode_DEVELOPMENT {
-				return false, gating.ErrNoPermission("managed services supported by this tier only in development mode")
-			}
-		}
-	}
-
-	return true, nil
+	return hasManagedServices, nil
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -125,23 +113,11 @@ func makeComposeUpCmd() *cobra.Command {
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
 			var hasManagedServices bool
-			if hasManagedServices, err = canUseManagedServices(managedServices, resp.Tier, mode.Value()); err != nil {
+			if hasManagedServices, err = canUseManagedServices(managedServices, resp.Tier); err != nil {
 				return err
 			}
 
-			if len(managedServices) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
-			}
-
 			if hasManagedServices {
-				if resp.Tier == defangv1.SubscriptionTier_PERSONAL {
-					if mode != Mode(defangv1.DeploymentMode_DEVELOPMENT) {
-						return gating.ErrNoPermission("managed services supported by this tier only in development mode")
-					}
-				}
-			}
-
-			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
