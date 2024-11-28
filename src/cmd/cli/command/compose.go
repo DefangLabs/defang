@@ -12,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/logs"
-	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -51,15 +50,15 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string
 	return managedServices, unmanagedServices
 }
 
-func canUseManagedServices(managedServices map[string]int, mode defangv1.DeploymentMode) (bool, error) {
+func canUseManagedServices(managedServices map[string]int, userTier defangv1.SubscriptionTier, mode defangv1.DeploymentMode) (bool, error) {
 	var hasManagedServices bool = false
-	for key, count := range managedServices {
+	for key := range managedServices {
 		var err error
 		switch key {
 		case "x-defang-redis":
-			err = gating.HasAuthorization(store.UserWhoAmI.Tier, "use-managed", "redis", float64(count), "no managed redis enabled at current subscription tier")
+			err = gating.HasAuthorization(userTier, gating.ActionUseManaged, string(gating.ResourceRedis), "no managed redis enabled at current subscription tier")
 		case "x-defang-postgres":
-			err = gating.HasAuthorization(store.UserWhoAmI.Tier, "use-managed", "postgres", float64(count), "no managed postgres enabled at current subscription tier")
+			err = gating.HasAuthorization(userTier, gating.ActionUseManaged, string(gating.ResourceRedis), "no managed postgres enabled at current subscription tier")
 		default:
 			continue
 		}
@@ -76,7 +75,7 @@ func canUseManagedServices(managedServices map[string]int, mode defangv1.Deploym
 	}
 
 	if hasManagedServices {
-		if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_PERSONAL {
+		if userTier == defangv1.SubscriptionTier_PERSONAL {
 			if mode != defangv1.DeploymentMode_DEVELOPMENT {
 				return false, gating.ErrNoPermission("managed services supported by this tier only in development mode")
 			}
@@ -110,11 +109,12 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			if err := canUseProvider(cmd.Context()); err != nil {
+			project, err := loader.LoadProject(cmd.Context())
+			if err != nil {
 				return err
 			}
 
-			project, err := loader.LoadProject(cmd.Context())
+			resp, err := client.WhoAmI(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -122,7 +122,7 @@ func makeComposeUpCmd() *cobra.Command {
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
 			var hasManagedServices bool
-			if hasManagedServices, err = canUseManagedServices(managedServices, mode.Value()); err != nil {
+			if hasManagedServices, err = canUseManagedServices(managedServices, resp.Tier, mode.Value()); err != nil {
 				return err
 			}
 
@@ -131,7 +131,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			if hasManagedServices {
-				if store.UserWhoAmI.Tier == defangv1.SubscriptionTier_PERSONAL {
+				if resp.Tier == defangv1.SubscriptionTier_PERSONAL {
 					if mode != Mode(defangv1.DeploymentMode_DEVELOPMENT) {
 						return gating.ErrNoPermission("managed services supported by this tier only in development mode")
 					}
@@ -142,8 +142,9 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			if !cli.DoDryRun {
-				setLastUserProvider(cmd.Context(), provider)
+			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
+			if numGPUS > 0 {
+				gating.HasAuthorization(resp.Tier, gating.ActionUseGPU, string(gating.ResourceGPU), "no GPUs enabled. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu")
 			}
 
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
@@ -337,14 +338,6 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			if err := canUseProvider(cmd.Context()); err != nil {
-				return err
-			}
-
-			if !cli.DoDryRun {
-				setLastUserProvider(cmd.Context(), provider)
-			}
-
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {
@@ -404,10 +397,6 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			if err := canUseProvider(cmd.Context()); err != nil {
-				return err
-			}
-
 			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
@@ -429,10 +418,6 @@ func makeComposePsCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
-				return err
-			}
-
-			if err := canUseProvider(cmd.Context()); err != nil {
 				return err
 			}
 
@@ -515,10 +500,6 @@ func makeComposeLogsCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
-				return err
-			}
-
-			if err := canUseProvider(cmd.Context()); err != nil {
 				return err
 			}
 

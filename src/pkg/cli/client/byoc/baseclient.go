@@ -10,7 +10,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -54,7 +53,6 @@ func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, bl Bootstra
 	b := &ByocBaseClient{
 		TenantID:        string(tenantID),
 		PulumiStack:     "beta", // TODO: make customizable
-		Quota:           gating.ProjectQuota,
 		bootstrapLister: bl,
 	}
 	return b

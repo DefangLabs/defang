@@ -66,8 +66,6 @@ type ByocAws struct {
 	lastCdEtag       types.ETag
 	lastCdStart      time.Time
 	lastCdTaskArn    ecs.TaskArn
-
-	stsClient StsProviderAPI
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -129,10 +127,9 @@ func newByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 
 var NewByocProvider NewByocInterface = newByocProvider
 
-func (b *ByocAws) initStsClient(cfg awssdk.Config) {
-	b.stsClient = StsClient
-	if b.stsClient == nil {
-		b.stsClient = sts.NewFromConfig(cfg)
+func initStsClient(cfg awssdk.Config) {
+	if StsClient == nil {
+		StsClient = sts.NewFromConfig(cfg)
 	}
 }
 
@@ -244,7 +241,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	quotaClient = NewServiceQuotasClient(ctx, cfg)
-	if err = ValidateGPUResources(ctx, project, req.GetMode()); err != nil {
+	if err = ValidateGPUResources(ctx, project); err != nil {
 		return nil, err
 	}
 
@@ -335,8 +332,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		b.initStsClient(cfg)
-		creds := stscreds.NewAssumeRoleProvider(b.stsClient, roleARN)
+		initStsClient(cfg)
+		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -443,9 +440,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	b.initStsClient(cfg)
+	initStsClient(cfg)
 
-	identity, err := b.stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}

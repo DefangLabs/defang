@@ -9,7 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
-	"github.com/DefangLabs/defang/src/pkg/store"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -52,9 +51,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 			term.Debugf("Overriding TenantID %q with server provided value %q", tenantId, resp.Tenant)
 		}
 		grpcClient.TenantID = types.TenantID(resp.Tenant)
-		store.SetUserWhoAmI(resp)
 	}
-
 	track.Fabric = grpcClient // Update track client
 	return grpcClient
 }

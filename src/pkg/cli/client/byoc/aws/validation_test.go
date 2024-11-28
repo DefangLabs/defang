@@ -9,7 +9,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	aws "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
-	"github.com/DefangLabs/defang/src/pkg/store"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 
@@ -34,24 +33,23 @@ func (q *MockQuotaClientApi) ListServiceQuotas(ctx context.Context, params *serv
 var ctx = context.Background()
 var mockQuotaClient = &MockQuotaClientApi{}
 
-func TestValidateGPUResources(t *testing.T) {
-	originalWhoAmI := store.UserWhoAmI
-	store.UserWhoAmI = &defangv1.WhoAmIResponse{
-		Tier: defangv1.SubscriptionTier_PRO,
-	}
-
-	t.Run("No service quota received", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 0},
-						},
+func getServiceWithGPUCapacity(numGPU int) composeTypes.ServiceConfig {
+	return composeTypes.ServiceConfig{
+		Deploy: &composeTypes.DeployConfig{
+			Resources: composeTypes.Resources{
+				Reservations: &composeTypes.Resource{
+					Devices: []composeTypes.DeviceRequest{
+						{Capabilities: []string{"gpu"}, Count: composeTypes.DeviceCount(numGPU)},
 					},
 				},
 			},
-		}
+		},
+	}
+}
+
+func TestValidateGPUResources(t *testing.T) {
+	t.Run("No service quota received", func(t *testing.T) {
+		testService := getServiceWithGPUCapacity(0)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -60,26 +58,14 @@ func TestValidateGPUResources(t *testing.T) {
 		quotaClient = mockQuotaClient
 		mockQuotaClient.output = nil
 		mockQuotaClient.err = ErrNoQuotasReceived
-		mode := defangv1.DeploymentMode_STAGING
-
-		err := ValidateGPUResources(ctx, &project, mode)
+		err := ValidateGPUResources(ctx, &project)
 		if err != nil && errors.Is(err, ErrNoQuotasReceived) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected errors %v", err)
 		}
 	})
 
 	t.Run("no errors when gpu is set to 0", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 0},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(0)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -88,25 +74,14 @@ func TestValidateGPUResources(t *testing.T) {
 
 		quotaClient = nil
 		mockQuotaClient.err = nil
-		mode := defangv1.DeploymentMode_STAGING
-		err := ValidateGPUResources(ctx, &project, mode)
+		err := ValidateGPUResources(ctx, &project)
 		if err != nil {
 			t.Fatalf("ValidateGPUResources() failed: expected no errors but got %v", err)
 		}
 	})
 
 	t.Run("zero gpu quota but requesting 24", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(24)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -123,26 +98,14 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		mode := defangv1.DeploymentMode_STAGING
-		err := ValidateGPUResources(ctx, &project, mode)
-		errNoPerm := gating.ErrNoPermission("not enough GPUs permitted at current subscription tier")
-		if err != nil && !errors.Is(err, errNoPerm) {
+		err := ValidateGPUResources(ctx, &project)
+		if err != nil && !errors.Is(err, ErrGPUQuotaZero) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
 
 	t.Run("gpu quota exists and requesting more", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(24)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -159,8 +122,7 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		mode := defangv1.DeploymentMode_STAGING
-		err := ValidateGPUResources(ctx, &project, mode)
+		err := ValidateGPUResources(ctx, &project)
 		errNoPerm := gating.ErrNoPermission("not enough GPUs permitted at current subscription tier")
 		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
@@ -168,17 +130,7 @@ func TestValidateGPUResources(t *testing.T) {
 	})
 
 	t.Run("gpu quota exists and requesting one but fail because in developer deployment mode", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 1},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(1)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -195,8 +147,7 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		mode := defangv1.DeploymentMode_DEVELOPMENT
-		err := ValidateGPUResources(ctx, &project, mode)
+		err := ValidateGPUResources(ctx, &project)
 		errNoPerm := gating.ErrNoPermission("cannot deploy GPUs for current deployment mode DEVELOPMENT")
 		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
@@ -204,17 +155,7 @@ func TestValidateGPUResources(t *testing.T) {
 	})
 
 	t.Run("unable to get AWS gpu quota", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(24)
 
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
@@ -223,14 +164,11 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 
 		quotaClient = nil
-		mode := defangv1.DeploymentMode_STAGING
-		err := ValidateGPUResources(ctx, &project, mode)
+		err := ValidateGPUResources(ctx, &project)
 		if err != nil && !errors.Is(err, ErrAWSNoConnection) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
-
-	store.UserWhoAmI = originalWhoAmI
 }
 
 func TestDeployValidateGPUResources(t *testing.T) {
@@ -244,14 +182,6 @@ func TestDeployValidateGPUResources(t *testing.T) {
 	b.ByocBaseClient.SetupDone = true
 
 	t.Run("no errors", func(t *testing.T) {
-		store.ReadOnlyUserWhoAmI = false
-		store.SetUserWhoAmI(&defangv1.WhoAmIResponse{
-			Account: "test-account",
-			Region:  "us-test-2",
-			Tier:    defangv1.SubscriptionTier_PRO,
-		})
-		store.ReadOnlyUserWhoAmI = true
-
 		testDeploy := defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project

@@ -18,8 +18,8 @@ func TestAccessGates(t *testing.T) {
 			name: "no permission for provider = aws",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_HOBBY,
-				action:   "use-provider",
-				resource: "aws",
+				action:   ActionUseProvider,
+				resource: ResourceAWS,
 			},
 			expectedErrorText: "aws not supported by this tier",
 		},
@@ -27,8 +27,8 @@ func TestAccessGates(t *testing.T) {
 			name: "has permission for provider = aws",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "use-provider",
-				resource: "aws",
+				action:   ActionUseProvider,
+				resource: ResourceAWS,
 			},
 			expectedErrorText: "",
 		},
@@ -36,8 +36,8 @@ func TestAccessGates(t *testing.T) {
 			name: "no permission for gpu",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "use-gpu",
-				resource: "gpu",
+				action:   ActionUseGPU,
+				resource: ResourceGPU,
 			},
 			expectedErrorText: "gpus not supported by this tier",
 		},
@@ -45,40 +45,17 @@ func TestAccessGates(t *testing.T) {
 			name: "have permission for gpu",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PRO,
-				action:   "use-gpu",
-				resource: "gpu",
-				count:    1,
+				action:   ActionUseGPU,
+				resource: ResourceGPU,
 			},
 			expectedErrorText: "",
-		},
-		{
-			name: "have permission gpu 0",
-			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "use-gpu",
-				resource: "gpu",
-				count:    0,
-			},
-			expectedErrorText: "",
-		},
-		{
-			name: "no permission gpu 1",
-			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "use-gpu",
-				resource: "gpu",
-				count:    1,
-			},
-			expectedResult:    false,
-			expectedErrorText: "gpus not supported by this tier",
 		},
 		{
 			name: "have permission managed postgres",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PRO,
-				action:   "use-managed",
-				resource: "postgres",
-				count:    1,
+				action:   ActionUseManaged,
+				resource: ResourcePostgres,
 			},
 			expectedErrorText: "",
 		},
@@ -86,26 +63,16 @@ func TestAccessGates(t *testing.T) {
 			name: "have permission managed redis",
 			action: ActionRequest{
 				tier:     defangv1.SubscriptionTier_PRO,
-				action:   "use-managed",
-				resource: "redis",
-				count:    1,
+				action:   ActionUseManaged,
+				resource: ResourceRedis,
 			},
 			expectedErrorText: "",
-		},
-		{
-			name: "unknown permission check errors",
-			action: ActionRequest{
-				tier:     defangv1.SubscriptionTier_PERSONAL,
-				action:   "do",
-				resource: "random",
-			},
-			expectedErrorText: "unknown resource: random",
 		},
 	}
 
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HasAuthorization(tt.action.tier, tt.action.action, tt.action.resource, tt.action.count, tt.expectedErrorText)
+			err := HasAuthorization(tt.action.tier, tt.action.action, string(tt.action.resource), tt.expectedErrorText)
 			if err != nil {
 				if !strings.Contains(err.Error(), tt.expectedErrorText) {
 					t.Fatalf("unexpected error: %v", err)

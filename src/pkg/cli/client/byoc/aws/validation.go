@@ -3,11 +3,8 @@ package aws
 import (
 	"context"
 	"errors"
-	"slices"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
-	"github.com/DefangLabs/defang/src/pkg/store"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -72,41 +69,23 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func ValidateGPUResources(ctx context.Context, project *composeTypes.Project, mode defangv1.DeploymentMode) error {
+func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
 	// return after checking if there are actually non-zero GPUs requested
 	hasGPUs, quotaErr := hasGPUQuota(ctx)
 
-	for _, service := range project.Services {
-		if service.Deploy != nil &&
-			service.Deploy.Resources.Reservations != nil {
-			for _, device := range service.Deploy.Resources.Reservations.Devices {
-				if slices.Contains(device.Capabilities, "gpu") {
-					if device.Count == 0 {
-						continue
-					}
+	cpuCount := compose.GetNumOfGPUs(ctx, project)
 
-					// if there was an error getting the quota
-					if quotaErr != nil {
-						return quotaErr
-					}
+	if cpuCount == 0 {
+		return nil
+	}
 
-					if err := gating.HasAuthorization(store.UserWhoAmI.Tier, "use-gpu", "gpu", float64(device.Count), "not enough GPUs permitted at current subscription tier"); err != nil {
-						return err
-					}
+	// if there was an error getting the quota
+	if quotaErr != nil {
+		return quotaErr
+	}
 
-					errorText := "cannot deploy GPUs for current deployment mode " + mode.String()
-					if err := gating.HasAuthorization(store.UserWhoAmI.Tier, "use-gpu", "mode", float64(mode.Number()), errorText); err != nil {
-						return err
-					}
-
-					if !hasGPUs {
-						return ErrGPUQuotaZero
-					}
-
-					break
-				}
-			}
-		}
+	if !hasGPUs {
+		return ErrGPUQuotaZero
 	}
 
 	return nil
