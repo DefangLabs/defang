@@ -21,18 +21,20 @@ func TestParseAcitivityEntry(t *testing.T) {
 		},
 	}
 
-	resp, err := ParseActivityEntry(serviceUpdateEntry)
+	parser := getActivityParser()
+	resp, err := parser(serviceUpdateEntry)
 	if err != nil {
 		t.Fatalf("ParseActivityEntry() failed: %v", err)
 	}
 	if resp == nil {
 		t.Fatal("ParseActivityEntry() returned nil response")
 	}
-	if resp.State != defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-		t.Errorf("ParseActivityEntry() returned unexpected state: %v, wanted DEPLOYMENT_COMPLETED", resp.State)
+	// When cd service is not compelete, it should return DEPLOYMENT_PENDING
+	if resp[0].State != defangv1.ServiceState_DEPLOYMENT_PENDING {
+		t.Errorf("ParseActivityEntry() returned unexpected state: %v, wanted DEPLOYMENT_PENDING", resp[0].State)
 	}
-	if resp.Status != "Ready condition status changed to True for Service nginx-d5a1fde." {
-		t.Errorf("ParseActivityEntry() returned unexpected status: %s", resp.Status)
+	if resp[0].Status != "Ready condition status changed to True for Service nginx-d5a1fde." {
+		t.Errorf("ParseActivityEntry() returned unexpected status: %s", resp[0].Status)
 	}
 
 	jobRunEntry := &loggingpb.LogEntry{
@@ -46,12 +48,12 @@ func TestParseAcitivityEntry(t *testing.T) {
 		},
 	}
 
-	resp, err = ParseActivityEntry(jobRunEntry)
+	resp, err = parser(jobRunEntry)
 	if err != nil {
 		t.Fatalf("ParseActivityEntry() failed: %v", err)
 	}
 
-	if resp != nil {
-		t.Fatal("ParseActivityEntry() should returned nil response for cd success execution update")
+	if len(resp) != 1 {
+		t.Fatalf("ParseActivityEntry() returned unexpected number of responses: %d, wanted 1", len(resp))
 	}
 }

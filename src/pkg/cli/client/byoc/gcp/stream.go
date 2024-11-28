@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type LogParser[T any] func(*loggingpb.LogEntry) (T, error)
+type LogParser[T any] func(*loggingpb.LogEntry) ([]T, error)
 
 type ServerStream[T any] struct {
 	ctx    context.Context
@@ -32,7 +32,7 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) (*ServerStream[T], error) {
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) (*ServerStream[T], error) {
 	tailer, err := gcp.NewTailer(ctx)
 	if err != nil {
 		return nil, err
@@ -75,12 +75,14 @@ func (s *ServerStream[T]) Start() error {
 				s.errCh <- err
 				return
 			}
-			resp, err := s.parse(entry)
+			resps, err := s.parse(entry)
 			if err != nil {
 				s.errCh <- err
 				return
 			}
-			s.respCh <- resp
+			for _, resp := range resps {
+				s.respCh <- resp
+			}
 		}
 	}()
 	return nil
@@ -99,7 +101,7 @@ type LogStream struct {
 }
 
 func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
-	ss, err := NewStream(ctx, gcp, getLogEntryParser(ctx, gcp))
+	ss, err := NewServerStream(ctx, gcp, getLogEntryParser(ctx, gcp))
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +175,7 @@ type SubscribeStream struct {
 }
 
 func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp) (*SubscribeStream, error) {
-	ss, err := NewStream(ctx, gcp, ParseActivityEntry)
+	ss, err := NewServerStream(ctx, gcp, getActivityParser())
 	if err != nil {
 		return nil, err
 	}
@@ -232,10 +234,10 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
-func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) (*defangv1.TailResponse, error) {
+func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
 
-	return func(entry *loggingpb.LogEntry) (*defangv1.TailResponse, error) {
+	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
 			return nil, nil
 		}
@@ -278,125 +280,145 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			host = "pulumi" // Hardcoded to match end condition detector in cmd/cli/command/compose.go
 		}
 
-		return &defangv1.TailResponse{
-			Service: serviceName,
-			Etag:    etag,
-			Entries: []*defangv1.LogEntry{
-				{
-					Message:   entry.GetTextPayload(),
-					Timestamp: entry.Timestamp,
-					Etag:      etag,
-					Service:   serviceName,
-					Host:      host,
-					Stderr:    strings.HasSuffix(entry.LogName, "run.googleapis.com%2Fstderr"),
+		return []*defangv1.TailResponse{
+			{
+				Service: serviceName,
+				Etag:    etag,
+				Entries: []*defangv1.LogEntry{
+					{
+						Message:   entry.GetTextPayload(),
+						Timestamp: entry.Timestamp,
+						Etag:      etag,
+						Service:   serviceName,
+						Host:      host,
+						Stderr:    strings.HasSuffix(entry.LogName, "run.googleapis.com%2Fstderr"),
+					},
 				},
 			},
 		}, nil
 	}
 }
 
-func ParseActivityEntry(entry *loggingpb.LogEntry) (*defangv1.SubscribeResponse, error) {
-	if entry == nil {
-		return nil, nil
-	}
+func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+	cdSuccess := false
+	readyServices := make(map[string]string)
 
-	if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-		return nil, errors.New("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
-	}
-
-	auditLog := new(auditpb.AuditLog)
-	if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-		panic("failed to unmarshal audit log : " + err.Error())
-	}
-
-	switch entry.Resource.Type {
-	case "cloud_run_revision": // Service status
-		if request := auditLog.GetRequest(); request != nil { // Activity log: service update requests
-			serviceName := GetValueInStruct(request, "service.spec.template.metadata.labels.defang-service")
-			return &defangv1.SubscribeResponse{
-				Name:   serviceName,
-				State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
-				Status: GetValueInStruct(request, "methodName"),
-			}, nil
-		} else if response := auditLog.GetResponse(); response != nil { // System log: service status update
-			serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
-			status := auditLog.GetStatus()
-			if status == nil {
-				return nil, errors.New("missing status in audit log for service " + serviceName)
-			}
-			var state defangv1.ServiceState
-			if status.GetCode() == 0 {
-				state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-			} else {
-				state = defangv1.ServiceState_DEPLOYMENT_FAILED
-			}
-			return &defangv1.SubscribeResponse{
-				Name:   serviceName,
-				State:  state,
-				Status: status.GetMessage(),
-			}, nil
-		} else {
-			return nil, errors.New("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
+	return func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+		if entry == nil {
+			return nil, nil
 		}
 
-		// etag is at protoPayload.response.spec.template.metadata.labels.defang-etag
-		// etag := getValueInStruct(auditLog.GetResponse(), "spec.template.metadata.labels.defang-etag") // etag not needed
-		// service.spec.template.metadata.labels."defang-service"
+		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
+			return nil, errors.New("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
+		}
 
-	case "cloud_run_job": // Job execution update
-		if request := auditLog.GetRequest(); request != nil { // Acitivity log: job creation
-			serviceName := GetValueInStruct(request, "job.template.labels.defang-service")
-			if serviceName != "" {
-				return &defangv1.SubscribeResponse{
+		auditLog := new(auditpb.AuditLog)
+		if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
+			panic("failed to unmarshal audit log : " + err.Error())
+		}
+
+		switch entry.Resource.Type {
+		case "cloud_run_revision": // Service status
+			if request := auditLog.GetRequest(); request != nil { // Activity log: service update requests
+				serviceName := GetValueInStruct(request, "service.spec.template.metadata.labels.defang-service")
+				return []*defangv1.SubscribeResponse{{
 					Name:   serviceName,
-					State:  defangv1.ServiceState_BUILD_ACTIVATING,
-					Status: "Building job creating",
-				}, nil
-			}
-		} else if response := auditLog.GetResponse(); response != nil { // System log: job status update
-			serviceName := GetValueInStruct(response, "metadata.labels.defang-service")
-			status := auditLog.GetStatus()
-			if status == nil {
-				return nil, errors.New("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
-			}
-			var state defangv1.ServiceState
-			if status.GetCode() == 0 {
-				if strings.Contains(status.GetMessage(), "Ready condition status changed to True") { // TODO: Is it better to scan though the conditions instead?
-					state = defangv1.ServiceState_BUILD_RUNNING
-				} else {
-					state = defangv1.ServiceState_BUILD_STOPPING
+					State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
+					Status: GetValueInStruct(request, "methodName"),
+				}}, nil
+			} else if response := auditLog.GetResponse(); response != nil { // System log: service status update
+				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
+				status := auditLog.GetStatus()
+				if status == nil {
+					return nil, errors.New("missing status in audit log for service " + serviceName)
 				}
-			} else {
-				state = defangv1.ServiceState_DEPLOYMENT_FAILED
-			}
-			if serviceName != "" {
-				return &defangv1.SubscribeResponse{
+				var state defangv1.ServiceState
+				if status.GetCode() == 0 {
+					if cdSuccess {
+						state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+					} else {
+						state = defangv1.ServiceState_DEPLOYMENT_PENDING // Report later
+						readyServices[serviceName] = status.GetMessage()
+					}
+				} else {
+					state = defangv1.ServiceState_DEPLOYMENT_FAILED
+				}
+				return []*defangv1.SubscribeResponse{{
 					Name:   serviceName,
 					State:  state,
 					Status: status.GetMessage(),
-				}, nil
+				}}, nil
+			} else {
+				return nil, errors.New("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
 			}
-		}
-		// CD job
-		executionName := path.Base(auditLog.GetResourceName())
-		if executionName == "" {
-			return nil, errors.New("missing resource name in audit log")
-		}
-		if len(executionName) <= 6 {
-			return nil, errors.New("Invalid resource name in audit log : " + executionName)
-		}
-		executionName = executionName[:len(executionName)-6] // Remove the random suffix
-		if executionName == "defang-cd" {
-			if auditLog.GetStatus().GetCode() != 0 {
-				return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+
+			// etag is at protoPayload.response.spec.template.metadata.labels.defang-etag
+			// etag := getValueInStruct(auditLog.GetResponse(), "spec.template.metadata.labels.defang-etag") // etag not needed
+			// service.spec.template.metadata.labels."defang-service"
+
+		case "cloud_run_job": // Job execution update
+			if request := auditLog.GetRequest(); request != nil { // Acitivity log: job creation
+				serviceName := GetValueInStruct(request, "job.template.labels.defang-service")
+				if serviceName != "" {
+					return []*defangv1.SubscribeResponse{{
+						Name:   serviceName,
+						State:  defangv1.ServiceState_BUILD_ACTIVATING,
+						Status: "Building job creating",
+					}}, nil
+				}
+			} else if response := auditLog.GetResponse(); response != nil { // System log: job status update
+				serviceName := GetValueInStruct(response, "metadata.labels.defang-service")
+				status := auditLog.GetStatus()
+				if status == nil {
+					return nil, errors.New("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+				}
+				var state defangv1.ServiceState
+				if status.GetCode() == 0 {
+					if strings.Contains(status.GetMessage(), "Ready condition status changed to True") { // TODO: Is it better to scan though the conditions instead?
+						state = defangv1.ServiceState_BUILD_RUNNING
+					} else {
+						state = defangv1.ServiceState_BUILD_STOPPING
+					}
+				} else {
+					state = defangv1.ServiceState_DEPLOYMENT_FAILED
+				}
+				if serviceName != "" {
+					return []*defangv1.SubscribeResponse{{
+						Name:   serviceName,
+						State:  state,
+						Status: status.GetMessage(),
+					}}, nil
+				}
 			}
-			fmt.Println("Ignored successful cd run")
-			return nil, nil // Ignore success cd status
-		} else {
-			return nil, errors.New("unexpected execution name in audit log : " + executionName)
+			// CD job
+			executionName := path.Base(auditLog.GetResourceName())
+			if executionName == "" {
+				return nil, errors.New("missing resource name in audit log")
+			}
+			if len(executionName) <= 6 {
+				return nil, errors.New("Invalid resource name in audit log : " + executionName)
+			}
+			executionName = executionName[:len(executionName)-6] // Remove the random suffix
+			if executionName == "defang-cd" {
+				if auditLog.GetStatus().GetCode() != 0 {
+					return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+				}
+				cdSuccess = true
+				resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
+				for serviceName, status := range readyServices {
+					resps = append(resps, &defangv1.SubscribeResponse{
+						Name:   serviceName,
+						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+						Status: status,
+					})
+				}
+				return resps, nil // Ignore success cd status
+			} else {
+				return nil, errors.New("unexpected execution name in audit log : " + executionName)
+			}
+		default:
+			return nil, errors.New("unexpected resource type : " + entry.Resource.Type)
 		}
-	default:
-		return nil, errors.New("unexpected resource type : " + entry.Resource.Type)
 	}
 }
 

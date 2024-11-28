@@ -147,3 +147,28 @@ func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName strin
 
 	return io.ReadAll(r)
 }
+
+func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string, f func(*storage.ObjectAttrs) error) error {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("storage.NewClient: %w", err)
+	}
+	defer client.Close()
+
+	bucket := client.Bucket(bucketName)
+	it := bucket.Objects(ctx, &storage.Query{Prefix: prefix})
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("bucket.Objects iterator error: %w", err)
+		}
+
+		if err := f(attrs); err != nil {
+			return err
+		}
+	}
+	return nil
+}

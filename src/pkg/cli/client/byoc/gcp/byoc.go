@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -199,9 +200,42 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	return nil
 }
 
+type gcpObj struct{ obj *storage.ObjectAttrs }
+
+func (o gcpObj) Name() string {
+	return o.obj.Name
+}
+
+func (o gcpObj) Size() int64 {
+	return o.obj.Size
+}
+
 func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP bootstrap list")
+	bucketName, err := b.driver.GetBucketWithPrefix(ctx, "defang-cd")
+	if err != nil {
+		return nil, annotateGcpError(err)
+	}
+	if bucketName == "" {
+		return nil, errors.New("No defang cd bucket found")
+	}
+
+	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
+
+	var stacks []string
+	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
+		stack, err := b.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
+		if err != nil {
+			return err
+		}
+		if stack != "" {
+			stacks = append(stacks, stack)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, annotateGcpError(err)
+	}
+	return stacks, nil
 }
 
 func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
@@ -467,6 +501,10 @@ func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 	return &listServiceResp, nil
 }
 
+func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
+	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
+}
+
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
 
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
@@ -485,10 +523,6 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP DeleteConfig")
-}
-
-func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
 func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
