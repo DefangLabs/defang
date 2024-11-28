@@ -123,7 +123,7 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
 
-  rpc CanUseProvider(CanUseProviderRequest) returns (CanUseProviderResponse) {
+  rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -197,12 +197,12 @@ enum DeploymentMode {
   PRODUCTION = 3;
 }
 
-message CanUseProviderRequest {
+message CanIUseRequest {
   string project = 1;
   Provider provider = 2;
 }
 
-message CanUseProviderResponse { map<string, bool> gates = 1; }
+message CanIUseResponse { map<string, bool> gates = 1; }
 
 message DeployRequest {
   repeated Service services = 1
