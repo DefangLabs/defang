@@ -123,7 +123,7 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
 
-  rpc CanUseProvider(CanUseProviderRequest) returns (CanUseProviderResponse) {
+  rpc CanUseProvider(CanUseProviderRequest) returns (google.protobuf.Empty) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -197,10 +197,9 @@ enum DeploymentMode {
   PRODUCTION = 3;
 }
 
-message CanUseProviderRequest { Provider provider = 1; }
-message CanUseProviderResponse {
-  bool can_use = 1;
-  int32 deployments_remaining = 2;
+message CanUseProviderRequest {
+  string project = 1;
+  Provider provider = 2;
 }
 
 message DeployRequest {

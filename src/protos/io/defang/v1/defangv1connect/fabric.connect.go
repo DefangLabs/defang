@@ -196,7 +196,7 @@ type FabricControllerClient interface {
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
-	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[v1.CanUseProviderResponse], error)
+	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -419,7 +419,7 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
 			connect_go.WithClientOptions(opts...),
 		),
-		canUseProvider: connect_go.NewClient[v1.CanUseProviderRequest, v1.CanUseProviderResponse](
+		canUseProvider: connect_go.NewClient[v1.CanUseProviderRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerCanUseProviderProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -468,7 +468,7 @@ type fabricControllerClient struct {
 	verifyDNSSetup           *connect_go.Client[v1.VerifyDNSSetupRequest, emptypb.Empty]
 	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
 	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
-	canUseProvider           *connect_go.Client[v1.CanUseProviderRequest, v1.CanUseProviderResponse]
+	canUseProvider           *connect_go.Client[v1.CanUseProviderRequest, emptypb.Empty]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -674,7 +674,7 @@ func (c *fabricControllerClient) SetSelectedProvider(ctx context.Context, req *c
 }
 
 // CanUseProvider calls io.defang.v1.FabricController.CanUseProvider.
-func (c *fabricControllerClient) CanUseProvider(ctx context.Context, req *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[v1.CanUseProviderResponse], error) {
+func (c *fabricControllerClient) CanUseProvider(ctx context.Context, req *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.canUseProvider.CallUnary(ctx, req)
 }
 
@@ -728,7 +728,7 @@ type FabricControllerHandler interface {
 	VerifyDNSSetup(context.Context, *connect_go.Request[v1.VerifyDNSSetupRequest]) (*connect_go.Response[emptypb.Empty], error)
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
-	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[v1.CanUseProviderResponse], error)
+	CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1194,6 +1194,6 @@ func (UnimplementedFabricControllerHandler) SetSelectedProvider(context.Context,
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SetSelectedProvider is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[v1.CanUseProviderResponse], error) {
+func (UnimplementedFabricControllerHandler) CanUseProvider(context.Context, *connect_go.Request[v1.CanUseProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CanUseProvider is not implemented"))
 }
