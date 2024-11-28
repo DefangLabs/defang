@@ -123,7 +123,7 @@ service FabricController {
     option idempotency_level = IDEMPOTENT;
   }
 
-  rpc CanUseProvider(CanUseProviderRequest) returns (google.protobuf.Empty) {
+  rpc CanUseProvider(CanUseProviderRequest) returns (CanUseProviderResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -201,6 +201,8 @@ message CanUseProviderRequest {
   string project = 1;
   Provider provider = 2;
 }
+
+message CanUseProviderResponse { map<string, bool> gates = 1; }
 
 message DeployRequest {
   repeated Service services = 1
