@@ -84,7 +84,7 @@ type ByocGcp struct {
 }
 
 func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocGcp {
-	region := pkg.Getenv("GCP_REGION", "us-central1") // Defaults to us-central1 for lower price
+	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := os.Getenv("GCP_PROJECT_ID")
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
