@@ -41,7 +41,7 @@ func P(name string, value interface{}) cliClient.Property {
 }
 
 type GrpcClientApi interface {
-	CanUseProvider(ctx context.Context, canUseReq *defangv1.CanUseProviderRequest) (*defangv1.CanUseProviderResponse, error)
+	CanUseProvider(ctx context.Context, canUseReq *defangv1.CanUseProviderRequest) error
 	GetVersions(ctx context.Context) (*defangv1.Version, error)
 	CheckLoginAndToS(context.Context) error
 	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
@@ -73,19 +73,14 @@ func prettyError(err error) error {
 	return err
 }
 
-const CLOUD_PROVIDER_PROJECT = "last-cloud-deployed-project"
-
-func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID) error {
+func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) error {
 	canUseReq := defangv1.CanUseProviderRequest{
+		Project:  projectName,
 		Provider: providerID.EnumValue(),
 	}
 
-	canUseResp, err := localClient.CanUseProvider(ctx, &canUseReq)
+	err := localClient.CanUseProvider(ctx, &canUseReq)
 	if err != nil {
-		return err
-	}
-
-	if !canUseResp.CanUse {
 		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
 
@@ -938,7 +933,9 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		if err := allowToUseProvider(cmd.Context(), providerID); err != nil {
+		loader := configureLoader(cmd)
+		_, err := getProvider(cmd.Context(), loader)
+		if err != nil {
 			return err
 		}
 
@@ -1228,7 +1225,12 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 
-	if err := allowToUseProvider(ctx, providerID); err != nil {
+	projName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := allowToUseProvider(ctx, providerID, projName); err != nil {
 		return nil, err
 	}
 

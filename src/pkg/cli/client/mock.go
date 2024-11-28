@@ -74,8 +74,8 @@ type MockFabricClient struct {
 	DelegateDomain string
 }
 
-func (m MockFabricClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) (*defangv1.CanUseProviderResponse, error) {
-	return &defangv1.CanUseProviderResponse{CanUse: true, DeploymentsRemaining: 10}, nil
+func (m MockFabricClient) CanUseProvider(ctx context.Context, req *defangv1.CanUseProviderRequest) error {
+	return nil
 }
 
 func (m MockFabricClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
