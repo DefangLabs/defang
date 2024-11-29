@@ -312,6 +312,11 @@ func ValidateProject(project *composeTypes.Project) error {
 	for k := range project.Extensions {
 		term.Warnf("unsupported compose extension: %q", k)
 	}
+
+	if len(project.Volumes) > 0 {
+		term.Warn("unsupported \"volumes\" definition")
+	}
+
 	return nil
 }
 
