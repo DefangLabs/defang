@@ -24,7 +24,13 @@ func ConfigList(ctx context.Context, loader client.Loader, provider client.Provi
 		return err
 	}
 
-	configNames := make([]PrintConfig, 0, len(config.Names))
+	numConfigs := len(config.Names)
+	if numConfigs == 0 {
+		_, err := term.Warnf("No configs found")
+		return err
+	}
+
+	configNames := make([]PrintConfig, 0, numConfigs)
 	for _, c := range config.Names {
 		configNames = append(configNames, PrintConfig{Name: c})
 	}

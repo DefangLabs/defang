@@ -28,8 +28,14 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 		return err
 	}
 
+	numDeployments := len(response.Deployments)
+	if numDeployments == 0 {
+		_, err := term.Warnf("No deployments found for project %q", projectName)
+		return err
+	}
+
 	// map to Deployment struct
-	deployments := make([]PrintDeployment, 0, len(response.Deployments))
+	deployments := make([]PrintDeployment, 0, numDeployments)
 	for _, d := range response.Deployments {
 		deployments = append(deployments, PrintDeployment{
 			Id:         d.Id,
