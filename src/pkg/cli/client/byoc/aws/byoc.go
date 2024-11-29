@@ -236,10 +236,6 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	etag := pkg.RandomID()
-	if len(project.Services) > b.Quota.Services {
-		return nil, errors.New("maximum number of services reached")
-	}
-
 	quotaClient = NewServiceQuotasClient(ctx, cfg)
 	if err = ValidateGPUResources(ctx, project); err != nil {
 		return nil, err

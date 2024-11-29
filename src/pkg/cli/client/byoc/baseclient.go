@@ -10,7 +10,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -41,7 +40,6 @@ type BootstrapLister interface {
 
 type ByocBaseClient struct {
 	PulumiStack             string
-	Quota                   quota.Quotas
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantID                string
