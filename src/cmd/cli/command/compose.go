@@ -107,12 +107,12 @@ func makeComposeUpCmd() *cobra.Command {
 
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
-			var hasManagedServices bool
-			if hasManagedServices, err = canUseManagedServices(managedServices); err != nil {
+			var canUseManagedSvcs bool
+			if canUseManagedSvcs, err = canUseManagedServices(managedServices); err != nil {
 				return err
 			}
 
-			if hasManagedServices {
+			if len(managedServices) > 0 && canUseManagedSvcs {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
