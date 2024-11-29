@@ -71,7 +71,7 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 
 func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
 	// return after checking if there are actually non-zero GPUs requested
-	hasGPUs, quotaErr := hasGPUQuota(ctx)
+	gpusAvailable, quotaErr := hasGPUQuota(ctx)
 
 	gpuCount := compose.GetNumOfGPUs(ctx, project)
 
@@ -84,7 +84,7 @@ func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) er
 		return quotaErr
 	}
 
-	if !hasGPUs {
+	if !gpusAvailable {
 		return ErrGPUQuotaZero
 	}
 
