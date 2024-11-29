@@ -138,6 +138,8 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/iam.serviceAccountUser",          // For impersonating service accounts
 		"roles/artifactregistry.admin",          // For creating artifact registry
 		"roles/compute.futureReservationViewer", // For `compute.regions.list` permission to avoid pulumi error message
+		"roles/compute.loadBalancerAdmin",       // For creating load balancer and ssl certs
+		"roles/compute.networkAdmin",            // For creating network
 	}); err != nil {
 		return err
 	}
@@ -331,7 +333,9 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	url, err := b.driver.CreateUploadURL(ctx, b.bucket, req.Digest, b.uploadServiceAccount)
+	const prefix = "uploads/"
+
+	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(prefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 			return nil, errors.New("Current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
@@ -356,12 +360,8 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	etag := pkg.RandomID()
 	var serviceInfos []*defangv1.ServiceInfo
-	projectNumber, err := b.driver.GetProjectNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name, projectNumber)
+		serviceInfo := b.update(service, project.Name)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -409,7 +409,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
 	// TODO: Copied from DO provider, double check if more is needed
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
@@ -422,7 +422,8 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 			mode = defangv1.Mode_HOST
 		}
 
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("TODO_SERVICE_NAME-%v.%v.run.app", projectNumber, b.driver.Region))
+		// TODO: To be replaced by deterministic defang delegated URL
+		// si.Endpoints = append(si.Endpoints, fmt.Sprintf("TODO_SERVICE_NAME-%v.%v.run.app", projectNumber, b.driver.Region))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,

@@ -109,8 +109,11 @@ func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := fmt.Sprintf(`
+	query := `
 resource.type = "cloud_run_job"
+logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
+
+	query += fmt.Sprintf(`
 labels."run.googleapis.com/execution_name" = "%v"`, executionName)
 
 	if !since.IsZero() {
@@ -123,7 +126,8 @@ timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
 	query := `
-resource.type = "cloud_run_job"`
+resource.type = "cloud_run_job"
+logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
 
 	if project != "" {
 		query += fmt.Sprintf(`
@@ -150,7 +154,8 @@ timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
 	query := `
-resource.type="cloud_run_revision"`
+resource.type="cloud_run_revision"
+logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
 
 	if etag != "" {
 		query += fmt.Sprintf(`
