@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
@@ -39,6 +40,15 @@ func P(name string, value interface{}) cliClient.Property {
 	return cliClient.Property{Name: name, Value: value}
 }
 
+type GrpcClientApi interface {
+	CanIUse(ctx context.Context, canUseReq *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
+	GetVersions(ctx context.Context) (*defangv1.Version, error)
+	CheckLoginAndToS(context.Context) error
+	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
+	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
+	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
+}
+
 // GLOBALS
 var (
 	client         cliClient.GrpcClient
@@ -47,6 +57,7 @@ var (
 	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
+	localClient    GrpcClientApi
 	nonInteractive = !hasTty
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
@@ -60,6 +71,21 @@ func prettyError(err error) error {
 		err = errors.Unwrap(cerr)
 	}
 	return err
+}
+
+func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) error {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:  projectName,
+		Provider: providerID.EnumValue(),
+	}
+
+	resp, err := localClient.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+	}
+
+	gating.Gates = resp.Gates
+	return nil
 }
 
 func Execute(ctx context.Context) error {
@@ -316,9 +342,13 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
-		client = cli.NewGrpcClient(cmd.Context(), cluster)
 
-		if v, err := client.GetVersions(cmd.Context()); err == nil {
+		client = cli.NewGrpcClient(cmd.Context(), cluster)
+		if localClient == nil {
+			localClient = client
+		}
+
+		if v, err := localClient.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
@@ -332,7 +362,7 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
+		if err = localClient.CheckLoginAndToS(cmd.Context()); err != nil {
 			if nonInteractive {
 				return err
 			}
@@ -346,8 +376,12 @@ var RootCmd = &cobra.Command{
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
+				client = cli.NewGrpcClient(cmd.Context(), cluster) // reconnect with the new token
+				if localClient == nil {
+					localClient = client
+				}
+
+				if err = localClient.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
 			}
@@ -362,6 +396,7 @@ var RootCmd = &cobra.Command{
 				}
 			}
 		}
+
 		return err
 	},
 }
@@ -397,6 +432,7 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
@@ -542,7 +578,7 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 
-		if client.CheckLoginAndToS(cmd.Context()) != nil {
+		if localClient.CheckLoginAndToS(cmd.Context()) != nil {
 			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
 			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
@@ -747,6 +783,7 @@ var configDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -774,6 +811,7 @@ var configListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.ConfigList(cmd.Context(), loader, provider)
 	},
 }
@@ -791,6 +829,7 @@ var debugCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
 	},
 }
@@ -810,6 +849,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
 		if err != nil {
@@ -863,7 +903,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("Command 'restart' is deprecated, use 'up' instead")
+		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
@@ -893,6 +933,12 @@ var tokenCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
+
+		loader := configureLoader(cmd)
+		_, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
 
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
@@ -930,6 +976,7 @@ var cdDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
 	},
 }
@@ -944,6 +991,7 @@ var cdDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
 	},
 }
@@ -958,6 +1006,7 @@ var cdRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
 	},
 }
@@ -972,6 +1021,7 @@ var cdCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
 	},
 }
@@ -988,6 +1038,7 @@ var cdTearDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.TearDown(cmd.Context(), provider, force)
 	},
 }
@@ -1005,6 +1056,7 @@ var cdListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		if remote {
 			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
 		}
@@ -1023,6 +1075,7 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
@@ -1042,7 +1095,7 @@ var tosCmd = &cobra.Command{
 	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if we are correctly logged in
-		if _, err := client.WhoAmI(cmd.Context()); err != nil {
+		if _, err := localClient.WhoAmI(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1172,6 +1225,16 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 	if err != nil {
 		return nil, err
 	}
+
+	projName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := allowToUseProvider(ctx, providerID, projName); err != nil {
+		return nil, err
+	}
+
 	return provider, nil
 }
 
@@ -1180,7 +1243,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 	if err != nil {
 		term.Warn("Unable to load project:", err)
 	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+		resp, err := localClient.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
 		if err != nil {
 			term.Warn("Unable to get selected provider:", err)
 		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
@@ -1219,7 +1282,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 
 	// Save the selected provider to the fabric
 	if projName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
+		if err := localClient.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
 			term.Warn("Unable to save selected provider to defang server:", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projName)

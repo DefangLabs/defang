@@ -3,8 +3,8 @@ package aws
 import (
 	"context"
 	"errors"
-	"slices"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -71,30 +71,21 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 
 func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
 	// return after checking if there are actually non-zero GPUs requested
-	hasGPUs, quotaErr := hasGPUQuota(ctx)
+	gpusAvailable, quotaErr := hasGPUQuota(ctx)
 
-	for _, service := range project.Services {
-		if service.Deploy != nil &&
-			service.Deploy.Resources.Reservations != nil {
-			for _, device := range service.Deploy.Resources.Reservations.Devices {
-				if slices.Contains(device.Capabilities, "gpu") {
-					if device.Count == 0 {
-						continue
-					}
+	gpuCount := compose.GetNumOfGPUs(ctx, project)
 
-					// if there was an error getting the quota
-					if quotaErr != nil {
-						return quotaErr
-					}
+	if gpuCount == 0 {
+		return nil
+	}
 
-					if !hasGPUs {
-						return ErrGPUQuotaZero
-					}
+	// if there was an error getting the quota
+	if quotaErr != nil {
+		return quotaErr
+	}
 
-					break
-				}
-			}
-		}
+	if !gpusAvailable {
+		return ErrGPUQuotaZero
 	}
 
 	return nil
