@@ -139,3 +139,7 @@ func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSe
 	_, err := g.client.SetSelectedProvider(ctx, connect.NewRequest(req))
 	return err
 }
+
+func (g GrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
+	return getMsg(g.client.CanIUse(ctx, connect.NewRequest(req)))
+}
