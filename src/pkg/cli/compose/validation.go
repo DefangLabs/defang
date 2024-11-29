@@ -441,39 +441,9 @@ func ValidateManagedStore(managedStore any) error {
 		return nil
 	}
 
-	for _, key := range []string{"allow-downtime", "retention"} {
-		switch key {
-		case "allow-downtime":
-			if downtime, ok := postgresProps[key]; ok {
-				if _, ok := downtime.(bool); !ok {
-					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'allow-downtime' must be a boolean"))
-				}
-			}
-		case "retention":
-			if retention, ok := postgresProps[key]; ok {
-				// retention is optional
-				if retention == nil {
-					continue
-				}
-
-				retentionProps, ok := retention.(map[string]any)
-				if !ok {
-					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'retention' should contain 'final-snapshot-name' field"))
-					continue
-				}
-
-				key := "last-snapshot-name"
-				value, ok := retentionProps[key]
-				if !ok {
-					continue
-				}
-
-				if _, ok := value.(string); !ok {
-					aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam(fmt.Sprintf("'%s' must be a string", key)))
-				}
-			}
-		default:
-			return fmt.Errorf("unsupported postgres property: %q", key)
+	if downtime, ok := postgresProps["allow-downtime"]; ok {
+		if _, ok := downtime.(bool); !ok {
+			aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'allow-downtime' must be a boolean"))
 		}
 	}
 

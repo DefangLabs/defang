@@ -131,35 +131,14 @@ func TestAWSPostgres(t *testing.T) {
 						t.Fatalf("expecting 'x-defang-postgres' map")
 					}
 
-					// retention
-					{
-						retention, ok := postgresProps["retention"]
-						if !ok {
-							t.Fatal("expecting 'retention' definition but not defined")
-						}
-
-						snapshotsProps, ok := retention.(map[string]interface{})
-						if !ok {
-							t.Fatal("expecting 'retention' not a map")
-						}
-
-						key := "final-snapshot-name"
-						if _, ok := snapshotsProps[key]; !ok {
-							t.Fatalf("expecting '%s' retention property but not defined", key)
-						}
+					downtime, ok := postgresProps["allow-downtime"]
+					if !ok {
+						continue
 					}
 
-					// downtime
-					{
-						downtime, ok := postgresProps["allow-downtime"]
-						if !ok {
-							continue
-						}
-
-						_, ok = downtime.(bool)
-						if !ok {
-							t.Fatal("expecting 'allow-downtime' to be a boolean")
-						}
+					_, ok = downtime.(bool)
+					if !ok {
+						t.Fatal("expecting 'allow-downtime' to be a boolean")
 					}
 				}
 			case "y":

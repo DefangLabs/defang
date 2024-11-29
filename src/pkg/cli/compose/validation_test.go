@@ -187,7 +187,7 @@ func TestXDefangManaged(t *testing.T) {
 			}
 
 			if err := ValidateManagedStore(redis); err != nil {
-				t.Fatalf("ValidateRedis() failed: %v", err)
+				t.Fatalf("ValidateManagedStore() failed: %v", err)
 			}
 		})
 
@@ -203,7 +203,7 @@ func TestXDefangManaged(t *testing.T) {
 			}
 
 			if err := ValidateManagedStore(redis); err != nil {
-				t.Fatalf("ValidateRedis() failed: %v", err)
+				t.Fatalf("ValidateManagedStore() failed: %v", err)
 			}
 		})
 
@@ -212,9 +212,6 @@ func TestXDefangManaged(t *testing.T) {
 				Extensions: composeTypes.Extensions{
 					extensionName: map[string]any{
 						"allow-downtime": true,
-						"retention": map[string]any{
-							"final-snapshot-name": "final-snapshot",
-						},
 					},
 				}}
 
@@ -224,7 +221,7 @@ func TestXDefangManaged(t *testing.T) {
 			}
 
 			if err := ValidateManagedStore(postgres); err != nil {
-				t.Fatalf("ValidateRedis() failed: %v", err)
+				t.Fatalf("ValidateManagedStore() failed: %v", err)
 			}
 		})
 	}
@@ -243,30 +240,6 @@ func TestManagedStoreParams(t *testing.T) {
 			},
 			errors: []string{"error found: 'allow-downtime' must be a boolean"},
 		},
-		{
-			name: "valid allow-downtime",
-			extension: map[string]any{
-				"allow-downtime": false,
-				"retention":      nil,
-			},
-			errors: []string{},
-		},
-		{
-			name: "invalid final-snapshot-name",
-			extension: map[string]any{
-				"retention": map[string]any{
-					"final-snapshot-name": 1234,
-				},
-			},
-			errors: []string{"'final-snapshot-name' must be a string"},
-		},
-		{
-			name: "no fields",
-			extension: map[string]any{
-				"retention": map[string]any{},
-			},
-			errors: []string{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -274,7 +247,7 @@ func TestManagedStoreParams(t *testing.T) {
 			if err := ValidateManagedStore(tt.extension); err != nil {
 				for _, errMsg := range tt.errors {
 					if !strings.Contains(err.Error(), errMsg) {
-						t.Fatalf("ValidatePostgresParams() = %v, want %v", err.Error(), tt.errors)
+						t.Fatalf("ValidateManagedStore() = %v, want %v", err.Error(), tt.errors)
 					}
 				}
 			}
