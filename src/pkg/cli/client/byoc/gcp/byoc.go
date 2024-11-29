@@ -33,6 +33,7 @@ var _ client.Provider = (*ByocGcp)(nil)
 
 const (
 	DefangCDProjectName = "defang-cd"
+	UploadPrefix        = "uploads/"
 )
 
 var (
@@ -333,9 +334,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 		return nil, err
 	}
 
-	const prefix = "uploads/"
-
-	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(prefix, req.Digest), b.uploadServiceAccount)
+	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 			return nil, errors.New("Current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
@@ -360,8 +359,12 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 	etag := pkg.RandomID()
 	var serviceInfos []*defangv1.ServiceInfo
+	projectNumber, err := b.driver.GetProjectNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name)
+		serviceInfo := b.update(service, project.Name, projectNumber)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -379,7 +382,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	if len(data) < 1000 {
 		payload = base64.StdEncoding.EncodeToString(data)
 	} else {
-		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, etag, b.uploadServiceAccount)
+		payloadUrl, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, etag), b.uploadServiceAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -393,6 +396,8 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 			return nil, fmt.Errorf("unexpected status code during upload: %s", resp.Status)
 		}
 		payload = http.RemoveQueryParam(payloadUrl)
+		// Only gs:// is supported in the payload as http get in gcpcd does not handle auth yet
+		payload = strings.Replace(payload, "https://storage.googleapis.com/", "gs://", 1)
 	}
 
 	cmd := cdCommand{
@@ -409,7 +414,7 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
 	// TODO: Copied from DO provider, double check if more is needed
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
@@ -422,8 +427,7 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string)
 			mode = defangv1.Mode_HOST
 		}
 
-		// TODO: To be replaced by deterministic defang delegated URL
-		// si.Endpoints = append(si.Endpoints, fmt.Sprintf("TODO_SERVICE_NAME-%v.%v.run.app", projectNumber, b.driver.Region))
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-%v-%v.%v.run.app", service.Name, projectName, projectNumber, b.driver.Region))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
