@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ComposeError struct {
@@ -74,7 +76,24 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 		term.Debug("Failed to get delegate domain:", err)
 	}
 
-	deployRequest := &defangv1.DeployRequest{Mode: mode, Project: project.Name, Compose: bytes, DelegateDomain: delegateDomain.Zone}
+	deployRequest := &defangv1.DeployRequest{
+		Mode:           mode,
+		Project:        project.Name,
+		Compose:        bytes,
+		DelegateDomain: delegateDomain.Zone,
+	}
+
+	delegation, err := p.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
+		DelegateDomain: delegateDomain.Zone,
+		Preview:        upload == compose.UploadModePreview,
+		Project:        project.Name,
+	})
+	if err != nil {
+		return nil, project, err
+	} else if delegation != nil {
+		deployRequest.DelegationSetId = delegation.DelegationSetId
+	}
+
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview {
 		resp, err = p.Preview(ctx, deployRequest)
@@ -82,21 +101,34 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 			return nil, project, err
 		}
 	} else {
-		req := client.PrepareDomainDelegationRequest{Project: project.Name, DelegateDomain: delegateDomain.Zone}
-		var delegation *client.PrepareDomainDelegationResponse
-		delegation, err = p.PrepareDomainDelegation(ctx, req)
-		if err != nil {
-			return nil, project, err
-		}
 		if delegation != nil && len(delegation.NameServers) > 0 {
 			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
 			_, err = c.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
-			deployRequest.DelegationSetId = delegation.DelegationSetId
 		}
+
+		accountInfo, err := p.AccountInfo(ctx)
+		if err != nil {
+			return nil, project, err
+		}
+
+		timestamp := time.Now()
 		resp, err = p.Deploy(ctx, deployRequest)
+		if err != nil {
+			return nil, project, err
+		}
+
+		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+			Deployment: &defangv1.Deployment{
+				Id:                resp.Etag,
+				Project:           project.Name,
+				Provider:          string(accountInfo.Provider()),
+				ProviderAccountId: accountInfo.AccountID(),
+				Timestamp:         timestamppb.New(timestamp),
+			},
+		})
 		if err != nil {
 			return nil, project, err
 		}

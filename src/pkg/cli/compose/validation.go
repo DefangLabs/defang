@@ -126,10 +126,10 @@ func ValidateProject(project *composeTypes.Project) error {
 			}
 		}
 		if len(svccfg.Volumes) > 0 {
-			term.Debugf("service %q: unsupported compose directive: volumes", svccfg.Name) // TODO: add support for volumes
+			term.Warnf("service %q: unsupported compose directive: volumes", svccfg.Name) // TODO: add support for volumes
 		}
 		if len(svccfg.VolumesFrom) > 0 {
-			term.Debugf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
+			term.Warnf("service %q: unsupported compose directive: volumes_from", svccfg.Name) // TODO: add support for volumes_from
 		}
 		if svccfg.Build != nil {
 			_, err := filepath.Abs(svccfg.Build.Context)
@@ -324,9 +324,6 @@ func ValidateProject(project *composeTypes.Project) error {
 		}
 	}
 
-	for k := range project.Extensions {
-		term.Warnf("unsupported compose extension: %q", k)
-	}
 	return nil
 }
 

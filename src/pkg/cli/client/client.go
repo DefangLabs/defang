@@ -21,15 +21,20 @@ type ProjectLoader interface {
 
 type FabricClient interface {
 	AgreeToS(context.Context) error
+	CanIUse(context.Context, *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
 	CheckLoginAndToS(context.Context) error
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context) error
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
+	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
+	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
+	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
 	RevokeToken(context.Context) error
+	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
 	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error

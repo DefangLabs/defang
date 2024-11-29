@@ -61,6 +61,15 @@ func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) e
 	return err
 }
 
+func (g GrpcClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
+	_, err := g.client.PutDeployment(ctx, connect.NewRequest(req))
+	return err
+}
+
+func (g GrpcClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
+	return getMsg(g.client.ListDeployments(ctx, connect.NewRequest(req)))
+}
+
 func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error) {
 	return getMsg(g.client.GenerateFiles(ctx, connect.NewRequest(req)))
 }
@@ -129,4 +138,8 @@ func (g GrpcClient) GetSelectedProvider(ctx context.Context, req *defangv1.GetSe
 func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error {
 	_, err := g.client.SetSelectedProvider(ctx, connect.NewRequest(req))
 	return err
+}
+
+func (g GrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
+	return getMsg(g.client.CanIUse(ctx, connect.NewRequest(req)))
 }

@@ -81,6 +81,14 @@ service FabricController {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
 
+  rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  };
+  rpc ListDeployments(ListDeploymentsRequest)
+      returns (ListDeploymentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
+
   rpc CreateUploadURL(UploadURLRequest) returns (UploadURLResponse);
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
@@ -113,6 +121,10 @@ service FabricController {
   rpc SetSelectedProvider(SetSelectedProviderRequest)
       returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
 
@@ -185,6 +197,13 @@ enum DeploymentMode {
   PRODUCTION = 3;
 }
 
+message CanIUseRequest {
+  string project = 1;
+  Provider provider = 2;
+}
+
+message CanIUseResponse { map<string, bool> gates = 1; }
+
 message DeployRequest {
   repeated Service services = 1
       [ deprecated = true ];                // deprecated; use compose
@@ -251,6 +270,7 @@ enum ServiceState {
   DEPLOYMENT_FAILED = 10;
 
   BUILD_FAILED = 11;
+  DEPLOYMENT_SCALED_IN = 12;
 }
 
 message ServiceInfo {
@@ -324,6 +344,20 @@ message ListConfigsRequest {
 }
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
+
+message Deployment {
+  string id = 1;
+  string project = 2;
+  string provider = 3;
+  string provider_account_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message PutDeploymentRequest { Deployment deployment = 1; }
+
+message ListDeploymentsRequest { string project = 1; }
+
+message ListDeploymentsResponse { repeated Deployment deployments = 1; }
 
 message TokenRequest {
   string tenant = 1;
@@ -574,8 +608,8 @@ message DelegateSubdomainZoneResponse { string zone = 1; }
 
 enum SubscriptionTier {
   SUBSCRIPTION_TIER_UNSPECIFIED = 0;
-  PERSONAL = 1;
-  BASIC = 2;
+  HOBBY = 1;
+  PERSONAL = 2;
   PRO = 3;
   TEAM = 4;
 }

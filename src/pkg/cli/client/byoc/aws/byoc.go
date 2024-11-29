@@ -49,6 +49,13 @@ var (
 	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 )
 
+type StsProviderAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
+}
+
+var StsClient StsProviderAPI
+
 type ByocAws struct {
 	*byoc.ByocBaseClient
 
@@ -107,12 +114,23 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
+type NewByocInterface func(ctx context.Context, tenantId types.TenantID) *ByocAws
+
+func newByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+
 	return b
+}
+
+var NewByocProvider NewByocInterface = newByocProvider
+
+func initStsClient(cfg awssdk.Config) {
+	if StsClient == nil {
+		StsClient = sts.NewFromConfig(cfg)
+	}
 }
 
 func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
@@ -314,8 +332,8 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 
 	if roleARN != "" {
-		stsClient := sts.NewFromConfig(cfg)
-		creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN)
+		initStsClient(cfg)
+		creds := stscreds.NewAssumeRoleProvider(StsClient, roleARN)
 		cfg.Credentials = awssdk.NewCredentialsCache(creds)
 	}
 
@@ -379,6 +397,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 		if zone != nil {
 			zoneId = zone.Id
 		}
+		// TODO: avoid creating the delegation set if we're in preview mode
 		delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
 		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
 		var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
@@ -421,7 +440,9 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	initStsClient(cfg)
+
+	identity, err := StsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -823,7 +844,7 @@ func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(projectName, delegateDomain, fqn, &port))
+			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, projectName, delegateDomain, &port))
 			mode := defangv1.Mode_INGRESS
 			if port.Mode == compose.Mode_HOST {
 				mode = defangv1.Mode_HOST

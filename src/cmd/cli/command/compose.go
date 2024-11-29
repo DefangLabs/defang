@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -27,18 +28,52 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
-	var managedServices []string
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string]int, []string) {
+	var managedServices = map[string]int{
+		"x-defang-static-files": 0,
+		"x-defang-redis":        0,
+		"x-defang-postgres":     0,
+	}
 	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			managedServices = append(managedServices, service.Name)
+			for key := range service.Extensions {
+				if _, ok := managedServices[key]; ok {
+					managedServices[key]++
+				}
+			}
 		} else {
 			unmanagedServices = append(unmanagedServices, service.Name)
 		}
 	}
 
 	return managedServices, unmanagedServices
+}
+
+func canUseManagedServices(managedServices map[string]int) (bool, error) {
+	var hasManagedServices bool = false
+	for key := range managedServices {
+		var err error
+		var resource gating.Resources
+		switch key {
+		case "x-defang-redis":
+			resource = gating.ResourceRedis
+		case "x-defang-postgres":
+			resource = gating.ResourcePostgres
+		default:
+			continue
+		}
+
+		if resource != "" && managedServices[key] > 0 {
+			if err = gating.HasAuthorization(resource, "usage of managed storage"); err != nil {
+				return true, err
+			}
+		}
+
+		hasManagedServices = true
+	}
+
+	return hasManagedServices, nil
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -64,6 +99,30 @@ func makeComposeUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			project, err := loader.LoadProject(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+
+			var canUseManagedSvcs bool
+			if canUseManagedSvcs, err = canUseManagedServices(managedServices); err != nil {
+				return err
+			}
+
+			if len(managedServices) > 0 && canUseManagedSvcs {
+				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
+			}
+
+			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
+			if numGPUS > 0 {
+				if err := gating.HasAuthorization(gating.ResourceGPU, "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
+					return err
+				}
+			}
+
 			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
 
 			if err != nil {
@@ -90,12 +149,6 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			printPlaygroundPortalServiceURLs(deploy.Services)
-
-			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
-
-			if len(managedServices) > 0 {
-				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
-			}
 
 			if detach {
 				term.Info("Detached.")
@@ -215,7 +268,7 @@ func makeComposeStartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'start' is deprecated, use 'up' instead")
+			return errors.New("command 'start' is deprecated, use 'up' instead")
 		},
 	}
 	composeStartCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
@@ -229,7 +282,7 @@ func makeComposeRestartCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'restart' is deprecated, use 'up' instead")
+			return errors.New("command 'restart' is deprecated, use 'up' instead")
 		},
 	}
 }
@@ -241,7 +294,7 @@ func makeComposeStopCmd() *cobra.Command {
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("Command 'stop' is deprecated, use 'down' instead")
+			return errors.New("command 'stop' is deprecated, use 'down' instead")
 		},
 	}
 }
@@ -260,6 +313,7 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
 			if err != nil {
@@ -318,6 +372,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
@@ -423,6 +478,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			return cli.Tail(cmd.Context(), loader, provider, tailOptions)
 		},
 	}
