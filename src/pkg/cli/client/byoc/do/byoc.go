@@ -228,7 +228,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	_, err = b.runCdCommand(ctx, project.Name, req.DelegateDomain, cmd, payloadString)
+	_, err = b.runCdCommand(ctx, cdImageTag, project.Name, req.DelegateDomain, cmd, payloadString)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +244,12 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 		return "", err
 	}
 
-	_, err := b.runCdCommand(ctx, req.Project, "dummy.domain", req.Command)
+	cdImageTag, err := b.getCdImageTag(ctx, req.Project)
 	if err != nil {
+		return "", err
+	}
+
+	if _, err := b.runCdCommand(ctx, cdImageTag, req.Project, "dummy.domain", req.Command); err != nil {
 		return "", err
 	}
 	etag := pkg.RandomID()
@@ -543,7 +547,7 @@ func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.Prepare
 	return nil, nil // TODO: implement domain delegation for DO
 }
 
-func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
+func (b *ByocDo) runCdCommand(ctx context.Context, cdImageTag, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
 	env := b.environment(projectName, delegateDomain)
 	if term.DoDebug() {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
@@ -555,7 +559,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 			return nil, err
 		}
 	}
-	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
+	app, err := b.driver.Run(ctx, cdImageTag, env, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
 }
 

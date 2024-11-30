@@ -1,6 +1,7 @@
 package appPlatform
 
 import (
+	"context"
 	"testing"
 
 	"github.com/digitalocean/godo"
@@ -39,10 +40,12 @@ func TestShellQuote(t *testing.T) {
 }
 
 func Test_getImageSourceSpec(t *testing.T) {
+	const fakeSha = "sha256:0000000011111111222222223333333344444444555555556666666677777777"
 	// Given
 	tests := []struct {
-		imageURI string
-		expected *godo.ImageSourceSpec
+		imageURI    string
+		overrideTag string
+		expected    *godo.ImageSourceSpec
 	}{
 		{
 			imageURI: "docker.io/library/nginx:tagx",
@@ -50,7 +53,8 @@ func Test_getImageSourceSpec(t *testing.T) {
 				RegistryType: "DOCKER_HUB",
 				Registry:     "library",
 				Repository:   "nginx",
-				Tag:          "tagx",
+				// Tag:          "tagx",
+				Digest: fakeSha + "tagx",
 			},
 		},
 		{
@@ -59,7 +63,8 @@ func Test_getImageSourceSpec(t *testing.T) {
 				RegistryType: "DOCKER_HUB",
 				Registry:     "library",
 				Repository:   "nginx",
-				Tag:          "latest",
+				// Tag:          "latest",
+				Digest: fakeSha + "latest",
 			},
 		},
 		{
@@ -68,7 +73,8 @@ func Test_getImageSourceSpec(t *testing.T) {
 				RegistryType: "DOCKER_HUB",
 				// Registry:     "library",
 				Repository: "nginx",
-				Tag:        "latest",
+				// Tag:        "latest",
+				Digest: fakeSha + "latest",
 			},
 		},
 		{
@@ -77,7 +83,8 @@ func Test_getImageSourceSpec(t *testing.T) {
 				RegistryType: "DOCKER_HUB",
 				// Registry:     "library",
 				Repository: "nginx",
-				Tag:        "latest",
+				// Tag:        "latest",
+				Digest: fakeSha + "latest",
 			},
 		},
 		{
@@ -99,11 +106,14 @@ func Test_getImageSourceSpec(t *testing.T) {
 			},
 		},
 	}
+	getDockerhubImageTagDigest = func(ctx context.Context, reg, repo, tag string) (string, error) {
+		return fakeSha + tag, nil
+	}
 
 	for _, test := range tests {
 		t.Run(test.imageURI, func(t *testing.T) {
 			t.Setenv("DEFANG_CD_IMAGE", test.imageURI)
-			actual, err := getImageSourceSpec()
+			actual, err := getImageSourceSpec(context.Background(), test.overrideTag)
 			if err != nil {
 				t.Fatalf("Expected no error but got: %s", err)
 			}

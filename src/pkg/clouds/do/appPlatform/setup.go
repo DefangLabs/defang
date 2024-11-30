@@ -2,6 +2,7 @@ package appPlatform
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
+	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -98,16 +100,22 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
-func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
-	cdImagePath := byoc.GetCdImage(CdImageBase, byoc.CdLatestImageTag)
+func getImageSourceSpec(ctx context.Context, cdImageTag string) (*godo.ImageSourceSpec, error) {
+	cdImagePath := byoc.GetCdImage(CdImageBase, cdImageTag)
 	term.Debugf("Using CD image: %s", cdImagePath)
 	image, err := ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
 	}
+
+	isDockerHub := false
 	if image.Registry == "docker.io" || image.Registry == "index.docker.io" {
+		isDockerHub = true
 		image.Registry = path.Dir(image.Repo)
 		image.Repo = path.Base(image.Repo)
+	}
+	if image.Registry == "" {
+		isDockerHub = true
 	}
 	if image.Digest != "" {
 		// only one of jobs.image.tag or jobs.image.digest can be specified; digest takes precedence
@@ -116,6 +124,18 @@ func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 		// default to tag "latest"
 		image.Tag = "latest"
 	}
+
+	// Use docker hub public API to resolve the digest of the image as digitalocean always caches old images
+	if isDockerHub && image.Digest == "" {
+		digest, err := getDockerhubImageTagDigest(ctx, image.Registry, image.Repo, image.Tag)
+		if err != nil {
+			term.Warnf("Failed to get digest for %s:%s, using only tag to resolve cd image: %s", image.Repo, image.Tag, err)
+		} else if digest != "" {
+			image.Digest = digest
+			image.Tag = "" // only one of jobs.image.tag or jobs.image.digest can be specified; digest takes precedence
+		}
+	}
+
 	return &godo.ImageSourceSpec{
 		// RegistryType: godo.ImageSourceSpecRegistryType_DOCR, TODO: support DOCR and GHCR
 		// Repository:   "defangmvp/do-cd",
@@ -127,10 +147,42 @@ func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 	}, nil
 }
 
-func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
+type githubRepoTag struct {
+	Images []struct {
+		Digest       string `json:"digest"`
+		Os           string `json:"os"`
+		Architecture string `json:"architecture"`
+	} `json:"images"`
+}
+
+var getDockerhubImageTagDigest = func(ctx context.Context, registry, repo, tag string) (string, error) {
+	if registry == "" {
+		registry = "library"
+	}
+	url := fmt.Sprintf("https://hub.docker.com/v2/namespaces/%v/repositories/%v/tags/%v", registry, repo, tag)
+	resp, err := http.GetWithContext(ctx, url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var tagData githubRepoTag
+	if err := json.NewDecoder(resp.Body).Decode(&tagData); err != nil {
+		return "", err
+	}
+	for _, image := range tagData.Images {
+		// TODO: Only support linux and amd64 for now
+		if image.Os == "linux" && image.Architecture == "amd64" {
+			return image.Digest, nil
+		}
+	}
+
+	return "", nil
+}
+
+func (d DoApp) Run(ctx context.Context, cdImageTag string, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
 	client := NewClient(ctx)
 
-	image, err := getImageSourceSpec()
+	image, err := getImageSourceSpec(ctx, cdImageTag)
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -18,7 +19,7 @@ import (
 
 const (
 	CdDefaultImageTag = "public-beta" // for when a project has no cd version, this would be a old deployment
-	CdLatestImageTag  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
+	CdLatestImageTag  = "latest"      // Update this to the latest CD service major version number whenever cd major is changed
 	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
 )
 
@@ -93,10 +94,21 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	return errors.New("local pulumi command succeeded; stopping")
 }
 
+var sha256digest = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
+
 func GetCdImage(repo string, tag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
+	if image, ok := os.LookupEnv("DEFANG_CD_IMAGE"); ok {
+		return image
+	}
+	// Detects if the tag is a sha256 digest and returns the full image URI
+	// to maintain backward compatibility with deployments with digest saved as CD version
+	if sha256digest.MatchString(tag) {
+		return repo + "@sha256:" + tag
+	}
+	return repo + ":" + tag
 }
 
+// This would result in cd image with only sha256 digest saving the digest as tag
 func ExtractImageTag(fullQualifiedImageURI string) string {
 	index := strings.LastIndex(fullQualifiedImageURI, ":")
 	return fullQualifiedImageURI[index+1:]
