@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -50,7 +51,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	}
 
 	for _, stack := range stacks {
-		fmt.Println(" -", stack)
+		fmt.Println(" -", strings.Replace(stack, "/beta", "", -1))
 	}
 
 	return nil
