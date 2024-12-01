@@ -207,7 +207,7 @@ message CanIUseResponse {
   string cd_image = 2;
   bool gpu = 3;
   bool postgres = 4;
-  Provider provider = 5;
+  bool provider = 5;
   bool redis = 6;
 }
 
