@@ -205,9 +205,9 @@ message CanIUseRequest {
 message CanIUseResponse {
   map<string, bool> gates = 1 [ deprecated = true ];
   string cd_image = 2;
-  Provider provider = 3;
-  bool gpu = 4;
-  bool postgres = 5;
+  bool gpu = 3;
+  bool postgres = 4;
+  Provider provider = 5;
   bool redis = 6;
 }
 
