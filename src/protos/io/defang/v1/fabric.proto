@@ -349,12 +349,19 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
+enum DeploymentStatus {
+  DEPLOYMENT_STATUS_UNSPECIFIED = 0;
+  DEPLOYMENT_STATUS_UP = 1;
+  DEPLOYMENT_STATUS_DOWN = 2;
+}
+
 message Deployment {
   string id = 1;
   string project = 2;
   string provider = 3;
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
+  DeploymentStatus status = 6;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
