@@ -34,8 +34,9 @@ func DnsSafe(fqdn string) string {
 	return strings.ToLower(fqdn)
 }
 
-type BootstrapLister interface {
+type ProjectBackend interface {
 	BootstrapList(context.Context) ([]string, error)
+	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
 type ByocBaseClient struct {
@@ -43,15 +44,16 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantID                string
+	CDImage                 string
 
-	bootstrapLister BootstrapLister
+	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, backend ProjectBackend) *ByocBaseClient {
 	b := &ByocBaseClient{
-		TenantID:        string(tenantID),
-		PulumiStack:     "beta", // TODO: make customizable
-		bootstrapLister: bl,
+		TenantID:       string(tenantID),
+		PulumiStack:    "beta", // TODO: make customizable
+		projectBackend: backend,
 	}
 	return b
 }
@@ -91,8 +93,17 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	return errors.New("local pulumi command succeeded; stopping")
 }
 
-func GetCdImage(repo string, tag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
+func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
+	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
+	if err != nil {
+		return "", err
+	}
+
+	if projUpdate == nil {
+		return "", nil
+	}
+
+	return projUpdate.CdVersion, nil
 }
 
 func ExtractImageTag(fullQualifiedImageURI string) string {
@@ -102,6 +113,10 @@ func ExtractImageTag(fullQualifiedImageURI string) string {
 
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
+}
+
+func (b *ByocBaseClient) SetCDImage(image string) {
+	b.CDImage = image
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
@@ -115,7 +130,7 @@ func (b *ByocBaseClient) ServiceDNS(name string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.bootstrapLister.BootstrapList(ctx)
+	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
 		return "", err
 	}

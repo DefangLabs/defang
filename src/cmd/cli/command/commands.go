@@ -73,7 +73,8 @@ func prettyError(err error) error {
 	return err
 }
 
-func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) error {
+// TODO: Make call to provider to get project cd version and pass to CanIUse API call
+func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) (string, error) {
 	canUseReq := defangv1.CanIUseRequest{
 		Project:  projectName,
 		Provider: providerID.EnumValue(),
@@ -81,11 +82,11 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 
 	resp, err := localClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+		return "", gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
-
+	term.Debugf("CanIUse: %+v\n", resp)
 	gating.Gates = resp.Gates
-	return nil
+	return resp.CdImage, nil
 }
 
 func Execute(ctx context.Context) error {
@@ -1232,8 +1233,12 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 
-	if err := allowToUseProvider(ctx, providerID, projName); err != nil {
+	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
 		return nil, err
+	} else {
+		// Allow local override of the CD image
+		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
+		provider.SetCDImage(cdImage)
 	}
 
 	return provider, nil

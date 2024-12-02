@@ -41,10 +41,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	CdImageRepo = "public.ecr.aws/defang-io/cd"
-)
-
 var (
 	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 )
@@ -133,15 +129,9 @@ func initStsClient(cfg awssdk.Config) {
 	}
 }
 
-func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, error) {
+func (b *ByocAws) setUpCD(ctx context.Context) error {
 	if b.SetupDone {
-		return "", nil
-	}
-
-	// note: the CD image is tagged with the major release number, use that for setup
-	projectCdImageTag, err := b.getCdImageTag(ctx, projectName)
-	if err != nil {
-		return "", err
+		return nil
 	}
 
 	cdTaskName := byoc.CdTaskPrefix
@@ -160,7 +150,7 @@ func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, erro
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     byoc.GetCdImage(CdImageRepo, projectCdImageTag),
+			Image:     b.CDImage,
 			Name:      cdTaskName,
 			Essential: ptr.Bool(false),
 			Volumes: []types.TaskVolume{
@@ -178,36 +168,11 @@ func (b *ByocAws) setUpCD(ctx context.Context, projectName string) (string, erro
 		},
 	}
 	if err := b.driver.SetUp(ctx, containers); err != nil {
-		return "", AnnotateAwsError(err)
+		return AnnotateAwsError(err)
 	}
 
 	b.SetupDone = true
-	return projectCdImageTag, nil
-}
-
-func (b *ByocAws) getCdImageTag(ctx context.Context, projectName string) (string, error) {
-	// see if we have a previous deployment; use the same cd image tag
-	projUpdate, err := b.getProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	// older deployments may not have the cd_version field set,
-	// these would have been deployed with public-beta
-	if projUpdate != nil && projUpdate.CdVersion == "" {
-		projUpdate.CdVersion = byoc.CdDefaultImageTag
-	}
-
-	// send project update with the current deploy's cd image tag,
-	// most current version if new deployment
-	imagePath := byoc.GetCdImage(CdImageRepo, byoc.CdLatestImageTag)
-	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
-	if (projUpdate != nil) && (len(projUpdate.Services) > 0) && (projUpdate.CdVersion != "") {
-		deploymentCdImageTag = projUpdate.CdVersion
-	}
-
-	// possible values are [public-beta, 1, 2,...]
-	return deploymentCdImageTag, nil
+	return nil
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -230,8 +195,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	cdImageTag, err := b.setUpCD(ctx, project.Name)
-	if err != nil {
+	if err := b.setUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -263,7 +227,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: cdImageTag,
+		CdVersion: b.CDImage,
 		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
@@ -350,6 +314,19 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 		}
 		return *zone.Id, nil
 	}
+}
+
+func (b *ByocAws) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
+	projUpdate, err := b.GetProjectUpdate(ctx, projectName)
+	if err != nil {
+		return "", err
+	}
+
+	if projUpdate == nil {
+		return "", nil
+	}
+
+	return projUpdate.CdVersion, nil
 }
 
 func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
@@ -547,7 +524,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	if len(req.Names) > 0 {
 		return nil, client.ErrNotImplemented("per-service deletion is not supported for BYOC")
 	}
-	if _, err := b.setUpCD(ctx, req.Project); err != nil {
+	if err := b.setUpCD(ctx); err != nil {
 		return nil, err
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
@@ -574,7 +551,7 @@ func (b *ByocAws) stackDir(projectName, name string) string {
 	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
-func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
 		return nil, nil
 	}
@@ -629,7 +606,7 @@ func (b *ByocAws) getProjectUpdate(ctx context.Context, projectName string) (*de
 }
 
 func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
+	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -672,7 +649,7 @@ func (b *ByocAws) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 }
 
 func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	if _, err := b.setUpCD(ctx, req.Project); err != nil {
+	if err := b.setUpCD(ctx); err != nil {
 		return nil, err
 	}
 
@@ -929,7 +906,7 @@ func (b *ByocAws) TearDown(ctx context.Context) error {
 }
 
 func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
-	if _, err := b.setUpCD(ctx, req.Project); err != nil {
+	if err := b.setUpCD(ctx); err != nil {
 		return "", err
 	}
 	cmd := cdCmd{
