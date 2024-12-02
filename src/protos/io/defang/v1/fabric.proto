@@ -205,10 +205,11 @@ message CanIUseRequest {
 message CanIUseResponse {
   map<string, bool> gates = 1 [ deprecated = true ];
   string cd_image = 2;
-  bool gpu = 3;
-  bool postgres = 4;
-  bool provider = 5;
-  bool redis = 6;
+  bool deployment = 3;
+  bool gpu = 4;
+  bool postgres = 5;
+  bool provider = 6;
+  bool redis = 7;
 }
 
 message DeployRequest {
