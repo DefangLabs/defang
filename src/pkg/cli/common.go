@@ -38,6 +38,6 @@ func PrintObject(root string, data proto.Message) error {
 		return err
 	}
 	// TODO: add color
-	term.Info(string(bytes))
+	term.Println(string(bytes))
 	return nil
 }
