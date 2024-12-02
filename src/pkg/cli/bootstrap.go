@@ -31,6 +31,12 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 	return tail(ctx, p, TailOptions{Project: projectName, Etag: etag, Since: since})
 }
 
+func SplitProjectStack(name string) (projectName string, stackName string) {
+	projectName = strings.Split(name, "/")[0] // get the project name
+	stackName = strings.Split(name, "/")[1]   // get the stack name
+	return projectName, stackName
+}
+
 func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	term.Debug("Running CD list")
 	if DoDryRun {
@@ -51,7 +57,8 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	}
 
 	for _, stack := range stacks {
-		fmt.Println(" -", strings.Replace(stack, "/beta", "", -1))
+		projectName, _ := SplitProjectStack(stack)
+		fmt.Println(" -", projectName)
 	}
 
 	return nil
