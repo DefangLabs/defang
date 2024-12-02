@@ -32,9 +32,8 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {
-	projectName = strings.Split(name, "/")[0] // get the project name
-	stackName = strings.Split(name, "/")[1]   // get the stack name
-	return projectName, stackName
+	parts := strings.Split(name, "/")
+	return parts[0], parts[1]
 }
 
 func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
