@@ -79,8 +79,8 @@ func makeComposeUpCmd() *cobra.Command {
 
 			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
 			if numGPUS > 0 {
-				if err := gating.HasAuthorization(gating.ResourceGPU, "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
-					return err
+				if !gating.Gates.Gpu {
+					return gating.ErrNoPermission("usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu")
 				}
 			}
 

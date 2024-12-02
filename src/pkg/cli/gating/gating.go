@@ -1,8 +1,7 @@
 package gating
 
 import (
-	"errors"
-	"fmt"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
@@ -22,21 +21,10 @@ const (
 	ResourceRedis    Resources = "redis"
 )
 
-var Gates map[string]bool
+var Gates struct {
+	Gpu bool
+}
 
-func HasAuthorization(resource Resources, errorText string) error {
-	if Gates == nil {
-		return errors.New("authorization information not available")
-	}
-
-	allowed, ok := Gates[string(resource)]
-	if !ok {
-		return fmt.Errorf("resource not found: %s", resource)
-	}
-
-	if !allowed {
-		return ErrNoPermission(errorText)
-	}
-
-	return nil
+func InitGates(gates *defangv1.CanIUseResponse) {
+	Gates.Gpu = gates.Gpu
 }
