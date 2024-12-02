@@ -316,19 +316,6 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 	}
 }
 
-func (b *ByocAws) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
-	projUpdate, err := b.GetProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	if projUpdate == nil {
-		return "", nil
-	}
-
-	return projUpdate.CdVersion, nil
-}
-
 func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
 
