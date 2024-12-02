@@ -79,6 +79,7 @@ type ByocGcp struct {
 	cdServiceAccount     string
 	setupDone            bool
 	uploadServiceAccount string
+	delegateDomainZone   string
 
 	lastCdExecution string
 	lastCdEtag      string
@@ -108,6 +109,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"cloudresourcemanager.googleapis.com", // For service account and role management
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
+		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
 		return annotateGcpError(err)
@@ -510,15 +512,21 @@ func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (ty
 	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
-// FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	// FIXME: implement
-	// return nil, client.ErrNotImplemented("GCP PrepareDomainDelegation")
-	return &client.PrepareDomainDelegationResponse{
-		NameServers: []string{"ns1.google.com", "ns2.google.com"},
-	}, nil
+	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
+	// Ignore preview, always create the zone for the defang stack
+	if zone, err := b.driver.EnsureDNSZoneExists(ctx, "defang", req.DelegateDomain, "defang delegate domain"); err != nil {
+		return nil, err
+	} else {
+		b.delegateDomainZone = zone.Name
+		term.Debugf("Zone %s created with nameservers %v", zone.Name, zone.NameServers)
+		return &client.PrepareDomainDelegationResponse{
+			NameServers: zone.NameServers,
+		}, nil
+	}
 }
+
+// FUNCTIONS TO BE IMPLEMENTED BELOW ========================
 
 func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	// FIXME: implement
