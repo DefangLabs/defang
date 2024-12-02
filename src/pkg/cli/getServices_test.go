@@ -16,8 +16,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var mockCreatedAt = timestamppb.Now()
-var mockExpiresAt = timestamppb.New(time.Now().Add(1 * time.Hour))
+var mockCreatedAt, _ = time.Parse(time.RFC3339, "2021-09-01T12:34:56Z")
+var mockExpiresAt, _ = time.Parse(time.RFC3339, "2021-09-02T12:34:56Z")
 
 type mockGetServicesHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
@@ -41,7 +41,7 @@ func (g *mockGetServicesHandler) GetServices(ctx context.Context, req *connect.R
 				Status:      "UNKNOWN",
 				PublicFqdn:  "test-foo.prod1.defang.dev",
 				PrivateFqdn: "",
-				CreatedAt:   mockCreatedAt,
+				CreatedAt:   timestamppb.New(mockCreatedAt),
 			},
 		}
 	}
@@ -49,7 +49,7 @@ func (g *mockGetServicesHandler) GetServices(ctx context.Context, req *connect.R
 	return connect.NewResponse(&defangv1.GetServicesResponse{
 		Project:   project,
 		Services:  services,
-		ExpiresAt: mockExpiresAt,
+		ExpiresAt: timestamppb.New(mockExpiresAt),
 	}), nil
 }
 
@@ -134,18 +134,17 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "expiresAt: \"" + mockExpiresAt.AsTime().Format(time.RFC3339) + `"
-project: test
-services:
-    - createdAt: "` + mockCreatedAt.AsTime().Format(time.RFC3339) + `"
-      etag: a1b2c3
-      project: test
-      publicFqdn: test-foo.prod1.defang.dev
-      service:
-        name: foo
-      status: UNKNOWN
-
-`
+		expectedOutput := "\x1b[95m * expiresAt: \"2021-09-02T12:34:56Z\"\n" +
+			"project: test\n" +
+			"services:\n" +
+			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +
+			"      etag: a1b2c3\n" +
+			"      project: test\n" +
+			"      publicFqdn: test-foo.prod1.defang.dev\n" +
+			"      service:\n" +
+			"        name: foo\n" +
+			"      status: UNKNOWN\n\n" +
+			"\x1b[0m"
 
 		receivedLines := stdout.String()
 		expectedLines := expectedOutput
