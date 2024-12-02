@@ -1220,6 +1220,15 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
 		return nil, err
 	} else {
+		// provide sane defaults for the CD image
+		if cdImage == "" {
+			switch providerID {
+			case cliClient.ProviderAWS:
+				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
+			case cliClient.ProviderDO:
+				cdImage = "docker.com/defangio/cd:public-beta"
+			}
+		}
 		// Allow local override of the CD image
 		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
 		provider.SetCDImage(cdImage)
