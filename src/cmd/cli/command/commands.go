@@ -74,7 +74,8 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
 
-	gating.Gates = resp.Gates
+	gating.InitGates(resp)
+
 	return nil
 }
 
