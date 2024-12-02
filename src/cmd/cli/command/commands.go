@@ -428,9 +428,10 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		nonInteractive = true // don't show provider prompt
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
-			return err
+			term.Debug("unable to get provider:", err)
 		}
 
 		str, err := cli.Whoami(cmd.Context(), client, provider)
@@ -1176,7 +1177,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 
 func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {
 	extraMsg := ""
-	source := ""
+	source := "default project"
 
 	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
 		// Sanitize the provider value from the environment variable
