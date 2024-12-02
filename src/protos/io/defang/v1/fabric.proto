@@ -206,7 +206,6 @@ message CanIUseResponse {
   reserved 1;
   string cd_image = 2;
   bool gpu = 3;
-  bool managed = 4;
 }
 
 message DeployRequest {
