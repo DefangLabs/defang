@@ -134,7 +134,7 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "\x1b[0mexpiresAt: \"2021-09-02T12:34:56Z\"\n" +
+		expectedOutput := "expiresAt: \"2021-09-02T12:34:56Z\"\n" +
 			"project: test\n" +
 			"services:\n" +
 			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +

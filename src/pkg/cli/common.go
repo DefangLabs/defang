@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -38,6 +37,6 @@ func PrintObject(root string, data proto.Message) error {
 	if err != nil {
 		return err
 	}
-	term.Println(fmt.Sprintf("%s%s", term.ResetColorStr, string(bytes)))
+	term.Println(string(bytes))
 	return nil
 }
