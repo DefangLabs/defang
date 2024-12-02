@@ -10,7 +10,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -61,6 +60,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
+
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
@@ -79,8 +79,18 @@ func makeComposeUpCmd() *cobra.Command {
 
 			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
 			if numGPUS > 0 {
-				if !gating.Gates.Gpu {
-					return gating.ErrNoPermission("usage of GPUs. To resolve see https://defang.io/pricing/")
+				req := &defangv1.CanIUseRequest{
+					Project:  project.Name,
+					Provider: providerID.EnumValue(),
+				}
+
+				resp, err := client.CanIUse(cmd.Context(), req)
+				if err != nil {
+					return err
+				}
+
+				if !resp.Gpu {
+					return ErrNoPermission("usage of GPUs. To resolve see https://defang.io/pricing/")
 				}
 			}
 

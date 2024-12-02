@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -205,7 +204,7 @@ func TestCommandGates(t *testing.T) {
 			}
 
 			if tt.wantError != "" {
-				var errNoPermission = gating.ErrNoPermission(tt.wantError)
+				var errNoPermission = ErrNoPermission(tt.wantError)
 				if !errors.As(err, &errNoPermission) || !strings.Contains(err.Error(), tt.wantError) {
 					t.Fatalf("Expected errNoPermission, got: %v", err)
 				}

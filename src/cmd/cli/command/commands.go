@@ -19,7 +19,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/scope"
@@ -53,6 +52,14 @@ var (
 	verbose        = false
 )
 
+const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
+
+type ErrNoPermission string
+
+func (e ErrNoPermission) Error() string {
+	return TIER_ERROR_MESSAGE + string(e)
+}
+
 func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
@@ -69,12 +76,10 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 		Provider: providerID.EnumValue(),
 	}
 
-	resp, err := client.CanIUse(ctx, &canUseReq)
+	_, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+		return ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
-
-	gating.InitGates(resp)
 
 	return nil
 }
