@@ -40,15 +40,6 @@ func P(name string, value interface{}) cliClient.Property {
 	return cliClient.Property{Name: name, Value: value}
 }
 
-type GrpcClientApi interface {
-	CanIUse(ctx context.Context, canUseReq *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error)
-	GetVersions(ctx context.Context) (*defangv1.Version, error)
-	CheckLoginAndToS(context.Context) error
-	WhoAmI(context.Context) (*defangv1.WhoAmIResponse, error)
-	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
-	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
-}
-
 // GLOBALS
 var (
 	client         cliClient.GrpcClient
@@ -57,7 +48,6 @@ var (
 	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
-	localClient    GrpcClientApi
 	nonInteractive = !hasTty
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
@@ -80,7 +70,7 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 		Provider: providerID.EnumValue(),
 	}
 
-	resp, err := localClient.CanIUse(ctx, &canUseReq)
+	resp, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
 		return "", gating.ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
@@ -345,11 +335,8 @@ var RootCmd = &cobra.Command{
 		}
 
 		client = cli.NewGrpcClient(cmd.Context(), cluster)
-		if localClient == nil {
-			localClient = client
-		}
 
-		if v, err := localClient.GetVersions(cmd.Context()); err == nil {
+		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) {
@@ -363,7 +350,7 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err = localClient.CheckLoginAndToS(cmd.Context()); err != nil {
+		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
 			if nonInteractive {
 				return err
 			}
@@ -378,11 +365,8 @@ var RootCmd = &cobra.Command{
 				}
 
 				client = cli.NewGrpcClient(cmd.Context(), cluster) // reconnect with the new token
-				if localClient == nil {
-					localClient = client
-				}
 
-				if err = localClient.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
+				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
 			}
@@ -580,7 +564,7 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 
-		if localClient.CheckLoginAndToS(cmd.Context()) != nil {
+		if client.CheckLoginAndToS(cmd.Context()) != nil {
 			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
 			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
@@ -1097,7 +1081,7 @@ var tosCmd = &cobra.Command{
 	Short:   "Read and/or agree the Defang terms of service",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if we are correctly logged in
-		if _, err := localClient.WhoAmI(cmd.Context()); err != nil {
+		if _, err := client.WhoAmI(cmd.Context()); err != nil {
 			return err
 		}
 
@@ -1249,7 +1233,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 	if err != nil {
 		term.Warn("Unable to load project:", err)
 	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := localClient.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
 		if err != nil {
 			term.Warn("Unable to get selected provider:", err)
 		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
@@ -1288,7 +1272,7 @@ func determineProviderID(ctx context.Context, loader *compose.Loader) (string, e
 
 	// Save the selected provider to the fabric
 	if projName != "" {
-		if err := localClient.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
 			term.Warn("Unable to save selected provider to defang server:", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projName)
