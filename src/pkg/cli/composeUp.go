@@ -130,6 +130,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 			},
 		})
 		if err != nil {
+			term.Debug("PutDeployment failed:", err)
 			term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
 		}
 	}
