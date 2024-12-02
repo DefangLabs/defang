@@ -53,24 +53,27 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return "", err
 	}
 
-	account, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if account.AccountID() != "" {
-		showData.AccountID = account.AccountID()
-	}
-
 	showData.Region = resp.Region
-	if account.Region() != "" {
-		showData.Region = account.Region()
-	}
-
-	showData.Details = account.Details()
-	showData.Provider = account.Provider().Name()
 	showData.SubscriberTier = resp.Tier
 	showData.Tenant = resp.Tenant
+
+	if provider != nil {
+		account, err := provider.AccountInfo(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		if account.AccountID() != "" {
+			showData.AccountID = account.AccountID()
+		}
+
+		if account.Region() != "" {
+			showData.Region = account.Region()
+		}
+
+		showData.Details = account.Details()
+		showData.Provider = account.Provider().Name()
+	}
 
 	return showAccountInfo(showData)
 }
