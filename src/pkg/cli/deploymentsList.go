@@ -28,14 +28,20 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 		return err
 	}
 
+	numDeployments := len(response.Deployments)
+	if numDeployments == 0 {
+		_, err := term.Warnf("No deployments found for project %q", projectName)
+		return err
+	}
+
 	// map to Deployment struct
-	deployments := make([]PrintDeployment, 0, len(response.Deployments))
-	for _, d := range response.Deployments {
-		deployments = append(deployments, PrintDeployment{
+	deployments := make([]PrintDeployment, numDeployments)
+	for i, d := range response.Deployments {
+		deployments[i] = PrintDeployment{
 			Id:         d.Id,
 			Provider:   d.Provider,
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-		})
+		}
 	}
 
 	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
