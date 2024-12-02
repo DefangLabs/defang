@@ -134,7 +134,7 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "\x1b[95m * expiresAt: \"2021-09-02T12:34:56Z\"\n" +
+		expectedOutput := "\x1b[0mexpiresAt: \"2021-09-02T12:34:56Z\"\n" +
 			"project: test\n" +
 			"services:\n" +
 			"    - createdAt: \"2021-09-01T12:34:56Z\"\n" +
@@ -143,8 +143,7 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 			"      publicFqdn: test-foo.prod1.defang.dev\n" +
 			"      service:\n" +
 			"        name: foo\n" +
-			"      status: UNKNOWN\n\n" +
-			"\x1b[0m"
+			"      status: UNKNOWN\n\n"
 
 		receivedLines := stdout.String()
 		expectedLines := expectedOutput
