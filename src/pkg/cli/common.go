@@ -3,8 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -37,7 +37,6 @@ func PrintObject(root string, data proto.Message) error {
 	if err != nil {
 		return err
 	}
-	// TODO: add color
-	fmt.Println(string(bytes))
+	term.Println(string(bytes))
 	return nil
 }
