@@ -134,7 +134,7 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := "\x1b[95m * expiresAt: \"" + mockExpiresAt.AsTime().Format(time.RFC3339) + `"
+		expectedOutput := "expiresAt: \"" + mockExpiresAt.AsTime().Format(time.RFC3339) + `"
 project: test
 services:
     - createdAt: "` + mockCreatedAt.AsTime().Format(time.RFC3339) + `"
@@ -145,7 +145,7 @@ services:
         name: foo
       status: UNKNOWN
 
-` + "\x1b[0m"
+`
 
 		receivedLines := stdout.String()
 		expectedLines := expectedOutput
