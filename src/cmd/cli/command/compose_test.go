@@ -6,14 +6,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
-func getTotalManagedServices(managed map[string]int) int {
-	var total = 0
-	for _, value := range managed {
-		total += value
-	}
-
-	return total
-}
 func TestInitializeTailCmd(t *testing.T) {
 	t.Run("", func(t *testing.T) {
 		for _, cmd := range RootCmd.Commands() {
@@ -30,9 +22,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		project := types.Services{}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-		if totalManaged != 0 {
-			t.Errorf("Expected 0 managed resources, got %d (%v)", totalManaged, managed)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resources, got %d (%v)", len(managed), managed)
 		}
 
 		if len(unmanaged) != 0 {
@@ -48,10 +39,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-
-		if totalManaged != 1 {
-			t.Errorf("Expected 1 managed resource, got %d (%v)", totalManaged, managed)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
 
 		if len(unmanaged) != 0 {
@@ -65,9 +54,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-		if totalManaged != 0 {
-			t.Errorf("Expected 0 managed resource, got %d (%v)", totalManaged, managed)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
 
 		if len(unmanaged) != 1 {
@@ -84,9 +72,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-		if totalManaged != 1 {
-			t.Errorf("Expected 1 managed resource, got %d (%v)", totalManaged, managed)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
 
 		if len(unmanaged) != 1 {
@@ -101,9 +88,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-		if totalManaged != 0 {
-			t.Errorf("Expected 0 managed resource, got %d (%v)", totalManaged, managed)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
 
 		if len(unmanaged) != 2 {
@@ -123,9 +109,8 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 		}
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
-		var totalManaged = getTotalManagedServices(managed)
-		if totalManaged != 2 {
-			t.Errorf("Expected 2 managed resource, got %d (%v)", totalManaged, managed)
+		if len(managed) != 2 {
+			t.Errorf("Expected 2 managed resource, got %d (%v)", len(managed), managed)
 		}
 		if len(unmanaged) != 1 {
 			t.Errorf("Expected 1 unmanaged resource, got %d (%s)", len(unmanaged), unmanaged)
