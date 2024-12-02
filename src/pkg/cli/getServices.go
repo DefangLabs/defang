@@ -60,15 +60,15 @@ func GetServices(ctx context.Context, loader client.Loader, provider client.Prov
 		return PrintObject("", servicesResponse)
 	}
 
-	printServices := make([]PrintService, 0, numServices)
+	printServices := make([]PrintService, numServices)
 	for i, si := range servicesResponse.Services {
-		printServices = append(printServices, PrintService{
+		printServices[i] = PrintService{
 			Name:        si.Service.Name,
 			Etag:        si.Etag,
 			PublicFqdn:  si.PublicFqdn,
 			PrivateFqdn: si.PrivateFqdn,
 			Status:      si.Status,
-		})
+		}
 		servicesResponse.Services[i] = nil
 	}
 
