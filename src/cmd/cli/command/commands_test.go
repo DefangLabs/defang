@@ -40,7 +40,7 @@ type mockFabricService struct {
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
 	if !m.allowedToUseProvider {
-		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("no access to use aws provider"))
+		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
 	}
 	return connect_go.NewResponse(&m.canIUseResponse), nil
 }
