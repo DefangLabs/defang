@@ -143,6 +143,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.futureReservationViewer", // For `compute.regions.list` permission to avoid pulumi error message
 		"roles/compute.loadBalancerAdmin",       // For creating load balancer and ssl certs
 		"roles/compute.networkAdmin",            // For creating network
+		"roles/dns.admin",                       // For creating DNS records
 	}); err != nil {
 		return err
 	}
@@ -297,10 +298,11 @@ func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 }
 
 type cdCommand struct {
-	Project     string
-	Command     []string
-	EnvOverride map[string]string
-	Mode        defangv1.DeploymentMode
+	Project        string
+	Command        []string
+	EnvOverride    map[string]string
+	Mode           defangv1.DeploymentMode
+	DelegateDomain string
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -309,13 +311,18 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"PULUMI_BACKEND_URL":       `gs://` + b.bucket,
 		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"REGION":                   b.driver.Region,
-		"DOMAIN":                   cmd.Project + ".defang.dev", // FIXME: Use delegated domain
 		"DEFANG_ORG":               "defang",
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
 		"DEFANG_PREFIX":            "defang",
 		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+	}
+
+	if cmd.DelegateDomain != "" {
+		env["DOMAIN"] = b.GetProjectDomain(cmd.Project, cmd.DelegateDomain)
+	} else {
+		env["DOMAIN"] = "dummy.domain"
 	}
 
 	for k, v := range cmd.EnvOverride {
@@ -345,8 +352,15 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}
 	return &defangv1.UploadURLResponse{Url: url}, nil
 }
-
 func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
+}
+
+func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
 	if err != nil {
@@ -403,10 +417,11 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 	}
 
 	cmd := cdCommand{
-		Mode:        req.Mode,
-		Project:     project.Name,
-		Command:     []string{"up", payload},
-		EnvOverride: map[string]string{"DEFANG_ETAG": etag},
+		Mode:           req.Mode,
+		Project:        project.Name,
+		Command:        []string{command, payload},
+		EnvOverride:    map[string]string{"DEFANG_ETAG": etag},
+		DelegateDomain: req.DelegateDomain,
 	}
 
 	if _, err := b.runCdCommand(ctx, cmd); err != nil {
@@ -546,11 +561,6 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP Query")
-}
-
-func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP Preview")
 }
 
 func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
