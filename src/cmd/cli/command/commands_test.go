@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -35,12 +34,13 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
-	canIUseResponse defangv1.CanIUseResponse
+	allowedToUseProvider bool
+	canIUseResponse      defangv1.CanIUseResponse
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
-	if !m.canIUseResponse.Gates["provider"] {
-		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("no access to use aws provider"))
+	if !m.allowedToUseProvider {
+		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
 	}
 	return connect_go.NewResponse(&m.canIUseResponse), nil
 }
@@ -128,7 +128,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestCommandGates(t *testing.T) {
-	mockService := &mockFabricService{canIUseResponse: defangv1.CanIUseResponse{Gates: make(map[string]bool)}}
+	mockService := &mockFabricService{canIUseResponse: defangv1.CanIUseResponse{}}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 
 	server := httptest.NewServer(handler)
@@ -193,10 +193,7 @@ func TestCommandGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
 			pkg.SsmClientOverride = &MockSsmClient{}
-			mockService.canIUseResponse.Gates[string(gating.ResourceProvider)] = tt.accessAllowed
-			mockService.canIUseResponse.Gates[string(gating.ResourceGPU)] = tt.accessAllowed
-			mockService.canIUseResponse.Gates[string(gating.ResourcePostgres)] = tt.accessAllowed
-			mockService.canIUseResponse.Gates[string(gating.ResourceRedis)] = tt.accessAllowed
+			mockService.allowedToUseProvider = tt.accessAllowed
 
 			err := testCommand(tt.command, server.URL)
 
@@ -207,7 +204,7 @@ func TestCommandGates(t *testing.T) {
 			}
 
 			if tt.wantError != "" {
-				var errNoPermission = gating.ErrNoPermission(tt.wantError)
+				var errNoPermission = ErrNoPermission(tt.wantError)
 				if !errors.As(err, &errNoPermission) || !strings.Contains(err.Error(), tt.wantError) {
 					t.Fatalf("Expected errNoPermission, got: %v", err)
 				}
