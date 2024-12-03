@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func ComposeDown(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
@@ -26,6 +28,24 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 	if len(names) == 0 {
 		// If no names are provided, destroy the entire project
 		return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+	}
+
+	accountInfo, err := provider.AccountInfo(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		Deployment: &defangv1.Deployment{
+			Deploying:         false,
+			Project:           projectName,
+			Provider:          string(accountInfo.Provider()),
+			ProviderAccountId: accountInfo.AccountID(),
+			Timestamp:         timestamppb.New(time.Now()),
+		},
+	})
+	if err != nil {
+		return "", err
 	}
 
 	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
