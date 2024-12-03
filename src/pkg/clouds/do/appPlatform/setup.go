@@ -256,7 +256,7 @@ func (d DoApp) CreateUploadURL(ctx context.Context, name string) (string, error)
 		}
 		// Sanitize the digest so it's safe to use as a file name
 		name = s3InvalidCharsRegexp.ReplaceAllString(name, "_")
-		// name = path.Join(buildsPath, tenantId.String(), digest); TODO: avoid collisions between tenants
+		// name = path.Join(buildsPath, tenantName.String(), digest); TODO: avoid collisions between tenants
 	}
 
 	// Use S3 SDK to create a presigned URL for uploading a file.

@@ -59,7 +59,7 @@ type ByocDo struct {
 
 var _ client.Provider = (*ByocDo)(nil)
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocDo {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocDo {
 	doRegion := do.Region(os.Getenv("REGION"))
 	if doRegion == "" {
 		doRegion = region.SFO3 // TODO: change default
@@ -71,7 +71,7 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocDo {
 		client: client,
 		driver: appPlatform.New(doRegion),
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 	return b
 }
 
@@ -543,7 +543,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		},
 		{
 			Key:   "DEFANG_ORG",
-			Value: b.TenantID,
+			Value: b.TenantName,
 		},
 		{
 			Key:   "DOMAIN",

@@ -96,12 +96,11 @@ func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
 }
 
 func (g PlaygroundProvider) ServiceDNS(name string) string {
-	return string(g.TenantID) + "-" + name
+	return string(g.TenantName) + "-" + name
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
 	// Hack: Use GetServices to get the current project name
-	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
 	resp, err := g.GetServices(ctx, &defangv1.GetServicesRequest{})
 	if err != nil {
 		return "", err

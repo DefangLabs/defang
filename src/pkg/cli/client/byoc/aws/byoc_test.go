@@ -28,7 +28,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
 	tests := []struct {
 		ProjectName string
-		TenantID    types.TenantID
+		TenantName  types.TenantName
 		Fqn         string
 		Port        *composeTypes.ServicePortConfig
 		EndPoint    string
@@ -50,12 +50,12 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.ProjectName+","+string(tt.TenantID), func(t *testing.T) {
+		t.Run(tt.ProjectName+","+string(tt.TenantName), func(t *testing.T) {
 			//like calling NewByocProvider(), but without needing real AccountInfo data
 			b := &ByocAws{
 				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantID, b)
+			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantName, b)
 
 			const delegateDomain = "example.com"
 

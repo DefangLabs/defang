@@ -43,15 +43,15 @@ type ByocBaseClient struct {
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantID                string
+	TenantName              string
 	CDImage                 string
 
 	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, backend ProjectBackend) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
 	b := &ByocBaseClient{
-		TenantID:       string(tenantID),
+		TenantName:     string(tenantName),
 		PulumiStack:    "beta", // TODO: make customizable
 		projectBackend: backend,
 	}
@@ -156,7 +156,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	projectLabel := DnsSafeLabel(projectName)
-	if projectLabel == DnsSafeLabel(b.TenantID) {
+	if projectLabel == DnsSafeLabel(b.TenantName) {
 		return DnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + DnsSafe(zone)

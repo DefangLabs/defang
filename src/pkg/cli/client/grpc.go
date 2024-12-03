@@ -20,10 +20,10 @@ type GrpcClient struct {
 	anonID string
 	client defangv1connect.FabricControllerClient
 
-	TenantID types.TenantID
+	TenantName types.TenantName
 }
 
-func NewGrpcClient(host, accessToken string, tenantID types.TenantID) GrpcClient {
+func NewGrpcClient(host, accessToken string, tenantName types.TenantName) GrpcClient {
 	baseUrl := "http://"
 	if strings.HasSuffix(host, ":443") {
 		baseUrl = "https://"
@@ -32,7 +32,7 @@ func NewGrpcClient(host, accessToken string, tenantID types.TenantID) GrpcClient
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
 
-	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantID: tenantID}
+	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
