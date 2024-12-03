@@ -27,6 +27,7 @@ func (g *mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *c
 	} else {
 		deployments = []*defangv1.Deployment{
 			{
+				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
 				Id:                "a1b2c3",
 				Project:           "test",
 				Provider:          "playground",
@@ -77,8 +78,8 @@ func TestDeploymentsList(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := `Id      Provider    DeployedAt
-a1b2c3  playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
+		expectedOutput := `Id      Provider    DeployedAt            Action
+a1b2c3  playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `  UP
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")

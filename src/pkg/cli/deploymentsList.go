@@ -39,11 +39,16 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 	// map to Deployment struct
 	deployments := make([]PrintDeployment, numDeployments)
 	for i, d := range response.Deployments {
+		actionText := strings.TrimPrefix(d.Action.String(), "DEPLOYMENT_ACTION_")
+		if d.Action == defangv1.DeploymentAction_DEPLOYMENT_ACTION_UNSPECIFIED {
+			actionText = "UP"
+		}
+
 		deployments[i] = PrintDeployment{
 			Id:         d.Id,
 			Provider:   d.Provider,
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-			Action:     strings.TrimPrefix(d.Action.String(), "DEPLOYMENT_ACTION_"),
+			Action:     actionText,
 		}
 	}
 
