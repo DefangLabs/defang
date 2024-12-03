@@ -52,6 +52,14 @@ var (
 	verbose        = false
 )
 
+const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
+
+type ErrNoPermission string
+
+func (e ErrNoPermission) Error() string {
+	return TIER_ERROR_MESSAGE + string(e)
+}
+
 func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
@@ -60,6 +68,21 @@ func prettyError(err error) error {
 		err = errors.Unwrap(cerr)
 	}
 	return err
+}
+
+// TODO: Make call to provider to get project cd version and pass to CanIUse API call
+func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) (string, error) {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:  projectName,
+		Provider: providerID.EnumValue(),
+	}
+
+	resp, err := client.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+	}
+
+	return resp.CdImage, nil
 }
 
 func Execute(ctx context.Context) error {
@@ -147,7 +170,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
-	RootCmd.Flag("provider").NoOptDefVal = "auto"
+	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
@@ -316,6 +339,7 @@ var RootCmd = &cobra.Command{
 				return err
 			}
 		}
+
 		client = cli.NewGrpcClient(cmd.Context(), cluster)
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
@@ -346,7 +370,8 @@ var RootCmd = &cobra.Command{
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), cluster)            // reconnect with the new token
+				client = cli.NewGrpcClient(cmd.Context(), cluster) // reconnect with the new token
+
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
 				}
@@ -362,6 +387,7 @@ var RootCmd = &cobra.Command{
 				}
 			}
 		}
+
 		return err
 	},
 }
@@ -393,10 +419,12 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show the current user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		nonInteractive = true // don't show provider prompt
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
-			return err
+			term.Debug("unable to get provider:", err)
 		}
+
 		str, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
@@ -747,6 +775,7 @@ var configDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -774,6 +803,7 @@ var configListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.ConfigList(cmd.Context(), loader, provider)
 	},
 }
@@ -791,6 +821,7 @@ var debugCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
 	},
 }
@@ -810,6 +841,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
 		if err != nil {
@@ -863,7 +895,7 @@ var restartCmd = &cobra.Command{
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("Command 'restart' is deprecated, use 'up' instead")
+		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
@@ -893,6 +925,12 @@ var tokenCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
+
+		loader := configureLoader(cmd)
+		_, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
 
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
@@ -930,6 +968,7 @@ var cdDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
 	},
 }
@@ -944,6 +983,7 @@ var cdDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
 	},
 }
@@ -958,6 +998,7 @@ var cdRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
 	},
 }
@@ -972,6 +1013,7 @@ var cdCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
 	},
 }
@@ -988,6 +1030,7 @@ var cdTearDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		return cli.TearDown(cmd.Context(), provider, force)
 	},
 }
@@ -1005,6 +1048,7 @@ var cdListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		if remote {
 			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
 		}
@@ -1023,6 +1067,7 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
@@ -1124,7 +1169,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 
 func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {
 	extraMsg := ""
-	source := ""
+	source := "default project"
 
 	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
 		// Sanitize the provider value from the environment variable
@@ -1173,6 +1218,29 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 	if err != nil {
 		return nil, err
 	}
+
+	projName, err := loader.LoadProjectName(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
+		return nil, err
+	} else {
+		// provide sane defaults for the CD image
+		if cdImage == "" {
+			switch providerID {
+			case cliClient.ProviderAWS:
+				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
+			case cliClient.ProviderDO:
+				cdImage = "docker.com/defangio/cd:public-beta"
+			}
+		}
+		// Allow local override of the CD image
+		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
+		provider.SetCDImage(cdImage)
+	}
+
 	return provider, nil
 }
 

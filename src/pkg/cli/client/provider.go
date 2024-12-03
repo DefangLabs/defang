@@ -135,7 +135,8 @@ type Provider interface {
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)
-	ServiceDNS(name string) string
+	ServiceDNS(string) string
+	SetCDImage(string)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error
 }

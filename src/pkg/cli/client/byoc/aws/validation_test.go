@@ -32,29 +32,31 @@ func (q *MockQuotaClientApi) ListServiceQuotas(ctx context.Context, params *serv
 var ctx = context.Background()
 var mockQuotaClient = &MockQuotaClientApi{}
 
-func TestValidateGPUResources(t *testing.T) {
-	t.Run("No service quuota received", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 0},
-						},
+func getServiceWithGPUCapacity(numGPU int) composeTypes.ServiceConfig {
+	return composeTypes.ServiceConfig{
+		Deploy: &composeTypes.DeployConfig{
+			Resources: composeTypes.Resources{
+				Reservations: &composeTypes.Resource{
+					Devices: []composeTypes.DeviceRequest{
+						{Capabilities: []string{"gpu"}, Count: composeTypes.DeviceCount(numGPU)},
 					},
 				},
 			},
-		}
+		},
+	}
+}
+
+func TestValidateGPUResources(t *testing.T) {
+	t.Run("No service quota received", func(t *testing.T) {
+		testService := getServiceWithGPUCapacity(0)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
 			},
 		}
-
 		quotaClient = mockQuotaClient
 		mockQuotaClient.output = nil
 		mockQuotaClient.err = ErrNoQuotasReceived
-
 		err := ValidateGPUResources(ctx, &project)
 		if err != nil && errors.Is(err, ErrNoQuotasReceived) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected errors %v", err)
@@ -62,17 +64,7 @@ func TestValidateGPUResources(t *testing.T) {
 	})
 
 	t.Run("no errors when gpu is set to 0", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 0},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(0)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -87,18 +79,8 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 	})
 
-	t.Run("no gpu quota but requesting one", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
+	t.Run("zero gpu quota but requesting 24", func(t *testing.T) {
+		testService := getServiceWithGPUCapacity(24)
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{
 				"test": testService,
@@ -121,52 +103,8 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 	})
 
-	t.Run("gpu quota exists but requesting one", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
-		project := composeTypes.Project{
-			Services: map[string]composeTypes.ServiceConfig{
-				"test": testService,
-			},
-		}
-
-		quotaClient = mockQuotaClient
-		mockQuotaClient.err = nil
-		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
-			Quotas: []quotaTypes.ServiceQuota{
-				{
-					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
-					Value:     awssdk.Float64(1),
-				},
-			},
-		}
-		err := ValidateGPUResources(ctx, &project)
-		if err != nil {
-			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
-		}
-	})
-
 	t.Run("unable to get AWS gpu quota", func(t *testing.T) {
-		testService := composeTypes.ServiceConfig{
-			Deploy: &composeTypes.DeployConfig{
-				Resources: composeTypes.Resources{
-					Reservations: &composeTypes.Resource{
-						Devices: []composeTypes.DeviceRequest{
-							{Capabilities: []string{"gpu"}, Count: 24},
-						},
-					},
-				},
-			},
-		}
+		testService := getServiceWithGPUCapacity(24)
 
 		project := composeTypes.Project{
 			Services: map[string]composeTypes.ServiceConfig{

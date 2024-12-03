@@ -202,7 +202,11 @@ message CanIUseRequest {
   Provider provider = 2;
 }
 
-message CanIUseResponse { map<string, bool> gates = 1; }
+message CanIUseResponse {
+  reserved 1;
+  string cd_image = 2;
+  bool gpu = 3;
+}
 
 message DeployRequest {
   repeated Service services = 1
