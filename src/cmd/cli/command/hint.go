@@ -50,18 +50,17 @@ func printDefangHint(hint string, cmds ...string) {
 	executable := prettyExecutable("defang")
 
 	fmt.Printf("\n%s\n\n", hint)
-	providerFlag := RootCmd.Flag("provider")
-	clusterFlag := RootCmd.Flag("cluster")
-	var prefix string
-	if providerFlag.Changed {
-		prefix = fmt.Sprintf("%s --provider %s", executable, providerFlag.Value.String())
-	} else if clusterFlag.Changed {
-		prefix = fmt.Sprintf("%s --cluster %s", executable, clusterFlag.Value.String())
-	} else {
-		prefix = executable
+	if providerFlag := RootCmd.Flag("provider"); providerFlag.Changed {
+		executable += " --provider=" + providerFlag.Value.String()
+	}
+	if clusterFlag := RootCmd.Flag("cluster"); clusterFlag.Changed {
+		executable += " --cluster=" + clusterFlag.Value.String()
+	}
+	if orgFlag := RootCmd.Flag("org"); orgFlag.Changed {
+		executable += " --org=" + orgFlag.Value.String()
 	}
 	for _, arg := range cmds {
-		fmt.Printf("  %s %s\n\n", prefix, arg)
+		fmt.Printf("  %s %s\n\n", executable, arg)
 	}
 	if rand.Intn(10) == 0 {
 		fmt.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")

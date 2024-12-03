@@ -114,13 +114,13 @@ func AnnotateAwsError(err error) error {
 	return err
 }
 
-type NewByocInterface func(ctx context.Context, tenantId types.TenantID) *ByocAws
+type NewByocInterface func(ctx context.Context, tenantName types.TenantName) *ByocAws
 
-func newByocProvider(ctx context.Context, tenantId types.TenantID) *ByocAws {
+func newByocProvider(ctx context.Context, tenantName types.TenantName) *ByocAws {
 	b := &ByocAws{
 		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 
 	return b
 }
@@ -494,7 +494,7 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 	return map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
-		"DEFANG_ORG":                 b.TenantID,
+		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
