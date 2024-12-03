@@ -12,7 +12,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Token(ctx context.Context, client client.FabricClient, clientId string, tenant types.TenantID, dur time.Duration, scope scope.Scope) error {
+func Token(ctx context.Context, client client.FabricClient, clientId string, tenant types.TenantName, dur time.Duration, scope scope.Scope) error {
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -32,7 +32,7 @@ func Token(ctx context.Context, client client.FabricClient, clientId string, ten
 	return nil
 }
 
-func exchangeCodeForToken(ctx context.Context, client client.FabricClient, code string, tenant types.TenantID, dur time.Duration, ss ...scope.Scope) (string, error) {
+func exchangeCodeForToken(ctx context.Context, client client.FabricClient, code string, tenant types.TenantName, dur time.Duration, ss ...scope.Scope) (string, error) {
 	var scopes []string
 	for _, s := range ss {
 		if s == scope.Admin {
