@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,7 +13,6 @@ type PrintDeployment struct {
 	Id         string
 	Provider   string
 	DeployedAt string
-	Action     string
 }
 
 func DeploymentsList(ctx context.Context, loader client.Loader, client client.GrpcClient) error {
@@ -37,20 +35,19 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 	}
 
 	// map to Deployment struct
-	deployments := make([]PrintDeployment, numDeployments)
-	for i, d := range response.Deployments {
-		actionText := strings.TrimPrefix(d.Action.String(), "DEPLOYMENT_ACTION_")
-		if d.Action == defangv1.DeploymentAction_DEPLOYMENT_ACTION_UNSPECIFIED {
-			actionText = "UP"
+	deployments := make([]PrintDeployment, 0, numDeployments)
+	for _, d := range response.Deployments {
+
+		if d.GetAction() == defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN {
+			continue
 		}
 
-		deployments[i] = PrintDeployment{
+		deployments = append(deployments, PrintDeployment{
 			Id:         d.Id,
 			Provider:   d.Provider,
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-			Action:     actionText,
-		}
+		})
 	}
 
-	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt", "Action"})
+	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
 }
