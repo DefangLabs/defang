@@ -122,10 +122,6 @@ func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req Pr
 	return nil, nil // Playground does not support delegate domains
 }
 
-func (g *PlaygroundProvider) CanUseGPU(ctx context.Context) error {
-	return errors.New("GPU is not supported in the Defang playground")
-}
-
 type PlaygroundAccountInfo struct{}
 
 func (g PlaygroundAccountInfo) AccountID() string    { return "" }
