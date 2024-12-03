@@ -35,19 +35,6 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 		return "", err
 	}
 
-	err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-		Deployment: &defangv1.Deployment{
-			Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-			Project:           projectName,
-			Provider:          string(accountInfo.Provider()),
-			ProviderAccountId: accountInfo.AccountID(),
-			Timestamp:         timestamppb.New(time.Now()),
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-
 	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
@@ -57,6 +44,22 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 	if err != nil {
 		return "", err
 	}
+
+	err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		Deployment: &defangv1.Deployment{
+			Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+			Id:                resp.Etag,
+			Project:           projectName,
+			Provider:          string(accountInfo.Provider()),
+			ProviderAccountId: accountInfo.AccountID(),
+			Timestamp:         timestamppb.New(time.Now()),
+		},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
 	return resp.Etag, nil
 }
 
