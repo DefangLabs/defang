@@ -37,7 +37,6 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 	// map to Deployment struct
 	deployments := make([]PrintDeployment, 0, numDeployments)
 	for _, d := range response.Deployments {
-
 		if d.GetAction() == defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN {
 			continue
 		}
