@@ -75,31 +75,7 @@ func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocDo {
 	return b
 }
 
-func (b *ByocDo) getCdImageTag(ctx context.Context, projectName string) (string, error) {
-	projUpdate, err := b.getProjectUpdate(ctx, projectName)
-	if err != nil {
-		return "", err
-	}
-
-	// older deployments may not have the cd_version field set,
-	// these would have been deployed with public-beta
-	if projUpdate != nil && projUpdate.CdVersion == "" {
-		projUpdate.CdVersion = byoc.CdDefaultImageTag
-	}
-
-	// send project update with the current deploy's cd version,
-	// most current version if new deployment
-	imagePath := byoc.GetCdImage(appPlatform.CdImageBase, byoc.CdLatestImageTag)
-	deploymentCdImageTag := byoc.ExtractImageTag(imagePath)
-	if projUpdate != nil && len(projUpdate.Services) > 0 {
-		deploymentCdImageTag = projUpdate.CdVersion
-	}
-
-	// possible values are [public-beta, 1, 2, ...]
-	return deploymentCdImageTag, nil
-}
-
-func (b *ByocDo) getProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+func (b *ByocDo) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	client, err := b.driver.CreateS3Client()
 	if err != nil {
 		return nil, err
@@ -166,11 +142,6 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	cdImageTag, err := b.getCdImageTag(ctx, project.Name)
-	if err != nil {
-		return nil, err
-	}
-
 	etag := pkg.RandomID()
 
 	serviceInfos := []*defangv1.ServiceInfo{}
@@ -193,7 +164,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		CdVersion: cdImageTag,
+		CdVersion: b.CDImage,
 		Compose:   req.Compose,
 		Services:  serviceInfos,
 	})
@@ -555,7 +526,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 			return nil, err
 		}
 	}
-	app, err := b.driver.Run(ctx, env, append([]string{"node", "lib/index.js"}, cmd...)...)
+	app, err := b.driver.Run(ctx, env, b.CDImage, append([]string{"node", "lib/index.js"}, cmd...)...)
 	return app, err
 }
 
