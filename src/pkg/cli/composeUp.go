@@ -122,6 +122,7 @@ func ComposeUp(ctx context.Context, loader client.Loader, c client.FabricClient,
 
 		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 			Deployment: &defangv1.Deployment{
+				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
 				Id:                resp.Etag,
 				Project:           project.Name,
 				Provider:          string(accountInfo.Provider()),
