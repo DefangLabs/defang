@@ -78,18 +78,19 @@ func prettyError(err error) error {
 	return err
 }
 
-func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) error {
+// TODO: Make call to provider to get project cd version and pass to CanIUse API call
+func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) (string, error) {
 	canUseReq := defangv1.CanIUseRequest{
 		Project:  projectName,
 		Provider: providerID.EnumValue(),
 	}
 
-	_, err := client.CanIUse(ctx, &canUseReq)
+	resp, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
 	}
 
-	return nil
+	return resp.CdImage, nil
 }
 
 func Execute(ctx context.Context) error {
@@ -1231,8 +1232,21 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 
-	if err := allowToUseProvider(ctx, providerID, projName); err != nil {
+	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
 		return nil, err
+	} else {
+		// provide sane defaults for the CD image
+		if cdImage == "" {
+			switch providerID {
+			case cliClient.ProviderAWS:
+				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
+			case cliClient.ProviderDO:
+				cdImage = "docker.com/defangio/cd:public-beta"
+			}
+		}
+		// Allow local override of the CD image
+		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
+		provider.SetCDImage(cdImage)
 	}
 
 	return provider, nil

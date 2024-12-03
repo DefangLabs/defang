@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/do"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -98,8 +97,7 @@ func shellQuote(args ...string) string {
 	return strings.Join(quoted, " ")
 }
 
-func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
-	cdImagePath := byoc.GetCdImage(CdImageBase, byoc.CdLatestImageTag)
+func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
 	term.Debugf("Using CD image: %s", cdImagePath)
 	image, err := ParseImage(cdImagePath)
 	if err != nil {
@@ -127,10 +125,10 @@ func getImageSourceSpec() (*godo.ImageSourceSpec, error) {
 	}, nil
 }
 
-func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cmd ...string) (*godo.App, error) {
+func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdImagePath string, cmd ...string) (*godo.App, error) {
 	client := NewClient(ctx)
 
-	image, err := getImageSourceSpec()
+	image, err := getImageSourceSpec(cdImagePath)
 	if err != nil {
 		return nil, err
 	}
