@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -30,6 +31,11 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 	return tail(ctx, p, TailOptions{Project: projectName, Etag: etag, Since: since})
 }
 
+func SplitProjectStack(name string) (projectName string, stackName string) {
+	parts := strings.SplitN(name, "/", 2)
+	return parts[0], parts[1]
+}
+
 func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	term.Debug("Running CD list")
 	if DoDryRun {
@@ -50,7 +56,8 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 	}
 
 	for _, stack := range stacks {
-		fmt.Println(" -", stack)
+		projectName, _ := SplitProjectStack(stack)
+		fmt.Println(" -", projectName)
 	}
 
 	return nil
