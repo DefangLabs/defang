@@ -25,12 +25,12 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 		return "", ErrDryRun
 	}
 
-	accountInfo, err := provider.AccountInfo(ctx)
-	if err != nil {
-		return "", err
-	}
-
 	if len(names) == 0 {
+		accountInfo, err := provider.AccountInfo(ctx)
+		if err != nil {
+			return "", err
+		}
+
 		// If no names are provided, destroy the entire project
 		etag, err := provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
 		if err != nil {
