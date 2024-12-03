@@ -32,7 +32,7 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {
-	parts := strings.Split(name, "/")
+	parts := strings.SplitN(name, "/", 2)
 	return parts[0], parts[1]
 }
 
