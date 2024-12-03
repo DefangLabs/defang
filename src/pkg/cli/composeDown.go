@@ -37,7 +37,7 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 
 	err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 		Deployment: &defangv1.Deployment{
-			Deploying:         false,
+			Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
 			Project:           projectName,
 			Provider:          string(accountInfo.Provider()),
 			ProviderAccountId: accountInfo.AccountID(),
