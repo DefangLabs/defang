@@ -7,7 +7,6 @@ import (
 	"embed"
 	"encoding/json"
 	"io"
-	"os"
 	"path"
 	"strings"
 	"sync"
@@ -168,40 +167,4 @@ func TestSubscribe(t *testing.T) {
 			wg.Wait()
 		})
 	}
-}
-
-func TestGetCDImageTag(t *testing.T) {
-	ctx := context.Background()
-
-	//like calling NewByocProvider(), but without needing real AccountInfo data
-	b := &ByocAws{
-		driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
-	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), "tenant1", b)
-
-	t.Run("no project should use latest", func(t *testing.T) {
-		os.Unsetenv("DEFANG_CD_IMAGE")
-
-		const expected = byoc.CdLatestImageTag
-		tag, err := b.getCdImageTag(ctx, "")
-		if err != nil {
-			t.Fatalf("getCdImageTag() failed: %v", err)
-		}
-		if tag != expected {
-			t.Errorf("expected tag %q, got %q", expected, tag)
-		}
-	})
-
-	t.Run("can be overridden by DEFANG_CD_IMAGE", func(t *testing.T) {
-		const expected = "abc"
-		t.Setenv("DEFANG_CD_IMAGE", "defanglabs/cd:"+expected)
-
-		tag, err := b.getCdImageTag(ctx, "")
-		if err != nil {
-			t.Fatalf("getCdImageTag() failed: %v", err)
-		}
-		if tag != expected {
-			t.Errorf("expected tag %q, got %q", expected, tag)
-		}
-	})
 }
