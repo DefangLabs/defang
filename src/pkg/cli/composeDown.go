@@ -25,14 +25,34 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 		return "", ErrDryRun
 	}
 
-	if len(names) == 0 {
-		// If no names are provided, destroy the entire project
-		return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
-	}
-
 	accountInfo, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return "", err
+	}
+
+	if len(names) == 0 {
+		// If no names are provided, destroy the entire project
+		etag, err := provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+		if err != nil {
+			return "", err
+		}
+
+		err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+			Deployment: &defangv1.Deployment{
+				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+				Id:                etag,
+				Project:           projectName,
+				Provider:          string(accountInfo.Provider()),
+				ProviderAccountId: accountInfo.AccountID(),
+				Timestamp:         timestamppb.New(time.Now()),
+			},
+		})
+
+		if err != nil {
+			term.Debug("PutDeployment failed:", err)
+		}
+
+		return etag, nil
 	}
 
 	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
@@ -44,17 +64,6 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 	if err != nil {
 		return "", err
 	}
-
-	err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-		Deployment: &defangv1.Deployment{
-			Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
-			Id:                resp.Etag,
-			Project:           projectName,
-			Provider:          string(accountInfo.Provider()),
-			ProviderAccountId: accountInfo.AccountID(),
-			Timestamp:         timestamppb.New(time.Now()),
-		},
-	})
 
 	if err != nil {
 		return "", err

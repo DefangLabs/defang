@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -13,6 +14,7 @@ type PrintDeployment struct {
 	Id         string
 	Provider   string
 	DeployedAt string
+	Action     string
 }
 
 func DeploymentsList(ctx context.Context, loader client.Loader, client client.GrpcClient) error {
@@ -41,8 +43,9 @@ func DeploymentsList(ctx context.Context, loader client.Loader, client client.Gr
 			Id:         d.Id,
 			Provider:   d.Provider,
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
+			Action:     strings.TrimPrefix(d.Action.String(), "DEPLOYMENT_ACTION_"),
 		}
 	}
 
-	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
+	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt", "Action"})
 }
