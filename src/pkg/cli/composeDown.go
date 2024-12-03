@@ -65,10 +65,6 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 		return "", err
 	}
 
-	if err != nil {
-		return "", err
-	}
-
 	return resp.Etag, nil
 }
 
