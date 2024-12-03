@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	aws "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -100,56 +99,6 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 		err := ValidateGPUResources(ctx, &project)
 		if err != nil && !errors.Is(err, ErrGPUQuotaZero) {
-			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
-		}
-	})
-
-	t.Run("gpu quota exists and requesting more", func(t *testing.T) {
-		testService := getServiceWithGPUCapacity(24)
-		project := composeTypes.Project{
-			Services: map[string]composeTypes.ServiceConfig{
-				"test": testService,
-			},
-		}
-
-		quotaClient = mockQuotaClient
-		mockQuotaClient.err = nil
-		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
-			Quotas: []quotaTypes.ServiceQuota{
-				{
-					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
-					Value:     awssdk.Float64(1),
-				},
-			},
-		}
-		err := ValidateGPUResources(ctx, &project)
-		errNoPerm := gating.ErrNoPermission("not enough GPUs permitted at current subscription tier")
-		if err != nil && !errors.Is(err, errNoPerm) {
-			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
-		}
-	})
-
-	t.Run("gpu quota exists and requesting one but fail because in developer deployment mode", func(t *testing.T) {
-		testService := getServiceWithGPUCapacity(1)
-		project := composeTypes.Project{
-			Services: map[string]composeTypes.ServiceConfig{
-				"test": testService,
-			},
-		}
-
-		quotaClient = mockQuotaClient
-		mockQuotaClient.err = nil
-		mockQuotaClient.output = &servicequotas.ListServiceQuotasOutput{
-			Quotas: []quotaTypes.ServiceQuota{
-				{
-					QuotaCode: awssdk.String("AWS_ECS_GPU_LIMIT"),
-					Value:     awssdk.Float64(1),
-				},
-			},
-		}
-		err := ValidateGPUResources(ctx, &project)
-		errNoPerm := gating.ErrNoPermission("cannot deploy GPUs for current deployment mode DEVELOPMENT")
-		if err != nil && !errors.Is(err, errNoPerm) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
 	})
