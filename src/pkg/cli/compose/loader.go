@@ -67,9 +67,6 @@ func NewLoader(opts ...LoaderOption) *Loader {
 }
 
 func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
-	if c == nil {
-		return "", errors.New("missing loader")
-	}
 	if c.options.ProjectName != "" {
 		return c.options.ProjectName, nil
 	}

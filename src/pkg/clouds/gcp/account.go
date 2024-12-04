@@ -12,8 +12,10 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
+
 func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
-	creds, err := google.FindDefaultCredentials(ctx)
+	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
 		return "", fmt.Errorf("unable to find default credentials: %w", err)
 	}

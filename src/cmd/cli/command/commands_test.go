@@ -4,17 +4,24 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/bufbuild/connect-go"
 	connect_go "github.com/bufbuild/connect-go"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -211,4 +218,139 @@ func TestCommandGates(t *testing.T) {
 			}
 		})
 	}
+}
+
+type MockFabricControllerClient struct {
+	defangv1connect.FabricControllerClient
+	canIUseResponse defangv1.CanIUseResponse
+	savedProvider   defangv1.Provider
+}
+
+func (m *MockFabricControllerClient) CanIUse(context.Context, *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
+	return connect.NewResponse(&m.canIUseResponse), nil
+}
+
+func (m *MockFabricControllerClient) GetServices(context.Context, *connect_go.Request[defangv1.GetServicesRequest]) (*connect_go.Response[defangv1.GetServicesResponse], error) {
+	return connect.NewResponse(&defangv1.GetServicesResponse{}), nil
+}
+
+func (m *MockFabricControllerClient) GetSelectedProvider(context.Context, *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
+	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
+		Provider: m.savedProvider,
+	}), nil
+}
+
+func TestGetProvider(t *testing.T) {
+	mockClient := cliClient.GrpcClient{Client: &MockFabricControllerClient{
+		canIUseResponse: defangv1.CanIUseResponse{},
+	}}
+	client = mockClient
+	loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
+
+	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
+		ctx := context.Background()
+		providerID = "auto"
+		os.Unsetenv("DEFANG_PROVIDER")
+
+		p, err := getProvider(ctx, nil)
+		if err != nil {
+			t.Fatalf("getProvider() failed: %v", err)
+		}
+		if _, ok := p.(*cliClient.PlaygroundProvider); !ok {
+			t.Errorf("Expected provider to be of type *cliClient.PlaygroundProvider, got %T", p)
+		}
+	})
+
+	t.Run("Auto provider should get provider from client", func(t *testing.T) {
+		ctx := context.Background()
+		providerID = "auto"
+		os.Unsetenv("DEFANG_PROVIDER")
+		t.Setenv("AWS_REGION", "us-west-2")
+		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
+		mockCtrl.savedProvider = defangv1.Provider_AWS
+		RootCmd.ResetFlags() // TODO: This should not be needed, but seems other tests messes up RootCmd.PersistentFlags()
+
+		ni := nonInteractive
+		sts := aws.StsClient
+		aws.StsClient = &mockStsProviderAPI{}
+		nonInteractive = false
+		t.Cleanup(func() {
+			nonInteractive = ni
+			aws.StsClient = sts
+			mockCtrl.savedProvider = defangv1.Provider_PROVIDER_UNSPECIFIED
+		})
+
+		p, err := getProvider(ctx, loader)
+		if err != nil {
+			t.Fatalf("getProvider() failed: %v", err)
+		}
+		if _, ok := p.(*aws.ByocAws); !ok {
+			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
+		}
+	})
+
+	t.Run("Should take provider from env aws", func(t *testing.T) {
+		ctx := context.Background()
+		t.Setenv("DEFANG_PROVIDER", "aws")
+		t.Setenv("AWS_REGION", "us-west-2")
+		sts := aws.StsClient
+		aws.StsClient = &mockStsProviderAPI{}
+		t.Cleanup(func() {
+			aws.StsClient = sts
+		})
+
+		p, err := getProvider(ctx, loader)
+		if err != nil {
+			t.Errorf("getProvider() failed: %v", err)
+		}
+		if _, ok := p.(*aws.ByocAws); !ok {
+			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
+		}
+	})
+
+	t.Run("Should take provider from env gcp", func(t *testing.T) {
+		ctx := context.Background()
+		t.Setenv("DEFANG_PROVIDER", "gcp")
+		t.Setenv("GCP_PROJECT_ID", "test_proj_id")
+		gcpdriver.FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+			return &google.Credentials{
+				JSON: []byte(`{"client_email":"test@email.com"}`),
+			}, nil
+		}
+
+		p, err := getProvider(ctx, loader)
+		if err != nil {
+			t.Errorf("getProvider() failed: %v", err)
+		}
+		if _, ok := p.(*gcp.ByocGcp); !ok {
+			t.Errorf("Expected provider to be of type *aws.ByocGcp, got %T", p)
+		}
+	})
+
+	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
+		ctx := context.Background()
+		t.Setenv("DEFANG_PROVIDER", "aws")
+		t.Setenv("AWS_REGION", "us-west-2")
+		sts := aws.StsClient
+		aws.StsClient = &mockStsProviderAPI{}
+		const cdImageTag = "site/registry/repo:tag@sha256:digest"
+		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
+		mockCtrl.canIUseResponse.CdImage = cdImageTag
+		t.Cleanup(func() {
+			aws.StsClient = sts
+			mockCtrl.canIUseResponse.CdImage = ""
+		})
+
+		p, err := getProvider(ctx, loader)
+		if err != nil {
+			t.Errorf("getProvider() failed: %v", err)
+		}
+		if awsProvider, ok := p.(*aws.ByocAws); !ok {
+			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
+		} else {
+			if awsProvider.CDImage != cdImageTag {
+				t.Errorf("Expected cd image tag to be %s, got %s", cdImageTag, awsProvider.CDImage)
+			}
+		}
+	})
 }
