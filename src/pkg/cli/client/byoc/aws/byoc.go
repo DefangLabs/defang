@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
@@ -561,7 +561,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
+	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
 	ensure(projectName != "", "ProjectName not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 
@@ -924,6 +924,16 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
+type awsObj struct{ obj s3types.Object }
+
+func (a awsObj) Name() string {
+	return *a.obj.Key
+}
+
+func (a awsObj) Size() int64 {
+	return *a.obj.Size
+}
+
 func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	bucketName := b.bucketName()
 	if bucketName == "" {
@@ -951,50 +961,25 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	}
 	var stacks []string
 	for _, obj := range out.Contents {
-		// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
-		if obj.Key == nil || !strings.HasSuffix(*obj.Key, ".json") || obj.Size == nil || *obj.Size < 700 {
+		if obj.Key == nil || obj.Size == nil {
 			continue
 		}
-		// Cut off the prefix and the .json suffix
-		stack := (*obj.Key)[len(prefix) : len(*obj.Key)-5]
-		// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
-		objOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: &bucketName,
-			Key:    obj.Key,
+		stack, err := b.ParsePulumiStackObject(ctx, awsObj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+				Bucket: &bucket,
+				Key:    &path,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return io.ReadAll(getObjectOutput.Body)
 		})
 		if err != nil {
-			term.Debugf("Failed to get Pulumi state object %q: %v", *obj.Key, err)
-		} else {
-			defer objOutput.Body.Close()
-			var state struct {
-				Version    int `json:"version"`
-				Checkpoint struct {
-					// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
-					Latest struct {
-						Resources         []struct{} `json:"resources,omitempty"`
-						PendingOperations []struct {
-							Resource struct {
-								Urn string `json:"urn"`
-							}
-						} `json:"pending_operations,omitempty"`
-					}
-				}
-			}
-			if err := json.NewDecoder(objOutput.Body).Decode(&state); err != nil {
-				term.Debugf("Failed to decode Pulumi state %q: %v", *obj.Key, err)
-			} else if state.Version != 3 {
-				term.Debug("Skipping Pulumi state with version", state.Version)
-			} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
-				for _, op := range state.Checkpoint.Latest.PendingOperations {
-					parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
-					stack += fmt.Sprintf(" (pending %q)", parts[3])
-				}
-			} else if len(state.Checkpoint.Latest.Resources) == 0 {
-				continue // skip: no resources and no pending operations
-			}
+			return nil, err
 		}
-
-		stacks = append(stacks, stack)
+		if stack != "" {
+			stacks = append(stacks, stack)
+		}
 	}
 	return stacks, nil
 }

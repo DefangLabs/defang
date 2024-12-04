@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -140,7 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			go func() {
 				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
-					var errDeploymentFailed cli.ErrDeploymentFailed
+					var errDeploymentFailed pkg.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
 					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
@@ -191,7 +192,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				var errDeploymentFailed cli.ErrDeploymentFailed
+				var errDeploymentFailed pkg.ErrDeploymentFailed
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
