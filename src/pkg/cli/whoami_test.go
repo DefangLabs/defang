@@ -27,11 +27,11 @@ func (g *grpcWhoamiMockHandler) WhoAmI(context.Context, *connect.Request[emptypb
 }
 
 func TestWhoami(t *testing.T) {
-	fabricServer := &grpcWhoamiMockHandler{}
-	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
+	mockService := &grpcWhoamiMockHandler{}
+	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")

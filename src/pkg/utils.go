@@ -120,7 +120,7 @@ func Contains[T comparable](s []T, v T) bool {
 func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	switch tier {
 	case defangv1.SubscriptionTier_SUBSCRIPTION_TIER_UNSPECIFIED:
-		return "Unknown"
+		fallthrough // free tier
 	case defangv1.SubscriptionTier_HOBBY:
 		return "Hobby"
 	case defangv1.SubscriptionTier_PERSONAL:

@@ -1,13 +1,12 @@
-package cli
+package client
 
 import (
 	"context"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func LoadProjectName(ctx context.Context, loader client.Loader, provider client.Provider) (string, error) {
+func LoadProjectNameWithFallback(ctx context.Context, loader Loader, provider Provider) (string, error) {
 	projectName, err := loader.LoadProjectName(ctx)
 	if err == nil {
 		return projectName, nil

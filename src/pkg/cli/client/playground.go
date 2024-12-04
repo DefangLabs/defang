@@ -96,12 +96,11 @@ func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
 }
 
 func (g PlaygroundProvider) ServiceDNS(name string) string {
-	return string(g.TenantID) + "-" + name
+	return string(g.TenantName) + "-" + name
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
 	// Hack: Use GetServices to get the current project name
-	// TODO: Use BootstrapList to get the list of projects after playground supports multiple projects
 	resp, err := g.GetServices(ctx, &defangv1.GetServicesRequest{})
 	if err != nil {
 		return "", err
@@ -121,6 +120,7 @@ func (g *PlaygroundProvider) Query(ctx context.Context, req *defangv1.DebugReque
 func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error) {
 	return nil, nil // Playground does not support delegate domains
 }
+func (g *PlaygroundProvider) SetCDImage(string) {}
 
 type PlaygroundAccountInfo struct{}
 

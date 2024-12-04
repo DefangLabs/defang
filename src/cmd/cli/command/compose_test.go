@@ -110,7 +110,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 
 		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 2 {
-			t.Errorf("Expected 2 managed resource, got %d (%s)", len(managed), managed)
+			t.Errorf("Expected 2 managed resource, got %d (%v)", len(managed), managed)
 		}
 		if len(unmanaged) != 1 {
 			t.Errorf("Expected 1 unmanaged resource, got %d (%s)", len(unmanaged), unmanaged)

@@ -11,7 +11,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/quota"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -36,39 +35,26 @@ func DnsSafe(fqdn string) string {
 	return strings.ToLower(fqdn)
 }
 
-type BootstrapLister interface {
+type ProjectBackend interface {
 	BootstrapList(context.Context) ([]string, error)
+	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
 type ByocBaseClient struct {
 	PulumiStack             string
-	Quota                   quota.Quotas
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantID                string
+	TenantName              string
+	CDImage                 string
 
-	bootstrapLister BootstrapLister
+	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
 	b := &ByocBaseClient{
-		TenantID:    string(tenantID),
-		PulumiStack: "beta", // TODO: make customizable
-		Quota: quota.Quotas{
-			// These serve mostly to prevent fat-finger errors in the CLI or Compose files
-			ServiceQuotas: quota.ServiceQuotas{
-				Cpus:       16,
-				Gpus:       8,
-				MemoryMiB:  65536,
-				Replicas:   16,
-				ShmSizeMiB: 30720,
-			},
-			ConfigCount: 20,   // TODO: add validation for this
-			ConfigSize:  4096, // TODO: add validation for this
-			Ingress:     10,   // TODO: add validation for this
-			Services:    40,
-		},
-		bootstrapLister: bl,
+		TenantName:     string(tenantName),
+		PulumiStack:    "beta", // TODO: make customizable
+		projectBackend: backend,
 	}
 	return b
 }
@@ -108,8 +94,17 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	return errors.New("local pulumi command succeeded; stopping")
 }
 
-func GetCdImage(repo string, tag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
+func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
+	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
+	if err != nil {
+		return "", err
+	}
+
+	if projUpdate == nil {
+		return "", nil
+	}
+
+	return projUpdate.CdVersion, nil
 }
 
 func ExtractImageTag(fullQualifiedImageURI string) string {
@@ -119,6 +114,10 @@ func ExtractImageTag(fullQualifiedImageURI string) string {
 
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
+}
+
+func (b *ByocBaseClient) SetCDImage(image string) {
+	b.CDImage = image
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
@@ -132,7 +131,7 @@ func (b *ByocBaseClient) ServiceDNS(name string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.bootstrapLister.BootstrapList(ctx)
+	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -158,7 +157,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	projectLabel := DnsSafeLabel(projectName)
-	if projectLabel == DnsSafeLabel(b.TenantID) {
+	if projectLabel == DnsSafeLabel(b.TenantName) {
 		return DnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + DnsSafe(zone)

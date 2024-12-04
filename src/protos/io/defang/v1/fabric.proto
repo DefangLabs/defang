@@ -202,7 +202,11 @@ message CanIUseRequest {
   Provider provider = 2;
 }
 
-message CanIUseResponse { map<string, bool> gates = 1; }
+message CanIUseResponse {
+  reserved 1;
+  string cd_image = 2;
+  bool gpu = 3;
+}
 
 message DeployRequest {
   repeated Service services = 1
@@ -345,12 +349,19 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
+enum DeploymentAction {
+  DEPLOYMENT_ACTION_UNSPECIFIED = 0;
+  DEPLOYMENT_ACTION_UP = 1;
+  DEPLOYMENT_ACTION_DOWN = 2;
+}
+
 message Deployment {
   string id = 1;
   string project = 2;
   string provider = 3;
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
+  DeploymentAction action = 6;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }

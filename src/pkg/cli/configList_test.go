@@ -6,45 +6,39 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type mockListDeploymentsHandler struct {
+type grpcListSecretsMockHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (g *mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
-	var deployments []*defangv1.Deployment
+func (g *grpcListSecretsMockHandler) ListSecrets(ctx context.Context, req *connect.Request[defangv1.ListConfigsRequest]) (*connect.Response[defangv1.Secrets], error) {
+	var names []string
 
-	if req.Msg.Project == "empty" {
-		deployments = []*defangv1.Deployment{}
+	if req.Msg.Project == "emptyconfigs" {
+		names = []string{}
 	} else {
-		deployments = []*defangv1.Deployment{
-			{
-				Id:                "a1b2c3",
-				Project:           "test",
-				Provider:          "playground",
-				ProviderAccountId: "1234567890",
-				Timestamp:         timestamppb.Now(),
-			},
+		names = []string{
+			"foo",
+			"bar",
 		}
 	}
-
-	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
-		Deployments: deployments,
+	return connect.NewResponse(&defangv1.Secrets{
+		Names: names,
 	}), nil
 }
 
-func TestDeploymentsList(t *testing.T) {
+func TestConfigList(t *testing.T) {
 	ctx := context.Background()
 
-	fabricServer := &mockListDeploymentsHandler{}
+	fabricServer := &grpcListSecretsMockHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
 	t.Cleanup(func() {
@@ -52,33 +46,38 @@ func TestDeploymentsList(t *testing.T) {
 	})
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	client := NewGrpcClient(ctx, url)
+	grpcClient := NewGrpcClient(ctx, url)
+	provider := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
-	t.Run("no deployments", func(t *testing.T) {
+	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
-		err := DeploymentsList(ctx, loader, client)
+
+		loader := client.MockLoader{Project: &compose.Project{Name: "emptyconfigs"}}
+		err := ConfigList(ctx, loader, &provider)
 		if err != nil {
-			t.Fatalf("DeploymentsList() error = %v", err)
+			t.Fatalf("ConfigList() error = %v", err)
 		}
 
 		receivedOutput := stdout.String()
-		expectedOutput := "No deployments"
+		expectedOutput := "No configs"
 
 		if !strings.Contains(stdout.String(), expectedOutput) {
 			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
 		}
 	})
 
-	t.Run("some deployments", func(t *testing.T) {
+	t.Run("some configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "test"}}
-		err := DeploymentsList(ctx, loader, client)
+
+		loader := client.MockLoader{Project: &compose.Project{Name: "test"}}
+		err := ConfigList(ctx, loader, &provider)
 		if err != nil {
-			t.Fatalf("DeploymentsList() error = %v", err)
+			t.Fatalf("ConfigList() error = %v", err)
 		}
-		expectedOutput := `Id      Provider    DeployedAt
-a1b2c3  playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
+
+		expectedOutput := `Name
+foo
+bar
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
