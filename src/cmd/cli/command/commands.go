@@ -883,6 +883,7 @@ var deleteCmd = &cobra.Command{
 
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
+	Short:       "Manage Deployments",
 	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 }
