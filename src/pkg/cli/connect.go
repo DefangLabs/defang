@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -64,6 +65,8 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient c
 		provider = aws.NewByocProvider(ctx, grpcClient.TenantName)
 	case client.ProviderDO:
 		provider = do.NewByocProvider(ctx, grpcClient.TenantName)
+	case client.ProviderGCP:
+		provider = gcp.NewByocProvider(ctx, grpcClient.TenantName)
 	default:
 		provider = &client.PlaygroundProvider{GrpcClient: grpcClient}
 	}

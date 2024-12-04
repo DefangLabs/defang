@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -11,14 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
-
-type ErrDeploymentFailed struct {
-	Service string
-}
-
-func (e ErrDeploymentFailed) Error() string {
-	return fmt.Sprintf("deployment failed for service %q", e.Service)
-}
 
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
@@ -75,7 +66,7 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return ErrDeploymentFailed{msg.Name}
+			return pkg.ErrDeploymentFailed{Service: msg.Name}
 		}
 
 		serviceStates[msg.Name] = msg.State

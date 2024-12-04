@@ -114,7 +114,12 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
-	return http.RemoveQueryParam(res.Url), nil
+	url := http.RemoveQueryParam(res.Url)
+	const gcpPrefix = "https://storage.googleapis.com/"
+	if strings.HasPrefix(url, gcpPrefix) {
+		url = "gs://" + url[len(gcpPrefix):]
+	}
+	return url, nil
 }
 
 type contextAwareWriter struct {
