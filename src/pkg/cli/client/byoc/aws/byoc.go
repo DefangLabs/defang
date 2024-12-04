@@ -961,6 +961,9 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	}
 	var stacks []string
 	for _, obj := range out.Contents {
+		if obj.Key == nil || obj.Size == nil {
+			continue
+		}
 		stack, err := b.ParsePulumiStackObject(ctx, awsObj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
 			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
