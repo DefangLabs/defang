@@ -84,11 +84,11 @@ type ByocGcp struct {
 	lastCdEtag      string
 }
 
-func NewByocProvider(ctx context.Context, tenantId types.TenantID) *ByocGcp {
+func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
 	projectId := os.Getenv("GCP_PROJECT_ID")
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantId, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 	return b
 }
 
@@ -492,7 +492,7 @@ func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*de
 }
 
 func (b *ByocGcp) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	projUpdate, err := b.getProjectUpdate(ctx, req.Project)
+	projUpdate, err := b.GetProjectUpdate(ctx, req.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +594,7 @@ func GetGoogleAPIErrorDetail(detail interface{}, path string) string {
 	return GetGoogleAPIErrorDetail(dm[key], rest)
 }
 
-func (b *ByocGcp) getProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
+func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
 		return nil, nil
 	}
