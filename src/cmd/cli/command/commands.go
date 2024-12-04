@@ -1257,16 +1257,19 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 }
 
 func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
-	projName, err := loader.LoadProjectName(ctx)
-	if err != nil {
-		term.Warn("Unable to load project:", err)
-	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
-		if err != nil {
-			term.Warn("Unable to get selected provider:", err)
-		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-			providerID.SetEnumValue(resp.Provider)
-			return "stored preference", nil
+	var projName string
+	if loader != nil {
+		if name, err := loader.LoadProjectName(ctx); err != nil {
+			term.Warn("Unable to load project:", err)
+		} else if name != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+			if err != nil {
+				term.Warn("Unable to get selected provider:", err)
+			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+				providerID.SetEnumValue(resp.Provider)
+				return "stored preference", nil
+			}
+			projName = name
 		}
 	}
 
