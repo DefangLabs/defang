@@ -1,12 +1,12 @@
 package types
 
-type TenantID string
+type TenantName string
 
 const (
-	DEFAULT_TENANT TenantID = "" // the default tenant (GitHub user ID)
+	DEFAULT_TENANT TenantName = "" // the default tenant (GitHub login)
 )
 
-func (t TenantID) String() string {
+func (t TenantName) String() string {
 	if t == DEFAULT_TENANT {
 		return "default"
 	}

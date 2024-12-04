@@ -3,16 +3,18 @@ package cli
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ComposeDown(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+func ComposeDown(ctx context.Context, loader client.Loader, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", err
 	}
@@ -24,11 +26,36 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 	}
 
 	if len(names) == 0 {
+		accountInfo, err := provider.AccountInfo(ctx)
+		if err != nil {
+			return "", err
+		}
+
 		// If no names are provided, destroy the entire project
-		return provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+		etag, err := provider.Destroy(ctx, &defangv1.DestroyRequest{Project: projectName})
+		if err != nil {
+			return "", err
+		}
+
+		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+			Deployment: &defangv1.Deployment{
+				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
+				Id:                etag,
+				Project:           projectName,
+				Provider:          string(accountInfo.Provider()),
+				ProviderAccountId: accountInfo.AccountID(),
+				Timestamp:         timestamppb.New(time.Now()),
+			},
+		})
+
+		if err != nil {
+			term.Debug("PutDeployment failed:", err)
+		}
+
+		return etag, nil
 	}
 
-	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
 	}
@@ -37,6 +64,7 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 	if err != nil {
 		return "", err
 	}
+
 	return resp.Etag, nil
 }
 

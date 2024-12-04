@@ -11,7 +11,7 @@ import (
 )
 
 func BootstrapCommand(ctx context.Context, loader client.Loader, c client.FabricClient, p client.Provider, cmd string) error {
-	projectName, err := LoadProjectName(ctx, loader, p)
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, p)
 	if err != nil {
 		// Some CD commands don't require a project name, so we don't return an error here.
 		term.Debug("Failed to load project name:", err)

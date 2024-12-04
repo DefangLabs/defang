@@ -48,9 +48,17 @@ var (
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	nonInteractive = !hasTty
+	org            string
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
 )
+
+func getCluster() string {
+	if org == "" {
+		return cluster
+	}
+	return org + "@" + cluster
+}
 
 const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
 
@@ -169,6 +177,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
+	RootCmd.PersistentFlags().StringVar(&org, "org", "", "Override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -181,8 +190,8 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Setup tracking client
-	track.Fabric = cli.NewGrpcClient(ctx, cluster)
+	// Client a temporary gRPC client for tracking events before login
+	_ = cli.NewGrpcClient(ctx, cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -340,7 +349,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client = cli.NewGrpcClient(cmd.Context(), cluster)
+		client = cli.NewGrpcClient(cmd.Context(), getCluster())
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -366,11 +375,11 @@ var RootCmd = &cobra.Command{
 				term.Warn("Please log in to continue.")
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster()); err != nil {
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), cluster) // reconnect with the new token
+				client = cli.NewGrpcClient(cmd.Context(), getCluster()) // reconnect with the new token
 
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
@@ -398,11 +407,11 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if nonInteractive {
-			if err := cli.NonInteractiveLogin(cmd.Context(), client, cluster); err != nil {
+			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, cluster)
+			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster())
 			if err != nil {
 				return err
 			}
@@ -699,7 +708,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := cli.LoadProjectName(cmd.Context(), loader, provider); err != nil {
+		if _, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider); err != nil {
 			return err
 		}
 
@@ -1219,9 +1228,9 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 
-	projName, err := loader.LoadProjectName(ctx)
+	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return nil, err
+		term.Debug("unable to load project name:", err)
 	}
 
 	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {

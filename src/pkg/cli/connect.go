@@ -19,11 +19,11 @@ const DefaultCluster = "fabric-prod1.defang.dev"
 
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
-func SplitTenantHost(cluster string) (types.TenantID, string) {
+func SplitTenantHost(cluster string) (types.TenantName, string) {
 	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
 	if len(parts) == 2 {
-		tenant, cluster = types.TenantID(parts[0]), parts[1]
+		tenant, cluster = types.TenantName(parts[0]), parts[1]
 	}
 	if cluster == "" {
 		cluster = DefangFabric
@@ -35,25 +35,25 @@ func SplitTenantHost(cluster string) (types.TenantID, string) {
 }
 
 func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
-	var tenantId types.TenantID
+	var tenantName types.TenantName
 	tenant, host := SplitTenantHost(cluster)
 	if tenant != types.DEFAULT_TENANT {
-		tenantId = tenant
+		tenantName = tenant
 	}
 	accessToken := GetExistingToken(cluster)
-	term.Debug("Using tenant", tenantId, "for cluster", host)
-	grpcClient := client.NewGrpcClient(host, accessToken, tenantId)
+	term.Debug("Using tenant", tenantName, "for cluster", host)
+	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
+	track.Fabric = grpcClient // Update track client
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
 		term.Debug("Unable to validate tenant ID with server:", err)
-	} else if string(tenantId) != resp.Tenant {
-		if tenantId != types.DEFAULT_TENANT {
-			term.Debugf("Overriding TenantID %q with server provided value %q", tenantId, resp.Tenant)
+	} else if string(tenantName) != resp.Tenant {
+		if tenantName != types.DEFAULT_TENANT {
+			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
 		}
-		grpcClient.TenantID = types.TenantID(resp.Tenant)
+		grpcClient.TenantName = types.TenantName(resp.Tenant)
 	}
-	track.Fabric = grpcClient // Update track client
 	return grpcClient
 }
 
@@ -62,11 +62,11 @@ func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient c
 	term.Debugf("Creating provider %q", providerID)
 	switch providerID {
 	case client.ProviderAWS:
-		provider = aws.NewByocProvider(ctx, grpcClient.TenantID)
+		provider = aws.NewByocProvider(ctx, grpcClient.TenantName)
 	case client.ProviderDO:
-		provider = do.NewByocProvider(ctx, grpcClient.TenantID)
+		provider = do.NewByocProvider(ctx, grpcClient.TenantName)
 	case client.ProviderGCP:
-		provider = gcp.NewByocProvider(ctx, grpcClient.TenantID)
+		provider = gcp.NewByocProvider(ctx, grpcClient.TenantName)
 	default:
 		provider = &client.PlaygroundProvider{GrpcClient: grpcClient}
 	}

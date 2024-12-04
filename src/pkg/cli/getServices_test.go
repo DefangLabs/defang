@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -68,18 +69,11 @@ func TestGetServices(t *testing.T) {
 	provider := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
-		stdout, _ := term.SetupTestTerm(t)
 		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
 		err := GetServices(ctx, loader, &provider, false)
-		if err == nil {
-			t.Fatalf("expected GetServices() error to not be nil")
-		}
-
-		receivedOutput := stdout.String()
-		expectedOutput := "no services found in project \"empty\""
-
-		if !strings.Contains(stdout.String(), expectedOutput) {
-			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
+		var expectedError ErrNoServices
+		if !errors.As(err, &expectedError) {
+			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
 		}
 	})
 
@@ -111,18 +105,11 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 	})
 
 	t.Run("no services long", func(t *testing.T) {
-		stdout, _ := term.SetupTestTerm(t)
 		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
 		err := GetServices(ctx, loader, &provider, false)
-		if err == nil {
-			t.Fatalf("expected GetServices() error to not be nil")
-		}
-
-		receivedOutput := stdout.String()
-		expectedOutput := "no services found in project \"empty\""
-
-		if !strings.Contains(stdout.String(), expectedOutput) {
-			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
+		var expectedError ErrNoServices
+		if !errors.As(err, &expectedError) {
+			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
 		}
 	})
 
