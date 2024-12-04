@@ -13,7 +13,7 @@ type PrintConfig struct {
 }
 
 func ConfigList(ctx context.Context, loader client.Loader, provider client.Provider) error {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return err
 	}
