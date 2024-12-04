@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"strings"
@@ -484,6 +485,37 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	if req.Etag == b.lastCdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
+		ss, err := NewSubscribeStream(ctx, b.driver)
+		if err != nil {
+			return nil, err
+		}
+		ss.AddJobExecutionUpdate(path.Base(b.lastCdExecution))
+		if err := ss.Start(); err != nil {
+			return nil, err
+		}
+
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		go func() {
+			defer ss.Close()
+			for ss.Receive() {
+				msg := ss.Msg()
+				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
+					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
+					cancel(fmt.Errorf("CD job failed %s", msg.Status))
+					return
+				}
+				if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
+					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
+					cancel(io.EOF)
+					return
+				}
+			}
+			cancel(ss.Err())
+		}()
+	}
+
 	ls, err := NewLogStream(ctx, b.driver)
 	if err != nil {
 		return nil, err
@@ -492,8 +524,10 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		ls.AddJobExecutionLog(path.Base(b.lastCdExecution), req.Since.AsTime()) // CD log
 	}
 
-	ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())     // Kaniko logs
-	ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // Service logs
+	if req.Etag != b.lastCdExecution { // No need to tail kaniko and service log if there is only cd running
+		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())     // Kaniko logs
+		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // Service logs
+	}
 	if err := ls.Start(); err != nil {
 		return nil, err
 	}

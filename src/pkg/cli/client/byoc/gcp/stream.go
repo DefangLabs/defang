@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path"
 	"regexp"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -59,9 +62,26 @@ func (s *ServerStream[T]) Receive() bool {
 	select {
 	case s.lastResp = <-s.respCh:
 		return true
-	case s.lastErr = <-s.errCh:
+	case err := <-s.errCh:
+		if context.Cause(s.ctx) == io.EOF {
+			s.lastErr = nil
+		} else if isContextCanceledError(err) {
+			s.lastErr = context.Cause(s.ctx)
+		} else {
+			s.lastErr = err
+		}
 		return false
 	}
+}
+
+func isContextCanceledError(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	if st, ok := status.FromError(err); ok {
+		return st.Code() == codes.Canceled
+	}
+	return false
 }
 
 func (s *ServerStream[T]) Start() error {
@@ -116,7 +136,7 @@ logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
 	query += fmt.Sprintf(`
 labels."run.googleapis.com/execution_name" = "%v"`, executionName)
 
-	if !since.IsZero() {
+	if !since.IsZero() && since.Unix() > 0 {
 		query += fmt.Sprintf(`
 timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 	}
@@ -144,7 +164,7 @@ labels."defang-etag"="%v"`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	if !since.IsZero() {
+	if !since.IsZero() && since.Unix() > 0 {
 		query += fmt.Sprintf(`
 timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 	}
@@ -167,7 +187,7 @@ labels."defang-etag"="%v"`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	if !since.IsZero() {
+	if !since.IsZero() && since.Unix() > 0 {
 		query += fmt.Sprintf(`
 timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
 	}
@@ -262,7 +282,6 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			}
 		} else {
 			if executionName == "" {
-				fmt.Printf("Entry: %+v\n", entry)
 				return nil, errors.New("missing both execution name and defang-service in log entry")
 			}
 			env, ok := envCache[executionName]
@@ -319,7 +338,7 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 
 		auditLog := new(auditpb.AuditLog)
 		if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-			panic("failed to unmarshal audit log : " + err.Error())
+			return nil, fmt.Errorf("failed to unmarshal audit log : %w", err)
 		}
 
 		switch entry.Resource.Type {
@@ -409,15 +428,22 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 					return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
-				resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
-				for serviceName, status := range readyServices {
-					resps = append(resps, &defangv1.SubscribeResponse{
-						Name:   serviceName,
-						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-						Status: status,
-					})
+				if len(readyServices) > 0 {
+					resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
+					for serviceName, status := range readyServices {
+						resps = append(resps, &defangv1.SubscribeResponse{
+							Name:   serviceName,
+							State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+							Status: status,
+						})
+					}
+					return resps, nil // Ignore success cd status when we are waiting for service status
 				}
-				return resps, nil // Ignore success cd status
+				return []*defangv1.SubscribeResponse{{
+					Name:   "defang CD",
+					State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+					Status: auditLog.GetStatus().GetMessage(),
+				}}, nil
 			} else {
 				return nil, errors.New("unexpected execution name in audit log : " + executionName)
 			}
