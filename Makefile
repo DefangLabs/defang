@@ -7,8 +7,8 @@ install-git-hooks:
 
 .PHONY: pre-commit
 pre-commit:
-	make -C src lint
+	@if git diff --cached --name-only | grep -q '^src/'; then make -C src lint; fi
 
 .PHONY: pre-push
 pre-push:
-	make -C src test
+	@make -C src test
