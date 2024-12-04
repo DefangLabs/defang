@@ -42,9 +42,7 @@ func GetServices(ctx context.Context, loader client.Loader, provider client.Prov
 	numServices := len(servicesResponse.Services)
 
 	if numServices == 0 {
-		err := ErrNoServices{ProjectName: projectName}
-		term.Warnf(err.Error())
-		return err
+		return ErrNoServices{ProjectName: projectName}
 	}
 
 	if long {

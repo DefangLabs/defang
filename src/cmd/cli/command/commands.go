@@ -1229,7 +1229,7 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 
 	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return nil, err
+		term.Debug("unable to load project name:", err)
 	}
 
 	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
