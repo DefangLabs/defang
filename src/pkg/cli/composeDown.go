@@ -13,8 +13,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ComposeDown(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+func ComposeDown(ctx context.Context, loader client.Loader, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", err
 	}
@@ -37,7 +37,7 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 			return "", err
 		}
 
-		err = client.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 			Deployment: &defangv1.Deployment{
 				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
 				Id:                etag,
@@ -55,7 +55,7 @@ func ComposeDown(ctx context.Context, loader client.Loader, client client.Fabric
 		return etag, nil
 	}
 
-	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
 	}
