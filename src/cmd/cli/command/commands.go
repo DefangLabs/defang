@@ -1242,7 +1242,9 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 			case cliClient.ProviderAWS:
 				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
 			case cliClient.ProviderDO:
-				cdImage = "docker.com/defangio/cd:public-beta"
+				cdImage = "docker.io/defangio/cd:public-beta"
+			case cliClient.ProviderGCP:
+				cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
 			}
 		}
 		// Allow local override of the CD image

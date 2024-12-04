@@ -37,9 +37,8 @@ const (
 )
 
 var (
-	DefaultCDTags    = map[string]string{"created-by": "defang"}
-	PulumiVersion    = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
-	DefangGcpCdImage = pkg.Getenv("DEFANG_GCP_CD_IMAGE", "edwardrf/gcpcd:test")
+	DefaultCDTags = map[string]string{"created-by": "defang"}
+	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 
 	//TODO: Create cd role with more fine-grained permissions
 	// cdPermissions = []string{
@@ -191,7 +190,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	serviceAccount := path.Base(b.cdServiceAccount)
 	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
 		{
-			Image:     DefangGcpCdImage,
+			Image:     b.CDImage,
 			Name:      ecs.CdContainerName,
 			Cpus:      2.0,
 			Memory:    2048_000_000, // 2G
@@ -386,9 +385,9 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
-		// CdVersion: , // FIXME cd version support
-		Compose:  req.Compose,
-		Services: serviceInfos,
+		CdVersion: b.CDImage,
+		Compose:   req.Compose,
+		Services:  serviceInfos,
 	})
 	if err != nil {
 		return nil, err
@@ -424,10 +423,15 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		DelegateDomain: req.DelegateDomain,
 	}
 
-	if _, err := b.runCdCommand(ctx, cmd); err != nil {
+	execution, err := b.runCdCommand(ctx, cmd)
+	if err != nil {
 		return nil, err
 	}
+
 	b.lastCdEtag = etag
+	if command == "preview" {
+		etag = execution // Only wait for the preview command cd job to finish
+	}
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
@@ -444,7 +448,8 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 			mode = defangv1.Mode_HOST
 		}
 
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-%v-%v.%v.run.app", service.Name, projectName, projectNumber, b.driver.Region))
+		// FIXME: hardcoded stack name beta
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-beta-%v-%v.%v.run.app", projectName, service.Name, projectNumber, b.driver.Region))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
