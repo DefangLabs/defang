@@ -9,7 +9,7 @@ import (
 )
 
 func ConfigDelete(ctx context.Context, loader client.Loader, provider client.Provider, names ...string) error {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return err
 	}

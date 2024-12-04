@@ -708,7 +708,7 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := cli.LoadProjectName(cmd.Context(), loader, provider); err != nil {
+		if _, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider); err != nil {
 			return err
 		}
 
@@ -1227,7 +1227,7 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 		return nil, err
 	}
 
-	projName, err := loader.LoadProjectName(ctx)
+	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return nil, err
 	}

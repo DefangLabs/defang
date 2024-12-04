@@ -28,7 +28,7 @@ type PrintService struct {
 }
 
 func GetServices(ctx context.Context, loader client.Loader, provider client.Provider, long bool) error {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return err
 	}
