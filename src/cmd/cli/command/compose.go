@@ -90,7 +90,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				if !resp.Gpu {
-					return ErrNoPermission("usage of GPUs. To resolve see https://s.defang.io/subscription")
+					return ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
 				}
 			}
 

@@ -87,7 +87,7 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 
 	resp, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider", providerID))
+		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider. Please upgrade on https://s.defang.io/subscription", providerID))
 	}
 
 	return resp.CdImage, nil
