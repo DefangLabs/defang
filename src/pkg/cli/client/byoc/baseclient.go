@@ -183,33 +183,32 @@ func (b *ByocBaseClient) ParsePulumiStackObject(ctx context.Context, obj Obj, bu
 	data, err := objLoader(ctx, bucket, obj.Name())
 	if err != nil {
 		return "", fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
-	} else {
-		var state struct {
-			Version    int `json:"version"`
-			Checkpoint struct {
-				// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
-				Latest struct {
-					Resources         []struct{} `json:"resources,omitempty"`
-					PendingOperations []struct {
-						Resource struct {
-							Urn string `json:"urn"`
-						}
-					} `json:"pending_operations,omitempty"`
-				}
+	}
+	var state struct {
+		Version    int `json:"version"`
+		Checkpoint struct {
+			// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
+			Latest struct {
+				Resources         []struct{} `json:"resources,omitempty"`
+				PendingOperations []struct {
+					Resource struct {
+						Urn string `json:"urn"`
+					}
+				} `json:"pending_operations,omitempty"`
 			}
 		}
-		if err := json.Unmarshal(data, &state); err != nil {
-			return "", fmt.Errorf("Failed to decode Pulumi state %q: %w", obj.Name(), err)
-		} else if state.Version != 3 {
-			term.Debug("Skipping Pulumi state with version", state.Version)
-		} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
-			for _, op := range state.Checkpoint.Latest.PendingOperations {
-				parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
-				stack += fmt.Sprintf(" (pending %q)", parts[3])
-			}
-		} else if len(state.Checkpoint.Latest.Resources) == 0 {
-			return "", nil // skip: no resources and no pending operations
+	}
+	if err := json.Unmarshal(data, &state); err != nil {
+		return "", fmt.Errorf("Failed to decode Pulumi state %q: %w", obj.Name(), err)
+	} else if state.Version != 3 {
+		term.Debug("Skipping Pulumi state with version", state.Version)
+	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
+		for _, op := range state.Checkpoint.Latest.PendingOperations {
+			parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
+			stack += fmt.Sprintf(" (pending %q)", parts[3])
 		}
+	} else if len(state.Checkpoint.Latest.Resources) == 0 {
+		return "", nil // skip: no resources and no pending operations
 	}
 
 	return stack, nil
