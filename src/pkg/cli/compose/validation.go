@@ -430,25 +430,24 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 }
 
 func ValidateManagedStore(managedStore any) error {
-	if managedStore == nil || managedStore == true || managedStore == false {
+	if managedStore == nil || managedStore == true {
 		return nil
 	}
 
-	aggErrPostgres := []error{}
+	if managedStore == false {
+		return ErrManagedStoreParam("to not use managed storage remove the 'x-defang-postgres' or 'x-defang-redis' fields")
+	}
 
 	postgresProps, ok := managedStore.(map[string]any)
 	if !ok {
-		return nil
+		return ErrManagedStoreParam("expected parameters in managed storage definition field")
 	}
 
 	if downtime, ok := postgresProps["allow-downtime"]; ok {
 		if _, ok := downtime.(bool); !ok {
-			aggErrPostgres = append(aggErrPostgres, ErrManagedStoreParam("'allow-downtime' must be a boolean"))
+			return ErrManagedStoreParam("'allow-downtime' must be a boolean")
 		}
 	}
 
-	if len(aggErrPostgres) > 0 {
-		return errors.Join(aggErrPostgres...)
-	}
 	return nil
 }

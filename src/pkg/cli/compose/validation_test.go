@@ -172,67 +172,34 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
-func TestXDefangManaged(t *testing.T) {
-	var serviceExtensionName = []string{"x-defang-post", "x-defang-redis"}
-	for _, extensionName := range serviceExtensionName {
-		t.Run("verify empty definition", func(t *testing.T) {
-			service := composeTypes.ServiceConfig{
-				Extensions: map[string]interface{}{
-					extensionName: nil,
-				}}
-
-			redis, ok := service.Extensions[extensionName]
-			if !ok {
-				t.Fatalf("%s extension not found", extensionName)
-			}
-
-			if err := ValidateManagedStore(redis); err != nil {
-				t.Fatalf("ValidateManagedStore() failed: %v", err)
-			}
-		})
-
-		t.Run("verify bool value", func(t *testing.T) {
-			service := composeTypes.ServiceConfig{
-				Extensions: map[string]interface{}{
-					extensionName: true,
-				}}
-
-			redis, ok := service.Extensions[extensionName]
-			if !ok {
-				t.Fatalf("%s extension not found", extensionName)
-			}
-
-			if err := ValidateManagedStore(redis); err != nil {
-				t.Fatalf("ValidateManagedStore() failed: %v", err)
-			}
-		})
-
-		t.Run("verify full definition", func(t *testing.T) {
-			service := composeTypes.ServiceConfig{
-				Extensions: composeTypes.Extensions{
-					extensionName: map[string]any{
-						"allow-downtime": true,
-					},
-				}}
-
-			postgres, ok := service.Extensions[extensionName]
-			if !ok {
-				t.Fatalf("%s extension not found", extensionName)
-			}
-
-			if err := ValidateManagedStore(postgres); err != nil {
-				t.Fatalf("ValidateManagedStore() failed: %v", err)
-			}
-		})
-	}
-}
-
 func TestManagedStoreParams(t *testing.T) {
 	tests := []struct {
 		name      string
-		extension map[string]any
+		extension any
 		errors    []string
 	}{
+		{
+			name: "sanity check",
+			extension: map[string]any{
+				"allow-downtime": true,
+			},
+			errors: []string{},
+		},
+		{
+			name:      "empty",
+			extension: nil,
+			errors:    []string{},
+		},
+		{
+			name:      "true value",
+			extension: true,
+			errors:    []string{},
+		},
+		{
+			name:      "false value",
+			extension: false,
+			errors:    []string{"to not use managed storage remove the 'x-defang-postgres' or 'x-defang-redis' fields"},
+		},
 		{
 			name: "invalid downtime",
 			extension: map[string]any{
@@ -240,11 +207,20 @@ func TestManagedStoreParams(t *testing.T) {
 			},
 			errors: []string{"error found: 'allow-downtime' must be a boolean"},
 		},
+		{
+			name:      "no options",
+			extension: map[string]any{},
+			errors:    []string{},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := ValidateManagedStore(tt.extension); err != nil {
+				if len(tt.errors) == 0 {
+					t.Fatalf("ValidateManagedStore() unexpected err = %v", err)
+				}
+
 				for _, errMsg := range tt.errors {
 					if !strings.Contains(err.Error(), errMsg) {
 						t.Fatalf("ValidateManagedStore() = %v, want %v", err.Error(), tt.errors)
