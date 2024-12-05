@@ -2,7 +2,7 @@ services:
   x:
     image: postgres
     x-defang-postgres:
-
+      allow-downtime: true
   y:
     image: example
     x-defang-postgres:
