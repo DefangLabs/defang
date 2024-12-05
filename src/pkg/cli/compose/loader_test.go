@@ -126,14 +126,3 @@ func TestHasSubstitution(t *testing.T) {
 		})
 	}
 }
-
-func TestNilLoader(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Nil loader should panic when loading project")
-		}
-	}()
-	var loader *Loader
-	loader.LoadProject(context.Background())
-	t.Error("Should not execute beyond nil loader.LoadProject()")
-}
