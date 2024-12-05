@@ -261,8 +261,12 @@ func SetupCommands(ctx context.Context, version string) {
 
 	RootCmd.AddCommand(setupComposeCommand())
 	// Add up/down commands to the root as well
-	RootCmd.AddCommand(makeComposeDownCmd())
-	RootCmd.AddCommand(makeComposeUpCmd())
+	down := makeComposeDownCmd()
+	down.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(down)
+	up := makeComposeUpCmd()
+	up.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(up)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -901,6 +905,7 @@ var deploymentsListCmd = &cobra.Command{
 
 var restartCmd = &cobra.Command{
 	Use:         "restart SERVICE...",
+	Hidden:      true,
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Short:       "Restart one or more services",
