@@ -353,4 +353,33 @@ func TestGetProvider(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("Can override cd image from environment variable", func(t *testing.T) {
+		ctx := context.Background()
+		t.Setenv("DEFANG_PROVIDER", "aws")
+		t.Setenv("AWS_REGION", "us-west-2")
+		sts := aws.StsClient
+		aws.StsClient = &mockStsProviderAPI{}
+		const cdImageTag = "site/registry/repo:tag@sha256:digest"
+		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
+		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
+		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
+		mockCtrl.canIUseResponse.CdImage = cdImageTag
+		t.Cleanup(func() {
+			aws.StsClient = sts
+			mockCtrl.canIUseResponse.CdImage = ""
+		})
+
+		p, err := getProvider(ctx, loader)
+		if err != nil {
+			t.Errorf("getProvider() failed: %v", err)
+		}
+		if awsProvider, ok := p.(*aws.ByocAws); !ok {
+			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
+		} else {
+			if awsProvider.CDImage != overrideImageTag {
+				t.Errorf("Expected cd image tag to be %s, got %s", cdImageTag, awsProvider.CDImage)
+			}
+		}
+	})
 }
