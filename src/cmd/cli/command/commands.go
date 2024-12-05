@@ -26,7 +26,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
@@ -108,8 +107,7 @@ func Execute(ctx context.Context) error {
 			return nil
 		}
 
-		var derr *cli.ComposeError
-		if errors.As(err, &derr) {
+		if cerr := new(cli.ComposeError); errors.As(err, &cerr) {
 			compose := "compose"
 			fileFlag := RootCmd.Flag("file")
 			if fileFlag.Changed {
@@ -134,20 +132,13 @@ func Execute(ctx context.Context) error {
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
-		var cerr *cli.CancelError
-		if errors.As(err, &cerr) {
+		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
 			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
 		if code == connect.CodeUnauthenticated {
-			// All AWS errors are wrapped in OperationError
-			var oe *smithy.OperationError
-			if errors.As(err, &oe) {
-				fmt.Println("Could not authenticate to the AWS service. Please check your AWS credentials and try again.")
-			} else {
-				printDefangHint("Please use the following command to log in:", "login")
-			}
+			printDefangHint("Please use the following command to log in:", "login")
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
