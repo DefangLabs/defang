@@ -42,6 +42,10 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
+func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {
+	g.client = client
+}
+
 func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
 	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
