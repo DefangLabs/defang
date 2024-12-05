@@ -241,9 +241,11 @@ func (m *MockFabricControllerClient) GetSelectedProvider(context.Context, *conne
 }
 
 func TestGetProvider(t *testing.T) {
-	mockClient := cliClient.GrpcClient{Client: &MockFabricControllerClient{
+	mockClient := cliClient.GrpcClient{}
+	mockCtrl := &MockFabricControllerClient{
 		canIUseResponse: defangv1.CanIUseResponse{},
-	}}
+	}
+	mockClient.SetClient(mockCtrl)
 	client = mockClient
 	loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
 
@@ -266,7 +268,6 @@ func TestGetProvider(t *testing.T) {
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
-		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
 		mockCtrl.savedProvider = defangv1.Provider_AWS
 		RootCmd.ResetFlags() // TODO: This should not be needed, but seems other tests messes up RootCmd.PersistentFlags()
 
@@ -334,7 +335,6 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
-		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
 			aws.StsClient = sts
@@ -363,7 +363,6 @@ func TestGetProvider(t *testing.T) {
 		const cdImageTag = "site/registry/repo:tag@sha256:digest"
 		const overrideImageTag = "site/override/replaced:tag@sha256:otherdigest"
 		t.Setenv("DEFANG_CD_IMAGE", overrideImageTag)
-		mockCtrl, _ := client.Client.(*MockFabricControllerClient)
 		mockCtrl.canIUseResponse.CdImage = cdImageTag
 		t.Cleanup(func() {
 			aws.StsClient = sts

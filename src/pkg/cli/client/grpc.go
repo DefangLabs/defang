@@ -18,7 +18,7 @@ import (
 
 type GrpcClient struct {
 	anonID string
-	Client defangv1connect.FabricControllerClient
+	client defangv1connect.FabricControllerClient
 
 	TenantName types.TenantName
 }
@@ -32,7 +32,7 @@ func NewGrpcClient(host, accessToken string, tenantName types.TenantName) GrpcCl
 	// Debug(" - Connecting to", baseUrl)
 	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
 
-	return GrpcClient{Client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
+	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
 }
 
 func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
@@ -42,62 +42,66 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
+func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {
+	g.client = client
+}
+
 func (g GrpcClient) GetVersions(ctx context.Context) (*defangv1.Version, error) {
-	return getMsg(g.Client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
+	return getMsg(g.client.GetVersion(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g GrpcClient) Token(ctx context.Context, req *defangv1.TokenRequest) (*defangv1.TokenResponse, error) {
 	req.AnonId = g.anonID
-	return getMsg(g.Client.Token(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.Token(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) RevokeToken(ctx context.Context) error {
-	_, err := g.Client.RevokeToken(ctx, &connect.Request[emptypb.Empty]{})
+	_, err := g.client.RevokeToken(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
 func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) error {
-	_, err := g.Client.Publish(ctx, connect.NewRequest(req))
+	_, err := g.client.Publish(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
-	_, err := g.Client.PutDeployment(ctx, connect.NewRequest(req))
+	_, err := g.client.PutDeployment(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) ListDeployments(ctx context.Context, req *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error) {
-	return getMsg(g.Client.ListDeployments(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.ListDeployments(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) GenerateFiles(ctx context.Context, req *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error) {
-	return getMsg(g.Client.GenerateFiles(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.GenerateFiles(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
-	return getMsg(g.Client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{}))
+	return getMsg(g.client.WhoAmI(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.Client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
-	_, err := getMsg(g.Client.DeleteSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
 	return err
 }
 
 func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.Client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
 }
 
 func (g GrpcClient) AgreeToS(ctx context.Context) error {
-	_, err := g.Client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
+	_, err := g.client.SignEULA(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
 func (g GrpcClient) Debug(ctx context.Context, req *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
-	return getMsg(g.Client.Debug(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.Debug(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) Track(event string, properties ...Property) error {
@@ -111,7 +115,7 @@ func (g GrpcClient) Track(event string, properties ...Property) error {
 	}
 	context, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err := g.Client.Track(context, &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
+	_, err := g.client.Track(context, &connect.Request[defangv1.TrackRequest]{Msg: &defangv1.TrackRequest{
 		AnonId:     g.anonID,
 		Event:      event,
 		Properties: props,
@@ -122,24 +126,24 @@ func (g GrpcClient) Track(event string, properties ...Property) error {
 }
 
 func (g GrpcClient) CheckLoginAndToS(ctx context.Context) error {
-	_, err := g.Client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
+	_, err := g.client.CheckToS(ctx, &connect.Request[emptypb.Empty]{})
 	return err
 }
 
 func (g GrpcClient) VerifyDNSSetup(ctx context.Context, req *defangv1.VerifyDNSSetupRequest) error {
-	_, err := g.Client.VerifyDNSSetup(ctx, connect.NewRequest(req))
+	_, err := g.client.VerifyDNSSetup(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) GetSelectedProvider(ctx context.Context, req *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error) {
-	return getMsg(g.Client.GetSelectedProvider(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.GetSelectedProvider(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSelectedProviderRequest) error {
-	_, err := g.Client.SetSelectedProvider(ctx, connect.NewRequest(req))
+	_, err := g.client.SetSelectedProvider(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g GrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
-	return getMsg(g.Client.CanIUse(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.CanIUse(ctx, connect.NewRequest(req)))
 }

@@ -17,7 +17,7 @@ type PlaygroundProvider struct {
 var _ Provider = (*PlaygroundProvider)(nil)
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return getMsg(g.Client.Deploy(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.Deploy(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
@@ -25,41 +25,41 @@ func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRe
 }
 
 func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
-	return getMsg(g.Client.Get(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	return getMsg(g.Client.Delete(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.Delete(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) GetServices(ctx context.Context, req *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error) {
-	return getMsg(g.Client.GetServices(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.GetServices(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	_, err := g.Client.PutSecret(ctx, connect.NewRequest(req))
+	_, err := g.client.PutSecret(ctx, connect.NewRequest(req))
 	return err
 }
 
 func (g *PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.Client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
+	_, err := g.client.DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
 	return err
 }
 
 func (g *PlaygroundProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	return getMsg(g.Client.ListSecrets(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.ListSecrets(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	return getMsg(g.Client.CreateUploadURL(ctx, connect.NewRequest(req)))
+	return getMsg(g.client.CreateUploadURL(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error) {
-	return g.Client.Subscribe(ctx, connect.NewRequest(req))
+	return g.client.Subscribe(ctx, connect.NewRequest(req))
 }
 
 func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	return g.Client.Tail(ctx, connect.NewRequest(req))
+	return g.client.Tail(ctx, connect.NewRequest(req))
 }
 
 func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, req BootstrapCommandRequest) (types.ETag, error) {

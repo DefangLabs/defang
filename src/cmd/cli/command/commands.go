@@ -1181,9 +1181,6 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	extraMsg := ""
 	source := "default project"
 
-	val, ok := os.LookupEnv("DEFANG_PROVIDER")
-	fmt.Println(val, ok)
-
 	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := providerID.Set(val); err != nil {
