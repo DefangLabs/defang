@@ -257,12 +257,18 @@ func SetupCommands(ctx context.Context, version string) {
 	configCmd.AddCommand(configListCmd)
 
 	RootCmd.AddCommand(configCmd)
-	RootCmd.AddCommand(restartCmd)
 
 	RootCmd.AddCommand(setupComposeCommand())
 	// Add up/down commands to the root as well
-	RootCmd.AddCommand(makeComposeDownCmd())
-	RootCmd.AddCommand(makeComposeUpCmd())
+	down := makeComposeDownCmd()
+	down.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(down)
+	up := makeComposeUpCmd()
+	up.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(up)
+	restart := makeComposeRestartCmd()
+	restart.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(restart)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -896,16 +902,6 @@ var deploymentsListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		return cli.DeploymentsList(cmd.Context(), loader, client)
-	},
-}
-
-var restartCmd = &cobra.Command{
-	Use:         "restart SERVICE...",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.MinimumNArgs(1),
-	Short:       "Restart one or more services",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
