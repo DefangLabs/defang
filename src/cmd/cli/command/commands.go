@@ -1177,11 +1177,11 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provider, error) {
+func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
 	extraMsg := ""
 	source := "default project"
 
-	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok && val == providerID.String() {
+	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := providerID.Set(val); err != nil {
 			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
@@ -1256,17 +1256,20 @@ func getProvider(ctx context.Context, loader *compose.Loader) (cliClient.Provide
 	return provider, nil
 }
 
-func determineProviderID(ctx context.Context, loader *compose.Loader) (string, error) {
-	projName, err := loader.LoadProjectName(ctx)
-	if err != nil {
-		term.Warn("Unable to load project:", err)
-	} else if !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-		resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
-		if err != nil {
-			term.Warn("Unable to get selected provider:", err)
-		} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-			providerID.SetEnumValue(resp.Provider)
-			return "stored preference", nil
+func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
+	var projName string
+	if loader != nil {
+		if name, err := loader.LoadProjectName(ctx); err != nil {
+			term.Warn("Unable to load project:", err)
+		} else if name != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+			if err != nil {
+				term.Warn("Unable to get selected provider:", err)
+			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
+				providerID.SetEnumValue(resp.Provider)
+				return "stored preference", nil
+			}
+			projName = name
 		}
 	}
 
