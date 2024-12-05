@@ -66,7 +66,7 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return pkg.ErrDeploymentFailed{Service: msg.Name}
+			return pkg.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
 
 		serviceStates[msg.Name] = msg.State
