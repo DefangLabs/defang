@@ -9,8 +9,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Delete(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
-	projectName, err := LoadProjectName(ctx, loader, provider)
+func Delete(ctx context.Context, loader client.Loader, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
+	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return "", err
 	}
@@ -21,7 +21,7 @@ func Delete(ctx context.Context, loader client.Loader, client client.FabricClien
 		return "", ErrDryRun
 	}
 
-	delegateDomain, err := client.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
 	}

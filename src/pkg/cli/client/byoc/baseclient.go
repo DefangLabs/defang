@@ -2,6 +2,7 @@ package byoc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -34,24 +35,26 @@ func DnsSafe(fqdn string) string {
 	return strings.ToLower(fqdn)
 }
 
-type BootstrapLister interface {
+type ProjectBackend interface {
 	BootstrapList(context.Context) ([]string, error)
+	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 }
 
 type ByocBaseClient struct {
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
-	TenantID                string
+	TenantName              string
+	CDImage                 string
 
-	bootstrapLister BootstrapLister
+	projectBackend ProjectBackend
 }
 
-func NewByocBaseClient(ctx context.Context, tenantID types.TenantID, bl BootstrapLister) *ByocBaseClient {
+func NewByocBaseClient(ctx context.Context, tenantName types.TenantName, backend ProjectBackend) *ByocBaseClient {
 	b := &ByocBaseClient{
-		TenantID:        string(tenantID),
-		PulumiStack:     "beta", // TODO: make customizable
-		bootstrapLister: bl,
+		TenantName:     string(tenantName),
+		PulumiStack:    "beta", // TODO: make customizable
+		projectBackend: backend,
 	}
 	return b
 }
@@ -91,8 +94,17 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	return errors.New("local pulumi command succeeded; stopping")
 }
 
-func GetCdImage(repo string, tag string) string {
-	return pkg.Getenv("DEFANG_CD_IMAGE", repo+":"+tag)
+func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
+	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
+	if err != nil {
+		return "", err
+	}
+
+	if projUpdate == nil {
+		return "", nil
+	}
+
+	return projUpdate.CdVersion, nil
 }
 
 func ExtractImageTag(fullQualifiedImageURI string) string {
@@ -102,6 +114,10 @@ func ExtractImageTag(fullQualifiedImageURI string) string {
 
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
+}
+
+func (b *ByocBaseClient) SetCDImage(image string) {
+	b.CDImage = image
 }
 
 func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
@@ -115,7 +131,7 @@ func (b *ByocBaseClient) ServiceDNS(name string) string {
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
 	// Get the list of projects from remote
-	projectNames, err := b.bootstrapLister.BootstrapList(ctx)
+	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +157,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 		return "" // no project name => no custom domain
 	}
 	projectLabel := DnsSafeLabel(projectName)
-	if projectLabel == DnsSafeLabel(b.TenantID) {
+	if projectLabel == DnsSafeLabel(b.TenantName) {
 		return DnsSafe(zone) // the zone will already have the tenant ID
 	}
 	return projectLabel + "." + DnsSafe(zone)
@@ -149,4 +165,51 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 
 func GetPrivateDomain(projectName string) string {
 	return DnsSafeLabel(projectName) + ".internal"
+}
+
+type Obj interface {
+	Name() string
+	Size() int64
+}
+
+func (b *ByocBaseClient) ParsePulumiStackObject(ctx context.Context, obj Obj, bucket, prefix string, objLoader func(ctx context.Context, bucket, object string) ([]byte, error)) (string, error) {
+	// The JSON file for an empty stack is ~600 bytes; we add a margin of 100 bytes to account for the length of the stack/project names
+	if !strings.HasSuffix(obj.Name(), ".json") || obj.Size() < 700 {
+		return "", nil
+	}
+	// Cut off the prefix and the .json suffix
+	stack := (obj.Name())[len(prefix) : len(obj.Name())-5]
+	// Check the contents of the JSON file, because the size is not a reliable indicator of a valid stack
+	data, err := objLoader(ctx, bucket, obj.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to get Pulumi state object %q: %w", obj.Name(), err)
+	}
+	var state struct {
+		Version    int `json:"version"`
+		Checkpoint struct {
+			// Stack  string `json:"stack"` TODO: could use this instead of deriving the stack name from the key
+			Latest struct {
+				Resources         []struct{} `json:"resources,omitempty"`
+				PendingOperations []struct {
+					Resource struct {
+						Urn string `json:"urn"`
+					}
+				} `json:"pending_operations,omitempty"`
+			}
+		}
+	}
+	if err := json.Unmarshal(data, &state); err != nil {
+		return "", fmt.Errorf("Failed to decode Pulumi state %q: %w", obj.Name(), err)
+	} else if state.Version != 3 {
+		term.Debug("Skipping Pulumi state with version", state.Version)
+	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
+		for _, op := range state.Checkpoint.Latest.PendingOperations {
+			parts := strings.Split(op.Resource.Urn, "::") // prefix::project::type::resource => urn:provider:stack::project::plugin:file:class::name
+			stack += fmt.Sprintf(" (pending %q)", parts[3])
+		}
+	} else if len(state.Checkpoint.Latest.Resources) == 0 {
+		return "", nil // skip: no resources and no pending operations
+	}
+
+	return stack, nil
 }

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/cli/gating"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -28,52 +28,18 @@ func isManagedService(service compose.ServiceConfig) bool {
 	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
 }
 
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) (map[string]int, []string) {
-	var managedServices = map[string]int{
-		"x-defang-static-files": 0,
-		"x-defang-redis":        0,
-		"x-defang-postgres":     0,
-	}
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
+	var managedServices []string
 	var unmanagedServices []string
 	for _, service := range serviceInfos {
 		if isManagedService(service) {
-			for key := range service.Extensions {
-				if _, ok := managedServices[key]; ok {
-					managedServices[key]++
-				}
-			}
+			managedServices = append(managedServices, service.Name)
 		} else {
 			unmanagedServices = append(unmanagedServices, service.Name)
 		}
 	}
 
 	return managedServices, unmanagedServices
-}
-
-func canUseManagedServices(managedServices map[string]int) (bool, error) {
-	var hasManagedServices bool = false
-	for key := range managedServices {
-		var err error
-		var resource gating.Resources
-		switch key {
-		case "x-defang-redis":
-			resource = gating.ResourceRedis
-		case "x-defang-postgres":
-			resource = gating.ResourcePostgres
-		default:
-			continue
-		}
-
-		if resource != "" && managedServices[key] > 0 {
-			if err = gating.HasAuthorization(resource, "usage of managed storage"); err != nil {
-				return true, err
-			}
-		}
-
-		hasManagedServices = true
-	}
-
-	return hasManagedServices, nil
 }
 
 func makeComposeUpCmd() *cobra.Command {
@@ -95,6 +61,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
+
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
@@ -107,19 +74,24 @@ func makeComposeUpCmd() *cobra.Command {
 
 			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
-			var canUseManagedSvcs bool
-			if canUseManagedSvcs, err = canUseManagedServices(managedServices); err != nil {
-				return err
-			}
-
-			if len(managedServices) > 0 && canUseManagedSvcs {
+			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
 			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
 			if numGPUS > 0 {
-				if err := gating.HasAuthorization(gating.ResourceGPU, "usage of GPUs. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu"); err != nil {
+				req := &defangv1.CanIUseRequest{
+					Project:  project.Name,
+					Provider: providerID.EnumValue(),
+				}
+
+				resp, err := client.CanIUse(cmd.Context(), req)
+				if err != nil {
 					return err
+				}
+
+				if !resp.Gpu {
+					return ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
 				}
 			}
 
@@ -169,7 +141,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			go func() {
 				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
-					var errDeploymentFailed cli.ErrDeploymentFailed
+					var errDeploymentFailed pkg.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
 					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
@@ -220,7 +192,7 @@ func makeComposeUpCmd() *cobra.Command {
 					return err
 				}
 
-				var errDeploymentFailed cli.ErrDeploymentFailed
+				var errDeploymentFailed pkg.ErrDeploymentFailed
 				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)

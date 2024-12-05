@@ -102,8 +102,7 @@ func Test_getImageSourceSpec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.imageURI, func(t *testing.T) {
-			t.Setenv("DEFANG_CD_IMAGE", test.imageURI)
-			actual, err := getImageSourceSpec()
+			actual, err := getImageSourceSpec(test.imageURI)
 			if err != nil {
 				t.Fatalf("Expected no error but got: %s", err)
 			}

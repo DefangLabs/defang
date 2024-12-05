@@ -17,8 +17,8 @@ const (
 	ProviderDefang ProviderID = "defang"
 	ProviderAWS    ProviderID = "aws"
 	ProviderDO     ProviderID = "digitalocean"
-	// ProviderGCP    Provider = "gcp"
-	// ProviderAzure  Provider = "azure"
+	ProviderGCP    ProviderID = "gcp"
+	// ProviderAzure  ProviderID = "azure"
 )
 
 var allProviders = []ProviderID{
@@ -26,7 +26,7 @@ var allProviders = []ProviderID{
 	ProviderDefang,
 	ProviderAWS,
 	ProviderDO,
-	// ProviderGCP,
+	ProviderGCP,
 	// ProviderAzure,
 }
 
@@ -48,6 +48,8 @@ func (p ProviderID) Name() string {
 		return "AWS"
 	case ProviderDO:
 		return "DigitalOcean"
+	case ProviderGCP:
+		return "Google Cloud Platform"
 	default:
 		return p.String()
 	}
@@ -61,6 +63,8 @@ func (p ProviderID) EnumValue() defangv1.Provider {
 		return defangv1.Provider_AWS
 	case ProviderDO:
 		return defangv1.Provider_DIGITALOCEAN
+	case ProviderGCP:
+		return defangv1.Provider_GCP
 	default:
 		return defangv1.Provider_PROVIDER_UNSPECIFIED
 	}
@@ -86,6 +90,8 @@ func (p *ProviderID) SetEnumValue(val defangv1.Provider) {
 		*p = ProviderAWS
 	case defangv1.Provider_DIGITALOCEAN:
 		*p = ProviderDO
+	case defangv1.Provider_GCP:
+		*p = ProviderGCP
 	default:
 		*p = ProviderAuto
 	}
@@ -129,7 +135,8 @@ type Provider interface {
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)
-	ServiceDNS(name string) string
+	ServiceDNS(string) string
+	SetCDImage(string)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error
 }
