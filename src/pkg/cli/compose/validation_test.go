@@ -205,7 +205,7 @@ func TestManagedStoreParams(t *testing.T) {
 			extension: map[string]any{
 				"allow-downtime": "abc",
 			},
-			errors: []string{"error found: 'allow-downtime' must be a boolean"},
+			errors: []string{"'allow-downtime' must be a boolean"},
 		},
 		{
 			name:      "no options",

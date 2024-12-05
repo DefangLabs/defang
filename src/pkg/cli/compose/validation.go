@@ -30,7 +30,7 @@ func (e ErrMissingConfig) Error() string {
 type ErrManagedStoreParam string
 
 func (e ErrManagedStoreParam) Error() string {
-	return "error found: " + string(e)
+	return string(e)
 }
 
 type PostgresProps map[string]any
