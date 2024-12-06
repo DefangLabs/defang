@@ -604,16 +604,6 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 		listServiceResp.Project = projUpdate.Project
 	}
 
-	lbName := fmt.Sprintf("defang-%s-%s-alb", req.Project, b.PulumiStack) // same as shared/common.ts
-	lbDnsName, err := b.driver.GetAlbDnsName(ctx, lbName)
-	if err != nil {
-		return nil, AnnotateAwsError(err)
-	}
-
-	for _, service := range listServiceResp.Services {
-		service.LbDnsName = lbDnsName
-	}
-
 	return &listServiceResp, nil
 }
 
