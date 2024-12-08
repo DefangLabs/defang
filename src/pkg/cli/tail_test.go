@@ -3,7 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
-	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -70,7 +70,7 @@ func TestParseTimeOrDuration(t *testing.T) {
 
 func TestTail(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	testTerm := term.NewTerm(&stdout, io.MultiWriter(&stderr))
+	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
 	testTerm.ForceColor(true)
 	defaultTerm := term.DefaultTerm
 	term.DefaultTerm = testTerm
