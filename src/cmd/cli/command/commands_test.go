@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlecAivazis/survey/v2/terminal"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	pkg "github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	gcpdriver "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -340,17 +340,17 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		nonInteractive = false
-		oldSurveyStdio := SurveyStdio
-		SurveyStdio = &terminal.Stdio{
-			In:  &FakeStdin{bytes.NewReader([]byte("aws\n"))},
-			Out: &FakeStdout{new(bytes.Buffer)},
-			Err: new(bytes.Buffer),
-		}
+		oldTerm := term.DefaultTerm
+		term.DefaultTerm = term.NewTerm(
+			&FakeStdin{bytes.NewReader([]byte("aws\n"))},
+			&FakeStdout{new(bytes.Buffer)},
+			new(bytes.Buffer),
+		)
 		t.Cleanup(func() {
 			nonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			SurveyStdio = oldSurveyStdio
+			term.DefaultTerm = oldTerm
 		})
 
 		p, err := getProvider(ctx, loader)
@@ -378,17 +378,17 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		nonInteractive = false
-		oldSurveyStdio := SurveyStdio
-		SurveyStdio = &terminal.Stdio{
-			In:  &FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
-			Out: &FakeStdout{new(bytes.Buffer)},
-			Err: new(bytes.Buffer),
-		}
+		oldTerm := term.DefaultTerm
+		term.DefaultTerm = term.NewTerm(
+			&FakeStdin{bytes.NewReader([]byte("\n"))}, // Use default option, which should be DO from env var
+			&FakeStdout{new(bytes.Buffer)},
+			new(bytes.Buffer),
+		)
 		t.Cleanup(func() {
 			nonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			SurveyStdio = oldSurveyStdio
+			term.DefaultTerm = oldTerm
 		})
 
 		_, err := getProvider(ctx, loader)
@@ -412,17 +412,17 @@ func TestGetProvider(t *testing.T) {
 		sts := aws.StsClient
 		aws.StsClient = &mockStsProviderAPI{}
 		nonInteractive = false
-		oldSurveyStdio := SurveyStdio
-		SurveyStdio = &terminal.Stdio{
-			In:  &FakeStdin{bytes.NewReader([]byte("gcp\n"))},
-			Out: &FakeStdout{new(bytes.Buffer)},
-			Err: new(bytes.Buffer),
-		}
+		oldTerm := term.DefaultTerm
+		term.DefaultTerm = term.NewTerm(
+			&FakeStdin{bytes.NewReader([]byte("gcp\n"))},
+			&FakeStdout{new(bytes.Buffer)},
+			new(bytes.Buffer),
+		)
 		t.Cleanup(func() {
 			nonInteractive = ni
 			aws.StsClient = sts
 			mockCtrl.savedProvider = nil
-			SurveyStdio = oldSurveyStdio
+			term.DefaultTerm = oldTerm
 		})
 
 		_, err := getProvider(ctx, loader)
