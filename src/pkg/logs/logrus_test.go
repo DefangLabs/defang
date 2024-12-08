@@ -3,6 +3,7 @@ package logs
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -49,7 +50,7 @@ func TestTermLogFormatter(t *testing.T) {
 	})
 
 	var out, termout, termerr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(&termout, &termerr)
+	term.DefaultTerm = term.NewTerm(os.Stdin, &termout, &termerr)
 	f := TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetOutput(&out)
 	logrus.SetFormatter(f)
@@ -95,7 +96,7 @@ func TestDiscardFormatter(t *testing.T) {
 	var out, termout, termerr bytes.Buffer
 	logrus.SetOutput(&out)
 	logrus.SetFormatter(DiscardFormatter{})
-	term.DefaultTerm = term.NewTerm(&termout, &termerr)
+	term.DefaultTerm = term.NewTerm(os.Stdin, &termout, &termerr)
 
 	logrus.Debug("debug message")
 	logrus.Info("info message")

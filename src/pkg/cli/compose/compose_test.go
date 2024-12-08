@@ -199,7 +199,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	})
 
 	var warnings bytes.Buffer
-	term.DefaultTerm = term.NewTerm(&warnings, &warnings)
+	term.DefaultTerm = term.NewTerm(os.Stdin, &warnings, &warnings)
 
 	loader := NewLoader(WithPath("../../../tests/compose-go-warn/compose.yaml"))
 	_, err := loader.LoadProject(context.Background())
