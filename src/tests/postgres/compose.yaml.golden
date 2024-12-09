@@ -4,7 +4,8 @@ services:
     image: postgres
     networks:
       default: null
-    x-defang-postgres: null
+    x-defang-postgres:
+      allow-downtime: true
   "y":
     image: example
     networks:

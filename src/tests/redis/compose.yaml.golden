@@ -4,7 +4,8 @@ services:
     image: redis
     networks:
       default: null
-    x-defang-redis: null
+    x-defang-redis:
+      allow-downtime: true
   "y":
     image: example
     networks:

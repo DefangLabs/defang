@@ -2,11 +2,10 @@ services:
   x:
     image: redis
     x-defang-redis:
-
+      allow-downtime: true
   y:
     image: example
     x-defang-redis:
 
   z:
     image: redis
-
