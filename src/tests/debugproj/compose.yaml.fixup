@@ -1,5 +1,5 @@
-[
-  {
+{
+  "failing": {
     "build": {
       "context": "./app",
       "dockerfile": "Dockerfile"
@@ -10,7 +10,7 @@
       "default": null
     }
   },
-  {
+  "ok": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile"
@@ -21,4 +21,4 @@
       "default": null
     }
   }
-]
+}

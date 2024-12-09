@@ -1,5 +1,5 @@
-[
-  {
+{
+  "averylongservicenamethatisdefinitelytoolongthatwillcauseanerror": {
     "command": null,
     "entrypoint": null,
     "image": "alpine",
@@ -7,4 +7,4 @@
       "default": null
     }
   }
-]
+}

@@ -1,5 +1,5 @@
-[
-  {
+{
+  "nginx": {
     "command": null,
     "deploy": {
       "replicas": 1,
@@ -28,4 +28,4 @@
     ],
     "restart": "unless-stopped"
   }
-]
+}

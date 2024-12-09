@@ -1,5 +1,5 @@
-[
-  {
+{
+  "bad-service": {
     "command": null,
     "entrypoint": null,
     "image": "somedb:latest",
@@ -15,7 +15,7 @@
       }
     ]
   },
-  {
+  "env-in-config": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -26,7 +26,7 @@
       "default": null
     }
   },
-  {
+  "fixup-args": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile",
@@ -40,7 +40,7 @@
       "default": null
     }
   },
-  {
+  "mistral": {
     "command": null,
     "entrypoint": null,
     "image": "mistral:latest",
@@ -55,7 +55,7 @@
       }
     ]
   },
-  {
+  "ui": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -67,7 +67,7 @@
       "default": null
     }
   },
-  {
+  "use-bad-service": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -78,4 +78,4 @@
       "default": null
     }
   }
-]
+}

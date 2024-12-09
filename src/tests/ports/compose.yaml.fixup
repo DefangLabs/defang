@@ -1,5 +1,5 @@
-[
-  {
+{
+  "long": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -15,7 +15,7 @@
       }
     ]
   },
-  {
+  "long-published": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -32,7 +32,7 @@
       }
     ]
   },
-  {
+  "short": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -48,7 +48,7 @@
       }
     ]
   },
-  {
+  "short-published": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -65,7 +65,7 @@
       }
     ]
   },
-  {
+  "short-udp": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -80,7 +80,7 @@
       }
     ]
   },
-  {
+  "short-udp-published": {
     "command": null,
     "entrypoint": null,
     "image": "bogus",
@@ -96,4 +96,4 @@
       }
     ]
   }
-]
+}
