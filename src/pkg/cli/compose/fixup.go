@@ -104,7 +104,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 				delete(svccfg.Extensions, "x-defang-redis")
 			} else if len(svccfg.Ports) == 0 {
-				// HACK: we must have at least one host port to get a CNAME for the service
+				// HACK: we must have at least one host port to get a CNAME for the service https://redis.io/docs/latest/operate/oss_and_stack/management/config/
 				var port uint32 = 6379
 				// Check entrypoint or command for --port argument
 				args := append(svccfg.Entrypoint, svccfg.Command...)
@@ -131,7 +131,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			} else if len(svccfg.Ports) == 0 {
 				// HACK: we must have at least one host port to get a CNAME for the service
 				var port uint32 = 5432
-				// Check PGPORT environment variable for port number
+				// Check PGPORT environment variable for port number https://www.postgresql.org/docs/current/libpq-envars.html
 				if pgport := svccfg.Environment["PGPORT"]; pgport != nil {
 					if p, err := strconv.ParseUint(*pgport, 10, 16); err != nil {
 						return err
