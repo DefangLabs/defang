@@ -1,5 +1,5 @@
-[
-  {
+{
+  "build1": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile",
@@ -15,7 +15,7 @@
       "default": null
     }
   },
-  {
+  "build2": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile",
@@ -31,4 +31,4 @@
       "default": null
     }
   }
-]
+}

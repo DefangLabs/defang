@@ -1,19 +1,36 @@
 name: redis
 services:
-  x:
+  no-ext:
+    image: redis
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
+  no-ports:
     image: redis
     networks:
       default: null
     x-defang-redis: null
-  "y":
+  with-ext:
+    image: redis
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
+    x-defang-redis: null
+  wrong-image:
     image: example
     networks:
       default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
     x-defang-redis: null
-  z:
-    image: redis
-    networks:
-      default: null
 networks:
   default:
     name: redis_default

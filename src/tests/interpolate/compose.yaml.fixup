@@ -1,5 +1,5 @@
-[
-  {
+{
+  "interpolate": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -17,4 +17,4 @@
       "default": null
     }
   }
-]
+}

@@ -1,5 +1,5 @@
-[
-  {
+{
+  "cmd-shell": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -22,7 +22,7 @@
       }
     ]
   },
-  {
+  "curl": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -46,7 +46,7 @@
       }
     ]
   },
-  {
+  "flask1": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -72,7 +72,7 @@
       }
     ]
   },
-  {
+  "flask2": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -97,7 +97,7 @@
       }
     ]
   },
-  {
+  "none": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -122,7 +122,7 @@
       }
     ]
   },
-  {
+  "wget": {
     "command": null,
     "entrypoint": null,
     "healthcheck": {
@@ -147,4 +147,4 @@
       }
     ]
   }
-]
+}
