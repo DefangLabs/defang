@@ -59,7 +59,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient client.GrpcClient) (client.Provider, error) {
 	var provider client.Provider
-	term.Debugf("Creating provider %q", providerID)
+	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
 		provider = aws.NewByocProvider(ctx, grpcClient.TenantName)
