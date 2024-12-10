@@ -13,6 +13,14 @@ services:
     networks:
       default: null
     x-defang-redis: null
+  no-ports-override:
+    command:
+      - --port
+      - "6380"
+    image: redis
+    networks:
+      default: null
+    x-defang-redis: null
   with-ext:
     image: redis
     networks:

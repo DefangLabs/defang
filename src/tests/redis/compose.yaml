@@ -22,3 +22,8 @@ services:
   no-ports:
     image: redis
     x-defang-redis:
+
+  no-ports-override:
+    image: redis
+    x-defang-redis:
+    command: ["--port", "6380"]

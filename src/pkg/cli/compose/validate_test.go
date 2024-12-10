@@ -39,7 +39,7 @@ func TestValidateService(t *testing.T) {
 		},
 		{
 			name:    "ingress with UDP",
-			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: "ingress", Protocol: Protocol_UDP}}},
+			service: &types.ServiceConfig{Name: "test", Image: "asdf", Ports: []types.ServicePortConfig{{Target: 53, Mode: "ingress", Protocol: "udp"}}},
 			wantErr: "`mode: ingress` is not supported by `protocol: udp`",
 		},
 		{
@@ -60,7 +60,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "echo 1"},
 				},
@@ -72,7 +72,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "echo", "1"},
 				},
@@ -84,7 +84,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "curl", "1"},
 				},
@@ -107,7 +107,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD-SHELL", "echo 1"},
 				},
@@ -119,7 +119,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"NONE"},
 				},
@@ -142,7 +142,7 @@ func TestValidateService(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "curl", "http://localhost"},
 				},
