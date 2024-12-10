@@ -20,7 +20,7 @@ func fixupPort(port *composeTypes.ServicePortConfig) {
 	case "":
 		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
 		fallthrough
-	case "ingress":
+	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
 		if port.Protocol != "udp" {
 			if port.Published != "" {
@@ -33,8 +33,8 @@ func fixupPort(port *composeTypes.ServicePortConfig) {
 			break
 		}
 		term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
-		port.Mode = "host"
-	case "host":
+		port.Mode = Mode_HOST
+	case Mode_HOST:
 		// no-op
 	default:
 		panic(fmt.Sprintf("port %d: 'mode' should have been validated to be one of [host ingress] but got: %v", port.Target, port.Mode))

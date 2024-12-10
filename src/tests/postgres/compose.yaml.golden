@@ -1,19 +1,36 @@
 name: postgres
 services:
-  x:
+  no-ext:
+    image: postgres
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
+  no-ports:
     image: postgres
     networks:
       default: null
     x-defang-postgres: null
-  "y":
+  with-ext:
+    image: postgres
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
+    x-defang-postgres: null
+  wrong-image:
     image: example
     networks:
       default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
     x-defang-postgres: null
-  z:
-    image: postgres
-    networks:
-      default: null
 networks:
   default:
     name: postgres_default

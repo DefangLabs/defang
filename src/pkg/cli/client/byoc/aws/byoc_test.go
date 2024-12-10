@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -23,9 +22,9 @@ import (
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
-	port80 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 80}
-	port8080 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 8080}
-	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
+	port80 := &composeTypes.ServicePortConfig{Mode: "ingress", Target: 80}
+	port8080 := &composeTypes.ServicePortConfig{Mode: "ingress", Target: 8080}
+	hostModePort := &composeTypes.ServicePortConfig{Mode: "host", Target: 80}
 	tests := []struct {
 		ProjectName string
 		TenantName  types.TenantName

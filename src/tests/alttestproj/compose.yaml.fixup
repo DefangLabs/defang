@@ -1,5 +1,5 @@
-[
-  {
+{
+  "dfnx": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile"
@@ -20,4 +20,4 @@
     },
     "restart": "unless-stopped"
   }
-]
+}

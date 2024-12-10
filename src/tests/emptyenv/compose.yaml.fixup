@@ -1,5 +1,5 @@
-[
-  {
+{
+  "emptyenv": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile",
@@ -17,4 +17,4 @@
       "default": null
     }
   }
-]
+}

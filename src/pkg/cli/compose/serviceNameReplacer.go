@@ -73,7 +73,7 @@ func (s *ServiceNameReplacer) HasServiceName(name string) bool {
 }
 
 func isHostPort(port composeTypes.ServicePortConfig) bool {
-	return port.Mode == "host"
+	return port.Mode == Mode_HOST
 }
 
 func makeServiceNameRegex(quotedServiceNames []string) *regexp.Regexp {

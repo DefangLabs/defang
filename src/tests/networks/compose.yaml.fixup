@@ -1,5 +1,5 @@
-[
-  {
+{
+  "service1": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -7,7 +7,7 @@
       "invalid-network-name": {}
     }
   },
-  {
+  "service2": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -15,7 +15,7 @@
       "public": {}
     }
   },
-  {
+  "service3": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -23,7 +23,7 @@
       "public": null
     }
   },
-  {
+  "service4": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -31,4 +31,4 @@
       "private": null
     }
   }
-]
+}

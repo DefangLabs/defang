@@ -1,5 +1,5 @@
-[
-  {
+{
+  "service1": {
     "command": null,
     "entrypoint": null,
     "environment": {
@@ -10,4 +10,4 @@
       "default": null
     }
   }
-]
+}
