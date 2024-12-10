@@ -296,10 +296,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if !strings.HasSuffix(repo, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
-		// Ensure the service has a valid host port
-		if !slices.ContainsFunc(svccfg.Ports, isHostPort) {
-			return fmt.Errorf("service %q: managed Redis service should expose a host port", svccfg.Name)
-		}
 	}
 
 	if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
@@ -307,10 +303,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		repo := strings.SplitN(svccfg.Image, ":", 2)[0]
 		if !strings.HasSuffix(repo, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
-		}
-		// Ensure the service has a valid host port
-		if !slices.ContainsFunc(svccfg.Ports, isHostPort) {
-			return fmt.Errorf("service %q: managed Postgres service should expose a host port", svccfg.Name)
 		}
 	}
 

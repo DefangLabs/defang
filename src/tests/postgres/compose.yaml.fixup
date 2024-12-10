@@ -20,7 +20,14 @@
     "image": "postgres",
     "networks": {
       "default": null
-    }
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "published": "5432"
+      }
+    ]
   },
   "with-ext": {
     "command": null,

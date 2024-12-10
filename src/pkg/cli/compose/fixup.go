@@ -102,6 +102,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
 				term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 				delete(svccfg.Extensions, "x-defang-redis")
+			} else if len(svccfg.Ports) == 0 {
+				term.Debugf("service %q: adding default redis port", svccfg.Name)
+				svccfg.Ports = []types.ServicePortConfig{{Target: 6379, Published: "6379", Mode: Mode_HOST}}
 			}
 		}
 
@@ -110,6 +113,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
 				term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 				delete(svccfg.Extensions, "x-defang-postgres")
+			} else if len(svccfg.Ports) == 0 {
+				term.Debugf("service %q: adding default postgres port", svccfg.Name)
+				svccfg.Ports = []types.ServicePortConfig{{Target: 5432, Published: "5432", Mode: Mode_HOST}}
 			}
 		}
 

@@ -4,4 +4,3 @@
  ! service "with-ext": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "wrong-image": managed Redis service should use a redis image
  ! service "wrong-image": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
-service "no-ports": managed Redis service should expose a host port
