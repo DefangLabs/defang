@@ -455,7 +455,7 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return map[string]string{
+	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantName,
@@ -468,6 +468,12 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}
+
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "enabled no color mode"
+	}
+
+	return env
 }
 
 type cdCmd struct {
