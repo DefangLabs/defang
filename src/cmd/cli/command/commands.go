@@ -338,8 +338,7 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(true)
 		}
 
-		cwd, _ := cmd.Flags().GetString("cwd")
-		if cwd != "" {
+		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
 			// Change directory before running the command
 			if err = os.Chdir(cwd); err != nil {
 				return err

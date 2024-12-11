@@ -57,8 +57,8 @@ func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.R
 
 func (m *mockFabricService) GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[defangv1.Version], error) {
 	return connect_go.NewResponse(&defangv1.Version{
-		Fabric: "1.0.0-test",
-		CliMin: "1.0.0-test",
+		Fabric: "0.0.0-test",
+		CliMin: "0.0.0-test",
 	}), nil
 }
 
@@ -138,26 +138,27 @@ func TestVersion(t *testing.T) {
 }
 
 func TestCommandGates(t *testing.T) {
-	mockService := &mockFabricService{canIUseResponse: defangv1.CanIUseResponse{}}
+	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	type cmdPermTest struct {
+	t.Setenv("AWS_REGION", "us-test-2")
+
+	if err := os.Chdir("../../../testdata/empty"); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+
+	testData := []struct {
 		name          string
 		command       []string
 		accessAllowed bool
 		wantError     string
-	}
-	type cmdPermTests []cmdPermTest
-
-	t.Setenv("AWS_REGION", "us-test-2")
-
-	testData := cmdPermTests{
+	}{
 		{
 			name:          "compose up - aws - no access",
-			command:       []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
+			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
 			accessAllowed: false,
 			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
 		},

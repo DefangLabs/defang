@@ -67,7 +67,7 @@ func testRunCompose(t *testing.T, f func(t *testing.T, path string)) {
 	t.Helper()
 
 	composeRegex := regexp.MustCompile(`^(?i)(docker-)?compose.ya?ml$`)
-	err := filepath.WalkDir("../../../tests", func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir("../../../testdata", func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !composeRegex.MatchString(d.Name()) {
 			return err
 		}
