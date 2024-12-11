@@ -848,8 +848,13 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
+		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -868,13 +873,14 @@ var deleteCmd = &cobra.Command{
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 		tailParams := cli.TailOptions{
-			Etag:    etag,
-			Since:   since,
-			Raw:     false,
-			Verbose: verbose,
-			LogType: logs.LogTypeAll,
+			ProjectName: projectName,
+			Etag:        etag,
+			Since:       since,
+			Raw:         false,
+			Verbose:     verbose,
+			LogType:     logs.LogTypeAll,
 		}
-		return cli.Tail(cmd.Context(), loader, provider, tailParams)
+		return cli.Tail(cmd.Context(), provider, tailParams)
 	},
 }
 
@@ -1060,19 +1066,25 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
 
-		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), loader, provider, cli.TailOptions{
-			Etag:    resp.Etag,
-			Verbose: verbose,
-			LogType: logs.LogTypeAll,
+		return cli.Tail(cmd.Context(), provider, cli.TailOptions{
+			ProjectName: project.Name,
+			Etag:        resp.Etag,
+			Verbose:     verbose,
+			LogType:     logs.LogTypeAll,
 		})
 	},
 }

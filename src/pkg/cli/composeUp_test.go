@@ -67,10 +67,9 @@ func TestComposeUp(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ml := client.MockLoader{Project: proj}
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := deployMock{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(context.Background(), ml, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(context.Background(), proj, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
