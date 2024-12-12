@@ -22,11 +22,11 @@ func fixupPort(port *composeTypes.ServicePortConfig) {
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
-		if port.Protocol != "udp" {
+		if port.Protocol != Protocol_UDP {
 			if port.Published != "" {
 				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
-			if (port.Protocol == "tcp" || port.Protocol == "udp") && port.AppProtocol != "http" {
+			if (port.Protocol == Protocol_TCP || port.Protocol == Protocol_UDP) && port.AppProtocol != "http" {
 				// term.Warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
 				port.AppProtocol = "http"
 			}
