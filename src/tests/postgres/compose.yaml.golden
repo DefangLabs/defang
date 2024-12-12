@@ -12,8 +12,7 @@ services:
     image: postgres
     networks:
       default: null
-    x-defang-postgres:
-      allow-downtime: true
+    x-defang-postgres: null
   with-ext:
     image: postgres
     networks:
@@ -22,7 +21,8 @@ services:
       - mode: host
         target: 5432
         protocol: tcp
-    x-defang-postgres: null
+    x-defang-postgres:
+      allow-downtime: true
   wrong-image:
     image: example
     networks:
