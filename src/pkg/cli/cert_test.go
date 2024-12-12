@@ -10,9 +10,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type tryResult struct {
@@ -234,5 +240,74 @@ func TestHttpClient(t *testing.T) {
 	resp.Body.Close()
 	if mr.calls != 2 {
 		t.Fatalf("expected 2nd dns lookup after cache expiry, but got %v", mr.calls)
+	}
+}
+
+func TestGetDomainTargets(t *testing.T) {
+	tests := []struct {
+		name        string
+		serviceInfo *defangv1.ServiceInfo
+		service     compose.ServiceConfig
+		expected    []string
+	}{
+		{
+			name: "use only lb dns name when present",
+			serviceInfo: &defangv1.ServiceInfo{
+				LbDnsName:  "aws.alb.com",
+				PublicFqdn: "app.defang.app",
+				Endpoints:  []string{"8080--app.defang.app", "8081--app.defang.app"},
+			},
+			service: compose.ServiceConfig{
+				Ports: []composetypes.ServicePortConfig{
+					{Mode: compose.Mode_INGRESS},
+					{Mode: compose.Mode_INGRESS},
+				},
+			},
+			expected: []string{"aws.alb.com"},
+		},
+		{
+			name: "use only public fqdn and end points when lb dns name is empty",
+			serviceInfo: &defangv1.ServiceInfo{
+				LbDnsName:  "",
+				PublicFqdn: "app.defang.app",
+				Endpoints:  []string{"8080--app.defang.app", "8081--app.defang.app"},
+			},
+			service: compose.ServiceConfig{
+				Ports: []composetypes.ServicePortConfig{
+					{Mode: compose.Mode_INGRESS},
+					{Mode: compose.Mode_INGRESS},
+				},
+			},
+			expected: []string{"app.defang.app", "8080--app.defang.app", "8081--app.defang.app"},
+		},
+		{
+			name: "only use endpoint of ingress ports",
+			serviceInfo: &defangv1.ServiceInfo{
+				LbDnsName:  "",
+				PublicFqdn: "app.defang.app",
+				Endpoints:  []string{"8080--app.defang.app", "8081--app.defang.app"},
+			},
+			service: compose.ServiceConfig{
+				Ports: []composetypes.ServicePortConfig{
+					{Mode: compose.Mode_INGRESS},
+					{Mode: compose.Mode_HOST},
+				},
+			},
+			expected: []string{"app.defang.app", "8080--app.defang.app"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targets := getDomainTargets(tt.serviceInfo, tt.service)
+			if len(targets) != len(tt.expected) {
+				t.Errorf("expected %v targets, got %v", len(tt.expected), len(targets))
+			}
+			sort.Strings(targets)
+			sort.Strings(tt.expected)
+			if !slices.Equal(targets, tt.expected) {
+				t.Errorf("expected %v, got %v", tt.expected, targets)
+			}
+		})
 	}
 }
