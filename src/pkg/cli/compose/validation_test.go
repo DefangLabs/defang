@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -53,7 +54,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 	testRunCompose(t, func(t *testing.T, path string) {
 		logs := new(bytes.Buffer)
-		term.DefaultTerm = term.NewTerm(logs, logs)
+		term.DefaultTerm = term.NewTerm(os.Stdin, logs, logs)
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}

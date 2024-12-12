@@ -1,5 +1,5 @@
-[
-  {
+{
+  "x": {
     "command": null,
     "entrypoint": null,
     "image": "blah",
@@ -7,7 +7,7 @@
       "default": null
     }
   },
-  {
+  "y": {
     "command": null,
     "entrypoint": null,
     "image": "blah",
@@ -15,4 +15,4 @@
       "default": null
     }
   }
-]
+}

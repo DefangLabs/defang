@@ -3,8 +3,6 @@ package compose
 import (
 	"context"
 	"encoding/json"
-	"slices"
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -23,13 +21,10 @@ func TestFixup(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		var services []composeTypes.ServiceConfig
+		services := map[string]composeTypes.ServiceConfig{}
 		for _, svc := range proj.Services {
-			services = append(services, svc)
+			services[svc.Name] = svc
 		}
-
-		// The order of the services is not guaranteed, so we sort the services before comparing
-		slices.SortFunc(services, func(i, j composeTypes.ServiceConfig) int { return strings.Compare(i.Name, j.Name) })
 
 		// Convert the protobuf services to pretty JSON for comparison (YAML would include all the zero values)
 		actual, err := json.MarshalIndent(services, "", "  ")

@@ -1,5 +1,5 @@
-[
-  {
+{
+  "app": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile"
@@ -14,4 +14,4 @@
     },
     "restart": "unless-stopped"
   }
-]
+}

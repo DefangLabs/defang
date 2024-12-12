@@ -257,12 +257,18 @@ func SetupCommands(ctx context.Context, version string) {
 	configCmd.AddCommand(configListCmd)
 
 	RootCmd.AddCommand(configCmd)
-	RootCmd.AddCommand(restartCmd)
 
 	RootCmd.AddCommand(setupComposeCommand())
 	// Add up/down commands to the root as well
-	RootCmd.AddCommand(makeComposeDownCmd())
-	RootCmd.AddCommand(makeComposeUpCmd())
+	down := makeComposeDownCmd()
+	down.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(down)
+	up := makeComposeUpCmd()
+	up.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(up)
+	restart := makeComposeRestartCmd()
+	restart.Hidden = true // hidden from top-level menu
+	RootCmd.AddCommand(restart)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
@@ -515,7 +521,7 @@ var generateCmd = &cobra.Command{
 					Description: func(value string, i int) string {
 						return sampleTitles[i]
 					},
-				}, &sample); err != nil {
+				}, &sample, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 					return err
 				}
 				if sample == generateWithAI {
@@ -523,7 +529,7 @@ var generateCmd = &cobra.Command{
 						Message: "Choose the language you'd like to use:",
 						Options: cli.SupportedLanguages,
 						Help:    "The project code will be in the language you choose here.",
-					}, &language); err != nil {
+					}, &language, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 						return err
 					}
 					sample = ""
@@ -574,7 +580,7 @@ var generateCmd = &cobra.Command{
 		}{}
 
 		// ask the remaining questions
-		err := survey.Ask(qs, &prompt)
+		err := survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
 		if err != nil {
 			return err
 		}
@@ -756,7 +762,7 @@ var configSetCmd = &cobra.Command{
 				Help:    "The value will be stored securely and cannot be retrieved later.",
 			}
 
-			err := survey.AskOne(sensitivePrompt, &value)
+			err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
 			if err != nil {
 				return err
 			}
@@ -896,16 +902,6 @@ var deploymentsListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		return cli.DeploymentsList(cmd.Context(), loader, client)
-	},
-}
-
-var restartCmd = &cobra.Command{
-	Use:         "restart SERVICE...",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.MinimumNArgs(1),
-	Short:       "Restart one or more services",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("command 'restart' is deprecated, use 'up' instead")
 	},
 }
 
@@ -1144,7 +1140,7 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 			var confirm bool
 			err := survey.AskOne(&survey.Confirm{
 				Message: "Continue with project: " + projectName + "?",
-			}, &nonInteractive)
+			}, &nonInteractive, survey.WithStdio(term.DefaultTerm.Stdio()))
 			if err == nil && !confirm {
 				os.Exit(1)
 			}
@@ -1259,9 +1255,13 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
 	var projName string
 	if loader != nil {
-		if name, err := loader.LoadProjectName(ctx); err != nil {
+		var err error
+		projName, err = loader.LoadProjectName(ctx)
+		if err != nil {
 			term.Warn("Unable to load project:", err)
-		} else if name != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+		}
+
+		if projName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
 			if err != nil {
 				term.Warn("Unable to get selected provider:", err)
@@ -1269,7 +1269,6 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 				providerID.SetEnumValue(resp.Provider)
 				return "stored preference", nil
 			}
-			projName = name
 		}
 	}
 
@@ -1294,7 +1293,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		Description: func(value string, i int) string {
 			return providerDescription[cliClient.ProviderID(value)]
 		},
-	}, &optionValue); err != nil {
+	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", err
 	}
 	if err := providerID.Set(optionValue); err != nil {
