@@ -532,7 +532,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 
 func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVariableDefinition {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return []*godo.AppVariableDefinition{
+	env := []*godo.AppVariableDefinition{
 		{
 			Key:   "DEFANG_PREFIX",
 			Value: byoc.DefangPrefix,
@@ -614,6 +614,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Type:  godo.AppVariableType_Secret,
 		},
 	}
+	if !term.StdoutCanColor() {
+		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
+	}
+	return env
 }
 
 func (b *ByocDo) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
