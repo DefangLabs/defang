@@ -198,7 +198,7 @@ func TestManagedStoreParams(t *testing.T) {
 		{
 			name:      "false value",
 			extension: false,
-			errors:    []string{"to not use managed storage remove the 'x-defang-postgres' or 'x-defang-redis' fields"},
+			errors:    []string{},
 		},
 		{
 			name: "invalid downtime",

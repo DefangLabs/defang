@@ -27,14 +27,6 @@ func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
 }
 
-type ErrManagedStoreParam string
-
-func (e ErrManagedStoreParam) Error() string {
-	return string(e)
-}
-
-type PostgresProps map[string]any
-
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
 func ValidateProject(project *composeTypes.Project) error {
@@ -430,22 +422,18 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 }
 
 func ValidateManagedStore(managedStore any) error {
-	if managedStore == nil || managedStore == true {
+	if managedStore == nil || managedStore == true || managedStore == false {
 		return nil
-	}
-
-	if managedStore == false {
-		return ErrManagedStoreParam("to not use managed storage remove the 'x-defang-postgres' or 'x-defang-redis' fields")
 	}
 
 	postgresProps, ok := managedStore.(map[string]any)
 	if !ok {
-		return ErrManagedStoreParam("expected parameters in managed storage definition field")
+		return errors.New("expected parameters in managed storage definition field")
 	}
 
 	if downtime, ok := postgresProps["allow-downtime"]; ok {
 		if _, ok := downtime.(bool); !ok {
-			return ErrManagedStoreParam("'allow-downtime' must be a boolean")
+			return errors.New("'allow-downtime' must be a boolean")
 		}
 	}
 
