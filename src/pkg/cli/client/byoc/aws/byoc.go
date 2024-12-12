@@ -470,7 +470,7 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 	}
 
 	if !term.StdoutCanColor() {
-		env["NO_COLOR"] = "enabled no color mode"
+		env["NO_COLOR"] = "1"
 	}
 
 	return env

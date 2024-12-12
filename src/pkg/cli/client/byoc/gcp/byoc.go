@@ -320,7 +320,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	}
 
 	if !term.StdoutCanColor() {
-		env["NO_COLOR"] = "enabled no color mode"
+		env["NO_COLOR"] = "1"
 	}
 
 	if cmd.DelegateDomain != "" {

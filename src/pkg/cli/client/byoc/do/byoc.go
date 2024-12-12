@@ -615,7 +615,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		},
 	}
 	if !term.StdoutCanColor() {
-		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "enabled no color mode"})
+		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
 	}
 	return env
 }
