@@ -67,7 +67,7 @@ func (d *DoApp) GetBucketName(ctx context.Context, s3Client *s3.Client) (string,
 	return bucketName, nil
 }
 
-func (d *DoApp) SetUp(ctx context.Context) error {
+func (d *DoApp) SetUpBucket(ctx context.Context) error {
 	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return err
