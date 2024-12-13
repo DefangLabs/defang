@@ -44,13 +44,13 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
-	allowedToUseProvider bool
-	canIUseResponse      defangv1.CanIUseResponse
+	canIUseErrorText string
+	canIUseResponse  defangv1.CanIUseResponse
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
-	if !m.allowedToUseProvider {
-		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
+	if m.canIUseErrorText != "" {
+		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New(m.canIUseErrorText))
 	}
 	return connect_go.NewResponse(&m.canIUseResponse), nil
 }
@@ -145,10 +145,10 @@ func TestCommandGates(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	type cmdPermTest struct {
-		name          string
-		command       []string
-		accessAllowed bool
-		wantError     string
+		name      string
+		command   []string
+		errorText string
+		wantError error
 	}
 	type cmdPermTests []cmdPermTest
 
@@ -156,46 +156,46 @@ func TestCommandGates(t *testing.T) {
 
 	testData := cmdPermTests{
 		{
-			name:          "compose up - aws - no access",
-			command:       []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "compose up - aws - no access",
+			command:   []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:          "compose up - defang - has access",
-			command:       []string{"compose", "up", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
+			name:      "compose up - defang - has access",
+			command:   []string{"compose", "up", "--provider=defang", "--dry-run"},
+			errorText: "",
+			wantError: nil,
 		},
 		{
-			name:          "compose down - aws - no access",
-			command:       []string{"compose", "down", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "compose down - aws - no access",
+			command:   []string{"compose", "down", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: nil,
 		},
 		{
-			name:          "config set - aws - no access",
-			command:       []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "config set - aws - no access",
+			command:   []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:          "config rm - aws - no access",
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "config rm - aws - no access",
+			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:          "config rm - defang - has access",
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
+			name:      "config rm - defang - has access",
+			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
+			errorText: "",
+			wantError: nil,
 		},
 		{
-			name:          "delete service - aws - no access",
-			command:       []string{"delete", "abc", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "delete service - aws - no access",
+			command:   []string{"delete", "abc", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 	}
 
@@ -203,20 +203,19 @@ func TestCommandGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
 			pkg.SsmClientOverride = &MockSsmClient{}
-			mockService.allowedToUseProvider = tt.accessAllowed
+			mockService.canIUseErrorText = tt.errorText
 
 			err := testCommand(tt.command, server.URL)
 
-			if err != nil && tt.wantError == "" {
+			if err != nil && tt.wantError == nil {
 				if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
 					t.Fatalf("Unexpected error: %v", err)
 				}
 			}
 
-			if tt.wantError != "" {
-				var errNoPermission = ErrNoPermission(tt.wantError)
-				if !errors.As(err, &errNoPermission) || !strings.Contains(err.Error(), tt.wantError) {
-					t.Fatalf("Expected errNoPermission, got: %v", err)
+			if tt.wantError != nil {
+				if err.Error() != tt.wantError.Error() {
+					t.Fatalf("Expected error: %v, got: %v", tt.wantError.Error(), err)
 				}
 			}
 		})
