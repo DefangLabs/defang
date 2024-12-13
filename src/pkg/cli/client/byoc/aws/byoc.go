@@ -930,13 +930,13 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-type awsObj struct{ obj s3types.Object }
+type s3Obj struct{ obj s3types.Object }
 
-func (a awsObj) Name() string {
+func (a s3Obj) Name() string {
 	return *a.obj.Key
 }
 
-func (a awsObj) Size() int64 {
+func (a s3Obj) Size() int64 {
 	return *a.obj.Size
 }
 
@@ -955,6 +955,10 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	}
 
 	s3client := s3.NewFromConfig(cfg)
+	return ListPulumiStacks(ctx, s3client, bucketName)
+}
+
+func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName string) ([]string, error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	term.Debug("Listing stacks in bucket:", bucketName)
@@ -970,7 +974,7 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		if obj.Key == nil || obj.Size == nil {
 			continue
 		}
-		stack, err := b.ParsePulumiStackObject(ctx, awsObj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+		stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
 			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
 				Key:    &path,
