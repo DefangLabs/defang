@@ -415,8 +415,17 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 		term.Debugf("Deployment phase: %s", deploymentInfo.GetPhase())
 		switch deploymentInfo.GetPhase() {
-		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy, godo.DeploymentPhase_Deploying:
+		case godo.DeploymentPhase_PendingBuild, godo.DeploymentPhase_PendingDeploy:
 			// Do nothing; check again in 10 seconds
+
+		case godo.DeploymentPhase_Deploying:
+			if logType.Has(logs.LogTypeBuild) {
+				logs, _, err := b.client.Apps.GetLogs(ctx, appID, deploymentID, appPlatform.CdName, godo.AppLogTypeDeploy, true, 50)
+				if err != nil {
+					return nil, err
+				}
+				return newByocServerStream(ctx, logs.LiveURL, req.Etag)
+			}
 
 		case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
 			if logType.Has(logs.LogTypeBuild) {
