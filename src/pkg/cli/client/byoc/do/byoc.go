@@ -420,6 +420,7 @@ func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.
 
 		case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
 			if logType.Has(logs.LogTypeBuild) {
+				// TODO: provide component name
 				logs, _, err := b.client.Apps.GetLogs(ctx, appID, deploymentID, "", godo.AppLogTypeDeploy, true, 50)
 				if err != nil {
 					return nil, err

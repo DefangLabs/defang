@@ -167,7 +167,8 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
 		term.Debugf("Updating existing CD app")
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
-			Spec: appJobSpec,
+			Spec:                    appJobSpec,
+			UpdateAllSourceVersions: true, // force update of the CD image
 		})
 
 		if err != nil {
