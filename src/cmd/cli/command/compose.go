@@ -158,17 +158,16 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-			tailParams := cli.TailOptions{
-				ProjectName: project.Name,
-				Etag:        deploy.Etag,
-				Since:       since,
-				Raw:         false,
-				Verbose:     verbose,
-				LogType:     logs.LogTypeAll,
-			}
 
 			// blocking call to tail
-			if err := cli.Tail(tailCtx, provider, tailParams); err != nil {
+			tailOptions := cli.TailOptions{
+				Etag:    deploy.Etag,
+				Since:   since,
+				Raw:     false,
+				Verbose: verbose,
+				LogType: logs.LogTypeAll,
+			}
+			if err := cli.Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 				term.Debug("Tail stopped with", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -204,8 +203,8 @@ func makeComposeUpCmd() *cobra.Command {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}
-					tailParams.Verbose = true // show all logs for debugging
-					printDefangHint("To see the logs of the failed service, do:", tailParams.String())
+					tailOptions.Verbose = true // show all logs for debugging
+					printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 					return err
 				}
 			}
@@ -317,18 +316,14 @@ func makeComposeDownCmd() *cobra.Command {
 				{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
 				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 			}
-
-			endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
-			tailParams := cli.TailOptions{
-				ProjectName:        projectName,
+			tailOptions := cli.TailOptions{
 				Etag:               etag,
 				Since:              since,
-				EndEventDetectFunc: endLogDetectFunc,
+				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-
-			err = cli.Tail(cmd.Context(), provider, tailParams)
+			err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 			if err != nil {
 				return err
 			}
@@ -456,22 +451,20 @@ func makeComposeLogsCmd() *cobra.Command {
 				return err
 			}
 
-			tailOptions := cli.TailOptions{
-				ProjectName: projectName,
-				Services:    services,
-				Etag:        etag,
-				Since:       ts,
-				Raw:         raw,
-				Verbose:     verbose,
-				LogType:     *logType,
-			}
-
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
-			return cli.Tail(cmd.Context(), provider, tailOptions)
+			tailOptions := cli.TailOptions{
+				Services: services,
+				Etag:     etag,
+				Since:    ts,
+				Raw:      raw,
+				Verbose:  verbose,
+				LogType:  *logType,
+			}
+			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service")

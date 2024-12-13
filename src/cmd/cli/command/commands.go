@@ -871,15 +871,14 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
-		tailParams := cli.TailOptions{
-			ProjectName: projectName,
-			Etag:        etag,
-			Since:       since,
-			Raw:         false,
-			Verbose:     verbose,
-			LogType:     logs.LogTypeAll,
+
+		tailOptions := cli.TailOptions{
+			Etag:    etag,
+			Since:   since,
+			Verbose: verbose,
+			LogType: logs.LogTypeAll,
 		}
-		return cli.Tail(cmd.Context(), provider, tailParams)
+		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
 }
 
@@ -1079,12 +1078,13 @@ var cdPreviewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), provider, cli.TailOptions{
-			ProjectName: project.Name,
-			Etag:        resp.Etag,
-			Verbose:     verbose,
-			LogType:     logs.LogTypeAll,
-		})
+
+		tailOptions := cli.TailOptions{
+			Etag:    resp.Etag,
+			Verbose: verbose,
+			LogType: logs.LogTypeAll,
+		}
+		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
 	},
 }
 

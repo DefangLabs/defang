@@ -107,7 +107,7 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	err = Tail(ctx, p, TailOptions{ProjectName: proj.Name, Verbose: true}) // Output host
+	err = Tail(ctx, p, proj.Name, TailOptions{Verbose: true}) // Output host
 	t.Log(err)
 
 	expectedLogs := []string{
