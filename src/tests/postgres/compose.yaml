@@ -2,6 +2,7 @@ services:
   with-ext:
     image: postgres
     x-defang-postgres:
+      allow-downtime: true
     ports:
       - target: 5432
         mode: host
