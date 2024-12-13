@@ -370,6 +370,7 @@ func TestGetProvider(t *testing.T) {
 		ctx := context.Background()
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
+		os.Unsetenv("AWS_PROFILE")
 		t.Setenv("AWS_REGION", "us-west-2")
 		t.Setenv("DIGITALOCEAN_TOKEN", "test-token")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"someotherproj": defangv1.Provider_AWS}
