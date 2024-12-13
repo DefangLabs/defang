@@ -319,6 +319,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 	}
 
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "1"
+	}
+
 	if cmd.DelegateDomain != "" {
 		env["DOMAIN"] = b.GetProjectDomain(cmd.Project, cmd.DelegateDomain)
 	} else {

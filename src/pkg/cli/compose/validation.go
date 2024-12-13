@@ -16,7 +16,6 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/compose-spec/compose-go/v2/types"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -35,7 +34,7 @@ func ValidateProject(project *composeTypes.Project) error {
 		return errors.New("no project found")
 	}
 	// Copy the services map into a slice so we can sort them and have consistent output
-	var services []types.ServiceConfig
+	var services []composeTypes.ServiceConfig
 	for _, svccfg := range project.Services {
 		services = append(services, svccfg)
 	}
@@ -290,19 +289,25 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if _, ok := svccfg.Extensions["x-defang-redis"]; ok {
+	if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
 		// Ensure the image is a valid Redis image
 		repo := strings.SplitN(svccfg.Image, ":", 2)[0]
 		if !strings.HasSuffix(repo, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
+		if err = ValidateManagedStore(redisExtension); err != nil {
+			return err
+		}
 	}
 
-	if _, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+	if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
 		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
 		repo := strings.SplitN(svccfg.Image, ":", 2)[0]
 		if !strings.HasSuffix(repo, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
+		}
+		if err = ValidateManagedStore(postgresExtension); err != nil {
+			return err
 		}
 	}
 
@@ -413,6 +418,25 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 
 	if len(errMissingConfig) > 0 {
 		return errMissingConfig
+	}
+
+	return nil
+}
+
+func ValidateManagedStore(managedStore any) error {
+	if managedStore == nil || managedStore == true || managedStore == false {
+		return nil
+	}
+
+	postgresProps, ok := managedStore.(map[string]any)
+	if !ok {
+		return errors.New("expected parameters in managed storage definition field")
+	}
+
+	if downtime, ok := postgresProps["allow-downtime"]; ok {
+		if _, ok := downtime.(bool); !ok {
+			return errors.New("'allow-downtime' must be a boolean")
+		}
 	}
 
 	return nil

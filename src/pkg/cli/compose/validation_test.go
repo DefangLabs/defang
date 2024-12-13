@@ -16,6 +16,22 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
+type validationMockProvider struct {
+	client.Provider
+	configs []string
+}
+
+func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	return &defangv1.Secrets{
+		Names:   m.configs,
+		Project: "mock-project",
+	}, nil
+}
+
+func (m validationMockProvider) ServiceDNS(name string) string {
+	return "mock-" + name
+}
+
 func TestValidationAndConvert(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
@@ -157,18 +173,61 @@ func TestValidateConfig(t *testing.T) {
 	})
 }
 
-type validationMockProvider struct {
-	client.Provider
-	configs []string
-}
+func TestManagedStoreParams(t *testing.T) {
+	tests := []struct {
+		name      string
+		extension any
+		errors    []string
+	}{
+		{
+			name: "sanity check",
+			extension: map[string]any{
+				"allow-downtime": true,
+			},
+			errors: []string{},
+		},
+		{
+			name:      "empty",
+			extension: nil,
+			errors:    []string{},
+		},
+		{
+			name:      "true value",
+			extension: true,
+			errors:    []string{},
+		},
+		{
+			name:      "false value",
+			extension: false,
+			errors:    []string{},
+		},
+		{
+			name: "invalid downtime",
+			extension: map[string]any{
+				"allow-downtime": "abc",
+			},
+			errors: []string{"'allow-downtime' must be a boolean"},
+		},
+		{
+			name:      "no options",
+			extension: map[string]any{},
+			errors:    []string{},
+		},
+	}
 
-func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{
-		Names:   m.configs,
-		Project: "mock-project",
-	}, nil
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateManagedStore(tt.extension); err != nil {
+				if len(tt.errors) == 0 {
+					t.Fatalf("ValidateManagedStore() unexpected err = %v", err)
+				}
 
-func (m validationMockProvider) ServiceDNS(name string) string {
-	return "mock-" + name
+				for _, errMsg := range tt.errors {
+					if !strings.Contains(err.Error(), errMsg) {
+						t.Fatalf("ValidateManagedStore() = %v, want %v", err.Error(), tt.errors)
+					}
+				}
+			}
+		})
+	}
 }

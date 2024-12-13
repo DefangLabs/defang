@@ -29,7 +29,8 @@ services:
       - mode: host
         target: 6379
         protocol: tcp
-    x-defang-redis: null
+    x-defang-redis:
+      allow-downtime: true
   wrong-image:
     image: example
     networks:
