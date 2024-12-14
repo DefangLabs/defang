@@ -157,7 +157,7 @@ func TestCommandGates(t *testing.T) {
 	testData := cmdPermTests{
 		{
 			name:      "compose up - aws - no access",
-			command:   []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
+			command:   []string{"compose", "up", "--project-name=app", "--provider=aws"},
 			errorText: "no access to use aws provider",
 			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
@@ -168,8 +168,8 @@ func TestCommandGates(t *testing.T) {
 			wantError: nil,
 		},
 		{
-			name:      "compose down - aws - no access",
-			command:   []string{"compose", "down", "--provider=aws", "--dry-run"},
+			name:      "compose down - aws - always allow",
+			command:   []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: nil,
 		},
@@ -197,6 +197,12 @@ func TestCommandGates(t *testing.T) {
 			errorText: "no access to use aws provider",
 			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
+		{
+			name:      "whoami - no access",
+			command:   []string{"whoami", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: nil,
+		},
 	}
 
 	for _, tt := range testData {
@@ -207,14 +213,16 @@ func TestCommandGates(t *testing.T) {
 
 			err := testCommand(tt.command, server.URL)
 
-			if err != nil && tt.wantError == nil {
-				if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
-					t.Fatalf("Unexpected error: %v", err)
+			if tt.wantError == nil {
+				if err != nil {
+					if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
+						t.Fatalf("Unexpected error: %v", err)
+					}
 				}
-			}
-
-			if tt.wantError != nil {
-				if err.Error() != tt.wantError.Error() {
+			} else {
+				if err == nil {
+					t.Fatalf("Expected error: %v, got nil", tt.wantError)
+				} else if err.Error() != tt.wantError.Error() {
 					t.Fatalf("Expected error: %v, got: %v", tt.wantError.Error(), err)
 				}
 			}
@@ -290,7 +298,7 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := getProvider(ctx, nil)
+		p, err := getProvider(ctx, nil, false)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -318,7 +326,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, false)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -352,7 +360,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, false)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -391,7 +399,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := getProvider(ctx, loader, false)
 		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -425,7 +433,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := getProvider(ctx, loader, false)
 		if err != nil && err.Error() != "GCP_PROJECT_ID must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -447,7 +455,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := getProvider(ctx, loader, false)
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -467,7 +475,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, true)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -487,7 +495,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, true)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -509,7 +517,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, true)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -537,7 +545,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := getProvider(ctx, loader, true)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

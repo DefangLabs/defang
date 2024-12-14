@@ -124,7 +124,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := getProvider(ctx, nil)
+			provider, err := getProvider(ctx, nil, true)
 			if err != nil {
 				return err
 			}
@@ -435,7 +435,7 @@ var whoamiCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		nonInteractive = true // don't show provider prompt
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, false)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -463,7 +463,7 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -709,7 +709,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -786,7 +786,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -814,7 +814,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -832,7 +832,7 @@ var debugCmd = &cobra.Command{
 		etag, _ := cmd.Flags().GetString("etag")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -852,7 +852,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -933,7 +933,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		loader := configureLoader(cmd)
-		_, err := getProvider(cmd.Context(), loader)
+		_, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -970,7 +970,7 @@ var cdDestroyCmd = &cobra.Command{
 	Short: "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -985,7 +985,7 @@ var cdDownCmd = &cobra.Command{
 	Short: "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -1000,7 +1000,7 @@ var cdRefreshCmd = &cobra.Command{
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -1015,7 +1015,7 @@ var cdCancelCmd = &cobra.Command{
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -1032,7 +1032,7 @@ var cdTearDownCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -1050,7 +1050,7 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, false)
 		if err != nil {
 			return err
 		}
@@ -1069,7 +1069,7 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
@@ -1173,7 +1173,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseError bool) (cliClient.Provider, error) {
 	extraMsg := ""
 	source := "default project"
 
@@ -1230,26 +1230,32 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		term.Debug("unable to load project name:", err)
 	}
 
-	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
-		return nil, err
-	} else {
-		// provide sane defaults for the CD image
-		if cdImage == "" {
-			switch providerID {
-			case cliClient.ProviderAWS:
-				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
-			case cliClient.ProviderDO:
-				cdImage = "docker.io/defangio/cd:public-beta"
-			case cliClient.ProviderGCP:
-				cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
-			}
+	cdImage, err := allowToUseProvider(ctx, providerID, projName)
+	if err != nil {
+		if stopOnCanIUseError {
+			return nil, err
 		}
-		// Allow local override of the CD image
-		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
-		provider.SetCDImage(cdImage)
+
+		term.Warn(err)
+		err = nil
 	}
 
-	return provider, nil
+	// provide sane defaults for the CD image
+	if cdImage == "" {
+		switch providerID {
+		case cliClient.ProviderAWS:
+			cdImage = "public.ecr.aws/defang-io/cd:public-beta"
+		case cliClient.ProviderDO:
+			cdImage = "docker.io/defangio/cd:public-beta"
+		case cliClient.ProviderGCP:
+			cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
+		}
+	}
+	// Allow local override of the CD image
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
+	provider.SetCDImage(cdImage)
+
+	return provider, err
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

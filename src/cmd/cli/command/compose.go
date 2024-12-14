@@ -62,7 +62,7 @@ func makeComposeUpCmd() *cobra.Command {
 			since := time.Now()
 			loader := configureLoader(cmd)
 
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(cmd.Context(), loader, true)
 			if err != nil {
 				return err
 			}
@@ -281,10 +281,9 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(cmd.Context(), loader, false)
 			if err != nil {
-				// log warning but allow to continue
-				term.Warn(prettyError(err))
+				return err
 			}
 
 			since := time.Now()
@@ -340,7 +339,7 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(cmd.Context(), loader, true)
 			if err != nil {
 				return err
 			}
@@ -364,7 +363,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(cmd.Context(), loader, false)
 			if err != nil {
 				return err
 			}
@@ -446,7 +445,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(cmd.Context(), loader, true)
 			if err != nil {
 				return err
 			}
