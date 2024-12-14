@@ -11,7 +11,7 @@ import (
 )
 
 func TestFindMathingProjectFiles(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func (m MockDebugFabricClient) Debug(ctx context.Context, req *defangv1.DebugReq
 }
 
 func TestQueryHasProject(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
