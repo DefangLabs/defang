@@ -78,7 +78,7 @@ func TestTail(t *testing.T) {
 		term.DefaultTerm = defaultTerm
 	})
 
-	loader := compose.NewLoader(compose.WithPath("../../tests/testproj/compose.yaml"))
+	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
 	proj, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
@@ -86,7 +86,6 @@ func TestTail(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	l := client.MockLoader{Project: proj}
 	p := client.MockProvider{
 		ServerStream: &client.MockServerStream{
 			Resps: []*defangv1.TailResponse{
@@ -108,7 +107,8 @@ func TestTail(t *testing.T) {
 		},
 	}
 
-	Tail(ctx, l, p, TailOptions{Verbose: true}) // Output host
+	err = Tail(ctx, p, proj.Name, TailOptions{Verbose: true}) // Output host
+	t.Log(err)
 
 	expectedLogs := []string{
 		"SOMEETAG service1 SOMEHOST e1msg1",

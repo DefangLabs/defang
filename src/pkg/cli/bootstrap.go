@@ -28,7 +28,7 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 		return err
 	}
 
-	return tail(ctx, p, TailOptions{Project: projectName, Etag: etag, Since: since})
+	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since})
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {

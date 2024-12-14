@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -71,7 +72,7 @@ type ErrMissingAwsCreds struct {
 }
 
 func (e ErrMissingAwsCreds) Error() string {
-	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+	return "Could not authenticate to the AWS service. Please check your AWS credentials and try again. (https://docs.defang.io/docs/providers/aws/#getting-started)"
 }
 
 func (e ErrMissingAwsCreds) Unwrap() error {
@@ -83,7 +84,7 @@ type ErrMissingAwsRegion struct {
 }
 
 func (e ErrMissingAwsRegion) Error() string {
-	return "missing AWS region: set AWS_REGION or edit your AWS profile (https://docs.defang.io/docs/providers/aws#region)"
+	return e.err.Error() + " (https://docs.defang.io/docs/providers/aws#region)"
 }
 
 func (e ErrMissingAwsRegion) Unwrap() error {
@@ -95,17 +96,17 @@ func AnnotateAwsError(err error) error {
 		return nil
 	}
 	term.Debug("AWS error:", err)
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCreds{err})
-	}
 	if strings.Contains(err.Error(), "missing AWS region:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsRegion{err})
+		return ErrMissingAwsRegion{err}
 	}
 	if cerr := new(aws.ErrNoSuchKey); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	if cerr := new(aws.ErrParameterNotFound); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
+		return ErrMissingAwsCreds{err}
 	}
 	return err
 }
@@ -744,10 +745,10 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
 				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
-					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-					cancel(err)
+					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
+					cancel(pkg.ErrDeploymentFailed{Service: "Defang CD", Message: err.Error()})
 				}
 			}
 		}()

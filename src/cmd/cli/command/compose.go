@@ -61,13 +61,12 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
-
-			provider, err := getProvider(cmd.Context(), loader)
+			project, err := loader.LoadProject(cmd.Context())
 			if err != nil {
 				return err
 			}
 
-			project, err := loader.LoadProject(cmd.Context())
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -95,7 +94,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}
 
-			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
+			deploy, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -159,16 +158,16 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-			tailParams := cli.TailOptions{
+
+			// blocking call to tail
+			tailOptions := cli.TailOptions{
 				Etag:    deploy.Etag,
 				Since:   since,
 				Raw:     false,
 				Verbose: verbose,
 				LogType: logs.LogTypeAll,
 			}
-
-			// blocking call to tail
-			if err := cli.Tail(tailCtx, loader, provider, tailParams); err != nil {
+			if err := cli.Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 				term.Debug("Tail stopped with", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -200,8 +199,12 @@ func makeComposeUpCmd() *cobra.Command {
 						failedServices := []string{errDeploymentFailed.Service}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						_ = cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices)
+						if nil == cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices) {
+							return err // don't show the defang hint if debugging was successful
+						}
 					}
+					tailOptions.Verbose = true // show all logs for debugging
+					printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 					return err
 				}
 			}
@@ -281,6 +284,11 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			loader := configureLoader(cmd)
+			projectName, err := loader.LoadProjectName(cmd.Context())
+			if err != nil {
+				return err
+			}
+
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
@@ -308,18 +316,14 @@ func makeComposeDownCmd() *cobra.Command {
 				{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
 				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 			}
-
-			endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
-			tailParams := cli.TailOptions{
+			tailOptions := cli.TailOptions{
 				Etag:               etag,
 				Since:              since,
-				Raw:                false,
-				EndEventDetectFunc: endLogDetectFunc,
+				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-
-			err = cli.Tail(cmd.Context(), loader, provider, tailParams)
+			err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 			if err != nil {
 				return err
 			}
@@ -340,12 +344,17 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
+			project, err := loader.LoadProject(cmd.Context())
+			if err != nil {
+				return err
+			}
+
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
-			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			if _, _, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
@@ -436,6 +445,17 @@ func makeComposeLogsCmd() *cobra.Command {
 
 			term.Debug("logType", logType)
 
+			loader := configureLoader(cmd)
+			projectName, err := loader.LoadProjectName(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
 			tailOptions := cli.TailOptions{
 				Services: services,
 				Etag:     etag,
@@ -444,14 +464,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  verbose,
 				LogType:  *logType,
 			}
-
-			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
-			if err != nil {
-				return err
-			}
-
-			return cli.Tail(cmd.Context(), loader, provider, tailOptions)
+			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service")
