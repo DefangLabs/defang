@@ -2,14 +2,14 @@
   "no-ext": {
     "command": null,
     "entrypoint": null,
-    "image": "postgres",
+    "image": "redis",
     "networks": {
       "default": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 5432,
+        "target": 6379,
         "protocol": "tcp"
       }
     ]
@@ -17,22 +17,47 @@
   "no-ports": {
     "command": null,
     "entrypoint": null,
-    "image": "postgres",
-    "networks": {
-      "default": null
-    }
-  },
-  "with-ext": {
-    "command": null,
-    "entrypoint": null,
-    "image": "postgres",
+    "image": "redis",
     "networks": {
       "default": null
     },
     "ports": [
       {
         "mode": "host",
-        "target": 5432,
+        "target": 6379,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "no-ports-override": {
+    "command": [
+      "--port",
+      "6380"
+    ],
+    "entrypoint": null,
+    "image": "redis",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6380,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "with-ext": {
+    "command": null,
+    "entrypoint": null,
+    "image": "redis",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6379,
         "protocol": "tcp"
       }
     ]
@@ -47,7 +72,7 @@
     "ports": [
       {
         "mode": "host",
-        "target": 5432,
+        "target": 6379,
         "protocol": "tcp"
       }
     ]

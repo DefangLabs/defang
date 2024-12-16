@@ -1,27 +1,34 @@
-name: redis
+name: postgres
 services:
   no-ext:
-    image: redis
+    image: postgres
     networks:
       default: null
     ports:
       - mode: host
-        target: 6379
+        target: 5432
         protocol: tcp
   no-ports:
-    image: redis
+    image: postgres
     networks:
       default: null
-    x-defang-redis: null
+    x-defang-postgres: null
+  no-ports-override:
+    environment:
+      PGPORT: "5433"
+    image: postgres
+    networks:
+      default: null
+    x-defang-postgres: null
   with-ext:
-    image: redis
+    image: postgres
     networks:
       default: null
     ports:
       - mode: host
-        target: 6379
+        target: 5432
         protocol: tcp
-    x-defang-redis:
+    x-defang-postgres:
       allow-downtime: true
   wrong-image:
     image: example
@@ -29,9 +36,9 @@ services:
       default: null
     ports:
       - mode: host
-        target: 6379
+        target: 5432
         protocol: tcp
-    x-defang-redis: null
+    x-defang-postgres: null
 networks:
   default:
-    name: redis_default
+    name: postgres_default

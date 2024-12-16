@@ -56,8 +56,8 @@ func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Requ
 
 func (m *mockFabricService) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.Version], error) {
 	return connect.NewResponse(&defangv1.Version{
-		Fabric: "1.0.0-test",
-		CliMin: "1.0.0-test",
+		Fabric: "0.0.0-test",
+		CliMin: "0.0.0-test",
 	}), nil
 }
 
@@ -137,7 +137,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestCommandGates(t *testing.T) {
-	mockService := &mockFabricService{canIUseResponse: defangv1.CanIUseResponse{}}
+	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
 
 	server := httptest.NewServer(handler)

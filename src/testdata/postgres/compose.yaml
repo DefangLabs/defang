@@ -23,3 +23,9 @@ services:
   no-ports:
     image: postgres
     x-defang-postgres:
+
+  no-ports-override:
+    image: postgres
+    x-defang-postgres:
+    environment:
+      - PGPORT=5433

@@ -26,7 +26,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/smithy-go"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
@@ -108,8 +107,7 @@ func Execute(ctx context.Context) error {
 			return nil
 		}
 
-		var derr *cli.ComposeError
-		if errors.As(err, &derr) {
+		if cerr := new(cli.ComposeError); errors.As(err, &cerr) {
 			compose := "compose"
 			fileFlag := RootCmd.Flag("file")
 			if fileFlag.Changed {
@@ -134,20 +132,13 @@ func Execute(ctx context.Context) error {
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
 
-		var cerr *cli.CancelError
-		if errors.As(err, &cerr) {
+		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
 			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
 		if code == connect.CodeUnauthenticated {
-			// All AWS errors are wrapped in OperationError
-			var oe *smithy.OperationError
-			if errors.As(err, &oe) {
-				fmt.Println("Could not authenticate to the AWS service. Please check your AWS credentials and try again.")
-			} else {
-				printDefangHint("Please use the following command to log in:", "login")
-			}
+			printDefangHint("Please use the following command to log in:", "login")
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
@@ -347,8 +338,7 @@ var RootCmd = &cobra.Command{
 			term.ForceColor(true)
 		}
 
-		cwd, _ := cmd.Flags().GetString("cwd")
-		if cwd != "" {
+		if cwd, _ := cmd.Flags().GetString("cwd"); cwd != "" {
 			// Change directory before running the command
 			if err = os.Chdir(cwd); err != nil {
 				return err
@@ -857,8 +847,13 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), loader, client, provider, names...)
+		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -876,14 +871,14 @@ var deleteCmd = &cobra.Command{
 		}
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
-		tailParams := cli.TailOptions{
+
+		tailOptions := cli.TailOptions{
 			Etag:    etag,
 			Since:   since,
-			Raw:     false,
 			Verbose: verbose,
 			LogType: logs.LogTypeAll,
 		}
-		return cli.Tail(cmd.Context(), loader, provider, tailParams)
+		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
 }
 
@@ -1069,20 +1064,27 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		provider, err := getProvider(cmd.Context(), loader, true)
 		if err != nil {
 			return err
 		}
 
-		resp, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 		if err != nil {
 			return err
 		}
-		return cli.Tail(cmd.Context(), loader, provider, cli.TailOptions{
+
+		tailOptions := cli.TailOptions{
 			Etag:    resp.Etag,
 			Verbose: verbose,
 			LogType: logs.LogTypeAll,
-		})
+		}
+		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
 	},
 }
 
