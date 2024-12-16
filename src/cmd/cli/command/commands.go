@@ -317,7 +317,6 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-
 		term.SetDebug(doDebug)
 
 		// Don't track/connect the completion commands
@@ -836,6 +835,7 @@ var deleteCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.MinimumNArgs(1),
 	Aliases:     []string{"del", "rm", "remove"},
+	Hidden:      true,
 	Short:       "Delete a service from the cluster",
 	Deprecated:  "use 'compose down' instead",
 	RunE: func(cmd *cobra.Command, names []string) error {
@@ -890,10 +890,11 @@ var deploymentsCmd = &cobra.Command{
 }
 
 var deploymentsListCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"ls"},
-	Args:    cobra.NoArgs,
-	Short:   "List deployments",
+	Use:         "list",
+	Aliases:     []string{"ls"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		return cli.DeploymentsList(cmd.Context(), loader, client)
@@ -949,142 +950,6 @@ var logoutCmd = &cobra.Command{
 		}
 		term.Info("Successfully logged out")
 		return nil
-	},
-}
-
-var cdCmd = &cobra.Command{
-	Use:     "cd",
-	Aliases: []string{"bootstrap"},
-	Short:   "Manually run a command with the CD task (for BYOC only)",
-	Hidden:  true,
-}
-
-var cdDestroyCmd = &cobra.Command{
-	Use:   "destroy",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Destroy the service stack",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
-	},
-}
-
-var cdDownCmd = &cobra.Command{
-	Use:   "down",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Refresh and then destroy the service stack",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
-	},
-}
-
-var cdRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Refresh the service stack",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
-	},
-}
-
-var cdCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Cancel the current CD operation",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
-	},
-}
-
-var cdTearDownCmd = &cobra.Command{
-	Use:   "teardown",
-	Args:  cobra.NoArgs,
-	Short: "Destroy the CD cluster without destroying the services",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		force, _ := cmd.Flags().GetBool("force")
-
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		return cli.TearDown(cmd.Context(), provider, force)
-	},
-}
-
-var cdListCmd = &cobra.Command{
-	Use:     "ls",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"list"},
-	Short:   "List all the projects and stacks in the CD cluster",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		remote, _ := cmd.Flags().GetBool("remote")
-
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		if remote {
-			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
-		}
-		return cli.BootstrapLocalList(cmd.Context(), provider)
-	},
-}
-
-var cdPreviewCmd = &cobra.Command{
-	Use:         "preview",
-	Args:        cobra.NoArgs,
-	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
-	Short:       "Preview the changes that will be made by the CD task",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		provider, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
-		if err != nil {
-			return err
-		}
-
-		tailOptions := cli.TailOptions{
-			Etag:    resp.Etag,
-			Verbose: verbose,
-			LogType: logs.LogTypeAll,
-		}
-		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
 	},
 }
 
