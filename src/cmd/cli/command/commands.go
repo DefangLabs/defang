@@ -1230,14 +1230,12 @@ func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseErro
 		term.Debug("unable to load project name:", err)
 	}
 
-	cdImage, err := allowToUseProvider(ctx, providerID, projName)
-	if err != nil {
-		if stopOnCanIUseError {
+	var cdImage string
+	if stopOnCanIUseError {
+		cdImage, err = allowToUseProvider(ctx, providerID, projName)
+		if err != nil {
 			return nil, err
 		}
-
-		term.Debug(err)
-		err = nil
 	}
 
 	// provide sane defaults for the CD image
