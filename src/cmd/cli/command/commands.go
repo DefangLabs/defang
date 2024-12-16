@@ -1236,7 +1236,7 @@ func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseErro
 			return nil, err
 		}
 
-		term.Warn(err)
+		term.Debug(err)
 		err = nil
 	}
 
