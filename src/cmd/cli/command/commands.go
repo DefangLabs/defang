@@ -122,7 +122,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := getProvider(ctx, nil, true)
+			provider, err := getProvider(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -424,7 +424,7 @@ var whoamiCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		nonInteractive = true // don't show provider prompt
-		provider, err := getProvider(cmd.Context(), loader, false)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -452,7 +452,7 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -698,7 +698,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -775,7 +775,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -803,7 +803,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -821,7 +821,7 @@ var debugCmd = &cobra.Command{
 		etag, _ := cmd.Flags().GetString("etag")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -842,7 +842,12 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		provider, err = canIUseProvider(cmd.Context(), provider, loader)
 		if err != nil {
 			return err
 		}
@@ -929,7 +934,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		loader := configureLoader(cmd)
-		_, err := getProvider(cmd.Context(), loader, true)
+		_, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -1040,7 +1045,7 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseError bool) (cliClient.Provider, error) {
+func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
 	extraMsg := ""
 	source := "default project"
 
@@ -1092,17 +1097,19 @@ func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseErro
 		return nil, err
 	}
 
+	return provider, nil
+}
+
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, loader cliClient.Loader) (cliClient.Provider, error) {
 	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		term.Debug("unable to load project name:", err)
 	}
 
 	var cdImage string
-	if stopOnCanIUseError {
-		cdImage, err = allowToUseProvider(ctx, providerID, projName)
-		if err != nil {
-			return nil, err
-		}
+	cdImage, err = allowToUseProvider(ctx, providerID, projName)
+	if err != nil {
+		return nil, err
 	}
 
 	// provide sane defaults for the CD image
@@ -1120,7 +1127,7 @@ func getProvider(ctx context.Context, loader cliClient.Loader, stopOnCanIUseErro
 	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
 	provider.SetCDImage(cdImage)
 
-	return provider, err
+	return provider, nil
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

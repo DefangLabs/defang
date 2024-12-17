@@ -170,19 +170,19 @@ func TestCommandGates(t *testing.T) {
 			name:      "compose down - aws - always allow",
 			command:   []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
 			errorText: "no access to use aws provider",
-			wantError: nil,
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
 			name:      "config set - aws - no access",
 			command:   []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
-			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			wantError: nil,
 		},
 		{
 			name:      "config rm - aws - no access",
 			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
-			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			wantError: nil,
 		},
 		{
 			name:      "config rm - defang - has access",
@@ -297,7 +297,7 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := getProvider(ctx, nil, false)
+		p, err := getProvider(ctx, nil)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -325,7 +325,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := getProvider(ctx, loader, false)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -359,7 +359,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		p, err := getProvider(ctx, loader, false)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -398,7 +398,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader, false)
+		_, err := getProvider(ctx, loader)
 		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -432,7 +432,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader, false)
+		_, err := getProvider(ctx, loader)
 		if err != nil && err.Error() != "GCP_PROJECT_ID must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -454,7 +454,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := getProvider(ctx, loader, false)
+		_, err := getProvider(ctx, loader)
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -474,7 +474,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := getProvider(ctx, loader, true)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -494,7 +494,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := getProvider(ctx, loader, true)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -516,10 +516,16 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader, true)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
+
+		p, err = canIUseProvider(ctx, p, loader)
+		if err != nil {
+			t.Errorf("CanIUseProvider() failed: %v", err)
+		}
+
 		if awsProvider, ok := p.(*aws.ByocAws); !ok {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {
@@ -544,10 +550,16 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader, true)
+		p, err := getProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
+
+		p, err = canIUseProvider(ctx, p, loader)
+		if err != nil {
+			t.Errorf("CanIUseProvider() failed: %v", err)
+		}
+
 		if awsProvider, ok := p.(*aws.ByocAws); !ok {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {

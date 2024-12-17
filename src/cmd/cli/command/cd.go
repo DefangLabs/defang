@@ -22,7 +22,12 @@ var cdDestroyCmd = &cobra.Command{
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		provider, err = canIUseProvider(cmd.Context(), provider, loader)
 		if err != nil {
 			return err
 		}
@@ -38,7 +43,12 @@ var cdDownCmd = &cobra.Command{
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		provider, err = canIUseProvider(cmd.Context(), provider, loader)
 		if err != nil {
 			return err
 		}
@@ -53,7 +63,7 @@ var cdRefreshCmd = &cobra.Command{
 	Short: "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -68,7 +78,7 @@ var cdCancelCmd = &cobra.Command{
 	Short: "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -85,7 +95,7 @@ var cdTearDownCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -103,9 +113,16 @@ var cdListCmd = &cobra.Command{
 		remote, _ := cmd.Flags().GetBool("remote")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader, false)
+		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
+		}
+
+		if remote {
+			provider, err = canIUseProvider(cmd.Context(), provider, loader)
+			if err != nil {
+				return err
+			}
 		}
 
 		if remote {
@@ -128,7 +145,12 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := getProvider(cmd.Context(), loader, true)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		provider, err = canIUseProvider(cmd.Context(), provider, loader)
 		if err != nil {
 			return err
 		}

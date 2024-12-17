@@ -62,7 +62,12 @@ func makeComposeUpCmd() *cobra.Command {
 			since := time.Now()
 			loader := configureLoader(cmd)
 
-			provider, err := getProvider(cmd.Context(), loader, true)
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
+			provider, err = canIUseProvider(cmd.Context(), provider, loader)
 			if err != nil {
 				return err
 			}
@@ -292,7 +297,12 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader, false)
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
+			provider, err = canIUseProvider(cmd.Context(), provider, loader)
 			if err != nil {
 				return err
 			}
@@ -351,7 +361,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader, true)
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -375,7 +385,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader, false)
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -453,7 +463,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader, true)
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
