@@ -452,12 +452,17 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
 
-		if err := cli.GenerateLetsEncryptCert(cmd.Context(), loader, client, provider); err != nil {
+		if err := cli.GenerateLetsEncryptCert(cmd.Context(), project, client, provider); err != nil {
 			return err
 		}
 		return nil
@@ -706,7 +711,8 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider); err != nil {
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
 			return err
 		}
 
@@ -760,7 +766,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), loader, provider, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)
@@ -783,7 +789,12 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(prettyError(err))
@@ -811,7 +822,12 @@ var configListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.ConfigList(cmd.Context(), loader, provider)
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		return cli.ConfigList(cmd.Context(), projectName, provider)
 	},
 }
 
@@ -829,7 +845,12 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
 	},
 }
 
@@ -900,7 +921,12 @@ var deploymentsListCmd = &cobra.Command{
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		return cli.DeploymentsList(cmd.Context(), loader, client)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), projectName, client)
 	},
 }
 

@@ -14,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
@@ -28,7 +27,7 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func InteractiveDebug(ctx context.Context, l client.Loader, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
@@ -44,7 +43,7 @@ func InteractiveDebug(ctx context.Context, l client.Loader, c client.FabricClien
 
 	track.Evt("Debug Prompt Accepted", P("etag", etag))
 
-	if err := Debug(ctx, l, c, p, etag, project, failedServices); err != nil {
+	if err := Debug(ctx, c, p, etag, project, failedServices); err != nil {
 		term.Warnf("Failed to debug deployment: %v", err)
 		return err
 	}
@@ -52,15 +51,8 @@ func InteractiveDebug(ctx context.Context, l client.Loader, c client.FabricClien
 	return nil
 }
 
-func Debug(ctx context.Context, l client.Loader, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
-	if project == nil {
-		var err error
-		project, err = l.LoadProject(ctx)
-		if err != nil {
-			return err
-		}
-	}
 
 	files := findMatchingProjectFiles(project, failedServices)
 
@@ -130,12 +122,12 @@ func readFile(basepath, path string) *defangv1.File {
 	}
 }
 
-func getServices(project *composeTypes.Project, names []string) composeTypes.Services {
+func getServices(project *compose.Project, names []string) compose.Services {
 	// project.GetServices(…) aborts if any service is not found, so we filter them out ourselves
 	if len(names) == 0 {
 		return project.Services
 	}
-	services := composeTypes.Services{}
+	services := compose.Services{}
 	for _, s := range names {
 		if svc, err := project.GetService(s); err != nil {
 			term.Debug("skipped for debugging:", err)
@@ -146,7 +138,7 @@ func getServices(project *composeTypes.Project, names []string) composeTypes.Ser
 	return services
 }
 
-func findMatchingProjectFiles(project *composeTypes.Project, services []string) []*defangv1.File {
+func findMatchingProjectFiles(project *compose.Project, services []string) []*defangv1.File {
 	var files []*defangv1.File
 
 	for _, path := range project.ComposeFiles {
