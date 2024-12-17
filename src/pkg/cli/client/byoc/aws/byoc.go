@@ -555,6 +555,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			// FillOutputs might fail if the stack is not created yet; return empty update in that case
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
+				term.Debugf("FillOutputs: %v", err)
 				return nil, nil // no services yet
 			}
 			return nil, AnnotateAwsError(err)
