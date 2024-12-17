@@ -621,7 +621,10 @@ var generateCmd = &cobra.Command{
 
 		// Load the project and check for empty environment variables
 		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
-		project, _ := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			term.Debugf("unable to load new project: %v", err)
+		}
 
 		var envInstructions []string
 		for _, envVar := range collectUnsetEnvVars(project) {
@@ -1024,6 +1027,10 @@ func doInEnv() bool {
 	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }
 
+func gcpInEnv() bool {
+	return os.Getenv("GCP_PROJECT_ID") != ""
+}
+
 func awsInConfig(ctx context.Context) bool {
 	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
 	return err == nil
@@ -1044,16 +1051,15 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	extraMsg := ""
 	source := "default project"
 
-	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+	// Command line flag takes precedence over environment variable
+	if RootCmd.PersistentFlags().Changed("provider") {
+		source = "command line flag"
+	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := providerID.Set(val); err != nil {
 			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
 		source = "environment variable"
-	}
-
-	if RootCmd.PersistentFlags().Changed("provider") {
-		source = "command line flag"
 	}
 
 	switch providerID {
@@ -1071,11 +1077,14 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 			if doInEnv() {
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
+			if gcpInEnv() {
+				term.Warn("Using Defang playground, but GCP_PROJECT_ID environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+			}
 			providerID = cliClient.ProviderDefang
 		}
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
-			term.Warn("AWS provider was selected, but AWS environment variables are not set")
+			term.Warn("AWS provider was selected, but AWS environment is not set")
 		}
 	case cliClient.ProviderDO:
 		if !doInEnv() {
@@ -1150,6 +1159,8 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		defaultOption = cliClient.ProviderAWS.String()
 	} else if doInEnv() {
 		defaultOption = cliClient.ProviderDO.String()
+	} else if gcpInEnv() {
+		defaultOption = cliClient.ProviderGCP.String()
 	}
 	var optionValue string
 	if err := survey.AskOne(&survey.Select{
