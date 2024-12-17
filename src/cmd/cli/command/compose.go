@@ -10,6 +10,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -199,7 +200,7 @@ func makeComposeUpCmd() *cobra.Command {
 						failedServices := []string{errDeploymentFailed.Service}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						if nil == cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices) {
+						if nil == cli.InteractiveDebug(cmd.Context(), client, provider, deploy.Etag, project, failedServices) {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}
@@ -287,18 +288,18 @@ func makeComposeDownCmd() *cobra.Command {
 			var detach, _ = cmd.Flags().GetBool("detach")
 
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(cmd.Context())
-			if err != nil {
-				return err
-			}
-
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			if err != nil {
+				return err
+			}
+
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
+			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -381,7 +382,12 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.GetServices(cmd.Context(), loader, provider, long); err != nil {
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			if err != nil {
+				return err
+			}
+
+			if err := cli.GetServices(cmd.Context(), projectName, provider, long); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}

@@ -2,6 +2,7 @@ package command
 
 import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -27,7 +28,11 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "destroy")
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "destroy")
 	},
 }
 
@@ -43,7 +48,11 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "down")
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "down")
 	},
 }
 
@@ -58,7 +67,11 @@ var cdRefreshCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "refresh")
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "refresh")
 	},
 }
 
@@ -73,7 +86,11 @@ var cdCancelCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "cancel")
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "cancel")
 	},
 }
 
@@ -102,15 +119,14 @@ var cdListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		remote, _ := cmd.Flags().GetBool("remote")
 
-		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(cmd.Context(), nil)
 		if err != nil {
 			return err
 		}
 
 		if remote {
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), loader, client, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider)
 	},

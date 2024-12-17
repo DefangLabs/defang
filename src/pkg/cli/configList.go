@@ -12,11 +12,7 @@ type PrintConfig struct {
 	Name string
 }
 
-func ConfigList(ctx context.Context, loader client.Loader, provider client.Provider) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return err
-	}
+func ConfigList(ctx context.Context, projectName string, provider client.Provider) error {
 	term.Debugf("Listing config in project %q", projectName)
 
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})

@@ -9,7 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-var ErrTermsNotAgreed = errors.New("You must agree to the Defang terms of service to use this tool")
+var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of service to use this tool")
 
 func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if client.TermsAccepted() {
