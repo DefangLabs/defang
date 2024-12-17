@@ -8,11 +8,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigDelete(ctx context.Context, loader client.Loader, provider client.Provider, names ...string) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return err
-	}
+func ConfigDelete(ctx context.Context, projectName string, provider client.Provider, names ...string) error {
 	term.Debugf("Deleting config %v in project %q", names, projectName)
 
 	if DoDryRun {

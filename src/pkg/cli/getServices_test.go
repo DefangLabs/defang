@@ -9,7 +9,6 @@ import (
 	"time"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -69,8 +68,7 @@ func TestGetServices(t *testing.T) {
 	provider := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
-		err := GetServices(ctx, loader, &provider, false)
+		err := GetServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
@@ -79,9 +77,8 @@ func TestGetServices(t *testing.T) {
 
 	t.Run("some services", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "test"}}
 
-		err := GetServices(ctx, loader, &provider, false)
+		err := GetServices(ctx, "test", &provider, false)
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
@@ -105,8 +102,7 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 	})
 
 	t.Run("no services long", func(t *testing.T) {
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
-		err := GetServices(ctx, loader, &provider, false)
+		err := GetServices(ctx, "empty", &provider, false)
 		var expectedError ErrNoServices
 		if !errors.As(err, &expectedError) {
 			t.Fatalf("expected GetServices() error to be of type ErrNoServices, got: %v", err)
@@ -115,9 +111,8 @@ foo   a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
 
 	t.Run("some services long", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "test"}}
 
-		err := GetServices(ctx, loader, &provider, true)
+		err := GetServices(ctx, "test", &provider, true)
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
