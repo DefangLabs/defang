@@ -19,12 +19,9 @@ func (e ErrNoServices) Error() string {
 	return fmt.Sprintf("no services found in project %q", e.ProjectName)
 }
 
-type PrintService struct {
-	Name        string
-	Etag        string
-	PublicFqdn  string
-	PrivateFqdn string
-	Status      string
+type printService struct {
+	Service string
+	*defangv1.ServiceInfo
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider, long bool) error {
@@ -54,17 +51,14 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return PrintObject("", servicesResponse)
 	}
 
-	printServices := make([]PrintService, numServices)
+	printServices := make([]printService, numServices)
 	for i, si := range servicesResponse.Services {
-		printServices[i] = PrintService{
-			Name:        si.Service.Name,
-			Etag:        si.Etag,
-			PublicFqdn:  si.PublicFqdn,
-			PrivateFqdn: si.PrivateFqdn,
-			Status:      si.Status,
+		printServices[i] = printService{
+			Service:     si.Service.Name,
+			ServiceInfo: si,
 		}
 		servicesResponse.Services[i] = nil
 	}
 
-	return term.Table(printServices, []string{"Name", "Etag", "PublicFqdn", "PrivateFqdn", "Status"})
+	return term.Table(printServices, []string{"Service", "Etag", "PublicFqdn", "PrivateFqdn", "Status"})
 }
