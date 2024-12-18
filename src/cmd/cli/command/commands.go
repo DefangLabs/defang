@@ -452,12 +452,17 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
 
-		if err := cli.GenerateLetsEncryptCert(cmd.Context(), loader, client, provider); err != nil {
+		if err := cli.GenerateLetsEncryptCert(cmd.Context(), project, client, provider); err != nil {
 			return err
 		}
 		return nil
@@ -621,7 +626,10 @@ var generateCmd = &cobra.Command{
 
 		// Load the project and check for empty environment variables
 		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
-		project, _ := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			term.Debugf("unable to load new project: %v", err)
+		}
 
 		var envInstructions []string
 		for _, envVar := range collectUnsetEnvVars(project) {
@@ -703,7 +711,8 @@ var configSetCmd = &cobra.Command{
 			return err
 		}
 
-		if _, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider); err != nil {
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
 			return err
 		}
 
@@ -757,7 +766,7 @@ var configSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := cli.ConfigSet(cmd.Context(), loader, provider, name, value); err != nil {
+		if err := cli.ConfigSet(cmd.Context(), projectName, provider, name, value); err != nil {
 			return err
 		}
 		term.Info("Updated value for", name)
@@ -780,7 +789,12 @@ var configDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		if err := cli.ConfigDelete(cmd.Context(), loader, provider, names...); err != nil {
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				term.Warn(prettyError(err))
@@ -808,7 +822,12 @@ var configListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.ConfigList(cmd.Context(), loader, provider)
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		return cli.ConfigList(cmd.Context(), projectName, provider)
 	},
 }
 
@@ -826,7 +845,12 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), loader, client, provider, etag, nil, args)
+		project, err := loader.LoadProject(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
 	},
 }
 
@@ -847,12 +871,12 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err = canIUseProvider(cmd.Context(), provider, loader)
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 		if err != nil {
 			return err
 		}
 
-		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		provider, err = canIUseProvider(cmd.Context(), provider, projectName)
 		if err != nil {
 			return err
 		}
@@ -902,7 +926,12 @@ var deploymentsListCmd = &cobra.Command{
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		return cli.DeploymentsList(cmd.Context(), loader, client)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), projectName, client)
 	},
 }
 
@@ -1029,6 +1058,10 @@ func doInEnv() bool {
 	return os.Getenv("DIGITALOCEAN_ACCESS_TOKEN") != "" || os.Getenv("DIGITALOCEAN_TOKEN") != ""
 }
 
+func gcpInEnv() bool {
+	return os.Getenv("GCP_PROJECT_ID") != ""
+}
+
 func awsInConfig(ctx context.Context) bool {
 	_, err := aws.LoadDefaultConfig(ctx, aws.Region(""))
 	return err == nil
@@ -1049,16 +1082,15 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	extraMsg := ""
 	source := "default project"
 
-	if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
+	// Command line flag takes precedence over environment variable
+	if RootCmd.PersistentFlags().Changed("provider") {
+		source = "command line flag"
+	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := providerID.Set(val); err != nil {
 			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
 		source = "environment variable"
-	}
-
-	if RootCmd.PersistentFlags().Changed("provider") {
-		source = "command line flag"
 	}
 
 	switch providerID {
@@ -1076,11 +1108,14 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 			if doInEnv() {
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
+			if gcpInEnv() {
+				term.Warn("Using Defang playground, but GCP_PROJECT_ID environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+			}
 			providerID = cliClient.ProviderDefang
 		}
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
-			term.Warn("AWS provider was selected, but AWS environment variables are not set")
+			term.Warn("AWS provider was selected, but AWS environment is not set")
 		}
 	case cliClient.ProviderDO:
 		if !doInEnv() {
@@ -1100,14 +1135,8 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return provider, nil
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, loader cliClient.Loader) (cliClient.Provider, error) {
-	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		term.Debug("unable to load project name:", err)
-	}
-
-	var cdImage string
-	cdImage, err = allowToUseProvider(ctx, providerID, projName)
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) (cliClient.Provider, error) {
+	cdImage, err := allowToUseProvider(ctx, providerID, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -1161,6 +1190,8 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		defaultOption = cliClient.ProviderAWS.String()
 	} else if doInEnv() {
 		defaultOption = cliClient.ProviderDO.String()
+	} else if gcpInEnv() {
+		defaultOption = cliClient.ProviderGCP.String()
 	}
 	var optionValue string
 	if err := survey.AskOne(&survey.Select{

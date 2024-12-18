@@ -142,17 +142,16 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	if len(projectNames) == 0 {
 		return "", errors.New("no projects found")
 	}
-	if len(projectNames) == 1 {
-		term.Debug("Using default project:", projectNames[0])
-		return projectNames[0], nil
-	}
+	if len(projectNames) > 1 {
+		var projectList = ""
+		for _, projectName := range projectNames {
+			projectList += " - " + projectName + "\n"
+		}
 
-	term.Warn("Multiple projects found:")
-	for _, projectName := range projectNames {
-		term.Println(" - " + projectName)
+		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: %v", projectList)
 	}
-
-	return "", errors.New("use the --project-name flag to specify a project")
+	term.Debug("Using default project:", projectNames[0])
+	return projectNames[0], nil
 }
 
 func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {

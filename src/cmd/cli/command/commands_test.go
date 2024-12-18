@@ -139,9 +139,18 @@ func TestVersion(t *testing.T) {
 func TestCommandGates(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	composeDir := "../../../../src/testdata/sanity"
+	os.Chdir(composeDir)
 
 	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close)
+	t.Cleanup(func() {
+		os.Chdir(origDir)
+		server.Close()
+	})
 
 	type cmdPermTest struct {
 		name      string
@@ -156,7 +165,7 @@ func TestCommandGates(t *testing.T) {
 	testData := cmdPermTests{
 		{
 			name:      "compose up - aws - no access",
-			command:   []string{"compose", "up", "--project-name=app", "--provider=aws"},
+			command:   []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
@@ -167,25 +176,25 @@ func TestCommandGates(t *testing.T) {
 			wantError: nil,
 		},
 		{
-			name:      "compose down - aws - always allow",
+			name:      "compose down - aws - no access",
 			command:   []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:      "config set - aws - no access",
+			name:      "config set - aws - allowed",
 			command:   []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: nil,
 		},
 		{
-			name:      "config rm - aws - no access",
+			name:      "config rm - aws - no allowed",
 			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: nil,
 		},
 		{
-			name:      "config rm - defang - has access",
+			name:      "config rm - defang - allowed",
 			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
 			errorText: "",
 			wantError: nil,
@@ -197,7 +206,7 @@ func TestCommandGates(t *testing.T) {
 			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:      "whoami - no access",
+			name:      "whoami - allowed",
 			command:   []string{"whoami", "--provider=aws", "--dry-run"},
 			errorText: "no access to use aws provider",
 			wantError: nil,
@@ -521,7 +530,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		p, err = canIUseProvider(ctx, p, loader)
+		p, err = canIUseProvider(ctx, p, "project")
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -555,7 +564,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		p, err = canIUseProvider(ctx, p, loader)
+		p, err = canIUseProvider(ctx, p, "project")
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}

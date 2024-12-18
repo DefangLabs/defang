@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -56,8 +54,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
-		err := DeploymentsList(ctx, loader, client)
+		err := DeploymentsList(ctx, "empty", client)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -72,8 +69,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		loader := cliClient.MockLoader{Project: &compose.Project{Name: "test"}}
-		err := DeploymentsList(ctx, loader, client)
+		err := DeploymentsList(ctx, "test", client)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}

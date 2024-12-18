@@ -27,11 +27,7 @@ type PrintService struct {
 	Status      string
 }
 
-func GetServices(ctx context.Context, loader client.Loader, provider client.Provider, long bool) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return err
-	}
+func GetServices(ctx context.Context, projectName string, provider client.Provider, long bool) error {
 	term.Debugf("Listing services in project %q", projectName)
 
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
