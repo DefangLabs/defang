@@ -148,7 +148,7 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 			projectList += " - " + projectName + "\n"
 		}
 
-		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: %v", projectList)
+		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: \n%v", projectList)
 	}
 	term.Debug("Using default project:", projectNames[0])
 	return projectNames[0], nil
@@ -201,7 +201,7 @@ func (b *ByocBaseClient) ParsePulumiStackObject(ctx context.Context, obj Obj, bu
 		}
 	}
 	if err := json.Unmarshal(data, &state); err != nil {
-		return "", fmt.Errorf("Failed to decode Pulumi state %q: %w", obj.Name(), err)
+		return "", fmt.Errorf("failed to decode Pulumi state %q: %w", obj.Name(), err)
 	} else if state.Version != 3 {
 		term.Debug("Skipping Pulumi state with version", state.Version)
 	} else if len(state.Checkpoint.Latest.PendingOperations) > 0 {
