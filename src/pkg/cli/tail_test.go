@@ -3,15 +3,18 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -68,6 +71,22 @@ func TestParseTimeOrDuration(t *testing.T) {
 	}
 }
 
+type mockTailProvider struct {
+	client.Provider
+	ServerStreams []client.ServerStream[defangv1.TailResponse]
+	Reqs          []*defangv1.TailRequest
+}
+
+func (m *mockTailProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	m.Reqs = append(m.Reqs, req)
+	if len(m.ServerStreams) == 0 {
+		return nil, errors.New("no server stream provided")
+	}
+	ss := m.ServerStreams[0]
+	m.ServerStreams = m.ServerStreams[1:]
+	return ss, nil
+}
+
 func TestTail(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
@@ -78,37 +97,37 @@ func TestTail(t *testing.T) {
 		term.DefaultTerm = defaultTerm
 	})
 
-	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
-	proj, err := loader.LoadProject(context.Background())
-	if err != nil {
-		t.Fatalf("LoadProject() failed: %v", err)
-	}
+	const projectName = "project1"
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	p := client.MockProvider{
-		ServerStream: &client.MockServerStream{
-			Resps: []*defangv1.TailResponse{
-				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
-					{Message: "e1msg1", Timestamp: timestamppb.New(time.Now())},
-					{Message: "e1msg2", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
-					{Message: "e1msg3", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
-					{Message: "e1msg4", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e1err1", Timestamp: timestamppb.New(time.Now()), Stderr: true},                                                       // Error message should be in stdout too when not raw
-				}},
-				{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{ // Test entry etag does not affect the default values from response
-					{Message: "e2err1", Timestamp: timestamppb.New(time.Now()), Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
-					{Message: "e2msg1", Timestamp: timestamppb.New(time.Now()), Etag: "ENTRIES2ETAG"},
-					{Message: "e2msg2", Timestamp: timestamppb.New(time.Now())},
-					{Message: "e2msg3", Timestamp: timestamppb.New(time.Now()), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
-					{Message: "e2msg4", Timestamp: timestamppb.New(time.Now())},
-				}},
+	p := &mockTailProvider{
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&client.MockServerStream{
+				Resps: []*defangv1.TailResponse{
+					{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
+						{Message: "e1msg1", Timestamp: timestamppb.Now()},
+						{Message: "e1msg2", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG"},                                              // Test event etag override the response etag
+						{Message: "e1msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST"},                      // override both etag and host
+						{Message: "e1msg4", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+						{Message: "e1err1", Timestamp: timestamppb.Now(), Stderr: true},                                                       // Error message should be in stdout too when not raw
+					}},
+					{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{ // Test entry etag does not affect the default values from response
+						{Message: "e2err1", Timestamp: timestamppb.Now(), Stderr: true, Etag: "SOMEOTHERETAG"}, // Error message should be in stdout too when not raw
+						{Message: "e2msg1", Timestamp: timestamppb.Now(), Etag: "ENTRIES2ETAG"},
+						{Message: "e2msg2", Timestamp: timestamppb.Now()},
+						{Message: "e2msg3", Timestamp: timestamppb.Now(), Etag: "SOMEOTHERETAG2", Host: "SOMEOTHERHOST", Service: "service2"}, // override both etag, host and service
+						{Message: "e2msg4", Timestamp: timestamppb.Now()},
+					}},
+				},
+				Error: connect.NewError(connect.CodeInternal, &cwTypes.SessionStreamingException{}), // to test retries
 			},
+			&client.MockServerStream{Error: io.EOF},
 		},
 	}
 
-	err = Tail(ctx, p, proj.Name, TailOptions{Verbose: true}) // Output host
-	t.Log(err)
+	err := Tail(context.Background(), p, projectName, TailOptions{Verbose: true}) // Output host
+	if err != io.EOF {
+		t.Errorf("Tail() error = %v, want io.EOF", err)
+	}
 
 	expectedLogs := []string{
 		"SOMEETAG service1 SOMEHOST e1msg1",
@@ -121,23 +140,50 @@ func TestTail(t *testing.T) {
 		"SOMEETAG service1 SOMEHOST e2msg2",
 		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e2msg3",
 		"SOMEETAG service1 SOMEHOST e2msg4",
+		"! Reconnecting...\r                           \r",
 	}
 
 	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
 
 	if len(got) != len(expectedLogs) {
-		t.Fatalf("Expecting %v lines of log, but only got %v", len(expectedLogs), len(got))
+		t.Log(got)
+		t.Fatalf("Expecting %v lines of log, but got %v", len(expectedLogs), len(got))
 	}
 
 	for i, g := range got {
 		e := expectedLogs[i]
 		g = term.StripAnsi(g)
-		if strings.SplitN(g, " ", 2)[1] != e { // Remove the date from the log entry
-			t.Errorf("Tail() = %v, want %v", g, e)
+		if got := strings.SplitN(g, " ", 2)[1]; got != e { // Remove the date from the log entry
+			t.Errorf("Tail() = %q, want %q", got, e)
 		}
 	}
 
 	if stderr.Len() > 0 {
 		t.Errorf("Tail() stderr = %v, want empty", stderr.String())
+	}
+
+	if p.Reqs[0].Project != projectName {
+		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
+	}
+	if p.Reqs[0].LogType != 2 {
+		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	}
+	if p.Reqs[0].Since != nil {
+		t.Errorf("Tail() sent request with since %v, want nil", p.Reqs[0].Since)
+	}
+
+	if len(p.Reqs) != 2 {
+		t.Errorf("Tail() sent %v requests, want 2", len(p.Reqs))
+	}
+
+	// Ensure the second request is the same but with a valid`since` value
+	if p.Reqs[1].Project != projectName {
+		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
+	}
+	if p.Reqs[1].LogType != 2 {
+		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	}
+	if p.Reqs[1].Since == nil {
+		t.Errorf("Tail() sent request with since nil, want not nil")
 	}
 }

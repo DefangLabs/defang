@@ -298,7 +298,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Services: options.Services, Etag: options.Etag, Since: timestamppb.New(options.Since)})
+				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Project: projectName, Services: options.Services, Etag: options.Etag, Since: timestamppb.New(options.Since), LogType: uint32(options.LogType)})
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
@@ -324,7 +324,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
+			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
