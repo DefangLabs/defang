@@ -7,6 +7,7 @@ import (
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
@@ -49,6 +50,7 @@ func (t *Tailer) AddQuerySet(query string) {
 }
 
 func (t *Tailer) Start(ctx context.Context) error {
+	term.Debugf("Starting log tailer with query: \n%v", t.query)
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
 		Filter:        t.query,
