@@ -229,7 +229,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 
 	var stacks []string
 	err = b.driver.IterateBucketObjects(ctx, bucketName, prefix, func(obj *storage.ObjectAttrs) error {
-		stack, err := b.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
+		stack, err := byoc.ParsePulumiStackObject(ctx, gcpObj{obj}, bucketName, prefix, b.driver.GetBucketObject)
 		if err != nil {
 			return err
 		}
