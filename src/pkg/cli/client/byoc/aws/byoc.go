@@ -532,12 +532,6 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
-// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
-func (b *ByocAws) stackDir(projectName, name string) string {
-	ensure(projectName != "", "ProjectName not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
-}
-
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
 	if projectName == "" {
 		return nil, nil
@@ -562,7 +556,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
-	ensure(projectName != "", "ProjectName not set")
+	pkg.Ensure(projectName != "", "ProjectName not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
@@ -608,7 +602,7 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 }
 
 func (b *ByocAws) getSecretID(projectName, name string) string {
-	return b.stackDir(projectName, name) // same as defang_service.ts
+	return b.StackDir(projectName, name) // same as defang_service.ts
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
@@ -769,15 +763,15 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service
 		}
 		groups = append(groups, cdTail)
 		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
 		groups = append(groups, kanikoTail)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
 		groups = append(groups, ecsTail)
 	}
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
 		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
 		groups = append(groups, servicesTail)
 	}
@@ -790,7 +784,7 @@ func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string
 		return nil, err
 	}
 
-	ensure(projectName != "", "ProjectName not set")
+	pkg.Ensure(projectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 		Project: projectName,    // was: tenant
@@ -982,12 +976,6 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		}
 	}
 	return stacks, nil
-}
-
-func ensure(cond bool, msg string) {
-	if !cond {
-		panic(msg)
-	}
 }
 
 type ECSEventHandler interface {

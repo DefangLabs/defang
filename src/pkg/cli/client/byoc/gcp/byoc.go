@@ -27,6 +27,8 @@ import (
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -109,6 +111,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"cloudresourcemanager.googleapis.com", // For service account and role management
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
+		"secretmanager.googleapis.com",        // For config/secrets
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -144,6 +147,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.loadBalancerAdmin",       // For creating load balancer and ssl certs
 		"roles/compute.networkAdmin",            // For creating network
 		"roles/dns.admin",                       // For creating DNS records
+		"roles/cloudbuild.builds.editor",        // For building images using cloud build
 	}); err != nil {
 		return err
 	}
@@ -469,7 +473,7 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	ss, err := NewSubscribeStream(ctx, b.driver)
+	ss, err := NewSubscribeStream(ctx, b.driver, false)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +490,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if req.Etag == b.lastCdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		ss, err := NewSubscribeStream(ctx, b.driver)
+		ss, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
 		}
@@ -525,8 +529,9 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	}
 
 	if req.Etag != b.lastCdExecution { // No need to tail kaniko and service log if there is only cd running
-		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())     // Kaniko logs
-		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // Service logs
+		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
+		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
+		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
 	}
 	if err := ls.Start(); err != nil {
 		return nil, err
@@ -580,6 +585,50 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 }
 
+func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
+	for _, name := range req.Names {
+		secretId := b.StackName(req.Project, name)
+		term.Debugf("Deleting secret %q", secretId)
+		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
+			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
+		}
+	}
+	return nil
+}
+
+func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	prefix := b.StackName(req.Project, "")
+	secrets, err := b.driver.ListSecrets(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	return &defangv1.Secrets{Names: secrets}, nil
+}
+
+func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	if !pkg.IsValidSecretName(req.Name) {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
+	}
+	secretId := b.StackName(req.Project, req.Name)
+	term.Debugf("Creating secret %q", secretId)
+
+	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
+		if stat, _ := status.FromError(err); stat.Code() == codes.AlreadyExists {
+			term.Debugf("Secret %q already exists", secretId)
+		} else {
+			return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+		}
+	}
+	term.Debugf("Adding a new secret version for %q", secretId)
+	if _, err := b.driver.AddSecretVersion(ctx, secretId, []byte(req.Value)); err != nil {
+		return fmt.Errorf("failed to add secret version for %q: %w", secretId, err)
+	}
+	if err := b.driver.CleanupOldVersionsExcept(ctx, secretId, 2); err != nil {
+		return fmt.Errorf("failed to cleanup old versions for %q: %w", secretId, err)
+	}
+	return nil
+}
+
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
 
 func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
@@ -587,24 +636,9 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
-func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP DeleteConfig")
-}
-
-func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP ListConfig")
-}
-
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	// FIXME: implement
 	return client.ErrNotImplemented("GCP Query")
-}
-
-func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP PutConfig")
 }
 
 func (b *ByocGcp) TearDown(ctx context.Context) error {
@@ -677,4 +711,9 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	return &projUpdate, nil
+}
+
+func (b *ByocGcp) StackName(projectName, name string) string {
+	pkg.Ensure(projectName != "", "ProjectName not set")
+	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
 }

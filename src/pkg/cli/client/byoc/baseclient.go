@@ -163,6 +163,12 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	return projectLabel + "." + DnsSafe(zone)
 }
 
+// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
+func (b *ByocBaseClient) StackDir(projectName, name string) string {
+	pkg.Ensure(projectName != "", "ProjectName not set")
+	return fmt.Sprintf("/%s/%s/%s/%s", DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
+}
+
 func GetPrivateDomain(projectName string) string {
 	return DnsSafeLabel(projectName) + ".internal"
 }

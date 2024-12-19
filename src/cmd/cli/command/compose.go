@@ -140,7 +140,7 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 					var errDeploymentFailed pkg.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)

@@ -133,3 +133,9 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 		return "Unknown"
 	}
 }
+
+func Ensure(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
+}
