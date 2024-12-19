@@ -60,9 +60,9 @@ type ByocAws struct {
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
-	lastCdEtag       types.ETag
-	lastCdStart      time.Time
-	lastCdTaskArn    ecs.TaskArn
+	cdEtag           types.ETag
+	cdStart          time.Time
+	cdTaskArn        ecs.TaskArn
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -270,9 +270,9 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	if err != nil {
 		return nil, err
 	}
-	b.lastCdEtag = etag
-	b.lastCdStart = time.Now()
-	b.lastCdTaskArn = taskArn
+	b.cdEtag = etag
+	b.cdStart = time.Now()
+	b.cdTaskArn = taskArn
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -533,9 +533,9 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, AnnotateAwsError(err)
 	}
 	etag := ecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
-	b.lastCdEtag = etag
-	b.lastCdStart = time.Now()
-	b.lastCdTaskArn = taskArn
+	b.cdEtag = etag
+	b.cdStart = time.Now()
+	b.cdTaskArn = taskArn
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
@@ -664,7 +664,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		service = req.Services[0]
 	}
 
-	since := b.lastCdStart // TODO: get start time from req.Etag
+	since := b.cdStart // TODO: get start time from req.Etag
 	if since.IsZero() {
 		since = time.Now().Add(-time.Hour)
 	}
@@ -737,7 +737,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			service = req.Services[0]
 		}
 		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, logType)...)
-		taskArn = b.lastCdTaskArn
+		taskArn = b.cdTaskArn
 	}
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -772,8 +772,8 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service
 	if logType.Has(logs.LogTypeBuild) {
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
 		// If we know the CD task ARN, only tail the logstream for that CD task
-		if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
-			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+		if b.cdTaskArn != nil && b.cdEtag == etag {
+			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 		}
 		groups = append(groups, cdTail)
 		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
