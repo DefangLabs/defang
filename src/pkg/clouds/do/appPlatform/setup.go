@@ -67,7 +67,7 @@ func (d *DoApp) GetBucketName(ctx context.Context, s3Client *s3.Client) (string,
 	return bucketName, nil
 }
 
-func (d *DoApp) SetUp(ctx context.Context) error {
+func (d *DoApp) SetUpBucket(ctx context.Context) error {
 	s3Client, err := d.CreateS3Client()
 	if err != nil {
 		return err
@@ -167,7 +167,8 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 	if currentCd.Spec != nil && currentCd.Spec.Name != "" {
 		term.Debugf("Updating existing CD app")
 		currentCd, _, err = client.Apps.Update(ctx, currentCd.ID, &godo.AppUpdateRequest{
-			Spec: appJobSpec,
+			Spec:                    appJobSpec,
+			UpdateAllSourceVersions: true, // force update of the CD image
 		})
 
 		if err != nil {

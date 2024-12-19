@@ -6,7 +6,7 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-P0CsjnnUmkFgljNotsFboEoHU6UoEIOgA5lBX2FXAxY=";
+  vendorHash = "sha256-HIkjHfMrBsApMjYFffiX7HMF34s8doO0x7BYnQqty6Q=";
 
   subPackages = [ "cmd/cli" ];
 
@@ -15,7 +15,6 @@ buildGoModule {
   ];
 
   CGO_ENABLED = 0;
-  GOFLAGS = [ "-trimpath" ];
   ldflags = [ "-s" "-w" ];
   doCheck = false; # some unit tests need internet access
 
