@@ -30,6 +30,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -107,6 +108,9 @@ func AnnotateAwsError(err error) error {
 	}
 	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
 		return ErrMissingAwsCreds{err}
+	}
+	if cerr := new(cwTypes.SessionStreamingException); errors.As(err, &cerr) {
+		return connect.NewError(connect.CodeInternal, err)
 	}
 	return err
 }
