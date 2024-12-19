@@ -336,7 +336,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 		} else if buildTags != "" {
 			parts := strings.Split(buildTags, "_")
 			if len(parts) < 3 {
-				return nil, errors.New("invalid cloud build build tags value: " + buildTags)
+				return nil, errors.New("invalid cloudbuild build tags value: " + buildTags)
 			}
 			serviceName = parts[len(parts)-2]
 			etag = parts[len(parts)-1]

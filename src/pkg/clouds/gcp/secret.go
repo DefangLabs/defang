@@ -19,7 +19,7 @@ func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error
 	defer client.Close()
 
 	req := &secretmanagerpb.CreateSecretRequest{
-		Parent:   fmt.Sprintf("projects/%s", gcp.ProjectId),
+		Parent:   "projects/" + gcp.ProjectId,
 		SecretId: secretID,
 		Secret: &secretmanagerpb.Secret{
 			Replication: &secretmanagerpb.Replication{
@@ -101,7 +101,7 @@ func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error)
 	defer client.Close()
 
 	req := &secretmanagerpb.ListSecretsRequest{
-		Parent: fmt.Sprintf("projects/%s", gcp.ProjectId),
+		Parent: "projects/%s" + gcp.ProjectId,
 	}
 	it := client.ListSecrets(ctx, req)
 	secretRegex := regexp.MustCompile(fmt.Sprintf(`/secrets/%s(.*)`, regexp.QuoteMeta(prefix)))

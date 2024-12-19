@@ -1,0 +1,10 @@
+{
+  "service1": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null
+    }
+  }
+}

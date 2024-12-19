@@ -1,0 +1,45 @@
+name: redis
+services:
+  no-ext:
+    image: redis
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
+  no-ports:
+    image: redis
+    networks:
+      default: null
+    x-defang-redis: null
+  no-ports-override:
+    command:
+      - --port
+      - "6380"
+    image: redis
+    networks:
+      default: null
+    x-defang-redis: null
+  with-ext:
+    image: redis
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
+    x-defang-redis:
+      allow-downtime: true
+  wrong-image:
+    image: example
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 6379
+        protocol: tcp
+    x-defang-redis: null
+networks:
+  default:
+    name: redis_default

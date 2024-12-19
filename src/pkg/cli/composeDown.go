@@ -13,12 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ComposeDown(ctx context.Context, loader client.Loader, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return "", err
-	}
-
+func ComposeDown(ctx context.Context, projectName string, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
 	if DoDryRun {

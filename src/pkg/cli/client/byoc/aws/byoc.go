@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -71,7 +72,7 @@ type ErrMissingAwsCreds struct {
 }
 
 func (e ErrMissingAwsCreds) Error() string {
-	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+	return "Could not authenticate to the AWS service. Please check your AWS credentials and try again. (https://docs.defang.io/docs/providers/aws/#getting-started)"
 }
 
 func (e ErrMissingAwsCreds) Unwrap() error {
@@ -83,7 +84,7 @@ type ErrMissingAwsRegion struct {
 }
 
 func (e ErrMissingAwsRegion) Error() string {
-	return "missing AWS region: set AWS_REGION or edit your AWS profile (https://docs.defang.io/docs/providers/aws#region)"
+	return e.err.Error() + " (https://docs.defang.io/docs/providers/aws#region)"
 }
 
 func (e ErrMissingAwsRegion) Unwrap() error {
@@ -95,17 +96,17 @@ func AnnotateAwsError(err error) error {
 		return nil
 	}
 	term.Debug("AWS error:", err)
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCreds{err})
-	}
 	if strings.Contains(err.Error(), "missing AWS region:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsRegion{err})
+		return ErrMissingAwsRegion{err}
 	}
 	if cerr := new(aws.ErrNoSuchKey); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	if cerr := new(aws.ErrParameterNotFound); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
+		return ErrMissingAwsCreds{err}
 	}
 	return err
 }
@@ -455,7 +456,7 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return map[string]string{
+	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantName,
@@ -468,6 +469,12 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}
+
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "1"
+	}
+
+	return env
 }
 
 type cdCmd struct {
@@ -542,6 +549,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			// FillOutputs might fail if the stack is not created yet; return empty update in that case
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
+				term.Debugf("FillOutputs: %v", err)
 				return nil, nil // no services yet
 			}
 			return nil, AnnotateAwsError(err)
@@ -732,10 +740,10 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
 				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
-					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
-					cancel(err)
+					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
+					cancel(pkg.ErrDeploymentFailed{Service: "Defang CD", Message: err.Error()})
 				}
 			}
 		}()
@@ -918,13 +926,13 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-type awsObj struct{ obj s3types.Object }
+type s3Obj struct{ obj s3types.Object }
 
-func (a awsObj) Name() string {
+func (a s3Obj) Name() string {
 	return *a.obj.Key
 }
 
-func (a awsObj) Size() int64 {
+func (a s3Obj) Size() int64 {
 	return *a.obj.Size
 }
 
@@ -943,6 +951,10 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	}
 
 	s3client := s3.NewFromConfig(cfg)
+	return ListPulumiStacks(ctx, s3client, bucketName)
+}
+
+func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName string) ([]string, error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	term.Debug("Listing stacks in bucket:", bucketName)
@@ -958,7 +970,7 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		if obj.Key == nil || obj.Size == nil {
 			continue
 		}
-		stack, err := b.ParsePulumiStackObject(ctx, awsObj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+		stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
 			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
 				Key:    &path,

@@ -11,7 +11,7 @@ import (
 )
 
 func TestFindMathingProjectFiles(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func (m MockDebugFabricClient) Debug(ctx context.Context, req *defangv1.DebugReq
 }
 
 func TestQueryHasProject(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../tests/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,13 +64,13 @@ func TestQueryHasProject(t *testing.T) {
 	provider := MustHaveProjectNameQueryProvider{}
 	fabricClient := MockDebugFabricClient{}
 
-	if err := Debug(context.Background(), compose.NewLoader(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
+	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
 	project.Name = ""
 
-	if err := Debug(context.Background(), compose.NewLoader(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
+	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {

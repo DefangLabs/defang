@@ -146,7 +146,7 @@ func TestValidateQuotas(t *testing.T) {
 			service: &types.ServiceConfig{
 				Name:  "test",
 				Image: "asdf",
-				Ports: []types.ServicePortConfig{{Target: 80, Mode: compose.Mode_INGRESS, Protocol: compose.Protocol_HTTP}},
+				Ports: []types.ServicePortConfig{{Target: 80, Mode: "ingress", Protocol: "http"}},
 				HealthCheck: &types.HealthCheckConfig{
 					Test: []string{"CMD", "curl", "http://localhost"},
 				},

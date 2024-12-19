@@ -68,7 +68,6 @@ type EndLogConditional struct {
 type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
 
 type TailOptions struct {
-	Project            string
 	Services           []string
 	Etag               types.ETag
 	Since              time.Time
@@ -76,6 +75,27 @@ type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
 	LogType            logs.LogType
+}
+
+func (to TailOptions) String() string {
+	cmd := "tail --since=" + to.Since.UTC().Format(time.RFC3339Nano)
+	if len(to.Services) > 0 {
+		cmd += " --name=" + strings.Join(to.Services, ",")
+	}
+	if to.Etag != "" {
+		cmd += " --etag=" + to.Etag
+	}
+	if to.Raw {
+		cmd += " --raw"
+	}
+	// --verbose is the default for "tail" so we test for false
+	if !to.Verbose {
+		cmd += " --verbose=0"
+	}
+	if to.LogType != logs.LogTypeUnspecified {
+		cmd += " --type=" + to.LogType.String()
+	}
+	return cmd
 }
 
 var P = track.P
@@ -129,46 +149,34 @@ func ParseTimeOrDuration(str string, now time.Time) (time.Time, error) {
 
 type CancelError struct {
 	TailOptions
+	ProjectName string
 	error
 }
 
-func (cerr *CancelError) Error() string {
-	cmd := "tail --since " + cerr.Since.UTC().Format(time.RFC3339Nano)
-	if len(cerr.Services) > 0 {
-		cmd += " --name " + strings.Join(cerr.Services, ",")
-	}
-	if cerr.Etag != "" {
-		cmd += " --etag " + cerr.Etag
-	}
-	if cerr.Verbose {
-		cmd += " --verbose"
+func (cerr CancelError) Error() string {
+	cmd := cerr.String()
+	if cerr.ProjectName != "" {
+		cmd += " --project-name=" + cerr.ProjectName
 	}
 	return cmd
 }
 
-func (cerr *CancelError) Unwrap() error {
+func (cerr CancelError) Unwrap() error {
 	return cerr.error
 }
 
-func Tail(ctx context.Context, loader client.Loader, provider client.Provider, params TailOptions) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return err
-	}
-	if params.Project == "" {
-		params.Project = projectName
-	}
-	if params.LogType == logs.LogTypeUnspecified {
-		params.LogType = logs.LogTypeRun
+func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
+	if options.LogType == logs.LogTypeUnspecified {
+		options.LogType = logs.LogTypeRun
 	}
 
-	term.Debugf("Tailing %s logs in project %q", params.LogType, projectName)
+	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)
 
-	if len(params.Services) > 0 {
-		for _, service := range params.Services {
+	if len(options.Services) > 0 {
+		for _, service := range options.Services {
 			service = compose.NormalizeServiceName(service)
 			// Show a warning if the service doesn't exist (yet); TODO: could do fuzzy matching and suggest alternatives
-			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: params.Project, Name: service}); err != nil {
+			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
 					term.Warn("Service does not exist (yet):", service)
@@ -185,7 +193,7 @@ func Tail(ctx context.Context, loader client.Loader, provider client.Provider, p
 		return ErrDryRun
 	}
 
-	return tail(ctx, provider, params)
+	return tail(ctx, provider, projectName, options)
 }
 
 func isTransientError(err error) bool {
@@ -197,20 +205,20 @@ func isTransientError(err error) bool {
 		errors.Is(err, io.ErrUnexpectedEOF)
 }
 
-func tail(ctx context.Context, provider client.Provider, params TailOptions) error {
+func tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
 	var since *timestamppb.Timestamp
-	if params.Since.Year() <= 1970 {
-		params.Since = time.Now() // this is used to continue from the last timestamp
+	if options.Since.Year() <= 1970 {
+		options.Since = time.Now() // this is used to continue from the last timestamp
 	} else {
-		since = timestamppb.New(params.Since)
+		since = timestamppb.New(options.Since)
 	}
 
 	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{
-		Project:  params.Project,
-		Services: params.Services,
-		Etag:     params.Etag,
+		Project:  projectName,
+		Services: options.Services,
+		Etag:     options.Etag,
 		Since:    since,
-		LogType:  uint32(params.LogType),
+		LogType:  uint32(options.LogType),
 	})
 	if err != nil {
 		return err
@@ -225,9 +233,9 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	}()
 
 	spin := spinner.New()
-	doSpinner := !params.Raw && term.StdoutCanColor() && term.IsTerminal()
+	doSpinner := !options.Raw && term.StdoutCanColor() && term.IsTerminal()
 
-	if term.IsTerminal() && !params.Raw {
+	if term.IsTerminal() && !options.Raw {
 		if doSpinner {
 			term.HideCursor()
 			defer term.ShowCursor()
@@ -236,7 +244,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 			defer cancelSpinner()
 		}
 
-		if !params.Verbose {
+		if !options.Verbose {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
@@ -257,8 +265,8 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 						case 10, 13: // Enter or Return
 							fmt.Println(" ") // empty line, but overwrite the spinner
 						case 'v', 'V':
-							verbose := !params.Verbose
-							params.Verbose = verbose
+							verbose := !options.Verbose
+							options.Verbose = verbose
 							modeStr := "OFF"
 							if verbose {
 								modeStr = "ON"
@@ -279,23 +287,23 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 	for {
 		if !serverStream.Receive() {
 			if errors.Is(serverStream.Err(), context.Canceled) || errors.Is(serverStream.Err(), context.DeadlineExceeded) {
-				return &CancelError{TailOptions: params, error: serverStream.Err()}
+				return &CancelError{TailOptions: options, error: serverStream.Err(), ProjectName: projectName}
 			}
 
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
 				term.Debug("Disconnected:", serverStream.Err())
 				var spaces int
-				if !params.Raw {
+				if !options.Raw {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Services: params.Services, Etag: params.Etag, Since: timestamppb.New(params.Since)})
+				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Services: options.Services, Etag: options.Etag, Since: timestamppb.New(options.Since)})
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
 				}
-				if !params.Raw {
+				if !options.Raw {
 					term.Printf("%*s", spaces, "\r") // clear the "reconnecting" message
 				}
 				skipDuplicate = true
@@ -317,9 +325,9 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 
 			// HACK: skip noisy CI/CD logs (except errors)
 			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "cloudbuild"
-			onlyErrors := !params.Verbose && isInternal
+			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, e.Message) {
+				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
 					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
@@ -327,15 +335,15 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 			}
 
 			ts := e.Timestamp.AsTime()
-			if skipDuplicate && ts.Equal(params.Since) {
+			if skipDuplicate && ts.Equal(options.Since) {
 				skipDuplicate = false
 				continue
 			}
-			if ts.After(params.Since) {
-				params.Since = ts
+			if ts.After(options.Since) {
+				options.Since = ts
 			}
 
-			if params.Raw {
+			if options.Raw {
 				if e.Stderr {
 					term.Error(e.Message)
 				} else {
@@ -363,15 +371,15 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
 					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
-					if params.Etag == "" {
+					if options.Etag == "" {
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
-					if len(params.Services) == 0 {
+					if len(options.Services) == 0 {
 						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
-					if params.Verbose {
+					if options.Verbose {
 						l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
 						prefixLen += l
 					}
@@ -389,7 +397,7 @@ func tail(ctx context.Context, provider client.Provider, params TailOptions) err
 				buf.WriteRune('\n')
 
 				// Detect end logging event
-				if params.EndEventDetectFunc != nil && params.EndEventDetectFunc([]string{service}, host, line) {
+				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, line) {
 					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}

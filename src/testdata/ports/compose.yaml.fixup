@@ -1,0 +1,99 @@
+{
+  "long": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 82,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "long-published": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 83,
+        "published": "8083",
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "short": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 80,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "short-published": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 81,
+        "published": "8081",
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "short-udp": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 84,
+        "protocol": "udp"
+      }
+    ]
+  },
+  "short-udp-published": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 85,
+        "published": "8085",
+        "protocol": "udp"
+      }
+    ]
+  }
+}

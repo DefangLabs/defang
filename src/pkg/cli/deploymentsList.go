@@ -15,12 +15,7 @@ type PrintDeployment struct {
 	DeployedAt string
 }
 
-func DeploymentsList(ctx context.Context, loader client.Loader, client client.GrpcClient) error {
-	projectName, err := loader.LoadProjectName(ctx)
-	if err != nil {
-		return err
-	}
-
+func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: projectName,
 	})

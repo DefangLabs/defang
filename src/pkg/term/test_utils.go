@@ -2,7 +2,7 @@ package term
 
 import (
 	"bytes"
-	"io"
+	"os"
 	"testing"
 )
 
@@ -10,7 +10,7 @@ func SetupTestTerm(t *testing.T) (*bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
-	testTerm := NewTerm(&stdout, io.MultiWriter(&stderr))
+	testTerm := NewTerm(os.Stdin, &stdout, &stderr)
 	testTerm.ForceColor(true)
 	defaultTerm := DefaultTerm
 	DefaultTerm = testTerm

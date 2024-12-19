@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -17,7 +18,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(&stdout, &stderr)
+	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
 	providerID = cliClient.ProviderDefang
 	cluster = cli.DefaultCluster
@@ -40,7 +41,7 @@ func TestPrintEndpoints(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(&stdout, &stderr)
+	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
 	printEndpoints([]*defangv1.ServiceInfo{
 		{

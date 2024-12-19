@@ -3,6 +3,7 @@ package term
 import (
 	"bytes"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -74,7 +75,7 @@ func TestAddingPrefix(t *testing.T) {
 		DefaultTerm = defaultTerm
 	})
 	var stdout, stderr bytes.Buffer
-	DefaultTerm = NewTerm(&stdout, &stderr)
+	DefaultTerm = NewTerm(os.Stdin, &stdout, &stderr)
 	DefaultTerm.SetDebug(true)
 
 	Debug("Hello, World!")
@@ -124,7 +125,7 @@ func TestInfoAddSpaceBetweenStrings(t *testing.T) {
 		DefaultTerm = defaultTerm
 	})
 	var stdout, stderr bytes.Buffer
-	DefaultTerm = NewTerm(&stdout, &stderr)
+	DefaultTerm = NewTerm(os.Stdin, &stdout, &stderr)
 	DefaultTerm.SetDebug(true)
 
 	Info("Hello", "World!")

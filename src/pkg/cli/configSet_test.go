@@ -6,15 +6,13 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestConfigSet(t *testing.T) {
 	ctx := context.Background()
-	loader := client.MockLoader{Project: &compose.Project{Name: "test"}}
 	provider := MustHaveProjectNamePutConfigProvider{}
-	err := ConfigSet(ctx, loader, provider, "test_name", "test_value")
+	err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
 	if err != nil {
 		t.Fatalf("ConfigSet() error = %v", err)
 	}

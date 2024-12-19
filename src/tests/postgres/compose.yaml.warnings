@@ -1,5 +1,0 @@
- ! service "x": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "y": managed Postgres service should use a postgres image
- ! service "y": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "z": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "z": stateful service will lose data on restart; use a managed service instead

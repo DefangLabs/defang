@@ -1,0 +1,150 @@
+{
+  "cmd-shell": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "CMD-SHELL",
+        "echo hello",
+        "second line"
+      ]
+    },
+    "image": "alpine",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5000,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "curl": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "curl",
+        "-f",
+        "localhost"
+      ]
+    },
+    "image": "curl",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 80,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "flask1": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "python",
+        "-c",
+        "import sys, urllib.request;urllib.request.urlopen(sys.argv[1]).read()",
+        "http://localhost/"
+      ],
+      "timeout": "1s"
+    },
+    "image": "flask",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5000,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "flask2": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request;urllib.request.urlopen('http://127.0.0.1/path').read()"
+      ],
+      "interval": "10s"
+    },
+    "image": "flask",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5000,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "none": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "NONE",
+        "ignored"
+      ],
+      "timeout": "1s",
+      "interval": "1m0s",
+      "retries": 3
+    },
+    "image": "alpine",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5000,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
+  "wget": {
+    "command": null,
+    "entrypoint": null,
+    "healthcheck": {
+      "test": [
+        "CMD",
+        "wget",
+        "-q",
+        "--spider",
+        "localhost:80"
+      ]
+    },
+    "image": "alpine",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 80,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  }
+}

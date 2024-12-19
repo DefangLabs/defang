@@ -3,14 +3,13 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-var ErrTermsNotAgreed = errors.New("You must agree to the Defang terms of service to use this tool")
+var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of service to use this tool")
 
 func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if client.TermsAccepted() {
@@ -21,7 +20,7 @@ func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 		return nil
 	}
 
-	fmt.Println("Our latest terms of service can be found at https://defang.io/terms-service.html")
+	term.Println("Our latest terms of service can be found at https://s.defang.io/tos")
 
 	var agreeToS bool
 	err := survey.AskOne(&survey.Confirm{

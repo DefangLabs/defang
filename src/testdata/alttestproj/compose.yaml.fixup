@@ -1,0 +1,23 @@
+{
+  "dfnx": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "memory": "268435456"
+        }
+      },
+      "placement": {}
+    },
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    },
+    "restart": "unless-stopped"
+  }
+}

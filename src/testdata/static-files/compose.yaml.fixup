@@ -1,0 +1,18 @@
+{
+  "x": {
+    "command": null,
+    "entrypoint": null,
+    "image": "blah",
+    "networks": {
+      "default": null
+    }
+  },
+  "y": {
+    "command": null,
+    "entrypoint": null,
+    "image": "blah",
+    "networks": {
+      "default": null
+    }
+  }
+}

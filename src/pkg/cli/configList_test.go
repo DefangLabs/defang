@@ -6,9 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -52,8 +50,7 @@ func TestConfigList(t *testing.T) {
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		loader := client.MockLoader{Project: &compose.Project{Name: "emptyconfigs"}}
-		err := ConfigList(ctx, loader, &provider)
+		err := ConfigList(ctx, "emptyconfigs", &provider)
 		if err != nil {
 			t.Fatalf("ConfigList() error = %v", err)
 		}
@@ -69,8 +66,7 @@ func TestConfigList(t *testing.T) {
 	t.Run("some configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
 
-		loader := client.MockLoader{Project: &compose.Project{Name: "test"}}
-		err := ConfigList(ctx, loader, &provider)
+		err := ConfigList(ctx, "test", &provider)
 		if err != nil {
 			t.Fatalf("ConfigList() error = %v", err)
 		}

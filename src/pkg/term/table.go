@@ -15,7 +15,7 @@ func Table(slice interface{}, attributes []string) error {
 	}
 
 	// Create a tabwriter
-	w := tabwriter.NewWriter(DefaultTerm.outw, 0, 0, 2, ' ', 0)
+	w := tabwriter.NewWriter(DefaultTerm.stdout, 0, 0, 2, ' ', 0)
 
 	var err error
 
