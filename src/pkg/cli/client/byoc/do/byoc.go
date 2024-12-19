@@ -52,13 +52,13 @@ var (
 type ByocDo struct {
 	*byoc.ByocBaseClient
 
-	buildRepo          string
-	client             *godo.Client
-	driver             *appPlatform.DoApp
-	lastCdAppID        string
-	lastCdDeploymentID string
-	lastCdEtag         types.ETag
-	// lastCdStart      time.Time
+	buildRepo      string
+	client         *godo.Client
+	driver         *appPlatform.DoApp
+	cdAppID        string
+	cdDeploymentID string
+	cdEtag         types.ETag
+	// cdStart      time.Time
 }
 
 var _ client.Provider = (*ByocDo)(nil)
@@ -208,7 +208,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 		return nil, err
 	}
 
-	b.lastCdEtag = etag
+	b.cdEtag = etag
 	return &defangv1.DeployResponse{
 		Services: serviceInfos,
 		Etag:     etag,
@@ -226,7 +226,7 @@ func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapComma
 	}
 
 	etag := pkg.RandomID()
-	b.lastCdEtag = etag
+	b.cdEtag = etag
 	return etag, nil
 }
 
@@ -376,10 +376,10 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	var appID, deploymentID string
 
-	if req.Etag != "" && req.Etag == b.lastCdEtag {
+	if req.Etag != "" && req.Etag == b.cdEtag {
 		// Use the last known app and deployment ID from the last CD command
-		appID = b.lastCdAppID
-		deploymentID = b.lastCdDeploymentID
+		appID = b.cdAppID
+		deploymentID = b.cdDeploymentID
 	}
 
 	if deploymentID == "" || appID == "" {
@@ -515,14 +515,14 @@ func (i DoAccountInfo) Details() string {
 }
 
 func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	if req.Etag != b.lastCdEtag || b.lastCdAppID == "" {
+	if req.Etag != b.cdEtag || b.cdAppID == "" {
 		return nil, errors.ErrUnsupported // TODO: fetch the deployment ID for the given etag
 	}
 	ctx, cancel := context.WithCancel(ctx) // canceled by subscribeStream.Close()
 	return &subscribeStream{
-		appID:        b.lastCdAppID,
+		appID:        b.cdAppID,
 		b:            b,
-		deploymentID: b.lastCdDeploymentID,
+		deploymentID: b.cdDeploymentID,
 		ctx:          ctx,
 		cancel:       cancel,
 		queue:        make(chan *defangv1.SubscribeResponse, 10),
@@ -627,8 +627,8 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 		return nil, err
 	}
 
-	b.lastCdAppID = app.ID
-	b.lastCdDeploymentID = app.PendingDeployment.ID
+	b.cdAppID = app.ID
+	b.cdDeploymentID = app.PendingDeployment.ID
 	return app, nil
 }
 
