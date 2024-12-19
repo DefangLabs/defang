@@ -86,7 +86,7 @@ func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, pr
 
 	resp, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider. Please upgrade on https://s.defang.io/subscription", providerID))
+		return "", err
 	}
 
 	return resp.CdImage, nil
@@ -876,6 +876,11 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
+		provider, err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
@@ -1127,29 +1132,29 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+	return provider, nil
+}
+
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) (cliClient.Provider, error) {
+	cdImage, err := allowToUseProvider(ctx, providerID, projectName)
 	if err != nil {
-		term.Debug("unable to load project name:", err)
+		return nil, err
 	}
 
-	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
-		return nil, err
-	} else {
-		// provide sane defaults for the CD image
-		if cdImage == "" {
-			switch providerID {
-			case cliClient.ProviderAWS:
-				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
-			case cliClient.ProviderDO:
-				cdImage = "docker.io/defangio/cd:public-beta"
-			case cliClient.ProviderGCP:
-				cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
-			}
+	// provide sane defaults for the CD image
+	if cdImage == "" {
+		switch providerID {
+		case cliClient.ProviderAWS:
+			cdImage = "public.ecr.aws/defang-io/cd:public-beta"
+		case cliClient.ProviderDO:
+			cdImage = "docker.io/defangio/cd:public-beta"
+		case cliClient.ProviderGCP:
+			cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
 		}
-		// Allow local override of the CD image
-		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
-		provider.SetCDImage(cdImage)
 	}
+	// Allow local override of the CD image
+	cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
+	provider.SetCDImage(cdImage)
 
 	return provider, nil
 }
