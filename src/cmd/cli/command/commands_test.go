@@ -22,7 +22,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/bufbuild/connect-go"
-	connect_go "github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -44,30 +43,30 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
-	allowedToUseProvider bool
-	canIUseResponse      defangv1.CanIUseResponse
+	canIUseErrorText string
+	canIUseResponse  defangv1.CanIUseResponse
 }
 
-func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
-	if !m.allowedToUseProvider {
-		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
+func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
+	if m.canIUseErrorText != "" {
+		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New(m.canIUseErrorText))
 	}
-	return connect_go.NewResponse(&m.canIUseResponse), nil
+	return connect.NewResponse(&m.canIUseResponse), nil
 }
 
-func (m *mockFabricService) GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[defangv1.Version], error) {
-	return connect_go.NewResponse(&defangv1.Version{
+func (m *mockFabricService) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.Version], error) {
+	return connect.NewResponse(&defangv1.Version{
 		Fabric: "0.0.0-test",
 		CliMin: "0.0.0-test",
 	}), nil
 }
 
-func (m *mockFabricService) CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
-	return connect_go.NewResponse(&emptypb.Empty{}), nil
+func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-func (m *mockFabricService) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[defangv1.WhoAmIResponse], error) {
-	return connect_go.NewResponse(&defangv1.WhoAmIResponse{
+func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{
 		Tenant:  "default",
 		Account: "default",
 		Region:  "us-west-2",
@@ -75,14 +74,14 @@ func (m *mockFabricService) WhoAmI(context.Context, *connect_go.Request[emptypb.
 	}), nil
 }
 
-func (m *mockFabricService) GetSelectedProvider(context.Context, *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
-	return connect_go.NewResponse(&defangv1.GetSelectedProviderResponse{
+func (m *mockFabricService) GetSelectedProvider(context.Context, *connect.Request[defangv1.GetSelectedProviderRequest]) (*connect.Response[defangv1.GetSelectedProviderResponse], error) {
+	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
 		Provider: defangv1.Provider_AWS,
 	}), nil
 }
 
-func (m *mockFabricService) SetSelectedProvider(context.Context, *connect_go.Request[defangv1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return connect_go.NewResponse(&emptypb.Empty{}), nil
+func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func init() {
@@ -140,63 +139,77 @@ func TestVersion(t *testing.T) {
 func TestCommandGates(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	composeDir := "../../../../src/testdata/sanity"
+	os.Chdir(composeDir)
 
 	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close)
+	t.Cleanup(func() {
+		os.Chdir(origDir)
+		server.Close()
+	})
+
+	type cmdPermTest struct {
+		name      string
+		command   []string
+		errorText string
+		wantError error
+	}
+	type cmdPermTests []cmdPermTest
 
 	t.Setenv("AWS_REGION", "us-test-2")
 
-	if err := os.Chdir("../../../testdata/empty"); err != nil {
-		t.Fatalf("Failed to change directory: %v", err)
-	}
-
-	testData := []struct {
-		name          string
-		command       []string
-		accessAllowed bool
-		wantError     string
-	}{
+	testData := cmdPermTests{
 		{
-			name:          "compose up - aws - no access",
-			command:       []string{"compose", "up", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "compose up - aws - no access",
+			command:   []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:          "compose up - defang - has access",
-			command:       []string{"compose", "up", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
+			name:      "compose up - defang - has access",
+			command:   []string{"compose", "up", "--provider=defang", "--dry-run"},
+			errorText: "",
+			wantError: nil,
 		},
 		{
-			name:          "compose down - aws - no access",
-			command:       []string{"compose", "down", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "compose down - aws - no access",
+			command:   []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 		},
 		{
-			name:          "config set - aws - no access",
-			command:       []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "config set - aws - allowed",
+			command:   []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: nil,
 		},
 		{
-			name:          "config rm - aws - no access",
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "config rm - aws - no allowed",
+			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: nil,
 		},
 		{
-			name:          "config rm - defang - has access",
-			command:       []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			accessAllowed: true,
-			wantError:     "",
+			name:      "config rm - defang - allowed",
+			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
+			errorText: "",
+			wantError: nil,
 		},
 		{
-			name:          "delete service - aws - no access",
-			command:       []string{"delete", "abc", "--provider=aws", "--dry-run"},
-			accessAllowed: false,
-			wantError:     "current subscription tier does not allow this action: no access to use aws provider",
+			name:      "delete service - aws - no access",
+			command:   []string{"delete", "abc", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+		},
+		{
+			name:      "whoami - allowed",
+			command:   []string{"whoami", "--provider=aws", "--dry-run"},
+			errorText: "no access to use aws provider",
+			wantError: nil,
 		},
 	}
 
@@ -204,20 +217,21 @@ func TestCommandGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
 			pkg.SsmClientOverride = &MockSsmClient{}
-			mockService.allowedToUseProvider = tt.accessAllowed
+			mockService.canIUseErrorText = tt.errorText
 
 			err := testCommand(tt.command, server.URL)
 
-			if err != nil && tt.wantError == "" {
-				if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
-					t.Fatalf("Unexpected error: %v", err)
+			if tt.wantError == nil {
+				if err != nil {
+					if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
+						t.Fatalf("Unexpected error: %v", err)
+					}
 				}
-			}
-
-			if tt.wantError != "" {
-				var errNoPermission = ErrNoPermission(tt.wantError)
-				if !errors.As(err, &errNoPermission) || !strings.Contains(err.Error(), tt.wantError) {
-					t.Fatalf("Expected errNoPermission, got: %v", err)
+			} else {
+				if err == nil {
+					t.Fatalf("Expected error: %v, got nil", tt.wantError)
+				} else if err.Error() != tt.wantError.Error() {
+					t.Fatalf("Expected error: %v, got: %v", tt.wantError.Error(), err)
 				}
 			}
 		})
@@ -230,21 +244,21 @@ type MockFabricControllerClient struct {
 	savedProvider   map[string]defangv1.Provider
 }
 
-func (m *MockFabricControllerClient) CanIUse(context.Context, *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
+func (m *MockFabricControllerClient) CanIUse(context.Context, *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
 	return connect.NewResponse(&m.canIUseResponse), nil
 }
 
-func (m *MockFabricControllerClient) GetServices(context.Context, *connect_go.Request[defangv1.GetServicesRequest]) (*connect_go.Response[defangv1.GetServicesResponse], error) {
+func (m *MockFabricControllerClient) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
 	return connect.NewResponse(&defangv1.GetServicesResponse{}), nil
 }
 
-func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
+func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect.Request[defangv1.GetSelectedProviderRequest]) (*connect.Response[defangv1.GetSelectedProviderResponse], error) {
 	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
 		Provider: m.savedProvider[req.Msg.Project],
 	}), nil
 }
 
-func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
 	m.savedProvider[req.Msg.Project] = req.Msg.Provider
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
@@ -515,6 +529,12 @@ func TestGetProvider(t *testing.T) {
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
+
+		p, err = canIUseProvider(ctx, p, "project")
+		if err != nil {
+			t.Errorf("CanIUseProvider() failed: %v", err)
+		}
+
 		if awsProvider, ok := p.(*aws.ByocAws); !ok {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {
@@ -543,6 +563,12 @@ func TestGetProvider(t *testing.T) {
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
+
+		p, err = canIUseProvider(ctx, p, "project")
+		if err != nil {
+			t.Errorf("CanIUseProvider() failed: %v", err)
+		}
+
 		if awsProvider, ok := p.(*aws.ByocAws); !ok {
 			t.Errorf("Expected provider to be of type *aws.ByocAws, got %T", p)
 		} else {

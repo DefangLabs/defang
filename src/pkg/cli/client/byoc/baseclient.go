@@ -142,7 +142,12 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 		return "", errors.New("no projects found")
 	}
 	if len(projectNames) > 1 {
-		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: %v", projectNames)
+		var projectList = ""
+		for _, projectName := range projectNames {
+			projectList += " - " + projectName + "\n"
+		}
+
+		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: \n%v", projectList)
 	}
 	term.Debug("Using default project:", projectNames[0])
 	return projectNames[0], nil
