@@ -137,20 +137,11 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
-			loader := configureLoader(cmd)
-
-			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			provider, err = canIUseProvider(cmd.Context(), provider, "")
 			if err != nil {
 				return err
 			}
 
-			provider, err = canIUseProvider(cmd.Context(), provider, projectName)
-			if err != nil {
-				return err
-			}
-		}
-
-		if remote {
 			// FIXME: this needs auth because it spawns the CD task
 			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
 		}
