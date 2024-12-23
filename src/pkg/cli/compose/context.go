@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/go-units"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -33,12 +34,13 @@ const (
 )
 
 const (
-	MiB                  = 1024 * 1024
-	ContextFileLimit     = 100
-	ContextSizeSoftLimit = 10 * MiB
-	ContextSizeHardLimit = 100 * MiB
-	sourceDateEpoch      = 315532800 // 1980-01-01, same as nix-shell
-	defaultDockerIgnore  = `# Default .dockerignore file for Defang
+	MiB                         = 1024 * 1024
+	ContextFileLimit            = 100
+	ContextSizeSoftLimit        = 10 * MiB
+	DefaultContextSizeHardLimit = 100 * MiB
+
+	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
+	defaultDockerIgnore = `# Default .dockerignore file for Defang
 **/.DS_Store
 **/.direnv
 **/.envrc
@@ -59,6 +61,17 @@ const (
 defang
 # Ignore our project-level state
 .defang`
+)
+
+func parseContextLimit(limit string, def int64) int64 {
+	if size, err := units.RAMInBytes(limit); err == nil {
+		return size
+	}
+	return def
+}
+
+var (
+	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
 func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
@@ -279,11 +292,11 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		bufLen := buf.Len()
 		_, err = io.Copy(tarWriter, file)
-		if buf.Len() > ContextSizeHardLimit {
-			return fmt.Errorf("build context is too large; this beta version is limited to %dMiB, use --debug or create .dockerignore to exclude caches and build artifacts", ContextSizeHardLimit/MiB)
+		if int64(buf.Len()) > ContextSizeHardLimit {
+			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
 		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
-			term.Warnf("The build context is more than %dMiB; use --debug or create .dockerignore to exclude caches and build artifacts", ContextSizeSoftLimit/MiB)
+			term.Warnf("The build context is more than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
 		}
 		return err
 	})
