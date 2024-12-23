@@ -145,7 +145,7 @@ func makeComposeUpCmd() *cobra.Command {
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
 					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
+						term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
 					}
 				} else {
 					cancelTail(errCompleted)
