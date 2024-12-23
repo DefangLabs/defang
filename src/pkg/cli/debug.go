@@ -48,6 +48,16 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 		return err
 	}
 
+	var goodBad bool
+	if err := survey.AskOne(&survey.Input{
+		Message: "Was the debugging helpful?",
+		Help:    "Please provide feedback to help us improve the debugging experience.",
+	}, &goodBad); err != nil {
+		term.Debugf("failed to ask for feedback: %v", err)
+		track.Evt("Debug Feedback Prompt Failed", P("etag", etag), P("reason", err))
+	} else {
+		track.Evt("Debug Feedback Prompt Answered", P("etag", etag), P("feedback", goodBad))
+	}
 	return nil
 }
 
