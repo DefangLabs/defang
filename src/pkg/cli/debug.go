@@ -32,8 +32,7 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
-	}, &aiDebug); err != nil {
-		term.Debugf("failed to ask for AI debug: %v", err)
+	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err))
 		return err
 	} else if !aiDebug {
@@ -49,11 +48,10 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	}
 
 	var goodBad bool
-	if err := survey.AskOne(&survey.Input{
+	if err := survey.AskOne(&survey.Confirm{
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		term.Debugf("failed to ask for feedback: %v", err)
 		track.Evt("Debug Feedback Prompt Failed", P("etag", etag), P("reason", err))
 	} else {
 		track.Evt("Debug Feedback Prompt Answered", P("etag", etag), P("feedback", goodBad))
