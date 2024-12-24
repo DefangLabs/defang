@@ -439,7 +439,7 @@ func makeComposeLogsCmd() *cobra.Command {
 
 			ts = ts.UTC()
 			sinceStr := ""
-			if ts.Year() > 1970 {
+			if pkg.IsValidTime(ts) {
 				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 			}
 			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)

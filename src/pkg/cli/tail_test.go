@@ -15,6 +15,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/bufbuild/connect-go"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -78,7 +79,8 @@ type mockTailProvider struct {
 }
 
 func (m *mockTailProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	m.Reqs = append(m.Reqs, req)
+	dup, _ := proto.Clone(req).(*defangv1.TailRequest)
+	m.Reqs = append(m.Reqs, dup)
 	if len(m.ServerStreams) == 0 {
 		return nil, errors.New("no server stream provided")
 	}
