@@ -8,6 +8,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -69,10 +70,11 @@ func InteractiveComposeDown(ctx context.Context, provider client.Provider, proje
 	var wantComposeDown bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
-	}, &wantComposeDown); err != nil {
+	}, &wantComposeDown, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", err
 	}
 
+	track.Evt("Compose Down Prompt Answered", P("project", projectName), P("wantComposeDown", wantComposeDown))
 	if !wantComposeDown {
 		return "", ErrDoNotComposeDown
 	}
