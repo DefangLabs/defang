@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -73,7 +74,7 @@ func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupIn
 	var pendingGroups []LogGroupInput
 
 	sincePending := since
-	if sincePending.Year() <= 1970 {
+	if !pkg.IsValidTime(since) {
 		sincePending = time.Now()
 	}
 	for _, lgi := range logGroups {
@@ -342,7 +343,7 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		if since.Year() > 1970 {
+		if pkg.IsValidTime(since) {
 			// Query the logs between the start time and now
 			if err := Query(c.ctx, lgi, since, time.Now(), func(events []LogEvent) {
 				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
