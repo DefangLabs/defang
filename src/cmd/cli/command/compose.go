@@ -62,12 +62,18 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
+
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
 			project, err := loader.LoadProject(cmd.Context())
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err = canIUseProvider(cmd.Context(), provider, project.Name)
 			if err != nil {
 				return err
 			}
@@ -298,13 +304,17 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
+			provider, err = canIUseProvider(cmd.Context(), provider, projectName)
+			if err != nil {
+				return err
+			}
+
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
 					term.Warn(prettyError(err))
-					return nil
 				}
 				return err
 			}
@@ -473,6 +483,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  verbose,
 				LogType:  *logType,
 			}
+
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
