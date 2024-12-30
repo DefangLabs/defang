@@ -133,3 +133,7 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 		return "Unknown"
 	}
 }
+
+func IsValidTime(t time.Time) bool {
+	return t.Year() > 1970
+}

@@ -2,8 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
-	"io"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -28,16 +26,10 @@ func (m MockProvider) ServiceDNS(service string) string {
 	return service
 }
 
-func (m MockProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
-	if m.ServerStream != nil {
-		return m.ServerStream, nil
-	}
-	return nil, errors.New("no server stream provided")
-}
-
 type MockServerStream struct {
+	state int
 	Resps []*defangv1.TailResponse
-	Errs  []error
+	Error error
 }
 
 func (m *MockServerStream) Close() error {
@@ -45,28 +37,26 @@ func (m *MockServerStream) Close() error {
 }
 
 func (m *MockServerStream) Receive() bool {
-	return len(m.Resps) != 0
+	if len(m.Resps) == 0 {
+		return false
+	}
+	if m.state == 0 {
+		m.state = 1
+	} else {
+		m.Resps = m.Resps[1:]
+	}
+	return true
 }
 
 func (m *MockServerStream) Msg() *defangv1.TailResponse {
 	if len(m.Resps) == 0 {
 		return nil
 	}
-	resp := m.Resps[0]
-	m.Resps = m.Resps[1:]
-	return resp
+	return m.Resps[0]
 }
 
 func (m *MockServerStream) Err() error {
-	if len(m.Resps) == 0 && len(m.Errs) == 0 {
-		return io.EOF // End of test
-	}
-	if len(m.Errs) == 0 {
-		return errors.New("unexpected call to Err() for the test")
-	}
-	err := m.Errs[0]
-	m.Errs = m.Errs[1:]
-	return err
+	return m.Error
 }
 
 type MockFabricClient struct {
