@@ -71,7 +71,7 @@ func parseContextLimit(limit string, def int64) int64 {
 }
 
 var (
-	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
+	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_BUILD_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
 func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
@@ -293,7 +293,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		bufLen := buf.Len()
 		_, err = io.Copy(tarWriter, file)
 		if int64(buf.Len()) > ContextSizeHardLimit {
-			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
+			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
 		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
 			term.Warnf("The build context is more than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
