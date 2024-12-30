@@ -27,7 +27,7 @@ func Evt(name string, props ...cliClient.Property) {
 	if disableAnalytics {
 		return
 	}
-	term.Debugf("%s %v", name, props)
+	term.Debugf("tracking event %q: %v", name, props)
 	trackWG.Add(1)
 	go func(fabric cliClient.FabricClient) {
 		defer trackWG.Done()
