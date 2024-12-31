@@ -16,6 +16,26 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
+func Test_parseContextLimit(t *testing.T) {
+	t.Run("valid limit", func(t *testing.T) {
+		if got := parseContextLimit("1MiB", 0); got != MiB {
+			t.Errorf("Expected %v, got %v", MiB, got)
+		}
+	})
+
+	t.Run("invalid limit", func(t *testing.T) {
+		if got := parseContextLimit("invalid", 42); got != 42 {
+			t.Errorf("Expected 42, got %v", got)
+		}
+	})
+
+	t.Run("empty limit", func(t *testing.T) {
+		if got := parseContextLimit("", 42); got != 42 {
+			t.Errorf("Expected 42, got %v", got)
+		}
+	})
+}
+
 func TestUploadTarball(t *testing.T) {
 	const path = "/upload/x/"
 	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
