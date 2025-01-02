@@ -315,6 +315,7 @@ func makeComposeDownCmd() *cobra.Command {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
 					term.Warn(prettyError(err))
+					return nil
 				}
 				return err
 			}
