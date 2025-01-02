@@ -7,6 +7,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of service to use this tool")
@@ -26,11 +27,12 @@ func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	err := survey.AskOne(&survey.Confirm{
 		Message: "Do you agree to the Defang terms of service?",
 		Help:    "You must agree to the Defang terms of service to continue using this tool",
-	}, &agreeToS)
+	}, &agreeToS, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
 		return err
 	}
 
+	track.Evt("AgreeToS", P("agree", agreeToS))
 	if !agreeToS {
 		return ErrTermsNotAgreed
 	}

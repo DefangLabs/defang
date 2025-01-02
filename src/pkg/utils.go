@@ -139,3 +139,7 @@ func Ensure(cond bool, msg string) {
 		panic(msg)
 	}
 }
+
+func IsValidTime(t time.Time) bool {
+	return t.Year() > 1970
+}

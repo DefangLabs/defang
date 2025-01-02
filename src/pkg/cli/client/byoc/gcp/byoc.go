@@ -83,8 +83,8 @@ type ByocGcp struct {
 	uploadServiceAccount string
 	delegateDomainZone   string
 
-	lastCdExecution string
-	lastCdEtag      string
+	cdExecution string
+	cdEtag      string
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
@@ -342,7 +342,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	if err != nil {
 		return "", err
 	}
-	b.lastCdExecution = execution
+	b.cdExecution = execution
 	// fmt.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
@@ -438,7 +438,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		return nil, err
 	}
 
-	b.lastCdEtag = etag
+	b.cdEtag = etag
 	if command == "preview" {
 		etag = execution // Only wait for the preview command cd job to finish
 	}
@@ -482,8 +482,8 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.lastCdEtag {
-		ss.AddJobExecutionUpdate(path.Base(b.lastCdExecution))
+	if req.Etag == b.cdEtag {
+		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
 	ss.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
 	ss.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
@@ -494,12 +494,12 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if req.Etag == b.lastCdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
+	if req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		ss, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
 		}
-		ss.AddJobExecutionUpdate(path.Base(b.lastCdExecution))
+		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
 		if err := ss.Start(); err != nil {
 			return nil, err
 		}
@@ -529,11 +529,11 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.lastCdEtag || req.Etag == b.lastCdExecution {
-		ls.AddJobExecutionLog(path.Base(b.lastCdExecution), req.Since.AsTime()) // CD log
+	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
+		ls.AddJobExecutionLog(path.Base(b.cdExecution), req.Since.AsTime()) // CD log
 	}
 
-	if req.Etag != b.lastCdExecution { // No need to tail kaniko and service log if there is only cd running
+	if req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
 		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
 		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
 		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
