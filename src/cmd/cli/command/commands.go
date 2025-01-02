@@ -1026,7 +1026,8 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 			var confirm bool
 			err := survey.AskOne(&survey.Confirm{
 				Message: "Continue with project: " + projectName + "?",
-			}, &nonInteractive, survey.WithStdio(term.DefaultTerm.Stdio()))
+			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+			track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
 			if err == nil && !confirm {
 				os.Exit(1)
 			}
@@ -1183,6 +1184,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", err
 	}
+	track.Evt("ProviderSelected", P("provider", optionValue))
 	if err := providerID.Set(optionValue); err != nil {
 		panic(err)
 	}

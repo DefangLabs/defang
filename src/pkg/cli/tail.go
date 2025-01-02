@@ -207,19 +207,20 @@ func isTransientError(err error) bool {
 
 func tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
 	var since *timestamppb.Timestamp
-	if options.Since.Year() <= 1970 {
-		options.Since = time.Now() // this is used to continue from the last timestamp
-	} else {
+	if pkg.IsValidTime(options.Since) {
 		since = timestamppb.New(options.Since)
+	} else {
+		options.Since = time.Now() // this is used to continue from the last timestamp
 	}
 
-	serverStream, err := provider.Follow(ctx, &defangv1.TailRequest{
+	tailRequest := &defangv1.TailRequest{
 		Project:  projectName,
 		Services: options.Services,
 		Etag:     options.Etag,
 		Since:    since,
 		LogType:  uint32(options.LogType),
-	})
+	}
+	serverStream, err := provider.Follow(ctx, tailRequest)
 	if err != nil {
 		return err
 	}
@@ -298,7 +299,8 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
-				serverStream, err = provider.Follow(ctx, &defangv1.TailRequest{Services: options.Services, Etag: options.Etag, Since: timestamppb.New(options.Since)})
+				tailRequest.Since = timestamppb.New(options.Since)
+				serverStream, err = provider.Follow(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err
@@ -324,7 +326,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric"
+			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
@@ -335,6 +337,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			}
 
 			ts := e.Timestamp.AsTime()
+			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
 			if skipDuplicate && ts.Equal(options.Since) {
 				skipDuplicate = false
 				continue
