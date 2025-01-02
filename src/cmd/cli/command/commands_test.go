@@ -150,6 +150,7 @@ func TestCommandGates(t *testing.T) {
 		t.Fatalf("Failed to change directory: %v", err)
 	}
 
+	t.Setenv("AWS_REGION", "us-west-2")
 	t.Cleanup(func() {
 		os.Chdir(origDir)
 	})
