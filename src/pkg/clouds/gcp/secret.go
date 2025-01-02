@@ -101,7 +101,7 @@ func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error)
 	defer client.Close()
 
 	req := &secretmanagerpb.ListSecretsRequest{
-		Parent: "projects/%s" + gcp.ProjectId,
+		Parent: "projects/" + gcp.ProjectId,
 	}
 	it := client.ListSecrets(ctx, req)
 	secretRegex := regexp.MustCompile(fmt.Sprintf(`/secrets/%s(.*)`, regexp.QuoteMeta(prefix)))

@@ -148,6 +148,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.networkAdmin",            // For creating network
 		"roles/dns.admin",                       // For creating DNS records
 		"roles/cloudbuild.builds.editor",        // For building images using cloud build
+		"roles/secretmanager.admin",             // For set permission to secrets
 	}); err != nil {
 		return err
 	}
@@ -318,7 +319,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_ORG":               "defang",
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
-		"DEFANG_PREFIX":            "defang",
+		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 	}
