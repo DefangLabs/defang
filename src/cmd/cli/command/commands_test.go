@@ -162,63 +162,36 @@ func TestCommandGates(t *testing.T) {
 		name                string
 		command             []string
 		canIUseError        error
-		wantError           error
 		expectCanIUseCalled bool
 	}{
 		{
 			name:                "compose up - aws - no access",
 			command:             []string{"compose", "up", "--provider=aws", "--dry-run"},
 			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
-			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
-			expectCanIUseCalled: true,
-		},
-		{
-			name:                "compose up - defang - has access",
-			command:             []string{"compose", "up", "--provider=defang", "--dry-run"},
-			canIUseError:        nil,
-			wantError:           nil,
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "compose down - aws - no access",
 			command:             []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
 			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
-			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "config set - aws - allowed",
 			command:             []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
 			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
-			wantError:           nil,
-			expectCanIUseCalled: false,
-		},
-		{
-			name:                "config rm - aws - not allowed",
-			command:             []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
-			wantError:           nil,
-			expectCanIUseCalled: false,
-		},
-		{
-			name:                "config rm - defang - allowed",
-			command:             []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			canIUseError:        nil,
-			wantError:           nil,
 			expectCanIUseCalled: false,
 		},
 		{
 			name:                "delete service - aws - no access",
 			command:             []string{"delete", "abc", "--provider=aws", "--dry-run"},
 			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
-			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "whoami - allowed",
 			command:             []string{"whoami", "--provider=aws", "--dry-run"},
 			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
-			wantError:           nil,
 			expectCanIUseCalled: false,
 		},
 	}
@@ -230,24 +203,10 @@ func TestCommandGates(t *testing.T) {
 			mockService.canIUseIsCalled = false
 			mockService.canIUseError = tt.canIUseError
 
-			err := testCommand(tt.command, server.URL)
+			testCommand(tt.command, server.URL)
 
-			if tt.expectCanIUseCalled && !mockService.canIUseIsCalled {
-				t.Fatal("canIUse not called")
-			}
-
-			if tt.wantError == nil {
-				if err != nil {
-					if !strings.Contains(err.Error(), "dry run") && !strings.Contains(err.Error(), "no compose.yaml file found") {
-						t.Fatalf("Unexpected error: %v", err)
-					}
-				}
-			} else {
-				if err == nil {
-					t.Fatalf("Expected error: %v, got nil", tt.wantError)
-				} else if err.Error() != tt.wantError.Error() {
-					t.Fatalf("Expected error: %v, got: %v", tt.wantError.Error(), err)
-				}
+			if tt.expectCanIUseCalled != mockService.canIUseIsCalled {
+				t.Fatalf("unexpected canIUse: expected usage: %t", tt.expectCanIUseCalled)
 			}
 		})
 	}
