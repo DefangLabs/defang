@@ -33,7 +33,7 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName)
 		if err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
-			provider, err = canIUseProvider(cmd.Context(), provider, "")
+			err = canIUseProvider(cmd.Context(), provider, "")
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err = canIUseProvider(cmd.Context(), provider, project.Name)
+		err = canIUseProvider(cmd.Context(), provider, project.Name)
 		if err != nil {
 			return err
 		}

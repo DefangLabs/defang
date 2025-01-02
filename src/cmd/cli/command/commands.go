@@ -419,7 +419,7 @@ var whoamiCmd = &cobra.Command{
 			return err
 		}
 
-		term.Infof(str)
+		term.Info(str)
 		return nil
 	},
 }
@@ -861,7 +861,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName)
 		if err != nil {
 			return err
 		}
@@ -1120,7 +1120,7 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return provider, nil
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) (cliClient.Provider, error) {
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
 	canUseReq := defangv1.CanIUseRequest{
 		Project:  projectName,
 		Provider: providerID.EnumValue(),
@@ -1128,13 +1128,13 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 
 	resp, err := client.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Allow local override of the CD image
 	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
 	provider.SetCDImage(cdImage)
 
-	return provider, nil
+	return nil
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {

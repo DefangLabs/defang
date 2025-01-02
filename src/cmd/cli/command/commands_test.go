@@ -43,13 +43,15 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
-	canIUseErrorText string
-	canIUseResponse  defangv1.CanIUseResponse
+	canIUseIsCalled bool
+	canIUseError    error
+	canIUseResponse defangv1.CanIUseResponse
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
-	if m.canIUseErrorText != "" {
-		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New(m.canIUseErrorText))
+	m.canIUseIsCalled = true
+	if m.canIUseError != nil {
+		return nil, m.canIUseError
 	}
 	return connect.NewResponse(&m.canIUseResponse), nil
 }
@@ -144,72 +146,79 @@ func TestCommandGates(t *testing.T) {
 		t.Fatalf("Failed to get current directory: %v", err)
 	}
 	composeDir := "../../../../src/testdata/sanity"
-	os.Chdir(composeDir)
+	if err = os.Chdir(composeDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
-	server := httptest.NewServer(handler)
 	t.Cleanup(func() {
 		os.Chdir(origDir)
-		server.Close()
 	})
 
-	type cmdPermTest struct {
-		name      string
-		command   []string
-		errorText string
-		wantError error
-	}
-	type cmdPermTests []cmdPermTest
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
 
-	t.Setenv("AWS_REGION", "us-test-2")
-
-	testData := cmdPermTests{
+	testData := []struct {
+		name                string
+		command             []string
+		canIUseError        error
+		wantError           error
+		expectCanIUseCalled bool
+	}{
 		{
-			name:      "compose up - aws - no access",
-			command:   []string{"compose", "up", "--project-name=app", "--provider=aws", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			name:                "compose up - aws - no access",
+			command:             []string{"compose", "up", "--provider=aws", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			expectCanIUseCalled: true,
 		},
 		{
-			name:      "compose up - defang - has access",
-			command:   []string{"compose", "up", "--provider=defang", "--dry-run"},
-			errorText: "",
-			wantError: nil,
+			name:                "compose up - defang - has access",
+			command:             []string{"compose", "up", "--provider=defang", "--dry-run"},
+			canIUseError:        nil,
+			wantError:           nil,
+			expectCanIUseCalled: true,
 		},
 		{
-			name:      "compose down - aws - no access",
-			command:   []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			name:                "compose down - aws - no access",
+			command:             []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			expectCanIUseCalled: true,
 		},
 		{
-			name:      "config set - aws - allowed",
-			command:   []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: nil,
+			name:                "config set - aws - allowed",
+			command:             []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
+			wantError:           nil,
+			expectCanIUseCalled: false,
 		},
 		{
-			name:      "config rm - aws - no allowed",
-			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: nil,
+			name:                "config rm - aws - not allowed",
+			command:             []string{"config", "rm", "var", "--project-name=app", "--provider=aws", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
+			wantError:           nil,
+			expectCanIUseCalled: false,
 		},
 		{
-			name:      "config rm - defang - allowed",
-			command:   []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
-			errorText: "",
-			wantError: nil,
+			name:                "config rm - defang - allowed",
+			command:             []string{"config", "rm", "var", "--project-name=app", "--provider=defang", "--dry-run"},
+			canIUseError:        nil,
+			wantError:           nil,
+			expectCanIUseCalled: false,
 		},
 		{
-			name:      "delete service - aws - no access",
-			command:   []string{"delete", "abc", "--provider=aws", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			name:                "delete service - aws - no access",
+			command:             []string{"delete", "abc", "--provider=aws", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			wantError:           connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
+			expectCanIUseCalled: true,
 		},
 		{
-			name:      "whoami - allowed",
-			command:   []string{"whoami", "--provider=aws", "--dry-run"},
-			errorText: "no access to use aws provider",
-			wantError: nil,
+			name:                "whoami - allowed",
+			command:             []string{"whoami", "--provider=aws", "--dry-run"},
+			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
+			wantError:           nil,
+			expectCanIUseCalled: false,
 		},
 	}
 
@@ -217,9 +226,14 @@ func TestCommandGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
 			pkg.SsmClientOverride = &MockSsmClient{}
-			mockService.canIUseErrorText = tt.errorText
+			mockService.canIUseIsCalled = false
+			mockService.canIUseError = tt.canIUseError
 
 			err := testCommand(tt.command, server.URL)
+
+			if tt.expectCanIUseCalled && !mockService.canIUseIsCalled {
+				t.Fatal("canIUse not called")
+			}
 
 			if tt.wantError == nil {
 				if err != nil {
@@ -530,7 +544,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		p, err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project")
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -564,7 +578,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		p, err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project")
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
