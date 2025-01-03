@@ -32,6 +32,12 @@ var cdDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "destroy")
 	},
 }
@@ -52,6 +58,12 @@ var cdDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "down")
 	},
 }
@@ -125,6 +137,11 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
+			err = canIUseProvider(cmd.Context(), provider, "")
+			if err != nil {
+				return err
+			}
+
 			// FIXME: this needs auth because it spawns the CD task
 			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
 		}
@@ -145,6 +162,11 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		err = canIUseProvider(cmd.Context(), provider, project.Name)
 		if err != nil {
 			return err
 		}

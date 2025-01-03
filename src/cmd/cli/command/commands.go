@@ -77,21 +77,6 @@ func prettyError(err error) error {
 	return err
 }
 
-// TODO: Make call to provider to get project cd version and pass to CanIUse API call
-func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) (string, error) {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: providerID.EnumValue(),
-	}
-
-	resp, err := client.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider. Please upgrade on https://s.defang.io/subscription", providerID))
-	}
-
-	return resp.CdImage, nil
-}
-
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -434,7 +419,7 @@ var whoamiCmd = &cobra.Command{
 			return err
 		}
 
-		term.Infof(str)
+		term.Info(str)
 		return nil
 	},
 }
@@ -876,6 +861,11 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		since := time.Now()
 		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
@@ -1128,31 +1118,24 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		term.Debug("unable to load project name:", err)
-	}
-
-	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
-		return nil, err
-	} else {
-		// provide sane defaults for the CD image
-		if cdImage == "" {
-			switch providerID {
-			case cliClient.ProviderAWS:
-				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
-			case cliClient.ProviderDO:
-				cdImage = "docker.io/defangio/cd:public-beta"
-			case cliClient.ProviderGCP:
-				cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
-			}
-		}
-		// Allow local override of the CD image
-		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
-		provider.SetCDImage(cdImage)
-	}
-
 	return provider, nil
+}
+
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:  projectName,
+		Provider: providerID.EnumValue(),
+	}
+
+	resp, err := client.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return err
+	}
+	// Allow local override of the CD image
+	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
+	provider.SetCDImage(cdImage)
+
+	return nil
 }
 
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
