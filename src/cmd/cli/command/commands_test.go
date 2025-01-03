@@ -44,16 +44,11 @@ func (m *MockSsmClient) DeleteParameters(ctx context.Context, params *ssm.Delete
 type mockFabricService struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 	canIUseIsCalled bool
-	canIUseError    error
-	canIUseResponse defangv1.CanIUseResponse
 }
 
 func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
 	m.canIUseIsCalled = true
-	if m.canIUseError != nil {
-		return nil, m.canIUseError
-	}
-	return connect.NewResponse(&m.canIUseResponse), nil
+	return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider"))
 }
 
 func (m *mockFabricService) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.Version], error) {
@@ -161,37 +156,31 @@ func TestCommandGates(t *testing.T) {
 	testData := []struct {
 		name                string
 		command             []string
-		canIUseError        error
 		expectCanIUseCalled bool
 	}{
 		{
 			name:                "compose up - aws - no access",
 			command:             []string{"compose", "up", "--provider=aws", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "compose down - aws - no access",
 			command:             []string{"compose", "down", "--provider=aws", "--project-name=myproj", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "config set - aws - allowed",
 			command:             []string{"config", "set", "var", "--project-name=app", "--provider=aws", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: false,
 		},
 		{
 			name:                "delete service - aws - no access",
 			command:             []string{"delete", "abc", "--provider=aws", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodeResourceExhausted, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: true,
 		},
 		{
 			name:                "whoami - allowed",
 			command:             []string{"whoami", "--provider=aws", "--dry-run"},
-			canIUseError:        connect.NewError(connect.CodePermissionDenied, errors.New("no access to use aws provider")),
 			expectCanIUseCalled: false,
 		},
 	}
@@ -201,12 +190,17 @@ func TestCommandGates(t *testing.T) {
 			aws.StsClient = &mockStsProviderAPI{}
 			pkg.SsmClientOverride = &MockSsmClient{}
 			mockService.canIUseIsCalled = false
-			mockService.canIUseError = tt.canIUseError
 
-			testCommand(tt.command, server.URL)
+			err := testCommand(tt.command, server.URL)
 
 			if tt.expectCanIUseCalled != mockService.canIUseIsCalled {
 				t.Fatalf("unexpected canIUse: expected usage: %t", tt.expectCanIUseCalled)
+			}
+
+			if err != nil {
+				if tt.expectCanIUseCalled && err.Error() != "resource_exhausted: no access to use aws provider" {
+					t.Fatalf("expected \"no access error\" - got: %v", err.Error())
+				}
 			}
 		})
 	}
