@@ -34,6 +34,14 @@ func DnsSafe(fqdn string) string {
 	return strings.ToLower(fqdn)
 }
 
+type ErrMultipleProjects struct {
+	ProjectNames []string
+}
+
+func (mp ErrMultipleProjects) Error() string {
+	return fmt.Sprintf("multiple projects found; use the --project-name flag to specify a project: \n%v", strings.Join(mp.ProjectNames, "\n"))
+}
+
 type ProjectBackend interface {
 	BootstrapList(context.Context) ([]string, error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
@@ -141,8 +149,9 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	if len(projectNames) == 0 {
 		return "", errors.New("no projects found")
 	}
+
 	if len(projectNames) > 1 {
-		return "", fmt.Errorf("multiple projects found; use the --project-name flag to specify a project: %v", projectNames)
+		return "", ErrMultipleProjects{ProjectNames: projectNames}
 	}
 	term.Debug("Using default project:", projectNames[0])
 	return projectNames[0], nil

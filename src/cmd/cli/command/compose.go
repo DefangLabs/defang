@@ -62,12 +62,18 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
+
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
 			project, err := loader.LoadProject(cmd.Context())
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			err = canIUseProvider(cmd.Context(), provider, project.Name)
 			if err != nil {
 				return err
 			}
@@ -298,6 +304,11 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
+			err = canIUseProvider(cmd.Context(), provider, projectName)
+			if err != nil {
+				return err
+			}
+
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
@@ -473,6 +484,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  verbose,
 				LogType:  *logType,
 			}
+
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
