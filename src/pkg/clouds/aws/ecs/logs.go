@@ -218,6 +218,7 @@ func startLiveTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput)
 	return slto.GetStream(), nil
 }
 
+// GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
 	region := region.FromArn(*taskArn)
 	cluster, taskID := SplitClusterTask(taskArn)
@@ -234,6 +235,7 @@ func isTaskTerminalStatus(status string) bool {
 	}
 }
 
+// getTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) error {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
@@ -416,6 +418,7 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	}
 }
 
+// WaitForTask polls the ECS task status. It returns io.EOF if the task is stopped successfully, or an error if the task failed.
 func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error {
 	if taskArn == nil {
 		panic("taskArn is nil")
