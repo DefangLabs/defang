@@ -753,7 +753,10 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
 				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
 					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
-					cancel(pkg.ErrDeploymentFailed{Service: "Defang CD", Message: err.Error()})
+					if !errors.Is(err, io.EOF) {
+						err = pkg.ErrDeploymentFailed{Message: err.Error()}
+					}
+					cancel(err)
 				}
 			}
 		}()

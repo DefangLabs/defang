@@ -425,7 +425,7 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 			executionName = executionName[:len(executionName)-6] // Remove the random suffix
 			if executionName == "defang-cd" {
 				if auditLog.GetStatus().GetCode() != 0 {
-					return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
 				if len(readyServices) > 0 {
