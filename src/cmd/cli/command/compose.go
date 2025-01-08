@@ -338,8 +338,16 @@ func makeComposeDownCmd() *cobra.Command {
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-			err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+			tailCtx := cmd.Context()
+			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
+				if connect.CodeOf(err) == connect.CodePermissionDenied {
+					// If tail fails because of missing permission, we wait for the deployment to finish
+					term.Warn("Unable to tail logs. Waiting for down to finish.")
+					<-tailCtx.Done()
+					// Get the actual error from the context so we won't print "Error: missing tail permission"
+					err = context.Cause(tailCtx)
+				}
 				return err
 			}
 			term.Info("Done.")
