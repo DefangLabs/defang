@@ -74,10 +74,14 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 		Services: failedServices,
 		Project:  project.Name,
 	}
-	err := p.Query(ctx, &req)
-	if err != nil {
-		return err
+
+	if etag != "" {
+		err := p.Query(ctx, &req)
+		if err != nil {
+			return err
+		}
 	}
+
 	resp, err := c.Debug(ctx, &req)
 	if err != nil {
 		return err

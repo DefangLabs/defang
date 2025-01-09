@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
@@ -359,9 +361,29 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(cmd.Context())
-			if err != nil {
-				return err
+			project, loadErr := loader.LoadProject(cmd.Context())
+			if loadErr != nil {
+				projOpts, err := loader.LoadProjectOptions(cmd.Context())
+				if err != nil {
+					return err
+				}
+
+				// get the project name
+				if projOpts.Name == "" {
+					dir, err := os.Getwd()
+					if err != nil {
+						return err
+					}
+
+					projOpts.Name = filepath.Base(dir)
+				}
+				project = &compose.Project{
+					Name:        projOpts.Name,
+					WorkingDir:  projOpts.WorkingDir,
+					Environment: projOpts.Environment,
+				}
+
+				project.ComposeFiles = append(project.ComposeFiles, projOpts.ConfigPaths...)
 			}
 
 			provider, err := getProvider(cmd.Context(), loader)
@@ -369,7 +391,24 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			if _, _, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			err = loadErr
+			if err == nil {
+				_, _, err = cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+				// if err != nil && errors.Is(err, cli.ErrDryRun) {
+				// 	err = nil
+				// }
+			}
+
+			if err != nil {
+				term.Warn(err)
+				if !nonInteractive {
+					track.Evt("Debug Prompted", P("reason", err))
+					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+					if nil == cli.InteractiveDebug(cmd.Context(), client, provider, "", project, nil) {
+						return err // don't show the defang hint if debugging was successful
+					}
+				}
+
 				return err
 			}
 			return nil
