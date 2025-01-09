@@ -342,11 +342,12 @@ func makeComposeDownCmd() *cobra.Command {
 			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
-					// If tail fails because of missing permission, we wait for the deployment to finish
-					term.Warn("Unable to tail logs. Waiting for down to finish.")
-					<-tailCtx.Done()
-					// Get the actual error from the context so we won't print "Error: missing tail permission"
-					err = context.Cause(tailCtx)
+					// If tail fails because of missing permission, we show a warning and detach. This is
+					// different than `up`, which will wait for the deployment to finish, but we don't have an
+					// ECS event subscription for `down` so we can't wait for the deployment to finish.
+					// Instead, we'll just show a warning and detach.
+					term.Warn("Unable to tail logs. Detaching.")
+					return nil
 				}
 				return err
 			}
