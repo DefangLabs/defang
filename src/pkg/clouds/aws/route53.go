@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -50,9 +51,7 @@ func GetDelegationSetByZone(ctx context.Context, zoneId *string, r53 Route53API)
 }
 
 func GetDelegationSet(ctx context.Context, r53 Route53API) (*types.DelegationSet, error) {
-	params := &route53.ListReusableDelegationSetsInput{
-		MaxItems: ptr.Int32(1),
-	}
+	params := &route53.ListReusableDelegationSetsInput{}
 	resp, err := r53.ListReusableDelegationSets(ctx, params)
 	if err != nil {
 		return nil, err
@@ -60,7 +59,9 @@ func GetDelegationSet(ctx context.Context, r53 Route53API) (*types.DelegationSet
 	if len(resp.DelegationSets) == 0 {
 		return nil, ErrNoDelegationSetFound
 	}
-	return &resp.DelegationSets[0], nil
+	// Return a random delegation set, to work around the 100 zones-per-delegation-set limit,
+	// because we can't easily tell how many zones are using each delegation set.
+	return &resp.DelegationSets[rand.Intn(len(resp.DelegationSets))], nil
 }
 
 func GetHostedZoneByName(ctx context.Context, domain string, r53 Route53API) (*types.HostedZone, error) {

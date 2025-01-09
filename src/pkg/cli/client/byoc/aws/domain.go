@@ -31,13 +31,13 @@ func prepareDomainDelegation(ctx context.Context, projectDomain string, r53Clien
 		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
 
 		// Case 1: The zone doesn't exist: we'll create/get a delegation set and let CD/Pulumi create the hosted zone
-		delegationSet, err = prepareDomainDelegationFromDelegationSet(ctx, r53Client)
+		delegationSet, err = getOrCreateDelegationSet(ctx, r53Client)
 		if err != nil {
 			return nil, "", err
 		}
 	} else {
 		// Case 2: Get the NS records for the existing subdomain zone
-		delegationSet, err = prepareDomainDelegationFromZone(ctx, zone, r53Client)
+		delegationSet, err = getOrCreateDelegationSetByZone(ctx, zone, r53Client)
 		if err != nil {
 			return nil, "", err
 		}
@@ -54,7 +54,7 @@ func prepareDomainDelegation(ctx context.Context, projectDomain string, r53Clien
 	return delegationSet.NameServers, delegationSetId, nil
 }
 
-func prepareDomainDelegationFromDelegationSet(ctx context.Context, r53Client aws.Route53API) (*types.DelegationSet, error) {
+func getOrCreateDelegationSet(ctx context.Context, r53Client aws.Route53API) (*types.DelegationSet, error) {
 	// Avoid creating a new delegation set if one already exists
 	delegationSet, err := aws.GetDelegationSet(ctx, r53Client)
 	// Create a new delegation set if it doesn't exist
@@ -69,7 +69,7 @@ func prepareDomainDelegationFromDelegationSet(ctx context.Context, r53Client aws
 	return delegationSet, err
 }
 
-func prepareDomainDelegationFromZone(ctx context.Context, zone *types.HostedZone, r53Client aws.Route53API) (*types.DelegationSet, error) {
+func getOrCreateDelegationSetByZone(ctx context.Context, zone *types.HostedZone, r53Client aws.Route53API) (*types.DelegationSet, error) {
 	projectDomain := dns.Normalize(*zone.Name)
 	nsServers, err := aws.ListResourceRecords(ctx, *zone.Id, projectDomain, types.RRTypeNs, r53Client)
 	if err != nil {
