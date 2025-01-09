@@ -103,7 +103,6 @@ func prepareDomainDelegationFromZone(ctx context.Context, zone *types.HostedZone
 	if !slicesEqualUnordered(delegationSet.NameServers, nsServers) {
 		track.Evt("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
 		term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
-		// FIXME: this occurred 34 times between 2024-10-01 and 2025-01-01
 	}
 
 	return delegationSet, err
