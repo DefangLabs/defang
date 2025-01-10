@@ -475,12 +475,12 @@ func makeComposeLogsCmd() *cobra.Command {
 			term.Debug("logType", logType)
 
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(cmd.Context())
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
