@@ -64,13 +64,13 @@ func TestQueryHasProject(t *testing.T) {
 	provider := MustHaveProjectNameQueryProvider{}
 	fabricClient := MockDebugFabricClient{}
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
+	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, nil); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
 	project.Name = ""
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
+	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, nil); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {

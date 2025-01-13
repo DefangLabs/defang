@@ -835,7 +835,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
+		return cli.Debug(cmd.Context(), client, provider, etag, project, args, nil)
 	},
 }
 
