@@ -109,7 +109,7 @@ func makeComposeUpCmd() *cobra.Command {
 					track.Evt("Debug Prompted", P("reason", err))
 					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
-						return err // don't show the defang hint if debugging was successful
+						return nil // don't show the defang hint if debugging was successful
 					}
 				}
 
@@ -441,7 +441,7 @@ func makeComposeConfigCmd() *cobra.Command {
 					track.Evt("Debug Prompted", P("reason", err))
 					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, err) {
-						return err // don't show the defang hint if debugging was successful
+						return nil // don't show the defang hint if debugging was successful
 					}
 				}
 			}
