@@ -381,8 +381,17 @@ func makeComposeDownCmd() *cobra.Command {
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-			err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+			tailCtx := cmd.Context()
+			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
+				if connect.CodeOf(err) == connect.CodePermissionDenied {
+					// If tail fails because of missing permission, we show a warning and detach. This is
+					// different than `up`, which will wait for the deployment to finish, but we don't have an
+					// ECS event subscription for `down` so we can't wait for the deployment to finish.
+					// Instead, we'll just show a warning and detach.
+					term.Warn("Unable to tail logs. Detaching.")
+					return nil
+				}
 				return err
 			}
 			term.Info("Done.")
@@ -531,12 +540,12 @@ func makeComposeLogsCmd() *cobra.Command {
 			term.Debug("logType", logType)
 
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(cmd.Context())
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
