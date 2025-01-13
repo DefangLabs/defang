@@ -79,37 +79,6 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c *Loader) LoadProjectWithoutValidation(ctx context.Context) (*Project, error) {
-	if c.cached != nil {
-		return c.cached, nil
-	}
-	// Set logrus send logs via the term package
-	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
-	logrus.SetFormatter(termLogger)
-
-	projOpts, err := c.newProjectOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	project, err := projOpts.LoadProject(ctx)
-	if err != nil {
-		if errors.Is(err, errdefs.ErrNotFound) {
-			return nil, types.ErrComposeFileNotFound
-		}
-
-		return nil, err
-	}
-
-	if term.DoDebug() {
-		b, _ := yaml.Marshal(project)
-		fmt.Println(string(b))
-	}
-
-	c.cached = project
-	return project, nil
-}
-
 func (c *Loader) LoadProjectOptions(ctx context.Context) (*cli.ProjectOptions, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
