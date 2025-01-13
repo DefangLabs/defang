@@ -45,6 +45,32 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, 
 	return managedServices, unmanagedServices
 }
 
+func createCustomProject(ctx context.Context, loader *compose.Loader) (*compose.Project, error) {
+	projOpts, err := loader.LoadProjectOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the project name
+	if projOpts.Name == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		projOpts.Name = filepath.Base(dir)
+	}
+	project := &compose.Project{
+		Name:        projOpts.Name,
+		WorkingDir:  projOpts.WorkingDir,
+		Environment: projOpts.Environment,
+	}
+
+	project.ComposeFiles = append(project.ComposeFiles, projOpts.ConfigPaths...)
+
+	return project, nil
+}
+
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -65,40 +91,24 @@ func makeComposeUpCmd() *cobra.Command {
 			since := time.Now()
 			loader := configureLoader(cmd)
 
-			provider, err := getProvider(cmd.Context(), loader)
+			ctx := cmd.Context()
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			project, loadErr := loader.LoadProject(cmd.Context())
+			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
 				term.Warn(loadErr)
-				projOpts, err := loader.LoadProjectOptions(cmd.Context())
+				project, err := createCustomProject(ctx, loader)
 				if err != nil {
 					return err
 				}
 
-				// get the project name
-				if projOpts.Name == "" {
-					dir, err := os.Getwd()
-					if err != nil {
-						return err
-					}
-
-					projOpts.Name = filepath.Base(dir)
-				}
-				project = &compose.Project{
-					Name:        projOpts.Name,
-					WorkingDir:  projOpts.WorkingDir,
-					Environment: projOpts.Environment,
-				}
-
-				project.ComposeFiles = append(project.ComposeFiles, projOpts.ConfigPaths...)
-
 				if !nonInteractive {
 					track.Evt("Debug Prompted", P("reason", err))
 					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-					if nil == cli.InteractiveDebug(cmd.Context(), client, provider, "", project, nil, loadErr) {
+					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
 						return err // don't show the defang hint if debugging was successful
 					}
 				}
@@ -106,7 +116,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), provider, project.Name)
+			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
 			}
@@ -117,14 +127,14 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
+			numGPUS := compose.GetNumOfGPUs(ctx, project)
 			if numGPUS > 0 {
 				req := &defangv1.CanIUseRequest{
 					Project:  project.Name,
 					Provider: providerID.EnumValue(),
 				}
 
-				resp, err := client.CanIUse(cmd.Context(), req)
+				resp, err := client.CanIUse(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -134,7 +144,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}
 
-			deploy, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, upload, mode.Value())
+			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -166,7 +176,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
+			tailCtx, cancelTail := context.WithCancelCause(ctx)
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
 			if waitTimeout >= 0 {
@@ -395,27 +405,12 @@ func makeComposeConfigCmd() *cobra.Command {
 			ctx := cmd.Context()
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				projOpts, err := loader.LoadProjectOptions(ctx)
+				var err error
+				project, err = createCustomProject(ctx, loader)
 				if err != nil {
+					term.Warn(loadErr)
 					return err
 				}
-
-				// get the project name
-				if projOpts.Name == "" {
-					dir, err := os.Getwd()
-					if err != nil {
-						return err
-					}
-
-					projOpts.Name = filepath.Base(dir)
-				}
-				project = &compose.Project{
-					Name:        projOpts.Name,
-					WorkingDir:  projOpts.WorkingDir,
-					Environment: projOpts.Environment,
-				}
-
-				project.ComposeFiles = append(project.ComposeFiles, projOpts.ConfigPaths...)
 			}
 
 			provider, err := getProvider(ctx, loader)
