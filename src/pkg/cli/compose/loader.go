@@ -79,25 +79,12 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c *Loader) LoadProjectOptions(ctx context.Context) (*cli.ProjectOptions, error) {
-	// Set logrus send logs via the term package
-	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
-	logrus.SetFormatter(termLogger)
-
-	projOpts, err := c.newProjectOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	return projOpts, err
-}
-
 func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	if c.cached != nil {
 		return c.cached, nil
 	}
 
-	projOpts, err := c.LoadProjectOptions(ctx)
+	projOpts, err := c.NewProjectOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +107,11 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return project, nil
 }
 
-func (c *Loader) newProjectOptions() (*cli.ProjectOptions, error) {
+func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
+	// Set logrus send logs via the term package
+	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
+	logrus.SetFormatter(termLogger)
+
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
 	return cli.NewProjectOptions(c.options.ConfigPaths,

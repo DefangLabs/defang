@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestFindMathingProjectFiles(t *testing.T) {
@@ -77,4 +78,29 @@ func TestQueryHasProject(t *testing.T) {
 			t.Errorf("expected error %q, got %q", "project name is missing", err.Error())
 		}
 	}
+}
+
+func TestDebugProject(t *testing.T) {
+	project := &compose.Project{
+		Name:         "project",
+		WorkingDir:   "workingdir",
+		Environment:  types.Mapping{},
+		ComposeFiles: []string{"composefile"},
+	}
+
+	loadErr := errors.New("load error")
+	provider := MustHaveProjectNameQueryProvider{}
+	fabricClient := MockDebugFabricClient{}
+
+	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, loadErr); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if err := Debug(context.Background(), fabricClient, provider, "", project, []string{"service"}, nil); err != nil {
+		if err.Error() == "no information to use for debugger" {
+			return
+		}
+	}
+
+	t.Error("expected error, got none")
 }

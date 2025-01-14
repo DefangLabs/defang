@@ -59,7 +59,7 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	return nil
 }
 
-func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, termErr error) error {
+func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, loadErr error) error {
 	term.Debug("Invoking AI debugger", etag)
 
 	files := findMatchingProjectFiles(project, failedServices)
@@ -75,13 +75,16 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 		Project:  project.Name,
 	}
 
-	if etag != "" {
+	switch {
+	case etag != "":
 		err := p.Query(ctx, &req)
 		if err != nil {
 			return err
 		}
-	} else if termErr != nil {
-		req.Logs = termErr.Error()
+	case loadErr != nil:
+		req.Logs = loadErr.Error()
+	default:
+		return errors.New("no information to use for debugger")
 	}
 
 	resp, err := c.Debug(ctx, &req)

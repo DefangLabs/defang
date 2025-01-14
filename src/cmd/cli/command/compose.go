@@ -45,8 +45,8 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, 
 	return managedServices, unmanagedServices
 }
 
-func createCustomProject(ctx context.Context, loader *compose.Loader) (*compose.Project, error) {
-	projOpts, err := loader.LoadProjectOptions(ctx)
+func CreateDebugProject(loader *compose.Loader) (*compose.Project, error) {
+	projOpts, err := loader.NewProjectOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +61,11 @@ func createCustomProject(ctx context.Context, loader *compose.Loader) (*compose.
 		projOpts.Name = filepath.Base(dir)
 	}
 	project := &compose.Project{
-		Name:        projOpts.Name,
-		WorkingDir:  projOpts.WorkingDir,
-		Environment: projOpts.Environment,
+		Name:         projOpts.Name,
+		WorkingDir:   projOpts.WorkingDir,
+		Environment:  projOpts.Environment,
+		ComposeFiles: projOpts.ConfigPaths,
 	}
-
-	project.ComposeFiles = append(project.ComposeFiles, projOpts.ConfigPaths...)
 
 	return project, nil
 }
@@ -99,13 +98,13 @@ func makeComposeUpCmd() *cobra.Command {
 
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				term.Warn(loadErr)
-				project, err := createCustomProject(ctx, loader)
-				if err != nil {
-					return err
-				}
-
 				if !nonInteractive {
+					term.Warn(loadErr)
+					project, err := CreateDebugProject(loader)
+					if err != nil {
+						return err
+					}
+
 					track.Evt("Debug Prompted", P("reason", err))
 					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
@@ -113,7 +112,7 @@ func makeComposeUpCmd() *cobra.Command {
 					}
 				}
 
-				return err
+				return loadErr
 			}
 
 			err = canIUseProvider(ctx, provider, project.Name)
@@ -412,41 +411,37 @@ func makeComposeConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
 			ctx := cmd.Context()
-			project, loadErr := loader.LoadProject(ctx)
-			if loadErr != nil {
-				var err error
-				project, err = createCustomProject(ctx, loader)
-				if err != nil {
-					term.Warn(loadErr)
-					return err
-				}
-			}
-
 			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			err = loadErr
-			if err == nil {
+			project, loadErr := loader.LoadProject(ctx)
+			if loadErr == nil {
 				_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE)
 				if err != nil && errors.Is(err, cli.ErrDryRun) {
-					err = nil
+					return nil
 				}
+
+				loadErr = err
 			}
 
-			if err != nil {
-				term.Warn(err)
+			if loadErr != nil {
 				if !nonInteractive {
-					track.Evt("Debug Prompted", P("reason", err))
-					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, err) {
-						return nil // don't show the defang hint if debugging was successful
+					project, err = CreateDebugProject(loader)
+					if err != nil {
+						return err
 					}
 				}
+
+				track.Evt("Debug Prompted", P("reason", loadErr))
+				// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+				if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
+					return nil // don't show the defang hint if debugging was successful
+				}
 			}
 
-			return err
+			return loadErr
 		},
 	}
 }
