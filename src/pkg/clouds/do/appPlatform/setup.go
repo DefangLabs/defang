@@ -98,7 +98,7 @@ func shellQuote(args ...string) string {
 }
 
 func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
-	term.Debugf("Using CD image: %s", cdImagePath)
+	term.Debugf("Using CD image: %q", cdImagePath)
 	image, err := ParseImage(cdImagePath)
 	if err != nil {
 		return nil, err
