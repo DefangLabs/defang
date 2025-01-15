@@ -4,7 +4,7 @@ managed:
   go_package_prefix:
     default: github.com/DefangLabs/defang/src/protos
 plugins:
-  - plugin: buf.build/protocolbuffers/go
+  - plugin: buf.build/protocolbuffers/go:v1.36.2
     out: protos
     opt: paths=source_relative
   - plugin: buf.build/bufbuild/connect-go
