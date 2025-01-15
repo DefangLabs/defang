@@ -65,13 +65,13 @@ func TestQueryHasProject(t *testing.T) {
 	provider := MustHaveProjectNameQueryProvider{}
 	fabricClient := MockDebugFabricClient{}
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, nil); err != nil {
+	if err := DebugDeployment(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
 	project.Name = ""
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, nil); err == nil {
+	if err := DebugDeployment(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {
@@ -93,13 +93,13 @@ func TestDebugProject(t *testing.T) {
 	fabricClient := MockDebugFabricClient{}
 
 	t.Run("with load error", func(t *testing.T) {
-		if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, loadErr); err != nil {
+		if err := DebugComposeFileLoadError(context.Background(), fabricClient, provider, project, loadErr); err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 	})
 
 	t.Run("without load error", func(t *testing.T) {
-		err := Debug(context.Background(), fabricClient, provider, "", project, []string{"service"}, nil)
+		err := DebugDeployment(context.Background(), fabricClient, provider, "", project, []string{"service"})
 		if err == nil {
 			t.Fatal("expected error, got none")
 		}

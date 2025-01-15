@@ -45,7 +45,7 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, 
 	return managedServices, unmanagedServices
 }
 
-func CreateDebugProject(loader *compose.Loader) (*compose.Project, error) {
+func CreateProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 	projOpts, err := loader.NewProjectOptions()
 	if err != nil {
 		return nil, err
@@ -98,21 +98,21 @@ func makeComposeUpCmd() *cobra.Command {
 
 			project, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
-				if !nonInteractive {
-					term.Warn(loadErr)
-					project, err := CreateDebugProject(loader)
-					if err != nil {
-						return err
-					}
-
-					track.Evt("Debug Prompted", P("reason", err))
-					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-					if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
-						return nil // don't show the defang hint if debugging was successful
-					}
+				if nonInteractive {
+					return loadErr
 				}
 
-				return loadErr
+				term.Warn(loadErr)
+				project, err := CreateProjectForDebug(loader)
+				if err != nil {
+					return err
+				}
+
+				track.Evt("Debug Prompted", P("reason", err))
+				// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+				if nil == cli.InteractiveDebug(ctx, client, provider, "", project, nil, loadErr) {
+					return nil // don't show the defang hint if debugging was successful
+				}
 			}
 
 			err = canIUseProvider(ctx, provider, project.Name)
@@ -426,12 +426,14 @@ func makeComposeConfigCmd() *cobra.Command {
 				loadErr = err
 			}
 
+			if nonInteractive {
+				return loadErr
+			}
+
 			if loadErr != nil {
-				if !nonInteractive {
-					project, err = CreateDebugProject(loader)
-					if err != nil {
-						return err
-					}
+				project, err = CreateProjectForDebug(loader)
+				if err != nil {
+					return err
 				}
 
 				track.Evt("Debug Prompted", P("reason", loadErr))
@@ -441,7 +443,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 			}
 
-			return loadErr
+			return nil
 		},
 	}
 }

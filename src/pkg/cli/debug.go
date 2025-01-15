@@ -42,9 +42,16 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 
 	track.Evt("Debug Prompt Accepted", P("etag", etag))
 
-	if err := Debug(ctx, c, p, etag, project, failedServices, loadError); err != nil {
-		term.Warnf("Failed to debug deployment: %v", err)
-		return err
+	if etag == "" {
+		if err := DebugComposeFileLoadError(ctx, c, p, project, loadError); err != nil {
+			term.Warnf("Failed to debug compose file load: %v", err)
+			return err
+		}
+	} else {
+		if err := DebugDeployment(ctx, c, p, etag, project, failedServices); err != nil {
+			term.Warnf("Failed to debug deployment: %v", err)
+			return err
+		}
 	}
 
 	var goodBad bool
@@ -59,7 +66,7 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	return nil
 }
 
-func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, loadErr error) error {
+func DebugDeployment(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
 	term.Debug("Invoking AI debugger", etag)
 
 	files := findMatchingProjectFiles(project, failedServices)
@@ -75,15 +82,12 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 		Project:  project.Name,
 	}
 
-	switch {
-	case etag != "":
+	if etag != "" {
 		err := p.Query(ctx, &req)
 		if err != nil {
 			return err
 		}
-	case loadErr != nil:
-		req.Logs = loadErr.Error()
-	default:
+	} else {
 		return errors.New("no information to use for debugger")
 	}
 
@@ -92,6 +96,44 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 		return err
 	}
 
+	printDebugReport(resp)
+
+	// for _, request := range resp.Requests {
+	// 	term.Info(request)
+	// }
+	return nil
+}
+
+func DebugComposeFileLoadError(ctx context.Context, c client.FabricClient, p client.Provider, project *compose.Project, loadErr error) error {
+	term.Debug("Invoking AI debugger for Load Error")
+
+	files := findMatchingProjectFiles(project, nil)
+
+	if DoDryRun {
+		return ErrDryRun
+	}
+
+	req := defangv1.DebugRequest{
+		Files:   files,
+		Project: project.Name,
+	}
+
+	if loadErr != nil {
+		req.Logs = loadErr.Error()
+	} else {
+		return errors.New("no information to use for debugger")
+	}
+
+	resp, err := c.Debug(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	printDebugReport(resp)
+	return nil
+}
+
+func printDebugReport(resp *defangv1.DebugResponse) {
 	term.Println("")
 	term.Println("===================")
 	term.Println("Debugging Summary")
@@ -118,10 +160,6 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 			}
 		}
 	}
-	// for _, request := range resp.Requests {
-	// 	term.Info(request)
-	// }
-	return nil
 }
 
 func readFile(basepath, path string) *defangv1.File {
