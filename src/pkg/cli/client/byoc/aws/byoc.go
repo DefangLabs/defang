@@ -137,6 +137,8 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 		return nil
 	}
 
+	term.Debugf("Using CD image: %q", b.CDImage)
+
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{

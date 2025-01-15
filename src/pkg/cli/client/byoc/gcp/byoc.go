@@ -188,6 +188,8 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	}
 
 	// 5. Setup Cloud Run Job
+	term.Debugf("Using CD image: %q", b.CDImage)
+
 	serviceAccount := path.Base(b.cdServiceAccount)
 	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
 		{
