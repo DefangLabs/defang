@@ -125,6 +125,9 @@ const (
 	// FabricControllerGetDelegateSubdomainZoneProcedure is the fully-qualified name of the
 	// FabricController's GetDelegateSubdomainZone RPC.
 	FabricControllerGetDelegateSubdomainZoneProcedure = "/io.defang.v1.FabricController/GetDelegateSubdomainZone"
+	// FabricControllerSetOptionsProcedure is the fully-qualified name of the FabricController's
+	// SetOptions RPC.
+	FabricControllerSetOptionsProcedure = "/io.defang.v1.FabricController/SetOptions"
 	// FabricControllerWhoAmIProcedure is the fully-qualified name of the FabricController's WhoAmI RPC.
 	FabricControllerWhoAmIProcedure = "/io.defang.v1.FabricController/WhoAmI"
 	// FabricControllerTrackProcedure is the fully-qualified name of the FabricController's Track RPC.
@@ -189,6 +192,7 @@ type FabricControllerClient interface {
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
+	SetOptions(context.Context, *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	// Endpoint for GDPR compliance
@@ -384,6 +388,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		setOptions: connect_go.NewClient[v1.SetOptionsRequest, emptypb.Empty](
+			httpClient,
+			baseURL+FabricControllerSetOptionsProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
+		),
 		whoAmI: connect_go.NewClient[emptypb.Empty, v1.WhoAmIResponse](
 			httpClient,
 			baseURL+FabricControllerWhoAmIProcedure,
@@ -462,6 +472,7 @@ type fabricControllerClient struct {
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
 	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
+	setOptions               *connect_go.Client[v1.SetOptionsRequest, emptypb.Empty]
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
 	deleteMe                 *connect_go.Client[emptypb.Empty, emptypb.Empty]
@@ -643,6 +654,11 @@ func (c *fabricControllerClient) GetDelegateSubdomainZone(ctx context.Context, r
 	return c.getDelegateSubdomainZone.CallUnary(ctx, req)
 }
 
+// SetOptions calls io.defang.v1.FabricController.SetOptions.
+func (c *fabricControllerClient) SetOptions(ctx context.Context, req *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return c.setOptions.CallUnary(ctx, req)
+}
+
 // WhoAmI calls io.defang.v1.FabricController.WhoAmI.
 func (c *fabricControllerClient) WhoAmI(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
 	return c.whoAmI.CallUnary(ctx, req)
@@ -721,6 +737,7 @@ type FabricControllerHandler interface {
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
 	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
+	SetOptions(context.Context, *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
 	// Endpoint for GDPR compliance
@@ -912,6 +929,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerSetOptionsHandler := connect_go.NewUnaryHandler(
+		FabricControllerSetOptionsProcedure,
+		svc.SetOptions,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	fabricControllerWhoAmIHandler := connect_go.NewUnaryHandler(
 		FabricControllerWhoAmIProcedure,
 		svc.WhoAmI,
@@ -1019,6 +1042,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteSubdomainZoneHandler.ServeHTTP(w, r)
 		case FabricControllerGetDelegateSubdomainZoneProcedure:
 			fabricControllerGetDelegateSubdomainZoneHandler.ServeHTTP(w, r)
+		case FabricControllerSetOptionsProcedure:
+			fabricControllerSetOptionsHandler.ServeHTTP(w, r)
 		case FabricControllerWhoAmIProcedure:
 			fabricControllerWhoAmIHandler.ServeHTTP(w, r)
 		case FabricControllerTrackProcedure:
@@ -1168,6 +1193,10 @@ func (UnimplementedFabricControllerHandler) DeleteSubdomainZone(context.Context,
 
 func (UnimplementedFabricControllerHandler) GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetDelegateSubdomainZone is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) SetOptions(context.Context, *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.SetOptions is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error) {
