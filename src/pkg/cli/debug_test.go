@@ -89,22 +89,11 @@ func TestDebugProject(t *testing.T) {
 	}
 
 	loadErr := errors.New("load error")
-	provider := MustHaveProjectNameQueryProvider{}
 	fabricClient := MockDebugFabricClient{}
 
 	t.Run("with load error", func(t *testing.T) {
-		if err := DebugComposeFileLoadError(context.Background(), fabricClient, provider, project, loadErr); err != nil {
+		if err := debugComposeFileLoadError(context.Background(), fabricClient, project, loadErr); err != nil {
 			t.Errorf("expected no error, got %v", err)
-		}
-	})
-
-	t.Run("without load error", func(t *testing.T) {
-		err := DebugDeployment(context.Background(), fabricClient, provider, "", project, []string{"service"})
-		if err == nil {
-			t.Fatal("expected error, got none")
-		}
-		if err.Error() != "no information to use for debugger" {
-			t.Error("expected: no information to use for debugger")
 		}
 	})
 }
