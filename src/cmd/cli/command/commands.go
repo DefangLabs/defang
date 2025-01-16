@@ -195,6 +195,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
+	loginCmd.Flags().Bool("training-opt-out", false, "Opt out of ML training (Pro users only)")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
@@ -386,6 +387,8 @@ var loginCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
+
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
@@ -397,6 +400,14 @@ var loginCmd = &cobra.Command{
 			}
 
 			printDefangHint("To generate a sample service, do:", "generate")
+		}
+
+		if trainingOptOut {
+			req := &defangv1.SetOptionsRequest{TrainingOptOut: trainingOptOut}
+			if err := client.SetOptions(cmd.Context(), req); err != nil {
+				return err
+			}
+			term.Info("Options updated successfully")
 		}
 		return nil
 	},
