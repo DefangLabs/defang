@@ -27,31 +27,41 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, loadError error) error {
+func InteractiveDebugDeployment(ctx context.Context, c client.FabricClient, project *compose.Project, p client.Provider, etag types.ETag, failedServices []string) error {
+	return interactiveDebug(ctx, c, p, etag, project, failedServices, nil)
+}
+
+func InteractiveDebugForLoadError(ctx context.Context, c client.FabricClient, project *compose.Project, loadError error) error {
+	return interactiveDebug(ctx, c, nil, "", project, nil, loadError)
+}
+
+func interactiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, loadError error) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err))
+		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err), P("loadErr", loadError))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", etag))
+		track.Evt("Debug Prompt Skipped", P("etag", etag), P("loadErr", loadError))
 		return ErrDebugSkipped
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", etag))
+	track.Evt("Debug Prompt Accepted", P("etag", etag), P("loadErr", loadError))
 
-	if etag == "" {
-		if err := DebugComposeFileLoadError(ctx, c, p, project, loadError); err != nil {
+	if loadError != nil {
+		if err := debugComposeFileLoadError(ctx, c, project, loadError); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
-	} else {
+	} else if etag != "" {
 		if err := DebugDeployment(ctx, c, p, etag, project, failedServices); err != nil {
 			term.Warnf("Failed to debug deployment: %v", err)
 			return err
 		}
+	} else {
+		return errors.New("no information to use for debugger")
 	}
 
 	var goodBad bool
@@ -59,15 +69,15 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		track.Evt("Debug Feedback Prompt Failed", P("etag", etag), P("reason", err))
+		track.Evt("Debug Feedback Prompt Failed", P("etag", etag), P("reason", err), P("loadErr", loadError))
 	} else {
-		track.Evt("Debug Feedback Prompt Answered", P("etag", etag), P("feedback", goodBad))
+		track.Evt("Debug Feedback Prompt Answered", P("etag", etag), P("feedback", goodBad), P("loadErr", loadError))
 	}
 	return nil
 }
 
 func DebugDeployment(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
-	term.Debug("Invoking AI debugger", etag)
+	term.Debugf("Invoking AI debugger for deployment %q", etag)
 
 	files := findMatchingProjectFiles(project, failedServices)
 
@@ -82,13 +92,9 @@ func DebugDeployment(ctx context.Context, c client.FabricClient, p client.Provid
 		Project:  project.Name,
 	}
 
-	if etag != "" {
-		err := p.Query(ctx, &req)
-		if err != nil {
-			return err
-		}
-	} else {
-		return errors.New("no information to use for debugger")
+	err := p.Query(ctx, &req)
+	if err != nil {
+		return err
 	}
 
 	resp, err := c.Debug(ctx, &req)
@@ -104,8 +110,8 @@ func DebugDeployment(ctx context.Context, c client.FabricClient, p client.Provid
 	return nil
 }
 
-func DebugComposeFileLoadError(ctx context.Context, c client.FabricClient, p client.Provider, project *compose.Project, loadErr error) error {
-	term.Debug("Invoking AI debugger for Load Error")
+func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, project *compose.Project, loadErr error) error {
+	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
 
 	files := findMatchingProjectFiles(project, nil)
 
@@ -116,12 +122,7 @@ func DebugComposeFileLoadError(ctx context.Context, c client.FabricClient, p cli
 	req := defangv1.DebugRequest{
 		Files:   files,
 		Project: project.Name,
-	}
-
-	if loadErr != nil {
-		req.Logs = loadErr.Error()
-	} else {
-		return errors.New("no information to use for debugger")
+		Logs:    loadErr.Error(),
 	}
 
 	resp, err := c.Debug(ctx, &req)
