@@ -2,15 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/docker"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
-
-var currentUser = os.Getenv("USER")
 
 type DriverOption func(types.Driver) error
 
@@ -51,7 +49,7 @@ func createDriver(reg Region, opts ...DriverOption) (types.Driver, error) {
 		region.USEast2,      // "us-east-2"
 		region.USWest1,      // "us-west-1"
 		region.USWest2:      // "us-west-2"
-		driver = cfn.New(stackName(currentUser), reg)
+		driver = cfn.New(stackName(pkg.GetCurrentUser()), reg)
 	default:
 		return nil, fmt.Errorf("unsupported region: %v", reg)
 	}
