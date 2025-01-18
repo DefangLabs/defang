@@ -180,3 +180,25 @@ func TestIsValidTime(t *testing.T) {
 		})
 	}
 }
+
+func TestGetCurrentUser(t *testing.T) {
+	if got := GetCurrentUser(); got == "" {
+		t.Errorf("GetCurrentUser() returned an empty string")
+	}
+
+	t.Setenv("USER", "test")
+	if got := GetCurrentUser(); got != "test" {
+		t.Errorf("GetCurrentUser() returned %v, expected test", got)
+	}
+
+	t.Setenv("USER", "")
+	t.Setenv("USERNAME", "testx")
+	if got := GetCurrentUser(); got != "testx" {
+		t.Errorf("GetCurrentUser() returned %v, expected testx", got)
+	}
+
+	t.Setenv("USERNAME", "")
+	if got := GetCurrentUser(); got == "" {
+		t.Errorf("GetCurrentUser() returned an empty string")
+	}
+}

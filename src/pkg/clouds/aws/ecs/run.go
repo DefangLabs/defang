@@ -3,10 +3,10 @@ package ecs
 import (
 	"context"
 	"errors"
-	"os"
 	"regexp"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -65,7 +65,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 		TaskDefinition: ptr.String(a.TaskDefARN),
 		PropagateTags:  types.PropagateTagsTaskDefinition,
 		Cluster:        ptr.String(a.ClusterName),
-		StartedBy:      ptr.String(sanitizeStartedBy.ReplaceAllLiteralString(os.Getenv("USER"), "_")),
+		StartedBy:      ptr.String(sanitizeStartedBy.ReplaceAllLiteralString(pkg.GetCurrentUser(), "_")),
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				AssignPublicIp: types.AssignPublicIpEnabled, // only works with public subnets
@@ -94,7 +94,7 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 			},
 			{
 				Key:   ptr.String("StartedBy"),
-				Value: ptr.String(os.Getenv("USER")),
+				Value: ptr.String(pkg.GetCurrentUser()),
 			},
 		},
 	}

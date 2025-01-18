@@ -92,7 +92,7 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	// Run the Pulumi command locally
 	env = append([]string{
 		"PATH=" + os.Getenv("PATH"),
-		"USER=" + os.Getenv("USER"), // needed for Pulumi
+		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
 	}, env...)
 	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
 		return err
