@@ -112,6 +112,8 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
 		"secretmanager.googleapis.com",        // For config/secrets
+		"sqladmin.googleapis.com",             // For Cloud SQL
+		"servicenetworking.googleapis.com",    // For VPC peering
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -149,6 +151,9 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/dns.admin",                       // For creating DNS records
 		"roles/cloudbuild.builds.editor",        // For building images using cloud build
 		"roles/secretmanager.admin",             // For set permission to secrets
+		"roles/resourcemanager.projectIamAdmin", // For assiging roles to service account used by service
+		"roles/compute.instanceAdmin.v1",        // For creating compute instances
+		"roles/cloudsql.admin",                  // For creating cloud sql instances
 	}); err != nil {
 		return err
 	}
@@ -322,6 +327,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 	}
 
 	if !term.StdoutCanColor() {
@@ -384,12 +390,8 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 
 	etag := pkg.RandomID()
 	var serviceInfos []*defangv1.ServiceInfo
-	projectNumber, err := b.driver.GetProjectNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name, projectNumber)
+		serviceInfo := b.update(service, project.Name, req.DelegateDomain)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -445,8 +447,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
-	// TODO: Copied from DO provider, double check if more is needed
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delegateDomain string) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
 		Service: &defangv1.Service{Name: service.Name},
@@ -458,8 +459,7 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 			mode = defangv1.Mode_HOST
 		}
 
-		// FIXME: hardcoded stack name beta
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-beta-%v-%v.%v.run.app", projectName, service.Name, projectNumber, b.driver.Region))
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v.%v.%v.%v", service.Name, b.PulumiStack, projectName, delegateDomain))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
