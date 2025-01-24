@@ -434,7 +434,7 @@ var whoamiCmd = &cobra.Command{
 			return err
 		}
 
-		term.Infof(str)
+		term.Info(str)
 		return nil
 	},
 }

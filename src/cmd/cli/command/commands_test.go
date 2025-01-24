@@ -21,7 +21,6 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/bufbuild/connect-go"
 	connect_go "github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
@@ -231,22 +230,22 @@ type MockFabricControllerClient struct {
 }
 
 func (m *MockFabricControllerClient) CanIUse(context.Context, *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
-	return connect.NewResponse(&m.canIUseResponse), nil
+	return connect_go.NewResponse(&m.canIUseResponse), nil
 }
 
 func (m *MockFabricControllerClient) GetServices(context.Context, *connect_go.Request[defangv1.GetServicesRequest]) (*connect_go.Response[defangv1.GetServicesResponse], error) {
-	return connect.NewResponse(&defangv1.GetServicesResponse{}), nil
+	return connect_go.NewResponse(&defangv1.GetServicesResponse{}), nil
 }
 
 func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
-	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
+	return connect_go.NewResponse(&defangv1.GetSelectedProviderResponse{
 		Provider: m.savedProvider[req.Msg.Project],
 	}), nil
 }
 
 func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	m.savedProvider[req.Msg.Project] = req.Msg.Provider
-	return connect.NewResponse(&emptypb.Empty{}), nil
+	return connect_go.NewResponse(&emptypb.Empty{}), nil
 }
 
 type FakeStdin struct {
