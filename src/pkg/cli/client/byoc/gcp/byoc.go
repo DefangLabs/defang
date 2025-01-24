@@ -109,11 +109,13 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"run.googleapis.com",                  // Cloud Run API
 		"iam.googleapis.com",                  // IAM API
 		"cloudresourcemanager.googleapis.com", // For service account and role management
+		"cloudbuild.googleapis.com",           // For building images using cloud build
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
 		"secretmanager.googleapis.com",        // For config/secrets
 		"sqladmin.googleapis.com",             // For Cloud SQL
 		"servicenetworking.googleapis.com",    // For VPC peering
+		"redis.googleapis.com",                // For Redis
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -154,6 +156,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/resourcemanager.projectIamAdmin", // For assiging roles to service account used by service
 		"roles/compute.instanceAdmin.v1",        // For creating compute instances
 		"roles/cloudsql.admin",                  // For creating cloud sql instances
+		"roles/redis.admin",                     // For creating redis instances/clusters
 	}); err != nil {
 		return err
 	}
@@ -605,7 +608,17 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 	prefix := b.StackName(req.Project, "")
 	secrets, err := b.driver.ListSecrets(ctx, prefix)
 	if err != nil {
-		return nil, err
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
+				return nil, annotateGcpError(err)
+			}
+			secrets, err = b.driver.ListSecrets(ctx, prefix)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	return &defangv1.Secrets{Names: secrets}, nil
 }
@@ -618,7 +631,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
-		if stat, _ := status.FromError(err); stat.Code() == codes.AlreadyExists {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
 			term.Debugf("Secret %q already exists", secretId)
 		} else {
 			return fmt.Errorf("failed to create secret %q: %w", secretId, err)

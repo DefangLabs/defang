@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
@@ -14,7 +13,7 @@ import (
 func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create secretmanager client: %v", err)
+		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
@@ -40,7 +39,7 @@ func (gcp Gcp) CreateSecret(ctx context.Context, secretID string) (string, error
 func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload []byte) (string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create secretmanager client: %v", err)
+		return "", fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
@@ -62,7 +61,7 @@ func (gcp Gcp) AddSecretVersion(ctx context.Context, secretName string, payload 
 func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, keep int) error {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create secretmanager client: %v", err)
+		return fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
@@ -78,7 +77,7 @@ func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, 
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("failed to list secret versions: %v", err)
+			return fmt.Errorf("failed to list secret versions: %w", err)
 		}
 		// The versions are returned sorted
 		// https://cloud.google.com/secret-manager/docs/filtering#gcloud
@@ -86,7 +85,7 @@ func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, 
 			continue
 		}
 		if _, err := client.DestroySecretVersion(ctx, &secretmanagerpb.DestroySecretVersionRequest{Name: version.Name}); err != nil {
-			return fmt.Errorf("failed to destroy secret version %v: %v", version.Name, err)
+			return fmt.Errorf("failed to destroy secret version %v: %w", version.Name, err)
 		}
 	}
 
@@ -96,7 +95,7 @@ func (gcp Gcp) CleanupOldVersionsExcept(ctx context.Context, secretName string, 
 func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create secretmanager client: %v", err)
+		return nil, fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
@@ -112,7 +111,7 @@ func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error)
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to list secrets: %v", err)
+			return nil, fmt.Errorf("failed to list secrets: %w", err)
 		}
 		match := secretRegex.FindStringSubmatch(secret.Name)
 		if len(match) > 1 {
@@ -125,7 +124,7 @@ func (gcp Gcp) ListSecrets(ctx context.Context, prefix string) ([]string, error)
 func (gcp Gcp) DeleteSecret(ctx context.Context, secretName string) error {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create secretmanager client: %v", err)
+		return fmt.Errorf("failed to create secretmanager client: %w", err)
 	}
 	defer client.Close()
 
@@ -133,7 +132,7 @@ func (gcp Gcp) DeleteSecret(ctx context.Context, secretName string) error {
 		Name: fmt.Sprintf("projects/%v/secrets/%v", gcp.ProjectId, secretName),
 	}
 	if err := client.DeleteSecret(ctx, req); err != nil {
-		return fmt.Errorf("failed to delete secret %v: %v", secretName, err)
+		return fmt.Errorf("failed to delete secret %v: %w", secretName, err)
 	}
 	return nil
 }
