@@ -8,5 +8,5 @@ type ErrDeploymentFailed struct {
 }
 
 func (e ErrDeploymentFailed) Error() string {
-	return fmt.Sprintf("deployment failed for service %q", e.Service)
+	return fmt.Sprintf("deployment failed for service %q: %v", e.Service, e.Message)
 }

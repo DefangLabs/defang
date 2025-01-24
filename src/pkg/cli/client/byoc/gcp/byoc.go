@@ -87,9 +87,9 @@ type ByocGcp struct {
 	uploadServiceAccount string
 	delegateDomainZone   string
 
-	lastCdExecution string
-	lastCdEtag      string
-	lastCdStart     time.Time
+	cdExecution string
+	cdEtag      string
+	cdStartTime time.Time
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
@@ -101,7 +101,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp 
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
-	b.lastCdStart = time.Now()
+	b.cdStartTime = time.Now()
 	if b.setupDone {
 		return nil
 	}
@@ -115,9 +115,13 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"run.googleapis.com",                  // Cloud Run API
 		"iam.googleapis.com",                  // IAM API
 		"cloudresourcemanager.googleapis.com", // For service account and role management
+		"cloudbuild.googleapis.com",           // For building images using cloud build
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
 		"secretmanager.googleapis.com",        // For config/secrets
+		"sqladmin.googleapis.com",             // For Cloud SQL
+		"servicenetworking.googleapis.com",    // For VPC peering
+		"redis.googleapis.com",                // For Redis
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -154,6 +158,11 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.networkAdmin",            // For creating network
 		"roles/dns.admin",                       // For creating DNS records
 		"roles/cloudbuild.builds.editor",        // For building images using cloud build
+		"roles/secretmanager.admin",             // For set permission to secrets
+		"roles/resourcemanager.projectIamAdmin", // For assiging roles to service account used by service
+		"roles/compute.instanceAdmin.v1",        // For creating compute instances
+		"roles/cloudsql.admin",                  // For creating cloud sql instances
+		"roles/redis.admin",                     // For creating redis instances/clusters
 	}); err != nil {
 		return err
 	}
@@ -324,9 +333,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_ORG":               "defang",
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
-		"DEFANG_PREFIX":            "defang",
+		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 	}
 
 	if !term.StdoutCanColor() {
@@ -347,7 +357,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 	if err != nil {
 		return "", err
 	}
-	b.lastCdExecution = execution
+	b.cdExecution = execution
 	// fmt.Printf("CD Execution: %s\n", execution)
 	return execution, nil
 }
@@ -390,12 +400,8 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	etag := pkg.RandomID()
 
 	var serviceInfos []*defangv1.ServiceInfo
-	projectNumber, err := b.driver.GetProjectNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name, projectNumber)
+		serviceInfo := b.update(service, project.Name, req.DelegateDomain)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -444,15 +450,14 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 		return nil, err
 	}
 
-	b.lastCdEtag = etag
+	b.cdEtag = etag
 	if command == "preview" {
 		etag = execution // Only wait for the preview command cd job to finish
 	}
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
-	// TODO: Copied from DO provider, double check if more is needed
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delegateDomain string) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
 		Service: &defangv1.Service{Name: service.Name},
@@ -464,8 +469,7 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 			mode = defangv1.Mode_HOST
 		}
 
-		// FIXME: hardcoded stack name beta
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-beta-%v-%v.%v.run.app", projectName, service.Name, projectNumber, b.driver.Region))
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v.%v.%v.%v", service.Name, b.PulumiStack, projectName, delegateDomain))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
@@ -488,8 +492,8 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.lastCdEtag {
-		ss.AddJobExecutionUpdate(path.Base(b.lastCdExecution))
+	if req.Etag == b.cdEtag {
+		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
 	ss.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
 	ss.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
@@ -500,12 +504,12 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if req.Etag == b.lastCdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
+	if req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		ss, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
 		}
-		ss.AddJobExecutionUpdate(path.Base(b.lastCdExecution))
+		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
 		if err := ss.Start(); err != nil {
 			return nil, err
 		}
@@ -535,11 +539,11 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.lastCdEtag || req.Etag == b.lastCdExecution {
-		ls.AddJobExecutionLog(path.Base(b.lastCdExecution), req.Since.AsTime()) // CD log
+	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
+		ls.AddJobExecutionLog(path.Base(b.cdExecution), req.Since.AsTime()) // CD log
 	}
 
-	if req.Etag != b.lastCdExecution { // No need to tail kaniko and service log if there is only cd running
+	if req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
 		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
 		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
 		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
@@ -611,7 +615,17 @@ func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsReque
 	prefix := b.StackName(req.Project, "")
 	secrets, err := b.driver.ListSecrets(ctx, prefix)
 	if err != nil {
-		return nil, err
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
+				return nil, annotateGcpError(err)
+			}
+			secrets, err = b.driver.ListSecrets(ctx, prefix)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	return &defangv1.Secrets{Names: secrets}, nil
 }
@@ -624,7 +638,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
-		if stat, _ := status.FromError(err); stat.Code() == codes.AlreadyExists {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
 			term.Debugf("Secret %q already exists", secretId)
 		} else {
 			return fmt.Errorf("failed to create secret %q: %w", secretId, err)
@@ -649,19 +663,19 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 
 func (b *ByocGcp) createQuery(req *defangv1.DebugRequest) string {
 	query := cloudgcp.CreateStdQuery(b.driver.ProjectId)
-	if req.Etag == b.lastCdEtag || req.Etag == b.lastCdExecution {
-		newQueryFragment := cloudgcp.CreateJobExecutionQuery(path.Base(b.lastCdExecution), b.lastCdStart)
+	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
+		newQueryFragment := cloudgcp.CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
 		query = cloudgcp.ConcatQuery(query, newQueryFragment)
 	}
 
-	if req.Etag != b.lastCdExecution {
-		newQueryFragment := cloudgcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart)
+	if req.Etag != b.cdExecution {
+		newQueryFragment := cloudgcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
 		query = cloudgcp.ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = cloudgcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart)
+		newQueryFragment = cloudgcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
 		query = cloudgcp.ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = cloudgcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart) // CloudBuild logs
+		newQueryFragment = cloudgcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
 		query = cloudgcp.ConcatQuery(query, newQueryFragment)
 	}
 
