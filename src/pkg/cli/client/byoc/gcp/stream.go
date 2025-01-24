@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	cloudgcp "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
@@ -126,91 +127,29 @@ func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
 	if err != nil {
 		return nil, err
 	}
-	ss.tailer.SetBaseQuery(`(logName=~"logs/run.googleapis.com%2F(stdout|stderr)$" OR logName="projects/edw-test-proj/logs/cloudbuild")`)
+
+	query := cloudgcp.CreateStdQuery(gcp.ProjectId)
+	ss.tailer.SetBaseQuery(query)
 	return &LogStream{ServerStream: ss}, nil
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := `resource.type = "cloud_run_job"`
-
-	query += fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := cloudgcp.CreateJobExecutionQuery(executionName, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type = "cloud_run_job"`
-
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project" = "%v"`, project)
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := cloudgcp.CreateJobLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type="cloud_run_revision"`
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project"="%v"`, project)
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := cloudgcp.CreateServiceLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type="build"`
-
-	servicesRegex := `[a-zA-Z0-9-]{1,63}`
-	if len(services) > 0 {
-		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|"))
-	}
-	query += fmt.Sprintf(`
-labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := cloudgcp.CreateCloudBuildLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -228,8 +167,7 @@ func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*Subs
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	query := cloudgcp.CreateJobExecutionUpdateQuery(executionName)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -461,7 +399,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 			executionName := path.Base(auditLog.GetResourceName())
 			if cdExecutionNamePattern.MatchString(executionName) {
 				if auditLog.GetStatus().GetCode() != 0 {
-					return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+					return nil, pkg.ErrDeploymentFailed{Service: "defang-cd", Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
 				if len(readyServices) > 0 {

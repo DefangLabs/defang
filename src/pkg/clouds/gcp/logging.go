@@ -39,6 +39,7 @@ func (t *Tailer) SetBaseQuery(query string) {
 }
 
 func (t *Tailer) AddQuerySet(query string) {
+	t.query = ConcatQuery(t.query, query)
 	if len(t.query) > 0 {
 		if t.query[len(t.query)-1] == ')' {
 			t.query += " OR "

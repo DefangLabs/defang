@@ -193,7 +193,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				var errDeploymentFailed pkg.ErrDeploymentFailed
-				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	logging "cloud.google.com/go/logging/apiv2"
+	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -19,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	cloudgcp "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -27,6 +30,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -85,6 +89,7 @@ type ByocGcp struct {
 
 	lastCdExecution string
 	lastCdEtag      string
+	lastCdStart     time.Time
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
@@ -96,6 +101,7 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp 
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
+	b.lastCdStart = time.Now()
 	if b.setupDone {
 		return nil
 	}
@@ -382,6 +388,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	}
 
 	etag := pkg.RandomID()
+
 	var serviceInfos []*defangv1.ServiceInfo
 	projectNumber, err := b.driver.GetProjectNumber(ctx)
 	if err != nil {
@@ -640,9 +647,93 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
+func (b *ByocGcp) createQuery(req *defangv1.DebugRequest) string {
+	query := cloudgcp.CreateStdQuery(b.driver.ProjectId)
+	if req.Etag == b.lastCdEtag || req.Etag == b.lastCdExecution {
+		newQueryFragment := cloudgcp.CreateJobExecutionQuery(path.Base(b.lastCdExecution), b.lastCdStart)
+		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+	}
+
+	if req.Etag != b.lastCdExecution {
+		newQueryFragment := cloudgcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart)
+		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = cloudgcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart)
+		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = cloudgcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.lastCdStart) // CloudBuild logs
+		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+	}
+
+	return query
+}
+
+func (b *ByocGcp) extractLogsToString(logEntries []*loggingpb.LogEntry) string {
+	result := ""
+	for _, logEntry := range logEntries {
+		result += logEntry.GetTextPayload() + "\n"
+	}
+
+	return result
+}
+
+func (b *ByocGcp) query(ctx context.Context, client *logging.Client, projectId string, query string) ([]*loggingpb.LogEntry, error) {
+	var entries []*loggingpb.LogEntry
+
+	req := &loggingpb.ListLogEntriesRequest{
+		ResourceNames: []string{"projects/" + projectId}, // Required
+		Filter:        query,                             // Query string
+		OrderBy:       "timestamp desc",                  // Optional: Sort by timestamp
+		PageSize:      50,                                // Number of entries per page
+	}
+
+	term.Debugf("Querying logs with filter: \n %s", query)
+	resp := client.ListLogEntries(ctx, req)
+	defer client.Close()
+
+	for {
+		// aggregate log entries
+		for {
+			entry, err := resp.Next()
+			if err != nil {
+				if err == iterator.Done {
+					break
+				}
+				return nil, err
+			}
+
+			entries = append(entries, entry)
+		}
+
+		// set request for next page
+		if resp.PageInfo().Token == "" {
+			break
+		}
+		req.PageToken = resp.PageInfo().Token
+	}
+
+	return entries, nil
+}
+
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP Query")
+	logClient, err := logging.NewClient(ctx)
+	if err != nil {
+		return annotateGcpError(err)
+	}
+
+	query := b.createQuery(req)
+
+	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
+	if err != nil {
+		return annotateGcpError(err)
+	}
+
+	req.Logs = b.extractLogsToString(logEntries)
+
+	term.Debug("AI debugger Logs: \n")
+	term.Debug(req.Logs)
+
+	return nil
 }
 
 func (b *ByocGcp) TearDown(ctx context.Context) error {
