@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	cloudgcp "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
@@ -122,34 +121,34 @@ type LogStream struct {
 	*ServerStream[*defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getLogEntryParser(ctx, gcp))
+func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient))
 	if err != nil {
 		return nil, err
 	}
 
-	query := cloudgcp.CreateStdQuery(gcp.ProjectId)
+	query := gcp.CreateStdQuery(gcpClient.ProjectId)
 	ss.tailer.SetBaseQuery(query)
 	return &LogStream{ServerStream: ss}, nil
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := cloudgcp.CreateJobExecutionQuery(executionName, since)
+	query := gcp.CreateJobExecutionQuery(executionName, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := cloudgcp.CreateJobLogQuery(project, etag, services, since)
+	query := gcp.CreateJobLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := cloudgcp.CreateServiceLogQuery(project, etag, services, since)
+	query := gcp.CreateServiceLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	query := cloudgcp.CreateCloudBuildLogQuery(project, etag, services, since)
+	query := gcp.CreateCloudBuildLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -167,7 +166,7 @@ func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*Subs
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := cloudgcp.CreateJobExecutionUpdateQuery(executionName)
+	query := gcp.CreateJobExecutionUpdateQuery(executionName)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -312,7 +311,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			term.Warnf("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
+			term.Warn("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
 			return nil, nil
 		}
 
@@ -354,7 +353,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				term.Warnf("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
+				term.Warn("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
 				return nil, nil
 			}
 
@@ -377,7 +376,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					term.Warnf("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+					term.Warn("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
 					return nil, nil
 				}
 				var state defangv1.ServiceState
@@ -422,11 +421,11 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				}
 				return nil, nil // Ignore success cd status if not reporting cd
 			} else {
-				term.Warnf("unexpected execution name in audit log : " + executionName)
+				term.Warn("unexpected execution name in audit log : " + executionName)
 				return nil, nil
 			}
 		default:
-			term.Warnf("unexpected resource type : " + entry.Resource.Type)
+			term.Warn("unexpected resource type : " + entry.Resource.Type)
 			return nil, nil
 		}
 	}

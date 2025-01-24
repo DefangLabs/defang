@@ -160,7 +160,7 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	return project, nil
 }
 
-func (gcp Gcp) GetProjectNumber(ctx context.Context) (int64, error) {
+func (gcp *Gcp) GetProjectNumber(ctx context.Context) (int64, error) {
 	if gcp.ProjectNumber != 0 {
 		return gcp.ProjectNumber, nil
 	}

@@ -21,7 +21,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
-	cloudgcp "github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -195,7 +194,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		if _, err := b.driver.SignBytes(ctx, []byte("testdata"), b.uploadServiceAccount); err != nil {
 			if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 				if time.Since(start) > 5*time.Minute {
-					return errors.New("Could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
+					return errors.New("could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
 				}
 				pkg.SleepWithContext(ctx, 30*time.Second)
 				continue
@@ -241,7 +240,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, errors.New("No defang cd bucket found")
+		return nil, errors.New("no defang cd bucket found")
 	}
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
@@ -370,7 +369,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
-			return nil, errors.New("Current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
+			return nil, errors.New("current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
 		}
 		return nil, err
 	}
@@ -662,21 +661,21 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 }
 
 func (b *ByocGcp) createQuery(req *defangv1.DebugRequest) string {
-	query := cloudgcp.CreateStdQuery(b.driver.ProjectId)
+	query := gcp.CreateStdQuery(b.driver.ProjectId)
 	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		newQueryFragment := cloudgcp.CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
-		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment := gcp.CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
+		query = gcp.ConcatQuery(query, newQueryFragment)
 	}
 
 	if req.Etag != b.cdExecution {
-		newQueryFragment := cloudgcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
-		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment := gcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		query = gcp.ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = cloudgcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
-		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment = gcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		query = gcp.ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = cloudgcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
-		query = cloudgcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment = gcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
+		query = gcp.ConcatQuery(query, newQueryFragment)
 	}
 
 	return query
@@ -803,7 +802,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, errors.New("No defang cd bucket found")
+		return nil, errors.New("no defang cd bucket found")
 	}
 
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
