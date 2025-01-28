@@ -127,28 +127,28 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
 		return nil, err
 	}
 
-	query := gcp.CreateStdQuery(gcpClient.ProjectId)
+	query := CreateStdQuery(gcpClient.ProjectId)
 	ss.tailer.SetBaseQuery(query)
 	return &LogStream{ServerStream: ss}, nil
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := gcp.CreateJobExecutionQuery(executionName, since)
+	query := CreateJobExecutionQuery(executionName, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := gcp.CreateJobLogQuery(project, etag, services, since)
+	query := CreateJobLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := gcp.CreateServiceLogQuery(project, etag, services, since)
+	query := CreateServiceLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	query := gcp.CreateCloudBuildLogQuery(project, etag, services, since)
+	query := CreateCloudBuildLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -166,62 +166,21 @@ func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*Subs
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := gcp.CreateJobExecutionUpdateQuery(executionName)
+	query := CreateJobExecutionUpdateQuery(executionName)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
-	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
-	resQuery := `protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "/Jobs.UpdateJob"`
-
-	if project != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-project"="%v"`, project)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-etag"="%v"`, etag)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
+	reqQuery := CreateJobStatusUpdateRequestQuery(project, etag, services)
+	resQuery := CreateJobStatusUpdateResponseQuery(project, etag, services)
 
 	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
 }
 
 func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
-	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService"`
-	resQuery := `protoPayload.methodName="/Services.CreateService" OR "/Services.UpdateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
+	reqQuery := CreateServiceStatusRequestUpdate(project, etag, services)
+	resQuery := CreateServiceStatusReponseUpdate(project, etag, services)
 
-	if project != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"="%v"`, project)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-etag"="%v"`, etag)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
 	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
 }
 

@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	resourcepb "cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
-	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iterator"
 )
 
@@ -99,9 +97,8 @@ func (id ProjectId) Suffix() string {
 }
 
 type Gcp struct {
-	Region        string
-	ProjectId     string
-	ProjectNumber int64
+	Region    string
+	ProjectId string
 }
 
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcepb.Project, error) {
@@ -158,22 +155,4 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	}
 
 	return project, nil
-}
-
-func (gcp *Gcp) GetProjectNumber(ctx context.Context) (int64, error) {
-	if gcp.ProjectNumber != 0 {
-		return gcp.ProjectNumber, nil
-	}
-	resourceManagerService, err := cloudresourcemanager.NewService(ctx)
-	if err != nil {
-		log.Fatalf("Failed to create Resource Manager service: %v", err)
-	}
-
-	// Get the project details
-	project, err := resourceManagerService.Projects.Get(gcp.ProjectId).Context(ctx).Do()
-	if err != nil {
-		log.Fatalf("Failed to get project: %v", err)
-	}
-	gcp.ProjectNumber = project.ProjectNumber
-	return project.ProjectNumber, nil
 }

@@ -100,7 +100,9 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp 
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
-	b.cdStartTime = time.Now()
+	if b.cdStartTime.IsZero() {
+		b.cdStartTime = time.Now()
+	}
 	if b.setupDone {
 		return nil
 	}
@@ -660,22 +662,34 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
-func (b *ByocGcp) createQuery(req *defangv1.DebugRequest) string {
-	query := gcp.CreateStdQuery(b.driver.ProjectId)
+func (b *ByocGcp) createAiLogQuery(req *defangv1.DebugRequest) string {
+	query := CreateStdQuery(b.driver.ProjectId)
 	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		newQueryFragment := gcp.CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
-		query = gcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
+		query = ConcatQuery(query, newQueryFragment)
 	}
 
 	if req.Etag != b.cdExecution {
-		newQueryFragment := gcp.CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
-		query = gcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment := CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = gcp.CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
-		query = gcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = gcp.CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
-		query = gcp.ConcatQuery(query, newQueryFragment)
+		newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
+		query = ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+		query = ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = CreateJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+		query = ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = CreateServiceStatusRequestUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
+		query = ConcatQuery(query, newQueryFragment)
+
+		newQueryFragment = CreateServiceStatusReponseUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
+		query = ConcatQuery(query, newQueryFragment)
 	}
 
 	return query
@@ -734,7 +748,7 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		return annotateGcpError(err)
 	}
 
-	query := b.createQuery(req)
+	query := b.createAiLogQuery(req)
 
 	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
 	if err != nil {
