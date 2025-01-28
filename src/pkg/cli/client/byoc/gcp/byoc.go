@@ -88,7 +88,6 @@ type ByocGcp struct {
 
 	cdExecution string
 	cdEtag      string
-	cdStartTime time.Time
 }
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
@@ -100,9 +99,6 @@ func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp 
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
-	if b.cdStartTime.IsZero() {
-		b.cdStartTime = time.Now()
-	}
 	if b.setupDone {
 		return nil
 	}
@@ -665,18 +661,18 @@ func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 func (b *ByocGcp) createAiLogQuery(req *defangv1.DebugRequest) string {
 	query := CreateStdQuery(b.driver.ProjectId)
 	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), b.cdStartTime)
+		newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
 		query = ConcatQuery(query, newQueryFragment)
 	}
 
 	if req.Etag != b.cdExecution {
-		newQueryFragment := CreateJobLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		newQueryFragment := CreateJobLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
 		query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime)
+		newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
 		query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, b.cdStartTime) // CloudBuild logs
+		newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
 		query = ConcatQuery(query, newQueryFragment)
 
 		newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs

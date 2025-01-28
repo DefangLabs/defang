@@ -850,7 +850,8 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
+		var zeroTime time.Time
+		return cli.Debug(cmd.Context(), client, provider, etag, project, args, zeroTime)
 	},
 }
 

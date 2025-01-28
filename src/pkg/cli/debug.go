@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
@@ -27,7 +29,7 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
+func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
@@ -42,7 +44,7 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 
 	track.Evt("Debug Prompt Accepted", P("etag", etag))
 
-	if err := Debug(ctx, c, p, etag, project, failedServices); err != nil {
+	if err := Debug(ctx, c, p, etag, project, failedServices, since); err != nil {
 		term.Warnf("Failed to debug deployment: %v", err)
 		return err
 	}
@@ -59,7 +61,7 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	return nil
 }
 
-func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string) error {
+func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
 	term.Debug("Invoking AI debugger for deployment", etag)
 
 	files := findMatchingProjectFiles(project, failedServices)
@@ -69,10 +71,10 @@ func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag t
 	}
 
 	req := defangv1.DebugRequest{
-		Etag:     etag,
-		Files:    files,
-		Services: failedServices,
-		Project:  project.Name,
+		Etag:    etag,
+		Files:   files,
+		Since:   timestamppb.New(since),
+		Project: project.Name,
 	}
 	err := p.Query(ctx, &req)
 	if err != nil {
