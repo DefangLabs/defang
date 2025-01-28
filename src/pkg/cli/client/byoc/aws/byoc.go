@@ -613,6 +613,12 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		since = time.Now().Add(-time.Hour)
 	}
 
+	// get stack information
+	err := b.driver.FillOutputs(ctx)
+	if err != nil {
+		return AnnotateAwsError(err)
+	}
+
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
 	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
