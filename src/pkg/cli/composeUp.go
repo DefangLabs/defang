@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -67,10 +68,8 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
-		term.Debug("Failed to get delegate domain:", err)
-		delegateDomain = &defangv1.DelegateSubdomainZoneResponse{
-			Zone: "",
-		}
+		term.Debug("GetDelegateSubdomainZone failed:", err)
+		return nil, project, errors.New("failed to get delegate domain")
 	}
 
 	deployRequest := &defangv1.DeployRequest{

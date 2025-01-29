@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -18,10 +19,8 @@ func Delete(ctx context.Context, projectName string, c client.FabricClient, prov
 
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
-		term.Debug("Failed to get delegate domain:", err)
-		delegateDomain = &defangv1.DelegateSubdomainZoneResponse{
-			Zone: "",
-		}
+		term.Debug("GetDelegateSubdomainZone failed:", err)
+		return "", errors.New("failed to get delegate domain")
 	}
 
 	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
