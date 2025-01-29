@@ -744,6 +744,23 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		return annotateGcpError(err)
 	}
 
+	// if there is no execution info then get from jobs list
+	if req.Etag != "" && b.cdExecution == "" {
+		job, err := b.driver.FindJobWithEtag(req.Etag)
+		if err != nil {
+			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
+		}
+
+		if len(job.Template.Template.Containers) == 0 {
+			return fmt.Errorf("job %s does not have any containers", job.Name)
+		}
+
+		// populate with job information for creating queries
+		b.cdEtag = req.Etag
+		b.cdExecution = job.Name
+		req.Since = job.CreateTime
+	}
+
 	query := b.createAiLogQuery(req)
 
 	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
