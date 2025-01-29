@@ -19,6 +19,9 @@ func Delete(ctx context.Context, projectName string, c client.FabricClient, prov
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("Failed to get delegate domain:", err)
+		delegateDomain = &defangv1.DelegateSubdomainZoneResponse{
+			Zone: "",
+		}
 	}
 
 	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
