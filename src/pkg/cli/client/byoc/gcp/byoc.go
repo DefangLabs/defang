@@ -651,42 +651,31 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	return nil
 }
 
-// FUNCTIONS TO BE IMPLEMENTED BELOW ========================
-
-func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP Delete")
-}
-
 func (b *ByocGcp) createAiLogQuery(req *defangv1.DebugRequest) string {
 	query := CreateStdQuery(b.driver.ProjectId)
-	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
-		query = ConcatQuery(query, newQueryFragment)
-	}
+	newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
+	query = ConcatQuery(query, newQueryFragment)
 
-	if req.Etag != b.cdExecution {
-		newQueryFragment := CreateJobLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateJobLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateServiceStatusRequestUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
-		query = ConcatQuery(query, newQueryFragment)
+	newQueryFragment = CreateServiceStatusRequestUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query = ConcatQuery(query, newQueryFragment)
 
-		newQueryFragment = CreateServiceStatusReponseUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
-		query = ConcatQuery(query, newQueryFragment)
-	}
+	newQueryFragment = CreateServiceStatusReponseUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query = ConcatQuery(query, newQueryFragment)
 
 	return query
 }
@@ -746,19 +735,19 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	// if there is no execution info then get from jobs list
 	if req.Etag != "" && b.cdExecution == "" {
-		job, err := b.driver.FindJobWithEtag(req.Etag)
+		execution, err := b.driver.FindExecutionWithEtag(req.Etag)
 		if err != nil {
 			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
 		}
 
-		if len(job.Template.Template.Containers) == 0 {
-			return fmt.Errorf("job %s does not have any containers", job.Name)
+		if len(execution.Template.Containers) == 0 {
+			return fmt.Errorf("job %s does not have any containers", execution.Name)
 		}
 
 		// populate with job information for creating queries
 		b.cdEtag = req.Etag
-		b.cdExecution = job.Name
-		req.Since = job.CreateTime
+		b.cdExecution = execution.Name
+		req.Since = execution.CreateTime
 	}
 
 	query := b.createAiLogQuery(req)
@@ -774,6 +763,13 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	term.Debug(req.Logs)
 
 	return nil
+}
+
+// FUNCTIONS TO BE IMPLEMENTED BELOW ========================
+
+func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
+	// FIXME: implement
+	return nil, client.ErrNotImplemented("GCP Delete")
 }
 
 func (b *ByocGcp) TearDown(ctx context.Context) error {

@@ -18,6 +18,10 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+const (
+	JOBNAME_CD = "defang-cd"
+)
+
 func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, containers []types.Container) error {
 	client, err := run.NewJobsClient(ctx)
 	if err != nil {
@@ -93,72 +97,48 @@ func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, conta
 	}
 }
 
-func (gcp Gcp) FindJobWithEtag(etag string) (*runpb.Job, error) {
+func (gcp Gcp) FindExecutionWithEtag(etag string) (*runpb.Execution, error) {
 	ctx := context.Background()
 
-	// Create a Cloud Run Jobs client
-	client, err := run.NewJobsClient(ctx)
+	// Create a Cloud Run Job Executions client
+	client, err := run.NewExecutionsClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Cloud Run client: %v", err)
 	}
 	defer client.Close()
 
 	// List jobs in the region
-	req := &runpb.ListJobsRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s", gcp.ProjectId, gcp.Region),
+	req := &runpb.ListExecutionsRequest{
+		Parent: fmt.Sprintf("projects/%s/locations/%s/jobs/%s", gcp.ProjectId, gcp.Region, JOBNAME_CD),
 	}
-	it := client.ListJobs(ctx, req)
+	it := client.ListExecutions(ctx, req)
 
-	// Iterate through jobs and filter by environment variable
-	var job *runpb.Job
+	// Iterate through executions and filter by environment variable
+	var execList *runpb.Execution
 	for {
-		job, err = it.Next()
+		execList, err = it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("error listing jobs: %v", err)
+			return nil, fmt.Errorf("error listing execuitions: %v", err)
 		}
 
-		if len(job.Template.Template.Containers) == 0 {
-			return nil, fmt.Errorf("job %s does not have any containers", job.Name)
+		if len(execList.Template.Containers) == 0 {
+			continue
 		}
-		// Check if the job has the target environment variable
-		for _, envVar := range job.Template.Template.Containers[0].Env {
-			if envVar.Name == "DEFANG_ETAG" {
-				fmt.Printf("Found job with environment variable '%s': %s\n", envVar.Name, job.Name)
-				return job, nil
+
+		// Check if the execution has the target environment variable
+		for _, container := range execList.Template.Containers {
+			for _, entry := range container.Env {
+				if entry.GetName() == "DEFANG_ETAG" && entry.GetValue() == etag {
+					return execList, nil
+				}
 			}
 		}
 	}
 	return nil, errors.New("no job found with matching etag")
 }
-
-// func (gcp Gcp) updateJobEnv(ctx context.Context, client *run.JobsClient, jobPath string, env map[string]string) error {
-
-// 	job, err := client.GetJob(ctx, &runpb.GetJobRequest{Name: jobPath})
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if len(job.Template.Template.Containers) == 0 {
-// 		return fmt.Errorf("job %s does not have any containers", jobPath)
-// 	}
-
-// 	for key, value := range env {
-// 		job.Template.Template.Containers[0].Env = append(job.Template.Template.Containers[0].Env,
-// 			&runpb.EnvVar{Name: key, Values: &runpb.EnvVar_Value{Value: value}})
-// 	}
-// 	updateReq := &runpb.UpdateJobRequest{Job: job, AllowMissing: true}
-// 	op, err := client.UpdateJob(ctx, updateReq)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	term.Debugf("Updated job %s - id %s", jobPath, op.Name())
-
-// 	return nil
-// }
 
 func (gcp Gcp) Run(ctx context.Context, jobId string, env map[string]string, cmd ...string) (string, error) {
 	client, err := run.NewJobsClient(ctx)

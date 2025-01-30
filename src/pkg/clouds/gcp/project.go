@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
-	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	resourcepb "cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"google.golang.org/api/iterator"
@@ -111,7 +110,7 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	var project *resourcepb.Project
 	// Find if there is already a CD project with the defang-cd prefix
 	projectId := ProjectIDFromName(projectName)
-	req := &resourcemanagerpb.SearchProjectsRequest{}
+	req := &resourcepb.SearchProjectsRequest{}
 
 	// TODO:: Figure out how to use client.ListProjects to find projects without an org as according
 	// to doc Search projects is eventually consistent, so 2 consecutive calls may create 2 cd projects
