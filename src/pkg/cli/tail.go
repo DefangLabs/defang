@@ -220,6 +220,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 		Since:    since,
 		LogType:  uint32(options.LogType),
 	}
+
 	serverStream, err := provider.Follow(ctx, tailRequest)
 	if err != nil {
 		return err

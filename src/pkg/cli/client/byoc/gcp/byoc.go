@@ -33,6 +33,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ client.Provider = (*ByocGcp)(nil)
@@ -501,6 +502,22 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	//	if there is no execution info then get from execution list
+	if req.Etag != "" && b.cdExecution == "" {
+		// get the execution info
+		var err error
+		var since *timestamppb.Timestamp
+		b.cdEtag = req.Etag
+		b.cdExecution, since, err = b.PopulateWithCdJobInfo(req.Etag)
+		if err != nil {
+			return nil, err
+		}
+
+		if req.Since == nil {
+			req.Since = since
+		}
+	}
+
 	if req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		ss, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
@@ -727,27 +744,27 @@ func (b *ByocGcp) query(ctx context.Context, client *logging.Client, projectId s
 	return entries, nil
 }
 
+func (b *ByocGcp) PopulateWithCdJobInfo(etag string) (string, *timestamppb.Timestamp, error) {
+	execution, err := b.driver.FindExecutionWithEtag(etag)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not find job with etag %s: %v", etag, annotateGcpError(err))
+	}
+	return execution.Name, execution.CreateTime, nil
+}
+
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	logClient, err := logging.NewClient(ctx)
 	if err != nil {
 		return annotateGcpError(err)
 	}
 
-	// if there is no execution info then get from jobs list
+	// if there is no execution info then get from execution list
 	if req.Etag != "" && b.cdExecution == "" {
-		execution, err := b.driver.FindExecutionWithEtag(req.Etag)
-		if err != nil {
-			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
-		}
-
-		if len(execution.Template.Containers) == 0 {
-			return fmt.Errorf("job %s does not have any containers", execution.Name)
-		}
-
-		// populate with job information for creating queries
 		b.cdEtag = req.Etag
-		b.cdExecution = execution.Name
-		req.Since = execution.CreateTime
+		b.cdExecution, req.Since, err = b.PopulateWithCdJobInfo(req.Etag)
+		if err != nil {
+			return err
+		}
 	}
 
 	query := b.createAiLogQuery(req)
@@ -759,7 +776,7 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	req.Logs = b.extractLogsToString(logEntries)
 
-	term.Debug("AI debugger Logs: \n")
+	term.Debug("Query Logs: \n")
 	term.Debug(req.Logs)
 
 	return nil
