@@ -188,11 +188,12 @@ var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
 func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
-
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
 			return nil, nil
 		}
+
+		msg := entry.GetTextPayload()
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
@@ -238,7 +239,11 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			etag = parts[len(parts)-1]
 			host = "cloudbuild"
 		} else {
-			return nil, errors.New("missing both execution name and defang-service in log entry")
+			var err error
+			_, msg, err = LogEntryToString(entry)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return []*defangv1.TailResponse{
@@ -247,7 +252,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 				Etag:    etag,
 				Entries: []*defangv1.LogEntry{
 					{
-						Message:   entry.GetTextPayload(),
+						Message:   msg,
 						Timestamp: entry.Timestamp,
 						Etag:      etag,
 						Service:   serviceName,

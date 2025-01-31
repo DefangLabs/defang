@@ -565,12 +565,15 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		Etag:    req.Etag,
 		Since:   deploymentStartTime,
 	}
+
+	// query for all logs up until now
 	if err := b.Query(ctx, debugReq); err != nil {
 		return nil, err
 	}
 	term.Println(debugReq.Logs)
 
-	req.Since = debugReq.Since
+	// stream logs from now forward
+	req.Since = timestamppb.Now()
 	return b.streamLogs(ctx, req)
 }
 
@@ -675,9 +678,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 }
 
 func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
+	var newQueryFragment string
 	query := CreateStdQuery(b.driver.ProjectId)
-	newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
-	query = ConcatQuery(query, newQueryFragment)
+	if b.cdExecution != "" {
+		newQueryFragment = CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
+		query = ConcatQuery(query, newQueryFragment)
+	}
 
 	newQueryFragment = CreateJobLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
 	query = ConcatQuery(query, newQueryFragment)
@@ -703,34 +709,42 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	return query
 }
 
-func (b *ByocGcp) extractLogsToString(logEntries []*loggingpb.LogEntry) string {
+func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
 	result := ""
-	protoConvertError := 0
-	for _, logEntry := range logEntries {
-		switch {
-		case logEntry.GetJsonPayload() != nil:
-			result += logEntry.GetJsonPayload().String()
-		case logEntry.GetProtoPayload() != nil:
-			auditLog := &auditpb.AuditLog{}
-			if err := logEntry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-				protoConvertError++
-				continue
-			}
-			if auditLog.Status == nil {
-				continue
-			}
-			result += auditLog.Status.Message
-		case logEntry.GetTextPayload() != "":
-			result += logEntry.GetTextPayload()
-		default:
-			continue
-		}
-
-		result += "\n"
+	emptySpace := strings.Repeat(" ", len(time.RFC3339)+1) // length of what a time stampe would be
+	logTimestamp := emptySpace
+	if logEntry.Timestamp != nil {
+		logTimestamp = logEntry.Timestamp.AsTime().Local().Format(time.RFC3339) + " "
 	}
 
-	if protoConvertError > 0 {
-		term.Debugf("Failed to convert %d proto payloads to JSON", protoConvertError)
+	switch {
+	case logEntry.GetJsonPayload() != nil:
+		result += logTimestamp + logEntry.GetJsonPayload().String()
+	case logEntry.GetProtoPayload() != nil:
+		auditLog := &auditpb.AuditLog{}
+		if err := logEntry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
+			return logTimestamp, "", err
+		}
+
+		if auditLog.Status == nil {
+			return logTimestamp, "", nil
+		}
+		return logTimestamp, auditLog.Status.Message, nil
+	case logEntry.GetTextPayload() != "":
+		return logTimestamp, logEntry.GetTextPayload(), nil
+	}
+
+	return logTimestamp, result, nil
+}
+
+func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
+	result := ""
+	for _, logEntry := range logEntries {
+		logTimestamp, msg, err := LogEntryToString(logEntry)
+		if err != nil {
+			continue
+		}
+		result += logTimestamp + " " + msg + "\n"
 	}
 	return result
 }
@@ -803,7 +817,7 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		return annotateGcpError(err)
 	}
 
-	req.Logs = b.extractLogsToString(logEntries)
+	req.Logs = LogEntriesToString(logEntries)
 
 	term.Debug("Query Logs: \n")
 	term.Debug(req.Logs)
