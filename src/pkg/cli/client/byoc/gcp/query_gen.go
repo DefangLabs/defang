@@ -23,8 +23,10 @@ func CreateStdQuery(projectId string) string {
 func CreateJobExecutionQuery(executionName string, since time.Time) string {
 	query := `resource.type = "cloud_run_job"`
 
-	query += fmt.Sprintf(`
+	if executionName != "" {
+		query += fmt.Sprintf(`
 labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	}
 
 	query += CreateSinceTimestamp(since)
 
@@ -93,6 +95,9 @@ labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
 }
 
 func CreateJobExecutionUpdateQuery(executionName string) string {
+	if executionName == "" {
+		return ""
+	}
 	return fmt.Sprintf(`labels."run.googleapis.com/execution_name" = "%v"`, executionName)
 }
 

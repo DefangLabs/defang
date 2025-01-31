@@ -30,6 +30,7 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -501,24 +502,8 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	return ss, nil
 }
 
-func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	//	if there is no execution info then get from execution list
-	if req.Etag != "" && b.cdExecution == "" {
-		// get the execution info
-		var err error
-		var since *timestamppb.Timestamp
-		b.cdEtag = req.Etag
-		b.cdExecution, since, err = b.PopulateWithCdJobInfo(req.Etag)
-		if err != nil {
-			return nil, err
-		}
-
-		if req.Since == nil {
-			req.Since = since
-		}
-	}
-
-	if req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
+func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		ss, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
@@ -553,11 +538,15 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		ls.AddJobExecutionLog(path.Base(b.cdExecution), req.Since.AsTime()) // CD log
+	if req.Since != nil || req.Etag == b.cdEtag || req.Etag == b.cdExecution {
+		execName := path.Base(b.cdExecution)
+		if execName == "." {
+			execName = ""
+		}
+		ls.AddJobExecutionLog(execName, req.Since.AsTime()) // CD log
 	}
 
-	if req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
+	if req.Since != nil || req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
 		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
 		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
 		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
@@ -566,6 +555,23 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, err
 	}
 	return ls, nil
+}
+
+func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	//	if there is no execution info then get from execution list if we have an etag
+	var deploymentStartTime *timestamppb.Timestamp = req.Since
+	debugReq := &defangv1.DebugRequest{
+		Project: req.Project,
+		Etag:    req.Etag,
+		Since:   deploymentStartTime,
+	}
+	if err := b.Query(ctx, debugReq); err != nil {
+		return nil, err
+	}
+	term.Println(debugReq.Logs)
+
+	req.Since = debugReq.Since
+	return b.streamLogs(ctx, req)
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -668,7 +674,7 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	return nil
 }
 
-func (b *ByocGcp) createAiLogQuery(req *defangv1.DebugRequest) string {
+func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	query := CreateStdQuery(b.driver.ProjectId)
 	newQueryFragment := CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
 	query = ConcatQuery(query, newQueryFragment)
@@ -699,10 +705,33 @@ func (b *ByocGcp) createAiLogQuery(req *defangv1.DebugRequest) string {
 
 func (b *ByocGcp) extractLogsToString(logEntries []*loggingpb.LogEntry) string {
 	result := ""
+	protoConvertError := 0
 	for _, logEntry := range logEntries {
-		result += logEntry.GetTextPayload() + "\n"
+		switch {
+		case logEntry.GetJsonPayload() != nil:
+			result += logEntry.GetJsonPayload().String()
+		case logEntry.GetProtoPayload() != nil:
+			auditLog := &auditpb.AuditLog{}
+			if err := logEntry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
+				protoConvertError++
+				continue
+			}
+			if auditLog.Status == nil {
+				continue
+			}
+			result += auditLog.Status.Message
+		case logEntry.GetTextPayload() != "":
+			result += logEntry.GetTextPayload()
+		default:
+			continue
+		}
+
+		result += "\n"
 	}
 
+	if protoConvertError > 0 {
+		term.Debugf("Failed to convert %d proto payloads to JSON", protoConvertError)
+	}
 	return result
 }
 
@@ -767,7 +796,7 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		}
 	}
 
-	query := b.createAiLogQuery(req)
+	query := b.createDeploymentLogQuery(req)
 
 	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
 	if err != nil {
