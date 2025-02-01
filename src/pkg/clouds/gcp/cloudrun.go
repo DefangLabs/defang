@@ -111,28 +111,24 @@ func (gcp Gcp) FindExecutionWithEtag(etag string) (*runpb.Execution, error) {
 	req := &runpb.ListExecutionsRequest{
 		Parent: fmt.Sprintf("projects/%s/locations/%s/jobs/%s", gcp.ProjectId, gcp.Region, JOBNAME_CD),
 	}
-	it := client.ListExecutions(ctx, req)
 
 	// Iterate through executions and filter by environment variable
-	var execList *runpb.Execution
+	it := client.ListExecutions(ctx, req)
+	var execution *runpb.Execution
 	for {
-		execList, err = it.Next()
+		execution, err = it.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("error listing execuitions: %v", err)
-		}
-
-		if len(execList.Template.Containers) == 0 {
-			continue
+			return nil, fmt.Errorf("error listing execution: %v", err)
 		}
 
 		// Check if the execution has the target environment variable
-		for _, container := range execList.Template.Containers {
+		for _, container := range execution.Template.Containers {
 			for _, entry := range container.Env {
 				if entry.GetName() == "DEFANG_ETAG" && entry.GetValue() == etag {
-					return execList, nil
+					return execution, nil
 				}
 			}
 		}

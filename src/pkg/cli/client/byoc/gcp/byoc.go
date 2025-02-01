@@ -538,15 +538,13 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 	if err != nil {
 		return nil, err
 	}
-	if req.Since != nil || req.Etag == b.cdEtag || req.Etag == b.cdExecution {
+
+	if req.Since != nil || req.Etag != "" {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
 		}
-		ls.AddJobExecutionLog(execName, req.Since.AsTime()) // CD log
-	}
-
-	if req.Since != nil || req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
+		ls.AddJobExecutionLog(execName, req.Since.AsTime())                          // CD log
 		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
 		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
 		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
@@ -811,15 +809,13 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	}
 
 	query := b.createDeploymentLogQuery(req)
+	term.Debugf("Query : %s\n", query)
 
 	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
 	if err != nil {
 		return annotateGcpError(err)
 	}
-
 	req.Logs = LogEntriesToString(logEntries)
-
-	term.Debug("Query Logs: \n")
 	term.Debug(req.Logs)
 
 	return nil
