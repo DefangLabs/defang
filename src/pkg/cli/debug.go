@@ -29,6 +29,15 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
+type DebugConfig struct {
+	Etag           types.ETag
+	Client         client.FabricClient
+	FailedServices []string
+	Project        *compose.Project
+	Provider       client.Provider
+	Since          time.Time
+}
+
 func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
@@ -44,7 +53,15 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 
 	track.Evt("Debug Prompt Accepted", P("etag", etag))
 
-	if err := Debug(ctx, c, p, etag, project, failedServices, since); err != nil {
+	var debugConfig = DebugConfig{
+		Client:         c,
+		Etag:           etag,
+		FailedServices: failedServices,
+		Project:        project,
+		Provider:       p,
+		Since:          since,
+	}
+	if err := Debug(ctx, debugConfig); err != nil {
 		term.Warnf("Failed to debug deployment: %v", err)
 		return err
 	}
@@ -61,26 +78,31 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 	return nil
 }
 
-func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
-	term.Debug("Invoking AI debugger for deployment", etag)
+// func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
+func Debug(ctx context.Context, config DebugConfig) error {
+	term.Debug("Invoking AI debugger for deployment", config.Etag)
 
-	files := findMatchingProjectFiles(project, failedServices)
+	files := findMatchingProjectFiles(config.Project, config.FailedServices)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	req := defangv1.DebugRequest{
-		Etag:    etag,
-		Files:   files,
-		Since:   timestamppb.New(since),
-		Project: project.Name,
+	var sinceTime *timestamppb.Timestamp = nil
+	if !config.Since.IsZero() {
+		sinceTime = timestamppb.New(config.Since)
 	}
-	err := p.Query(ctx, &req)
+	req := defangv1.DebugRequest{
+		Etag:    config.Etag,
+		Files:   files,
+		Since:   sinceTime,
+		Project: config.Project.Name,
+	}
+	err := config.Provider.Query(ctx, &req)
 	if err != nil {
 		return err
 	}
-	resp, err := c.Debug(ctx, &req)
+	resp, err := config.Client.Debug(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -369,7 +369,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
-			return nil, errors.New("current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
+			return nil, errors.New("current user does not have 'iam.serviceAccounts.signBlob' permission. If it has been recently added, please wait a few minutes then try again")
 		}
 		return nil, err
 	}
@@ -677,19 +677,23 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 
 func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	var newQueryFragment string
+	var since time.Time
+	if req.Since != nil {
+		since = req.Since.AsTime()
+	}
 	query := CreateStdQuery(b.driver.ProjectId)
 	if b.cdExecution != "" {
-		newQueryFragment = CreateJobExecutionQuery(path.Base(b.cdExecution), req.Since.AsTime())
+		newQueryFragment = CreateJobExecutionQuery(path.Base(b.cdExecution), since)
 		query = ConcatQuery(query, newQueryFragment)
 	}
 
-	newQueryFragment = CreateJobLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
+	newQueryFragment = CreateJobLogQuery(req.Project, req.Etag, req.Services, since)
 	query = ConcatQuery(query, newQueryFragment)
 
-	newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime())
+	newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, since)
 	query = ConcatQuery(query, newQueryFragment)
 
-	newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
+	newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, since) // CloudBuild logs
 	query = ConcatQuery(query, newQueryFragment)
 
 	newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
@@ -724,8 +728,9 @@ func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
 			return logTimestamp, "", err
 		}
 
+		// we do not know the reason for no status events we will log it here (update in future)
 		if auditLog.Status == nil {
-			return logTimestamp, "", nil
+			return logTimestamp, "<No Status>", nil
 		}
 		return logTimestamp, auditLog.Status.Message, nil
 	case logEntry.GetTextPayload() != "":

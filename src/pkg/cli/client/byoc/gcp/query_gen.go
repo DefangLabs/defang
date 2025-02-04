@@ -10,7 +10,7 @@ func CreateSinceTimestamp(since time.Time) string {
 	result := ""
 	if !since.IsZero() && since.Unix() > 0 {
 		result = fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
+timestamp >= %q`, since.UTC().Format(time.RFC3339Nano)) // Nano?
 	}
 
 	return result
@@ -25,7 +25,7 @@ func CreateJobExecutionQuery(executionName string, since time.Time) string {
 
 	if executionName != "" {
 		query += fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+labels."run.googleapis.com/execution_name" = %q`, executionName)
 	}
 
 	query += CreateSinceTimestamp(since)
@@ -38,12 +38,12 @@ func CreateJobLogQuery(project, etag string, services []string, since time.Time)
 
 	if project != "" {
 		query += fmt.Sprintf(`
-labels."defang-project" = "%v"`, project)
+labels."defang-project" = %q`, project)
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
+labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -61,7 +61,7 @@ func CreateServiceLogQuery(project, etag string, services []string, since time.T
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
+labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -71,7 +71,7 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 
 	if project != "" {
 		query += fmt.Sprintf(`
-labels."defang-project"="%v"`, project)
+labels."defang-project"=%q`, project)
 	}
 
 	query += CreateSinceTimestamp(since)
@@ -98,7 +98,7 @@ func CreateJobExecutionUpdateQuery(executionName string) string {
 	if executionName == "" {
 		return ""
 	}
-	return fmt.Sprintf(`labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	return fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, executionName)
 }
 
 func CreateJobStatusUpdateRequestQuery(project string, etag string, services []string) string {
@@ -106,12 +106,12 @@ func CreateJobStatusUpdateRequestQuery(project string, etag string, services []s
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-project"="%v"`, project)
+protoPayload.request.job.template.labels."defang-project"=%q`, project)
 	}
 
 	if etag != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-etag"="%v"`, etag)
+protoPayload.request.job.template.labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -127,12 +127,12 @@ func CreateJobStatusUpdateResponseQuery(project string, etag string, services []
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
+protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, project)
 	}
 
 	if etag != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
+protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -148,12 +148,12 @@ func CreateServiceStatusRequestUpdate(project, etag string, services []string) s
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"="%v"`, project)
+protoPayload.request.service.template.labels."defang-service"=%q`, project)
 	}
 
 	if etag != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-etag"="%v"`, etag)
+protoPayload.request.service.template.labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -169,12 +169,12 @@ func CreateServiceStatusReponseUpdate(project, etag string, services []string) s
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
+protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, project)
 	}
 
 	if etag != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
+protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
 	}
 
 	if len(services) > 0 {

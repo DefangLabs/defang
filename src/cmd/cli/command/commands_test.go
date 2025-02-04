@@ -21,7 +21,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	connect_go "github.com/bufbuild/connect-go"
+	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -47,26 +47,26 @@ type mockFabricService struct {
 	canIUseResponse      defangv1.CanIUseResponse
 }
 
-func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
+func (m *mockFabricService) CanIUse(ctx context.Context, canUseReq *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
 	if !m.allowedToUseProvider {
-		return nil, connect_go.NewError(connect_go.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("your account does not permit access to use the aws provider. upgrade at https://portal.defang.dev/pricing"))
 	}
-	return connect_go.NewResponse(&m.canIUseResponse), nil
+	return connect.NewResponse(&m.canIUseResponse), nil
 }
 
-func (m *mockFabricService) GetVersion(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[defangv1.Version], error) {
-	return connect_go.NewResponse(&defangv1.Version{
+func (m *mockFabricService) GetVersion(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.Version], error) {
+	return connect.NewResponse(&defangv1.Version{
 		Fabric: "0.0.0-test",
 		CliMin: "0.0.0-test",
 	}), nil
 }
 
-func (m *mockFabricService) CheckToS(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
-	return connect_go.NewResponse(&emptypb.Empty{}), nil
+func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-func (m *mockFabricService) WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[defangv1.WhoAmIResponse], error) {
-	return connect_go.NewResponse(&defangv1.WhoAmIResponse{
+func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{
 		Tenant:  "default",
 		Account: "default",
 		Region:  "us-west-2",
@@ -74,14 +74,14 @@ func (m *mockFabricService) WhoAmI(context.Context, *connect_go.Request[emptypb.
 	}), nil
 }
 
-func (m *mockFabricService) GetSelectedProvider(context.Context, *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
-	return connect_go.NewResponse(&defangv1.GetSelectedProviderResponse{
+func (m *mockFabricService) GetSelectedProvider(context.Context, *connect.Request[defangv1.GetSelectedProviderRequest]) (*connect.Response[defangv1.GetSelectedProviderResponse], error) {
+	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
 		Provider: defangv1.Provider_AWS,
 	}), nil
 }
 
-func (m *mockFabricService) SetSelectedProvider(context.Context, *connect_go.Request[defangv1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
-	return connect_go.NewResponse(&emptypb.Empty{}), nil
+func (m *mockFabricService) SetSelectedProvider(context.Context, *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func init() {
@@ -229,23 +229,23 @@ type MockFabricControllerClient struct {
 	savedProvider   map[string]defangv1.Provider
 }
 
-func (m *MockFabricControllerClient) CanIUse(context.Context, *connect_go.Request[defangv1.CanIUseRequest]) (*connect_go.Response[defangv1.CanIUseResponse], error) {
-	return connect_go.NewResponse(&m.canIUseResponse), nil
+func (m *MockFabricControllerClient) CanIUse(context.Context, *connect.Request[defangv1.CanIUseRequest]) (*connect.Response[defangv1.CanIUseResponse], error) {
+	return connect.NewResponse(&m.canIUseResponse), nil
 }
 
-func (m *MockFabricControllerClient) GetServices(context.Context, *connect_go.Request[defangv1.GetServicesRequest]) (*connect_go.Response[defangv1.GetServicesResponse], error) {
-	return connect_go.NewResponse(&defangv1.GetServicesResponse{}), nil
+func (m *MockFabricControllerClient) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
+	return connect.NewResponse(&defangv1.GetServicesResponse{}), nil
 }
 
-func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.GetSelectedProviderRequest]) (*connect_go.Response[defangv1.GetSelectedProviderResponse], error) {
-	return connect_go.NewResponse(&defangv1.GetSelectedProviderResponse{
+func (m *MockFabricControllerClient) GetSelectedProvider(ctx context.Context, req *connect.Request[defangv1.GetSelectedProviderRequest]) (*connect.Response[defangv1.GetSelectedProviderResponse], error) {
+	return connect.NewResponse(&defangv1.GetSelectedProviderResponse{
 		Provider: m.savedProvider[req.Msg.Project],
 	}), nil
 }
 
-func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect_go.Request[defangv1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error) {
+func (m *MockFabricControllerClient) SetSelectedProvider(ctx context.Context, req *connect.Request[defangv1.SetSelectedProviderRequest]) (*connect.Response[emptypb.Empty], error) {
 	m.savedProvider[req.Msg.Project] = req.Msg.Provider
-	return connect_go.NewResponse(&emptypb.Empty{}), nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 type FakeStdin struct {

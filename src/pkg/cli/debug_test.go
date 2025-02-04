@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -62,17 +61,19 @@ func TestQueryHasProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	provider := MustHaveProjectNameQueryProvider{}
-	fabricClient := MockDebugFabricClient{}
-
-	var zeroTime time.Time
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, zeroTime); err != nil {
+	var debugConfig = DebugConfig{
+		Client:   MockDebugFabricClient{},
+		Etag:     "etag",
+		Project:  project,
+		Provider: MustHaveProjectNameQueryProvider{},
+	}
+	if err := Debug(context.Background(), debugConfig); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	project.Name = ""
+	debugConfig.Project.Name = ""
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}, zeroTime); err == nil {
+	if err := Debug(context.Background(), debugConfig); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {

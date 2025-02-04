@@ -112,6 +112,10 @@ func (gcp Gcp) FindExecutionWithEtag(etag string) (*runpb.Execution, error) {
 		Parent: fmt.Sprintf("projects/%s/locations/%s/jobs/%s", gcp.ProjectId, gcp.Region, JOBNAME_CD),
 	}
 
+	//FIXME: This may need refactoring or architecture changes as we have to scour all
+	//  executions to find the matching etag. For any job there may be a large number of
+	//  executions to look through which may not scale well.
+
 	// Iterate through executions and filter by environment variable
 	it := client.ListExecutions(ctx, req)
 	var execution *runpb.Execution

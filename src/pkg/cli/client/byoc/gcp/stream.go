@@ -275,7 +275,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			term.Warn("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
+			term.Warnf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl())
 			return nil, nil
 		}
 
@@ -317,7 +317,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				term.Warn("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
+				term.Warnf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
 			}
 
@@ -340,7 +340,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					term.Warn("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+					term.Warnf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName()))
 					return nil, nil
 				}
 				var state defangv1.ServiceState
@@ -362,7 +362,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 			executionName := path.Base(auditLog.GetResourceName())
 			if cdExecutionNamePattern.MatchString(executionName) {
 				if auditLog.GetStatus().GetCode() != 0 {
-					return nil, pkg.ErrDeploymentFailed{Service: "defang-cd", Message: auditLog.GetStatus().GetMessage()}
+					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
 				if len(readyServices) > 0 {
@@ -385,11 +385,11 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				}
 				return nil, nil // Ignore success cd status if not reporting cd
 			} else {
-				term.Warn("unexpected execution name in audit log : " + executionName)
+				term.Warnf("unexpected execution name in audit log : %v", executionName)
 				return nil, nil
 			}
 		default:
-			term.Warn("unexpected resource type : " + entry.Resource.Type)
+			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
 			return nil, nil
 		}
 	}
