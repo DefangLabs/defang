@@ -199,8 +199,17 @@ func makeComposeUpCmd() *cobra.Command {
 					if !nonInteractive {
 						failedServices := []string{errDeploymentFailed.Service}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						if nil == cli.InteractiveDebug(cmd.Context(), client, provider, deploy.Etag, project, failedServices, since) {
+						var debugConfig = cli.DebugConfig{
+							Client:         client,
+							Etag:           deploy.Etag,
+							FailedServices: failedServices,
+							Project:        project,
+							Provider:       provider,
+							Since:          since,
+						}
+						if nil == cli.InteractiveDebug(cmd.Context(), debugConfig) {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}

@@ -556,7 +556,6 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	//	if there is no execution info then get from execution list if we have an etag
 	var deploymentStartTime *timestamppb.Timestamp = req.Since
 	debugReq := &defangv1.DebugRequest{
 		Project: req.Project,
@@ -790,14 +789,6 @@ func (b *ByocGcp) query(ctx context.Context, client *logging.Client, projectId s
 	return entries, nil
 }
 
-func (b *ByocGcp) PopulateWithCdJobInfo(etag string) (string, *timestamppb.Timestamp, error) {
-	execution, err := b.driver.FindExecutionWithEtag(etag)
-	if err != nil {
-		return "", nil, fmt.Errorf("could not find job with etag %s: %v", etag, annotateGcpError(err))
-	}
-	return execution.Name, execution.CreateTime, nil
-}
-
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	logClient, err := logging.NewClient(ctx)
 	if err != nil {
@@ -807,10 +798,13 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 	// if there is no execution info then get from execution list
 	if req.Etag != "" && b.cdExecution == "" {
 		b.cdEtag = req.Etag
-		b.cdExecution, req.Since, err = b.PopulateWithCdJobInfo(req.Etag)
+
+		execution, err := b.driver.FindExecutionWithEtag(req.Etag)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
 		}
+		b.cdExecution = execution.Name
+		req.Since = execution.CreateTime
 	}
 
 	query := b.createDeploymentLogQuery(req)

@@ -38,29 +38,21 @@ type DebugConfig struct {
 	Since          time.Time
 }
 
-func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
+func InteractiveDebug(ctx context.Context, debugConfig DebugConfig) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err))
+		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", etag))
+		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag))
 		return ErrDebugSkipped
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", etag))
+	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag))
 
-	var debugConfig = DebugConfig{
-		Client:         c,
-		Etag:           etag,
-		FailedServices: failedServices,
-		Project:        project,
-		Provider:       p,
-		Since:          since,
-	}
 	if err := Debug(ctx, debugConfig); err != nil {
 		term.Warnf("Failed to debug deployment: %v", err)
 		return err
@@ -71,14 +63,13 @@ func InteractiveDebug(ctx context.Context, c client.FabricClient, p client.Provi
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		track.Evt("Debug Feedback Prompt Failed", P("etag", etag), P("reason", err))
+		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err))
 	} else {
-		track.Evt("Debug Feedback Prompt Answered", P("etag", etag), P("feedback", goodBad))
+		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad))
 	}
 	return nil
 }
 
-// func Debug(ctx context.Context, c client.FabricClient, p client.Provider, etag types.ETag, project *compose.Project, failedServices []string, since time.Time) error {
 func Debug(ctx context.Context, config DebugConfig) error {
 	term.Debug("Invoking AI debugger for deployment", config.Etag)
 
