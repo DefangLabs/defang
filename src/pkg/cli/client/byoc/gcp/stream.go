@@ -121,96 +121,34 @@ type LogStream struct {
 	*ServerStream[*defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getLogEntryParser(ctx, gcp))
+func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient))
 	if err != nil {
 		return nil, err
 	}
-	ss.tailer.SetBaseQuery(`(logName=~"logs/run.googleapis.com%2F(stdout|stderr)$" OR logName="projects/edw-test-proj/logs/cloudbuild")`)
+
+	query := CreateStdQuery(gcpClient.ProjectId)
+	ss.tailer.SetBaseQuery(query)
 	return &LogStream{ServerStream: ss}, nil
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := `resource.type = "cloud_run_job"`
-
-	query += fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := CreateJobExecutionQuery(executionName, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type = "cloud_run_job"`
-
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project" = "%v"`, project)
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := CreateJobLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type="cloud_run_revision"`
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project"="%v"`, project)
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := CreateServiceLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	query := `resource.type="build"`
-
-	servicesRegex := `[a-zA-Z0-9-]{1,63}`
-	if len(services) > 0 {
-		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|"))
-	}
-	query += fmt.Sprintf(`
-labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
+	query := CreateCloudBuildLogQuery(project, etag, services, since)
 	s.tailer.AddQuerySet(query)
 }
 
@@ -228,63 +166,21 @@ func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*Subs
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
+	query := CreateJobExecutionUpdateQuery(executionName)
 	s.tailer.AddQuerySet(query)
 }
 
 func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
-	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
-	resQuery := `protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "/Jobs.UpdateJob"`
-
-	if project != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-project"="%v"`, project)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-etag"="%v"`, etag)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
+	reqQuery := CreateJobStatusUpdateRequestQuery(project, etag, services)
+	resQuery := CreateJobStatusUpdateResponseQuery(project, etag, services)
 
 	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
 }
 
 func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
-	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService"`
-	resQuery := `protoPayload.methodName="/Services.CreateService" OR "/Services.UpdateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
+	reqQuery := CreateServiceStatusRequestUpdate(project, etag, services)
+	resQuery := CreateServiceStatusReponseUpdate(project, etag, services)
 
-	if project != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"="%v"`, project)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-etag"="%v"`, etag)
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
 	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
 }
 
@@ -292,11 +188,12 @@ var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
 func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
-
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
 			return nil, nil
 		}
+
+		msg := entry.GetTextPayload()
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
@@ -342,7 +239,11 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			etag = parts[len(parts)-1]
 			host = "cloudbuild"
 		} else {
-			return nil, errors.New("missing both execution name and defang-service in log entry")
+			var err error
+			_, msg, err = LogEntryToString(entry)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return []*defangv1.TailResponse{
@@ -351,7 +252,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 				Etag:    etag,
 				Entries: []*defangv1.LogEntry{
 					{
-						Message:   entry.GetTextPayload(),
+						Message:   msg,
 						Timestamp: entry.Timestamp,
 						Etag:      etag,
 						Service:   serviceName,
@@ -374,7 +275,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			term.Warnf("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
+			term.Warnf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl())
 			return nil, nil
 		}
 
@@ -416,7 +317,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				term.Warnf("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
+				term.Warnf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName()))
 				return nil, nil
 			}
 
@@ -439,7 +340,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					term.Warnf("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+					term.Warnf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName()))
 					return nil, nil
 				}
 				var state defangv1.ServiceState
@@ -461,7 +362,7 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 			executionName := path.Base(auditLog.GetResourceName())
 			if cdExecutionNamePattern.MatchString(executionName) {
 				if auditLog.GetStatus().GetCode() != 0 {
-					return nil, pkg.ErrDeploymentFailed{Service: "defang CD", Message: auditLog.GetStatus().GetMessage()}
+					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
 				if len(readyServices) > 0 {
@@ -484,11 +385,11 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 				}
 				return nil, nil // Ignore success cd status if not reporting cd
 			} else {
-				term.Warnf("unexpected execution name in audit log : " + executionName)
+				term.Warnf("unexpected execution name in audit log : %v", executionName)
 				return nil, nil
 			}
 		default:
-			term.Warnf("unexpected resource type : " + entry.Resource.Type)
+			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
 			return nil, nil
 		}
 	}

@@ -434,7 +434,7 @@ var whoamiCmd = &cobra.Command{
 			return err
 		}
 
-		term.Infof(str)
+		term.Info(str)
 		return nil
 	},
 }
@@ -850,7 +850,14 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
+		var debugConfig = cli.DebugConfig{
+			Project:  project,
+			Provider: provider,
+			Etag:     etag,
+			Client:   client,
+		}
+
+		return cli.Debug(cmd.Context(), debugConfig)
 	},
 }
 

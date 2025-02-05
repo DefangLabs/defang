@@ -162,6 +162,7 @@ message DebugRequest {
   string project = 3;
   string logs = 4;
   repeated string services = 5;
+  google.protobuf.Timestamp since = 6;
 }
 
 message DebugResponse {

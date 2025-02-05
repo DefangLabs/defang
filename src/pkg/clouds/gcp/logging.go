@@ -69,7 +69,7 @@ func (t *Tailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 		}
 		t.cache = resp.GetEntries()
 		if len(t.cache) == 0 {
-			return nil, errors.New("No log entries found")
+			return nil, errors.New("no log entries found")
 		}
 	}
 
