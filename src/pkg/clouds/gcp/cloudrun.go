@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	JOBNAME_CD = "defang-cd"
+	JobNameCD = "defang-cd"
 )
 
 func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, containers []types.Container) error {
@@ -109,7 +109,7 @@ func (gcp Gcp) FindExecutionWithEtag(etag string) (*runpb.Execution, error) {
 
 	// List jobs in the region
 	req := &runpb.ListExecutionsRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s/jobs/%s", gcp.ProjectId, gcp.Region, JOBNAME_CD),
+		Parent: fmt.Sprintf("projects/%s/locations/%s/jobs/%s", gcp.ProjectId, gcp.Region, JobNameCD),
 	}
 
 	//FIXME: This may need refactoring or architecture changes as we have to scour all

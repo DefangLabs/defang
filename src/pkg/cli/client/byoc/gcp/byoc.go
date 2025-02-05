@@ -352,7 +352,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env[k] = v
 	}
 
-	execution, err := b.driver.Run(ctx, "defang-cd", env, cmd.Command...)
+	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.Command...)
 	if err != nil {
 		return "", err
 	}
