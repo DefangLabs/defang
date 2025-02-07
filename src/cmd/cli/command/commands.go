@@ -899,9 +899,9 @@ var deleteCmd = &cobra.Command{
 
 		tailOptions := cli.TailOptions{
 			Etag:    etag,
+			LogType: logs.LogTypeAll,
 			Since:   since,
 			Verbose: verbose,
-			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},

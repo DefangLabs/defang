@@ -495,6 +495,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
+			var pattern, _ = cmd.Flags().GetString("pattern")
 
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
@@ -539,12 +540,13 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			tailOptions := cli.TailOptions{
-				Services: services,
 				Etag:     etag,
-				Since:    ts,
-				Raw:      raw,
-				Verbose:  verbose,
 				LogType:  *logType,
+				Pattern:  pattern,
+				Raw:      raw,
+				Services: services,
+				Since:    ts,
+				Verbose:  verbose,
 			}
 
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)

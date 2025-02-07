@@ -75,6 +75,7 @@ type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
 	LogType            logs.LogType
+	Pattern            string
 }
 
 func (to TailOptions) String() string {
@@ -94,6 +95,9 @@ func (to TailOptions) String() string {
 	}
 	if to.LogType != logs.LogTypeUnspecified {
 		cmd += " --type=" + to.LogType.String()
+	}
+	if to.Pattern != "" {
+		cmd += fmt.Sprintf(" --pattern=%q", to.Pattern)
 	}
 	return cmd
 }
@@ -214,11 +218,12 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	tailRequest := &defangv1.TailRequest{
+		Etag:     options.Etag,
+		LogType:  uint32(options.LogType),
+		Pattern:  options.Pattern,
 		Project:  projectName,
 		Services: options.Services,
-		Etag:     options.Etag,
 		Since:    since,
-		LogType:  uint32(options.LogType),
 	}
 	serverStream, err := provider.Follow(ctx, tailRequest)
 	if err != nil {
@@ -350,7 +355,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 				if e.Stderr {
 					term.Error(e.Message)
 				} else {
-					term.Printlnc(term.InfoColor, e.Message)
+					term.Println(e.Message)
 				}
 				continue
 			}
