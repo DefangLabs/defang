@@ -2,90 +2,112 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"net/http/httptest"
+	"errors"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 )
 
-type mockSubscribeProvider struct {
-	client.MockProvider
-	ServerStreams []client.ServerStream[defangv1.TailResponse]
-	Reqs          []*defangv1.TailRequest
-}
-
+// MockSubscribeServerStream mocks the stream response for Subscribe.
 type MockSubscribeServerStream struct {
-	state int
+	index int
 	Resps []*defangv1.SubscribeResponse
 	Error error
 }
 
-func (m *MockSubscribeServerStream) Close() error {
+func (*MockSubscribeServerStream) Close() error {
 	return nil
 }
 
 func (m *MockSubscribeServerStream) Receive() bool {
-	if len(m.Resps) == 0 {
+	if m.index >= len(m.Resps) {
 		return false
 	}
-	if m.state == 0 {
-		m.state = 1
-	} else {
-		m.Resps = m.Resps[1:]
-	}
+	m.index++
 	return true
 }
 
 func (m *MockSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
-	if len(m.Resps) == 0 {
+	if m.index == 0 || m.index > len(m.Resps) {
 		return nil
 	}
-	return m.Resps[0]
+	return m.Resps[m.index-1]
 }
 
 func (m *MockSubscribeServerStream) Err() error {
 	return m.Error
 }
 
-func (d mockSubscribeProvider) Subscribe(_ context.Context, _ *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	s := &MockSubscribeServerStream{
+// mockSubscribeProvider mocks the provider for Subscribe.
+type mockSubscribeProvider struct {
+	client.MockProvider
+	Reqs []*defangv1.SubscribeRequest
+}
+
+func (m *mockSubscribeProvider) Subscribe(
+	_ context.Context,
+	req *defangv1.SubscribeRequest,
+) (client.ServerStream[defangv1.SubscribeResponse], error) {
+	m.Reqs = append(m.Reqs, req)
+
+	stream := &MockSubscribeServerStream{
 		Resps: []*defangv1.SubscribeResponse{
-			{Name: "service1", Status: "COMPLETED", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
-			{Name: "service2", Status: "BUILD_FAILED", State: defangv1.ServiceState_BUILD_FAILED},
-			{Name: "service3", Status: "COMPLETED", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+			{Name: "service1", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+			{Name: "service2", State: defangv1.ServiceState_BUILD_FAILED},
+			{Name: "service3", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
 		},
 	}
-	return s, nil
+	return stream, nil
 }
 
 func TestWaitServiceState(t *testing.T) {
 	ctx := context.Background()
-	fabricServer := &grpcListSecretsMockHandler{}
-	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
-	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close)
-
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	provider := &mockSubscribeProvider{}
 
-	t.Run("WaitServiceState will succeed", func(t *testing.T) {
-		var unmanagedServices = []string{"service1", "service3"}
+	tests := []struct {
+		name              string
+		unmanagedServices []string
+		expectErr         bool
+	}{
+		{
+			name:              "state with DEPLOYMENT_COMPLETED",
+			unmanagedServices: []string{"service1", "service3"},
+			expectErr:         false,
+		},
+		{
+			name:              "state with BUILD_FAILED",
+			unmanagedServices: []string{"service2"},
+			expectErr:         true,
+		},
+		{
+			name:              "state with DEPLOYMENT_COMPLETED and BUILD_FAILED",
+			unmanagedServices: []string{"service1", "service2", "service3"},
+			expectErr:         true,
+		},
+	}
 
-		fmt.Println(provider)
-		err := WaitServiceState(ctx, provider, targetState, "EtagSomething", unmanagedServices)
-		if err != nil {
-			t.Fatalf("WaitServiceState() failed: %v", err)
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := WaitServiceState(ctx, provider, targetState, "EtagSomething", tt.unmanagedServices)
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+				} else if !errors.As(err, &pkg.ErrDeploymentFailed{}) {
+					t.Errorf("Expected ErrDeploymentFailed but got %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
 
-	t.Run("WaitServiceState will fail", func(t *testing.T) {
-		var unmanagedServices = []string{"service2"}
-		err := WaitServiceState(ctx, provider, targetState, "EtagSomething", unmanagedServices)
-		if err == nil {
-			t.Fatalf("WaitServiceState() failed: %v", err)
-		}
-	})
+	// Validate that Subscribe was called with expected parameters
+	if len(provider.Reqs) == 0 {
+		t.Errorf("Expected Subscribe to be called but got 0 requests")
+	}
 }
