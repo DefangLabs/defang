@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -27,6 +26,7 @@ type ServerStream[T any] struct {
 	ctx    context.Context
 	gcp    *gcp.Gcp
 	parse  LogParser[T]
+	query  *Query
 	tailer *gcp.Tailer
 
 	lastResp T
@@ -86,7 +86,7 @@ func isContextCanceledError(err error) bool {
 }
 
 func (s *ServerStream[T]) Start() error {
-	if err := s.tailer.Start(s.ctx); err != nil {
+	if err := s.tailer.Start(s.ctx, s.query.GetQuery()); err != nil {
 		return err
 	}
 	go func() {
@@ -127,29 +127,24 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
 		return nil, err
 	}
 
-	query := CreateStdQuery(gcpClient.ProjectId)
-	ss.tailer.SetBaseQuery(query)
+	ss.query = NewLogQuery(gcpClient.ProjectId)
 	return &LogStream{ServerStream: ss}, nil
 }
 
 func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := CreateJobExecutionQuery(executionName, since)
-	s.tailer.AddQuerySet(query)
+	s.query.AddJobExecutionQuery(executionName, since)
 }
 
 func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := CreateJobLogQuery(project, etag, services, since)
-	s.tailer.AddQuerySet(query)
+	s.query.AddJobLogQuery(project, etag, services, since)
 }
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := CreateServiceLogQuery(project, etag, services, since)
-	s.tailer.AddQuerySet(query)
+	s.query.AddServiceLogQuery(project, etag, services, since)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	query := CreateCloudBuildLogQuery(project, etag, services, since)
-	s.tailer.AddQuerySet(query)
+	s.query.AddCloudBuildLogQuery(project, etag, services, since)
 }
 
 type SubscribeStream struct {
@@ -161,27 +156,22 @@ func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*Subs
 	if err != nil {
 		return nil, err
 	}
-	ss.tailer.SetBaseQuery(`protoPayload.serviceName="run.googleapis.com"`)
+	ss.query = NewSubscribeQuery()
 	return &SubscribeStream{ServerStream: ss}, nil
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := CreateJobExecutionUpdateQuery(executionName)
-	s.tailer.AddQuerySet(query)
+	s.query.AddJobExecutionUpdateQuery(executionName)
 }
 
 func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
-	reqQuery := CreateJobStatusUpdateRequestQuery(project, etag, services)
-	resQuery := CreateJobStatusUpdateResponseQuery(project, etag, services)
-
-	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
+	s.query.AddJobStatusUpdateRequestQuery(project, etag, services)
+	s.query.AddJobStatusUpdateResponseQuery(project, etag, services)
 }
 
 func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
-	reqQuery := CreateServiceStatusRequestUpdate(project, etag, services)
-	resQuery := CreateServiceStatusReponseUpdate(project, etag, services)
-
-	s.tailer.AddQuerySet(fmt.Sprintf("\n(\n%s\n) OR (\n%s\n)", reqQuery, resQuery))
+	s.query.AddServiceStatusRequestUpdate(project, etag, services)
+	s.query.AddServiceStatusReponseUpdate(project, etag, services)
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)

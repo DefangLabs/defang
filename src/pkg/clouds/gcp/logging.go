@@ -31,29 +31,13 @@ type Tailer struct {
 	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
 
 	cache []*loggingpb.LogEntry
-	query string
 }
 
-func (t *Tailer) SetBaseQuery(query string) {
-	t.query = query
-}
-
-func (t *Tailer) AddQuerySet(query string) {
-	if len(t.query) > 0 {
-		if t.query[len(t.query)-1] == ')' {
-			t.query += " OR "
-		} else {
-			t.query += " AND "
-		}
-	}
-	t.query += "(" + query + "\n)"
-}
-
-func (t *Tailer) Start(ctx context.Context) error {
-	term.Debugf("Starting log tailer with query: \n%v", t.query)
+func (t *Tailer) Start(ctx context.Context, query string) error {
+	term.Debugf("Starting log tailer with query: \n%v", query)
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
-		Filter:        t.query,
+		Filter:        query,
 	}
 	if err := t.tleClient.Send(req); err != nil {
 		return fmt.Errorf("failed to send tail log entries request: %w", err)

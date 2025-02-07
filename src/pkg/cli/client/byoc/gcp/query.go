@@ -6,21 +6,41 @@ import (
 	"time"
 )
 
-func CreateSinceTimestamp(since time.Time) string {
-	result := ""
-	if !since.IsZero() && since.Unix() > 0 {
-		result = fmt.Sprintf(`
-timestamp >= %q`, since.UTC().Format(time.RFC3339Nano)) // Nano?
+type Query struct {
+	baseQuery string
+	queries   []string
+}
+
+func NewQuery(baseQuery string) *Query {
+	return &Query{
+		baseQuery: baseQuery,
 	}
-
-	return result
 }
 
-func CreateStdQuery(projectId string) string {
-	return fmt.Sprintf(`(logName=~"logs/run.googleapis.com/(stdout|stderr)$" OR logName="projects/%s/logs/cloudbuild")`, projectId)
+func (q *Query) AddQuery(query string) {
+	q.queries = append(q.queries, query)
 }
 
-func CreateJobExecutionQuery(executionName string, since time.Time) string {
+func (q *Query) GetQuery() string {
+	var buf strings.Builder
+	buf.WriteString(q.baseQuery)
+	if len(q.queries) > 0 {
+		buf.WriteString(" AND (")
+		buf.WriteString(strings.Join(q.queries, "\n) OR ("))
+		buf.WriteString("\n)")
+	}
+	return buf.String()
+}
+
+func NewLogQuery(projectId string) *Query {
+	return NewQuery(fmt.Sprintf(`(logName=~"logs/run.googleapis.com/(stdout|stderr)$" OR logName="projects/%s/logs/cloudbuild")`, projectId))
+}
+
+func NewSubscribeQuery() *Query {
+	return NewQuery(`protoPayload.serviceName="run.googleapis.com"`) // TODO: Add compute engine
+}
+
+func (q *Query) AddJobExecutionQuery(executionName string, since time.Time) {
 	query := `resource.type = "cloud_run_job"`
 
 	if executionName != "" {
@@ -28,12 +48,12 @@ func CreateJobExecutionQuery(executionName string, since time.Time) string {
 labels."run.googleapis.com/execution_name" = %q`, executionName)
 	}
 
-	query += CreateSinceTimestamp(since)
+	query += sinceTimestamp(since)
 
-	return query
+	q.AddQuery(query)
 }
 
-func CreateJobLogQuery(project, etag string, services []string, since time.Time) string {
+func (q *Query) AddJobLogQuery(project, etag string, services []string, since time.Time) {
 	query := `resource.type = "cloud_run_job"`
 
 	if project != "" {
@@ -51,12 +71,12 @@ labels."defang-etag"=%q`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	query += CreateSinceTimestamp(since)
+	query += sinceTimestamp(since)
 
-	return query
+	q.AddQuery(query)
 }
 
-func CreateServiceLogQuery(project, etag string, services []string, since time.Time) string {
+func (q *Query) AddServiceLogQuery(project, etag string, services []string, since time.Time) {
 	query := `resource.type="cloud_run_revision"`
 
 	if etag != "" {
@@ -74,12 +94,12 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 labels."defang-project"=%q`, project)
 	}
 
-	query += CreateSinceTimestamp(since)
+	query += sinceTimestamp(since)
 
-	return query
+	q.AddQuery(query)
 }
 
-func CreateCloudBuildLogQuery(project, etag string, services []string, since time.Time) string {
+func (q *Query) AddCloudBuildLogQuery(project, etag string, services []string, since time.Time) {
 	query := `resource.type="build"`
 
 	servicesRegex := `[a-zA-Z0-9-]{1,63}`
@@ -89,19 +109,19 @@ func CreateCloudBuildLogQuery(project, etag string, services []string, since tim
 	query += fmt.Sprintf(`
 labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
 
-	query += CreateSinceTimestamp(since)
+	query += sinceTimestamp(since)
 
-	return query
+	q.AddQuery(query)
 }
 
-func CreateJobExecutionUpdateQuery(executionName string) string {
+func (q *Query) AddJobExecutionUpdateQuery(executionName string) {
 	if executionName == "" {
-		return ""
+		return
 	}
-	return fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, executionName)
+	q.AddQuery(fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, executionName))
 }
 
-func CreateJobStatusUpdateRequestQuery(project string, etag string, services []string) string {
+func (q *Query) AddJobStatusUpdateRequestQuery(project string, etag string, services []string) {
 	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
 
 	if project != "" {
@@ -119,10 +139,10 @@ protoPayload.request.job.template.labels."defang-etag"=%q`, etag)
 protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	return reqQuery
+	q.AddQuery(reqQuery)
 }
 
-func CreateJobStatusUpdateResponseQuery(project string, etag string, services []string) string {
+func (q *Query) AddJobStatusUpdateResponseQuery(project string, etag string, services []string) {
 	resQuery := `protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "/Jobs.UpdateJob"`
 
 	if project != "" {
@@ -140,10 +160,10 @@ protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
 protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	return resQuery
+	q.AddQuery(resQuery)
 }
 
-func CreateServiceStatusRequestUpdate(project, etag string, services []string) string {
+func (q *Query) AddServiceStatusRequestUpdate(project, etag string, services []string) {
 	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService"`
 
 	if project != "" {
@@ -161,10 +181,10 @@ protoPayload.request.service.template.labels."defang-etag"=%q`, etag)
 protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	return reqQuery
+	q.AddQuery(reqQuery)
 }
 
-func CreateServiceStatusReponseUpdate(project, etag string, services []string) string {
+func (q *Query) AddServiceStatusReponseUpdate(project, etag string, services []string) {
 	resQuery := `protoPayload.methodName="/Services.CreateService" OR "/Services.UpdateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
 
 	if project != "" {
@@ -182,18 +202,15 @@ protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
 protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	return resQuery
+	q.AddQuery(resQuery)
 }
 
-func ConcatQuery(existingQuery, newQuery string) string {
-	if len(existingQuery) > 0 {
-		if existingQuery[len(existingQuery)-1] == ')' {
-			existingQuery += " OR "
-		} else {
-			existingQuery += " AND "
-		}
+func sinceTimestamp(since time.Time) string {
+	result := ""
+	if !since.IsZero() && since.Unix() > 0 {
+		result = fmt.Sprintf(`
+timestamp >= %q`, since.UTC().Format(time.RFC3339Nano))
 	}
-	existingQuery += "(" + newQuery + "\n)"
 
-	return existingQuery
+	return result
 }

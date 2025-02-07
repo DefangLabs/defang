@@ -677,39 +677,27 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 }
 
 func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
-	var newQueryFragment string
 	var since time.Time
 	if req.Since != nil {
 		since = req.Since.AsTime()
 	}
-	query := CreateStdQuery(b.driver.ProjectId)
+	query := NewLogQuery(b.driver.ProjectId)
 	if b.cdExecution != "" {
-		newQueryFragment = CreateJobExecutionQuery(path.Base(b.cdExecution), since)
-		query = ConcatQuery(query, newQueryFragment)
+		query.AddJobExecutionQuery(path.Base(b.cdExecution), since)
 	}
 
-	newQueryFragment = CreateJobLogQuery(req.Project, req.Etag, req.Services, since)
-	query = ConcatQuery(query, newQueryFragment)
+	// Logs
+	query.AddJobLogQuery(req.Project, req.Etag, req.Services, since)        // CD log?  TODO: Use the execution name to generate etag
+	query.AddServiceLogQuery(req.Project, req.Etag, req.Services, since)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services, since) // CloudBuild logs
 
-	newQueryFragment = CreateServiceLogQuery(req.Project, req.Etag, req.Services, since)
-	query = ConcatQuery(query, newQueryFragment)
+	// Service status updates
+	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate(req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(req.Project, req.Etag, req.Services)
 
-	newQueryFragment = CreateCloudBuildLogQuery(req.Project, req.Etag, req.Services, since) // CloudBuild logs
-	query = ConcatQuery(query, newQueryFragment)
-
-	newQueryFragment = CreateJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
-	query = ConcatQuery(query, newQueryFragment)
-
-	newQueryFragment = CreateJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
-	query = ConcatQuery(query, newQueryFragment)
-
-	newQueryFragment = CreateServiceStatusRequestUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
-	query = ConcatQuery(query, newQueryFragment)
-
-	newQueryFragment = CreateServiceStatusReponseUpdate(req.Project, req.Etag, req.Services) // CloudBuild logs
-	query = ConcatQuery(query, newQueryFragment)
-
-	return query
+	return query.GetQuery()
 }
 
 func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
