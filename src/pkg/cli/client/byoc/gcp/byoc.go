@@ -546,10 +546,14 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 		if execName == "." {
 			execName = ""
 		}
-		ls.AddJobExecutionLog(execName, req.Since.AsTime())                          // CD log
-		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())        // Kaniko logs
-		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime())    // Service logs
-		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // CloudBuild logs
+		var startTime time.Time
+		if req.Since != nil {
+			startTime = req.Since.AsTime()
+		}
+		ls.AddJobExecutionLog(execName, startTime)                          // CD log
+		ls.AddJobLog(req.Project, req.Etag, req.Services, startTime)        // Kaniko logs
+		ls.AddServiceLog(req.Project, req.Etag, req.Services, startTime)    // Service logs
+		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, startTime) // CloudBuild logs
 	}
 	if err := ls.Start(); err != nil {
 		return nil, err
@@ -558,18 +562,19 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	var deploymentStartTime *timestamppb.Timestamp = req.Since
-	debugReq := &defangv1.DebugRequest{
-		Project: req.Project,
-		Etag:    req.Etag,
-		Since:   deploymentStartTime,
-	}
-
 	// query for all logs up until now
-	if err := b.Query(ctx, debugReq); err != nil {
-		return nil, err
+	if time.Since(req.Since.AsTime()) > 10*time.Millisecond {
+		term.Debugf("Querying older logs since %v before live tail", req.Since)
+		debugReq := &defangv1.DebugRequest{
+			Project: req.Project,
+			Etag:    req.Etag,
+			Since:   req.Since,
+		}
+		if err := b.Query(ctx, debugReq); err != nil {
+			return nil, err
+		}
+		term.Println(debugReq.Logs)
 	}
-	term.Println(debugReq.Logs)
 
 	// stream logs from now forward
 	req.Since = timestamppb.Now()
@@ -687,7 +692,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	}
 
 	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services, since)        // CD log?  TODO: Use the execution name to generate etag
+	query.AddJobLogQuery(req.Project, req.Etag, req.Services, since)        // Kaniko logs
 	query.AddServiceLogQuery(req.Project, req.Etag, req.Services, since)    // Cloudrun service logs
 	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services, since) // CloudBuild logs
 

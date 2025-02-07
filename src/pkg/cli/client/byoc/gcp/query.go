@@ -25,15 +25,23 @@ func (q *Query) GetQuery() string {
 	var buf strings.Builder
 	buf.WriteString(q.baseQuery)
 	if len(q.queries) > 0 {
-		buf.WriteString(" AND (")
-		buf.WriteString(strings.Join(q.queries, "\n) OR ("))
+		buf.WriteString(" AND \n(")
+		for i, query := range q.queries {
+			if i > 0 {
+				buf.WriteString("\n) OR (")
+			}
+			for _, line := range strings.Split(query, "\n") {
+				buf.WriteString("\n  ")
+				buf.WriteString(line)
+			}
+		}
 		buf.WriteString("\n)")
 	}
 	return buf.String()
 }
 
 func NewLogQuery(projectId string) *Query {
-	return NewQuery(fmt.Sprintf(`(logName=~"logs/run.googleapis.com/(stdout|stderr)$" OR logName="projects/%s/logs/cloudbuild")`, projectId))
+	return NewQuery(fmt.Sprintf(`(logName=~"logs/run.googleapis.com%%2F(stdout|stderr)$" OR logName="projects/%s/logs/cloudbuild")`, projectId))
 }
 
 func NewSubscribeQuery() *Query {
