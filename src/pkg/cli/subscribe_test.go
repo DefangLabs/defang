@@ -68,30 +68,30 @@ func TestWaitServiceState(t *testing.T) {
 	provider := &mockSubscribeProvider{}
 
 	tests := []struct {
-		name              string
-		unmanagedServices []string
-		expectErr         bool
+		name      string
+		services  []string
+		expectErr bool
 	}{
 		{
-			name:              "state with DEPLOYMENT_COMPLETED",
-			unmanagedServices: []string{"service1", "service3"},
-			expectErr:         false,
+			name:      "state with DEPLOYMENT_COMPLETED",
+			services:  []string{"service1", "service3"},
+			expectErr: false,
 		},
 		{
-			name:              "state with BUILD_FAILED",
-			unmanagedServices: []string{"service2"},
-			expectErr:         true,
+			name:      "state with BUILD_FAILED",
+			services:  []string{"service2"},
+			expectErr: true,
 		},
 		{
-			name:              "state with DEPLOYMENT_COMPLETED and BUILD_FAILED",
-			unmanagedServices: []string{"service1", "service2", "service3"},
-			expectErr:         true,
+			name:      "state with DEPLOYMENT_COMPLETED and BUILD_FAILED",
+			services:  []string{"service1", "service2", "service3"},
+			expectErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, targetState, "EtagSomething", tt.unmanagedServices)
+			err := WaitServiceState(ctx, provider, targetState, "EtagSomething", tt.services)
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("Expected error but got nil")
