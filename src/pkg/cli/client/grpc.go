@@ -30,7 +30,16 @@ func NewGrpcClient(host, accessToken string, tenantName types.TenantName) GrpcCl
 	}
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
-	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
+	fabricClient := defangv1connect.NewFabricControllerClient(
+		http.DefaultClient,
+		baseUrl,
+		connect.WithGRPC(),
+		connect.WithInterceptors(
+			grpcLogger{},
+			auth.NewAuthInterceptor(accessToken),
+			Retrier{},
+		),
+	)
 
 	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
 }
