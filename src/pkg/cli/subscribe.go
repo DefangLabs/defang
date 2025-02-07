@@ -13,7 +13,13 @@ import (
 
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
-func WaitServiceState(ctx context.Context, provider client.Provider, targetState defangv1.ServiceState, etag string, services []string) error {
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	etag string,
+	services []string,
+) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
 	if DoDryRun {
