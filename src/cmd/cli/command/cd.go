@@ -18,8 +18,8 @@ var cdCmd = &cobra.Command{
 
 var cdDestroyCmd = &cobra.Command{
 	Use:         "destroy",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
@@ -32,14 +32,20 @@ var cdDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "destroy")
 	},
 }
 
 var cdDownCmd = &cobra.Command{
 	Use:         "down",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
@@ -52,14 +58,21 @@ var cdDownCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "down")
 	},
 }
 
 var cdRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Refresh the service stack",
+	Use:         "refresh",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
+	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -71,14 +84,21 @@ var cdRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "refresh")
 	},
 }
 
 var cdCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Cancel the current CD operation",
+	Use:         "cancel",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
+	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -90,6 +110,12 @@ var cdCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
 		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "cancel")
 	},
 }
@@ -125,6 +151,11 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
+			err = canIUseProvider(cmd.Context(), provider, "")
+			if err != nil {
+				return err
+			}
+
 			// FIXME: this needs auth because it spawns the CD task
 			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
 		}
@@ -145,6 +176,11 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		err = canIUseProvider(cmd.Context(), provider, project.Name)
 		if err != nil {
 			return err
 		}

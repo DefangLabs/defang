@@ -99,6 +99,9 @@ service FabricController {
       returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
+  rpc SetOptions(SetOptionsRequest) returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  }
   rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
@@ -162,7 +165,8 @@ message DebugRequest {
   string project = 3;
   string logs = 4;
   repeated string services = 5;
-  google.protobuf.Timestamp since = 6;
+  bool training_opt_out = 6; // only valid for Pro users
+  google.protobuf.Timestamp since = 7;
 }
 
 message DebugResponse {
@@ -236,6 +240,7 @@ message GenerateFilesRequest {
   string prompt = 1;
   string language = 2;
   bool agree_tos = 3;
+  bool training_opt_out = 4; // only valid for Pro users
 }
 
 message File {
@@ -626,10 +631,15 @@ enum SubscriptionTier {
   TEAM = 4;
 }
 
+message SetOptionsRequest {
+  bool training_opt_out = 1; // only valid for Pro users
+}
+
 message WhoAmIResponse {
   string tenant = 1;
   string account = 2;
   string region = 3;
   string user_id = 4;
   SubscriptionTier tier = 5;
+  bool training_opt_out = 6;
 }

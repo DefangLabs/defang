@@ -77,21 +77,6 @@ func prettyError(err error) error {
 	return err
 }
 
-// TODO: Make call to provider to get project cd version and pass to CanIUse API call
-func allowToUseProvider(ctx context.Context, providerID cliClient.ProviderID, projectName string) (string, error) {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: providerID.EnumValue(),
-	}
-
-	resp, err := client.CanIUse(ctx, &canUseReq)
-	if err != nil {
-		return "", ErrNoPermission(fmt.Sprintf("no access to use %s provider. Please upgrade on https://s.defang.io/subscription", providerID))
-	}
-
-	return resp.CdImage, nil
-}
-
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		restore := term.EnableANSI()
@@ -210,6 +195,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
+	loginCmd.Flags().Bool("training-opt-out", false, "Opt out of ML training (Pro users only)")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
@@ -401,6 +387,8 @@ var loginCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
+
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
@@ -412,6 +400,14 @@ var loginCmd = &cobra.Command{
 			}
 
 			printDefangHint("To generate a sample service, do:", "generate")
+		}
+
+		if trainingOptOut {
+			req := &defangv1.SetOptionsRequest{TrainingOptOut: trainingOptOut}
+			if err := client.SetOptions(cmd.Context(), req); err != nil {
+				return err
+			}
+			term.Info("Options updated successfully")
 		}
 		return nil
 	},
@@ -857,7 +853,7 @@ var debugCmd = &cobra.Command{
 			Client:   client,
 		}
 
-		return cli.Debug(cmd.Context(), debugConfig)
+		return cli.DebugDeployment(cmd.Context(), debugConfig)
 	},
 }
 
@@ -879,6 +875,11 @@ var deleteCmd = &cobra.Command{
 		}
 
 		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
 		if err != nil {
 			return err
 		}
@@ -1135,44 +1136,37 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		return nil, err
 	}
 
-	projName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		term.Debug("unable to load project name:", err)
-	}
-
-	if cdImage, err := allowToUseProvider(ctx, providerID, projName); err != nil {
-		return nil, err
-	} else {
-		// provide sane defaults for the CD image
-		if cdImage == "" {
-			switch providerID {
-			case cliClient.ProviderAWS:
-				cdImage = "public.ecr.aws/defang-io/cd:public-beta"
-			case cliClient.ProviderDO:
-				cdImage = "docker.io/defangio/cd:public-beta"
-			case cliClient.ProviderGCP:
-				cdImage = "docker.io/defangio/cd:pubilc-gcp-beta"
-			}
-		}
-		// Allow local override of the CD image
-		cdImage = pkg.Getenv("DEFANG_CD_IMAGE", cdImage)
-		provider.SetCDImage(cdImage)
-	}
-
 	return provider, nil
 }
 
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:  projectName,
+		Provider: providerID.EnumValue(),
+	}
+
+	resp, err := client.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return err
+	}
+	// Allow local override of the CD image
+	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
+	provider.SetCDImage(cdImage)
+
+	return nil
+}
+
 func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, error) {
-	var projName string
+	var projectName string
 	if loader != nil {
 		var err error
-		projName, err = loader.LoadProjectName(ctx)
+		projectName, err = loader.LoadProjectName(ctx)
 		if err != nil {
 			term.Warn("Unable to load project:", err)
 		}
 
-		if projName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
-			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projName})
+		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
+			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
 				term.Warn("Unable to get selected provider:", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
@@ -1214,11 +1208,11 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	}
 
 	// Save the selected provider to the fabric
-	if projName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projName, Provider: providerID.EnumValue()}); err != nil {
+	if projectName != "" {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
 			term.Warn("Unable to save selected provider to defang server:", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projName)
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 		}
 	}
 	return "interactive prompt", nil

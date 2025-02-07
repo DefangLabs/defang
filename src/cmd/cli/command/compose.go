@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
@@ -43,6 +45,31 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, 
 	return managedServices, unmanagedServices
 }
 
+func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
+	projOpts, err := loader.NewProjectOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	// get the project name
+	if projOpts.Name == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		projOpts.Name = filepath.Base(dir)
+	}
+	project := &compose.Project{
+		Name:         projOpts.Name,
+		WorkingDir:   projOpts.WorkingDir,
+		Environment:  projOpts.Environment,
+		ComposeFiles: projOpts.ConfigPaths,
+	}
+
+	return project, nil
+}
+
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -62,12 +89,35 @@ func makeComposeUpCmd() *cobra.Command {
 
 			since := time.Now()
 			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(cmd.Context())
+
+			ctx := cmd.Context()
+			project, loadErr := loader.LoadProject(ctx)
+			if loadErr != nil {
+				if nonInteractive {
+					return loadErr
+				}
+
+				term.Error("Cannot load project:", loadErr)
+				project, err := createProjectForDebug(loader)
+				if err != nil {
+					return err
+				}
+
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
+				var debugConfig = cli.DebugConfig{
+					Client:    client,
+					Project:   project,
+					LoadError: loadErr,
+				}
+				return cli.InteractiveDebugForLoadError(ctx, debugConfig)
+			}
+
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
 			}
@@ -78,14 +128,14 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
+			numGPUS := compose.GetNumOfGPUs(ctx, project)
 			if numGPUS > 0 {
 				req := &defangv1.CanIUseRequest{
 					Project:  project.Name,
 					Provider: providerID.EnumValue(),
 				}
 
-				resp, err := client.CanIUse(cmd.Context(), req)
+				resp, err := client.CanIUse(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -95,7 +145,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}
 
-			deploy, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, upload, mode.Value())
+			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -127,7 +177,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
+			tailCtx, cancelTail := context.WithCancelCause(ctx)
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
 			if waitTimeout >= 0 {
@@ -209,7 +259,7 @@ func makeComposeUpCmd() *cobra.Command {
 							Provider:       provider,
 							Since:          since,
 						}
-						if nil == cli.InteractiveDebug(cmd.Context(), debugConfig) {
+						if nil == cli.InteractiveDebugDeployment(cmd.Context(), debugConfig) {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}
@@ -307,6 +357,11 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
+			err = canIUseProvider(cmd.Context(), provider, projectName)
+			if err != nil {
+				return err
+			}
+
 			since := time.Now()
 			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
@@ -336,8 +391,17 @@ func makeComposeDownCmd() *cobra.Command {
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-			err = cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+			tailCtx := cmd.Context()
+			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
+				if connect.CodeOf(err) == connect.CodePermissionDenied {
+					// If tail fails because of missing permission, we show a warning and detach. This is
+					// different than `up`, which will wait for the deployment to finish, but we don't have an
+					// ECS event subscription for `down` so we can't wait for the deployment to finish.
+					// Instead, we'll just show a warning and detach.
+					term.Warn("Unable to tail logs. Detaching.")
+					return nil
+				}
 				return err
 			}
 			term.Info("Done.")
@@ -357,17 +421,36 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(cmd.Context())
+
+			ctx := cmd.Context()
+			project, loadErr := loader.LoadProject(ctx)
+			if loadErr != nil {
+				if nonInteractive {
+					return loadErr
+				}
+
+				term.Error("Cannot load project:", loadErr)
+				project, err := createProjectForDebug(loader)
+				if err != nil {
+					return err
+				}
+
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
+				var debugConfig = cli.DebugConfig{
+					Client:    client,
+					LoadError: loadErr,
+					Project:   project,
+				}
+				return cli.InteractiveDebugForLoadError(ctx, debugConfig)
+			}
+
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
-			if err != nil {
-				return err
-			}
-
-			if _, _, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+			if !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
@@ -464,12 +547,12 @@ func makeComposeLogsCmd() *cobra.Command {
 			term.Debug("logType", logType)
 
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(cmd.Context())
+			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
 			if err != nil {
 				return err
 			}
@@ -482,6 +565,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Verbose:  verbose,
 				LogType:  *logType,
 			}
+
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}

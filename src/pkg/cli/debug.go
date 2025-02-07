@@ -36,26 +36,44 @@ type DebugConfig struct {
 	Project        *compose.Project
 	Provider       client.Provider
 	Since          time.Time
+	LoadError      error
 }
 
-func InteractiveDebug(ctx context.Context, debugConfig DebugConfig) error {
+func InteractiveDebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
+	return interactiveDebug(ctx, debugConfig)
+}
+
+func InteractiveDebugForLoadError(ctx context.Context, debugConfig DebugConfig) error {
+	return interactiveDebug(ctx, debugConfig)
+}
+
+func interactiveDebug(ctx context.Context, debugConfig DebugConfig) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err))
+		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", debugConfig.LoadError))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag))
+		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag), P("loadErr", debugConfig.LoadError))
 		return ErrDebugSkipped
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag))
+	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag), P("loadErr", debugConfig.LoadError))
 
-	if err := Debug(ctx, debugConfig); err != nil {
-		term.Warnf("Failed to debug deployment: %v", err)
-		return err
+	if debugConfig.LoadError != nil {
+		if err := debugComposeFileLoadError(ctx, debugConfig.Client, debugConfig.Project, debugConfig.LoadError); err != nil {
+			term.Warnf("Failed to debug compose file load: %v", err)
+			return err
+		}
+	} else if debugConfig.Etag != "" {
+		if err := DebugDeployment(ctx, debugConfig); err != nil {
+			term.Warnf("Failed to debug deployment: %v", err)
+			return err
+		}
+	} else {
+		return errors.New("no information to use for debugger")
 	}
 
 	var goodBad bool
@@ -63,41 +81,75 @@ func InteractiveDebug(ctx context.Context, debugConfig DebugConfig) error {
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err))
+		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", debugConfig.LoadError))
 	} else {
-		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad))
+		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad), P("loadErr", debugConfig.LoadError))
 	}
 	return nil
 }
 
-func Debug(ctx context.Context, config DebugConfig) error {
-	term.Debug("Invoking AI debugger for deployment", config.Etag)
+func DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
+	term.Debugf("Invoking AI debugger for deployment %q", debugConfig.Etag)
 
-	files := findMatchingProjectFiles(config.Project, config.FailedServices)
+	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
 	var sinceTime *timestamppb.Timestamp = nil
-	if !config.Since.IsZero() {
-		sinceTime = timestamppb.New(config.Since)
+	if !debugConfig.Since.IsZero() {
+		sinceTime = timestamppb.New(debugConfig.Since)
 	}
 	req := defangv1.DebugRequest{
-		Etag:    config.Etag,
+		Etag:    debugConfig.Etag,
 		Files:   files,
 		Since:   sinceTime,
-		Project: config.Project.Name,
+		Project: debugConfig.Project.Name,
 	}
-	err := config.Provider.Query(ctx, &req)
-	if err != nil {
-		return err
-	}
-	resp, err := config.Client.Debug(ctx, &req)
+	err := debugConfig.Provider.Query(ctx, &req)
 	if err != nil {
 		return err
 	}
 
+	resp, err := debugConfig.Client.Debug(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	printDebugReport(resp)
+
+	// for _, request := range resp.Requests {
+	// 	term.Info(request)
+	// }
+	return nil
+}
+
+func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, project *compose.Project, loadErr error) error {
+	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
+
+	files := findMatchingProjectFiles(project, nil)
+
+	if DoDryRun {
+		return ErrDryRun
+	}
+
+	req := defangv1.DebugRequest{
+		Files:   files,
+		Project: project.Name,
+		Logs:    loadErr.Error(),
+	}
+
+	resp, err := c.Debug(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	printDebugReport(resp)
+	return nil
+}
+
+func printDebugReport(resp *defangv1.DebugResponse) {
 	term.Println("")
 	term.Println("===================")
 	term.Println("Debugging Summary")
@@ -124,10 +176,6 @@ func Debug(ctx context.Context, config DebugConfig) error {
 			}
 		}
 	}
-	// for _, request := range resp.Requests {
-	// 	term.Info(request)
-	// }
-	return nil
 }
 
 func readFile(basepath, path string) *defangv1.File {

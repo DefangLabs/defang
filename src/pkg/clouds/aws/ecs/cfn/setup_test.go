@@ -5,10 +5,10 @@ package cfn
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
@@ -20,7 +20,7 @@ func TestCloudFormation(t *testing.T) {
 
 	retainBucket = false // delete bucket after test
 
-	user := os.Getenv("USER") // avoid conflict with other users in the same account
+	user := pkg.GetCurrentUser() // avoid conflict with other users in the same account
 	aws := New("crun-test-"+user, region.Region("us-west-2"))
 	if aws == nil {
 		t.Fatal("aws is nil")
