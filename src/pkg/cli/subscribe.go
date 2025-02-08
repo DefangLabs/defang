@@ -74,9 +74,11 @@ func WaitServiceState(
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
 			return pkg.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
-
 		serviceStates[msg.Name] = msg.State
 
+		if !allServicesUpdated(serviceStates) {
+			continue
+		}
 		if allInState(targetState, serviceStates) {
 			return nil // all services are in the target state
 		}
@@ -86,6 +88,15 @@ func WaitServiceState(
 func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
 	for _, state := range serviceStates {
 		if state != targetState {
+			return false
+		}
+	}
+	return true
+}
+
+func allServicesUpdated(serviceStates map[string]defangv1.ServiceState) bool {
+	for _, state := range serviceStates {
+		if state == defangv1.ServiceState_NOT_SPECIFIED {
 			return false
 		}
 	}
