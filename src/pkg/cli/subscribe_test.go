@@ -52,56 +52,167 @@ func (m *mockSubscribeProvider) Subscribe(
 ) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	m.Reqs = append(m.Reqs, req)
 
-	stream := &MockSubscribeServerStream{
-		Resps: []*defangv1.SubscribeResponse{
-			{Name: "service1", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
-			{Name: "service2", State: defangv1.ServiceState_BUILD_FAILED},
-			{Name: "service3", State: defangv1.ServiceState_DEPLOYMENT_COMPLETED},
+	responses := map[string][]*defangv1.SubscribeResponse{
+		"etag1": {
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
 		},
-	}
-	return stream, nil
+		"etag2": {
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
+		},
+		"etag3": {
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_FAILED,
+			},
+		},
+		"etag4": {
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_DEPLOYMENT_FAILED,
+			},
+		},
+		"etag5": {
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service1",
+				State: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service2",
+				State: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
+			{
+				Name:  "service3",
+				State: defangv1.ServiceState_BUILD_QUEUED,
+			},
+			{
+				Name:  "service3",
+				State: defangv1.ServiceState_BUILD_PROVISIONING,
+			},
+			{
+				Name:  "service3",
+				State: defangv1.ServiceState_DEPLOYMENT_FAILED,
+			},
+		},
+	}[req.Etag]
+	return &MockSubscribeServerStream{Resps: responses}, nil
 }
 
 func TestWaitServiceState(t *testing.T) {
 	ctx := context.Background()
-	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	provider := &mockSubscribeProvider{}
 
-	tests := []struct {
-		name      string
-		services  []string
-		expectErr bool
+	pass_tests := []struct {
+		etag        string
+		services    []string
+		targetState defangv1.ServiceState
 	}{
 		{
-			name:      "state with DEPLOYMENT_COMPLETED",
-			services:  []string{"service1", "service3"},
-			expectErr: false,
+			etag:        "etag1",
+			services:    []string{"service1"},
+			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
 		},
 		{
-			name:      "state with BUILD_FAILED",
-			services:  []string{"service2"},
-			expectErr: true,
-		},
-		{
-			name:      "state with DEPLOYMENT_COMPLETED and BUILD_FAILED",
-			services:  []string{"service1", "service2", "service3"},
-			expectErr: true,
+			etag:        "etag2",
+			services:    []string{"service1", "service2"},
+			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, targetState, "EtagSomething", tt.services)
-			if tt.expectErr {
-				if err == nil {
-					t.Errorf("Expected error but got nil")
-				} else if !errors.As(err, &pkg.ErrDeploymentFailed{}) {
-					t.Errorf("Expected ErrDeploymentFailed but got %v", err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+	fail_tests := []struct {
+		etag        string
+		services    []string
+		targetState defangv1.ServiceState
+	}{
+		{
+			etag:        "etag3",
+			services:    []string{"service1"},
+			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+		},
+	}
+
+	for _, tt := range pass_tests {
+		t.Run("pass", func(t *testing.T) {
+			err := WaitServiceState(ctx, provider, tt.targetState, tt.etag, tt.services)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+
+	for _, tt := range fail_tests {
+		t.Run("fail", func(t *testing.T) {
+			err := WaitServiceState(ctx, provider, tt.targetState, tt.etag, tt.services)
+			if err == nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !errors.As(err, &pkg.ErrDeploymentFailed{}) {
+				t.Errorf("Expected ErrDeploymentFailed but got %v", err)
 			}
 		})
 	}
