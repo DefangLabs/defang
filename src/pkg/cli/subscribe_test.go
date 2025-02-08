@@ -52,7 +52,7 @@ func (m *mockSubscribeProvider) Subscribe(
 ) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	m.Reqs = append(m.Reqs, req)
 
-	responses := map[string][]*defangv1.SubscribeResponse{
+	resps, ok := map[string][]*defangv1.SubscribeResponse{
 		"etag1": {
 			{
 				Name:  "service1",
@@ -160,7 +160,13 @@ func (m *mockSubscribeProvider) Subscribe(
 			},
 		},
 	}[req.Etag]
-	return &MockSubscribeServerStream{Resps: responses}, nil
+
+	if !ok {
+		panic("unexpected etag")
+	}
+
+	stream := &MockSubscribeServerStream{Resps: resps}
+	return stream, nil
 }
 
 func TestWaitServiceState(t *testing.T) {
