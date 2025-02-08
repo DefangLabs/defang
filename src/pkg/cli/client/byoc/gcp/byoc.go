@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -29,12 +28,10 @@ import (
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/iterator"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ client.Provider = (*ByocGcp)(nil)
@@ -489,38 +486,38 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delega
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	ss, err := NewSubscribeStream(ctx, b.driver, false)
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, false)
 	if err != nil {
 		return nil, err
 	}
 	if req.Etag == b.cdEtag {
-		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
+		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
-	ss.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
-	ss.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
-	if err := ss.Start(); err != nil {
-		return nil, err
-	}
-	return ss, nil
+	subscribeStream.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
+	subscribeStream.Start(time.Now())
+	return subscribeStream, nil
 }
 
 func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		ss, err := NewSubscribeStream(ctx, b.driver, true)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
 		}
-		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
-		if err := ss.Start(); err != nil {
-			return nil, err
+		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
+		var since time.Time
+		if req.Since != nil {
+			since = req.Since.AsTime()
 		}
+		subscribeStream.Start(since)
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
-			defer ss.Close()
-			for ss.Receive() {
-				msg := ss.Msg()
+			defer subscribeStream.Close()
+			for subscribeStream.Receive() {
+				msg := subscribeStream.Msg()
 				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
 					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
 					cancel(fmt.Errorf("CD job failed %s", msg.Status))
@@ -532,52 +529,34 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 					return
 				}
 			}
-			cancel(ss.Err())
+			cancel(subscribeStream.Err())
 		}()
 	}
 
-	ls, err := NewLogStream(ctx, b.driver)
+	logStream, err := NewLogStream(ctx, b.driver)
 	if err != nil {
 		return nil, err
 	}
 
+	var startTime time.Time
+	if req.Since != nil {
+		startTime = req.Since.AsTime()
+	}
 	if req.Since != nil || req.Etag != "" {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
 		}
-		var startTime time.Time
-		if req.Since != nil {
-			startTime = req.Since.AsTime()
-		}
-		ls.AddJobExecutionLog(execName, startTime)                          // CD log
-		ls.AddJobLog(req.Project, req.Etag, req.Services, startTime)        // Kaniko logs
-		ls.AddServiceLog(req.Project, req.Etag, req.Services, startTime)    // Service logs
-		ls.AddCloudBuildLog(req.Project, req.Etag, req.Services, startTime) // CloudBuild logs
+		logStream.AddJobExecutionLog(execName, startTime)                          // CD log
+		logStream.AddJobLog(req.Project, req.Etag, req.Services, startTime)        // Kaniko logs
+		logStream.AddServiceLog(req.Project, req.Etag, req.Services, startTime)    // Service logs
+		logStream.AddCloudBuildLog(req.Project, req.Etag, req.Services, startTime) // CloudBuild logs
 	}
-	if err := ls.Start(); err != nil {
-		return nil, err
-	}
-	return ls, nil
+	logStream.Start(startTime)
+	return logStream, nil
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// query for all logs up until now
-	if time.Since(req.Since.AsTime()) > 10*time.Millisecond {
-		term.Debugf("Querying older logs since %v before live tail", req.Since)
-		debugReq := &defangv1.DebugRequest{
-			Project: req.Project,
-			Etag:    req.Etag,
-			Since:   req.Since,
-		}
-		if err := b.Query(ctx, debugReq); err != nil {
-			return nil, err
-		}
-		term.Println(debugReq.Logs)
-	}
-
-	// stream logs from now forward
-	req.Since = timestamppb.Now()
 	return b.streamLogs(ctx, req)
 }
 
@@ -746,50 +725,29 @@ func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
 	return result
 }
 
-func (b *ByocGcp) query(ctx context.Context, client *logging.Client, projectId string, query string) ([]*loggingpb.LogEntry, error) {
+func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
+	term.Debugf("Querying logs with filter: \n %s", query)
 	var entries []*loggingpb.LogEntry
-
-	req := &loggingpb.ListLogEntriesRequest{
-		ResourceNames: []string{"projects/" + projectId}, // Required
-		Filter:        query,                             // Query string
-		OrderBy:       "timestamp desc",                  // Optional: Sort by timestamp
-		PageSize:      50,                                // Number of entries per page
+	lister, err := b.driver.ListLogEntries(ctx, query)
+	if err != nil {
+		return nil, err
 	}
 
-	term.Debugf("Querying logs with filter: \n %s", query)
-	resp := client.ListLogEntries(ctx, req)
-	defer client.Close()
-
 	for {
-		// aggregate log entries
-		for {
-			entry, err := resp.Next()
-			if err != nil {
-				if err == iterator.Done {
-					break
-				}
-				return nil, err
-			}
-
-			entries = append(entries, entry)
-		}
-
-		// set request for next page
-		if resp.PageInfo().Token == "" {
+		entry, err := lister.Next()
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		req.PageToken = resp.PageInfo().Token
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
 	}
 
 	return entries, nil
 }
 
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
-	logClient, err := logging.NewClient(ctx)
-	if err != nil {
-		return annotateGcpError(err)
-	}
-
 	// if there is no execution info then get from execution list
 	if req.Etag != "" && b.cdExecution == "" {
 		b.cdEtag = req.Etag
@@ -802,10 +760,7 @@ func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		req.Since = execution.CreateTime
 	}
 
-	query := b.createDeploymentLogQuery(req)
-	term.Debugf("Query : %s\n", query)
-
-	logEntries, err := b.query(ctx, logClient, b.driver.ProjectId, query)
+	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
 	if err != nil {
 		return annotateGcpError(err)
 	}

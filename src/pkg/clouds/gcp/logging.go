@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	logging "cloud.google.com/go/logging/apiv2"
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"google.golang.org/api/iterator"
 )
 
 func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
@@ -22,6 +24,7 @@ func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
 	t := &Tailer{
 		projectId: gcp.ProjectId,
 		tleClient: tleClient,
+		client:    client,
 	}
 	return t, nil
 }
@@ -29,6 +32,7 @@ func (gcp Gcp) NewTailer(ctx context.Context) (*Tailer, error) {
 type Tailer struct {
 	projectId string
 	tleClient loggingpb.LoggingServiceV2_TailLogEntriesClient
+	client    *logging.Client
 
 	cache []*loggingpb.LogEntry
 }
@@ -64,5 +68,39 @@ func (t *Tailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 
 func (t Tailer) Close() error {
 	// TODO: find out how to properly close the client
-	return t.tleClient.CloseSend()
+	term.Debugf("Closing log tailer")
+	t.tleClient.CloseSend()
+	term.Debugf("Closing log tailer client")
+	return t.client.Close()
+}
+
+type Lister struct {
+	it     *logging.LogEntryIterator
+	client *logging.Client
+}
+
+func (gcp Gcp) ListLogEntries(ctx context.Context, query string) (*Lister, error) {
+	client, err := logging.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &loggingpb.ListLogEntriesRequest{
+		ResourceNames: []string{"projects/" + gcp.ProjectId},
+		Filter:        query,
+	}
+	it := client.ListLogEntries(ctx, req)
+	return &Lister{it: it, client: client}, nil
+}
+
+func (l *Lister) Next() (*loggingpb.LogEntry, error) {
+	entry, err := l.it.Next()
+	if err == iterator.Done {
+		term.Debugf("Closing log lister client")
+		if err := l.client.Close(); err != nil {
+			return nil, err
+		}
+		return nil, io.EOF
+	}
+	return entry, err
 }

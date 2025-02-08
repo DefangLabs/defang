@@ -85,11 +85,41 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) Start() error {
-	if err := s.tailer.Start(s.ctx, s.query.GetQuery()); err != nil {
-		return err
-	}
+func (s *ServerStream[T]) Start(start time.Time) {
+	query := s.query.GetQuery()
 	go func() {
+		// Only query older logs if start time is more than 10ms ago
+		// if time.Since(start) > 10*time.Millisecond {
+		lister, err := s.gcp.ListLogEntries(s.ctx, query)
+		if err != nil {
+			s.errCh <- err
+			return
+		}
+		for {
+			entry, err := lister.Next()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				s.errCh <- err
+				return
+			}
+			resps, err := s.parse(entry)
+			if err != nil {
+				s.errCh <- err
+				return
+			}
+			for _, resp := range resps {
+				s.respCh <- resp
+			}
+		}
+		// }
+
+		// Start tailing logs after all older logs are processed
+		if err := s.tailer.Start(s.ctx, query); err != nil {
+			s.errCh <- err
+			return
+		}
 		for {
 			entry, err := s.tailer.Next(s.ctx)
 			if err != nil {
@@ -106,7 +136,6 @@ func (s *ServerStream[T]) Start() error {
 			}
 		}
 	}()
-	return nil
 }
 
 func (s *ServerStream[T]) Err() error {
