@@ -1,2 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-pkgs.callPackage ./pkgs/defang/cli.nix {}
+{
+  pkgs ? import <nixpkgs> { },
+}:
+pkgs.callPackage ./pkgs/defang/cli.nix { }
