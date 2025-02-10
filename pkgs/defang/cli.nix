@@ -1,6 +1,7 @@
-{ buildGoModule
-, installShellFiles
-, lib
+{
+  buildGoModule,
+  installShellFiles,
+  lib,
 }:
 buildGoModule {
   pname = "defang-cli";
@@ -15,7 +16,10 @@ buildGoModule {
   ];
 
   CGO_ENABLED = 0;
-  ldflags = [ "-s" "-w" ];
+  ldflags = [
+    "-s"
+    "-w"
+  ];
   doCheck = false; # some unit tests need internet access
 
   postInstall = ''
