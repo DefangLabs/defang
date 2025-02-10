@@ -17,10 +17,14 @@ func PostForValues(_url, contentType string, body io.Reader) (url.Values, error)
 	if err != nil {
 		return nil, err
 	}
-	// FIXME: on error, the body might not be URL-encoded
 	values, err := url.ParseQuery(string(bytes))
+	// By default, HTTP status codes in the 2xx range are considered successful
+	// and the default client will have followed any redirects.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return values, fmt.Errorf("unexpected status code: %s", resp.Status)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response body %s: %w", resp.Status, err)
+		return nil, fmt.Errorf("failed to parse response body: %w", err)
 	}
 	return values, nil
 }
