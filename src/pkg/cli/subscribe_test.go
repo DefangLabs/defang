@@ -191,7 +191,7 @@ func TestWaitServiceState(t *testing.T) {
 		},
 	}
 
-	fail_tests := []struct {
+	errTests := []struct {
 		etag        string
 		services    []string
 		targetState defangv1.ServiceState
