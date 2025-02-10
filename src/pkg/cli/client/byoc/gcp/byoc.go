@@ -486,7 +486,8 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delega
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	subscribeStream, err := NewSubscribeStream(ctx, b.driver, false)
+	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
@@ -499,9 +500,9 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	return subscribeStream, nil
 }
 
-func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver)
 		if err != nil {
 			return nil, err
 		}
@@ -554,10 +555,6 @@ func (b *ByocGcp) streamLogs(ctx context.Context, req *defangv1.TailRequest) (cl
 	}
 	logStream.Start(startTime)
 	return logStream, nil
-}
-
-func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	return b.streamLogs(ctx, req)
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {

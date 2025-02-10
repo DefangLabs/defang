@@ -12,7 +12,7 @@ import (
 	"cloud.google.com/go/iam"
 	iamadm "cloud.google.com/go/iam/admin/apiv1"
 	iamadmpb "cloud.google.com/go/iam/admin/apiv1/adminpb"
-	iamv1 "cloud.google.com/go/iam/apiv1/iampb"
+	"cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -236,7 +236,7 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 	resource := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccount)
 	member := "user:" + user
 
-	policy, err := client.GetIamPolicy(ctx, &iamv1.GetIamPolicyRequest{Resource: resource})
+	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for service account %s: %w", serviceAccount, err)
 	}
@@ -264,7 +264,7 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 	}
 
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
-		vp, err := client.GetIamPolicy(ctx, &iamv1.GetIamPolicyRequest{Resource: resource})
+		vp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 		if err != nil {
 			return fmt.Errorf("failed to verify IAM policy for user %v on service account %s: %w", user, serviceAccount, err)
 		}
@@ -282,8 +282,8 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 }
 
 type resourceWithIAMPolicyClient interface {
-	GetIamPolicy(context.Context, *iamv1.GetIamPolicyRequest, ...gax.CallOption) (*iamv1.Policy, error)
-	SetIamPolicy(context.Context, *iamv1.SetIamPolicyRequest, ...gax.CallOption) (*iamv1.Policy, error)
+	GetIamPolicy(context.Context, *iampb.GetIamPolicyRequest, ...gax.CallOption) (*iampb.Policy, error)
+	SetIamPolicy(context.Context, *iampb.SetIamPolicyRequest, ...gax.CallOption) (*iampb.Policy, error)
 }
 
 func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, account string, roles []string) error {
@@ -293,7 +293,7 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 	} else {
 		member = "user:" + account
 	}
-	policy, err := client.GetIamPolicy(ctx, &iamv1.GetIamPolicyRequest{Resource: resource})
+	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for resource %s: %w", resource, err)
 	}
@@ -315,7 +315,7 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 	for _, role := range roles {
 		if !slices.Contains(rolesFound, role) {
 			rolesNotFound = append(rolesNotFound, role)
-			policy.Bindings = append(policy.Bindings, &iamv1.Binding{
+			policy.Bindings = append(policy.Bindings, &iampb.Binding{
 				Role:    role,
 				Members: []string{member},
 			})
@@ -327,12 +327,12 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 		return nil
 	}
 	term.Infof("Updating IAM policy for resource %s", resource)
-	if _, err := client.SetIamPolicy(ctx, &iamv1.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
+	if _, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{Resource: resource, Policy: policy}); err != nil {
 		return fmt.Errorf("failed to set IAM policy for resource %s: %w", resource, err)
 	}
 
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
-		vp, err := client.GetIamPolicy(ctx, &iamv1.GetIamPolicyRequest{Resource: resource})
+		vp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 		if err != nil {
 			return fmt.Errorf("failed to verify IAM policy for resource %s: %w", resource, err)
 		}

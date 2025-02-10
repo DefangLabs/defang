@@ -21,13 +21,15 @@ import (
 )
 
 type LogParser[T any] func(*loggingpb.LogEntry) ([]T, error)
+type LogFilter[T any] func(entry T) bool
 
 type ServerStream[T any] struct {
-	ctx    context.Context
-	gcp    *gcp.Gcp
-	parse  LogParser[T]
-	query  *Query
-	tailer *gcp.Tailer
+	ctx     context.Context
+	gcp     *gcp.Gcp
+	parse   LogParser[T]
+	filters []LogFilter[T]
+	query   *Query
+	tailer  *gcp.Tailer
 
 	lastResp T
 	lastErr  error
@@ -36,17 +38,18 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) (*ServerStream[T], error) {
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[T]) (*ServerStream[T], error) {
 	tailer, err := gcp.NewTailer(ctx)
 	if err != nil {
 		return nil, err
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:    streamCtx,
-		gcp:    gcp,
-		parse:  parse,
-		tailer: tailer,
+		ctx:     streamCtx,
+		gcp:     gcp,
+		parse:   parse,
+		filters: filters,
+		tailer:  tailer,
 
 		respCh: make(chan T),
 		errCh:  make(chan error),
@@ -104,7 +107,7 @@ func (s *ServerStream[T]) Start(start time.Time) {
 				s.errCh <- err
 				return
 			}
-			resps, err := s.parse(entry)
+			resps, err := s.parseAndFilter(entry)
 			if err != nil {
 				s.errCh <- err
 				return
@@ -126,7 +129,7 @@ func (s *ServerStream[T]) Start(start time.Time) {
 				s.errCh <- err
 				return
 			}
-			resps, err := s.parse(entry)
+			resps, err := s.parseAndFilter(entry)
 			if err != nil {
 				s.errCh <- err
 				return
@@ -136,6 +139,27 @@ func (s *ServerStream[T]) Start(start time.Time) {
 			}
 		}
 	}()
+}
+
+func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]T, error) {
+	resps, err := s.parse(entry)
+	if err != nil {
+		return nil, err
+	}
+	newResps := make([]T, 0, len(resps))
+	for _, resp := range resps {
+		include := true
+		for _, admit := range s.filters {
+			if !admit(resp) {
+				include = false
+				break
+			}
+		}
+		if include {
+			newResps = append(newResps, resp)
+		}
+	}
+	return newResps, nil
 }
 
 func (s *ServerStream[T]) Err() error {
@@ -180,8 +204,8 @@ type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, reportCD bool) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser(reportCD))
+func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+	ss, err := NewServerStream(ctx, gcp, getActivityParser(), filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +308,9 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 	}
 }
 
-func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
+
+func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
 
@@ -384,29 +410,26 @@ func getActivityParser(reportCD bool) func(entry *loggingpb.LogEntry) ([]*defang
 					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
-				if len(readyServices) > 0 {
-					resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
-					for serviceName, status := range readyServices {
-						resps = append(resps, &defangv1.SubscribeResponse{
-							Name:   serviceName,
-							State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-							Status: status,
-						})
-					}
-					return resps, nil // Ignore success cd status when we are waiting for service status
-				}
-				if reportCD {
-					return []*defangv1.SubscribeResponse{{
-						Name:   "defang CD",
+				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done
+				resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
+				for serviceName, status := range readyServices {
+					resps = append(resps, &defangv1.SubscribeResponse{
+						Name:   serviceName,
 						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-						Status: auditLog.GetStatus().GetMessage(),
-					}}, nil
+						Status: status,
+					})
 				}
-				return nil, nil // Ignore success cd status if not reporting cd
+				resps = append(resps, &defangv1.SubscribeResponse{
+					Name:   defangCD,
+					State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+					Status: auditLog.GetStatus().GetMessage(),
+				})
+				return resps, nil // Ignore success cd status when we are waiting for service status
 			} else {
 				term.Warnf("unexpected execution name in audit log : %v", executionName)
 				return nil, nil
 			}
+		// TODO: Add cloud build activities for building status update
 		default:
 			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
 			return nil, nil

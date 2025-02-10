@@ -69,9 +69,10 @@ func (t *Tailer) Next(ctx context.Context) (*loggingpb.LogEntry, error) {
 func (t Tailer) Close() error {
 	// TODO: find out how to properly close the client
 	term.Debugf("Closing log tailer")
-	t.tleClient.CloseSend()
+	e1 := t.tleClient.CloseSend()
 	term.Debugf("Closing log tailer client")
-	return t.client.Close()
+	e2 := t.client.Close()
+	return errors.Join(e1, e2)
 }
 
 type Lister struct {

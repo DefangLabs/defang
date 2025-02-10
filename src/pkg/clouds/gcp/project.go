@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
-	resourcepb "cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
+	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"google.golang.org/api/iterator"
 )
@@ -100,17 +100,17 @@ type Gcp struct {
 	ProjectId string
 }
 
-func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcepb.Project, error) {
+func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
 	client, err := resourcemanager.NewProjectsClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("resourcemanager.NewProjectsClient: %w", err)
 	}
 	defer client.Close()
 
-	var project *resourcepb.Project
+	var project *resourcemanagerpb.Project
 	// Find if there is already a CD project with the defang-cd prefix
 	projectId := ProjectIDFromName(projectName)
-	req := &resourcepb.SearchProjectsRequest{}
+	req := &resourcemanagerpb.SearchProjectsRequest{}
 
 	// TODO:: Figure out how to use client.ListProjects to find projects without an org as according
 	// to doc Search projects is eventually consistent, so 2 consecutive calls may create 2 cd projects
@@ -125,7 +125,7 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 			return nil, fmt.Errorf("it.Next: %w", err)
 		}
 		id := ProjectId(resp.ProjectId)
-		if resp.State != resourcepb.Project_ACTIVE {
+		if resp.State != resourcemanagerpb.Project_ACTIVE {
 			continue
 		}
 		if id.Prefix() == projectId.Prefix() {
@@ -137,8 +137,8 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	if project == nil {
 		// return nil, fmt.Errorf("project not found")
 		// If project doesn't exist, create it
-		createReq := &resourcepb.CreateProjectRequest{
-			Project: &resourcepb.Project{
+		createReq := &resourcemanagerpb.CreateProjectRequest{
+			Project: &resourcemanagerpb.Project{
 				ProjectId:   projectId.String(),
 				DisplayName: projectName,
 			},
