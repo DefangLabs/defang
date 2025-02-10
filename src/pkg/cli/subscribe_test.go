@@ -200,6 +200,16 @@ func TestWaitServiceState(t *testing.T) {
 			services:    []string{"service1"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
 		},
+		{
+			etag:        "etag4",
+			services:    []string{"service1"},
+			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+		},
+		{
+			etag:        "etag5",
+			services:    []string{"service1", "service2", "service3"},
+			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+		},
 	}
 
 	for _, tt := range pass_tests {
@@ -223,7 +233,6 @@ func TestWaitServiceState(t *testing.T) {
 		})
 	}
 
-	// Validate that Subscribe was called with expected parameters
 	if len(provider.Reqs) == 0 {
 		t.Errorf("Expected Subscribe to be called but got 0 requests")
 	}
