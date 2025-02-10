@@ -174,7 +174,7 @@ func TestWaitServiceState(t *testing.T) {
 	ctx := context.Background()
 	provider := &mockSubscribeProvider{}
 
-	pass_tests := []struct {
+	noErrTests := []struct {
 		etag        string
 		services    []string
 		targetState defangv1.ServiceState
