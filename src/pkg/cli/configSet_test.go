@@ -12,10 +12,22 @@ import (
 func TestConfigSet(t *testing.T) {
 	ctx := context.Background()
 	provider := MustHaveProjectNamePutConfigProvider{}
-	err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
-	if err != nil {
-		t.Fatalf("ConfigSet() error = %v", err)
-	}
+
+	t.Run("expect no error", func(t *testing.T) {
+		err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
+		if err != nil {
+			t.Fatalf("ConfigSet() error = %v", err)
+		}
+	})
+
+	t.Run("expect error on DryRun", func(t *testing.T) {
+		DoDryRun = true
+		defer func() { DoDryRun = false }()
+		err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
+		if err != ErrDryRun {
+			t.Fatalf("Expected ErrDryRun, got %v", err)
+		}
+	})
 }
 
 type MustHaveProjectNamePutConfigProvider struct {
