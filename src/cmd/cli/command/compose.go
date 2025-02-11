@@ -482,6 +482,7 @@ func makeComposePsCmd() *cobra.Command {
 }
 
 func makeComposeLogsCmd() *cobra.Command {
+	logType := logs.LogTypeRun
 	var logsCmd = &cobra.Command{
 		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
@@ -499,7 +500,6 @@ func makeComposeLogsCmd() *cobra.Command {
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
 			}
-			logType := cmd.Flag("type").Value.(*logs.LogType) // nolint:forcetypeassert
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -521,12 +521,6 @@ func makeComposeLogsCmd() *cobra.Command {
 				services = append(args, strings.Split(name, ",")...) // backwards compat
 			}
 
-			if *logType == logs.LogTypeUnspecified {
-				*logType = logs.LogTypeRun
-			}
-
-			term.Debug("logType", logType)
-
 			loader := configureLoader(cmd)
 			provider, err := getProvider(cmd.Context(), loader)
 			if err != nil {
@@ -541,7 +535,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			tailOptions := cli.TailOptions{
 				Etag:     etag,
 				Filter:   filter,
-				LogType:  *logType,
+				LogType:  logType,
 				Raw:      raw,
 				Services: services,
 				Since:    ts,
@@ -559,7 +553,6 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	var logType logs.LogType
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
 	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
