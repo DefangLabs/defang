@@ -483,10 +483,9 @@ func makeComposePsCmd() *cobra.Command {
 
 func makeComposeLogsCmd() *cobra.Command {
 	var logsCmd = &cobra.Command{
-		Use:         "logs",
+		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
 		Aliases:     []string{"tail"},
-		Args:        cobra.NoArgs,
 		Short:       "Show logs from one or more services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
@@ -517,9 +516,9 @@ func makeComposeLogsCmd() *cobra.Command {
 				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 			}
 			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
-			services := []string{}
+			services := args
 			if len(name) > 0 {
-				services = strings.Split(name, ",")
+				services = append(args, strings.Split(name, ",")...) // backwards compat
 			}
 
 			if *logType == logs.LogTypeUnspecified {
@@ -552,7 +551,8 @@ func makeComposeLogsCmd() *cobra.Command {
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
-	logsCmd.Flags().StringP("name", "n", "", "name of the service")
+	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
+	logsCmd.Flags().MarkHidden("name")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
 	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this

@@ -253,7 +253,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Tail Command
 	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail"
+	tailCmd.Use = "tail [SERVICE...]"
 	tailCmd.Aliases = []string{"logs"}
 	RootCmd.AddCommand(tailCmd)
 
