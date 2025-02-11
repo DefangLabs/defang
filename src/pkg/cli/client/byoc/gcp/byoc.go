@@ -152,6 +152,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.futureReservationViewer", // For `compute.regions.list` permission to avoid pulumi error message
 		"roles/compute.loadBalancerAdmin",       // For creating load balancer and ssl certs
 		"roles/compute.networkAdmin",            // For creating network
+		"roles/compute.securityAdmin",           // For creating firewall rules
 		"roles/dns.admin",                       // For creating DNS records
 		"roles/cloudbuild.builds.editor",        // For building images using cloud build
 		"roles/secretmanager.admin",             // For set permission to secrets
