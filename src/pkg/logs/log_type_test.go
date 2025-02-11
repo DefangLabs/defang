@@ -10,16 +10,17 @@ func TestParseLogType(t *testing.T) {
 		wantErr bool
 	}{
 		{"empty", "", LogTypeUnspecified, false},
-		{"unspecified", "unspecified", LogTypeUnspecified, true},
+		{"unspecified", "unspecified", LogTypeUnspecified, false},
 		{"run", "run", LogTypeRun, false},
 		{"build", "build", LogTypeBuild, false},
+		{"run and build", "run,build", LogTypeRun | LogTypeBuild, false},
 		{"all", "all", LogTypeAll, false},
 		{"invalid", "invalid", LogTypeUnspecified, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseLogType(tt.value)
-			if err != nil && !tt.wantErr {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseLogType() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got != tt.want {
@@ -38,7 +39,8 @@ func TestLogTypeString(t *testing.T) {
 		{"unspecified", LogTypeUnspecified, "UNSPECIFIED"},
 		{"run", LogTypeRun, "RUN"},
 		{"build", LogTypeBuild, "BUILD"},
-		{"all", LogTypeAll, "RUN,BUILD"},
+		{"run and build", LogTypeRun | LogTypeBuild, "RUN,BUILD"},
+		{"all", LogTypeAll, "ALL"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -107,11 +109,11 @@ func TestLogTypeHas(t *testing.T) {
 		{"run has unspecified", LogTypeRun, LogTypeUnspecified, false},
 		{"run has run", LogTypeRun, LogTypeRun, true},
 		{"run has build", LogTypeRun, LogTypeBuild, false},
-		{"run has all", LogTypeRun, LogTypeAll, true},
+		{"run has all", LogTypeRun, LogTypeAll, false},
 		{"build has unspecified", LogTypeBuild, LogTypeUnspecified, false},
 		{"build has run", LogTypeBuild, LogTypeRun, false},
 		{"build has build", LogTypeBuild, LogTypeBuild, true},
-		{"build has all", LogTypeBuild, LogTypeAll, true},
+		{"build has all", LogTypeBuild, LogTypeAll, false},
 		{"all has unspecified", LogTypeAll, LogTypeUnspecified, false},
 		{"all has run", LogTypeAll, LogTypeRun, true},
 		{"all has build", LogTypeAll, LogTypeBuild, true},
