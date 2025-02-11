@@ -105,11 +105,10 @@ func makeComposeUpCmd() *cobra.Command {
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				var debugConfig = cli.DebugConfig{
-					Client:    client,
-					Project:   project,
-					LoadError: loadErr,
+					Client:  client,
+					Project: project,
 				}
-				return cli.InteractiveDebugForLoadError(ctx, debugConfig)
+				return cli.InteractiveDebugForLoadError(ctx, debugConfig, loadErr)
 			}
 
 			provider, err := getProvider(ctx, loader)
@@ -437,11 +436,10 @@ func makeComposeConfigCmd() *cobra.Command {
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
 				var debugConfig = cli.DebugConfig{
-					Client:    client,
-					LoadError: loadErr,
-					Project:   project,
+					Client:  client,
+					Project: project,
 				}
-				return cli.InteractiveDebugForLoadError(ctx, debugConfig)
+				return cli.InteractiveDebugForLoadError(ctx, debugConfig, loadErr)
 			}
 
 			provider, err := getProvider(ctx, loader)
