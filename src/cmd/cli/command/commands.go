@@ -166,7 +166,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Client a temporary gRPC client for tracking events before login
+	// Create a temporary gRPC client for tracking events before login
 	_ = cli.NewGrpcClient(ctx, cluster)
 
 	// CD command
