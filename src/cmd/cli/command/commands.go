@@ -847,13 +847,13 @@ var debugCmd = &cobra.Command{
 		}
 
 		var debugConfig = cli.DebugConfig{
-			Project:  project,
-			Provider: provider,
-			Etag:     etag,
-			Client:   client,
+			Etag:           etag,
+			FailedServices: args,
+			Project:        project,
+			Provider:       provider,
 		}
 
-		return cli.DebugDeployment(cmd.Context(), debugConfig)
+		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }
 

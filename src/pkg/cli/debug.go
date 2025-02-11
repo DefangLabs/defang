@@ -31,22 +31,21 @@ var (
 
 type DebugConfig struct {
 	Etag           types.ETag
-	Client         client.FabricClient
 	FailedServices []string
 	Project        *compose.Project
 	Provider       client.Provider
 	Since          time.Time
 }
 
-func InteractiveDebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
-	return interactiveDebug(ctx, debugConfig, nil)
+func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
+	return interactiveDebug(ctx, client, debugConfig, nil)
 }
 
-func InteractiveDebugForLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
-	return interactiveDebug(ctx, debugConfig, loadErr)
+func InteractiveDebugForLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
+	return interactiveDebug(ctx, client, DebugConfig{}, loadErr)
 }
 
-func interactiveDebug(ctx context.Context, debugConfig DebugConfig, loadError error) error {
+func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, loadError error) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
@@ -62,12 +61,12 @@ func interactiveDebug(ctx context.Context, debugConfig DebugConfig, loadError er
 	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag), P("loadErr", loadError))
 
 	if loadError != nil {
-		if err := debugComposeFileLoadError(ctx, debugConfig.Client, debugConfig.Project, loadError); err != nil {
+		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, loadError); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
 	} else if debugConfig.Etag != "" {
-		if err := DebugDeployment(ctx, debugConfig); err != nil {
+		if err := DebugDeployment(ctx, client, debugConfig); err != nil {
 			term.Warnf("Failed to debug deployment: %v", err)
 			return err
 		}
@@ -87,7 +86,7 @@ func interactiveDebug(ctx context.Context, debugConfig DebugConfig, loadError er
 	return nil
 }
 
-func DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
+func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
 	term.Debugf("Invoking AI debugger for deployment %q", debugConfig.Etag)
 
 	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
@@ -101,26 +100,24 @@ func DebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
 		sinceTime = timestamppb.New(debugConfig.Since)
 	}
 	req := defangv1.DebugRequest{
-		Etag:    debugConfig.Etag,
-		Files:   files,
-		Since:   sinceTime,
-		Project: debugConfig.Project.Name,
+		Etag:     debugConfig.Etag,
+		Files:    files,
+		Project:  debugConfig.Project.Name,
+		Services: debugConfig.FailedServices,
+		Since:    sinceTime,
 	}
 	err := debugConfig.Provider.Query(ctx, &req)
 	if err != nil {
 		return err
 	}
 
-	resp, err := debugConfig.Client.Debug(ctx, &req)
+	resp, err := client.Debug(ctx, &req)
 	if err != nil {
 		return err
 	}
 
 	printDebugReport(resp)
 
-	// for _, request := range resp.Requests {
-	// 	term.Info(request)
-	// }
 	return nil
 }
 

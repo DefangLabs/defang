@@ -62,20 +62,20 @@ func TestQueryHasProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var mockClient = MockDebugFabricClient{}
 	var debugConfig = DebugConfig{
-		Client:         MockDebugFabricClient{},
 		Etag:           "etag",
 		FailedServices: []string{"service"},
 		Project:        project,
 		Provider:       MustHaveProjectNameQueryProvider{},
 	}
-	if err := DebugDeployment(context.Background(), debugConfig); err != nil {
+	if err := DebugDeployment(context.Background(), mockClient, debugConfig); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
 	debugConfig.Project.Name = ""
 
-	if err := DebugDeployment(context.Background(), debugConfig); err == nil {
+	if err := DebugDeployment(context.Background(), mockClient, debugConfig); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {
