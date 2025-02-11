@@ -13,7 +13,14 @@ import (
 
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
-func WaitServiceState(ctx context.Context, provider client.Provider, targetState defangv1.ServiceState, project string, etag string, services []string) error {
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	project string,
+	etag string,
+	services []string,
+) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
 	if DoDryRun {
@@ -68,9 +75,11 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
 			return pkg.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
-
 		serviceStates[msg.Name] = msg.State
 
+		if !allServicesUpdated(serviceStates) {
+			continue
+		}
 		if allInState(targetState, serviceStates) {
 			return nil // all services are in the target state
 		}
@@ -80,6 +89,15 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
 	for _, state := range serviceStates {
 		if state != targetState {
+			return false
+		}
+	}
+	return true
+}
+
+func allServicesUpdated(serviceStates map[string]defangv1.ServiceState) bool {
+	for _, state := range serviceStates {
+		if state == defangv1.ServiceState_NOT_SPECIFIED {
 			return false
 		}
 	}

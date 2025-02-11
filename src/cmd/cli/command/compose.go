@@ -499,12 +499,12 @@ func makeComposePsCmd() *cobra.Command {
 }
 
 func makeComposeLogsCmd() *cobra.Command {
+	logType := logs.LogTypeRun
 	var logsCmd = &cobra.Command{
-		Use:         "logs",
+		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
 		Aliases:     []string{"tail"},
-		Args:        cobra.NoArgs,
-		Short:       "Tail logs from one or more services",
+		Short:       "Show logs from one or more services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
@@ -512,11 +512,11 @@ func makeComposeLogsCmd() *cobra.Command {
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
+			var filter, _ = cmd.Flags().GetString("filter")
 
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
 			}
-			logType := cmd.Flag("type").Value.(*logs.LogType) // nolint:forcetypeassert
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -533,16 +533,10 @@ func makeComposeLogsCmd() *cobra.Command {
 				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 			}
 			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
-			services := []string{}
+			services := args
 			if len(name) > 0 {
-				services = strings.Split(name, ",")
+				services = append(args, strings.Split(name, ",")...) // backwards compat
 			}
-
-			if *logType == logs.LogTypeUnspecified {
-				*logType = logs.LogTypeRun
-			}
-
-			term.Debug("logType", logType)
 
 			loader := configureLoader(cmd)
 			provider, err := getProvider(cmd.Context(), loader)
@@ -556,26 +550,28 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			tailOptions := cli.TailOptions{
-				Services: services,
 				Etag:     etag,
-				Since:    ts,
+				Filter:   filter,
+				LogType:  logType,
 				Raw:      raw,
+				Services: services,
+				Since:    ts,
 				Verbose:  verbose,
-				LogType:  *logType,
 			}
 
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
-	logsCmd.Flags().StringP("name", "n", "", "name of the service")
+	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
+	logsCmd.Flags().MarkHidden("name")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
+	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	var logType logs.LogType
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
-	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
-	logsCmd.Flags().MarkHidden("pattern")
+	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
 }
 

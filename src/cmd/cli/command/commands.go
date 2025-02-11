@@ -153,7 +153,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "Override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -163,10 +163,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
-	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
+	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Client a temporary gRPC client for tracking events before login
+	// Create a temporary gRPC client for tracking events before login
 	_ = cli.NewGrpcClient(ctx, cluster)
 
 	// CD command
@@ -253,7 +253,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Tail Command
 	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail"
+	tailCmd.Use = "tail [SERVICE...]"
 	tailCmd.Aliases = []string{"logs"}
 	RootCmd.AddCommand(tailCmd)
 
@@ -906,9 +906,9 @@ var deleteCmd = &cobra.Command{
 
 		tailOptions := cli.TailOptions{
 			Etag:    etag,
+			LogType: logs.LogTypeAll,
 			Since:   since,
 			Verbose: verbose,
-			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
