@@ -539,7 +539,7 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		return nil, err
 	}
 
-	var startTime time.Time
+	startTime := time.Now()
 	if req.Since != nil {
 		startTime = req.Since.AsTime()
 	}
