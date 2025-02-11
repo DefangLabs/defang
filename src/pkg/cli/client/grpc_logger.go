@@ -8,6 +8,8 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
+const maxPayloadLength = 1024
+
 type grpcLogger struct {
 	prefix string
 }
@@ -23,8 +25,12 @@ func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			payload = []byte("Error marshaling request payload")
 		}
 
-		term.Debug(g.prefix, reqType, string(payload))
+		// Truncate long payloads
+		if len(payload) > maxPayloadLength {
+			payload = append(payload[:maxPayloadLength], []byte("…")...)
+		}
 
+		term.Debug(g.prefix, reqType, string(payload))
 		return next(ctx, req)
 	}
 }

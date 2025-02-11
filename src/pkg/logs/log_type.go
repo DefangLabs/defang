@@ -7,35 +7,36 @@ import (
 
 type LogType uint32
 
-type InvalidLogTypeError struct {
+type ErrInvalidLogType struct {
 	Value string
 }
 
-func (e InvalidLogTypeError) Error() string {
+func (e ErrInvalidLogType) Error() string {
 	return fmt.Sprintf("invalid log type: %q, must be one of %v", e.Value, AllLogTypes)
 }
 
 const (
-	LogTypeUnspecified LogType = 0
-	LogTypeRun         LogType = 1 << iota
+	_LogTypeUnused LogType = 1 << iota
+	LogTypeRun
 	LogTypeBuild
-
-	LogTypeAll LogType = 0xFFFFFFFF
+	LogTypeUnspecified LogType = 0
+	LogTypeAll         LogType = 0xFFFFFFFF
 )
 
 var AllLogTypes = []LogType{
 	LogTypeRun,
 	LogTypeBuild,
+	LogTypeAll,
 }
 
 var (
-	LogType_name = map[LogType]string{
+	logType_name = map[LogType]string{
 		LogTypeUnspecified: "UNSPECIFIED",
 		LogTypeRun:         "RUN",
 		LogTypeBuild:       "BUILD",
 		LogTypeAll:         "ALL",
 	}
-	LogType_value = map[string]LogType{
+	logType_value = map[string]LogType{
 		"UNSPECIFIED": LogTypeUnspecified,
 		"RUN":         LogTypeRun,
 		"BUILD":       LogTypeBuild,
@@ -43,61 +44,53 @@ var (
 	}
 )
 
-func (c *LogType) Set(value string) error {
-	value = strings.TrimSpace(strings.ToUpper(value))
+func ParseLogType(value string) (LogType, error) {
+	var logType LogType
 
-	if value == "" {
-		*c = LogTypeUnspecified
-		return nil
-	}
+	if value != "" {
+		value = strings.TrimSpace(strings.ToUpper(value))
 
-	if value == "ALL" {
-		*c = LogTypeAll
-		return nil
-	}
+		parts := strings.Split(value, ",")
+		for _, part := range parts {
+			bit, ok := logType_value[part]
+			if !ok {
+				return 0, ErrInvalidLogType{Value: value}
+			}
 
-	parts := strings.Split(value, ",")
-	for _, part := range parts {
-		logType, ok := LogType_value[part]
-		if !ok {
-			return InvalidLogTypeError{Value: value}
+			logType |= bit
 		}
-
-		*c |= logType
 	}
+	return logType, nil
+}
 
-	return nil
+func (c *LogType) Set(value string) error {
+	var err error
+	*c, err = ParseLogType(value)
+	return err
 }
 
 func (c LogType) Has(logType LogType) bool {
-	return c&logType != 0
+	return logType != LogTypeUnspecified && (c&logType) == logType
 }
 
 func (c LogType) Type() string {
 	return "log-type"
 }
 
-func (c LogType) Value() string {
-	return c.String()
-}
-
-func ParseLogType(value string) (LogType, error) {
-	var logType LogType
-	err := logType.Set(value)
-	return logType, err
-}
-
 func (c LogType) String() string {
+	if exact := logType_name[c]; exact != "" {
+		return exact
+	}
 	// convert the bitfield into a comma-separated list of log types
 	var logTypes []string
 	for _, logType := range AllLogTypes {
-		if c&logType != 0 {
-			logTypes = append(logTypes, LogType_name[logType])
+		if c.Has(logType) {
+			logTypes = append(logTypes, logType_name[logType])
 		}
 	}
 
 	if len(logTypes) == 0 {
-		return LogType_name[LogTypeUnspecified]
+		return logType_name[LogTypeUnspecified]
 	}
 
 	return strings.Join(logTypes, ",")
