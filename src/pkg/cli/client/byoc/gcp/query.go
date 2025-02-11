@@ -41,11 +41,18 @@ func (q *Query) GetQuery() string {
 }
 
 func NewLogQuery(projectId string) *Query {
-	return NewQuery(fmt.Sprintf(`(logName=~"logs/run.googleapis.com%%2F(stdout|stderr)$" OR logName="projects/%s/logs/cloudbuild")`, projectId))
+	return NewQuery(fmt.Sprintf(`(
+logName=~"logs/run.googleapis.com%%2F(stdout|stderr)$" OR
+logName="projects/%s/logs/cloudbuild" OR
+logName="projects/%s/logs/cos_containers"
+)`, projectId, projectId))
 }
 
 func NewSubscribeQuery() *Query {
-	return NewQuery(`protoPayload.serviceName="run.googleapis.com"`) // TODO: Add compute engine
+	return NewQuery(`(
+protoPayload.serviceName="run.googleapis.com" OR
+protoPayload.serviceName="compute.googleapis.com"
+)`)
 }
 
 func (q *Query) AddJobExecutionQuery(executionName string, since time.Time) {
@@ -86,6 +93,29 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 
 func (q *Query) AddServiceLogQuery(project, etag string, services []string, since time.Time) {
 	query := `resource.type="cloud_run_revision"`
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+labels."defang-etag"=%q`, etag)
+	}
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+	}
+
+	if project != "" {
+		query += fmt.Sprintf(`
+labels."defang-project"=%q`, project)
+	}
+
+	query += sinceTimestamp(since)
+
+	q.AddQuery(query)
+}
+
+func (q *Query) AddComputeEngineLogQuery(project, etag string, services []string, since time.Time) {
+	query := `resource.type="gce_instance"`
 
 	if etag != "" {
 		query += fmt.Sprintf(`
@@ -211,6 +241,34 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 	}
 
 	q.AddQuery(resQuery)
+}
+
+func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(project, etag string, services []string) {
+	query := `protoPayload.methodName=~"beta.compute.regionInstanceGroupManagers.(insert|patch)" AND operation.first="true"`
+
+	if project != "" {
+		query += fmt.Sprintf(`
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-project"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, project)
+	}
+
+	if etag != "" {
+		query += fmt.Sprintf(`
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-etag"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, etag)
+	}
+
+	if len(services) > 0 {
+		query += fmt.Sprintf(`
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-service"
+protoPayload.request.allInstancesConfig.properties.labels.value=~"^(%v)$"`, strings.Join(services, "|"))
+	}
+
+	q.AddQuery(query)
+}
+
+func (q *Query) AddComputeEngineInstanceGroupAddInstances() {
+	q.AddQuery(`protoPayload.methodName="v1.compute.instanceGroups.addInstances"`)
 }
 
 func sinceTimestamp(since time.Time) string {

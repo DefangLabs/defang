@@ -194,6 +194,7 @@ func (s *LogStream) AddJobLog(project, etag string, services []string, since tim
 
 func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
 	s.query.AddServiceLogQuery(project, etag, services, since)
+	s.query.AddComputeEngineLogQuery(project, etag, services, since)
 }
 
 func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
@@ -225,6 +226,8 @@ func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []st
 func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
 	s.query.AddServiceStatusRequestUpdate(project, etag, services)
 	s.query.AddServiceStatusReponseUpdate(project, etag, services)
+	s.query.AddComputeEngineInstanceGroupInsertOrPatch(project, etag, services)
+	s.query.AddComputeEngineInstanceGroupAddInstances()
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
@@ -313,6 +316,8 @@ const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid
 func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
+
+	computeEngineRootTriggers := make(map[string]string)
 
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 		if entry == nil {
@@ -429,6 +434,69 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 				term.Warnf("unexpected execution name in audit log : %v", executionName)
 				return nil, nil
 			}
+		case "gce_instance_group_manager": // Compute engine update start
+			request := auditLog.GetRequest()
+			if request == nil {
+				term.Warnf("missing request in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			labels := GetListInStruct(request, "allInstancesConfig.properties.labels")
+			if labels == nil {
+				term.Warnf("missing labels in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			// Find the service name from the labels
+			serviceName := ""
+			for _, label := range labels {
+				fields := label.GetStructValue().GetFields()
+				if fields["key"].GetStringValue() == "defang-service" {
+					serviceName = fields["value"].GetStringValue()
+					break
+				}
+			}
+			if serviceName == "" {
+				term.Warnf("missing defang-service label in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
+			if rootTriggerId == "" {
+				term.Warnf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+			} else {
+				computeEngineRootTriggers[rootTriggerId] = serviceName
+			}
+			return []*defangv1.SubscribeResponse{{
+				Name:   serviceName,
+				State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
+				Status: auditLog.GetResponse().GetFields()["status"].GetStringValue(),
+			}}, nil
+		case "gce_instance_group": // Compute engine update end
+			// TODO: Better handle of multiple instance group insert events for the same service where more than 1 replica is created, all of them would have 100% for progress and DONE as status
+			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
+			serviceName, ok := computeEngineRootTriggers[rootTriggerId]
+			if !ok {
+				term.Debugf("ignored root trigger id %v for instance group insert", rootTriggerId)
+				return nil, nil
+			}
+			response := auditLog.GetResponse()
+			if response == nil {
+				term.Warnf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			status := response.GetFields()["status"].GetStringValue()
+			var state defangv1.ServiceState
+			switch status {
+			case "DONE":
+				state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+			case "RUNNING":
+				state = defangv1.ServiceState_DEPLOYMENT_PENDING
+			default:
+				state = defangv1.ServiceState_DEPLOYMENT_FAILED
+			}
+			return []*defangv1.SubscribeResponse{{
+				Name:   serviceName,
+				State:  state,
+				Status: status,
+			}}, nil
 		// TODO: Add cloud build activities for building status update
 		default:
 			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
@@ -452,4 +520,20 @@ func GetValueInStruct(s *structpb.Struct, path string) string {
 		keys = keys[1:]
 	}
 	return ""
+}
+
+func GetListInStruct(s *structpb.Struct, path string) []*structpb.Value {
+	keys := strings.Split(path, ".")
+	for len(keys) > 0 {
+		if s == nil {
+			return nil
+		}
+		key := keys[0]
+		field := s.GetFields()[key]
+		if s = field.GetStructValue(); s == nil {
+			return field.GetListValue().Values
+		}
+		keys = keys[1:]
+	}
+	return nil
 }
