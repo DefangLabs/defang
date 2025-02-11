@@ -487,7 +487,7 @@ func makeComposeLogsCmd() *cobra.Command {
 		Annotations: authNeededAnnotation,
 		Aliases:     []string{"tail"},
 		Args:        cobra.NoArgs,
-		Short:       "Tail logs from one or more services",
+		Short:       "Show logs from one or more services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
@@ -495,7 +495,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
-			var pattern, _ = cmd.Flags().GetString("pattern")
+			var filter, _ = cmd.Flags().GetString("filter")
 
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
@@ -541,8 +541,8 @@ func makeComposeLogsCmd() *cobra.Command {
 
 			tailOptions := cli.TailOptions{
 				Etag:     etag,
+				Filter:   filter,
 				LogType:  *logType,
-				Pattern:  pattern,
 				Raw:      raw,
 				Services: services,
 				Since:    ts,
@@ -554,13 +554,14 @@ func makeComposeLogsCmd() *cobra.Command {
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
+	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	var logType logs.LogType
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
-	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
-	logsCmd.Flags().MarkHidden("pattern")
+	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
 }
 
