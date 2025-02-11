@@ -36,34 +36,33 @@ type DebugConfig struct {
 	Project        *compose.Project
 	Provider       client.Provider
 	Since          time.Time
-	LoadError      error
 }
 
 func InteractiveDebugDeployment(ctx context.Context, debugConfig DebugConfig) error {
-	return interactiveDebug(ctx, debugConfig)
+	return interactiveDebug(ctx, debugConfig, nil)
 }
 
-func InteractiveDebugForLoadError(ctx context.Context, debugConfig DebugConfig) error {
-	return interactiveDebug(ctx, debugConfig)
+func InteractiveDebugForLoadError(ctx context.Context, debugConfig DebugConfig, loadErr error) error {
+	return interactiveDebug(ctx, debugConfig, loadErr)
 }
 
-func interactiveDebug(ctx context.Context, debugConfig DebugConfig) error {
+func interactiveDebug(ctx context.Context, debugConfig DebugConfig, loadError error) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", debugConfig.LoadError))
+		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", loadError))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag), P("loadErr", debugConfig.LoadError))
+		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag), P("loadErr", loadError))
 		return ErrDebugSkipped
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag), P("loadErr", debugConfig.LoadError))
+	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag), P("loadErr", loadError))
 
-	if debugConfig.LoadError != nil {
-		if err := debugComposeFileLoadError(ctx, debugConfig.Client, debugConfig.Project, debugConfig.LoadError); err != nil {
+	if loadError != nil {
+		if err := debugComposeFileLoadError(ctx, debugConfig.Client, debugConfig.Project, loadError); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
@@ -81,9 +80,9 @@ func interactiveDebug(ctx context.Context, debugConfig DebugConfig) error {
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", debugConfig.LoadError))
+		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", loadError))
 	} else {
-		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad), P("loadErr", debugConfig.LoadError))
+		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad), P("loadErr", loadError))
 	}
 	return nil
 }
