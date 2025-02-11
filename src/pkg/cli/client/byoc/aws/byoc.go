@@ -610,7 +610,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	since := b.cdStart // TODO: get start time from req.Etag
 	if since.IsZero() {
-		since = time.Now().Add(-time.Hour)
+		since = time.Now().Add(-time.Hour) // TODO: get start time from req
 	}
 
 	// get stack information
@@ -619,11 +619,13 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		return AnnotateAwsError(err)
 	}
 
+	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB (to stay well below the 1MB gRPC payload limit)
+
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
 	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
 		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
-		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) {
+		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
 			for _, event := range logEvents {
 				msg := term.StripAnsi(*event.Message)
 				if parseECSEventRecords {
@@ -644,9 +646,13 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 				}
 				sb.WriteString(msg)
 				sb.WriteByte('\n')
+				if sb.Len() > maxQuerySizePerLogGroup {
+					return errors.New("query result was truncated")
+				}
 			}
+			return nil
 		}); err != nil {
-			term.Warn("CloudWatch query failed:", AnnotateAwsError(err))
+			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
@@ -656,7 +662,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// FillOutputs is needed to get the CD task ARN
+	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -715,12 +721,8 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service string, logType logs.LogType) []ecs.LogGroupInput {
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service string, logType logs.LogType) []ecs.LogGroupInput {
 	var groups []ecs.LogGroupInput
-	var serviceLogsPrefix string
-	if service != "" {
-		serviceLogsPrefix = service + "/" + service + "_" + etag
-	}
 	// Tail CD and kaniko
 	if logType.Has(logs.LogTypeBuild) {
 		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
@@ -737,9 +739,13 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
 		groups = append(groups, ecsTail)
 	}
+	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
-		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs"))} // must match logic in ecs/common.ts
+		if service != "" && etag != "" {
+			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
+		}
+		term.Debug("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix)
 		groups = append(groups, servicesTail)
 	}
 	return groups
