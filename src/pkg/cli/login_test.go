@@ -115,7 +115,7 @@ func (m MockForNonInteractiveLogin) Token(ctx context.Context, req *defangv1.Tok
 
 func TestNonInteractiveLogin(t *testing.T) {
 	ctx := context.Background()
-	mockClient := client.MockFabricClient{}
+	mockClient := &MockForNonInteractiveLogin{}
 	fabric := "test.defang.dev"
 
 	t.Run("Access Token should be saved when login succeeds", func(t *testing.T) {
