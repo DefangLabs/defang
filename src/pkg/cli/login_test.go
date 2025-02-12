@@ -27,13 +27,9 @@ func TestGetExistingToken(t *testing.T) {
 		tokenFile := getTokenFile(fabric)
 		os.WriteFile(tokenFile, []byte(expectedToken), 0600)
 
-		currentToken := os.Getenv("DEFANG_ACCESS_TOKEN")
-		os.Unsetenv("DEFANG_ACCESS_TOKEN")
-
-		defer func() {
+		t.Cleanup(func() {
 			os.Remove(tokenFile)
-			os.Setenv("DEFANG_ACCESS_TOKEN", currentToken)
-		}()
+		})
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
