@@ -1,0 +1,17 @@
+{
+    "name": "Defang CLI Dev Container",
+    "image": "golang:1.22.12",
+    "features": {
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.shell.linux": "/bin/bash"
+            },
+            "extensions": [
+                "golang.go"
+            ]
+        }
+    },
+    "postCreateCommand": "make setup"
+}
