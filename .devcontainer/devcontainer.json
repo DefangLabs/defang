@@ -1,13 +1,14 @@
 {
     "name": "Defang CLI Dev Container",
-    "image": "golang:1.22.12",
+    "build": {
+        "dockerfile": "devcontainer.Dockerfile",
+        "context": "."
+    },
     "features": {
+        "ghcr.io/devcontainers/features/nix:1": {}
     },
     "customizations": {
         "vscode": {
-            "settings": {
-                "terminal.integrated.shell.linux": "/bin/bash"
-            },
             "extensions": [
                 "golang.go"
             ]

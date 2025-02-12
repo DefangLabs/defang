@@ -14,4 +14,8 @@ pre-push:
 	@make -C src test
 
 setup: install-git-hooks
+	grep -q 'flake' .envrc || echo 'use flake' >> .envrc
+	direnv allow
+	cd ..; cd -
+	nix-env -if https://github.com/DefangLabs/defang/archive/main.tar.gz
 	go -C src mod tidy
