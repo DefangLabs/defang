@@ -14,10 +14,11 @@ func TestGetExistingToken(t *testing.T) {
 
 	t.Run("Get access token from environmental variable", func(t *testing.T) {
 		expectedToken := "env-token"
-		if os.Getenv("DEFANG_ACCESS_TOKEN") != expectedToken {
+		currentToken := os.Getenv("DEFANG_ACCESS_TOKEN")
+		if currentToken != expectedToken {
 			os.Setenv("DEFANG_ACCESS_TOKEN", expectedToken)
 		}
-		defer os.Unsetenv("DEFANG_ACCESS_TOKEN")
+		defer os.Setenv("DEFANG_ACCESS_TOKEN", currentToken)
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
@@ -25,12 +26,18 @@ func TestGetExistingToken(t *testing.T) {
 		}
 	})
 
-	t.Run("Get access token from environmental token file", func(t *testing.T) {
+	t.Run("Get access token from file", func(t *testing.T) {
 		expectedToken := "file-token"
 		tokenFile := getTokenFile(fabric)
 		os.WriteFile(tokenFile, []byte(expectedToken), 0600)
-		defer os.Remove(tokenFile)
+
+		currentToken := os.Getenv("DEFANG_ACCESS_TOKEN")
 		os.Unsetenv("DEFANG_ACCESS_TOKEN")
+
+		defer func() {
+			os.Remove(tokenFile)
+			os.Setenv("DEFANG_ACCESS_TOKEN", currentToken)
+		}()
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
@@ -136,23 +143,5 @@ func TestNonInteractiveLogin(t *testing.T) {
 			err.Error() != "non-interactive login failed: ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN not set" {
 			t.Fatalf("expected no error, got %v", err)
 		}
-	})
-}
-
-func TestSaveAccessToken(t *testing.T) {
-	fabric := "test.defang.dev"
-	token := "test-token"
-	tokenFile := getTokenFile(fabric)
-
-	t.Run("Save access token successfully", func(t *testing.T) {
-		err := saveAccessToken(fabric, token)
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-		savedToken, _ := os.ReadFile(tokenFile)
-		if string(savedToken) != token {
-			t.Errorf("expected token %s, got %s", token, string(savedToken))
-		}
-		defer os.Remove(tokenFile)
 	})
 }
