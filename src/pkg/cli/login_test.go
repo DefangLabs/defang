@@ -118,7 +118,7 @@ func TestNonInteractiveLogin(t *testing.T) {
 	mockClient := &MockForNonInteractiveLogin{}
 	fabric := "test.defang.dev"
 
-	t.Run("Access Token should be saved when login succeeds", func(t *testing.T) {
+	t.Run("Expect accessToken to be stored when NonInteractiveLogin() succeeds", func(t *testing.T) {
 		requestUrl := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
 		requestToken := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
 		if len(requestUrl) == 0 || len(requestToken) == 0 {
@@ -142,11 +142,13 @@ func TestNonInteractiveLogin(t *testing.T) {
 		defer os.Remove(tokenFile)
 	})
 
-	t.Run("Login fails in the case that GitHub Actions info is not set", func(t *testing.T) {
-		err := NonInteractiveLogin(ctx, mockClient, fabric)
-		if err != nil &&
-			err.Error() != "non-interactive login failed: ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN not set" {
-			t.Fatalf("expected no error, got %v", err)
-		}
-	})
+	t.Run("Expect error when NonInteractiveLogin() fails in the case that GitHub Actions info is not set",
+		func(t *testing.T) {
+			err := NonInteractiveLogin(ctx, mockClient, fabric)
+			if err != nil &&
+				err.Error() != "non-interactive login failed: ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN not set" {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		},
+	)
 }
