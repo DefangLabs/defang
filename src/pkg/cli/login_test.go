@@ -124,6 +124,8 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
+		// use a temp dir for the token file
+		t.setEnv("XDG_STATE_HOME", t.TempDir())
 		tokenFile := getTokenFile(fabric)
 		savedToken, err := os.ReadFile(tokenFile)
 		if err != nil {
