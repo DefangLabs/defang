@@ -549,10 +549,14 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if execName == "." {
 			execName = ""
 		}
-		logStream.AddJobExecutionLog(execName, startTime)                          // CD log
-		logStream.AddJobLog(req.Project, req.Etag, req.Services, startTime)        // Kaniko logs
-		logStream.AddServiceLog(req.Project, req.Etag, req.Services, startTime)    // Service logs
-		logStream.AddCloudBuildLog(req.Project, req.Etag, req.Services, startTime) // CloudBuild logs
+		etag := req.Etag
+		if etag == b.cdExecution { // Do not pass the cd execution name as etag
+			etag = ""
+		}
+		logStream.AddJobExecutionLog(execName, startTime)                      // CD log
+		logStream.AddJobLog(req.Project, etag, req.Services, startTime)        // Kaniko logs
+		logStream.AddServiceLog(req.Project, etag, req.Services, startTime)    // Service logs
+		logStream.AddCloudBuildLog(req.Project, etag, req.Services, startTime) // CloudBuild logs
 	}
 	logStream.Start(startTime)
 	return logStream, nil
