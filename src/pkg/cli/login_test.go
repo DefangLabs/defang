@@ -14,7 +14,8 @@ func TestGetExistingToken(t *testing.T) {
 	fabric := "test.defang.dev"
 
 	t.Run("Get access token from environmental variable", func(t *testing.T) {
-		t.setEnv("DEFANG_ACCESS_TOKEN", "env-token")
+		expectedToken := "env-token"
+		t.Setenv("DEFANG_ACCESS_TOKEN", expectedToken)
 
 		accessToken := GetExistingToken(fabric)
 		if accessToken != expectedToken {
