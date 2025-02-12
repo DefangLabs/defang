@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -38,9 +39,61 @@ func TestGetExistingToken(t *testing.T) {
 	})
 }
 
+type MockGitHubAuthService struct {
+	GitHubAuthService
+	MockLogin func(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) (string, error)
+}
+
+func (g MockGitHubAuthService) login(
+	ctx context.Context, client client.FabricClient, gitHubClientId, fabric string,
+) (string, error) {
+	return g.MockLogin(ctx, client, gitHubClientId, fabric)
+}
+
 func TestInteractiveLogin(t *testing.T) {
-	t.Run("TestInteractiveLogin", func(t *testing.T) {
-		t.Skip("To implement TestInteractiveLogin, need to change ")
+	temp := githubAuthService
+	accessToken := "test-token"
+	fabric := "test.defang.dev"
+	tokenFile := getTokenFile(fabric)
+
+	defer func() {
+		githubAuthService = temp
+		os.Remove(tokenFile)
+	}()
+
+	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
+		githubAuthService = MockGitHubAuthService{
+			MockLogin: func(
+				ctx context.Context, client client.FabricClient, gitHubClientId, fabric string,
+			) (string, error) {
+				return accessToken, nil
+			},
+		}
+
+		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, "github-client-id", fabric)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		savedToken, err := os.ReadFile(tokenFile)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if string(savedToken) != accessToken {
+			t.Errorf("expected %s, got %s", accessToken, string(savedToken))
+		}
+	})
+
+	t.Run("Expect error when InteractiveLogin fails", func(t *testing.T) {
+		githubAuthService = MockGitHubAuthService{
+			MockLogin: func(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) (string, error) {
+				return "", errors.New("test-error")
+			},
+		}
+
+		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, "github-client-id", fabric)
+		if err == nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
 	})
 }
 
