@@ -104,11 +104,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				var debugConfig = cli.DebugConfig{
-					Client:  client,
-					Project: project,
-				}
-				return cli.InteractiveDebugForLoadError(ctx, debugConfig, loadErr)
+				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
 			provider, err := getProvider(ctx, loader)
@@ -246,19 +242,21 @@ func makeComposeUpCmd() *cobra.Command {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {
-						failedServices := []string{errDeploymentFailed.Service}
+						var failedServices []string
+						if errDeploymentFailed.Service != "" {
+							failedServices = []string{errDeploymentFailed.Service}
+						}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
 						var debugConfig = cli.DebugConfig{
-							Client:         client,
 							Etag:           deploy.Etag,
 							FailedServices: failedServices,
 							Project:        project,
 							Provider:       provider,
 							Since:          since,
 						}
-						if nil == cli.InteractiveDebugDeployment(cmd.Context(), debugConfig) {
+						if nil == cli.InteractiveDebugDeployment(cmd.Context(), client, debugConfig) {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}
@@ -435,11 +433,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				var debugConfig = cli.DebugConfig{
-					Client:  client,
-					Project: project,
-				}
-				return cli.InteractiveDebugForLoadError(ctx, debugConfig, loadErr)
+				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
 			provider, err := getProvider(ctx, loader)
