@@ -20,7 +20,7 @@ func TestConfigDelete(t *testing.T) {
 
 	t.Run("expect error on DryRun", func(t *testing.T) {
 		DoDryRun = true
-		defer func() { DoDryRun = false }()
+		t.Cleanup(func() { DoDryRun = false })
 
 		if err := ConfigDelete(ctx, "test", provider, "test_name"); err != ErrDryRun {
 			t.Fatalf("Expected ErrDryRun, got %v", err)
