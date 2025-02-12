@@ -58,10 +58,9 @@ func TestInteractiveLogin(t *testing.T) {
 	t.setEnv("XDG_STATE_HOME", t.TempDir())
 	tokenFile := getTokenFile(fabric)
 
-	defer func() {
+	t.Cleanup(func() {
 		githubAuthService = temp
-		os.Remove(tokenFile)
-	}()
+	})
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		githubAuthService = MockGitHubAuthService{
