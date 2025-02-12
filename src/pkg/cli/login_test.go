@@ -55,7 +55,7 @@ func TestInteractiveLogin(t *testing.T) {
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
 	// use a temp dir for the token file
-	t.setEnv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	tokenFile := getTokenFile(fabric)
 
 	t.Cleanup(func() {
@@ -124,7 +124,7 @@ func TestNonInteractiveLogin(t *testing.T) {
 		}
 
 		// use a temp dir for the token file
-		t.setEnv("XDG_STATE_HOME", t.TempDir())
+		t.Setenv("XDG_STATE_HOME", t.TempDir())
 		tokenFile := getTokenFile(fabric)
 		savedToken, err := os.ReadFile(tokenFile)
 		if err != nil {
@@ -133,7 +133,6 @@ func TestNonInteractiveLogin(t *testing.T) {
 		if len(savedToken) == 0 {
 			t.Fatalf("expected token, got none")
 		}
-
 	})
 
 	t.Run("Expect error when NonInteractiveLogin() fails in the case that GitHub Actions info is not set",
