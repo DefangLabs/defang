@@ -135,7 +135,6 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Fatalf("expected token, got none")
 		}
 
-		defer os.Remove(tokenFile)
 	})
 
 	t.Run("Expect error when NonInteractiveLogin() fails in the case that GitHub Actions info is not set",
