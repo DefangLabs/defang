@@ -1063,7 +1063,7 @@ func doInEnv() bool {
 }
 
 func gcpInEnv() bool {
-	return os.Getenv("GCP_PROJECT_ID") != ""
+	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
 }
 
 func awsInConfig(ctx context.Context) bool {
@@ -1113,7 +1113,7 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			if gcpInEnv() {
-				term.Warn("Using Defang playground, but GCP_PROJECT_ID environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
 			providerID = cliClient.ProviderDefang
 		}

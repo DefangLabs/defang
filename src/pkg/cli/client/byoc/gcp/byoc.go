@@ -91,10 +91,18 @@ type ByocGcp struct {
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
-	projectId := os.Getenv("GCP_PROJECT_ID")
+	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 	return b
+}
+
+func getGcpProjectID() string {
+	projectId, ok := os.LookupEnv("GCP_PROJECT_ID")
+	if !ok {
+		projectId = os.Getenv("CLOUDSDK_CORE_PROJECT")
+	}
+	return projectId
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
@@ -263,9 +271,9 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
-	projectId := os.Getenv("GCP_PROJECT_ID")
+	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID must be set for GCP projects")
+		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
 	}
 	email, err := b.driver.GetCurrentAccountEmail(ctx)
 	if err != nil {
