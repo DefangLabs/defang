@@ -54,6 +54,8 @@ func TestInteractiveLogin(t *testing.T) {
 	temp := githubAuthService
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
+	// use a temp dir for the token file
+	t.setEnv("XDG_STATE_HOME", t.TempDir())
 	tokenFile := getTokenFile(fabric)
 
 	defer func() {
