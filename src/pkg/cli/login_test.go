@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestGetExistingToken(t *testing.T) {
@@ -106,6 +107,10 @@ func TestInteractiveLogin(t *testing.T) {
 
 type MockForNonInteractiveLogin struct {
 	client.MockFabricClient
+}
+
+func (m MockForNonInteractiveLogin) Token(ctx context.Context, req *defangv1.TokenRequest) (*defangv1.TokenResponse, error) {
+	return &defangv1.TokenResponse{AccessToken: "accessToken"}, nil
 }
 
 func TestNonInteractiveLogin(t *testing.T) {
