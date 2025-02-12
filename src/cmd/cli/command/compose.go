@@ -242,7 +242,10 @@ func makeComposeUpCmd() *cobra.Command {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {
-						failedServices := []string{errDeploymentFailed.Service}
+						var failedServices []string
+						if errDeploymentFailed.Service != "" {
+							failedServices = []string{errDeploymentFailed.Service}
+						}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
