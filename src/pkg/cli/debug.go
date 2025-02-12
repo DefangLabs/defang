@@ -42,7 +42,7 @@ func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient,
 }
 
 func InteractiveDebugForLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
-	return interactiveDebug(ctx, client, DebugConfig{}, loadErr)
+	return interactiveDebug(ctx, client, DebugConfig{Project: project}, loadErr)
 }
 
 func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, loadError error) error {
