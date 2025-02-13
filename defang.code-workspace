@@ -13,6 +13,7 @@
 		},
 		"go.buildTags": "integration",
 		"go.testFlags": ["-short"],
-		"go.testTimeout": "300s"
+		"go.testTimeout": "300s",
+		"makefile.configureOnOpen": false
 	}
 }

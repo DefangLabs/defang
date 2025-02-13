@@ -12,3 +12,6 @@ pre-commit:
 .PHONY: pre-push
 pre-push:
 	@make -C src test
+
+setup:
+	go -C src mod tidy
