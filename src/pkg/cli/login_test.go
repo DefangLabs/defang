@@ -52,16 +52,19 @@ func (g MockGitHubAuthService) login(
 }
 
 func TestInteractiveLogin(t *testing.T) {
-	temp := githubAuthService
+	tempGithubAuthService := githubAuthService
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
 	// use a temp dir for the token file
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	tokenFile := getTokenFile(fabric)
+	tempStateDir := client.StateDir
+	client.StateDir = filepath.Join(t.TempDir(), "defang")
 
 	t.Cleanup(func() {
-		githubAuthService = temp
+		githubAuthService = tempGithubAuthService
+		client.StateDir = tempStateDir
 	})
+
+	tokenFile := getTokenFile(fabric)
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		githubAuthService = MockGitHubAuthService{
