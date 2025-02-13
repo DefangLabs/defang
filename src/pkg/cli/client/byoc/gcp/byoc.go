@@ -562,8 +562,8 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			etag = ""
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName)                      // CD log
-			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko logs
+			logStream.AddJobExecutionLog(execName)                      // CD log when there is an execution name
+			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
 			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
@@ -686,7 +686,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	}
 
 	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko logs
+	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
 	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
 	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
