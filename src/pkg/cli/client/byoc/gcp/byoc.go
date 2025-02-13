@@ -342,7 +342,6 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
 		"DEFANG_PREFIX":            byoc.DefangPrefix,
-		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 	}
