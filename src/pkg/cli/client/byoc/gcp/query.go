@@ -25,7 +25,7 @@ func (q *Query) GetQuery() string {
 	var buf strings.Builder
 	buf.WriteString(q.baseQuery)
 	if len(q.queries) > 0 {
-		buf.WriteString(" AND \n(")
+		buf.WriteString(" AND (\n(")
 		for i, query := range q.queries {
 			if i > 0 {
 				buf.WriteString("\n) OR (")
@@ -35,7 +35,7 @@ func (q *Query) GetQuery() string {
 				buf.WriteString(line)
 			}
 		}
-		buf.WriteString("\n)")
+		buf.WriteString("\n)\n)")
 	}
 	return buf.String()
 }
@@ -55,7 +55,7 @@ protoPayload.serviceName="compute.googleapis.com"
 )`)
 }
 
-func (q *Query) AddJobExecutionQuery(executionName string, since time.Time) {
+func (q *Query) AddJobExecutionQuery(executionName string) {
 	query := `resource.type = "cloud_run_job"`
 
 	if executionName != "" {
@@ -63,12 +63,10 @@ func (q *Query) AddJobExecutionQuery(executionName string, since time.Time) {
 labels."run.googleapis.com/execution_name" = %q`, executionName)
 	}
 
-	query += sinceTimestamp(since)
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddJobLogQuery(project, etag string, services []string, since time.Time) {
+func (q *Query) AddJobLogQuery(project, etag string, services []string) {
 	query := `resource.type = "cloud_run_job"`
 
 	if project != "" {
@@ -86,12 +84,10 @@ labels."defang-etag"=%q`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	query += sinceTimestamp(since)
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddServiceLogQuery(project, etag string, services []string, since time.Time) {
+func (q *Query) AddServiceLogQuery(project, etag string, services []string) {
 	query := `resource.type="cloud_run_revision"`
 
 	if etag != "" {
@@ -109,12 +105,10 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 labels."defang-project"=%q`, project)
 	}
 
-	query += sinceTimestamp(since)
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddComputeEngineLogQuery(project, etag string, services []string, since time.Time) {
+func (q *Query) AddComputeEngineLogQuery(project, etag string, services []string) {
 	query := `resource.type="gce_instance"`
 
 	if etag != "" {
@@ -132,12 +126,10 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 labels."defang-project"=%q`, project)
 	}
 
-	query += sinceTimestamp(since)
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddCloudBuildLogQuery(project, etag string, services []string, since time.Time) {
+func (q *Query) AddCloudBuildLogQuery(project, etag string, services []string) {
 	query := `resource.type="build"`
 
 	servicesRegex := `[a-zA-Z0-9-]{1,63}`
@@ -146,8 +138,6 @@ func (q *Query) AddCloudBuildLogQuery(project, etag string, services []string, s
 	}
 	query += fmt.Sprintf(`
 labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
-
-	query += sinceTimestamp(since)
 
 	q.AddQuery(query)
 }
@@ -271,12 +261,9 @@ func (q *Query) AddComputeEngineInstanceGroupAddInstances() {
 	q.AddQuery(`protoPayload.methodName="v1.compute.instanceGroups.addInstances"`)
 }
 
-func sinceTimestamp(since time.Time) string {
-	result := ""
-	if !since.IsZero() && since.Unix() > 0 {
-		result = fmt.Sprintf(`
-timestamp >= %q`, since.UTC().Format(time.RFC3339Nano))
+func (q *Query) AddSince(since time.Time) {
+	if since.IsZero() || since.Unix() <= 0 {
+		return
 	}
-
-	return result
+	q.baseQuery += fmt.Sprintf(` AND (timestamp >= %q)`, since.UTC().Format(time.RFC3339Nano))
 }

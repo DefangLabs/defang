@@ -38,7 +38,6 @@ type Tailer struct {
 }
 
 func (t *Tailer) Start(ctx context.Context, query string) error {
-	term.Debugf("Starting log tailer with query: \n%v", query)
 	req := &loggingpb.TailLogEntriesRequest{
 		ResourceNames: []string{"projects/" + t.projectId},
 		Filter:        query,

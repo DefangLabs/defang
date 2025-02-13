@@ -563,13 +563,14 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			etag = ""
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName, startTime)                      // CD log
-			logStream.AddJobLog(req.Project, etag, req.Services, startTime)        // Kaniko logs
-			logStream.AddCloudBuildLog(req.Project, etag, req.Services, startTime) // CloudBuild logs
+			logStream.AddJobExecutionLog(execName)                      // CD log
+			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko logs
+			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			logStream.AddServiceLog(req.Project, etag, req.Services, startTime) // Service logs
+			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
 		}
+		logStream.AddSince(startTime)
 	}
 	logStream.Start(startTime)
 	return logStream, nil
@@ -682,13 +683,14 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	}
 	query := NewLogQuery(b.driver.ProjectId)
 	if b.cdExecution != "" {
-		query.AddJobExecutionQuery(path.Base(b.cdExecution), since)
+		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
 
 	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services, since)        // Kaniko logs
-	query.AddServiceLogQuery(req.Project, req.Etag, req.Services, since)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services, since) // CloudBuild logs
+	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko logs
+	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query.AddSince(since)
 
 	// Service status updates
 	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)

@@ -90,6 +90,7 @@ func isContextCanceledError(err error) bool {
 
 func (s *ServerStream[T]) Start(start time.Time) {
 	query := s.query.GetQuery()
+	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	go func() {
 		// Only query older logs if start time is more than 10ms ago
 		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
@@ -184,21 +185,25 @@ func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
 	return &LogStream{ServerStream: ss}, nil
 }
 
-func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	s.query.AddJobExecutionQuery(executionName, since)
+func (s *LogStream) AddJobExecutionLog(executionName string) {
+	s.query.AddJobExecutionQuery(executionName)
 }
 
-func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	s.query.AddJobLogQuery(project, etag, services, since)
+func (s *LogStream) AddJobLog(project, etag string, services []string) {
+	s.query.AddJobLogQuery(project, etag, services)
 }
 
-func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	s.query.AddServiceLogQuery(project, etag, services, since)
-	s.query.AddComputeEngineLogQuery(project, etag, services, since)
+func (s *LogStream) AddServiceLog(project, etag string, services []string) {
+	s.query.AddServiceLogQuery(project, etag, services)
+	s.query.AddComputeEngineLogQuery(project, etag, services)
 }
 
-func (s *LogStream) AddCloudBuildLog(project, etag string, services []string, since time.Time) {
-	s.query.AddCloudBuildLogQuery(project, etag, services, since)
+func (s *LogStream) AddCloudBuildLog(project, etag string, services []string) {
+	s.query.AddCloudBuildLogQuery(project, etag, services)
+}
+
+func (s *LogStream) AddSince(start time.Time) {
+	s.query.AddSince(start)
 }
 
 type SubscribeStream struct {
