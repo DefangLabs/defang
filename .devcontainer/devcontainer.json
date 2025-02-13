@@ -5,12 +5,15 @@
         "context": "."
     },
     "features": {
-        "ghcr.io/devcontainers/features/nix:1": {}
+        "ghcr.io/devcontainers/features/nix:1": {
+            "extraNixConfig": "experimental-features = nix-command flakes"
+        }
     },
     "customizations": {
         "vscode": {
             "extensions": [
-                "golang.go"
+                "golang.go",
+                "ms-vscode.makefile-tools"
             ]
         }
     },
