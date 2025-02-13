@@ -31,6 +31,7 @@
                 nodejs_20 # for Pulumi, must match values in package.json
                 pulumi-bin
                 google-cloud-sdk
+                vim
               ]
               ++ lib.optionals stdenv.isDarwin [
                 darwin.apple_sdk.frameworks.CoreServices

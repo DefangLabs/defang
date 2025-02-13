@@ -6,6 +6,9 @@
             "extraNixConfig": "experimental-features = nix-command flakes"
         }
     },
+    "containerEnv": {
+        "EDITOR": "vim"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
