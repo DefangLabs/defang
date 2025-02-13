@@ -56,6 +56,9 @@ protoPayload.serviceName="compute.googleapis.com"
 }
 
 func (q *Query) AddJobExecutionQuery(executionName string) {
+	if executionName == "" {
+		return
+	}
 	query := `resource.type = "cloud_run_job"`
 
 	if executionName != "" {
