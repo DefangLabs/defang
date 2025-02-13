@@ -272,6 +272,5 @@ func (q *Query) AddFilter(filter string) {
 	if filter == "" {
 		return
 	}
-	// FIXME: prevent query injection
-	q.baseQuery += fmt.Sprintf(` AND (%v)`, filter)
+	q.baseQuery += fmt.Sprintf(` AND (%q)`, filter)
 }
