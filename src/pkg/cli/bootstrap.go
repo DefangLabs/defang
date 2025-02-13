@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -22,7 +23,7 @@ func BootstrapCommand(ctx context.Context, projectName string, c client.FabricCl
 		return err
 	}
 
-	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since})
+	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since, LogType: logs.LogTypeBuild})
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {
