@@ -10,11 +10,9 @@ import (
 
 	artifactregistry "cloud.google.com/go/artifactregistry/apiv1"
 	"cloud.google.com/go/iam"
-	admin "cloud.google.com/go/iam/admin/apiv1"
 	iamadm "cloud.google.com/go/iam/admin/apiv1"
 	iamadmpb "cloud.google.com/go/iam/admin/apiv1/adminpb"
 	"cloud.google.com/go/iam/apiv1/iampb"
-	iamv1 "cloud.google.com/go/iam/apiv1/iampb"
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
@@ -229,7 +227,7 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 
 // TODO: Investigate if this can be merged with EnsureServiceAccountHasRoles
 func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, serviceAccount string, roles []string) error {
-	client, err := admin.NewIamClient(ctx)
+	client, err := iamadm.NewIamClient(ctx)
 	if err != nil {
 		log.Fatalf("failed to create artifact registry client: %v", err)
 	}
@@ -258,7 +256,7 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 	}
 
 	term.Infof("Updating IAM policy for %s on service account %s", user, serviceAccount)
-	if _, err := client.SetIamPolicy(ctx, &admin.SetIamPolicyRequest{
+	if _, err := client.SetIamPolicy(ctx, &iamadm.SetIamPolicyRequest{
 		Resource: resource,
 		Policy:   policy,
 	}); err != nil {
@@ -284,8 +282,8 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 }
 
 type resourceWithIAMPolicyClient interface {
-	GetIamPolicy(context.Context, *iampb.GetIamPolicyRequest, ...gax.CallOption) (*iamv1.Policy, error)
-	SetIamPolicy(context.Context, *iampb.SetIamPolicyRequest, ...gax.CallOption) (*iamv1.Policy, error)
+	GetIamPolicy(context.Context, *iampb.GetIamPolicyRequest, ...gax.CallOption) (*iampb.Policy, error)
+	SetIamPolicy(context.Context, *iampb.SetIamPolicyRequest, ...gax.CallOption) (*iampb.Policy, error)
 }
 
 func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, account string, roles []string) error {
@@ -317,7 +315,7 @@ func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithI
 	for _, role := range roles {
 		if !slices.Contains(rolesFound, role) {
 			rolesNotFound = append(rolesNotFound, role)
-			policy.Bindings = append(policy.Bindings, &iamv1.Binding{
+			policy.Bindings = append(policy.Bindings, &iampb.Binding{
 				Role:    role,
 				Members: []string{member},
 			})

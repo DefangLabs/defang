@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -20,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -27,6 +29,9 @@ import (
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
+	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -87,10 +92,18 @@ type ByocGcp struct {
 
 func NewByocProvider(ctx context.Context, tenantName types.TenantName) *ByocGcp {
 	region := pkg.Getenv("GCP_LOCATION", "us-central1") // Defaults to us-central1 for lower price
-	projectId := os.Getenv("GCP_PROJECT_ID")
+	projectId := getGcpProjectID()
 	b := &ByocGcp{driver: &gcp.Gcp{Region: region, ProjectId: projectId}}
 	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
 	return b
+}
+
+func getGcpProjectID() string {
+	projectId, ok := os.LookupEnv("GCP_PROJECT_ID")
+	if !ok {
+		projectId = os.Getenv("CLOUDSDK_CORE_PROJECT")
+	}
+	return projectId
 }
 
 func (b *ByocGcp) setUpCD(ctx context.Context) error {
@@ -107,8 +120,13 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"run.googleapis.com",                  // Cloud Run API
 		"iam.googleapis.com",                  // IAM API
 		"cloudresourcemanager.googleapis.com", // For service account and role management
+		"cloudbuild.googleapis.com",           // For building images using cloud build
 		"compute.googleapis.com",              // For load balancer
 		"dns.googleapis.com",                  // For DNS
+		"secretmanager.googleapis.com",        // For config/secrets
+		"sqladmin.googleapis.com",             // For Cloud SQL
+		"servicenetworking.googleapis.com",    // For VPC peering
+		"redis.googleapis.com",                // For Redis
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -143,7 +161,14 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.futureReservationViewer", // For `compute.regions.list` permission to avoid pulumi error message
 		"roles/compute.loadBalancerAdmin",       // For creating load balancer and ssl certs
 		"roles/compute.networkAdmin",            // For creating network
+		"roles/compute.securityAdmin",           // For creating firewall rules
 		"roles/dns.admin",                       // For creating DNS records
+		"roles/cloudbuild.builds.editor",        // For building images using cloud build
+		"roles/secretmanager.admin",             // For set permission to secrets
+		"roles/resourcemanager.projectIamAdmin", // For assiging roles to service account used by service
+		"roles/compute.instanceAdmin.v1",        // For creating compute instances
+		"roles/cloudsql.admin",                  // For creating cloud sql instances
+		"roles/redis.admin",                     // For creating redis instances/clusters
 	}); err != nil {
 		return err
 	}
@@ -176,7 +201,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		if _, err := b.driver.SignBytes(ctx, []byte("testdata"), b.uploadServiceAccount); err != nil {
 			if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
 				if time.Since(start) > 5*time.Minute {
-					return errors.New("Could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
+					return errors.New("could not wait for adding serviceAccountTokenCreator role to current user to take effect, please try again later")
 				}
 				pkg.SleepWithContext(ctx, 30*time.Second)
 				continue
@@ -224,7 +249,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, errors.New("No defang cd bucket found")
+		return nil, errors.New("no defang cd bucket found")
 	}
 
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
@@ -247,9 +272,9 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 }
 
 func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
-	projectId := os.Getenv("GCP_PROJECT_ID")
+	projectId := getGcpProjectID()
 	if projectId == "" {
-		return nil, errors.New("GCP_PROJECT_ID must be set for GCP projects")
+		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
 	}
 	email, err := b.driver.GetCurrentAccountEmail(ctx)
 	if err != nil {
@@ -316,9 +341,9 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"DEFANG_ORG":               "defang",
 		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
-		"DEFANG_PREFIX":            "defang",
-		"NO_COLOR":                 "true", // FIXME:  Remove later, for easier viewing in gcloud console for now
+		"DEFANG_PREFIX":            byoc.DefangPrefix,
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 	}
 
 	if !term.StdoutCanColor() {
@@ -335,7 +360,7 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env[k] = v
 	}
 
-	execution, err := b.driver.Run(ctx, "defang-cd", env, cmd.Command...)
+	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.Command...)
 	if err != nil {
 		return "", err
 	}
@@ -352,7 +377,7 @@ func (b *ByocGcp) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	url, err := b.driver.CreateUploadURL(ctx, b.bucket, path.Join(UploadPrefix, req.Digest), b.uploadServiceAccount)
 	if err != nil {
 		if strings.Contains(err.Error(), "Permission 'iam.serviceAccounts.signBlob' denied on resource") {
-			return nil, errors.New("Current user do not have 'iam.serviceAccounts.signBlob' permission, if it has been recently added, please wait for a few minutes and try again")
+			return nil, errors.New("current user does not have 'iam.serviceAccounts.signBlob' permission. If it has been recently added, please wait a few minutes then try again")
 		}
 		return nil, err
 	}
@@ -380,13 +405,10 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	}
 
 	etag := pkg.RandomID()
+
 	var serviceInfos []*defangv1.ServiceInfo
-	projectNumber, err := b.driver.GetProjectNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
 	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name, projectNumber)
+		serviceInfo := b.update(service, project.Name, req.DelegateDomain)
 		serviceInfo.Etag = etag
 		serviceInfos = append(serviceInfos, serviceInfo)
 	}
@@ -442,8 +464,7 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string, projectNumber int64) *defangv1.ServiceInfo {
-	// TODO: Copied from DO provider, double check if more is needed
+func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delegateDomain string) *defangv1.ServiceInfo {
 	si := &defangv1.ServiceInfo{
 		Project: projectName,
 		Service: &defangv1.Service{Name: service.Name},
@@ -455,8 +476,7 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 			mode = defangv1.Mode_HOST
 		}
 
-		// FIXME: hardcoded stack name beta
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v-beta-%v-%v.%v.run.app", projectName, service.Name, projectNumber, b.driver.Region))
+		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v.%v.%v.%v", service.Name, b.PulumiStack, projectName, delegateDomain))
 		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
 			Target: port.Target,
 			Mode:   mode,
@@ -475,38 +495,39 @@ func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName string,
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	ss, err := NewSubscribeStream(ctx, b.driver)
+	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
 	if req.Etag == b.cdEtag {
-		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
+		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
-	ss.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
-	ss.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
-	if err := ss.Start(); err != nil {
-		return nil, err
-	}
-	return ss, nil
+	subscribeStream.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
+	subscribeStream.Start(time.Now())
+	return subscribeStream, nil
 }
 
 func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	if req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		ss, err := NewSubscribeStream(ctx, b.driver)
+	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver)
 		if err != nil {
 			return nil, err
 		}
-		ss.AddJobExecutionUpdate(path.Base(b.cdExecution))
-		if err := ss.Start(); err != nil {
-			return nil, err
+		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
+		var since time.Time
+		if req.Since != nil {
+			since = req.Since.AsTime()
 		}
+		subscribeStream.Start(since)
 
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
-			defer ss.Close()
-			for ss.Receive() {
-				msg := ss.Msg()
+			defer subscribeStream.Close()
+			for subscribeStream.Receive() {
+				msg := subscribeStream.Msg()
 				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
 					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
 					cancel(fmt.Errorf("CD job failed %s", msg.Status))
@@ -518,26 +539,40 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 					return
 				}
 			}
-			cancel(ss.Err())
+			cancel(subscribeStream.Err())
 		}()
 	}
 
-	ls, err := NewLogStream(ctx, b.driver)
+	logStream, err := NewLogStream(ctx, b.driver)
 	if err != nil {
 		return nil, err
 	}
-	if req.Etag == b.cdEtag || req.Etag == b.cdExecution {
-		ls.AddJobExecutionLog(path.Base(b.cdExecution), req.Since.AsTime()) // CD log
-	}
 
-	if req.Etag != b.cdExecution { // No need to tail kaniko and service log if there is only cd running
-		ls.AddJobLog(req.Project, req.Etag, req.Services, req.Since.AsTime())     // Kaniko logs
-		ls.AddServiceLog(req.Project, req.Etag, req.Services, req.Since.AsTime()) // Service logs
+	startTime := time.Now()
+	if req.Since != nil {
+		startTime = req.Since.AsTime()
 	}
-	if err := ls.Start(); err != nil {
-		return nil, err
+	if req.Since != nil || req.Etag != "" {
+		execName := path.Base(b.cdExecution)
+		if execName == "." {
+			execName = ""
+		}
+		etag := req.Etag
+		if etag == b.cdExecution { // Do not pass the cd execution name as etag
+			etag = ""
+		}
+		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
+			logStream.AddJobExecutionLog(execName)                      // CD log
+			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko logs
+			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
+		}
+		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
+			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
+		}
+		logStream.AddSince(startTime)
 	}
-	return ls, nil
+	logStream.Start(startTime)
+	return logStream, nil
 }
 
 func (b *ByocGcp) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
@@ -586,31 +621,176 @@ func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	}
 }
 
+func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
+	for _, name := range req.Names {
+		secretId := b.StackName(req.Project, name)
+		term.Debugf("Deleting secret %q", secretId)
+		if err := b.driver.DeleteSecret(ctx, secretId); err != nil {
+			return fmt.Errorf("failed to delete secret %q: %w", secretId, err)
+		}
+	}
+	return nil
+}
+
+func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	prefix := b.StackName(req.Project, "")
+	secrets, err := b.driver.ListSecrets(ctx, prefix)
+	if err != nil {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
+				return nil, annotateGcpError(err)
+			}
+			secrets, err = b.driver.ListSecrets(ctx, prefix)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+	return &defangv1.Secrets{Names: secrets}, nil
+}
+
+func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
+	if !pkg.IsValidSecretName(req.Name) {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid secret name; must be alphanumeric or _, cannot start with a number: %q", req.Name))
+	}
+	secretId := b.StackName(req.Project, req.Name)
+	term.Debugf("Creating secret %q", secretId)
+
+	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
+			term.Debugf("Secret %q already exists", secretId)
+		} else {
+			return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+		}
+	}
+	term.Debugf("Adding a new secret version for %q", secretId)
+	if _, err := b.driver.AddSecretVersion(ctx, secretId, []byte(req.Value)); err != nil {
+		return fmt.Errorf("failed to add secret version for %q: %w", secretId, err)
+	}
+	if err := b.driver.CleanupOldVersionsExcept(ctx, secretId, 2); err != nil {
+		return fmt.Errorf("failed to cleanup old versions for %q: %w", secretId, err)
+	}
+	return nil
+}
+
+func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
+	var since time.Time
+	if req.Since != nil {
+		since = req.Since.AsTime()
+	}
+	query := NewLogQuery(b.driver.ProjectId)
+	if b.cdExecution != "" {
+		query.AddJobExecutionQuery(path.Base(b.cdExecution))
+	}
+
+	// Logs
+	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko logs
+	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query.AddSince(since)
+
+	// Service status updates
+	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate(req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(req.Project, req.Etag, req.Services)
+
+	return query.GetQuery()
+}
+
+func LogEntryToString(logEntry *loggingpb.LogEntry) (string, string, error) {
+	result := ""
+	emptySpace := strings.Repeat(" ", len(time.RFC3339)+1) // length of what a time stampe would be
+	logTimestamp := emptySpace
+	if logEntry.Timestamp != nil {
+		logTimestamp = logEntry.Timestamp.AsTime().Local().Format(time.RFC3339) + " "
+	}
+
+	switch {
+	case logEntry.GetJsonPayload() != nil:
+		result += logTimestamp + logEntry.GetJsonPayload().String()
+	case logEntry.GetProtoPayload() != nil:
+		auditLog := &auditpb.AuditLog{}
+		if err := logEntry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
+			return logTimestamp, "", err
+		}
+
+		// we do not know the reason for no status events we will log it here (update in future)
+		if auditLog.Status == nil {
+			return logTimestamp, "<No Status>", nil
+		}
+		return logTimestamp, auditLog.Status.Message, nil
+	case logEntry.GetTextPayload() != "":
+		return logTimestamp, logEntry.GetTextPayload(), nil
+	}
+
+	return logTimestamp, result, nil
+}
+
+func LogEntriesToString(logEntries []*loggingpb.LogEntry) string {
+	result := ""
+	for _, logEntry := range logEntries {
+		logTimestamp, msg, err := LogEntryToString(logEntry)
+		if err != nil {
+			continue
+		}
+		result += logTimestamp + " " + msg + "\n"
+	}
+	return result
+}
+
+func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntry, error) {
+	term.Debugf("Querying logs with filter: \n %s", query)
+	var entries []*loggingpb.LogEntry
+	lister, err := b.driver.ListLogEntries(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		entry, err := lister.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+	// if there is no execution info then get from execution list
+	if req.Etag != "" && b.cdExecution == "" {
+		b.cdEtag = req.Etag
+
+		execution, err := b.driver.FindExecutionWithEtag(req.Etag)
+		if err != nil {
+			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
+		}
+		b.cdExecution = execution.Name
+		req.Since = execution.CreateTime
+	}
+
+	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
+	if err != nil {
+		return annotateGcpError(err)
+	}
+	req.Logs = LogEntriesToString(logEntries)
+	term.Debug(req.Logs)
+
+	return nil
+}
+
 // FUNCTIONS TO BE IMPLEMENTED BELOW ========================
 
 func (b *ByocGcp) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	// FIXME: implement
 	return nil, client.ErrNotImplemented("GCP Delete")
-}
-
-func (b *ByocGcp) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP DeleteConfig")
-}
-
-func (b *ByocGcp) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	// FIXME: implement
-	return nil, client.ErrNotImplemented("GCP ListConfig")
-}
-
-func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP Query")
-}
-
-func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest) error {
-	// FIXME: implement
-	return client.ErrNotImplemented("GCP PutConfig")
 }
 
 func (b *ByocGcp) TearDown(ctx context.Context) error {
@@ -666,7 +846,7 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 		return nil, annotateGcpError(err)
 	}
 	if bucketName == "" {
-		return nil, errors.New("No defang cd bucket found")
+		return nil, errors.New("no defang cd bucket found")
 	}
 
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/byoc/aws/index.ts#L89
@@ -683,4 +863,9 @@ func (b *ByocGcp) GetProjectUpdate(ctx context.Context, projectName string) (*de
 	}
 
 	return &projUpdate, nil
+}
+
+func (b *ByocGcp) StackName(projectName, name string) string {
+	pkg.Ensure(projectName != "", "ProjectName not set")
+	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
 }

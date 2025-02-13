@@ -144,6 +144,12 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	}
 }
 
+func Ensure(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
+}
+
 func IsValidTime(t time.Time) bool {
 	return t.Year() > 1970
 }

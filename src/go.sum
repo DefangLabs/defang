@@ -23,6 +23,8 @@ cloud.google.com/go/resourcemanager v1.10.2 h1:LpqZZGM0uJiu1YWM878AA8zZ/qOQ/Ngno
 cloud.google.com/go/resourcemanager v1.10.2/go.mod h1:5f+4zTM/ZOTDm6MmPOp6BQAhR0fi8qFPnvVGSoWszcc=
 cloud.google.com/go/run v1.6.1 h1:5HKBaOr+UkEDFkZNJaZwepR5MZh62mjnMvTzaVf6yTM=
 cloud.google.com/go/run v1.6.1/go.mod h1:IvJOg2TBb/5a0Qkc6crn5yTy5nkjcgSWQLhgO8QL8PQ=
+cloud.google.com/go/secretmanager v1.14.2 h1:2XscWCfy//l/qF96YE18/oUaNJynAx749Jg3u0CjQr8=
+cloud.google.com/go/secretmanager v1.14.2/go.mod h1:Q18wAPMM6RXLC/zVpWTlqq2IBSbbm7pKBlM3lCKsmjw=
 cloud.google.com/go/storage v1.46.0 h1:OTXISBpFd8KaA2ClT3K3oRk8UGOcTHtrZ1bW88xKiic=
 cloud.google.com/go/storage v1.46.0/go.mod h1:lM+gMAW91EfXIeMTBmixRsKL/XCxysytoAgduVikjMk=
 cloud.google.com/go/trace v1.11.2 h1:4ZmaBdL8Ng/ajrgKqY5jfvzqMXbrDcBsUGXOT9aqTtI=

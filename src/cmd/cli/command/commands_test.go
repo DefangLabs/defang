@@ -410,7 +410,7 @@ func TestGetProvider(t *testing.T) {
 		})
 
 		_, err := getProvider(ctx, loader)
-		if err != nil && err.Error() != "GCP_PROJECT_ID must be set for GCP projects" {
+		if err != nil && err.Error() != "GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
 		if mockCtrl.savedProvider["empty"] != defangv1.Provider_GCP {

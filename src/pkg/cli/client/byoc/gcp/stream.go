@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -13,6 +12,7 @@ import (
 	"cloud.google.com/go/logging/apiv2/loggingpb"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -21,12 +21,15 @@ import (
 )
 
 type LogParser[T any] func(*loggingpb.LogEntry) ([]T, error)
+type LogFilter[T any] func(entry T) bool
 
 type ServerStream[T any] struct {
-	ctx    context.Context
-	gcp    *gcp.Gcp
-	parse  LogParser[T]
-	tailer *gcp.Tailer
+	ctx     context.Context
+	gcp     *gcp.Gcp
+	parse   LogParser[T]
+	filters []LogFilter[T]
+	query   *Query
+	tailer  *gcp.Tailer
 
 	lastResp T
 	lastErr  error
@@ -35,17 +38,18 @@ type ServerStream[T any] struct {
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T]) (*ServerStream[T], error) {
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[T]) (*ServerStream[T], error) {
 	tailer, err := gcp.NewTailer(ctx)
 	if err != nil {
 		return nil, err
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
 	return &ServerStream[T]{
-		ctx:    streamCtx,
-		gcp:    gcp,
-		parse:  parse,
-		tailer: tailer,
+		ctx:     streamCtx,
+		gcp:     gcp,
+		parse:   parse,
+		filters: filters,
+		tailer:  tailer,
 
 		respCh: make(chan T),
 		errCh:  make(chan error),
@@ -84,18 +88,49 @@ func isContextCanceledError(err error) bool {
 	return false
 }
 
-func (s *ServerStream[T]) Start() error {
-	if err := s.tailer.Start(s.ctx); err != nil {
-		return err
-	}
+func (s *ServerStream[T]) Start(start time.Time) {
+	query := s.query.GetQuery()
+	term.Debugf("Query and tail logs since %v with query: \n%v", start, query)
 	go func() {
+		// Only query older logs if start time is more than 10ms ago
+		if !start.IsZero() && start.Unix() > 0 && time.Since(start) > 10*time.Millisecond {
+			lister, err := s.gcp.ListLogEntries(s.ctx, query)
+			if err != nil {
+				s.errCh <- err
+				return
+			}
+			for {
+				entry, err := lister.Next()
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					s.errCh <- err
+					return
+				}
+				resps, err := s.parseAndFilter(entry)
+				if err != nil {
+					s.errCh <- err
+					return
+				}
+				for _, resp := range resps {
+					s.respCh <- resp
+				}
+			}
+		}
+
+		// Start tailing logs after all older logs are processed
+		if err := s.tailer.Start(s.ctx, query); err != nil {
+			s.errCh <- err
+			return
+		}
 		for {
 			entry, err := s.tailer.Next(s.ctx)
 			if err != nil {
 				s.errCh <- err
 				return
 			}
-			resps, err := s.parse(entry)
+			resps, err := s.parseAndFilter(entry)
 			if err != nil {
 				s.errCh <- err
 				return
@@ -105,7 +140,27 @@ func (s *ServerStream[T]) Start() error {
 			}
 		}
 	}()
-	return nil
+}
+
+func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]T, error) {
+	resps, err := s.parse(entry)
+	if err != nil {
+		return nil, err
+	}
+	newResps := make([]T, 0, len(resps))
+	for _, resp := range resps {
+		include := true
+		for _, admit := range s.filters {
+			if !admit(resp) {
+				include = false
+				break
+			}
+		}
+		if include {
+			newResps = append(newResps, resp)
+		}
+	}
+	return newResps, nil
 }
 
 func (s *ServerStream[T]) Err() error {
@@ -120,156 +175,81 @@ type LogStream struct {
 	*ServerStream[*defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcp *gcp.Gcp) (*LogStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getLogEntryParser(ctx, gcp))
+func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient))
 	if err != nil {
 		return nil, err
 	}
+
+	ss.query = NewLogQuery(gcpClient.ProjectId)
 	return &LogStream{ServerStream: ss}, nil
 }
 
-func (s *LogStream) AddJobExecutionLog(executionName string, since time.Time) {
-	query := `
-resource.type = "cloud_run_job"
-logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
-
-	query += fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
-	s.tailer.AddQuerySet(query)
+func (s *LogStream) AddJobExecutionLog(executionName string) {
+	s.query.AddJobExecutionQuery(executionName)
 }
 
-func (s *LogStream) AddJobLog(project, etag string, services []string, since time.Time) {
-	query := `
-resource.type = "cloud_run_job"
-logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
-
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project" = "%v"`, project)
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
-	s.tailer.AddQuerySet(query)
+func (s *LogStream) AddJobLog(project, etag string, services []string) {
+	s.query.AddJobLogQuery(project, etag, services)
 }
 
-func (s *LogStream) AddServiceLog(project, etag string, services []string, since time.Time) {
-	query := `
-resource.type="cloud_run_revision"
-logName=~"logs/run.googleapis.com%2F(stdout|stderr)$"`
+func (s *LogStream) AddServiceLog(project, etag string, services []string) {
+	s.query.AddServiceLogQuery(project, etag, services)
+	s.query.AddComputeEngineLogQuery(project, etag, services)
+}
 
-	if etag != "" {
-		query += fmt.Sprintf(`
-labels."defang-etag"="%v"`, etag)
-	}
+func (s *LogStream) AddCloudBuildLog(project, etag string, services []string) {
+	s.query.AddCloudBuildLogQuery(project, etag, services)
+}
 
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	if !since.IsZero() && since.Unix() > 0 {
-		query += fmt.Sprintf(`
-timestamp >= "%v"`, since.UTC().Format(time.RFC3339)) // Nano?
-	}
-
-	s.tailer.AddQuerySet(query)
+func (s *LogStream) AddSince(start time.Time) {
+	s.query.AddSince(start)
 }
 
 type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser())
+func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+	ss, err := NewServerStream(ctx, gcp, getActivityParser(), filters...)
 	if err != nil {
 		return nil, err
 	}
-	ss.tailer.SetBaseQuery(`logName:"cloudaudit.googleapis.com" AND protoPayload.serviceName="run.googleapis.com"`)
+	ss.query = NewSubscribeQuery()
 	return &SubscribeStream{ServerStream: ss}, nil
 }
 
 func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
-	query := fmt.Sprintf(`
-labels."run.googleapis.com/execution_name" = "%v"`, executionName)
-	s.tailer.AddQuerySet(query)
+	s.query.AddJobExecutionUpdateQuery(executionName)
 }
 
 func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
-	query := `
-protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
-
-	if project != "" {
-		query += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-protoPayload.response.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
-
-	s.tailer.AddQuerySet(query)
+	s.query.AddJobStatusUpdateRequestQuery(project, etag, services)
+	s.query.AddJobStatusUpdateResponseQuery(project, etag, services)
 }
 
 func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
-	query := `
-protoPayload.methodName="google.cloud.run.v1.Services.CreateService" OR "/Services.CreateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
-
-	if project != "" {
-		query += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"="%v"`, project)
-	}
-
-	if etag != "" {
-		query += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"="%v"`, etag)
-	}
-
-	if len(services) > 0 {
-		query += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
-	}
-	s.tailer.AddQuerySet(query)
+	s.query.AddServiceStatusRequestUpdate(project, etag, services)
+	s.query.AddServiceStatusReponseUpdate(project, etag, services)
+	s.query.AddComputeEngineInstanceGroupInsertOrPatch(project, etag, services)
+	s.query.AddComputeEngineInstanceGroupAddInstances()
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
 func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
-
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
 			return nil, nil
 		}
 
+		msg := entry.GetTextPayload()
+
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
 		executionName := entry.Labels["run.googleapis.com/execution_name"]
+		buildTags := entry.Labels["build_tags"]
 		// Log from service
 		if serviceName != "" {
 			etag = entry.Labels["defang-etag"]
@@ -277,13 +257,11 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			if len(host) > 8 {
 				host = host[:8]
 			}
+			// kaniko build job
 			if regexp.MustCompile(`-build-[a-z0-9]{7}-[a-z0-9]{8}$`).MatchString(executionName) {
 				serviceName += "-image"
 			}
-		} else {
-			if executionName == "" {
-				return nil, errors.New("missing both execution name and defang-service in log entry")
-			}
+		} else if executionName != "" {
 			env, ok := envCache[executionName]
 			if !ok {
 				var err error
@@ -300,8 +278,23 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 				serviceName = env["DEFANG_SERVICE"]
 			}
 
+			// use kaniko build job environment to get etag
 			etag = env["DEFANG_ETAG"]
 			host = "pulumi" // Hardcoded to match end condition detector in cmd/cli/command/compose.go
+		} else if buildTags != "" {
+			parts := strings.Split(buildTags, "_")
+			if len(parts) < 3 {
+				return nil, errors.New("invalid cloudbuild build tags value: " + buildTags)
+			}
+			serviceName = parts[len(parts)-2]
+			etag = parts[len(parts)-1]
+			host = "cloudbuild"
+		} else {
+			var err error
+			_, msg, err = LogEntryToString(entry)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return []*defangv1.TailResponse{
@@ -310,7 +303,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 				Etag:    etag,
 				Entries: []*defangv1.LogEntry{
 					{
-						Message:   entry.GetTextPayload(),
+						Message:   msg,
 						Timestamp: entry.Timestamp,
 						Etag:      etag,
 						Service:   serviceName,
@@ -323,9 +316,13 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 	}
 }
 
+const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
+
 func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
+
+	computeEngineRootTriggers := make(map[string]string)
 
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 		if entry == nil {
@@ -333,18 +330,20 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 		}
 
 		if entry.GetProtoPayload().GetTypeUrl() != "type.googleapis.com/google.cloud.audit.AuditLog" {
-			return nil, errors.New("unexpected log entry type : " + entry.GetProtoPayload().GetTypeUrl())
+			term.Warnf("unexpected log entry type : %v", entry.GetProtoPayload().GetTypeUrl())
+			return nil, nil
 		}
 
 		auditLog := new(auditpb.AuditLog)
 		if err := entry.GetProtoPayload().UnmarshalTo(auditLog); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal audit log : %w", err)
+			term.Warnf("failed to unmarshal audit log : %v", err)
+			return nil, nil
 		}
 
 		switch entry.Resource.Type {
 		case "cloud_run_revision": // Service status
 			if request := auditLog.GetRequest(); request != nil { // Activity log: service update requests
-				serviceName := GetValueInStruct(request, "service.spec.template.metadata.labels.defang-service")
+				serviceName := GetValueInStruct(request, "service.template.labels.defang-service")
 				return []*defangv1.SubscribeResponse{{
 					Name:   serviceName,
 					State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
@@ -373,7 +372,8 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 					Status: status.GetMessage(),
 				}}, nil
 			} else {
-				return nil, errors.New("missing request and response in audit log for service " + path.Base(auditLog.GetResourceName()))
+				term.Warnf("missing request and response in audit log for service %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
 			}
 
 			// etag is at protoPayload.response.spec.template.metadata.labels.defang-etag
@@ -381,6 +381,7 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 			// service.spec.template.metadata.labels."defang-service"
 
 		case "cloud_run_job": // Job execution update
+			// Kaniko job
 			if request := auditLog.GetRequest(); request != nil { // Acitivity log: job creation
 				serviceName := GetValueInStruct(request, "job.template.labels.defang-service")
 				if serviceName != "" {
@@ -391,18 +392,15 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 					}}, nil
 				}
 			} else if response := auditLog.GetResponse(); response != nil { // System log: job status update
-				serviceName := GetValueInStruct(response, "metadata.labels.defang-service")
+				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
 				status := auditLog.GetStatus()
 				if status == nil {
-					return nil, errors.New("missing status in audit log for job " + path.Base(auditLog.GetResourceName()))
+					term.Warnf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName()))
+					return nil, nil
 				}
 				var state defangv1.ServiceState
 				if status.GetCode() == 0 {
-					if strings.Contains(status.GetMessage(), "Ready condition status changed to True") { // TODO: Is it better to scan though the conditions instead?
-						state = defangv1.ServiceState_BUILD_RUNNING
-					} else {
-						state = defangv1.ServiceState_BUILD_STOPPING
-					}
+					state = defangv1.ServiceState_BUILD_STOPPING
 				} else {
 					state = defangv1.ServiceState_DEPLOYMENT_FAILED
 				}
@@ -414,41 +412,100 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 					}}, nil
 				}
 			}
+
 			// CD job
 			executionName := path.Base(auditLog.GetResourceName())
-			if executionName == "" {
-				return nil, errors.New("missing resource name in audit log")
-			}
-			if len(executionName) <= 6 {
-				return nil, errors.New("Invalid resource name in audit log : " + executionName)
-			}
-			executionName = executionName[:len(executionName)-6] // Remove the random suffix
-			if executionName == "defang-cd" {
+			if cdExecutionNamePattern.MatchString(executionName) {
 				if auditLog.GetStatus().GetCode() != 0 {
 					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
-				if len(readyServices) > 0 {
-					resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
-					for serviceName, status := range readyServices {
-						resps = append(resps, &defangv1.SubscribeResponse{
-							Name:   serviceName,
-							State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
-							Status: status,
-						})
-					}
-					return resps, nil // Ignore success cd status when we are waiting for service status
+				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done
+				resps := make([]*defangv1.SubscribeResponse, 0, len(readyServices))
+				for serviceName, status := range readyServices {
+					resps = append(resps, &defangv1.SubscribeResponse{
+						Name:   serviceName,
+						State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+						Status: status,
+					})
 				}
-				return []*defangv1.SubscribeResponse{{
-					Name:   "defang CD",
+				resps = append(resps, &defangv1.SubscribeResponse{
+					Name:   defangCD,
 					State:  defangv1.ServiceState_DEPLOYMENT_COMPLETED,
 					Status: auditLog.GetStatus().GetMessage(),
-				}}, nil
+				})
+				return resps, nil // Ignore success cd status when we are waiting for service status
 			} else {
-				return nil, errors.New("unexpected execution name in audit log : " + executionName)
+				term.Warnf("unexpected execution name in audit log : %v", executionName)
+				return nil, nil
 			}
+		case "gce_instance_group_manager": // Compute engine update start
+			request := auditLog.GetRequest()
+			if request == nil {
+				term.Warnf("missing request in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			labels := GetListInStruct(request, "allInstancesConfig.properties.labels")
+			if labels == nil {
+				term.Warnf("missing labels in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			// Find the service name from the labels
+			serviceName := ""
+			for _, label := range labels {
+				fields := label.GetStructValue().GetFields()
+				if fields["key"].GetStringValue() == "defang-service" {
+					serviceName = fields["value"].GetStringValue()
+					break
+				}
+			}
+			if serviceName == "" {
+				term.Warnf("missing defang-service label in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
+			if rootTriggerId == "" {
+				term.Warnf("missing root_trigger_id in audit log for instance group manager %v", path.Base(auditLog.GetResourceName()))
+			} else {
+				computeEngineRootTriggers[rootTriggerId] = serviceName
+			}
+			return []*defangv1.SubscribeResponse{{
+				Name:   serviceName,
+				State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
+				Status: auditLog.GetResponse().GetFields()["status"].GetStringValue(),
+			}}, nil
+		case "gce_instance_group": // Compute engine update end
+			// TODO: Better handle of multiple instance group insert events for the same service where more than 1 replica is created, all of them would have 100% for progress and DONE as status
+			rootTriggerId := entry.GetLabels()["compute.googleapis.com/root_trigger_id"]
+			serviceName, ok := computeEngineRootTriggers[rootTriggerId]
+			if !ok {
+				term.Debugf("ignored root trigger id %v for instance group insert", rootTriggerId)
+				return nil, nil
+			}
+			response := auditLog.GetResponse()
+			if response == nil {
+				term.Warnf("missing response in audit log for instance group %v", path.Base(auditLog.GetResourceName()))
+				return nil, nil
+			}
+			status := response.GetFields()["status"].GetStringValue()
+			var state defangv1.ServiceState
+			switch status {
+			case "DONE":
+				state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+			case "RUNNING":
+				state = defangv1.ServiceState_DEPLOYMENT_PENDING
+			default:
+				state = defangv1.ServiceState_DEPLOYMENT_FAILED
+			}
+			return []*defangv1.SubscribeResponse{{
+				Name:   serviceName,
+				State:  state,
+				Status: status,
+			}}, nil
+		// TODO: Add cloud build activities for building status update
 		default:
-			return nil, errors.New("unexpected resource type : " + entry.Resource.Type)
+			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
+			return nil, nil
 		}
 	}
 }
@@ -468,4 +525,20 @@ func GetValueInStruct(s *structpb.Struct, path string) string {
 		keys = keys[1:]
 	}
 	return ""
+}
+
+func GetListInStruct(s *structpb.Struct, path string) []*structpb.Value {
+	keys := strings.Split(path, ".")
+	for len(keys) > 0 {
+		if s == nil {
+			return nil
+		}
+		key := keys[0]
+		field := s.GetFields()[key]
+		if s = field.GetStructValue(); s == nil {
+			return field.GetListValue().Values
+		}
+		keys = keys[1:]
+	}
+	return nil
 }
