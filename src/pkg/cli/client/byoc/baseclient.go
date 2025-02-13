@@ -84,18 +84,30 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
 	term.Debug(strings.Join(append(env, localCmd...), " "))
 
-	dir := os.Getenv("DEFANG_PULUMI_DIR")
-	if dir == "" {
-		return nil // show the shell command, but use regular Pulumi command in cloud task
-	}
+	if dir := os.Getenv("DEFANG_PULUMI_DIR"); dir != "" {
+		// Run the Pulumi command locally
+		env = append([]string{
+			"PATH=" + os.Getenv("PATH"),
+			"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
+		}, env...)
+		if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
+			return err
+		}
+	} else if os.Getenv("DEFANG_DOCKER") == "1" {
+		// Run the Pulumi command locally in a Docker container
+		dockerCmd := []string{"docker", "run", "--rm", "--entrypoint=node"}
+		for _, e := range env {
+			dockerCmd = append(dockerCmd, "-e", e)
+		}
+		dockerCmd = append(dockerCmd, "docker.io/defangio/cd-sandbox:public-do-beta", "lib/index.js")
+		dockerCmd = append(dockerCmd, cmd...)
+		term.Debug(strings.Join(dockerCmd, " "))
 
-	// Run the Pulumi command locally
-	env = append([]string{
-		"PATH=" + os.Getenv("PATH"),
-		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
-	}, env...)
-	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
-		return err
+		if err := runLocalCommand(ctx, "", env, dockerCmd...); err != nil {
+			return err
+		}
+	} else {
+		return nil // show the shell command, but use regular Pulumi command in cloud task
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
 	return errors.New("local pulumi command succeeded; stopping")
