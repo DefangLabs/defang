@@ -185,7 +185,7 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 					var errDeploymentFailed pkg.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
@@ -238,14 +238,25 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				var errDeploymentFailed pkg.ErrDeploymentFailed
-				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {
-						failedServices := []string{errDeploymentFailed.Service}
+						var failedServices []string
+						if errDeploymentFailed.Service != "" {
+							failedServices = []string{errDeploymentFailed.Service}
+						}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						if nil == cli.InteractiveDebugDeployment(cmd.Context(), client, project, provider, deploy.Etag, failedServices) {
+						var debugConfig = cli.DebugConfig{
+							Etag:           deploy.Etag,
+							FailedServices: failedServices,
+							Project:        project,
+							Provider:       provider,
+							Since:          since,
+						}
+						if nil == cli.InteractiveDebugDeployment(cmd.Context(), client, debugConfig) {
 							return err // don't show the defang hint if debugging was successful
 						}
 					}

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// GCP_PROJECT_ID=defang-cd-idhk6xblr21o
 func TestSetUpCD(t *testing.T) {
 	t.Skip("skipping test")
 	ctx := context.Background()
