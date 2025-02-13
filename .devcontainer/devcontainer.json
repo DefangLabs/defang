@@ -14,5 +14,5 @@
             ]
         }
     },
-    "postCreateCommand": "nix develop --command bash && make setup"
+    "postAttachCommand": "nix develop --command bash && make setup"
 }

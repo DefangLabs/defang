@@ -22,6 +22,7 @@
                 crane
                 git
                 gnumake
+                less
                 gnused # force Linux `sed` everywhere
                 go_1_22
                 golangci-lint

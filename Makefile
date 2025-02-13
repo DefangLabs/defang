@@ -13,5 +13,5 @@ pre-commit:
 pre-push:
 	@make -C src test
 
-setup: install-git-hooks
+setup:
 	go -C src mod tidy
