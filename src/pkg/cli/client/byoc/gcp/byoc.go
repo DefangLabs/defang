@@ -764,18 +764,6 @@ func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntr
 }
 
 func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
-	// if there is no execution info then get from execution list
-	if req.Etag != "" && b.cdExecution == "" {
-		b.cdEtag = req.Etag
-
-		execution, err := b.driver.FindExecutionWithEtag(req.Etag)
-		if err != nil {
-			return fmt.Errorf("could not find job with etag %s: %v", req.Etag, annotateGcpError(err))
-		}
-		b.cdExecution = execution.Name
-		req.Since = execution.CreateTime
-	}
-
 	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
 	if err != nil {
 		return annotateGcpError(err)
