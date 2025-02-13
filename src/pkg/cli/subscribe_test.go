@@ -215,7 +215,7 @@ func TestWaitServiceState(t *testing.T) {
 
 	for _, tt := range noErrTests {
 		t.Run("Expect No Error", func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, tt.targetState, tt.etag, tt.services)
+			err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -224,7 +224,7 @@ func TestWaitServiceState(t *testing.T) {
 
 	for _, tt := range errTests {
 		t.Run("Expect Error", func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, tt.targetState, tt.etag, tt.services)
+			err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
 			if err == nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -320,6 +320,7 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 			err := WaitServiceState(
 				ctx, provider,
 				defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				"testproject",
 				"EtagSomething",
 				[]string{"service1"},
 			)

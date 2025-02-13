@@ -99,8 +99,7 @@ service FabricController {
       returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
-  rpc SetOptions(SetOptionsRequest)
-      returns (google.protobuf.Empty) {
+  rpc SetOptions(SetOptionsRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   }
   rpc WhoAmI(google.protobuf.Empty) returns (WhoAmIResponse) {
@@ -167,6 +166,7 @@ message DebugRequest {
   string logs = 4;
   repeated string services = 5;
   bool training_opt_out = 6; // only valid for Pro users
+  google.protobuf.Timestamp since = 7;
 }
 
 message DebugResponse {

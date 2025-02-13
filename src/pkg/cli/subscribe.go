@@ -17,6 +17,7 @@ func WaitServiceState(
 	ctx context.Context,
 	provider client.Provider,
 	targetState defangv1.ServiceState,
+	project string,
 	etag string,
 	services []string,
 ) error {
@@ -31,7 +32,7 @@ func WaitServiceState(
 	}
 
 	// Assume "services" are normalized service names
-	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
+	subscribeRequest := defangv1.SubscribeRequest{Project: project, Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return err
