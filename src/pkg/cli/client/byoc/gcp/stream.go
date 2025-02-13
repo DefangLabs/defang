@@ -206,6 +206,10 @@ func (s *LogStream) AddSince(start time.Time) {
 	s.query.AddSince(start)
 }
 
+func (s *LogStream) AddFilter(filter string) {
+	s.query.AddFilter(filter)
+}
+
 type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }

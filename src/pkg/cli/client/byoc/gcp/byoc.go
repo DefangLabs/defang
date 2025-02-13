@@ -570,6 +570,7 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
+		logStream.AddFilter(req.Pattern)
 	}
 	logStream.Start(startTime)
 	return logStream, nil
