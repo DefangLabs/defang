@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -118,13 +119,17 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Skip("ACTIONS_ID_TOKEN_REQUEST_URL not set")
 		}
 
+		// use a temp dir for the token file
+		temp := client.StateDir
+		client.StateDir = filepath.Join(t.TempDir(), "defang")
+
+		t.Cleanup(func() { client.StateDir = temp })
+
 		err := NonInteractiveLogin(ctx, mockClient, fabric)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		// use a temp dir for the token file
-		t.Setenv("XDG_STATE_HOME", t.TempDir())
 		tokenFile := getTokenFile(fabric)
 		savedToken, err := os.ReadFile(tokenFile)
 		if err != nil {
