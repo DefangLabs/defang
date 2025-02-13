@@ -14,5 +14,5 @@
             ]
         }
     },
-    "postCreateCommand": "nix develop --command bash && go -C src mod tidy"
+    "postCreateCommand": "nix develop --command bash && make setup"
 }
