@@ -267,3 +267,10 @@ func (q *Query) AddSince(since time.Time) {
 	}
 	q.baseQuery += fmt.Sprintf(` AND (timestamp >= %q)`, since.UTC().Format(time.RFC3339Nano))
 }
+
+func (q *Query) AddFilter(filter string) {
+	if filter == "" {
+		return
+	}
+	q.baseQuery += fmt.Sprintf(` AND (%q)`, filter)
+}
