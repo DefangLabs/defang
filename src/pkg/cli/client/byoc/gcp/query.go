@@ -56,6 +56,9 @@ protoPayload.serviceName="compute.googleapis.com"
 }
 
 func (q *Query) AddJobExecutionQuery(executionName string) {
+	if executionName == "" {
+		return
+	}
 	query := `resource.type = "cloud_run_job"`
 
 	if executionName != "" {
@@ -266,4 +269,11 @@ func (q *Query) AddSince(since time.Time) {
 		return
 	}
 	q.baseQuery += fmt.Sprintf(` AND (timestamp >= %q)`, since.UTC().Format(time.RFC3339Nano))
+}
+
+func (q *Query) AddFilter(filter string) {
+	if filter == "" {
+		return
+	}
+	q.baseQuery += fmt.Sprintf(` AND (%q)`, filter)
 }
