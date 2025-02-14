@@ -723,7 +723,10 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []ecs.LogGroupInput {
 	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
 	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
-	pattern := strconv.Quote(filter) // TODO: add etag to filter
+	var pattern string // TODO: add etag to filter
+	if filter != "" {
+		pattern = strconv.Quote(filter)
+	}
 
 	var groups []ecs.LogGroupInput
 	// Tail CD and kaniko
