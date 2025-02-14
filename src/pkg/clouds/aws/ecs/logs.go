@@ -162,12 +162,17 @@ func Query(ctx context.Context, input LogGroupInput, start, end time.Time, cb fu
 }
 
 func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+	var pattern *string
+	if lgi.LogEventFilterPattern != "" {
+		pattern = &lgi.LogEventFilterPattern
+	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
 		StartTime:          ptr.Int64(start.UnixMilli()),
 		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
+		FilterPattern:      pattern,
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
