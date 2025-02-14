@@ -105,7 +105,11 @@ func AnnotateAwsError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
-		return ErrMissingAwsCreds{err}
+		// Auth can fail for many reasons: ec2imds not available, timeout, no profile, etc. so only check for top-level STS error
+		if cerr.ServiceID == "STS" {
+			return ErrMissingAwsCreds{cerr}
+		}
+		return cerr.Err
 	}
 	if cerr := new(cwTypes.SessionStreamingException); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeInternal, err)
