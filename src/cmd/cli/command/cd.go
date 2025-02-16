@@ -38,7 +38,7 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "destroy")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "destroy")
 	},
 }
 
@@ -64,7 +64,7 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "down")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "down")
 	},
 }
 
@@ -90,7 +90,7 @@ var cdRefreshCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "refresh")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "refresh")
 	},
 }
 
@@ -116,7 +116,7 @@ var cdCancelCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "cancel")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "cancel")
 	},
 }
 
@@ -157,7 +157,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", verbose, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider)
 	},
