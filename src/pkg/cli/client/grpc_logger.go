@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 )
@@ -16,6 +17,10 @@ type grpcLogger struct {
 
 func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		// Add a request ID to the context
+		requestId := pkg.RandomID()
+		req.Header().Add("X-Request-Id", requestId)
+
 		// Get the request type name
 		reqType := req.Spec().Procedure
 
@@ -30,7 +35,7 @@ func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			payload = append(payload[:maxPayloadLength], []byte("…")...)
 		}
 
-		term.Debug(g.prefix, reqType, string(payload))
+		term.Debug(g.prefix, requestId, reqType, string(payload))
 		return next(ctx, req)
 	}
 }
