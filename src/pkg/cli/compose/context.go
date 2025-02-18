@@ -39,7 +39,8 @@ const (
 	ContextSizeSoftLimit        = 10 * MiB
 	DefaultContextSizeHardLimit = 100 * MiB
 
-	sourceDateEpoch     = 315532800 // 1980-01-01, same as nix-shell
+	sourceDateEpoch = 315532800 // 1980-01-01, same as nix-shell
+	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
 	defaultDockerIgnore = `# Default .dockerignore file for Defang
 **/.DS_Store
 **/.direnv
@@ -52,13 +53,15 @@ const (
 **/__pycache__
 **/compose.yaml
 **/compose.yml
-**/defang.exe
 **/docker-compose.yml
 **/docker-compose.yaml
 **/node_modules
 **/Thumbs.db
+Dockerfile
+*.Dockerfile
 # Ignore our own binary, but only in the root to avoid ignoring subfolders
 defang
+defang.exe
 # Ignore our project-level state
 .defang`
 )
