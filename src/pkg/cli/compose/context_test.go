@@ -109,6 +109,25 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatal("WalkContextFolder() should have failed")
 		}
 	})
+
+	t.Run("Default .dockerignore", func(t *testing.T) {
+		var files []string
+		err := WalkContextFolder("../../../testdata/alttestproj", "", func(path string, de os.DirEntry, slashPath string) error {
+			if strings.Contains(slashPath, "alttestproj") {
+				t.Errorf("Path is not relative: %v", slashPath)
+			}
+			files = append(files, slashPath)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("WalkContextFolder() failed: %v", err)
+		}
+
+		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		if !reflect.DeepEqual(files, expected) {
+			t.Errorf("Expected files: %v, got %v", expected, files)
+		}
+	})
 }
 
 func TestCreateTarballReader(t *testing.T) {
