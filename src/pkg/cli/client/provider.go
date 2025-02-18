@@ -128,7 +128,7 @@ type Provider interface {
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
-	DelayBeforeRetry(context.Context)
+	DelayBeforeRetry(context.Context) error
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
@@ -160,9 +160,9 @@ type RetryDelayer struct {
 	Delay time.Duration
 }
 
-func (r *RetryDelayer) DelayBeforeRetry(ctx context.Context) {
+func (r *RetryDelayer) DelayBeforeRetry(ctx context.Context) error {
 	if r.Delay == 0 {
 		r.Delay = 1 * time.Second // Minimum 1 second delay to be consistent with the old behavior
 	}
-	pkg.SleepWithContext(ctx, r.Delay)
+	return pkg.SleepWithContext(ctx, r.Delay)
 }

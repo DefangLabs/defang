@@ -47,7 +47,9 @@ func WaitServiceState(
 		if !serverStream.Receive() {
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
-				provider.DelayBeforeRetry(ctx)
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
 				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
 					return err
