@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -48,7 +47,7 @@ func WaitServiceState(
 		if !serverStream.Receive() {
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
-				pkg.SleepWithContext(ctx, 1*time.Second)
+				provider.DelayBeforeRetry(ctx)
 				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
 					return err

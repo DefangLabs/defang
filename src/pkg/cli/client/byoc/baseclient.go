@@ -48,6 +48,8 @@ type ProjectBackend interface {
 }
 
 type ByocBaseClient struct {
+	client.RetryDelayer
+
 	PulumiStack             string
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
