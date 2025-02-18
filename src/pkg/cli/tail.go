@@ -384,7 +384,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
-					if len(options.Services) == 0 {
+					if len(options.Services) != 1 {
 						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}
