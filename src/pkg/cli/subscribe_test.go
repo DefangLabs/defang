@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -267,6 +268,7 @@ func (m *MockSubscribeServerStreamForReconnectTest) Err() error {
 type mockSubscribeProviderForReconnectTest struct {
 	client.MockProvider
 	stream *MockSubscribeServerStreamForReconnectTest
+	client.RetryDelayer
 }
 
 func (m *mockSubscribeProviderForReconnectTest) Subscribe(
@@ -316,7 +318,7 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			provider := &mockSubscribeProviderForReconnectTest{stream: tt.stream}
+			provider := &mockSubscribeProviderForReconnectTest{stream: tt.stream, RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond}}
 			err := WaitServiceState(
 				ctx, provider,
 				defangv1.ServiceState_DEPLOYMENT_COMPLETED,

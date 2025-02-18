@@ -12,6 +12,7 @@ import (
 
 type PlaygroundProvider struct {
 	GrpcClient
+	RetryDelayer
 }
 
 var _ Provider = (*PlaygroundProvider)(nil)
