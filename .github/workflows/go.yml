@@ -92,7 +92,7 @@ jobs:
   #         cache-dependency-path: src/go.sum
 
   #     - name: Run sanity tests
-  #       run: go run ./cmd/cli compose up -f tests/compose.yaml
+  #       run: go run ./cmd/cli compose up -f testdata/compose.yaml
   #       working-directory: src
 
   go-playground-test:
@@ -114,17 +114,17 @@ jobs:
         working-directory: src
 
       - name: Add dummy config
-        run: echo blah | go run ./cmd/cli config set -n dummy -f tests/sanity/compose.yaml --debug
+        run: echo blah | go run ./cmd/cli config set -n dummy -f testdata/sanity/compose.yaml --debug
         working-directory: src
 
       - name: Run sanity tests UP
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli compose up -f tests/sanity/compose.yaml --debug
+        run: go run ./cmd/cli compose up -f testdata/sanity/compose.yaml --debug
         working-directory: src
 
       - name: Run sanity tests DOWN
         continue-on-error: true # until we have multi-project support in playground
-        run: go run ./cmd/cli compose down --detach -f tests/sanity/compose.yaml --debug
+        run: go run ./cmd/cli compose down --detach -f testdata/sanity/compose.yaml --debug
         working-directory: src
 
   build-and-sign:

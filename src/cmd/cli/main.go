@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime/debug"
 
 	"github.com/DefangLabs/defang/src/cmd/cli/command"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
@@ -29,11 +31,11 @@ func main() {
 	go func() {
 		<-sigs
 		signal.Stop(sigs)
-		term.Debug("Received interrupt signal; canceling...")
 		track.Evt("User Interrupted", track.P("version", version))
 		cancel()
 	}()
 
+	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 	command.SetupCommands(ctx, version)
 	err := command.Execute(ctx)
 	track.FlushAllTracking() // TODO: track errors/panics

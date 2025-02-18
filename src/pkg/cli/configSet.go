@@ -8,11 +8,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func ConfigSet(ctx context.Context, loader client.Loader, provider client.Provider, name string, value string) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return err
-	}
+func ConfigSet(ctx context.Context, projectName string, provider client.Provider, name string, value string) error {
 	term.Debugf("Setting config %q in project %q", name, projectName)
 
 	if DoDryRun {

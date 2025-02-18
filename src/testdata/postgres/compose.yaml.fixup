@@ -1,0 +1,80 @@
+{
+  "no-ext": {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "no-ports": {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "no-ports-override": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "PGPORT": "5433"
+    },
+    "image": "postgres",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5433,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "with-ext": {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "wrong-image": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+name: postgres
+services:
+  no-ext:
+    image: postgres
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
+  no-ports:
+    image: postgres
+    networks:
+      default: null
+    x-defang-postgres: null
+  no-ports-override:
+    environment:
+      PGPORT: "5433"
+    image: postgres
+    networks:
+      default: null
+    x-defang-postgres: null
+  with-ext:
+    image: postgres
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
+    x-defang-postgres:
+      allow-downtime: true
+  wrong-image:
+    image: example
+    networks:
+      default: null
+    ports:
+      - mode: host
+        target: 5432
+        protocol: tcp
+    x-defang-postgres: null
+networks:
+  default:
+    name: postgres_default

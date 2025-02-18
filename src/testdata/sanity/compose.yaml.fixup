@@ -1,0 +1,31 @@
+{
+  "nginx": {
+    "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {
+        "reservations": {
+          "memory": "268435456"
+        }
+      },
+      "placement": {}
+    },
+    "entrypoint": null,
+    "environment": {
+      "dummy": null
+    },
+    "image": "nginx",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 80,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ],
+    "restart": "unless-stopped"
+  }
+}

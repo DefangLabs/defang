@@ -30,7 +30,16 @@ func NewGrpcClient(host, accessToken string, tenantName types.TenantName) GrpcCl
 	}
 	baseUrl += host
 	// Debug(" - Connecting to", baseUrl)
-	fabricClient := defangv1connect.NewFabricControllerClient(http.DefaultClient, baseUrl, connect.WithGRPC(), connect.WithInterceptors(auth.NewAuthInterceptor(accessToken), Retrier{}))
+	fabricClient := defangv1connect.NewFabricControllerClient(
+		http.DefaultClient,
+		baseUrl,
+		connect.WithGRPC(),
+		connect.WithInterceptors(
+			grpcLogger{"fabricClient"},
+			auth.NewAuthInterceptor(accessToken),
+			Retrier{},
+		),
+	)
 
 	return GrpcClient{client: fabricClient, anonID: GetAnonID(), TenantName: tenantName}
 }
@@ -146,4 +155,9 @@ func (g GrpcClient) SetSelectedProvider(ctx context.Context, req *defangv1.SetSe
 
 func (g GrpcClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
 	return getMsg(g.client.CanIUse(ctx, connect.NewRequest(req)))
+}
+
+func (g GrpcClient) SetOptions(ctx context.Context, req *defangv1.SetOptionsRequest) error {
+	_, err := g.client.SetOptions(ctx, connect.NewRequest(req))
+	return err
 }

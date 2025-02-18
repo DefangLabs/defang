@@ -50,7 +50,7 @@ func (bs *byocServerStream) Err() error {
 	if bs.err == io.EOF {
 		return nil // same as the original gRPC/connect server stream
 	}
-	return AnnotateAwsError(bs.err)
+	return bs.err
 }
 
 func (bs *byocServerStream) Msg() *defangv1.TailResponse {
@@ -58,27 +58,24 @@ func (bs *byocServerStream) Msg() *defangv1.TailResponse {
 }
 
 func (bs *byocServerStream) Receive() bool {
-	var evts []ecs.LogEvent
 	select {
 	case e := <-bs.stream.Events(): // blocking
-		if bs.stream.Err() != nil {
-			bs.err = bs.stream.Err()
+		if err := bs.stream.Err(); err != nil {
+			bs.err = AnnotateAwsError(err)
 			return false
 		}
-		var err error
-		evts, err = ecs.GetLogEvents(e)
+		evts, err := ecs.GetLogEvents(e)
 		if err != nil {
 			bs.err = err
 			return false
 		}
+		bs.response = bs.parseEvents(evts)
+		return true
+
 	case <-bs.ctx.Done(): // blocking (if not nil)
 		bs.err = context.Cause(bs.ctx)
 		return false
 	}
-
-	bs.response = bs.parseEvents(evts)
-
-	return true
 }
 
 func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailResponse {

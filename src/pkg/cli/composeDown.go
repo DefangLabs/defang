@@ -8,17 +8,13 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ComposeDown(ctx context.Context, loader client.Loader, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
-	if err != nil {
-		return "", err
-	}
-
+func ComposeDown(ctx context.Context, projectName string, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
 	if DoDryRun {
@@ -57,7 +53,8 @@ func ComposeDown(ctx context.Context, loader client.Loader, c client.FabricClien
 
 	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
 	if err != nil {
-		term.Debug("Failed to get delegate domain:", err)
+		term.Debug("GetDelegateSubdomainZone failed:", err)
+		return "", errors.New("failed to get delegate domain")
 	}
 
 	resp, err := provider.Delete(ctx, &defangv1.DeleteRequest{Project: projectName, Names: names, DelegateDomain: delegateDomain.Zone})
@@ -74,10 +71,11 @@ func InteractiveComposeDown(ctx context.Context, provider client.Provider, proje
 	var wantComposeDown bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Run 'compose down' to deactivate project: " + projectName + "?",
-	}, &wantComposeDown); err != nil {
+	}, &wantComposeDown, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 		return "", err
 	}
 
+	track.Evt("Compose Down Prompt Answered", P("project", projectName), P("wantComposeDown", wantComposeDown))
 	if !wantComposeDown {
 		return "", ErrDoNotComposeDown
 	}

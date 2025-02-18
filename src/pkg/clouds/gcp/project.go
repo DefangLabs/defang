@@ -3,15 +3,12 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
 	resourcemanager "cloud.google.com/go/resourcemanager/apiv3"
 	"cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
-	resourcepb "cloud.google.com/go/resourcemanager/apiv3/resourcemanagerpb"
 	"github.com/DefangLabs/defang/src/pkg"
-	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iterator"
 )
 
@@ -99,19 +96,18 @@ func (id ProjectId) Suffix() string {
 }
 
 type Gcp struct {
-	Region        string
-	ProjectId     string
-	ProjectNumber int64
+	Region    string
+	ProjectId string
 }
 
-func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcepb.Project, error) {
+func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
 	client, err := resourcemanager.NewProjectsClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("resourcemanager.NewProjectsClient: %w", err)
 	}
 	defer client.Close()
 
-	var project *resourcepb.Project
+	var project *resourcemanagerpb.Project
 	// Find if there is already a CD project with the defang-cd prefix
 	projectId := ProjectIDFromName(projectName)
 	req := &resourcemanagerpb.SearchProjectsRequest{}
@@ -129,7 +125,7 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 			return nil, fmt.Errorf("it.Next: %w", err)
 		}
 		id := ProjectId(resp.ProjectId)
-		if resp.State != resourcepb.Project_ACTIVE {
+		if resp.State != resourcemanagerpb.Project_ACTIVE {
 			continue
 		}
 		if id.Prefix() == projectId.Prefix() {
@@ -141,8 +137,8 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	if project == nil {
 		// return nil, fmt.Errorf("project not found")
 		// If project doesn't exist, create it
-		createReq := &resourcepb.CreateProjectRequest{
-			Project: &resourcepb.Project{
+		createReq := &resourcemanagerpb.CreateProjectRequest{
+			Project: &resourcemanagerpb.Project{
 				ProjectId:   projectId.String(),
 				DisplayName: projectName,
 			},
@@ -158,22 +154,4 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 	}
 
 	return project, nil
-}
-
-func (gcp Gcp) GetProjectNumber(ctx context.Context) (int64, error) {
-	if gcp.ProjectNumber != 0 {
-		return gcp.ProjectNumber, nil
-	}
-	resourceManagerService, err := cloudresourcemanager.NewService(ctx)
-	if err != nil {
-		log.Fatalf("Failed to create Resource Manager service: %v", err)
-	}
-
-	// Get the project details
-	project, err := resourceManagerService.Projects.Get(gcp.ProjectId).Context(ctx).Do()
-	if err != nil {
-		log.Fatalf("Failed to get project: %v", err)
-	}
-	gcp.ProjectNumber = project.ProjectNumber
-	return project.ProjectNumber, nil
 }

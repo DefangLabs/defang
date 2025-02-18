@@ -1,0 +1,29 @@
+services:
+  with-ext:
+    image: redis
+    x-defang-redis:
+      allow-downtime: true
+    ports:
+      - target: 6379
+        mode: host
+  wrong-image:
+    image: example
+    x-defang-redis:
+    ports:
+      - target: 6379
+        mode: host
+
+  no-ext:
+    image: redis
+    ports:
+      - target: 6379
+        mode: host
+
+  no-ports:
+    image: redis
+    x-defang-redis:
+
+  no-ports-override:
+    image: redis
+    x-defang-redis:
+    command: ["--port", "6380"]

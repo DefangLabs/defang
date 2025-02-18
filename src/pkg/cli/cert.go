@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cert"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
@@ -78,11 +77,7 @@ var (
 	httpRetryDelayBase = 5 * time.Second
 )
 
-func GenerateLetsEncryptCert(ctx context.Context, loader client.Loader, client client.FabricClient, provider client.Provider) error {
-	project, err := loader.LoadProject(ctx)
-	if err != nil {
-		return err
-	}
+func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider) error {
 	term.Debugf("Generating TLS cert for project %q", project.Name)
 
 	services, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: project.Name})
@@ -200,9 +195,9 @@ func waitForTLS(ctx context.Context, domain string) error {
 	}
 }
 
-func waitForCNAME(ctx context.Context, domain string, targets []string, client cliClient.FabricClient) error {
+func waitForCNAME(ctx context.Context, domain string, targets []string, client client.FabricClient) error {
 	for i, target := range targets {
-		targets[i] = strings.TrimSuffix(strings.ToLower(target), ".")
+		targets[i] = dns.Normalize(strings.ToLower(target))
 	}
 
 	ticker := time.NewTicker(5 * time.Second)

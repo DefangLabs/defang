@@ -1,0 +1,21 @@
+{
+  "always": {
+    "command": null,
+    "entrypoint": null,
+    "image": "alpine",
+    "networks": {
+      "default": null
+    }
+  },
+  "defangonly": {
+    "profiles": [
+      "defang"
+    ],
+    "command": null,
+    "entrypoint": null,
+    "image": "alpine",
+    "networks": {
+      "default": null
+    }
+  }
+}

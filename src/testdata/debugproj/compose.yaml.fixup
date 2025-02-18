@@ -1,0 +1,24 @@
+{
+  "failing": {
+    "build": {
+      "context": "./app",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "ok": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  }
+}

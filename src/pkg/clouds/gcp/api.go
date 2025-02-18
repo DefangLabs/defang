@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -19,25 +18,25 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 	projectName := "projects/" + gcp.ProjectId
 
-	listReq := service.Services.List(projectName).Filter("state:ENABLED")
-	err = listReq.Pages(ctx, func(page *serviceusage.ListServicesResponse) error {
-		for _, svc := range page.Services {
-			if i := slices.Index(apis, svc.Config.Name); i != -1 {
-				apis = slices.Delete(apis, i, i+1)
-			}
-		}
-		return nil
-	})
-	if err != nil { // Ignore service usage API not being used
-		return fmt.Errorf("failed to list enabled services: %w", err)
-	}
+	// listReq := service.Services.List(projectName).Filter("state:ENABLED")
+	// err = listReq.Pages(ctx, func(page *serviceusage.ListServicesResponse) error {
+	// 	for _, svc := range page.Services {
+	// 		if i := slices.Index(apis, svc.Config.Name); i != -1 {
+	// 			apis = slices.Delete(apis, i, i+1)
+	// 		}
+	// 	}
+	// 	return nil
+	// })
+	// if err != nil { // Ignore service usage API not being used
+	// 	return fmt.Errorf("failed to list enabled services: %w", err)
+	// }
+	//
+	// if len(apis) == 0 {
+	// 	term.Debugf("All services already enabled\n")
+	// 	return nil
+	// }
 
-	if len(apis) == 0 {
-		term.Debugf("All services already enabled\n")
-		return nil
-	}
-
-	term.Infof("Enabling services: %v\n", apis)
+	term.Debugf("Enabling services: %v\n", apis)
 	req := &serviceusage.BatchEnableServicesRequest{
 		ServiceIds: apis,
 	}

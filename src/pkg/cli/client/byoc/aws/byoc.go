@@ -10,7 +10,7 @@ import (
 	"net"
 	"os"
 	"slices"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,19 +22,20 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -59,9 +60,9 @@ type ByocAws struct {
 
 	ecsEventHandlers []ECSEventHandler
 	handlersLock     sync.RWMutex
-	lastCdEtag       types.ETag
-	lastCdStart      time.Time
-	lastCdTaskArn    ecs.TaskArn
+	cdEtag           types.ETag
+	cdStart          time.Time
+	cdTaskArn        ecs.TaskArn
 }
 
 var _ client.Provider = (*ByocAws)(nil)
@@ -71,7 +72,7 @@ type ErrMissingAwsCreds struct {
 }
 
 func (e ErrMissingAwsCreds) Error() string {
-	return "AWS credentials must be set (https://docs.defang.io/docs/providers/aws/#getting-started)"
+	return "Could not authenticate to the AWS service. Please check your AWS credentials and try again. (https://docs.defang.io/docs/providers/aws/#getting-started)"
 }
 
 func (e ErrMissingAwsCreds) Unwrap() error {
@@ -83,7 +84,7 @@ type ErrMissingAwsRegion struct {
 }
 
 func (e ErrMissingAwsRegion) Error() string {
-	return "missing AWS region: set AWS_REGION or edit your AWS profile (https://docs.defang.io/docs/providers/aws#region)"
+	return e.err.Error() + " (https://docs.defang.io/docs/providers/aws#region)"
 }
 
 func (e ErrMissingAwsRegion) Unwrap() error {
@@ -95,17 +96,24 @@ func AnnotateAwsError(err error) error {
 		return nil
 	}
 	term.Debug("AWS error:", err)
-	if strings.Contains(err.Error(), "get credentials:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsCreds{err})
-	}
 	if strings.Contains(err.Error(), "missing AWS region:") {
-		return connect.NewError(connect.CodeUnauthenticated, ErrMissingAwsRegion{err})
+		return ErrMissingAwsRegion{err}
 	}
 	if cerr := new(aws.ErrNoSuchKey); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	if cerr := new(aws.ErrParameterNotFound); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
+		// Auth can fail for many reasons: ec2imds not available, timeout, no profile, etc. so only check for top-level STS error
+		if cerr.ServiceID == "STS" {
+			return ErrMissingAwsCreds{cerr}
+		}
+		return cerr.Err
+	}
+	if cerr := new(cwTypes.SessionStreamingException); errors.As(err, &cerr) {
+		return connect.NewError(connect.CodeInternal, err)
 	}
 	return err
 }
@@ -133,6 +141,8 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 	if b.SetupDone {
 		return nil
 	}
+
+	term.Debugf("Using CD image: %q", b.CDImage)
 
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
@@ -269,9 +279,9 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 	if err != nil {
 		return nil, err
 	}
-	b.lastCdEtag = etag
-	b.lastCdStart = time.Now()
-	b.lastCdTaskArn = taskArn
+	b.cdEtag = etag
+	b.cdStart = time.Now()
+	b.cdTaskArn = taskArn
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -299,8 +309,7 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 
 	r53Client := route53.NewFromConfig(cfg)
 
-	domain = strings.TrimSuffix(domain, ".")
-	domain = strings.ToLower(domain)
+	domain = dns.Normalize(strings.ToLower(domain))
 	for {
 		zone, err := aws.GetHostedZoneByName(ctx, domain, r53Client)
 		if errors.Is(err, aws.ErrZoneNotFound) {
@@ -317,80 +326,21 @@ func (b *ByocAws) findZone(ctx context.Context, domain, roleARN string) (string,
 }
 
 func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
-	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
-
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 	r53Client := route53.NewFromConfig(cfg)
 
-	// There's four cases to consider:
-	//  1. The subdomain zone does not exist: we get NS records from the delegation set and let CD/Pulumi create the hosted zone
-	//  2. The subdomain zone exists:
-	//    a. The zone was created by the older CLI: we need to get the NS records from the existing zone
-	//    b. The zone was created by the new CD/Pulumi: we get the NS records from the delegation set and let CD/Pulumi create the hosted zone
-	//    c. The zone was created another way: the deployment will likely fail with a "zone already exists" error
-
-	var nsServers []string
-	zone, err := aws.GetHostedZoneByName(ctx, projectDomain, r53Client)
+	projectDomain := b.GetProjectDomain(req.Project, req.DelegateDomain)
+	nsServers, delegationSetId, err := prepareDomainDelegation(ctx, projectDomain, r53Client)
 	if err != nil {
-		if !errors.Is(err, aws.ErrZoneNotFound) {
-			return nil, AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
-		}
-		term.Debugf("Zone %q not found, delegation set will be created", projectDomain)
-		// Case 1: The zone doesn't exist: we'll create a delegation set and let CD/Pulumi create the hosted zone
-	} else {
-		// Case 2: Get the NS records for the existing subdomain zone
-		nsServers, err = aws.ListResourceRecords(ctx, *zone.Id, projectDomain, r53types.RRTypeNs, r53Client)
-		if err != nil {
-			return nil, AnnotateAwsError(err) // TODO: we should not fail deployment if this fails
-		}
-		term.Debugf("Zone %q found, NS records: %v", projectDomain, nsServers)
+		return nil, AnnotateAwsError(err)
 	}
-
-	var resp client.PrepareDomainDelegationResponse
-	if zone == nil || zone.Config.Comment == nil || *zone.Config.Comment != aws.CreateHostedZoneComment {
-		// Case 2b or 2c: The zone does not exist, or was not created by an older version of this CLI.
-		// Get the NS records for the delegation set (using the existing zone) and let Pulumi create the hosted zone for us
-		var zoneId *string
-		if zone != nil {
-			zoneId = zone.Id
-		}
-		// TODO: avoid creating the delegation set if we're in preview mode
-		delegationSet, err := aws.CreateDelegationSet(ctx, zoneId, r53Client)
-		var delegationSetAlreadyCreated *r53types.DelegationSetAlreadyCreated
-		var delegationSetAlreadyReusable *r53types.DelegationSetAlreadyReusable
-		if errors.As(err, &delegationSetAlreadyCreated) || errors.As(err, &delegationSetAlreadyReusable) {
-			term.Debug("Route53 delegation set already created:", err)
-			delegationSet, err = aws.GetDelegationSet(ctx, r53Client)
-		}
-		if err != nil {
-			return nil, AnnotateAwsError(err)
-		}
-		if len(delegationSet.NameServers) == 0 {
-			return nil, errors.New("no NS records found for the delegation set") // should not happen
-		}
-		term.Debug("Route53 delegation set ID:", *delegationSet.Id)
-		resp.DelegationSetId = strings.TrimPrefix(*delegationSet.Id, "/delegationset/")
-
-		// Ensure the NS records match the ones from the delegation set if the zone already exists
-		if zoneId != nil {
-			sort.Strings(nsServers)
-			sort.Strings(delegationSet.NameServers)
-			if !slices.Equal(delegationSet.NameServers, nsServers) {
-				track.Evt("Compose-Up delegateSubdomain diff", track.P("fromDS", delegationSet.NameServers), track.P("fromZone", nsServers))
-				term.Debugf("NS records for the existing subdomain zone do not match the delegation set: %v <> %v", delegationSet.NameServers, nsServers)
-			}
-		}
-
-		nsServers = delegationSet.NameServers
-	} else {
-		// Case 2a: The zone was created by the older CLI, we'll use the existing NS records; track how many times this happens
-		track.Evt("Compose-Up delegateSubdomain old", track.P("domain", projectDomain))
+	resp := client.PrepareDomainDelegationResponse{
+		NameServers:     nsServers,
+		DelegationSetId: delegationSetId,
 	}
-	resp.NameServers = nsServers
-
 	return &resp, nil
 }
 
@@ -455,7 +405,7 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
-	return map[string]string{
+	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantName,
@@ -468,6 +418,12 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}
+
+	if !term.StdoutCanColor() {
+		env["NO_COLOR"] = "1"
+	}
+
+	return env
 }
 
 type cdCmd struct {
@@ -526,16 +482,10 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		return nil, AnnotateAwsError(err)
 	}
 	etag := ecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
-	b.lastCdEtag = etag
-	b.lastCdStart = time.Now()
-	b.lastCdTaskArn = taskArn
+	b.cdEtag = etag
+	b.cdStart = time.Now()
+	b.cdTaskArn = taskArn
 	return &defangv1.DeleteResponse{Etag: etag}, nil
-}
-
-// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
-func (b *ByocAws) stackDir(projectName, name string) string {
-	ensure(projectName != "", "ProjectName not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
@@ -548,6 +498,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 			// FillOutputs might fail if the stack is not created yet; return empty update in that case
 			var cfnErr *cfn.ErrStackNotFoundException
 			if errors.As(err, &cfnErr) {
+				term.Debugf("FillOutputs: %v", err)
 				return nil, nil // no services yet
 			}
 			return nil, AnnotateAwsError(err)
@@ -562,7 +513,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
-	ensure(projectName != "", "ProjectName not set")
+	pkg.Ensure(projectName != "", "ProjectName not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
@@ -608,7 +559,7 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 }
 
 func (b *ByocAws) getSecretID(projectName, name string) string {
-	return b.stackDir(projectName, name) // same as defang_service.ts
+	return b.StackDir(projectName, name) // same as defang_service.ts
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
@@ -656,16 +607,24 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 		service = req.Services[0]
 	}
 
-	since := b.lastCdStart // TODO: get start time from req.Etag
+	since := b.cdStart // TODO: get start time from req.Etag
 	if since.IsZero() {
-		since = time.Now().Add(-time.Hour)
+		since = time.Now().Add(-time.Hour) // TODO: get start time from req
 	}
+
+	// get stack information
+	err := b.driver.FillOutputs(ctx)
+	if err != nil {
+		return AnnotateAwsError(err)
+	}
+
+	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB (to stay well below the 1MB gRPC payload limit)
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
+	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll) {
 		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
-		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) {
+		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
 			for _, event := range logEvents {
 				msg := term.StripAnsi(*event.Message)
 				if parseECSEventRecords {
@@ -686,9 +645,13 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 				}
 				sb.WriteString(msg)
 				sb.WriteByte('\n')
+				if sb.Len() > maxQuerySizePerLogGroup {
+					return errors.New("query result was truncated")
+				}
 			}
+			return nil
 		}); err != nil {
-			term.Warn("CloudWatch query failed:", AnnotateAwsError(err))
+			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
@@ -698,7 +661,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// FillOutputs is needed to get the CD task ARN
+	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -728,8 +691,8 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, logType)...)
-		taskArn = b.lastCdTaskArn
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
+		taskArn = b.cdTaskArn
 	}
 	if err != nil {
 		return nil, AnnotateAwsError(err)
@@ -738,9 +701,12 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 3*time.Second); err != nil {
+			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
 				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
-					time.Sleep(time.Second) // make sure we got all the logs from the task before cancelling
+					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
+					if !errors.Is(err, io.EOF) {
+						err = pkg.ErrDeploymentFailed{Message: err.Error()}
+					}
 					cancel(err)
 				}
 			}
@@ -754,31 +720,38 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service string, logType logs.LogType) []ecs.LogGroupInput {
-	var groups []ecs.LogGroupInput
-	var serviceLogsPrefix string
-	if service != "" {
-		serviceLogsPrefix = service + "/" + service + "_" + etag
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []ecs.LogGroupInput {
+	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
+	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+	var pattern string // TODO: add etag to filter
+	if filter != "" {
+		pattern = strconv.Quote(filter)
 	}
+
+	var groups []ecs.LogGroupInput
 	// Tail CD and kaniko
 	if logType.Has(logs.LogTypeBuild) {
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
+		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
 		// If we know the CD task ARN, only tail the logstream for that CD task
-		if b.lastCdTaskArn != nil && b.lastCdEtag == etag {
-			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.lastCdTaskArn))}
+		if b.cdTaskArn != nil && b.cdEtag == etag {
+			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 		}
 		groups = append(groups, cdTail)
-		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
+		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
+		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN, filter)
 		groups = append(groups, kanikoTail)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
+	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
-		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		if service != "" && etag != "" {
+			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
+		}
+		term.Debug("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern)
 		groups = append(groups, servicesTail)
 	}
 	return groups
@@ -790,7 +763,7 @@ func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string
 		return nil, err
 	}
 
-	ensure(projectName != "", "ProjectName not set")
+	pkg.Ensure(projectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 		Project: projectName,    // was: tenant
@@ -832,7 +805,7 @@ func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string
 		}
 		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
 		cname, _ := net.LookupCNAME(service.DomainName)
-		if strings.TrimSuffix(cname, ".") != si.PublicFqdn {
+		if dns.Normalize(cname) != si.PublicFqdn {
 			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
 			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
 			if err != nil {
@@ -924,13 +897,13 @@ func (b *ByocAws) DeleteConfig(ctx context.Context, secrets *defangv1.Secrets) e
 	return nil
 }
 
-type awsObj struct{ obj s3types.Object }
+type s3Obj struct{ obj s3types.Object }
 
-func (a awsObj) Name() string {
+func (a s3Obj) Name() string {
 	return *a.obj.Key
 }
 
-func (a awsObj) Size() int64 {
+func (a s3Obj) Size() int64 {
 	return *a.obj.Size
 }
 
@@ -949,6 +922,10 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 	}
 
 	s3client := s3.NewFromConfig(cfg)
+	return ListPulumiStacks(ctx, s3client, bucketName)
+}
+
+func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName string) ([]string, error) {
 	prefix := `.pulumi/stacks/` // TODO: should we filter on `projectName`?
 
 	term.Debug("Listing stacks in bucket:", bucketName)
@@ -964,7 +941,7 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		if obj.Key == nil || obj.Size == nil {
 			continue
 		}
-		stack, err := b.ParsePulumiStackObject(ctx, awsObj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
+		stack, err := byoc.ParsePulumiStackObject(ctx, s3Obj{obj}, bucketName, prefix, func(ctx context.Context, bucket, path string) ([]byte, error) {
 			getObjectOutput, err := s3client.GetObject(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
 				Key:    &path,
@@ -982,12 +959,6 @@ func (b *ByocAws) BootstrapList(ctx context.Context) ([]string, error) {
 		}
 	}
 	return stacks, nil
-}
-
-func ensure(cond bool, msg string) {
-	if !cond {
-		panic(msg)
-	}
 }
 
 type ECSEventHandler interface {

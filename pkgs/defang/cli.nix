@@ -1,22 +1,23 @@
-{ buildGoModule
-, installShellFiles
-, lib
+{
+  buildGoModule,
+  installShellFiles,
+  lib,
 }:
 buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-4GF/EXgy6IoIq6AEUKn0YNRBpgI2c8pw6YiVtB/j+kc=";
+  vendorHash = "sha256-AWdzmP3mLe1GtDCjnk+misSWgYnp1kduh/GaiaJhK6A=";
 
   subPackages = [ "cmd/cli" ];
 
-  nativeBuildInputs = [
-    installShellFiles
-  ];
+  nativeBuildInputs = [ installShellFiles ];
 
   CGO_ENABLED = 0;
-  GOFLAGS = [ "-trimpath" ];
-  ldflags = [ "-s" "-w" ];
+  ldflags = [
+    "-s"
+    "-w"
+  ];
   doCheck = false; # some unit tests need internet access
 
   postInstall = ''

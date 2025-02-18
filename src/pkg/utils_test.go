@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestGetenvBool(t *testing.T) {
@@ -154,5 +157,48 @@ func TestContains(t *testing.T) {
 				t.Errorf("Contains() returned %v, expected %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestIsValidTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected bool
+	}{
+		{"Valid time", time.Now(), true},
+		{"Zero time", time.Time{}, false},
+		{"From zero Timestamppb", timestamppb.New(time.Time{}).AsTime(), false},
+		{"From now Timestamppb", timestamppb.Now().AsTime(), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidTime(tt.time); got != tt.expected {
+				t.Errorf("IsValidTime() returned %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCurrentUser(t *testing.T) {
+	if got := GetCurrentUser(); got == "" {
+		t.Errorf("GetCurrentUser() returned an empty string")
+	}
+
+	t.Setenv("USER", "test")
+	if got := GetCurrentUser(); got != "test" {
+		t.Errorf("GetCurrentUser() returned %v, expected test", got)
+	}
+
+	t.Setenv("USER", "")
+	t.Setenv("USERNAME", "testx")
+	if got := GetCurrentUser(); got != "testx" {
+		t.Errorf("GetCurrentUser() returned %v, expected testx", got)
+	}
+
+	t.Setenv("USERNAME", "")
+	if got := GetCurrentUser(); got == "" {
+		t.Errorf("GetCurrentUser() returned an empty string")
 	}
 }

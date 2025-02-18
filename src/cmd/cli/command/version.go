@@ -3,10 +3,12 @@ package command
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/http"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"golang.org/x/mod/semver"
 )
 
@@ -35,15 +37,37 @@ func GetCurrentVersion() string {
 	return version
 }
 
+type githubError struct {
+	Message          string
+	Status           string
+	DocumentationUrl string
+}
+
 func GetLatestVersion(ctx context.Context) (string, error) {
-	resp, err := http.GetWithContext(ctx, "https://api.github.com/repos/DefangLabs/defang/releases/latest")
+	// Anonymous API request to GitHub are rate limited to 60 requests per hour per IP.
+	// Check whether the user has set a GitHub token to increase the rate limit. (Copied from the install script.)
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		githubToken = os.Getenv("GH_TOKEN")
+	}
+	header := http.Header{}
+	if githubToken != "" {
+		header["Authorization"] = []string{"Bearer " + githubToken}
+	}
+	resp, err := http.GetWithHeader(ctx, "https://api.github.com/repos/DefangLabs/defang/releases/latest", header)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		term.Debug(resp.Header)
 		// The primary rate limit for unauthenticated requests is 60 requests per hour, per IP.
-		return "", errors.New(resp.Status)
+		// The API returns a 403 status code when the rate limit is exceeded.
+		githubError := githubError{Message: resp.Status}
+		if err := json.NewDecoder(resp.Body).Decode(&githubError); err != nil {
+			term.Debugf("Failed to decode GitHub response: %v", err)
+		}
+		return "", fmt.Errorf("error fetching release info from GitHub: %s", githubError.Message)
 	}
 	var release struct {
 		TagName string `json:"tag_name"`

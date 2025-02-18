@@ -1,0 +1,31 @@
+services:
+  with-ext:
+    image: postgres
+    x-defang-postgres:
+      allow-downtime: true
+    ports:
+      - target: 5432
+        mode: host
+
+  wrong-image:
+    image: example
+    x-defang-postgres:
+    ports:
+      - target: 5432
+        mode: host
+
+  no-ext:
+    image: postgres
+    ports:
+      - target: 5432
+        mode: host
+
+  no-ports:
+    image: postgres
+    x-defang-postgres:
+
+  no-ports-override:
+    image: postgres
+    x-defang-postgres:
+    environment:
+      - PGPORT=5433

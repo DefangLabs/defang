@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
@@ -23,9 +22,9 @@ import (
 )
 
 func TestDomainMultipleProjectSupport(t *testing.T) {
-	port80 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 80}
-	port8080 := &composeTypes.ServicePortConfig{Mode: compose.Mode_INGRESS, Target: 8080}
-	hostModePort := &composeTypes.ServicePortConfig{Mode: compose.Mode_HOST, Target: 80}
+	port80 := &composeTypes.ServicePortConfig{Mode: "ingress", Target: 80}
+	port8080 := &composeTypes.ServicePortConfig{Mode: "ingress", Target: 8080}
+	hostModePort := &composeTypes.ServicePortConfig{Mode: "host", Target: 80}
 	tests := []struct {
 		ProjectName string
 		TenantName  types.TenantName
@@ -89,15 +88,15 @@ func (f FakeLoader) LoadProjectName(ctx context.Context) (string, error) {
 	return f.ProjectName, nil
 }
 
-//go:embed test_ecs_events/*.json
+//go:embed testdata/*.json
 var testDir embed.FS
 
-//go:embed test_ecs_events/*.events
+//go:embed testdata/*.events
 var expectedDir embed.FS
 
 func TestSubscribe(t *testing.T) {
 	t.Skip("Pending test")
-	tests, err := testDir.ReadDir("test_ecs_events")
+	tests, err := testDir.ReadDir("testdata")
 	if err != nil {
 		t.Fatalf("failed to load ecs events test files: %v", err)
 	}
@@ -126,7 +125,7 @@ func TestSubscribe(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				filename := path.Join("test_ecs_events", name+".events")
+				filename := path.Join("testdata", name+".events")
 				ef, _ := expectedDir.ReadFile(filename)
 				dec := json.NewDecoder(bytes.NewReader(ef))
 
@@ -149,7 +148,7 @@ func TestSubscribe(t *testing.T) {
 				}
 			}()
 
-			data, err := testDir.ReadFile(path.Join("test_ecs_events", tt.Name()))
+			data, err := testDir.ReadFile(path.Join("testdata", tt.Name()))
 			if err != nil {
 				t.Fatalf("failed to read test file: %v", err)
 			}

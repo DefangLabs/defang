@@ -6,18 +6,28 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func TestConfigSet(t *testing.T) {
 	ctx := context.Background()
-	loader := client.MockLoader{Project: &compose.Project{Name: "test"}}
 	provider := MustHaveProjectNamePutConfigProvider{}
-	err := ConfigSet(ctx, loader, provider, "test_name", "test_value")
-	if err != nil {
-		t.Fatalf("ConfigSet() error = %v", err)
-	}
+
+	t.Run("expect no error", func(t *testing.T) {
+		err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
+		if err != nil {
+			t.Fatalf("ConfigSet() error = %v", err)
+		}
+	})
+
+	t.Run("expect error on DryRun", func(t *testing.T) {
+		DoDryRun = true
+		t.Cleanup(func() { DoDryRun = false })
+		err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
+		if err != ErrDryRun {
+			t.Fatalf("Expected ErrDryRun, got %v", err)
+		}
+	})
 }
 
 type MustHaveProjectNamePutConfigProvider struct {

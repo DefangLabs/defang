@@ -5,17 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
@@ -42,6 +45,31 @@ func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, 
 	return managedServices, unmanagedServices
 }
 
+func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
+	projOpts, err := loader.NewProjectOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	// get the project name
+	if projOpts.Name == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		projOpts.Name = filepath.Base(dir)
+	}
+	project := &compose.Project{
+		Name:         projOpts.Name,
+		WorkingDir:   projOpts.WorkingDir,
+		Environment:  projOpts.Environment,
+		ComposeFiles: projOpts.ConfigPaths,
+	}
+
+	return project, nil
+}
+
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -62,12 +90,29 @@ func makeComposeUpCmd() *cobra.Command {
 			since := time.Now()
 			loader := configureLoader(cmd)
 
-			provider, err := getProvider(cmd.Context(), loader)
+			ctx := cmd.Context()
+			project, loadErr := loader.LoadProject(ctx)
+			if loadErr != nil {
+				if nonInteractive {
+					return loadErr
+				}
+
+				term.Error("Cannot load project:", loadErr)
+				project, err := createProjectForDebug(loader)
+				if err != nil {
+					return err
+				}
+
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
+				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
+			}
+
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			project, err := loader.LoadProject(cmd.Context())
+			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
 			}
@@ -78,14 +123,14 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			numGPUS := compose.GetNumOfGPUs(cmd.Context(), project)
+			numGPUS := compose.GetNumOfGPUs(ctx, project)
 			if numGPUS > 0 {
 				req := &defangv1.CanIUseRequest{
 					Project:  project.Name,
 					Provider: providerID.EnumValue(),
 				}
 
-				resp, err := client.CanIUse(cmd.Context(), req)
+				resp, err := client.CanIUse(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -95,7 +140,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 			}
 
-			deploy, project, err := cli.ComposeUp(cmd.Context(), loader, client, provider, upload, mode.Value())
+			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -127,7 +172,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			tailCtx, cancelTail := context.WithCancelCause(cmd.Context())
+			tailCtx, cancelTail := context.WithCancelCause(ctx)
 			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
 			if waitTimeout >= 0 {
@@ -140,12 +185,12 @@ func makeComposeUpCmd() *cobra.Command {
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, deploy.Etag, unmanagedServices); err != nil {
+				if err := cli.WaitServiceState(tailCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 					var errDeploymentFailed pkg.ErrDeploymentFailed
 					if errors.As(err, &errDeploymentFailed) {
 						cancelTail(err)
 					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-						term.Warnf("failed to wait for service status: %v", err) // TODO: don't print in Go-routine
+						term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
 					}
 				} else {
 					cancelTail(errCompleted)
@@ -159,16 +204,16 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-			tailParams := cli.TailOptions{
+
+			// blocking call to tail
+			tailOptions := cli.TailOptions{
 				Etag:    deploy.Etag,
 				Since:   since,
 				Raw:     false,
 				Verbose: verbose,
 				LogType: logs.LogTypeAll,
 			}
-
-			// blocking call to tail
-			if err := cli.Tail(tailCtx, loader, provider, tailParams); err != nil {
+			if err := cli.Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 				term.Debug("Tail stopped with", err)
 
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -193,15 +238,30 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				var errDeploymentFailed pkg.ErrDeploymentFailed
-				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) {
+				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {
-						failedServices := []string{errDeploymentFailed.Service}
+						var failedServices []string
+						if errDeploymentFailed.Service != "" {
+							failedServices = []string{errDeploymentFailed.Service}
+						}
 						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+
 						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						_ = cli.InteractiveDebug(cmd.Context(), loader, client, provider, deploy.Etag, project, failedServices)
+						var debugConfig = cli.DebugConfig{
+							Etag:           deploy.Etag,
+							FailedServices: failedServices,
+							Project:        project,
+							Provider:       provider,
+							Since:          since,
+						}
+						if nil == cli.InteractiveDebugDeployment(cmd.Context(), client, debugConfig) {
+							return err // don't show the defang hint if debugging was successful
+						}
 					}
+					tailOptions.Verbose = true // show all logs for debugging
+					printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 					return err
 				}
 			}
@@ -238,6 +298,7 @@ func makeComposeStartCmd() *cobra.Command {
 		Aliases:     []string{"deploy"},
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
+		Hidden:      true,
 		Short:       "Reads a Compose file and deploys services to the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return errors.New("command 'start' is deprecated, use 'up' instead")
@@ -252,6 +313,7 @@ func makeComposeRestartCmd() *cobra.Command {
 		Use:         "restart",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
+		Hidden:      true,
 		Short:       "Reads a Compose file and restarts its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return errors.New("command 'restart' is deprecated, use 'up' instead")
@@ -264,6 +326,7 @@ func makeComposeStopCmd() *cobra.Command {
 		Use:         "stop",
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
+		Hidden:      true,
 		Short:       "Reads a Compose file and stops its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return errors.New("command 'stop' is deprecated, use 'down' instead")
@@ -286,8 +349,18 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			if err != nil {
+				return err
+			}
+
+			err = canIUseProvider(cmd.Context(), provider, projectName)
+			if err != nil {
+				return err
+			}
+
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), loader, client, provider, args...)
+			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -308,19 +381,24 @@ func makeComposeDownCmd() *cobra.Command {
 				{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
 				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 			}
-
-			endLogDetectFunc := cli.CreateEndLogEventDetectFunc(endLogConditions)
-			tailParams := cli.TailOptions{
+			tailOptions := cli.TailOptions{
 				Etag:               etag,
 				Since:              since,
-				Raw:                false,
-				EndEventDetectFunc: endLogDetectFunc,
+				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-
-			err = cli.Tail(cmd.Context(), loader, provider, tailParams)
+			tailCtx := cmd.Context()
+			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
+				if connect.CodeOf(err) == connect.CodePermissionDenied {
+					// If tail fails because of missing permission, we show a warning and detach. This is
+					// different than `up`, which will wait for the deployment to finish, but we don't have an
+					// ECS event subscription for `down` so we can't wait for the deployment to finish.
+					// Instead, we'll just show a warning and detach.
+					term.Warn("Unable to tail logs. Detaching.")
+					return nil
+				}
 				return err
 			}
 			term.Info("Done.")
@@ -340,12 +418,31 @@ func makeComposeConfigCmd() *cobra.Command {
 		Short: "Reads a Compose file and shows the generated config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+
+			ctx := cmd.Context()
+			project, loadErr := loader.LoadProject(ctx)
+			if loadErr != nil {
+				if nonInteractive {
+					return loadErr
+				}
+
+				term.Error("Cannot load project:", loadErr)
+				project, err := createProjectForDebug(loader)
+				if err != nil {
+					return err
+				}
+
+				track.Evt("Debug Prompted", P("loadErr", loadErr))
+				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
+			}
+
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
 
-			if _, _, err := cli.ComposeUp(cmd.Context(), loader, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE); !errors.Is(err, cli.ErrDryRun) {
+			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+			if !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}
 			return nil
@@ -369,7 +466,12 @@ func makeComposePsCmd() *cobra.Command {
 				return err
 			}
 
-			if err := cli.GetServices(cmd.Context(), loader, provider, long); err != nil {
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			if err != nil {
+				return err
+			}
+
+			if err := cli.GetServices(cmd.Context(), projectName, provider, long); err != nil {
 				if errNoServices := new(cli.ErrNoServices); !errors.As(err, errNoServices) {
 					return err
 				}
@@ -391,12 +493,12 @@ func makeComposePsCmd() *cobra.Command {
 }
 
 func makeComposeLogsCmd() *cobra.Command {
+	logType := logs.LogTypeRun
 	var logsCmd = &cobra.Command{
-		Use:         "logs",
+		Use:         "logs [SERVICE...]",
 		Annotations: authNeededAnnotation,
 		Aliases:     []string{"tail"},
-		Args:        cobra.NoArgs,
-		Short:       "Tail logs from one or more services",
+		Short:       "Show logs from one or more services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
@@ -404,11 +506,11 @@ func makeComposeLogsCmd() *cobra.Command {
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
+			var filter, _ = cmd.Flags().GetString("filter")
 
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
 			}
-			logType := cmd.Flag("type").Value.(*logs.LogType) // nolint:forcetypeassert
 
 			if utc {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
@@ -421,28 +523,13 @@ func makeComposeLogsCmd() *cobra.Command {
 
 			ts = ts.UTC()
 			sinceStr := ""
-			if ts.Year() > 1970 {
+			if pkg.IsValidTime(ts) {
 				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
 			}
 			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
-			services := []string{}
+			services := args
 			if len(name) > 0 {
-				services = strings.Split(name, ",")
-			}
-
-			if *logType == logs.LogTypeUnspecified {
-				*logType = logs.LogTypeRun
-			}
-
-			term.Debug("logType", logType)
-
-			tailOptions := cli.TailOptions{
-				Services: services,
-				Etag:     etag,
-				Since:    ts,
-				Raw:      raw,
-				Verbose:  verbose,
-				LogType:  *logType,
+				services = append(args, strings.Split(name, ",")...) // backwards compat
 			}
 
 			loader := configureLoader(cmd)
@@ -451,18 +538,34 @@ func makeComposeLogsCmd() *cobra.Command {
 				return err
 			}
 
-			return cli.Tail(cmd.Context(), loader, provider, tailOptions)
+			projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+			if err != nil {
+				return err
+			}
+
+			tailOptions := cli.TailOptions{
+				Etag:     etag,
+				Filter:   filter,
+				LogType:  logType,
+				Raw:      raw,
+				Services: services,
+				Since:    ts,
+				Verbose:  verbose,
+			}
+
+			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
-	logsCmd.Flags().StringP("name", "n", "", "name of the service")
+	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
+	logsCmd.Flags().MarkHidden("name")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
+	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
 	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	var logType logs.LogType
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
-	logsCmd.Flags().String("pattern", "", "show logs matching the text pattern")
-	logsCmd.Flags().MarkHidden("pattern")
+	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
 }
 

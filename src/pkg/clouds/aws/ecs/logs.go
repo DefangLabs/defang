@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -73,7 +74,7 @@ func TailLogGroups(ctx context.Context, since time.Time, logGroups ...LogGroupIn
 	var pendingGroups []LogGroupInput
 
 	sincePending := since
-	if sincePending.Year() <= 1970 {
+	if !pkg.IsValidTime(since) {
 		sincePending = time.Now()
 	}
 	for _, lgi := range logGroups {
@@ -151,7 +152,7 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error)
 	})
 }
 
-func Query(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent)) error {
+func Query(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
 	region := region.FromArn(input.LogGroupARN)
 	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
@@ -160,13 +161,18 @@ func Query(ctx context.Context, input LogGroupInput, start, end time.Time, cb fu
 	return filterLogEvents(ctx, cw, input, start, end, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent)) error {
+func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
+	var pattern *string
+	if lgi.LogEventFilterPattern != "" {
+		pattern = &lgi.LogEventFilterPattern
+	}
 	logGroupIdentifier := getLogGroupIdentifier(lgi.LogGroupARN)
 	params := &cloudwatchlogs.FilterLogEventsInput{
 		StartTime:          ptr.Int64(start.UnixMilli()),
 		EndTime:            ptr.Int64(end.UnixMilli()),
 		LogGroupIdentifier: &logGroupIdentifier,
 		LogStreamNames:     lgi.LogStreamNames,
+		FilterPattern:      pattern,
 	}
 	if lgi.LogStreamNamePrefix != "" {
 		params.LogStreamNamePrefix = &lgi.LogStreamNamePrefix
@@ -186,7 +192,9 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 				LogStreamName:      event.LogStreamName,
 			}
 		}
-		cb(events)
+		if err := cb(events); err != nil {
+			return err
+		}
 		if fleo.NextToken == nil {
 			return nil
 		}
@@ -217,6 +225,7 @@ func startLiveTail(ctx context.Context, slti *cloudwatchlogs.StartLiveTailInput)
 	return slto.GetStream(), nil
 }
 
+// GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
 	region := region.FromArn(*taskArn)
 	cluster, taskID := SplitClusterTask(taskArn)
@@ -233,6 +242,7 @@ func isTaskTerminalStatus(status string) bool {
 	}
 }
 
+// getTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func getTaskStatus(ctx context.Context, region aws.Region, cluster, taskId string) error {
 	cfg, err := aws.LoadDefaultConfig(ctx, region)
 	if err != nil {
@@ -342,12 +352,13 @@ func (c *collectionStream) addAndStart(s EventStream, since time.Time, lgi LogGr
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		if since.Year() > 1970 {
+		if pkg.IsValidTime(since) {
 			// Query the logs between the start time and now
-			if err := Query(c.ctx, lgi, since, time.Now(), func(events []LogEvent) {
+			if err := Query(c.ctx, lgi, since, time.Now(), func(events []LogEvent) error {
 				c.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
 					Value: types.LiveTailSessionUpdate{SessionResults: events},
 				}
+				return nil
 			}); err != nil {
 				c.errCh <- err // the caller will likely cancel the context
 			}
@@ -415,6 +426,7 @@ func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	}
 }
 
+// WaitForTask polls the ECS task status. It returns io.EOF if the task is stopped successfully, or an error if the task failed.
 func WaitForTask(ctx context.Context, taskArn TaskArn, poll time.Duration) error {
 	if taskArn == nil {
 		panic("taskArn is nil")

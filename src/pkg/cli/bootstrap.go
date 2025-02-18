@@ -7,17 +7,12 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func BootstrapCommand(ctx context.Context, loader client.Loader, c client.FabricClient, p client.Provider, cmd string) error {
-	projectName, err := client.LoadProjectNameWithFallback(ctx, loader, p)
-	if err != nil {
-		// Some CD commands don't require a project name, so we don't return an error here.
-		term.Debug("Failed to load project name:", err)
-	}
-
-	term.Debugf("Running CD command %s in project %q", cmd, projectName)
+func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p client.Provider, cmd string) error {
+	term.Infof("Running CD command %q in project %q", cmd, projectName)
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -28,7 +23,7 @@ func BootstrapCommand(ctx context.Context, loader client.Loader, c client.Fabric
 		return err
 	}
 
-	return tail(ctx, p, TailOptions{Project: projectName, Etag: etag, Since: since})
+	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {

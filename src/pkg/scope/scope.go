@@ -15,5 +15,5 @@ func (s Scope) String() string {
 }
 
 func All() []Scope {
-	return []Scope{Admin, Delete, Read, Tail, Delete}
+	return []Scope{Admin, Delete, Read, Tail}
 }

@@ -24,11 +24,15 @@ var (
 	errDNSNotInSync = errors.New("DNS not in sync")
 )
 
+func Normalize(domain string) string {
+	return strings.TrimSuffix(domain, ".")
+}
+
 // The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
 // OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync
 func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []string) bool {
 	for i, validCNAME := range validCNAMEs {
-		validCNAMEs[i] = strings.TrimSuffix(validCNAME, ".")
+		validCNAMEs[i] = Normalize(validCNAME)
 	}
 	cname, err := getCNAMEInSync(ctx, domain)
 	Logger.Debugf("CNAME for %v is: '%v', err: %v", domain, cname, err)
@@ -37,7 +41,7 @@ func CheckDomainDNSReady(ctx context.Context, domain string, validCNAMEs []strin
 		Logger.Debugf("CNAME for %v is not in sync: %v", domain, cname)
 		return false
 	}
-	cname = strings.TrimSuffix(cname, ".")
+	cname = Normalize(cname)
 	if slices.Contains(validCNAMEs, cname) {
 		Logger.Debugf("CNAME for %v is in sync: %v", domain, cname)
 		return true

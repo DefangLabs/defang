@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,7 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Arbitrary limit on the maximum number of files to process to avoid walking the entire drive and we have limited
@@ -28,61 +29,123 @@ var (
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
 
-func InteractiveDebug(ctx context.Context, l client.Loader, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
+type DebugConfig struct {
+	Etag           types.ETag
+	FailedServices []string
+	Project        *compose.Project
+	Provider       client.Provider
+	Since          time.Time
+}
+
+func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
+	return interactiveDebug(ctx, client, debugConfig, nil)
+}
+
+func InteractiveDebugForLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
+	return interactiveDebug(ctx, client, DebugConfig{Project: project}, loadErr)
+}
+
+func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, loadError error) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
-	}, &aiDebug); err != nil {
-		term.Debugf("failed to ask for AI debug: %v", err)
-		track.Evt("Debug Prompt Failed", P("etag", etag), P("reason", err))
+	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", loadError))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", etag))
+		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Etag), P("loadErr", loadError))
 		return ErrDebugSkipped
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", etag))
+	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Etag), P("loadErr", loadError))
 
-	if err := Debug(ctx, l, c, p, etag, project, failedServices); err != nil {
-		term.Warnf("Failed to debug deployment: %v", err)
+	if loadError != nil {
+		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, loadError); err != nil {
+			term.Warnf("Failed to debug compose file load: %v", err)
+			return err
+		}
+	} else if debugConfig.Etag != "" {
+		if err := DebugDeployment(ctx, client, debugConfig); err != nil {
+			term.Warnf("Failed to debug deployment: %v", err)
+			return err
+		}
+	} else {
+		return errors.New("no information to use for debugger")
+	}
+
+	var goodBad bool
+	if err := survey.AskOne(&survey.Confirm{
+		Message: "Was the debugging helpful?",
+		Help:    "Please provide feedback to help us improve the debugging experience.",
+	}, &goodBad); err != nil {
+		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Etag), P("reason", err), P("loadErr", loadError))
+	} else {
+		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Etag), P("feedback", goodBad), P("loadErr", loadError))
+	}
+	return nil
+}
+
+func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
+	term.Debugf("Invoking AI debugger for deployment %q", debugConfig.Etag)
+
+	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
+
+	if DoDryRun {
+		return ErrDryRun
+	}
+
+	var sinceTime *timestamppb.Timestamp = nil
+	if !debugConfig.Since.IsZero() {
+		sinceTime = timestamppb.New(debugConfig.Since)
+	}
+	req := defangv1.DebugRequest{
+		Etag:     debugConfig.Etag,
+		Files:    files,
+		Project:  debugConfig.Project.Name,
+		Services: debugConfig.FailedServices,
+		Since:    sinceTime,
+	}
+	err := debugConfig.Provider.Query(ctx, &req)
+	if err != nil {
 		return err
 	}
+
+	resp, err := client.Debug(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	printDebugReport(resp)
 
 	return nil
 }
 
-func Debug(ctx context.Context, l client.Loader, c client.FabricClient, p client.Provider, etag types.ETag, project *composeTypes.Project, failedServices []string) error {
-	term.Debug("Invoking AI debugger for deployment", etag)
-	if project == nil {
-		var err error
-		project, err = l.LoadProject(ctx)
-		if err != nil {
-			return err
-		}
-	}
+func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, project *compose.Project, loadErr error) error {
+	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
 
-	files := findMatchingProjectFiles(project, failedServices)
+	files := findMatchingProjectFiles(project, nil)
 
 	if DoDryRun {
 		return ErrDryRun
 	}
 
 	req := defangv1.DebugRequest{
-		Etag:     etag,
-		Files:    files,
-		Services: failedServices,
-		Project:  project.Name,
+		Files:   files,
+		Project: project.Name,
+		Logs:    loadErr.Error(),
 	}
-	err := p.Query(ctx, &req)
-	if err != nil {
-		return err
-	}
+
 	resp, err := c.Debug(ctx, &req)
 	if err != nil {
 		return err
 	}
 
+	printDebugReport(resp)
+	return nil
+}
+
+func printDebugReport(resp *defangv1.DebugResponse) {
 	term.Println("")
 	term.Println("===================")
 	term.Println("Debugging Summary")
@@ -109,10 +172,6 @@ func Debug(ctx context.Context, l client.Loader, c client.FabricClient, p client
 			}
 		}
 	}
-	// for _, request := range resp.Requests {
-	// 	term.Info(request)
-	// }
-	return nil
 }
 
 func readFile(basepath, path string) *defangv1.File {
@@ -130,12 +189,12 @@ func readFile(basepath, path string) *defangv1.File {
 	}
 }
 
-func getServices(project *composeTypes.Project, names []string) composeTypes.Services {
+func getServices(project *compose.Project, names []string) compose.Services {
 	// project.GetServices(…) aborts if any service is not found, so we filter them out ourselves
 	if len(names) == 0 {
 		return project.Services
 	}
-	services := composeTypes.Services{}
+	services := compose.Services{}
 	for _, s := range names {
 		if svc, err := project.GetService(s); err != nil {
 			term.Debug("skipped for debugging:", err)
@@ -146,7 +205,7 @@ func getServices(project *composeTypes.Project, names []string) composeTypes.Ser
 	return services
 }
 
-func findMatchingProjectFiles(project *composeTypes.Project, services []string) []*defangv1.File {
+func findMatchingProjectFiles(project *compose.Project, services []string) []*defangv1.File {
 	var files []*defangv1.File
 
 	for _, path := range project.ComposeFiles {
