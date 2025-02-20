@@ -1,15 +1,18 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -87,4 +90,138 @@ func TestComposeUp(t *testing.T) {
 			t.Errorf("ComposeUp() failed: service %s not found", service.Service.Name)
 		}
 	}
+}
+
+func TestPrintEndpoints(t *testing.T) {
+	defaultTerm := term.DefaultTerm
+	t.Cleanup(func() {
+		term.DefaultTerm = defaultTerm
+	})
+
+	var stdout, stderr bytes.Buffer
+	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
+
+	printEndpoints([]*defangv1.ServiceInfo{
+		{
+			Service: &defangv1.Service{
+				Name: "service1",
+				Ports: []*defangv1.Port{
+					{Mode: defangv1.Mode_INGRESS},
+					{Mode: defangv1.Mode_HOST},
+				},
+			},
+			Status: "UNKNOWN",
+			Endpoints: []string{
+				"example.com",
+				"service1.internal",
+			},
+		}})
+	const want = ` * Service service1 has status UNKNOWN and will be available at:
+   - https://example.com
+   - service1.internal
+`
+	if got := stdout.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestGetUnreferencedManagedResources(t *testing.T) {
+	t.Run("no services", func(t *testing.T) {
+		project := types.Services{}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resources, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 0 {
+			t.Errorf("Expected 0 unmanaged resources, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
+
+	t.Run("one service all managed", func(t *testing.T) {
+		project := types.Services{
+			"service1": types.ServiceConfig{
+				Extensions: map[string]any{"x-defang-postgres": true},
+			},
+		}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 0 {
+			t.Errorf("Expected 0 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
+
+	t.Run("one service unmanaged", func(t *testing.T) {
+		project := types.Services{
+			"service1": types.ServiceConfig{},
+		}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 1 {
+			t.Errorf("Expected 1 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
+
+	t.Run("one service unmanaged, one service managed", func(t *testing.T) {
+		project := types.Services{
+			"service1": types.ServiceConfig{},
+			"service2": types.ServiceConfig{
+				Extensions: map[string]any{"x-defang-postgres": true},
+			},
+		}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 1 {
+			t.Errorf("Expected 1 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
+
+	t.Run("two service two unmanaged", func(t *testing.T) {
+		project := types.Services{
+			"service1": types.ServiceConfig{},
+			"service2": types.ServiceConfig{},
+		}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 0 {
+			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 2 {
+			t.Errorf("Expected 2 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
+
+	t.Run("one service two managed", func(t *testing.T) {
+		project := types.Services{
+			"service1": types.ServiceConfig{},
+			"service2": types.ServiceConfig{
+				Extensions: map[string]any{"x-defang-postgres": true},
+			},
+			"service3": types.ServiceConfig{
+				Extensions: map[string]any{"x-defang-redis": true},
+			},
+		}
+
+		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		if len(managed) != 2 {
+			t.Errorf("Expected 2 managed resource, got %d (%v)", len(managed), managed)
+		}
+		if len(unmanaged) != 1 {
+			t.Errorf("Expected 1 unmanaged resource, got %d (%s)", len(unmanaged), unmanaged)
+		}
+	})
 }
