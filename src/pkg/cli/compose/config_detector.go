@@ -1,11 +1,12 @@
-package compose
+// package compose
 
-//package main
+package main
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/DefangLabs/secret-detector/pkg/dataformat"
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 )
@@ -54,12 +55,40 @@ func printScanOutput(ds []secrets.DetectedSecret, err error) {
 }
 
 func main() {
+	// high entropy and keyword do not work
+	//"detectors": ["basic_auth", "high_entropy_string", "keyword", "url_password"],
 
-	scanner := scanner.NewDefaultScanner()
+	// load config from json
+	jsonCfg := `{
+		"transformers": ["json"],
+		"detectors": ["basic_auth", "url_password"],
+		"threshold_in_bytes": 1000000}`
+	cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
+	if err != nil {
+		errors.New("Failed to make a config detector")
+	}
 
-	command := "ENV GITHUB_KEY=ghu_bWIj6excOoiobxoT_g0Ke1BChnXsuH_6UKpr"
-	ds, err := scanner.ScanStringWithFormat(command, dataformat.Command)
+	// create a scanner
+	scannerClient, err := scanner.NewScannerFromConfig(cfg)
+	if err != nil {
+		fmt.Println("Failed to create scanner:", err)
+		return
+	}
 
+	var secrets string = "https://user:p455w0rd@example.com"
+	ds, err := scannerClient.Scan(secrets)
 	printScanOutput(ds, err)
 
 }
+
+//WORKS FINE
+// func main() {
+
+// 	scanner := scanner.NewDefaultScanner()
+
+// 	command := "ENV GITHUB_KEY=ghu_bWIj6excOoiobxoT_g0Ke1BChnXsuH_6UKpr"
+// 	ds, err := scanner.ScanStringWithFormat(command, dataformat.Command)
+
+// 	printScanOutput(ds, err)
+
+// }
