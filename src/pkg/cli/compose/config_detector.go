@@ -11,39 +11,6 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 )
 
-// func main() {
-
-// 	// load config from json
-// jsonCfg := `{
-// 	"transformers": ["json", "yaml"],
-// 	"detectors": ["basic_auth", "high_entropy_string", "keyword", "url_password"],
-// 	"threshold_in_bytes": 1000000}`
-// cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
-// if err != nil {
-// 	errors.New("Failed to make a config detector")
-// }
-
-// 	// create a scanner
-// 	scanner, err := scanner.NewScannerFromConfig(cfg)
-
-// 	//////
-// 	// scanner := scanner.NewDefaultScanner()
-
-// 	// // // scanner input can be a file path
-// 	// // detectedSecrets, err := scanner.ScanFile("path/to/file")
-// 	// // // or an io.Reader
-// 	// // var in io.Reader
-// 	// // detectedSecrets, err := scanner.ScanReader(in)
-// 	// // or just a simple string
-// 	// var secrets string = "PASSWORD: hBhwOs2e3m4DsaQ"
-// 	detectedSecrets, err := scanner.Scan("PASSWORD: hBhwOs2e3m4DsaQ")
-
-// 	// // print the results
-// 	for d := range detectedSecrets {
-// 		fmt.Printf("Secret of type '%s' found in '%s'\n", d.Type, d.Key)
-// 	}
-// }
-
 func printScanOutput(ds []secrets.DetectedSecret, err error) {
 	fmt.Println("secrets: ")
 	for _, d := range ds {
@@ -54,31 +21,39 @@ func printScanOutput(ds []secrets.DetectedSecret, err error) {
 	fmt.Println("err: ", err)
 }
 
-func main() {
-	// high entropy and keyword do not work
-	//"detectors": ["basic_auth", "high_entropy_string", "keyword", "url_password"],
+func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err error) {
+	// note: high entropy and keyword detectors do not work
 
-	// load config from json
+	// create a custom config for scanner from json
 	jsonCfg := `{
 		"transformers": ["json"],
-		"detectors": ["basic_auth", "url_password"],
+		"detectors": ["basic_auth", "high_entropy_string", "keyword", "url_password"],
 		"threshold_in_bytes": 1000000}`
 	cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
 	if err != nil {
-		errors.New("Failed to make a config detector")
+		return nil, errors.New("Failed to make a config detector: " + err.Error())
 	}
 
 	// create a scanner
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
-		fmt.Println("Failed to create scanner:", err)
-		return
+		return nil, errors.New("Failed to make a config detector: " + err.Error())
 	}
 
-	var secrets string = "https://user:p455w0rd@example.com"
-	ds, err := scannerClient.Scan(secrets)
-	printScanOutput(ds, err)
+	ds, err := scannerClient.Scan(input)
 
+	return ds, err
+
+	// printScanOutput(ds, err)
+}
+
+func main() {
+	// load config from json
+	ds1, err1 := detectConfig("LINK: https://user:p455w0rd@example.com, LINK2: https://user:p483w0rd@example.com")
+	if err1 != nil {
+		fmt.Println("Error: ", err1)
+	}
+	printScanOutput(ds1, err)
 }
 
 //WORKS FINE
