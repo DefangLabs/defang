@@ -51,6 +51,14 @@ func getMsg[T any](resp *connect.Response[T], err error) (*T, error) {
 	return resp.Msg, nil
 }
 
+func (g GrpcClient) GetController() defangv1connect.FabricControllerClient {
+	return g.client
+}
+
+func (g GrpcClient) GetTenantName() types.TenantName {
+	return g.TenantName
+}
+
 func (g *GrpcClient) SetClient(client defangv1connect.FabricControllerClient) {
 	g.client = client
 }

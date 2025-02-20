@@ -57,18 +57,18 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 	return grpcClient
 }
 
-func NewProvider(ctx context.Context, providerID client.ProviderID, grpcClient client.GrpcClient) (client.Provider, error) {
+func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
 	var provider client.Provider
 	term.Debugf("Creating %s provider", providerID)
 	switch providerID {
 	case client.ProviderAWS:
-		provider = aws.NewByocProvider(ctx, grpcClient.TenantName)
+		provider = aws.NewByocProvider(ctx, fabricClient.GetTenantName())
 	case client.ProviderDO:
-		provider = do.NewByocProvider(ctx, grpcClient.TenantName)
+		provider = do.NewByocProvider(ctx, fabricClient.GetTenantName())
 	case client.ProviderGCP:
-		provider = gcp.NewByocProvider(ctx, grpcClient.TenantName)
+		provider = gcp.NewByocProvider(ctx, fabricClient.GetTenantName())
 	default:
-		provider = &client.PlaygroundProvider{GrpcClient: grpcClient}
+		provider = &client.PlaygroundProvider{FabricClient: fabricClient}
 	}
 	_, err := provider.AccountInfo(ctx)
 	return provider, err

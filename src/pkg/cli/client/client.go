@@ -3,7 +3,9 @@ package client
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -27,7 +29,9 @@ type FabricClient interface {
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context) error
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
+	GetController() defangv1connect.FabricControllerClient
 	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
+	GetTenantName() types.TenantName
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetVersions(context.Context) (*defangv1.Version, error)
 	Publish(context.Context, *defangv1.PublishRequest) error

@@ -43,7 +43,7 @@ func TestDestroy(t *testing.T) {
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient := NewGrpcClient(ctx, url)
-	client := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
+	client := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	etag, err := client.Destroy(ctx, &defangv1.DestroyRequest{Project: "test-project"})
 	if err != nil {
