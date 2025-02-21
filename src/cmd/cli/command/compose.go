@@ -216,13 +216,14 @@ func makeComposeUpCmd() *cobra.Command {
 			if err := cli.Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
 				term.Debug("Tail stopped with", err)
 
+				// FIXME: This code needs to be refactored
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we wait for the deployment to finish
 					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
 					<-tailCtx.Done()
 					// Get the actual error from the context so we won't print "Error: missing tail permission"
 					err = context.Cause(tailCtx)
-				} else if !(errors.Is(tailCtx.Err(), context.Canceled) || errors.Is(tailCtx.Err(), context.DeadlineExceeded)) {
+				} else if !(errors.Is(tailCtx.Err(), context.Canceled) || errors.Is(tailCtx.Err(), context.DeadlineExceeded) || errors.As(err, &pkg.ErrDeploymentFailed{})) {
 					return err // any error other than cancelation
 				}
 
