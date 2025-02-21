@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
-	"github.com/DefangLabs/secret-detector/pkg/secrets"
 )
 
 // func printScanOutput(ds []secrets.DetectedSecret, err error) {
@@ -22,7 +21,7 @@ import (
 
 // assume that the input is the value of a key-value pair
 
-func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err error) {
+func detectConfig(input string) (detectorTypes []string, err error) {
 	// note: high entropy and keyword detectors do not work
 
 	// create a custom config for scanner from json
@@ -34,7 +33,6 @@ func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err e
 	if err != nil {
 		return nil, errors.New("Failed to make a config detector: " + err.Error())
 	}
-
 	// create a scanner
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
@@ -46,15 +44,16 @@ func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err e
 		return nil, errors.New("Failed to scan input: " + err.Error())
 	}
 
-	if len(ds) > 1 {
-		return nil, errors.New("more than one secret detected")
-	}
-
 	if len(ds) == 0 {
 		return nil, errors.New("no secrets detected")
 	}
 
-	return ds, nil
+	list := []string{}
+	for _, d := range ds {
+		list = append(list, d.Type)
+	}
+
+	return list, nil
 	// printScanOutput(ds, err)
 }
 

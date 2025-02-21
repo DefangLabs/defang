@@ -3,35 +3,41 @@ package compose
 import "testing"
 
 func TestDetectConfig(t *testing.T) {
-	type Expected struct {
-		DetectorType string
-		Key          string
-		Value        string
-	}
 	tests := []struct {
-		input    string
-		expected Expected
+		input          string
+		expectedOutput []string
 	}{
-		{"basic dTpw", Expected{DetectorType: "HTTP Basic Authentication", Key: "", Value: "basic dTpw"}},
-		{"https://user:p455w0rd@example.com", Expected{DetectorType: "URL with password", Key: "", Value: "https://user:p455w0rd@example.com"}},
+		{"", []string{""}},
+		{"not a secret", []string{""}},
+		{"basic dTpw", []string{"HTTP Basic Authentication"}},
+		{"https://user:p455w0rd@example.com", []string{"URL with password"}},
+		{"LINK: https://user:p455w0rd@example.com, LINK: https://user:p845w0rd@example.com", []string{"URL with password", "URL with password"}},
 	}
 
 	for _, tt := range tests {
 		ds, err := detectConfig(tt.input)
+
+		//check for error
 		if err != nil {
-			t.Errorf("Error: %v", err)
+			if len(tt.expectedOutput) > 0 && tt.expectedOutput[0] != "" {
+				t.Errorf("Error: %v", err)
+			}
+			continue
 		}
-		for _, d := range ds {
-			if d.Type != tt.expected.DetectorType {
-				t.Errorf("Expected detector type %s, but got %s", tt.expected.DetectorType, d.Type)
-			}
-			if d.Key != tt.expected.Key {
-				t.Errorf("Expected key %s, but got %s", tt.expected.Key, d.Key)
-			}
-			if d.Value != tt.expected.Value {
-				t.Errorf("Expected value %s, but got %s", tt.expected.Value, d.Value)
+
+		// check for length of the output
+		if len(ds) != len(tt.expectedOutput) {
+			t.Errorf("Expected %d detector types, but got %d", len(tt.expectedOutput), len(ds))
+			continue
+		}
+
+		// check for the output match
+		for i, d := range ds {
+			if d != tt.expectedOutput[i] {
+				t.Errorf("Expected detector type %s, but got %s", tt.expectedOutput[i], d)
 			}
 		}
+
 	}
 
 }
