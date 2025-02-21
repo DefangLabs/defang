@@ -529,12 +529,12 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			for subscribeStream.Receive() {
 				msg := subscribeStream.Msg()
 				if msg.State == defangv1.ServiceState_BUILD_FAILED || msg.State == defangv1.ServiceState_DEPLOYMENT_FAILED {
-					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
+					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
 					cancel(fmt.Errorf("CD job failed %s", msg.Status))
 					return
 				}
 				if msg.State == defangv1.ServiceState_DEPLOYMENT_COMPLETED {
-					pkg.SleepWithContext(ctx, 1*time.Second) // Make sure the logs are flushed
+					pkg.SleepWithContext(ctx, 3*time.Second) // Make sure the logs are flushed, gcp logs has a longer delay, thus 3s
 					cancel(io.EOF)
 					return
 				}
