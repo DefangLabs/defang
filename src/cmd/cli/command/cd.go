@@ -120,6 +120,32 @@ var cdCancelCmd = &cobra.Command{
 	},
 }
 
+var cdExportCmd = &cobra.Command{
+	Use:         "export",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
+	Short:       "Export the service stack state",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "export")
+	},
+}
+
 var cdTearDownCmd = &cobra.Command{
 	Use:   "teardown",
 	Args:  cobra.NoArgs,
@@ -196,5 +222,31 @@ var cdPreviewCmd = &cobra.Command{
 			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
+	},
+}
+
+var cdUpgradeCmd = &cobra.Command{
+	Use:         "upgrade",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,
+	Short:       "Upgrade the provider",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		provider, err := getProvider(cmd.Context(), loader)
+		if err != nil {
+			return err
+		}
+
+		projectName, err := cliClient.LoadProjectNameWithFallback(cmd.Context(), loader, provider)
+		if err != nil {
+			return err
+		}
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
+		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "upgrade")
 	},
 }
