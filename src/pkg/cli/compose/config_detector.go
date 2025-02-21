@@ -1,25 +1,26 @@
-// package compose
+package compose
 
-package main
+// package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 )
 
-func printScanOutput(ds []secrets.DetectedSecret, err error) {
-	fmt.Println("secrets: ")
-	for _, d := range ds {
-		fmt.Printf("\ttype: %s\n", d.Type)
-		fmt.Printf("\tkey: %s\n", d.Key)
-		fmt.Printf("\tvalue: %s\n", d.Value)
-	}
-	fmt.Println("err: ", err)
-}
+// func printScanOutput(ds []secrets.DetectedSecret, err error) {
+// 	fmt.Println("secrets: ")
+// 	for _, d := range ds {
+// 		fmt.Printf("\ttype: %s\n", d.Type)
+// 		fmt.Printf("\tkey: %s\n", d.Key)
+// 		fmt.Printf("\tvalue: %s\n", d.Value)
+// 	}
+// 	fmt.Println("err: ", err)
+// }
+
+// assume that the input is the value of a key-value pair
 
 func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err error) {
 	// note: high entropy and keyword detectors do not work
@@ -41,20 +42,30 @@ func detectConfig(input string) (detectedSecrets []secrets.DetectedSecret, err e
 	}
 
 	ds, err := scannerClient.Scan(input)
+	if err != nil {
+		return nil, errors.New("Failed to scan input: " + err.Error())
+	}
 
-	return ds, err
+	if len(ds) > 1 {
+		return nil, errors.New("more than one secret detected")
+	}
 
+	if len(ds) == 0 {
+		return nil, errors.New("no secrets detected")
+	}
+
+	return ds, nil
 	// printScanOutput(ds, err)
 }
 
-func main() {
-	// load config from json
-	ds1, err1 := detectConfig("LINK: https://user:p455w0rd@example.com, LINK2: https://user:p483w0rd@example.com")
-	if err1 != nil {
-		fmt.Println("Error: ", err1)
-	}
-	printScanOutput(ds1, err)
-}
+// func main() {
+// 	// load config from json
+// 	ds1, err1 := detectConfig("basic dTpw")
+// 	if err1 != nil {
+// 		fmt.Println("Error: ", err1)
+// 	}
+// 	printScanOutput(ds1, err1)
+// }
 
 //WORKS FINE
 // func main() {
