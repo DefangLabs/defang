@@ -1,10 +1,14 @@
 package byoc
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestTopologicalSort(t *testing.T) {
@@ -43,5 +47,86 @@ func TestTopologicalSort(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type mockGetServiceInfosProvider struct {
+	client.Provider
+	*ByocBaseClient
+}
+
+func (m mockGetServiceInfosProvider) UpdateServiceInfo(ctx context.Context, serviceInfo *defangv1.ServiceInfo, projectName, delegateDomain string, service composeTypes.ServiceConfig) error {
+	serviceInfo.ZoneId = "test-zone-id"
+	return nil
+}
+
+func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
+	return nil, nil
+}
+
+// The array order has to be 3, 2, 1 because of the dependencies
+var expectedServiceInfosJson = `[
+  {
+    "service": {
+      "name": "service3"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  },
+  {
+    "service": {
+      "name": "service2"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  },
+  {
+    "service": {
+      "name": "service1"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  }
+]`
+
+func TestGetServiceInfos(t *testing.T) {
+	var testProvider mockGetServiceInfosProvider
+	testProvider.ByocBaseClient = NewByocBaseClient(context.Background(), "test-tenant", &testProvider)
+
+	serviceInfos, err := testProvider.GetServiceInfos(context.Background(), "test-project", "test-delegate-domain", "test-etag",
+		map[string]composeTypes.ServiceConfig{
+			"service1": {
+				Name:      "service1",
+				Image:     "test-image1",
+				DependsOn: map[string]composeTypes.ServiceDependency{"service2": {}, "service3": {}},
+			},
+			"service2": {
+				Name:      "service2",
+				Image:     "test-image2",
+				DependsOn: map[string]composeTypes.ServiceDependency{"service3": {}},
+			},
+			"service3": {
+				Name:  "service3",
+				Image: "test-image3",
+			},
+		})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b, err := json.MarshalIndent(serviceInfos, "", "  ")
+	if err != nil {
+		t.Fatalf("unexpected error while marshalling serviceInfos to json: %v", err)
+	}
+	if string(b) != expectedServiceInfosJson {
+		t.Errorf("expected %s, got %s", expectedServiceInfosJson, string(b))
 	}
 }
