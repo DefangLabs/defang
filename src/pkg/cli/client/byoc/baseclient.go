@@ -219,12 +219,12 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 		if node.Visited {
 			return
 		}
+		node.Visited = true
 
 		for _, dep := range node.Deps {
 			visit(nodes[dep])
 		}
 
-		node.Visited = true
 		serviceInfos = append(serviceInfos, node.ServiceInfo)
 	}
 

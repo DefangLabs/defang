@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -64,6 +65,12 @@ func (m mockGetServiceInfosProvider) GetProjectUpdate(context.Context, string) (
 	return nil, nil
 }
 
+func NewMockGetServiceInfosProvider() *mockGetServiceInfosProvider {
+	p := &mockGetServiceInfosProvider{}
+	p.ByocBaseClient = NewByocBaseClient(context.Background(), "test-tenant", p)
+	return p
+}
+
 // The array order has to be 3, 2, 1 because of the dependencies
 var expectedServiceInfosJson = `[
   {
@@ -99,8 +106,7 @@ var expectedServiceInfosJson = `[
 ]`
 
 func TestGetServiceInfos(t *testing.T) {
-	var testProvider mockGetServiceInfosProvider
-	testProvider.ByocBaseClient = NewByocBaseClient(context.Background(), "test-tenant", &testProvider)
+	testProvider := NewMockGetServiceInfosProvider()
 
 	serviceInfos, err := testProvider.GetServiceInfos(context.Background(), "test-project", "test-delegate-domain", "test-etag",
 		map[string]composeTypes.ServiceConfig{
@@ -128,5 +134,40 @@ func TestGetServiceInfos(t *testing.T) {
 	}
 	if string(b) != expectedServiceInfosJson {
 		t.Errorf("expected %s, got %s", expectedServiceInfosJson, string(b))
+	}
+}
+
+func TestGetServiceInfosWithTestData(t *testing.T) {
+	var tests = map[string]string{
+		"a->b,c, b->c": "../../../../testdata/dependson/compose.yaml",
+	}
+
+	for name, path := range tests {
+		t.Run(name, func(t *testing.T) {
+			loader := compose.NewLoader(compose.WithPath(path))
+			proj, err := loader.LoadProject(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			testProvider := NewMockGetServiceInfosProvider()
+			serviceInfos, err := testProvider.GetServiceInfos(context.Background(), proj.Name, "test-delegate-domain", "test-etag", proj.Services)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			indexMap := make(map[string]int)
+			for i, si := range serviceInfos {
+				indexMap[si.Service.Name] = i
+			}
+
+			for _, si := range serviceInfos {
+				for dep := range proj.Services[si.Service.Name].DependsOn {
+					if indexMap[si.Service.Name] < indexMap[dep] {
+						t.Errorf("dependency %q is not before %q", dep, si.Service.Name)
+					}
+				}
+			}
+		})
 	}
 }
