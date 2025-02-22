@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
+	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.148.0")
 )
 
 type StsProviderAPI interface {
@@ -147,6 +147,7 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
+			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + PulumiVersion,
 			Name:      ecs.CdContainerName,
 			Cpus:      2.0,
@@ -215,7 +216,7 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	serviceInfos := []*defangv1.ServiceInfo{}
+	var serviceInfos []*defangv1.ServiceInfo
 	for _, service := range project.Services {
 		serviceInfo, err := b.update(ctx, project.Name, req.DelegateDomain, service)
 		if err != nil {
@@ -957,6 +958,7 @@ func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName strin
 		if stack != "" {
 			stacks = append(stacks, stack)
 		}
+		// TODO: check for lock files
 	}
 	return stacks, nil
 }

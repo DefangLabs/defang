@@ -148,8 +148,7 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 
 	etag := pkg.RandomID()
 
-	serviceInfos := []*defangv1.ServiceInfo{}
-
+	var serviceInfos []*defangv1.ServiceInfo
 	for _, service := range project.Services {
 		serviceInfo := b.update(service, project.Name)
 		serviceInfo.Etag = etag
