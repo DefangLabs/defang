@@ -6,7 +6,6 @@
     },
     "command": null,
     "deploy": {
-      "replicas": 1,
       "resources": {
         "limits": {
           "memory": "268435456"
