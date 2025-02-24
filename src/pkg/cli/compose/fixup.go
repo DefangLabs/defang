@@ -34,13 +34,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
 
 	for _, svccfg := range project.Services {
-		if svccfg.Deploy != nil {
-			if svccfg.Deploy.Replicas == nil {
-				one := 1 // default to one replica per service; allow the user to override this to 0
-				svccfg.Deploy.Replicas = &one
-			}
-		}
-
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
