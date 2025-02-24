@@ -181,7 +181,6 @@ func makeComposeUpCmd() *cobra.Command {
 				defer cancelTimeout()
 			}
 
-			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
 			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 			go func() {
@@ -193,7 +192,7 @@ func makeComposeUpCmd() *cobra.Command {
 						term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
 					}
 				} else {
-					cancelTail(errCompleted)
+					cancelTail(cli.ErrDeploymentCompleted)
 				}
 			}()
 
@@ -268,7 +267,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			if errors.Is(context.Cause(tailCtx), errCompleted) {
+			if errors.Is(context.Cause(tailCtx), cli.ErrDeploymentCompleted) {
 				for _, service := range deploy.Services {
 					service.State = targetState
 				}

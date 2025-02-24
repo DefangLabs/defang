@@ -32,7 +32,8 @@ const (
 )
 
 var (
-	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
+	colorKeyRegex          = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
+	ErrDeploymentCompleted = errors.New("deployment completed")                                                                  // tail canceled because of deployment completion
 )
 
 type ServiceStatus string
