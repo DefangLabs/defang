@@ -76,6 +76,7 @@ type TailOptions struct {
 	Verbose            bool
 	LogType            logs.LogType
 	Filter             string
+	WaitTimeout        int
 }
 
 func (to TailOptions) String() string {
