@@ -58,17 +58,17 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 
 			const delegateDomain = "example.com"
 
-			endpoint := b.getEndpoint(tt.Fqn, tt.ProjectName, delegateDomain, tt.Port)
+			endpoint := b.GetEndpoint(tt.Fqn, tt.ProjectName, delegateDomain, tt.Port)
 			if endpoint != tt.EndPoint {
 				t.Errorf("expected endpoint %q, got %q", tt.EndPoint, endpoint)
 			}
 
-			publicFqdn := b.getPublicFqdn(tt.ProjectName, delegateDomain, tt.Fqn)
+			publicFqdn := b.GetPublicFqdn(tt.ProjectName, delegateDomain, tt.Fqn)
 			if publicFqdn != tt.PublicFqdn {
 				t.Errorf("expected public fqdn %q, got %q", tt.PublicFqdn, publicFqdn)
 			}
 
-			privateFqdn := b.getPrivateFqdn(tt.ProjectName, tt.Fqn)
+			privateFqdn := b.GetPrivateFqdn(tt.ProjectName, tt.Fqn)
 			if privateFqdn != tt.PrivateFqdn {
 				t.Errorf("expected private fqdn %q, got %q", tt.PrivateFqdn, privateFqdn)
 			}

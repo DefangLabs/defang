@@ -27,7 +27,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
 	"google.golang.org/grpc/codes"
@@ -406,11 +405,9 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 
 	etag := pkg.RandomID()
 
-	var serviceInfos []*defangv1.ServiceInfo
-	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name, req.DelegateDomain)
-		serviceInfo.Etag = etag
-		serviceInfos = append(serviceInfos, serviceInfo)
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
@@ -464,34 +461,8 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, nil
 }
 
-func (b *ByocGcp) update(service composeTypes.ServiceConfig, projectName, delegateDomain string) *defangv1.ServiceInfo {
-	si := &defangv1.ServiceInfo{
-		Project: projectName,
-		Service: &defangv1.Service{Name: service.Name},
-	}
-
-	for _, port := range service.Ports {
-		mode := defangv1.Mode_INGRESS
-		if port.Mode == compose.Mode_HOST {
-			mode = defangv1.Mode_HOST
-		}
-
-		si.Endpoints = append(si.Endpoints, fmt.Sprintf("%v.%v.%v.%v", service.Name, b.PulumiStack, projectName, delegateDomain))
-		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-			Target: port.Target,
-			Mode:   mode,
-		})
-	}
-
-	// TODO: Public FQDN
-
-	si.Status = "UPDATE_QUEUED"
-	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if service.Build != nil {
-		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
-		si.State = defangv1.ServiceState_BUILD_QUEUED
-	}
-	return si
+func (b *ByocGcp) GetStackName() string {
+	return b.PulumiStack
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
