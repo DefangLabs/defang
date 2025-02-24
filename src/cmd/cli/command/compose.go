@@ -23,28 +23,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func isManagedService(service compose.ServiceConfig) bool {
-	if service.Extensions == nil {
-		return false
-	}
-
-	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
-}
-
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
-	var managedServices []string
-	var unmanagedServices []string
-	for _, service := range serviceInfos {
-		if isManagedService(service) {
-			managedServices = append(managedServices, service.Name)
-		} else {
-			unmanagedServices = append(unmanagedServices, service.Name)
-		}
-	}
-
-	return managedServices, unmanagedServices
-}
-
 func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 	projOpts, err := loader.NewProjectOptions()
 	if err != nil {
@@ -117,7 +95,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+			managedServices, _ := cli.SplitManagedAndUnmanagedServices(project.Services)
 
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
