@@ -1,0 +1,32 @@
+name: dependson
+services:
+  service1:
+    depends_on:
+      service2:
+        condition: service_started
+        required: true
+      service3:
+        condition: service_started
+        required: true
+    image: alpine
+    networks:
+      default: null
+  service2:
+    depends_on:
+      service3:
+        condition: service_started
+        required: true
+    image: alpine
+    networks:
+      default: null
+  service3:
+    depends_on:
+      service3:
+        condition: service_started
+        required: true
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: dependson_default

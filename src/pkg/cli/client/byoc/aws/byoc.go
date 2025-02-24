@@ -216,14 +216,9 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	var serviceInfos []*defangv1.ServiceInfo
-	for _, service := range project.Services {
-		serviceInfo, err := b.update(ctx, project.Name, req.DelegateDomain, service)
-		if err != nil {
-			return nil, fmt.Errorf("service %q: %w", service.Name, err)
-		}
-		serviceInfo.Etag = etag // same etag for all services
-		serviceInfos = append(serviceInfos, serviceInfo)
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
 	}
 
 	// Ensure all service endpoints are unique
@@ -758,108 +753,27 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 	return groups
 }
 
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
-	if err := compose.ValidateService(&service); err != nil {
-		return nil, err
+func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInfo, projectName, delegateDomain string, service composeTypes.ServiceConfig) error {
+	if service.DomainName == "" {
+		return nil
 	}
-
-	pkg.Ensure(projectName != "", "ProjectName not set")
-	si := &defangv1.ServiceInfo{
-		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project: projectName,    // was: tenant
-		Service: &defangv1.Service{Name: service.Name},
-	}
-
-	hasHost := false
-	hasIngress := false
-	fqn := service.Name
-	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
-		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
-			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, projectName, delegateDomain, &port))
-			mode := defangv1.Mode_INGRESS
-			if port.Mode == compose.Mode_HOST {
-				mode = defangv1.Mode_HOST
-			}
-			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-				Target: port.Target,
-				Mode:   mode,
-			})
+	// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
+	cname, _ := net.LookupCNAME(service.DomainName)
+	if dns.Normalize(cname) != si.PublicFqdn {
+		dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+		zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
+		if err != nil {
+			return err
 		}
-	} else {
-		si.PublicFqdn = b.getPublicFqdn(projectName, delegateDomain, fqn)
-		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
-	}
-	if hasIngress {
-		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
-		si.PublicFqdn = b.getPublicFqdn(projectName, delegateDomain, fqn)
-	}
-	if hasHost {
-		si.PrivateFqdn = b.getPrivateFqdn(projectName, fqn)
-	}
-
-	if service.DomainName != "" {
-		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
-			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
-		}
-		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
-		cname, _ := net.LookupCNAME(service.DomainName)
-		if dns.Normalize(cname) != si.PublicFqdn {
-			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
-			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
-			if err != nil {
-				return nil, err
-			}
-			if zoneId == "" {
-				si.UseAcmeCert = true
-				// TODO: We should add link to documentation on how the acme cert workflow works
-				// TODO: Should we make this the default behavior or require the user to set a flag?
-			} else {
-				si.ZoneId = zoneId
-			}
+		if zoneId == "" {
+			si.UseAcmeCert = true
+			// TODO: We should add link to documentation on how the acme cert workflow works
+			// TODO: Should we make this the default behavior or require the user to set a flag?
+		} else {
+			si.ZoneId = zoneId
 		}
 	}
-
-	si.Status = "UPDATE_QUEUED"
-	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if service.Build != nil {
-		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
-		si.State = defangv1.ServiceState_BUILD_QUEUED
-	}
-	return si, nil
-}
-
-type qualifiedName = string // legacy
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, projectName, delegateDomain string, port *composeTypes.ServicePortConfig) string {
-	if port.Mode == compose.Mode_HOST {
-		privateFqdn := b.getPrivateFqdn(projectName, fqn)
-		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
-	}
-	projectDomain := b.GetProjectDomain(projectName, delegateDomain)
-	if projectDomain == "" {
-		return ":443" // placeholder for the public ALB/distribution
-	}
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getPublicFqdn(projectName, delegateDomain, fqn qualifiedName) string {
-	if projectName == "" {
-		return "" //b.fqdn
-	}
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.GetProjectDomain(projectName, delegateDomain))
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getPrivateFqdn(projectName string, fqn qualifiedName) string {
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, byoc.GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
+	return nil
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {

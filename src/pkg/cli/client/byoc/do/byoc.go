@@ -32,7 +32,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -148,11 +147,9 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 
 	etag := pkg.RandomID()
 
-	var serviceInfos []*defangv1.ServiceInfo
-	for _, service := range project.Services {
-		serviceInfo := b.update(service, project.Name)
-		serviceInfo.Etag = etag
-		serviceInfos = append(serviceInfos, serviceInfo)
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
 	}
 
 	// Ensure all service endpoints are unique
@@ -719,33 +716,6 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
 	}
 	return env
-}
-
-func (b *ByocDo) update(service composeTypes.ServiceConfig, projectName string) *defangv1.ServiceInfo {
-	si := &defangv1.ServiceInfo{
-		Etag:    pkg.RandomID(),
-		Project: projectName,
-		Service: &defangv1.Service{Name: service.Name},
-	}
-
-	for _, port := range service.Ports {
-		mode := defangv1.Mode_INGRESS
-		if port.Mode == compose.Mode_HOST {
-			mode = defangv1.Mode_HOST
-		}
-		si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-			Target: port.Target,
-			Mode:   mode,
-		})
-	}
-
-	si.Status = "UPDATE_QUEUED"
-	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if service.Build != nil {
-		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
-		si.State = defangv1.ServiceState_BUILD_QUEUED
-	}
-	return si
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
