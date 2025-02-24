@@ -65,7 +65,6 @@ func makeComposeUpCmd() *cobra.Command {
 				upload = compose.UploadModeForce
 			}
 
-			since := time.Now()
 			loader := configureLoader(cmd)
 
 			ctx := cmd.Context()
@@ -150,111 +149,42 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			tailCtx, cancelTail := context.WithCancelCause(ctx)
-			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
-
-			if waitTimeout >= 0 {
-				var cancelTimeout context.CancelFunc
-				tailCtx, cancelTimeout = context.WithTimeout(tailCtx, time.Duration(waitTimeout)*time.Second)
-				defer cancelTimeout()
-			}
-
-			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
-			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-
-			go func() {
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
-					var errDeploymentFailed pkg.ErrDeploymentFailed
-					if errors.As(err, &errDeploymentFailed) {
-						cancelTail(err)
-					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-						term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
-					}
-				} else {
-					cancelTail(errCompleted)
-				}
-			}()
-
-			// show users the current streaming logs
-			tailSource := "all services"
-			if deploy.Etag != "" {
-				tailSource = "deployment ID " + deploy.Etag
-			}
-
-			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
-
-			// blocking call to tail
+			now := time.Now()
 			tailOptions := cli.TailOptions{
-				Etag:    deploy.Etag,
-				Since:   since,
-				Raw:     false,
-				Verbose: verbose,
-				LogType: logs.LogTypeAll,
+				Since:       now,
+				WaitTimeout: waitTimeout,
+				Verbose:     verbose,
 			}
-			if err := cli.Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
-				term.Debug("Tail stopped with", err)
 
-				// FIXME: This code needs to be refactored
-				if connect.CodeOf(err) == connect.CodePermissionDenied {
-					// If tail fails because of missing permission, we wait for the deployment to finish
-					term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
-					<-tailCtx.Done()
-					// Get the actual error from the context so we won't print "Error: missing tail permission"
-					err = context.Cause(tailCtx)
-				} else if !(errors.Is(tailCtx.Err(), context.Canceled) || errors.Is(tailCtx.Err(), context.DeadlineExceeded) || errors.As(err, &pkg.ErrDeploymentFailed{})) {
-					return err // any error other than cancelation
-				}
-
-				// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
-				if errors.Is(context.Cause(tailCtx), context.Canceled) {
-					// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
-					term.Warn("Deployment is not finished. Service(s) might not be running.")
-					return err
-				} else if errors.Is(context.Cause(tailCtx), context.DeadlineExceeded) {
-					// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
-					term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
-					return err
-				}
-
-				var errDeploymentFailed pkg.ErrDeploymentFailed
-				if errors.As(context.Cause(tailCtx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
-					// Tail got canceled because of deployment failure: prompt to show the debugger
-					term.Warn(errDeploymentFailed)
-					if !nonInteractive {
-						var failedServices []string
-						if errDeploymentFailed.Service != "" {
-							failedServices = []string{errDeploymentFailed.Service}
-						}
-						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
-
-						// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-						var debugConfig = cli.DebugConfig{
-							Etag:           deploy.Etag,
-							FailedServices: failedServices,
-							Project:        project,
-							Provider:       provider,
-							Since:          since,
-						}
-						if nil == cli.InteractiveDebugDeployment(cmd.Context(), client, debugConfig) {
-							return err // don't show the defang hint if debugging was successful
-						}
+			err = cli.TailUp(ctx, provider, project, deploy, tailOptions)
+			var errDeploymentFailed pkg.ErrDeploymentFailed
+			if errors.As(context.Cause(ctx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
+				// Tail got canceled because of deployment failure: prompt to show the debugger
+				term.Warn(errDeploymentFailed)
+				if !nonInteractive {
+					var failedServices []string
+					if errDeploymentFailed.Service != "" {
+						failedServices = []string{errDeploymentFailed.Service}
 					}
-					tailOptions.Verbose = true // show all logs for debugging
-					printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
-					return err
+					track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+
+					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
+					var debugConfig = cli.DebugConfig{
+						Etag:           deploy.Etag,
+						FailedServices: failedServices,
+						Project:        project,
+						Provider:       provider,
+						Since:          now,
+					}
+					if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+						return err // don't show the defang hint if debugging was successful
+					}
 				}
+				tailOptions.Verbose = true // show all logs for debugging
+				printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
+				return err
 			}
 
-			// Print the current service states of the deployment
-			if errors.Is(context.Cause(tailCtx), errCompleted) {
-				for _, service := range deploy.Services {
-					service.State = targetState
-				}
-
-				printEndpoints(deploy.Services)
-			}
-
-			term.Info("Done.")
 			return nil
 		},
 	}

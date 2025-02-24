@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -139,6 +142,93 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 		}
 	}
 	return resp, project, nil
+}
+
+func TailUp(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, tailOptions TailOptions) error {
+	ctx, cancelTail := context.WithCancelCause(ctx)
+	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+
+	if tailOptions.WaitTimeout >= 0 {
+		var cancelTimeout context.CancelFunc
+		ctx, cancelTimeout = context.WithTimeout(ctx, time.Duration(tailOptions.WaitTimeout)*time.Second)
+		defer cancelTimeout()
+	}
+	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+
+	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+
+	go func() {
+		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
+			var errDeploymentFailed pkg.ErrDeploymentFailed
+			if errors.As(err, &errDeploymentFailed) {
+				cancelTail(err)
+			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
+			}
+		} else {
+			cancelTail(errCompleted)
+		}
+	}()
+
+	// show users the current streaming logs
+	tailSource := "all services"
+	if deploy.Etag != "" {
+		tailSource = "deployment ID " + deploy.Etag
+	}
+
+	term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
+
+	if tailOptions.Etag == "" {
+		tailOptions.Etag = deploy.Etag
+	}
+	if tailOptions.Since.IsZero() {
+		tailOptions.Since = time.Now()
+	}
+	if tailOptions.LogType == logs.LogTypeUnspecified {
+		tailOptions.LogType = logs.LogTypeAll
+	}
+
+	err := Tail(ctx, provider, project.Name, tailOptions)
+	if err != nil {
+		term.Debug("Tail stopped with", err)
+
+		if connect.CodeOf(err) == connect.CodePermissionDenied {
+			// If tail fails because of missing permission, we wait for the deployment to finish
+			term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
+			<-ctx.Done()
+			// Get the actual error from the context so we won't print "Error: missing tail permission"
+			err = context.Cause(ctx)
+		} else if !(errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
+			return err // any error other than cancelation
+		}
+
+		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
+		if errors.Is(context.Cause(ctx), context.Canceled) {
+			// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
+			term.Warn("Deployment is not finished. Service(s) might not be running.")
+			return err
+		} else if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
+			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
+			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
+			return err
+		}
+
+		return err
+	}
+
+	// Print the current service states of the deployment
+	if errors.Is(context.Cause(ctx), errCompleted) {
+		for _, service := range deploy.Services {
+			service.State = targetState
+		}
+
+		printEndpoints(deploy.Services)
+	}
+
+	term.Info("Done.")
+
+	return nil
 }
 
 func SplitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
