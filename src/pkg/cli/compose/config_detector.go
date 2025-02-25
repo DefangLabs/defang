@@ -22,12 +22,11 @@ import (
 // assume that the input is the value of a key-value pair
 
 func detectConfig(input string) (detectorTypes []string, err error) {
-	// note: high entropy and keyword detectors do not work
-
 	// create a custom config for scanner from json
 	jsonCfg := `{
 		"transformers": ["json"],
 		"detectors": ["basic_auth", "high_entropy_string", "keyword", "url_password"],
+		"detectors_configs": {"keyword": ["3"], "high_entropy_string": ["3"]},
 		"threshold_in_bytes": 1000000}`
 	cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
 	if err != nil {
