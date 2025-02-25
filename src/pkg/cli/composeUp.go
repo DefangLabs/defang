@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -182,4 +183,72 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 	}
 
 	return nil
+}
+
+func WaitAndTail(ctx context.Context, project *compose.Project, client client.GrpcClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
+	ctx, cancelTail := context.WithCancelCause(ctx)
+	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+
+	if waitTimeout >= 0 {
+		var cancelTimeout context.CancelFunc
+		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
+		defer cancelTimeout()
+	}
+
+	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+
+	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+	go func() {
+		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
+			var errDeploymentFailed pkg.ErrDeploymentFailed
+			if errors.As(err, &errDeploymentFailed) {
+				cancelTail(err)
+			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
+			}
+		} else {
+			for _, service := range deploy.Services {
+				service.State = targetState
+			}
+
+			cancelTail(errCompleted)
+		}
+	}()
+
+	// blocking call to tail
+	tailOptions := TailOptions{
+		Etag:    deploy.Etag,
+		Since:   since,
+		Raw:     false,
+		Verbose: verbose,
+		LogType: logs.LogTypeAll,
+	}
+	err := TailUp(ctx, provider, project, deploy, tailOptions)
+	if !errors.Is(context.Cause(ctx), errCompleted) {
+		return err
+	}
+	return nil
+}
+
+func isManagedService(service compose.ServiceConfig) bool {
+	if service.Extensions == nil {
+		return false
+	}
+
+	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
+}
+
+func SplitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
+	var managedServices []string
+	var unmanagedServices []string
+	for _, service := range serviceInfos {
+		if isManagedService(service) {
+			managedServices = append(managedServices, service.Name)
+		} else {
+			unmanagedServices = append(unmanagedServices, service.Name)
+		}
+	}
+
+	return managedServices, unmanagedServices
 }

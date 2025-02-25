@@ -23,28 +23,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func isManagedService(service compose.ServiceConfig) bool {
-	if service.Extensions == nil {
-		return false
-	}
-
-	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
-}
-
-func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
-	var managedServices []string
-	var unmanagedServices []string
-	for _, service := range serviceInfos {
-		if isManagedService(service) {
-			managedServices = append(managedServices, service.Name)
-		} else {
-			unmanagedServices = append(unmanagedServices, service.Name)
-		}
-	}
-
-	return managedServices, unmanagedServices
-}
-
 func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 	projOpts, err := loader.NewProjectOptions()
 	if err != nil {
@@ -69,8 +47,6 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 
 	return project, nil
 }
-
-const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
@@ -119,7 +95,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			managedServices, _ := splitManagedAndUnmanagedServices(project.Services)
+			managedServices, _ := cli.SplitManagedAndUnmanagedServices(project.Services)
 
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
@@ -182,7 +158,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			err = WaitAndTail(ctx, project, client, provider, deploy, time.Duration(waitTimeout)*time.Second, since)
+			err = cli.WaitAndTail(ctx, project, client, provider, deploy, time.Duration(waitTimeout)*time.Second, since, verbose)
 			if err != nil {
 				var errDeploymentFailed pkg.ErrDeploymentFailed
 				if errors.As(context.Cause(ctx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
@@ -229,51 +205,6 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
-}
-
-func WaitAndTail(ctx context.Context, project *compose.Project, client cliClient.GrpcClient, provider cliClient.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time) error {
-	ctx, cancelTail := context.WithCancelCause(ctx)
-	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
-
-	if waitTimeout >= 0 {
-		var cancelTimeout context.CancelFunc
-		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
-		defer cancelTimeout()
-	}
-
-	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
-
-	_, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
-	go func() {
-		if err := cli.WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
-			var errDeploymentFailed pkg.ErrDeploymentFailed
-			if errors.As(err, &errDeploymentFailed) {
-				cancelTail(err)
-			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
-			}
-		} else {
-			for _, service := range deploy.Services {
-				service.State = targetState
-			}
-
-			cancelTail(errCompleted)
-		}
-	}()
-
-	// blocking call to tail
-	tailOptions := cli.TailOptions{
-		Etag:    deploy.Etag,
-		Since:   since,
-		Raw:     false,
-		Verbose: verbose,
-		LogType: logs.LogTypeAll,
-	}
-	err := cli.TailUp(ctx, provider, project, deploy, tailOptions)
-	if !errors.Is(context.Cause(ctx), errCompleted) {
-		return err
-	}
-	return nil
 }
 
 func makeComposeStartCmd() *cobra.Command {
