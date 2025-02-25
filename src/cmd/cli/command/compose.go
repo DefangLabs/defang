@@ -211,10 +211,6 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			for _, service := range deploy.Services {
-				service.State = targetState
-			}
-
 			// Print the current service states of the deployment
 			printServiceStatesAndEndpoints(deploy.Services)
 
@@ -257,6 +253,10 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client cliClient
 				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
 			}
 		} else {
+			for _, service := range deploy.Services {
+				service.State = targetState
+			}
+
 			cancelTail(errCompleted)
 		}
 	}()
