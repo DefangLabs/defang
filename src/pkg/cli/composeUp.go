@@ -172,8 +172,6 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 			<-ctx.Done()
 			// Get the actual error from the context so we won't print "Error: missing tail permission"
 			err = context.Cause(ctx)
-		} else if !(errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
-			return err // any error other than cancelation
 		}
 
 		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
