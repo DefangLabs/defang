@@ -70,6 +70,8 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 	return project, nil
 }
 
+const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+
 func makeComposeUpCmd() *cobra.Command {
 	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
@@ -117,7 +119,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			managedServices, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+			managedServices, _ := splitManagedAndUnmanagedServices(project.Services)
 
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
@@ -172,31 +174,6 @@ func makeComposeUpCmd() *cobra.Command {
 				return nil
 			}
 
-			tailCtx, cancelTail := context.WithCancelCause(ctx)
-			defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
-
-			if waitTimeout >= 0 {
-				var cancelTimeout context.CancelFunc
-				tailCtx, cancelTimeout = context.WithTimeout(tailCtx, time.Duration(waitTimeout)*time.Second)
-				defer cancelTimeout()
-			}
-
-			errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
-			const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-
-			go func() {
-				if err := cli.WaitServiceState(tailCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
-					var errDeploymentFailed pkg.ErrDeploymentFailed
-					if errors.As(err, &errDeploymentFailed) {
-						cancelTail(err)
-					} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-						term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
-					}
-				} else {
-					cancelTail(errCompleted)
-				}
-			}()
-
 			// show users the current streaming logs
 			tailSource := "all services"
 			if deploy.Etag != "" {
@@ -205,48 +182,41 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			// blocking call to tail
-			tailOptions := cli.TailOptions{
-				Etag:    deploy.Etag,
-				Since:   since,
-				Raw:     false,
-				Verbose: verbose,
-				LogType: logs.LogTypeAll,
-			}
-			err = cli.TailUp(ctx, provider, project, deploy, tailOptions)
-			var errDeploymentFailed pkg.ErrDeploymentFailed
-			if errors.As(context.Cause(ctx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
-				// Tail got canceled because of deployment failure: prompt to show the debugger
-				term.Warn(errDeploymentFailed)
-				if !nonInteractive {
-					var failedServices []string
-					if errDeploymentFailed.Service != "" {
-						failedServices = []string{errDeploymentFailed.Service}
-					}
-					track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+			err = WaitAndTail(ctx, project, client, provider, deploy, time.Duration(waitTimeout)*time.Second, since)
+			if err != nil {
+				var errDeploymentFailed pkg.ErrDeploymentFailed
+				if errors.As(context.Cause(ctx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
+					// Tail got canceled because of deployment failure: prompt to show the debugger
+					term.Warn(errDeploymentFailed)
+					if !nonInteractive {
+						var failedServices []string
+						if errDeploymentFailed.Service != "" {
+							failedServices = []string{errDeploymentFailed.Service}
+						}
+						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
-					// Call the AI debug endpoint using the original command context (not the tailCtx which is canceled)
-					var debugConfig = cli.DebugConfig{
-						Etag:           deploy.Etag,
-						FailedServices: failedServices,
-						Project:        project,
-						Provider:       provider,
-						Since:          since,
-					}
-					if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
-						return err // don't show the defang hint if debugging was successful
+						var debugConfig = cli.DebugConfig{
+							Etag:           deploy.Etag,
+							FailedServices: failedServices,
+							Project:        project,
+							Provider:       provider,
+							Since:          since,
+						}
+						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
+						if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+							return err // don't show the defang hint if debugging was successful
+						}
 					}
 				}
+				return err
+			}
+
+			for _, service := range deploy.Services {
+				service.State = targetState
 			}
 
 			// Print the current service states of the deployment
-			if errors.Is(context.Cause(tailCtx), errCompleted) {
-				for _, service := range deploy.Services {
-					service.State = targetState
-				}
-
-				printEndpoints(deploy.Services)
-			}
+			printEndpoints(deploy.Services)
 
 			term.Info("Done.")
 			return nil
@@ -263,6 +233,47 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func WaitAndTail(ctx context.Context, project *compose.Project, client cliClient.GrpcClient, provider cliClient.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time) error {
+	ctx, cancelTail := context.WithCancelCause(ctx)
+	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+
+	if waitTimeout >= 0 {
+		var cancelTimeout context.CancelFunc
+		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
+		defer cancelTimeout()
+	}
+
+	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+
+	_, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+	go func() {
+		if err := cli.WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
+			var errDeploymentFailed pkg.ErrDeploymentFailed
+			if errors.As(err, &errDeploymentFailed) {
+				cancelTail(err)
+			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
+			}
+		} else {
+			cancelTail(errCompleted)
+		}
+	}()
+
+	// blocking call to tail
+	tailOptions := cli.TailOptions{
+		Etag:    deploy.Etag,
+		Since:   since,
+		Raw:     false,
+		Verbose: verbose,
+		LogType: logs.LogTypeAll,
+	}
+	err := cli.TailUp(ctx, provider, project, deploy, tailOptions)
+	if !errors.Is(context.Cause(ctx), errCompleted) {
+		return err
+	}
+	return nil
 }
 
 func makeComposeStartCmd() *cobra.Command {
