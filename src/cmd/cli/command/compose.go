@@ -216,7 +216,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			printEndpoints(deploy.Services)
+			printServiceStatesAndEndpoints(deploy.Services)
 
 			term.Info("Done.")
 			return nil
