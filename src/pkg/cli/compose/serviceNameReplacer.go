@@ -21,17 +21,25 @@ type ServiceNameReplacer struct {
 	provider                client.Provider
 	hostServiceNames        *regexp.Regexp
 	ingressServiceNameRegex *regexp.Regexp
+	serverNameRegex         *regexp.Regexp
 }
 
-func NewServiceNameReplacer(provider client.Provider, services composeTypes.Services) ServiceNameReplacer {
+func NewServiceNameReplacer(provider client.Provider, newToOldServiceName map[string]string, services composeTypes.Services) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var hostServiceNames []string
 	var ingressServiceNames []string
+	var serviceNames []string
 	for _, svccfg := range services {
+		var serviceName = svccfg.Name
+		var found bool
+		if serviceName, found = newToOldServiceName[svccfg.Name]; found {
+			serviceNames = append(serviceNames, regexp.QuoteMeta(serviceName))
+		}
+
 		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, isHostPort) {
-			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(svccfg.Name))
+			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(serviceName))
 		} else if len(svccfg.Ports) > 0 {
-			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(svccfg.Name))
+			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(serviceName))
 		}
 	}
 
@@ -39,6 +47,7 @@ func NewServiceNameReplacer(provider client.Provider, services composeTypes.Serv
 		provider:                provider,
 		hostServiceNames:        makeServiceNameRegex(hostServiceNames),
 		ingressServiceNameRegex: makeServiceNameRegex(ingressServiceNames),
+		serverNameRegex:         makeServiceNameRegex(serviceNames),
 	}
 }
 
@@ -63,6 +72,28 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 		term.Warnf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
 	} else if s.ingressServiceNameRegex != nil && s.ingressServiceNameRegex.MatchString(value) {
 		term.Warnf("service %q: service name in the %s %q was not adjusted, only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
+	}
+
+	return val
+}
+
+func (s *ServiceNameReplacer) replaceServiceName(value string) string {
+	match := s.serverNameRegex.FindStringSubmatchIndex(value)
+	if match == nil {
+		return value
+	}
+
+	// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
+	serviceStart := match[2]
+	serviceEnd := match[3]
+	return value[:serviceStart] + NormalizeServiceName(value[serviceStart:serviceEnd]) + value[serviceEnd:]
+}
+
+func (s *ServiceNameReplacer) ReplaceServiceName(serviceName string, key, value string, fixupTarget FixupTarget) string {
+	val := s.replaceServiceName(value)
+
+	if val != value {
+		term.Warnf("service %q: value containing environment variable %s was adjusted with updated service name reference", serviceName, key)
 	}
 
 	return val

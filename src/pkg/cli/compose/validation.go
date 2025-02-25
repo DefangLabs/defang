@@ -56,7 +56,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		return fmt.Errorf("service name is invalid: %q", svccfg.Name)
 	}
 	if normalized != svccfg.Name {
-		term.Warnf("service name %q was normalized to %q", svccfg.Name, normalized)
+		term.Warnf("service name %q will be normalized to %q", svccfg.Name, normalized)
 	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
