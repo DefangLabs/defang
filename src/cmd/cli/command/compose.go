@@ -182,6 +182,8 @@ func makeComposeUpCmd() *cobra.Command {
 						if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 							return err // don't show the defang hint if debugging was successful
 						}
+						tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
+						printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 					}
 				}
 				return err

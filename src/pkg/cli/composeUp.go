@@ -216,19 +216,23 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Gr
 		}
 	}()
 
+	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
-	tailOptions := TailOptions{
+	err := TailUp(ctx, provider, project, deploy, tailOptions)
+	if !errors.Is(context.Cause(ctx), errCompleted) {
+		return err
+	}
+	return err
+}
+
+func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
+	return TailOptions{
 		Etag:    deploy.Etag,
 		Since:   since,
 		Raw:     false,
 		Verbose: verbose,
 		LogType: logs.LogTypeAll,
 	}
-	err := TailUp(ctx, provider, project, deploy, tailOptions)
-	if !errors.Is(context.Cause(ctx), errCompleted) {
-		return err
-	}
-	return nil
 }
 
 func isManagedService(service compose.ServiceConfig) bool {
