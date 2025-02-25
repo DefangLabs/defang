@@ -9,18 +9,7 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 )
 
-// func printScanOutput(ds []secrets.DetectedSecret, err error) {
-// 	fmt.Println("secrets: ")
-// 	for _, d := range ds {
-// 		fmt.Printf("\ttype: %s\n", d.Type)
-// 		fmt.Printf("\tkey: %s\n", d.Key)
-// 		fmt.Printf("\tvalue: %s\n", d.Value)
-// 	}
-// 	fmt.Println("err: ", err)
-// }
-
-// assume that the input is the value of a key-value pair
-
+// assume that the input is a string of a key-value pair
 func detectConfig(input string) (detectorTypes []string, err error) {
 	// create a custom config for scanner from json
 	jsonCfg := `{
@@ -38,41 +27,22 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 		return nil, errors.New("Failed to make a config detector: " + err.Error())
 	}
 
+	// scan the input
 	ds, err := scannerClient.Scan(input)
 	if err != nil {
 		return nil, errors.New("Failed to scan input: " + err.Error())
 	}
 
+	// check if there are any secrets detected
 	if len(ds) == 0 {
 		return nil, errors.New("no secrets detected")
 	}
 
+	// return a list of detector types
 	list := []string{}
 	for _, d := range ds {
 		list = append(list, d.Type)
 	}
 
 	return list, nil
-	// printScanOutput(ds, err)
 }
-
-// func main() {
-// 	// load config from json
-// 	ds1, err1 := detectConfig("basic dTpw")
-// 	if err1 != nil {
-// 		fmt.Println("Error: ", err1)
-// 	}
-// 	printScanOutput(ds1, err1)
-// }
-
-//WORKS FINE
-// func main() {
-
-// 	scanner := scanner.NewDefaultScanner()
-
-// 	command := "ENV GITHUB_KEY=ghu_bWIj6excOoiobxoT_g0Ke1BChnXsuH_6UKpr"
-// 	ds, err := scanner.ScanStringWithFormat(command, dataformat.Command)
-
-// 	printScanOutput(ds, err)
-
-// }
