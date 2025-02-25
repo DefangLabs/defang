@@ -202,6 +202,31 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			term.Warnf("unsupported secret %q: not marked external:true", secret.Source) // TODO: support secrets from environment/file
 		}
 	}
+
+	// check for compose environment variables that may be sensitive
+	for key, value := range svccfg.Environment {
+		// format input as KEY=VALUE
+		input := key + "=" + *value
+
+		// call detectConfig to check for sensitive information
+		ds, err := detectConfig(input)
+		if err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+		// print warning for detected secret types if any found
+		if len(ds) > 0 {
+			sensitiveTypes := ""
+			for i, d := range ds {
+				if i > 0 {
+					sensitiveTypes += " "
+				}
+				sensitiveTypes += d
+			}
+			term.Warnf("service %q: environment variable %q may contain sensitive values of type: %q", svccfg.Name, key, sensitiveTypes)
+		}
+		term.Debugf("service %q: environment variable %q=%q", svccfg.Name, key, *value)
+	}
+
 	err := validatePorts(svccfg.Ports)
 	if err != nil {
 		return err
