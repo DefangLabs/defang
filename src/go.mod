@@ -10,6 +10,7 @@ require (
 	cloud.google.com/go/run v1.6.1
 	cloud.google.com/go/storage v1.46.0
 	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f
 	github.com/aws/aws-sdk-go-v2 v1.32.4
 	github.com/aws/aws-sdk-go-v2/config v1.26.6
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.42.6
@@ -61,7 +62,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	cloud.google.com/go/monitoring v1.21.2 // indirect
-	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
