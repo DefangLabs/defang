@@ -41,7 +41,7 @@ func TestIsValidServiceName(t *testing.T) {
 		{"foo_bar", true},
 		{"foo bar", false},
 		{"foo.bar", false},
-		{"Dfnx", false}, // no uppercase
+		{"Dfnx", true},
 		{"more-than-63-characters-are-not-allowed-012345678901234567890123", false},
 	}
 	for _, tt := range tests {
