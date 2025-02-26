@@ -185,7 +185,7 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 	return nil
 }
 
-func WaitAndTail(ctx context.Context, project *compose.Project, client client.GrpcClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
+func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
