@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
 )
 
 func NormalizeServiceName(s string) string {

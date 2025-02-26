@@ -171,3 +171,21 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 		})
 	}
 }
+
+func TestDnsSafe(t *testing.T) {
+	var tests = map[string]string{
+		"abc":         "abc",
+		"abc.def":     "abc.def",
+		"abc.def.ghi": "abc.def.ghi",
+		"abc_def":     "abc-def",
+		".abc":        "abc",
+		"-abc-":       "abc",
+	}
+	for name, want := range tests {
+		t.Run(name, func(t *testing.T) {
+			if DnsSafe(name) != want {
+				t.Errorf("DnsSafe(%q) = %q, want %q", name, DnsSafe(name), want)
+			}
+		})
+	}
+}
