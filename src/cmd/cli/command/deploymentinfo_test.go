@@ -34,7 +34,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	}
 }
 
-func TestPrintEndpoints(t *testing.T) {
+func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 	defaultTerm := term.DefaultTerm
 	t.Cleanup(func() {
 		term.DefaultTerm = defaultTerm
@@ -43,7 +43,7 @@ func TestPrintEndpoints(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
-	printEndpoints([]*defangv1.ServiceInfo{
+	printServiceStatesAndEndpoints([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{
 				Name: "service1",
