@@ -1,4 +1,19 @@
 {
+  "Mistral": {
+    "command": null,
+    "entrypoint": null,
+    "image": "mistral:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 8000,
+        "protocol": "tcp"
+      }
+    ]
+  },
   "bad-service": {
     "command": null,
     "entrypoint": null,
@@ -39,21 +54,6 @@
     "networks": {
       "default": null
     }
-  },
-  "mistral": {
-    "command": null,
-    "entrypoint": null,
-    "image": "mistral:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "host",
-        "target": 8000,
-        "protocol": "tcp"
-      }
-    ]
   },
   "ui": {
     "command": null,

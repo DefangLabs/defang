@@ -139,6 +139,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		if !redis && !postgres && isStatefulImage(svccfg.Image) {
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
+
+		// update the concrete service with the fixed up object
+		project.Services[svccfg.Name] = svccfg
 	}
 
 	return nil
