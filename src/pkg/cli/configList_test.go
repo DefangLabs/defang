@@ -45,7 +45,7 @@ func TestConfigList(t *testing.T) {
 
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient := NewGrpcClient(ctx, url)
-	provider := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
+	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no configs", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
