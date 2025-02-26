@@ -25,6 +25,10 @@ func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRe
 	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
 }
 
+func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
+	return nil, errors.New("the project update command is not valid for the Defang playground; did you forget --provider?")
+}
+
 func (g *PlaygroundProvider) GetService(ctx context.Context, req *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {
 	return getMsg(g.client.Get(ctx, connect.NewRequest(req)))
 }
