@@ -33,7 +33,7 @@ func DnsSafeLabel(fqn string) string {
 }
 
 func DnsSafe(fqdn string) string {
-	return strings.ToLower(fqdn)
+	return strings.ReplaceAll(strings.ToLower(fqdn), "_", "-")
 }
 
 type ErrMultipleProjects struct {

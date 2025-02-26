@@ -23,22 +23,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	}
 	slices.Sort(config.Names) // sort for binary search
 
-	newServiceNameToOld := make(map[string]string)
-	updatedServices := make(map[string]types.ServiceConfig)
 	for _, svccfg := range project.Services {
-		oldNServiceName := svccfg.Name
-		svccfg.Name = NormalizeServiceName(svccfg.Name)
-		updatedServices[svccfg.Name] = svccfg
-		newServiceNameToOld[svccfg.Name] = oldNServiceName
-
 		// Fixup ports (which affects service name replacement by ReplaceServiceNameWithDNS)
 		for i, port := range svccfg.Ports {
 			fixupPort(&port)
 			svccfg.Ports[i] = port
 		}
 	}
-	project.Services = updatedServices
-	svcNameReplacer := NewServiceNameReplacer(provider, newServiceNameToOld, project.Services)
+	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
@@ -57,7 +49,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 					continue
 				}
 
-				val := svcNameReplacer.ReplaceServiceNameWithDNS(newServiceNameToOld[svccfg.Name], key, *value, BuildArgs)
+				val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, BuildArgs)
 				svccfg.Build.Args[key] = &val
 			}
 		}
@@ -85,7 +77,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
-				if svcNameReplacer.HasServiceName(newServiceNameToOld[*value]) {
+				if svcNameReplacer.HasServiceName(*value) {
 					term.Warnf("service %q: environment variable %q will use the `defang config` value instead of adjusted service name", svccfg.Name, key)
 				} else {
 					term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
@@ -94,10 +86,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				continue
 			}
 
-			val := svcNameReplacer.ReplaceServiceNameWithDNS(newServiceNameToOld[svccfg.Name], key, *value, EnvironmentVars)
-			if val == *value {
-				val = svcNameReplacer.ReplaceServiceName(svccfg.Name, key, *value, EnvironmentVars)
-			}
+			val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
 			svccfg.Environment[key] = &val
 		}
 

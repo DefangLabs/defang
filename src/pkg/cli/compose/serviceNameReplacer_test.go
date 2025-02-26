@@ -45,8 +45,7 @@ func setup() ServiceNameReplacer {
 		},
 	}
 
-	newToOldServiceName := map[string]string{"host-serviceA": "host-serviceA", "host-serviceB": "host-serviceB", "ingress-serviceC": "ingress-serviceC", "ingress-serviceD": "ingress-serviceD"}
-	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, newToOldServiceName, services)
+	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, services)
 }
 
 func TestServiceNameReplacer(t *testing.T) {

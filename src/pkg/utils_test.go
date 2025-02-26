@@ -38,7 +38,7 @@ func TestIsValidServiceName(t *testing.T) {
 		{"foo-bar-123", true},
 		{"-foo", false},
 		{"foo-", false},
-		{"foo_bar", false},
+		{"foo_bar", true},
 		{"foo bar", false},
 		{"foo.bar", false},
 		{"Dfnx", false}, // no uppercase

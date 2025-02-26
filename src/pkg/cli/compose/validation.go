@@ -50,14 +50,6 @@ func ValidateProject(project *composeTypes.Project) error {
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
-	normalized := NormalizeServiceName(svccfg.Name)
-	if !pkg.IsValidServiceName(normalized) {
-		// FIXME: this is too strict; we should allow more characters like underscores and dots
-		return fmt.Errorf("service name is invalid: %q", svccfg.Name)
-	}
-	if normalized != svccfg.Name {
-		term.Warnf("service name %q will be normalized to %q", svccfg.Name, normalized)
-	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
