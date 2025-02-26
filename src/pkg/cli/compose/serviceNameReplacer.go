@@ -53,7 +53,7 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 	// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
 	serviceStart := match[2]
 	serviceEnd := match[3]
-	return value[:serviceStart] + s.provider.ServiceDNS(value[serviceStart:serviceEnd]) + value[serviceEnd:]
+	return value[:serviceStart] + s.provider.ServiceDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
 }
 
 func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key, value string, fixupTarget FixupTarget) string {
