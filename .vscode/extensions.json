@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "github.vscode-pull-request-github"
+        "github.vscode-pull-request-github",
+        "wayou.vscode-todo-highlight"
     ]
 }
