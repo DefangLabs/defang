@@ -219,10 +219,15 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Gr
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
 	err := TailUp(ctx, provider, project, deploy, tailOptions)
+	var errDeploymentFailed pkg.ErrDeploymentFailed
+	if errors.As(context.Cause(ctx), &errDeploymentFailed) {
+		return errDeploymentFailed
+	}
 	if !errors.Is(context.Cause(ctx), errCompleted) {
 		return err
 	}
-	return err
+
+	return nil
 }
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {

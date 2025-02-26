@@ -1,7 +1,6 @@
 package command
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -161,7 +160,7 @@ func makeComposeUpCmd() *cobra.Command {
 			err = cli.WaitAndTail(ctx, project, client, provider, deploy, time.Duration(waitTimeout)*time.Second, since, verbose)
 			if err != nil {
 				var errDeploymentFailed pkg.ErrDeploymentFailed
-				if errors.As(context.Cause(ctx), &errDeploymentFailed) || errors.As(err, &errDeploymentFailed) {
+				if errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					if !nonInteractive {
