@@ -20,31 +20,31 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	}
 }
 
-func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) {
+type ServiceTableItem struct {
+	Id         string `json:"Id"`
+	State      string `json:"State"`
+	Name       string `json:"Name"`
+	DomainName string `json:"DomainName"`
+}
+
+func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
+	serviceTableItems := make([]ServiceTableItem, 0, len(serviceInfos))
+
 	for _, serviceInfo := range serviceInfos {
-		andEndpoints := ""
-		if len(serviceInfo.Endpoints) > 0 {
-			andEndpoints = "and will be available at:"
-		}
-
-		serviceConditionText := "has status " + serviceInfo.Status
-		if serviceInfo.State != defangv1.ServiceState_NOT_SPECIFIED {
-			serviceConditionText = "is in state " + serviceInfo.State.String()
-		}
-
-		term.Info("Service", serviceInfo.Service.Name, serviceConditionText, andEndpoints)
-		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
-				endpoint = "https://" + endpoint
-			}
-			term.Println("   -", endpoint)
-		}
+		var domainname string
 		if serviceInfo.Domainname != "" {
-			if serviceInfo.ZoneId != "" {
-				term.Println("   -", "https://"+serviceInfo.Domainname)
-			} else {
-				term.Println("   -", "https://"+serviceInfo.Domainname+" (after `defang cert generate` to get a TLS certificate)")
+			domainname = "https://" + serviceInfo.Domainname
+			if serviceInfo.ZoneId == "" {
+				domainname = serviceInfo.Domainname + " (after `defang cert generate` to get a TLS certificate)"
 			}
 		}
+		serviceTableItems = append(serviceTableItems, ServiceTableItem{
+			Id:         serviceInfo.Etag,
+			Name:       serviceInfo.Service.Name,
+			State:      serviceInfo.State.String(),
+			DomainName: domainname,
+		})
 	}
+
+	return term.Table(serviceTableItems, []string{"Id", "Name", "State", "DomainName"})
 }

@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -43,7 +44,7 @@ func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
-	printServiceStatesAndEndpoints([]*defangv1.ServiceInfo{
+	_ = printServiceStatesAndEndpoints([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{
 				Name: "service1",
@@ -58,11 +59,20 @@ func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 				"service1.internal",
 			},
 		}})
-	const want = ` * Service service1 has status UNKNOWN and will be available at:
-   - https://example.com
-   - service1.internal
+	const expectedOutput = `Id  Name      State          DomainName
+    service1  NOT_SPECIFIED
 `
-	if got := stdout.String(); got != want {
-		t.Errorf("got %q, want %q", got, want)
+	receivedLines := strings.Split(stdout.String(), "\n")
+	expectedLines := strings.Split(expectedOutput, "\n")
+
+	if len(receivedLines) != len(expectedLines) {
+		t.Errorf("Expected %v lines, received %v", len(expectedLines), len(receivedLines))
+	}
+
+	for i, receivedLine := range receivedLines {
+		receivedLine = strings.TrimRight(receivedLine, " ")
+		if receivedLine != expectedLines[i] {
+			t.Errorf("\n-%v\n+%v", expectedLines[i], receivedLine)
+		}
 	}
 }
