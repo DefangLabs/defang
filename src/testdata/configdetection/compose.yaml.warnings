@@ -1,0 +1,3 @@
+ ! service "configdetection": environment variable "API_KEY" may contain sensitive values of type: "Keyword Detector" . Consider using 'defang config'
+ ! service "app": environment variable "HIGH_ENTROPY_STRING" may contain sensitive values of type: "High entropy string" . Consider using 'defang config'
+ ! service "app": environment variable "MY_URL" may contain sensitive values of type: "URL with password" . Consider using 'defang config'
