@@ -623,42 +623,97 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
+	var evtsChan chan ecs.LogEvent
+	errsChan := make(chan error)
 	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll) {
-		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
-		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
-			for _, event := range logEvents {
-				msg := term.StripAnsi(*event.Message)
-				if parseECSEventRecords {
-					if event, err := ecs.ParseECSEvent([]byte(msg)); err == nil {
-						// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
-						if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
-							continue
-						}
-						if event.Service() != "" && len(req.Services) > 0 && !slices.Contains(req.Services, event.Service()) {
-							continue
-						}
-						// This matches the status messages in the Defang Playground Loki logs
-						sb.WriteString("status=")
-						sb.WriteString(event.Status())
-						sb.WriteByte('\n')
+		lgEvtChan := make(chan ecs.LogEvent)
+		// Start a go routine for each log group
+		go func(lgi ecs.LogGroupInput) {
+			if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
+				for _, event := range logEvents {
+					lgEvtChan <- event
+				}
+				return nil
+			}); err != nil {
+				errsChan <- err
+			}
+			close(lgEvtChan)
+		}(lgi)
+		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events base one timestamp
+	}
+
+loop:
+	for {
+		select {
+		case evt, ok := <-evtsChan:
+			if !ok {
+				break loop
+			}
+			parseECSEventRecords := strings.HasSuffix(*evt.LogGroupIdentifier, "/ecs")
+			msg := term.StripAnsi(*evt.Message)
+			if parseECSEventRecords {
+				if event, err := ecs.ParseECSEvent([]byte(msg)); err == nil {
+					// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
+					if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
 						continue
 					}
-				}
-				sb.WriteString(msg)
-				sb.WriteByte('\n')
-				if sb.Len() > maxQuerySizePerLogGroup {
-					return errors.New("query result was truncated")
+					if event.Service() != "" && len(req.Services) > 0 && !slices.Contains(req.Services, event.Service()) {
+						continue
+					}
+					// This matches the status messages in the Defang Playground Loki logs
+					sb.WriteString("status=")
+					sb.WriteString(event.Status())
+					sb.WriteByte('\n')
+					continue
 				}
 			}
-			return nil
-		}); err != nil {
+			sb.WriteString(msg)
+			sb.WriteByte('\n')
+			if sb.Len() > maxQuerySizePerLogGroup {
+				term.Warn("Query result was truncated")
+				break loop
+			}
+		case err := <-errsChan:
 			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
-
 	req.Logs = sb.String()
 	return nil
+}
+
+// Inspired by https://dev.to/vinaygo/concurrency-merge-sort-using-channels-and-goroutines-in-golang-35f7
+func mergeLogEventChan(a, b chan ecs.LogEvent) chan ecs.LogEvent {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	out := make(chan ecs.LogEvent)
+	go func() {
+		defer close(out)
+		valA, okA := <-a
+		valB, okB := <-b
+		for okA && okB {
+			if *valA.Timestamp < *valB.Timestamp {
+				out <- valA
+				valA, okA = <-a
+			} else {
+				out <- valB
+				valB, okB = <-b
+			}
+		}
+		for okA {
+			out <- valA
+			valA, okA = <-a
+		}
+		for okB {
+			out <- valB
+			valB, okB = <-b
+		}
+	}()
+	return out
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
