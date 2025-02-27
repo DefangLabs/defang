@@ -50,9 +50,6 @@ func ValidateProject(project *composeTypes.Project) error {
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
-	if !pkg.IsValidServiceName(svccfg.Name) {
-		return fmt.Errorf("service name is invalid: %q", svccfg.Name)
-	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
