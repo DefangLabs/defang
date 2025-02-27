@@ -185,7 +185,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 		if err != nil {
 			return err
 		}

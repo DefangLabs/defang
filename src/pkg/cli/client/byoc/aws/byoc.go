@@ -468,7 +468,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
 	cmd := cdCmd{
-		mode:           defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		mode:           defangv1.DeploymentMode_MODE_UNSPECIFIED,
 		project:        req.Project,
 		delegateDomain: req.DelegateDomain,
 		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
@@ -785,7 +785,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		return "", err
 	}
 	cmd := cdCmd{
-		mode:    defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		mode:    defangv1.DeploymentMode_MODE_UNSPECIFIED,
 		project: req.Project,
 		cmd:     []string{req.Command},
 	}
