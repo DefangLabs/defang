@@ -205,7 +205,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	// check for compose environment variables that may be sensitive
 	for key, value := range svccfg.Environment {
-		// format input as KEY=VALUE
+		// format input as a key-value pair string
 		input := key + "=" + *value
 
 		// call detectConfig to check for sensitive information
@@ -222,7 +222,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 				}
 				sensitiveTypes += d
 			}
-			term.Warnf("service %q: environment variable %q may contain sensitive values of type: %q . Consider using 'defang config'", svccfg.Name, key, sensitiveTypes)
+			term.Warnf("service %q: environment variable %q may contain sensitive values. Consider using 'defang config set %s'", svccfg.Name, key, key)
 		}
 		term.Debugf("service %q: environment variable %q=%q", svccfg.Name, key, *value)
 	}
