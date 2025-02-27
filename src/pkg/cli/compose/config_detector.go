@@ -9,7 +9,7 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 )
 
-// assume that the input is a string of a key-value pair
+// assume that the input is a key-value pair string
 func detectConfig(input string) (detectorTypes []string, err error) {
 	// create a custom config for scanner from json
 	jsonCfg := `{
@@ -33,14 +33,15 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 		return nil, errors.New("Failed to scan input: " + err.Error())
 	}
 
-	// check if there are any secrets detected
-	if len(ds) == 0 {
-		return nil, errors.New("no secrets detected")
-	}
+	// // check if there are any secrets detected
+	// if len(ds) == 0 {
+	// 	return nil, errors.New("no secrets detected")
+	// }
 
 	// return a list of detector types
 	list := []string{}
 	for _, d := range ds {
+
 		list = append(list, d.Type)
 	}
 
