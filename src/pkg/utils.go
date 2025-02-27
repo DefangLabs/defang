@@ -151,5 +151,8 @@ func Ensure(cond bool, msg string) {
 }
 
 func IsValidTime(t time.Time) bool {
+	// When converting a timestamppb to a time.Time, the zero/nil value becomes 1970-01-01 00:00:00 UTC,
+	// and because of timezones this can either be sometime on 1969-12-31 or on 1970-01-01 in local time.
+	// We could be even more conservative and check for > 2000 or so, but this is more predictable.
 	return t.Year() > 1970
 }
