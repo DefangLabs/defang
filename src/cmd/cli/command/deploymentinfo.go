@@ -1,6 +1,8 @@
 package command
 
 import (
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -25,17 +27,21 @@ type ServiceTableItem struct {
 	State      string `json:"State"`
 	Name       string `json:"Name"`
 	DomainName string `json:"DomainName"`
+	Endpoints  string `json:"Endpoints"`
 }
 
 func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
 	serviceTableItems := make([]ServiceTableItem, 0, len(serviceInfos))
 
+	showDomainNameColumn := false
+	showCertGenerateHint := false
 	for _, serviceInfo := range serviceInfos {
 		var domainname string
 		if serviceInfo.Domainname != "" {
+			showDomainNameColumn = true
 			domainname = "https://" + serviceInfo.Domainname
 			if serviceInfo.ZoneId == "" {
-				domainname = serviceInfo.Domainname + " (after `defang cert generate` to get a TLS certificate)"
+				showCertGenerateHint = true
 			}
 		}
 		serviceTableItems = append(serviceTableItems, ServiceTableItem{
@@ -43,8 +49,25 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 			Name:       serviceInfo.Service.Name,
 			State:      serviceInfo.State.String(),
 			DomainName: domainname,
+			Endpoints:  strings.Join(serviceInfo.Endpoints, ", "),
 		})
 	}
 
-	return term.Table(serviceTableItems, []string{"Id", "Name", "State", "DomainName"})
+	var attrs []string
+	if showDomainNameColumn {
+		attrs = []string{"Id", "Name", "State", "Endpoints", "DomainName"}
+	} else {
+		attrs = []string{"Id", "Name", "State", "Endpoints"}
+	}
+
+	err := term.Table(serviceTableItems, attrs)
+	if err != nil {
+		return err
+	}
+
+	if showCertGenerateHint {
+		term.Info("Run `defang cert generate` to get a TLS certificate for your service(s)")
+	}
+
+	return nil
 }
