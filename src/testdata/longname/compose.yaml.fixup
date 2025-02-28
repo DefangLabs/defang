@@ -1,5 +1,5 @@
 {
-  "averylongservicenamethatisdefinitelytoolongthatwillcauseanerror": {
+  "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError": {
     "command": null,
     "entrypoint": null,
     "image": "alpine",
