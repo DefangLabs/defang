@@ -15,7 +15,7 @@ func TestNormalizeServiceName(t *testing.T) {
 		{name: "$ymb0ls", expected: "-ymb0ls"},
 		{name: "consecutive--hyphens", expected: "consecutive-hyphens"},
 		{name: "hyphen-$ymbol", expected: "hyphen-ymbol"},
-		{name: "_blah", expected: "-blah"},
+		{name: "_blaha", expected: "-blaha"},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {
