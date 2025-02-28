@@ -5,9 +5,13 @@ PROTOS := protos/io/defang/v1/fabric.pb.go protos/io/defang/v1/defangv1connect/f
 
 BINARY_NAME:=defang
 GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
+GOSRC := $(shell find . -name '*.go')
 
-$(BINARY_NAME):
+$(BINARY_NAME): $(PROTOS) $(GOSRC)
 	go build -o $@ $(GOFLAGS) ./cmd/cli
+
+.PHONY: build
+build: $(BINARY_NAME)
 
 .PHONY: protos
 protos: $(PROTOS)
