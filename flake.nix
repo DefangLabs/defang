@@ -29,6 +29,7 @@
                 goreleaser
                 nixfmt-rfc-style
                 nodejs_20 # for Pulumi, must match values in package.json
+                openssh
                 pulumi-bin
                 google-cloud-sdk
                 vim

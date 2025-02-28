@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	validServiceRegex = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)      // alphanumeric+hyphens 1 ≤ len < 64
-	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`) // alphanumeric+underscore 1 ≤ len ≤ 64
+	validServiceRegex = regexp.MustCompile(`^[A-Za-z0-9]+([-_][A-Za-z0-9]+)*$`) // alphanumeric+hyphens 1 ≤ len < 64
+	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)     // alphanumeric+underscore 1 ≤ len ≤ 64
 )
 
 func GetCurrentUser() string {

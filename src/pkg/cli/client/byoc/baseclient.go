@@ -257,7 +257,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	hasHost := false
 	hasIngress := false
-	fqn := service.Name
+	fqn := strings.ReplaceAll(service.Name, "_", "-")
 	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
 		for _, port := range service.Ports {
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS

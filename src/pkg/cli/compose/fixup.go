@@ -30,7 +30,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Ports[i] = port
 		}
 	}
-
 	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
 
 	for _, svccfg := range project.Services {
@@ -141,9 +140,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
-		oldName := svccfg.Name
-		svccfg.Name = NormalizeServiceName(svccfg.Name)
-		project.Services[oldName] = svccfg
+		// update the concrete service with the fixed up object
+		project.Services[svccfg.Name] = svccfg
 	}
+
 	return nil
 }
