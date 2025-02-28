@@ -6,7 +6,7 @@ PROTOS := protos/io/defang/v1/fabric.pb.go protos/io/defang/v1/defangv1connect/f
 BINARY_NAME:=defang
 GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
 
-$(BINARY_NAME): test
+$(BINARY_NAME):
 	go build -o $@ $(GOFLAGS) ./cmd/cli
 
 .PHONY: protos
@@ -16,7 +16,7 @@ $(PROTOS) &: protos/io/defang/v1/fabric.proto buf.gen.yaml
 	buf generate protos
 
 .PHONY: install
-install: $(BINARY_NAME)
+install: $(BINARY_NAME) test
 	install $(BINARY_NAME) "${HOME}/.local/bin/"
 
 .PHONY: test
