@@ -6,8 +6,8 @@ on:
       - "v*" # push events to tagged commits
     branches:
       - "**"
-  schedule: # nightly release
-    - cron: "15 9 * * 2-6" # Tuesday to Saturday at 2:15 AM
+  # schedule: # nightly release
+  #   - cron: "15 9 * * 2-6" # Tuesday to Saturday at 2:15 AM
 
 permissions:
   contents: read
