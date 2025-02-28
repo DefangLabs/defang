@@ -7,7 +7,7 @@ BINARY_NAME:=defang
 GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
 GOSRC := $(shell find . -name '*.go')
 
-$(BINARY_NAME): $(PROTOS) $(GOSRC)
+$(BINARY_NAME): $(PROTOS) $(GOSRC) go.mod go.sum
 	go build -o $@ $(GOFLAGS) ./cmd/cli
 
 .PHONY: build
