@@ -1,6 +1,6 @@
 module github.com/DefangLabs/defang/src
 
-go 1.22.7
+go 1.22.12
 
 require (
 	cloud.google.com/go/artifactregistry v1.16.0
@@ -8,10 +8,11 @@ require (
 	cloud.google.com/go/logging v1.12.0
 	cloud.google.com/go/resourcemanager v1.10.2
 	cloud.google.com/go/run v1.6.1
+	cloud.google.com/go/secretmanager v1.14.2
 	cloud.google.com/go/storage v1.46.0
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f
-	github.com/aws/aws-sdk-go-v2 v1.32.4
+	github.com/aws/aws-sdk-go-v2 v1.32.6
 	github.com/aws/aws-sdk-go-v2/config v1.26.6
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.42.6
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.35.4
@@ -22,7 +23,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/servicequotas v1.25.5
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.44.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.7
-	github.com/aws/smithy-go v1.22.0
+	github.com/aws/smithy-go v1.22.1
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/compose-spec/compose-go/v2 v2.4.3
@@ -48,7 +49,6 @@ require (
 	golang.org/x/term v0.27.0
 	google.golang.org/api v0.203.0
 	google.golang.org/genproto v0.0.0-20241104194629-dd2ea8efbc28
-	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -96,7 +96,8 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.29.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
@@ -108,8 +109,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.11 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.25 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.25 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.7.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.2.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.4 // indirect

@@ -2,7 +2,6 @@
   "nginx": {
     "command": null,
     "deploy": {
-      "replicas": 1,
       "resources": {
         "reservations": {
           "memory": "268435456"

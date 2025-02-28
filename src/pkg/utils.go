@@ -19,6 +19,16 @@ var (
 	validSecretRegex  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`) // alphanumeric+underscore 1 ≤ len ≤ 64
 )
 
+func GetCurrentUser() string {
+	if user := os.Getenv("USER"); user != "" {
+		return user
+	}
+	if user := os.Getenv("USERNAME"); user != "" { // Windows
+		return user
+	}
+	return "unknown"
+}
+
 func IsValidServiceName(name string) bool {
 	return len(name) < 20 && validServiceRegex.MatchString(name) // HACK to avoid long target group names
 }
@@ -134,6 +144,15 @@ func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
 	}
 }
 
+func Ensure(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
+}
+
 func IsValidTime(t time.Time) bool {
+	// When converting a timestamppb to a time.Time, the zero/nil value becomes 1970-01-01 00:00:00 UTC,
+	// and because of timezones this can either be sometime on 1969-12-31 or on 1970-01-01 in local time.
+	// We could be even more conservative and check for > 2000 or so, but this is more predictable.
 	return t.Year() > 1970
 }

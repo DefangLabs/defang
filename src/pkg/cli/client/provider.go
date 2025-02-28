@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -126,8 +128,10 @@ type Provider interface {
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
+	DelayBeforeRetry(context.Context) error
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
 	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
@@ -151,4 +155,15 @@ type AccountInfo interface {
 type Loader interface {
 	LoadProject(context.Context) (*composeTypes.Project, error)
 	LoadProjectName(context.Context) (string, error)
+}
+
+type RetryDelayer struct {
+	Delay time.Duration
+}
+
+func (r *RetryDelayer) DelayBeforeRetry(ctx context.Context) error {
+	if r.Delay == 0 {
+		r.Delay = 1 * time.Second // Minimum 1 second delay to be consistent with the old behavior
+	}
+	return pkg.SleepWithContext(ctx, r.Delay)
 }

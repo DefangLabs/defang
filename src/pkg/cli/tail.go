@@ -75,6 +75,7 @@ type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
 	Verbose            bool
 	LogType            logs.LogType
+	Filter             string
 }
 
 func (to TailOptions) String() string {
@@ -94,6 +95,9 @@ func (to TailOptions) String() string {
 	}
 	if to.LogType != logs.LogTypeUnspecified {
 		cmd += " --type=" + to.LogType.String()
+	}
+	if to.Filter != "" {
+		cmd += fmt.Sprintf(" --filter=%q", to.Filter)
 	}
 	return cmd
 }
@@ -214,12 +218,14 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	tailRequest := &defangv1.TailRequest{
+		Etag:     options.Etag,
+		LogType:  uint32(options.LogType),
+		Pattern:  options.Filter,
 		Project:  projectName,
 		Services: options.Services,
-		Etag:     options.Etag,
 		Since:    since,
-		LogType:  uint32(options.LogType),
 	}
+
 	serverStream, err := provider.Follow(ctx, tailRequest)
 	if err != nil {
 		return err
@@ -326,7 +332,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs"
+			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
@@ -350,7 +356,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 				if e.Stderr {
 					term.Error(e.Message)
 				} else {
-					term.Printlnc(term.InfoColor, e.Message)
+					term.Println(e.Message)
 				}
 				continue
 			}
@@ -378,7 +384,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}
-					if len(options.Services) == 0 {
+					if len(options.Services) != 1 {
 						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
 						prefixLen += l
 					}

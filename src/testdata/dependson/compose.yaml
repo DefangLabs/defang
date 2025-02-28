@@ -1,0 +1,14 @@
+services:
+  service1:
+    image: alpine
+    depends_on:
+      - service2
+      - service3
+  service2:
+    image: alpine
+    depends_on:
+      - service3
+  service3:
+    image: alpine
+    depends_on:
+      - service3

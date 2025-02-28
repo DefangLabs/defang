@@ -20,7 +20,7 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	}
 }
 
-func printEndpoints(serviceInfos []*defangv1.ServiceInfo) {
+func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) {
 	for _, serviceInfo := range serviceInfos {
 		andEndpoints := ""
 		if len(serviceInfo.Endpoints) > 0 {

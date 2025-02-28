@@ -121,6 +121,7 @@ func TestValidateGPUResources(t *testing.T) {
 }
 
 func TestDeployValidateGPUResources(t *testing.T) {
+	t.Skip("This is making actual AWS calls, need to mock out more; https://github.com/DefangLabs/defang/issues/1021")
 	quotaClient = nil
 
 	//like calling NewByocProvider(), but without needing real AccountInfo data
@@ -154,7 +155,6 @@ services:
 	})
 
 	t.Run("error on too many gpu", func(t *testing.T) {
-		t.Skip("This is making actual AWS calls, need to mock out more")
 		testDeploy := defangv1.DeployRequest{
 			Compose: []byte(
 				`name: project

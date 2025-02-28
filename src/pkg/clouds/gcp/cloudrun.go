@@ -16,6 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+const (
+	JobNameCD = "defang-cd"
+)
+
 func (gcp Gcp) SetupJob(ctx context.Context, jobId, serviceAccount string, containers []types.Container) error {
 	client, err := run.NewJobsClient(ctx)
 	if err != nil {

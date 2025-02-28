@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 func TestFindMathingProjectFiles(t *testing.T) {
@@ -61,20 +62,42 @@ func TestQueryHasProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	provider := MustHaveProjectNameQueryProvider{}
-	fabricClient := MockDebugFabricClient{}
-
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err != nil {
+	var mockClient = MockDebugFabricClient{}
+	var debugConfig = DebugConfig{
+		Etag:           "etag",
+		FailedServices: []string{"service"},
+		Project:        project,
+		Provider:       MustHaveProjectNameQueryProvider{},
+	}
+	if err := DebugDeployment(context.Background(), mockClient, debugConfig); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	project.Name = ""
+	debugConfig.Project.Name = ""
 
-	if err := Debug(context.Background(), fabricClient, provider, "etag", project, []string{"service"}); err == nil {
+	if err := DebugDeployment(context.Background(), mockClient, debugConfig); err == nil {
 		t.Error("expected error, got nil")
 	} else {
 		if err.Error() != "project name is missing" {
 			t.Errorf("expected error %q, got %q", "project name is missing", err.Error())
 		}
 	}
+}
+
+func TestDebugProject(t *testing.T) {
+	project := &compose.Project{
+		Name:         "project",
+		WorkingDir:   "workingdir",
+		Environment:  types.Mapping{},
+		ComposeFiles: []string{"composefile"},
+	}
+
+	loadErr := errors.New("load error")
+	fabricClient := MockDebugFabricClient{}
+
+	t.Run("with load error", func(t *testing.T) {
+		if err := debugComposeFileLoadError(context.Background(), fabricClient, project, loadErr); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
 }

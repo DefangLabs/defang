@@ -65,7 +65,7 @@ func TestGetServices(t *testing.T) {
 
 	url := strings.TrimPrefix(server.URL, "http://")
 	grpcClient := NewGrpcClient(ctx, url)
-	provider := cliClient.PlaygroundProvider{GrpcClient: grpcClient}
+	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
 		err := GetServices(ctx, "empty", &provider, false)

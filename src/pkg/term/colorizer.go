@@ -27,12 +27,13 @@ var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
 type Color = termenv.ANSIColor
 
 const (
-	BrightCyan    = termenv.ANSIBrightCyan
-	InfoColor     = termenv.ANSIBrightMagenta
-	ErrorColor    = termenv.ANSIBrightRed
-	WarnColor     = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
-	DebugColor    = termenv.ANSIBrightBlack // Gray
-	ResetColorStr = termenv.CSI + termenv.ResetSeq + "m"
+	BrightCyan = termenv.ANSIBrightCyan
+	InfoColor  = termenv.ANSIBrightMagenta
+	ErrorColor = termenv.ANSIBrightRed
+	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
+	DebugColor = termenv.ANSIBrightBlack // Gray
+
+	resetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 )
 
 type FileReader interface {
@@ -124,7 +125,7 @@ func (t *Term) Reset() {
 	t.out.Reset()
 }
 
-// DoColor returns true if the provided output's profile is not Ascii.
+// doColor returns true if the provided output's profile is not Ascii.
 func doColor(o *termenv.Output) bool {
 	return o.Profile != termenv.Ascii
 }
@@ -135,13 +136,13 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	var buf strings.Builder
 	if doColor(w) {
-		push(&buf, doColor(w), c, msg)
-		msg = buf.String()
+		fprintc(&buf, doColor(w), c, msg)
+		msg = buf.String() // this uses the buffer to avoid allocation, so make sure buf is not garbage collected
 	}
 	return w.WriteString(msg)
 }
 
-func push(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
+func fprintc(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 	if canColor {
 		n, err := io.WriteString(w, termenv.CSI+c.Sequence(false)+"m")
 		l += n
@@ -149,7 +150,7 @@ func push(w io.Writer, canColor bool, c Color, v ...any) (l int, e error) {
 			return l, err
 		}
 		defer func() {
-			n, err := io.WriteString(w, ResetColorStr)
+			n, err := io.WriteString(w, resetColorStr)
 			l += n
 			e = err
 		}()
@@ -180,15 +181,6 @@ func ensurePrefix(s string, prefix string) string {
 
 func (t *Term) Printc(c Color, v ...any) (int, error) {
 	return output(t.out, c, fmt.Sprint(v...))
-}
-
-func (t *Term) Printlnc(c Color, v ...any) (int, error) {
-	return output(t.out, c, ensureNewline(fmt.Sprintln(v...)))
-}
-
-func (t *Term) Printfc(c Color, format string, v ...any) (int, error) {
-	line := ensureNewline(fmt.Sprintf(format, v...))
-	return output(t.out, c, line)
 }
 
 func (t *Term) Print(v ...any) (int, error) {
@@ -268,14 +260,6 @@ func Printf(format string, v ...any) (int, error) {
 
 func Printc(c Color, v ...any) (int, error) {
 	return DefaultTerm.Printc(c, v...)
-}
-
-func Printlnc(c Color, v ...any) (int, error) {
-	return DefaultTerm.Printlnc(c, v...)
-}
-
-func Printfc(c Color, format string, v ...any) (int, error) {
-	return DefaultTerm.Printfc(c, format, v...)
 }
 
 func Debug(v ...any) (int, error) {
@@ -392,5 +376,5 @@ func NewMessageBuilder(canColor bool) *MessageBuilder {
 }
 
 func (b *MessageBuilder) Printc(c Color, v ...any) (int, error) {
-	return push(&b.Builder, b.canColor, c, v...)
+	return fprintc(&b.Builder, b.canColor, c, v...)
 }

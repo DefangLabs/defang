@@ -2,6 +2,7 @@ name: gpu
 services:
   mistral:
     deploy:
+      replicas: 1
       resources:
         reservations:
           devices:

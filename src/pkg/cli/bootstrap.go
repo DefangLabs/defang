@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func BootstrapCommand(ctx context.Context, projectName string, c client.FabricClient, p client.Provider, cmd string) error {
+func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p client.Provider, cmd string) error {
 	term.Infof("Running CD command %q in project %q", cmd, projectName)
 	if DoDryRun {
 		return ErrDryRun
@@ -22,7 +23,7 @@ func BootstrapCommand(ctx context.Context, projectName string, c client.FabricCl
 		return err
 	}
 
-	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since})
+	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {

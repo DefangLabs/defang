@@ -18,8 +18,8 @@ var cdCmd = &cobra.Command{
 
 var cdDestroyCmd = &cobra.Command{
 	Use:         "destroy",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
@@ -38,14 +38,14 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "destroy")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "destroy")
 	},
 }
 
 var cdDownCmd = &cobra.Command{
 	Use:         "down",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs, // TODO: set MaximumNArgs(1),
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
@@ -64,14 +64,15 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "down")
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "down")
 	},
 }
 
 var cdRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Refresh the service stack",
+	Use:         "refresh",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
+	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -83,14 +84,21 @@ var cdRefreshCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "refresh")
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "refresh")
 	},
 }
 
 var cdCancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Args:  cobra.NoArgs, // TODO: set MaximumNArgs(1),
-	Short: "Cancel the current CD operation",
+	Use:         "cancel",
+	Annotations: authNeededAnnotation, // need subscription
+	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
+	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -102,7 +110,13 @@ var cdCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return cli.BootstrapCommand(cmd.Context(), projectName, client, provider, "cancel")
+
+		err = canIUseProvider(cmd.Context(), provider, projectName)
+		if err != nil {
+			return err
+		}
+
+		return cli.BootstrapCommand(cmd.Context(), projectName, verbose, provider, "cancel")
 	},
 }
 
@@ -143,7 +157,7 @@ var cdListCmd = &cobra.Command{
 			}
 
 			// FIXME: this needs auth because it spawns the CD task
-			return cli.BootstrapCommand(cmd.Context(), "", client, provider, "list")
+			return cli.BootstrapCommand(cmd.Context(), "", verbose, provider, "list")
 		}
 		return cli.BootstrapLocalList(cmd.Context(), provider)
 	},
@@ -171,7 +185,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_UNSPECIFIED_MODE)
+		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 		if err != nil {
 			return err
 		}

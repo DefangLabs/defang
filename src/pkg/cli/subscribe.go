@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -13,7 +12,14 @@ import (
 
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
-func WaitServiceState(ctx context.Context, provider client.Provider, targetState defangv1.ServiceState, etag string, services []string) error {
+func WaitServiceState(
+	ctx context.Context,
+	provider client.Provider,
+	targetState defangv1.ServiceState,
+	project string,
+	etag string,
+	services []string,
+) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
 	if DoDryRun {
@@ -25,7 +31,7 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 	}
 
 	// Assume "services" are normalized service names
-	subscribeRequest := defangv1.SubscribeRequest{Etag: etag, Services: services}
+	subscribeRequest := defangv1.SubscribeRequest{Project: project, Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return err
@@ -41,7 +47,9 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		if !serverStream.Receive() {
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
-				pkg.SleepWithContext(ctx, 1*time.Second)
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
 				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
 					return err
@@ -68,9 +76,11 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
 			return pkg.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
-
 		serviceStates[msg.Name] = msg.State
 
+		if !allServicesUpdated(serviceStates) {
+			continue
+		}
 		if allInState(targetState, serviceStates) {
 			return nil // all services are in the target state
 		}
@@ -80,6 +90,15 @@ func WaitServiceState(ctx context.Context, provider client.Provider, targetState
 func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
 	for _, state := range serviceStates {
 		if state != targetState {
+			return false
+		}
+	}
+	return true
+}
+
+func allServicesUpdated(serviceStates map[string]defangv1.ServiceState) bool {
+	for _, state := range serviceStates {
+		if state == defangv1.ServiceState_NOT_SPECIFIED {
 			return false
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,7 +43,7 @@ import (
 )
 
 var (
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
+	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.148.0")
 )
 
 type StsProviderAPI interface {
@@ -105,7 +106,11 @@ func AnnotateAwsError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 	if cerr := new(smithy.OperationError); errors.As(err, &cerr) {
-		return ErrMissingAwsCreds{err}
+		// Auth can fail for many reasons: ec2imds not available, timeout, no profile, etc. so only check for top-level STS error
+		if cerr.ServiceID == "STS" {
+			return ErrMissingAwsCreds{cerr}
+		}
+		return cerr.Err
 	}
 	if cerr := new(cwTypes.SessionStreamingException); errors.As(err, &cerr) {
 		return connect.NewError(connect.CodeInternal, err)
@@ -137,9 +142,12 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 		return nil
 	}
 
+	term.Debugf("Using CD image: %q", b.CDImage)
+
 	cdTaskName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
+			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
 			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + PulumiVersion,
 			Name:      ecs.CdContainerName,
 			Cpus:      2.0,
@@ -208,14 +216,9 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	serviceInfos := []*defangv1.ServiceInfo{}
-	for _, service := range project.Services {
-		serviceInfo, err := b.update(ctx, project.Name, req.DelegateDomain, service)
-		if err != nil {
-			return nil, fmt.Errorf("service %q: %w", service.Name, err)
-		}
-		serviceInfo.Etag = etag // same etag for all services
-		serviceInfos = append(serviceInfos, serviceInfo)
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
 	}
 
 	// Ensure all service endpoints are unique
@@ -465,7 +468,7 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	}
 	// FIXME: this should only delete the services that are specified in the request, not all
 	cmd := cdCmd{
-		mode:           defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		mode:           defangv1.DeploymentMode_MODE_UNSPECIFIED,
 		project:        req.Project,
 		delegateDomain: req.DelegateDomain,
 		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
@@ -479,12 +482,6 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 	b.cdStart = time.Now()
 	b.cdTaskArn = taskArn
 	return &defangv1.DeleteResponse{Etag: etag}, nil
-}
-
-// stackDir returns a stack-qualified path, like the Pulumi TS function `stackDir`
-func (b *ByocAws) stackDir(projectName, name string) string {
-	ensure(projectName != "", "ProjectName not set")
-	return fmt.Sprintf("/%s/%s/%s/%s", byoc.DefangPrefix, projectName, b.PulumiStack, name) // same as shared/common.ts
 }
 
 func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*defangv1.ProjectUpdate, error) {
@@ -512,7 +509,7 @@ func (b *ByocAws) GetProjectUpdate(ctx context.Context, projectName string) (*de
 
 	s3Client := s3.NewFromConfig(cfg)
 	// Path to the state file, Defined at: https://github.com/DefangLabs/defang-mvp/blob/main/pulumi/cd/aws/byoc.ts#L104
-	ensure(projectName != "", "ProjectName not set")
+	pkg.Ensure(projectName != "", "ProjectName not set")
 	path := fmt.Sprintf("projects/%s/%s/project.pb", projectName, b.PulumiStack)
 
 	term.Debug("Getting services from bucket:", bucketName, path)
@@ -558,7 +555,7 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 }
 
 func (b *ByocAws) getSecretID(projectName, name string) string {
-	return b.stackDir(projectName, name) // same as defang_service.ts
+	return b.StackDir(projectName, name) // same as defang_service.ts
 }
 
 func (b *ByocAws) PutConfig(ctx context.Context, secret *defangv1.PutConfigRequest) error {
@@ -608,14 +605,22 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 
 	since := b.cdStart // TODO: get start time from req.Etag
 	if since.IsZero() {
-		since = time.Now().Add(-time.Hour)
+		since = time.Now().Add(-time.Hour) // TODO: get start time from req
 	}
+
+	// get stack information
+	err := b.driver.FillOutputs(ctx)
+	if err != nil {
+		return AnnotateAwsError(err)
+	}
+
+	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB (to stay well below the 1MB gRPC payload limit)
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, logs.LogTypeAll) {
+	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll) {
 		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
-		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) {
+		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
 			for _, event := range logEvents {
 				msg := term.StripAnsi(*event.Message)
 				if parseECSEventRecords {
@@ -636,9 +641,13 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 				}
 				sb.WriteString(msg)
 				sb.WriteByte('\n')
+				if sb.Len() > maxQuerySizePerLogGroup {
+					return errors.New("query result was truncated")
+				}
 			}
+			return nil
 		}); err != nil {
-			term.Warn("CloudWatch query failed:", AnnotateAwsError(err))
+			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
@@ -648,7 +657,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
-	// FillOutputs is needed to get the CD task ARN
+	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		return nil, AnnotateAwsError(err)
 	}
@@ -678,7 +687,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, logType)...)
+		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
 		taskArn = b.cdTaskArn
 	}
 	if err != nil {
@@ -707,138 +716,64 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName string, service string, logType logs.LogType) []ecs.LogGroupInput {
-	var groups []ecs.LogGroupInput
-	var serviceLogsPrefix string
-	if service != "" {
-		serviceLogsPrefix = service + "/" + service + "_" + etag
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []ecs.LogGroupInput {
+	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
+	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+	var pattern string // TODO: add etag to filter
+	if filter != "" {
+		pattern = strconv.Quote(filter)
 	}
+
+	var groups []ecs.LogGroupInput
 	// Tail CD and kaniko
 	if logType.Has(logs.LogTypeBuild) {
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN} // TODO: filter by etag
+		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
 		// If we know the CD task ARN, only tail the logstream for that CD task
 		if b.cdTaskArn != nil && b.cdEtag == etag {
 			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 		}
 		groups = append(groups, cdTail)
-		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "builds"))} // must match logic in ecs/common.ts; TODO: filter by etag/service
-		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN)
+		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
+		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN, filter)
 		groups = append(groups, kanikoTail)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "ecs"))} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
-		term.Debug("Query ecs events logs", ecsTail.LogGroupARN)
+		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
+	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.stackDir(projectName, "logs")), LogStreamNamePrefix: serviceLogsPrefix} // must match logic in ecs/common.ts
-		term.Debug("Query services logs", servicesTail.LogGroupARN, serviceLogsPrefix)
+		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		if service != "" && etag != "" {
+			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
+		}
+		term.Debug("Query services logs", servicesTail.LogGroupARN, servicesTail.LogStreamNamePrefix, pattern)
 		groups = append(groups, servicesTail)
 	}
 	return groups
 }
 
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) update(ctx context.Context, projectName, delegateDomain string, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
-	if err := compose.ValidateService(&service); err != nil {
-		return nil, err
+func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInfo, projectName, delegateDomain string, service composeTypes.ServiceConfig) error {
+	if service.DomainName == "" {
+		return nil
 	}
-
-	ensure(projectName != "", "ProjectName not set")
-	si := &defangv1.ServiceInfo{
-		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project: projectName,    // was: tenant
-		Service: &defangv1.Service{Name: service.Name},
-	}
-
-	hasHost := false
-	hasIngress := false
-	fqn := service.Name
-	if _, ok := service.Extensions["x-defang-static-files"]; !ok {
-		for _, port := range service.Ports {
-			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
-			hasHost = hasHost || port.Mode == compose.Mode_HOST
-			si.Endpoints = append(si.Endpoints, b.getEndpoint(fqn, projectName, delegateDomain, &port))
-			mode := defangv1.Mode_INGRESS
-			if port.Mode == compose.Mode_HOST {
-				mode = defangv1.Mode_HOST
-			}
-			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-				Target: port.Target,
-				Mode:   mode,
-			})
+	// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
+	cname, _ := net.LookupCNAME(service.DomainName)
+	if dns.Normalize(cname) != si.PublicFqdn {
+		dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+		zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
+		if err != nil {
+			return err
 		}
-	} else {
-		si.PublicFqdn = b.getPublicFqdn(projectName, delegateDomain, fqn)
-		si.Endpoints = append(si.Endpoints, si.PublicFqdn)
-	}
-	if hasIngress {
-		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
-		si.PublicFqdn = b.getPublicFqdn(projectName, delegateDomain, fqn)
-	}
-	if hasHost {
-		si.PrivateFqdn = b.getPrivateFqdn(projectName, fqn)
-	}
-
-	if service.DomainName != "" {
-		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
-			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
-		}
-		// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
-		cname, _ := net.LookupCNAME(service.DomainName)
-		if dns.Normalize(cname) != si.PublicFqdn {
-			dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
-			zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
-			if err != nil {
-				return nil, err
-			}
-			if zoneId == "" {
-				si.UseAcmeCert = true
-				// TODO: We should add link to documentation on how the acme cert workflow works
-				// TODO: Should we make this the default behavior or require the user to set a flag?
-			} else {
-				si.ZoneId = zoneId
-			}
+		if zoneId == "" {
+			si.UseAcmeCert = true
+			// TODO: We should add link to documentation on how the acme cert workflow works
+			// TODO: Should we make this the default behavior or require the user to set a flag?
+		} else {
+			si.ZoneId = zoneId
 		}
 	}
-
-	si.Status = "UPDATE_QUEUED"
-	si.State = defangv1.ServiceState_UPDATE_QUEUED
-	if service.Build != nil {
-		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
-		si.State = defangv1.ServiceState_BUILD_QUEUED
-	}
-	return si, nil
-}
-
-type qualifiedName = string // legacy
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getEndpoint(fqn qualifiedName, projectName, delegateDomain string, port *composeTypes.ServicePortConfig) string {
-	if port.Mode == compose.Mode_HOST {
-		privateFqdn := b.getPrivateFqdn(projectName, fqn)
-		return fmt.Sprintf("%s:%d", privateFqdn, port.Target)
-	}
-	projectDomain := b.GetProjectDomain(projectName, delegateDomain)
-	if projectDomain == "" {
-		return ":443" // placeholder for the public ALB/distribution
-	}
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getPublicFqdn(projectName, delegateDomain, fqn qualifiedName) string {
-	if projectName == "" {
-		return "" //b.fqdn
-	}
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, b.GetProjectDomain(projectName, delegateDomain))
-}
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocAws) getPrivateFqdn(projectName string, fqn qualifiedName) string {
-	safeFqn := byoc.DnsSafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, byoc.GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
+	return nil
 }
 
 func (b *ByocAws) TearDown(ctx context.Context) error {
@@ -850,7 +785,7 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		return "", err
 	}
 	cmd := cdCmd{
-		mode:    defangv1.DeploymentMode_UNSPECIFIED_MODE,
+		mode:    defangv1.DeploymentMode_MODE_UNSPECIFIED,
 		project: req.Project,
 		cmd:     []string{req.Command},
 	}
@@ -937,14 +872,9 @@ func ListPulumiStacks(ctx context.Context, s3client *s3.Client, bucketName strin
 		if stack != "" {
 			stacks = append(stacks, stack)
 		}
+		// TODO: check for lock files
 	}
 	return stacks, nil
-}
-
-func ensure(cond bool, msg string) {
-	if !cond {
-		panic(msg)
-	}
 }
 
 type ECSEventHandler interface {

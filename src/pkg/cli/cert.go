@@ -89,12 +89,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 	for _, serviceInfo := range services.Services {
 		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
 			cnt++
-			targets := []string{serviceInfo.PublicFqdn}
-			for i, endpoint := range serviceInfo.Endpoints {
-				if service.Ports[i].Mode == compose.Mode_INGRESS {
-					targets = append(targets, endpoint)
-				}
-			}
+			targets := getDomainTargets(serviceInfo, service)
 			term.Debugf("Found service %v with domain %v and targets %v", service.Name, service.DomainName, targets)
 			generateCert(ctx, service.DomainName, targets, client)
 		}
@@ -106,6 +101,20 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 	return nil
 }
 
+func getDomainTargets(serviceInfo *defangv1.ServiceInfo, service compose.ServiceConfig) []string {
+	// Only use the ALB for aws cert gen to avoid defang domain in the middle
+	if serviceInfo.LbDnsName != "" {
+		return []string{serviceInfo.LbDnsName}
+	} else {
+		targets := []string{serviceInfo.PublicFqdn}
+		for i, endpoint := range serviceInfo.Endpoints {
+			if service.Ports[i].Mode == compose.Mode_INGRESS {
+				targets = append(targets, endpoint)
+			}
+		}
+		return targets
+	}
+}
 func generateCert(ctx context.Context, domain string, targets []string, client client.FabricClient) {
 	term.Infof("Checking DNS setup for %v", domain)
 	if err := waitForCNAME(ctx, domain, targets, client); err != nil {

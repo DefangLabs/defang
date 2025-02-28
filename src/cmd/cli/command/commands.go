@@ -153,7 +153,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "Override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -163,10 +163,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
-	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path`)
+	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
-	// Client a temporary gRPC client for tracking events before login
+	// Create a temporary gRPC client for tracking events before login
 	_ = cli.NewGrpcClient(ctx, cluster)
 
 	// CD command
@@ -195,6 +195,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(tokenCmd)
 
 	// Login Command
+	loginCmd.Flags().Bool("training-opt-out", false, "Opt out of ML training (Pro users only)")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
@@ -252,7 +253,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Tail Command
 	tailCmd := makeComposeLogsCmd()
-	tailCmd.Use = "tail"
+	tailCmd.Use = "tail [SERVICE...]"
 	tailCmd.Aliases = []string{"logs"}
 	RootCmd.AddCommand(tailCmd)
 
@@ -386,6 +387,8 @@ var loginCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
+
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
@@ -397,6 +400,14 @@ var loginCmd = &cobra.Command{
 			}
 
 			printDefangHint("To generate a sample service, do:", "generate")
+		}
+
+		if trainingOptOut {
+			req := &defangv1.SetOptionsRequest{TrainingOptOut: trainingOptOut}
+			if err := client.SetOptions(cmd.Context(), req); err != nil {
+				return err
+			}
+			term.Info("Options updated successfully")
 		}
 		return nil
 	},
@@ -835,7 +846,14 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Debug(cmd.Context(), client, provider, etag, project, args)
+		var debugConfig = cli.DebugConfig{
+			Etag:           etag,
+			FailedServices: args,
+			Project:        project,
+			Provider:       provider,
+		}
+
+		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }
 
@@ -888,9 +906,9 @@ var deleteCmd = &cobra.Command{
 
 		tailOptions := cli.TailOptions{
 			Etag:    etag,
+			LogType: logs.LogTypeAll,
 			Since:   since,
 			Verbose: verbose,
-			LogType: logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
@@ -1045,7 +1063,7 @@ func doInEnv() bool {
 }
 
 func gcpInEnv() bool {
-	return os.Getenv("GCP_PROJECT_ID") != ""
+	return os.Getenv("GCP_PROJECT_ID") != "" || os.Getenv("CLOUDSDK_CORE_PROJECT") != ""
 }
 
 func awsInConfig(ctx context.Context) bool {
@@ -1095,7 +1113,7 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 				term.Warn("Using Defang playground, but DIGITALOCEAN_TOKEN environment variable was detected; did you forget --provider=digitalocean or DEFANG_PROVIDER=digitalocean?")
 			}
 			if gcpInEnv() {
-				term.Warn("Using Defang playground, but GCP_PROJECT_ID environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
+				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
 			providerID = cliClient.ProviderDefang
 		}
