@@ -1,6 +1,6 @@
- ! service "configdetection": environment variable "API_KEY" may contain sensitive values. Consider using 'defang config set API_KEY'
- ! service "configdetection": environment variable "AWS_CLIENT_ID" may contain sensitive values. Consider using 'defang config set AWS_CLIENT_ID'
- ! service "configdetection": environment variable "GH_PAT" may contain sensitive values. Consider using 'defang config set GH_PAT'
- ! service "configdetection": environment variable "HIGH_ENTROPY_STRING" may contain sensitive values. Consider using 'defang config set HIGH_ENTROPY_STRING'
- ! service "configdetection": environment variable "MY_URL" may contain sensitive values. Consider using 'defang config set MY_URL'
+ ! service "configdetection": environment variable "API_KEY" may contain sensitive information; consider using 'defang config set API_KEY' to securely store this value
+ ! service "configdetection": environment variable "AWS_CLIENT_ID" may contain sensitive information; consider using 'defang config set AWS_CLIENT_ID' to securely store this value
+ ! service "configdetection": environment variable "GH_PAT" may contain sensitive information; consider using 'defang config set GH_PAT' to securely store this value
+ ! service "configdetection": environment variable "HIGH_ENTROPY_STRING" may contain sensitive information; consider using 'defang config set HIGH_ENTROPY_STRING' to securely store this value
+ ! service "configdetection": environment variable "MY_URL" may contain sensitive information; consider using 'defang config set MY_URL' to securely store this value
  ! service "configdetection": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
