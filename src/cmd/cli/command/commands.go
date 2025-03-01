@@ -223,6 +223,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
+	configSetCmd.Flags().Bool("random", false, "set a random base64 value for config")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -699,6 +700,7 @@ var configSetCmd = &cobra.Command{
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
+		random, _ := cmd.Flags().GetBool("random")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -750,15 +752,32 @@ var configSetCmd = &cobra.Command{
 			// Trim the newline at the end because single line values are common
 			value = strings.TrimSuffix(string(bytes), "\n")
 		} else {
-			// Prompt for sensitive value
-			var sensitivePrompt = &survey.Password{
-				Message: fmt.Sprintf("Enter value for %q:", name),
-				Help:    "The value will be stored securely and cannot be retrieved later.",
-			}
+			if random {
+				// Prompt to generate and set a random value for config
+				var wantRandomConfig bool
+				if err := survey.AskOne(&survey.Confirm{
+					Message: fmt.Sprintf("Set a randomly generated base64 value for %q?", name),
+				}, &wantRandomConfig, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+					return err
+				}
+				if wantRandomConfig {
+					value = CreateRandomConfigValue()
+					term.Info("Generated random value: " + value)
+				} else {
+					term.Info("No changes made to", name)
+					return nil
+				}
+			} else {
+				// Prompt for sensitive value
+				var sensitivePrompt = &survey.Password{
+					Message: fmt.Sprintf("Enter value for %q:", name),
+					Help:    "The value will be stored securely and cannot be retrieved later.",
+				}
 
-			err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
-			if err != nil {
-				return err
+				err := survey.AskOne(sensitivePrompt, &value, survey.WithStdio(term.DefaultTerm.Stdio()))
+				if err != nil {
+					return err
+				}
 			}
 		}
 
