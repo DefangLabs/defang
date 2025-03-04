@@ -21,6 +21,7 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 
 	// create a custom scanner config in json
 	jsonCfg := `{
+		"transformers": ["json"],
 		"detectors": ["aws_client_id", "github", "high_entropy_string", "keyword", "url_password"],
 		"detectors_configs": {"keyword": ["3"], "high_entropy_string": ["3"]}
 		}`
