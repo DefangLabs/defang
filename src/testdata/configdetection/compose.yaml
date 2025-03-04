@@ -7,4 +7,4 @@ services:
       - GH_PAT=ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890 # github detector
       - HIGH_ENTROPY_STRING=1234567890abcdef # high_entropy_string detector
       - MY_URL=https://user:p455w0rd@example.com # url_password detector
-      - NOT_A_CONFIG=notaconfigvalue
+      - NOT_A_SECRET=notasecretvalue

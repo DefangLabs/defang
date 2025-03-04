@@ -217,9 +217,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 			// show warning if sensitive information is detected
 			if len(ds) > 0 {
-				detectedTypes := strings.Join(ds, " ")
-				term.Warnf("service %q: environment variable %q may contain sensitive information; consider using 'defang config set %s' to securely store this value", svccfg.Name, key, key)
-				term.Debugf("service %q: environment variable %q may contain detected secrets of type: %q", svccfg.Name, key, detectedTypes)
+				term.Warnf("service %q: environment %q may contain sensitive information; consider using 'defang config set %s' to securely store this value", svccfg.Name, key, key)
+				term.Debugf("service %q: environment %q may contain detected secrets of type: %q", svccfg.Name, key, ds)
 			}
 		}
 	}
