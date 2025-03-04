@@ -1,7 +1,5 @@
 package compose
 
-// package main
-
 import (
 	"errors"
 	"strings"
