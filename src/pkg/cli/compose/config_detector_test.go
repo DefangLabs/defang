@@ -40,7 +40,5 @@ func TestDetectConfig(t *testing.T) {
 				t.Errorf("Expected detector type %s, but got %s", tt.expectedOutput[i], d)
 			}
 		}
-
 	}
-
 }
