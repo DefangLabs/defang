@@ -752,20 +752,9 @@ var configSetCmd = &cobra.Command{
 			// Trim the newline at the end because single line values are common
 			value = strings.TrimSuffix(string(bytes), "\n")
 		} else if random {
-			// Prompt to generate and set a random value for config
-			var wantRandomConfig bool
-			if err := survey.AskOne(&survey.Confirm{
-				Message: fmt.Sprintf("Set a randomly generated base64 value for %q?", name),
-			}, &wantRandomConfig, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-				return err
-			}
-			if wantRandomConfig {
-				value = CreateRandomConfigValue()
-				term.Info("Generated random value: " + value)
-			} else {
-				term.Info("No changes made to", name)
-				return nil
-			}
+			// Generate a random value for the config
+			value = CreateRandomConfigValue()
+			term.Info("Generated random value: " + value)
 		} else {
 			// Prompt for sensitive value
 			var sensitivePrompt = &survey.Password{
