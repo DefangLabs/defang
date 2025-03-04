@@ -171,14 +171,19 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
+	cdDestroyCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdDestroyCmd)
+	cdDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdDownCmd)
+	cdRefreshCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdRefreshCmd)
 	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	cdCmd.AddCommand(cdTearDownCmd)
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
+	cdCancelCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	cdCmd.AddCommand(cdCancelCmd)
+	cdPreviewCmd.Flags().VarP(new(Mode), "mode", "m", fmt.Sprintf("deployment mode; one of %v", AllModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
@@ -1168,7 +1173,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
-				term.Warn("Unable to get selected provider:", err)
+				term.Debug("Unable to get selected provider:", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 				providerID.SetEnumValue(resp.Provider)
 				return "stored preference", nil
@@ -1212,7 +1217,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
 			term.Warn("Unable to save selected provider to defang server:", err)
 		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
+			term.Printf("%q is now the default provider for project %q and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 		}
 	}
 	return "interactive prompt", nil

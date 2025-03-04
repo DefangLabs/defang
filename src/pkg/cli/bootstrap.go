@@ -11,7 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p client.Provider, cmd string) error {
+func BootstrapCommand(ctx context.Context, projectName string, tailOpts *TailOptions, p client.Provider, cmd string) error {
 	term.Infof("Running CD command %q in project %q", cmd, projectName)
 	if DoDryRun {
 		return ErrDryRun
@@ -23,7 +23,15 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		return err
 	}
 
-	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
+	if tailOpts == nil {
+		term.Info("Detached.")
+		return nil
+	}
+
+	tailOpts.Etag = etag
+	tailOpts.LogType = logs.LogTypeBuild
+	tailOpts.Since = since
+	return tail(ctx, p, projectName, *tailOpts)
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {
@@ -47,7 +55,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("No projects found for account '%s' at region '%s'\n", accountInfo.AccountID(), accountInfo.Region())
+		fmt.Printf("No projects found for account %q in region %q\n", accountInfo.AccountID(), accountInfo.Region())
 	}
 
 	for _, stack := range stacks {
