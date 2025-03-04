@@ -1,7 +1,7 @@
 package compose
 
 import (
-	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
@@ -27,19 +27,19 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 		}`
 	cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
 	if err != nil {
-		return nil, errors.New("Failed to make a config detector: " + err.Error())
+		return nil, fmt.Errorf("Failed to make a config detector: %w", err)
 	}
 
 	// create a scanner from scanner config
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
-		return nil, errors.New("Failed to make a config detector: " + err.Error())
+		return nil, fmt.Errorf("Failed to make a config detector: %w", err)
 	}
 
 	// scan the input
 	ds, err := scannerClient.Scan(input)
 	if err != nil {
-		return nil, errors.New("Failed to scan input: " + err.Error())
+		return nil, fmt.Errorf("Failed to scan input: %w", err)
 	}
 
 	// return a list of detector types
