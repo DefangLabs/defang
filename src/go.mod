@@ -105,7 +105,6 @@ require (
 )
 
 require (
-	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16
