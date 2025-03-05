@@ -223,7 +223,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
-	configSetCmd.Flags().Bool("random", false, "set a random base64 value for config")
+	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
