@@ -10,7 +10,8 @@ func TestCreateRandomConfigValue(t *testing.T) {
 	// create a scanner config
 	cfg := scanner.NewConfigWithDefaults()
 
-	// adjust the entropy threshold value for the "high_entropy_string" detector
+	// adjust the entropy threshold value for the "high_entropy_string" detector.
+	// this will affect the level of randomness that is tolerated in a string
 	// (0 = low entropy, 4+ = very high entropy)
 	cfg.DetectorConfigs["high_entropy_string"] = []string{"3"}
 
