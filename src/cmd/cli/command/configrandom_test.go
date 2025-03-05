@@ -1,23 +1,20 @@
 package command
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 )
 
 func TestCreateRandomConfigValue(t *testing.T) {
-	// create the scanner with specific detectors
-	// the '3' is the entropy threshold value (0 = low entropy, 4 = high entropy)
-	jsonCfg := `{
-		"detectors": ["high_entropy_string"],
-		"detectors_configs": {"high_entropy_string": ["3"]}
-		}`
-	cfg, err := scanner.NewConfigFromJson(strings.NewReader(jsonCfg))
-	if err != nil {
-		t.Fatalf("Failed to make a config detector: " + err.Error())
-	}
+	// create a scanner config
+	cfg := scanner.NewConfigWithDefaults()
+
+	// adjust the entropy threshold value for the "high_entropy_string" detector
+	// (0 = low entropy, 4+ = very high entropy)
+	cfg.DetectorConfigs["high_entropy_string"] = []string{"3"}
+
+	// create the scanner based on scanner config
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to make a config detector: " + err.Error())
