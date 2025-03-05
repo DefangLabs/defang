@@ -18,27 +18,29 @@ func TestDetectConfig(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ds, err := detectConfig(tt.input)
+		t.Run(tt.input, func(t *testing.T) {
+			ds, err := detectConfig(tt.input)
 
-		//check for error
-		if err != nil {
-			if len(tt.expectedOutput) > 0 && tt.expectedOutput[0] != "" {
-				t.Errorf("Error: %v", err)
+			//check for error
+			if err != nil {
+				if len(tt.expectedOutput) > 0 && tt.expectedOutput[0] != "" {
+					t.Errorf("Error: %v", err)
+				}
+				return
 			}
-			continue
-		}
 
-		// check for length of the output
-		if len(ds) != len(tt.expectedOutput) {
-			t.Errorf("Expected %d detector types, but got %d", len(tt.expectedOutput), len(ds))
-			continue
-		}
-
-		// check for the output values
-		for i, d := range ds {
-			if d != tt.expectedOutput[i] {
-				t.Errorf("Expected detector type %s, but got %s", tt.expectedOutput[i], d)
+			// check for length of the output
+			if len(ds) != len(tt.expectedOutput) {
+				t.Errorf("Expected %d detector types, but got %d", len(tt.expectedOutput), len(ds))
+				return
 			}
-		}
+
+			// check for the output values
+			for i, d := range ds {
+				if d != tt.expectedOutput[i] {
+					t.Errorf("Expected detector type %s, but got %s", tt.expectedOutput[i], d)
+				}
+			}
+		})
 	}
 }
