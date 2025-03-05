@@ -167,6 +167,7 @@ message DebugRequest {
   repeated string services = 5;
   bool training_opt_out = 6; // only valid for Pro users
   google.protobuf.Timestamp since = 7;
+  google.protobuf.Timestamp until = 8;
 }
 
 message DebugResponse {
@@ -409,7 +410,13 @@ message TailRequest {
   google.protobuf.Timestamp since = 2;
   string etag = 3;
   string project = 4;
-  uint32 log_type = 5;
+  enum LogType {
+    LOG_TYPE_UNSPECIFIED = 0;
+    LOG_TYPE_CD = 1;
+    LOG_TYPE_BUILD = 2;
+    LOG_TYPE_RUN = 4;
+  }
+  uint32 log_type = 5; // bitfield
   string pattern = 6;
   google.protobuf.Timestamp until = 7;
 }
@@ -443,6 +450,7 @@ message ProjectUpdate {
   string project = 3 [ deprecated = true ]; // deprecated; use compose.name
   bytes compose = 4;
   string cd_version = 5;
+  DeploymentMode mode = 6;
 }
 
 enum Platform {

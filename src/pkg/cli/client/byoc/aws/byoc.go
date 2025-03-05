@@ -634,7 +634,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 			}
 			close(lgEvtChan)
 		}(lgi)
-		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events base one timestamp
+		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
 	}
 
 loop:
@@ -678,36 +678,40 @@ loop:
 }
 
 // Inspired by https://dev.to/vinaygo/concurrency-merge-sort-using-channels-and-goroutines-in-golang-35f7
-func mergeLogEventChan(a, b chan ecs.LogEvent) chan ecs.LogEvent {
-	if a == nil {
-		return b
+func mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
+	defer close(c)
+	val, ok := <-left
+	val2, ok2 := <-right
+	for ok && ok2 {
+		if less(val, val2) {
+			c <- val
+			val, ok = <-left
+		} else {
+			c <- val2
+			val2, ok2 = <-right
+		}
 	}
-	if b == nil {
-		return a
+	for ok {
+		c <- val
+		val, ok = <-left
+	}
+	for ok2 {
+		c <- val2
+		val2, ok2 = <-right
+	}
+}
+
+func mergeLogEventChan(left, right chan ecs.LogEvent) chan ecs.LogEvent {
+	if left == nil {
+		return right
+	}
+	if right == nil {
+		return left
 	}
 	out := make(chan ecs.LogEvent)
-	go func() {
-		defer close(out)
-		valA, okA := <-a
-		valB, okB := <-b
-		for okA && okB {
-			if *valA.Timestamp < *valB.Timestamp {
-				out <- valA
-				valA, okA = <-a
-			} else {
-				out <- valB
-				valB, okB = <-b
-			}
-		}
-		for okA {
-			out <- valA
-			valA, okA = <-a
-		}
-		for okB {
-			out <- valB
-			valB, okB = <-b
-		}
-	}()
+	go mergech(left, right, out, func(i1, i2 ecs.LogEvent) bool {
+		return *i1.Timestamp < *i2.Timestamp
+	})
 	return out
 }
 

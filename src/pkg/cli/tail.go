@@ -67,20 +67,24 @@ type EndLogConditional struct {
 type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
 
 type TailOptions struct {
-	Services           []string
-	Etag               types.ETag
-	Since              time.Time
-	Raw                bool
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
-	Verbose            bool
-	LogType            logs.LogType
+	Etag               types.ETag
 	Filter             string
+	LogType            logs.LogType
+	Raw                bool
+	Services           []string
+	Since              time.Time
+	Until              time.Time
+	Verbose            bool
 }
 
 func (to TailOptions) String() string {
 	cmd := "tail --since=" + to.Since.UTC().Format(time.RFC3339Nano)
 	if len(to.Services) > 0 {
 		cmd += " --name=" + strings.Join(to.Services, ",")
+	}
+	if !to.Until.IsZero() {
+		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
 	if to.Etag != "" {
 		cmd += " --etag=" + to.Etag
@@ -208,11 +212,18 @@ func isTransientError(err error) bool {
 }
 
 func tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
-	var since *timestamppb.Timestamp
+	var since, until *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		since = timestamppb.New(options.Since)
-	} else {
-		options.Since = time.Now() // this is used to continue from the last timestamp
+	}
+	if pkg.IsValidTime(options.Until) {
+		until = timestamppb.New(options.Until)
+		// If the user specifies a deadline in the future, we should respect it
+		if options.Until.After(time.Now()) {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, options.Until)
+			defer cancel()
+		}
 	}
 
 	tailRequest := &defangv1.TailRequest{
@@ -221,7 +232,8 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 		Pattern:  options.Filter,
 		Project:  projectName,
 		Services: options.Services,
-		Since:    since,
+		Since:    since, // this is also used to continue from the last timestamp
+		Until:    until,
 	}
 
 	serverStream, err := provider.Follow(ctx, tailRequest)
