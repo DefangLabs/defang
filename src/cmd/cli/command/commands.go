@@ -223,6 +223,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
+	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -699,6 +700,7 @@ var configSetCmd = &cobra.Command{
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
+		random, _ := cmd.Flags().GetBool("random")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -749,6 +751,10 @@ var configSetCmd = &cobra.Command{
 			}
 			// Trim the newline at the end because single line values are common
 			value = strings.TrimSuffix(string(bytes), "\n")
+		} else if random {
+			// Generate a random value for the config
+			value = CreateRandomConfigValue()
+			term.Info("Generated random value: " + value)
 		} else {
 			// Prompt for sensitive value
 			var sensitivePrompt = &survey.Password{
