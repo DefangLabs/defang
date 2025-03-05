@@ -7,7 +7,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-const DEFANG_PORTAL_HOST = "portal.defang.dev"
+const DEFANG_PORTAL_HOST = "portal.defang.io"
 const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {

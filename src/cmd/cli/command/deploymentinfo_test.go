@@ -27,7 +27,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 			Service: &defangv1.Service{Name: "service1"},
 		}})
 	const want = ` * Monitor your services' status in the defang portal
-   - https://portal.defang.dev/service/service1
+   - https://portal.defang.io/service/service1
 `
 	if got := stdout.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
