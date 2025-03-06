@@ -488,7 +488,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		}
 		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 		var since time.Time
-		if req.Since != nil {
+		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
 		subscribeStream.Start(since)
@@ -520,10 +520,14 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	}
 
 	startTime := time.Now()
-	if req.Since != nil {
+	if req.Since.IsValid() {
 		startTime = req.Since.AsTime()
 	}
-	if req.Since != nil || req.Etag != "" {
+	var endTime time.Time
+	if req.Until.IsValid() {
+		endTime = req.Until.AsTime()
+	}
+	if req.Since.IsValid() || req.Etag != "" {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
@@ -541,6 +545,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
+		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
 	logStream.Start(startTime)
@@ -648,9 +653,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 }
 
 func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
-	var since time.Time
-	if req.Since != nil {
+	var since, until time.Time
+	if req.Since.IsValid() {
 		since = req.Since.AsTime()
+	}
+	if req.Until.IsValid() {
+		until = req.Until.AsTime()
 	}
 	query := NewLogQuery(b.driver.ProjectId)
 	if b.cdExecution != "" {
@@ -662,6 +670,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
 	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
+	query.AddUntil(until)
 
 	// Service status updates
 	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
