@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -33,19 +34,40 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups 
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
+	// We must close the channel when all log groups are done
+	var counter atomic.Int32
+	// Start with 1 to prevent closing the channel when the first log group is done while others haven't started yet
+	counter.Add(1)
+
+	var err error
 	for _, lgi := range logGroups {
-		es, err := QueryAndTailLogGroup(ctx, lgi, start, end)
+		var es LiveTailStream
+		es, err = QueryAndTailLogGroup(ctx, lgi, start, end)
 		if err != nil {
-			cancel()
-			return nil, err
+			break // abort if there is any fatal error
 		}
+		counter.Add(1)
 		go func() {
 			defer es.Close()
 			// FIXME: this should *merge* the events from all log groups
-			e.pipeEvents(ctx, es)
+			e.err = e.pipeEvents(ctx, es)
+			// Decrement the counter and close the channel if all log groups are done
+			if counter.Add(-1) == 0 {
+				close(e.ch)
+			}
 		}()
 	}
 
+	// Close the channel early if there are no pending log groups
+	if counter.Add(-1) == 0 {
+		close(e.ch)
+		err = io.EOF // return an error to indicate that the caller need not call Close()
+	}
+
+	if err != nil {
+		cancel() // abort any goroutines
+		return nil, err
+	}
 	return e, nil
 }
 
@@ -179,7 +201,7 @@ type EventStream[T any] interface {
 	Err() error
 }
 
-// Deprecated: LiveTailStream is a stream of events from a call to StartLiveTail
+// Deprecated: LiveTailStream is a stream of events from a call to AWS StartLiveTail
 type LiveTailStream = EventStream[types.StartLiveTailResponseStream]
 
 func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {

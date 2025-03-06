@@ -70,7 +70,7 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end tim
 
 		if doTail {
 			// Pipe the events from the tail stream to the internal channel
-			es.pipeEvents(ctx, tailStream)
+			es.err = es.pipeEvents(ctx, tailStream)
 		}
 	}()
 
@@ -121,23 +121,25 @@ func (es *eventStream) Events() <-chan types.StartLiveTailResponseStream {
 
 // pipeEvents copies events from the given EventStream to the internal channel,
 // until the context is canceled or an error occurs in the given EventStream.
-func (es *eventStream) pipeEvents(ctx context.Context, tailStream LiveTailStream) {
+func (es *eventStream) pipeEvents(ctx context.Context, tailStream LiveTailStream) error {
 	for {
 		// Double select to make sure context cancellation is not blocked by either the receive or send
 		// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
 		select {
 		case event := <-tailStream.Events(): // blocking
 			if err := tailStream.Err(); err != nil {
-				es.err = err
-				// Don't return, but continue to send any events to the caller so they can see the error
+				return err
+			}
+			if event == nil {
+				return nil
 			}
 			select {
 			case es.ch <- event:
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			}
 		case <-ctx.Done(): // blocking
-			return
+			return ctx.Err()
 		}
 	}
 }
