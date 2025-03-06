@@ -19,16 +19,26 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start time.Tim
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
-	// TODO: call TailLogGroup once to check if the log group exists or we have another error
+	// First call TailLogGroup once to check if the log group exists or we have another error
+	eventStream, err := TailLogGroup(ctx, lgi)
+	if err != nil {
+		var resourceNotFound *types.ResourceNotFoundException
+		if !errors.As(err, &resourceNotFound) {
+			return nil, err
+		}
+	}
 
-	// Start goroutine to wait for the log group to be created for the resource not found log groups
+	// Start goroutine to wait for the log group to be created and then tail it
 	go func() {
 		defer close(es.ch)
 
-		eventStream, err := pollTailLogGroup(ctx, lgi)
-		if err != nil {
-			es.err = err
-			return
+		if eventStream == nil {
+			// If the log group does not exist yet, poll until it does
+			eventStream, err = pollTailLogGroup(ctx, lgi)
+			if err != nil {
+				es.err = err
+				return
+			}
 		}
 		defer eventStream.Close()
 
