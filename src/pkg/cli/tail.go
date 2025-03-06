@@ -79,12 +79,12 @@ type TailOptions struct {
 }
 
 func (to TailOptions) String() string {
-	cmd := "tail --since=" + to.Since.UTC().Format(time.RFC3339Nano)
-	if len(to.Services) > 0 {
-		cmd += " --name=" + strings.Join(to.Services, ",")
-	}
-	if !to.Until.IsZero() {
-		cmd += " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
+	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
+	if to.Until.IsZero() {
+		// No --until implies --follow
+		cmd += "tail" + cmd
+	} else {
+		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
 	if to.Etag != "" {
 		cmd += " --etag=" + to.Etag
@@ -101,6 +101,9 @@ func (to TailOptions) String() string {
 	}
 	if to.Filter != "" {
 		cmd += fmt.Sprintf(" --filter=%q", to.Filter)
+	}
+	if len(to.Services) > 0 {
+		cmd += " " + strings.Join(to.Services, " ")
 	}
 	return cmd
 }
@@ -238,7 +241,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 		Until:    until,
 	}
 
-	serverStream, err := provider.Follow(ctx, tailRequest)
+	serverStream, err := provider.QueryLogs(ctx, tailRequest)
 	if err != nil {
 		return err
 	}
@@ -318,7 +321,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 				}
 				pkg.SleepWithContext(ctx, 1*time.Second)
 				tailRequest.Since = timestamppb.New(options.Since)
-				serverStream, err = provider.Follow(ctx, tailRequest)
+				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
 					term.Debug("Reconnect failed:", err)
 					return err

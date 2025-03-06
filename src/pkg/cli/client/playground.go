@@ -63,7 +63,7 @@ func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.Subscr
 	return g.GetController().Subscribe(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.GetController().Tail(ctx, connect.NewRequest(req))
 }
 

@@ -678,7 +678,7 @@ loop:
 	return nil
 }
 
-func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		return nil, AnnotateAwsError(err)

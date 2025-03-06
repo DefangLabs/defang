@@ -137,7 +137,7 @@ type Provider interface {
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	DelayBeforeRetry(context.Context) error
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
-	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
