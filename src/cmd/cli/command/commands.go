@@ -336,7 +336,7 @@ var RootCmd = &cobra.Command{
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
-			if hasTty && isNewer(version, v.CliMin) {
+			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
 			}
@@ -1079,6 +1079,10 @@ func awsInConfig(ctx context.Context) bool {
 
 func IsCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
+}
+
+func isUpgradeCommand(cmd *cobra.Command) bool {
+	return cmd.Name() == "upgrade"
 }
 
 var providerDescription = map[cliClient.ProviderID]string{
