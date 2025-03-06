@@ -597,57 +597,57 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 }
 
 func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+	// tailRequest := &defangv1.TailRequest{
+	// 	Etag:     req.Etag,
+	// 	Project:  req.Project,
+	// 	Services: req.Services,
+	// 	Since:    req.Since,
+	// 	Until:    req.Until,
+	// }
+
 	// The LogStreamNamePrefix filter can only be used with one service name
 	var service string
 	if len(req.Services) == 1 {
 		service = req.Services[0]
 	}
 
-	since := b.cdStart // TODO: get start time from req.Etag
-	if since.IsZero() {
-		since = time.Now().Add(-time.Hour) // TODO: get start time from req
+	start := b.cdStart // TODO: get start time from req.Etag
+	if req.Since.IsValid() {
+		start = req.Since.AsTime()
+	} else if start.IsZero() {
+		start = time.Now().Add(-time.Hour)
 	}
 
-	// get stack information
+	end := time.Now()
+	if req.Until.IsValid() {
+		end = req.Until.AsTime()
+	}
+
+	// get stack information (for log group ARN)
 	err := b.driver.FillOutputs(ctx)
 	if err != nil {
 		return AnnotateAwsError(err)
 	}
 
-	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB (to stay well below the 1MB gRPC payload limit)
-
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	sb := strings.Builder{}
-	var evtsChan chan ecs.LogEvent
-	errsChan := make(chan error)
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll) {
-		lgEvtChan := make(chan ecs.LogEvent)
-		// Start a go routine for each log group
-		go func(lgi ecs.LogGroupInput) {
-			if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
-				for _, event := range logEvents {
-					lgEvtChan <- event
-				}
-				return nil
-			}); err != nil {
-				errsChan <- err
-			}
-			close(lgEvtChan)
-		}(lgi)
-		evtsChan = mergeLogEventChan(evtsChan, lgEvtChan) // Merge sort the log events based on timestamp
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	if evtsChan == nil {
+		return <-errsChan
 	}
 
+	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB per LogGroup (to stay well below the 1MB gRPC payload limit)
+
+	sb := strings.Builder{}
 loop:
 	for {
 		select {
-		case evt, ok := <-evtsChan:
+		case event, ok := <-evtsChan:
 			if !ok {
 				break loop
 			}
-			parseECSEventRecords := strings.HasSuffix(*evt.LogGroupIdentifier, "/ecs")
-			msg := term.StripAnsi(*evt.Message)
+			parseECSEventRecords := strings.HasSuffix(*event.LogGroupIdentifier, "/ecs")
 			if parseECSEventRecords {
-				if event, err := ecs.ParseECSEvent([]byte(msg)); err == nil {
+				if event, err := ecs.ParseECSEvent([]byte(*event.Message)); err == nil {
 					// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
 					if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
 						continue
@@ -662,9 +662,10 @@ loop:
 					continue
 				}
 			}
+			msg := term.StripAnsi(*event.Message)
 			sb.WriteString(msg)
 			sb.WriteByte('\n')
-			if sb.Len() > maxQuerySizePerLogGroup {
+			if sb.Len() > maxQuerySizePerLogGroup { // FIXME: this limit was supposed to be per LogGroup
 				term.Warn("Query result was truncated")
 				break loop
 			}
@@ -675,44 +676,6 @@ loop:
 	}
 	req.Logs = sb.String()
 	return nil
-}
-
-// Inspired by https://dev.to/vinaygo/concurrency-merge-sort-using-channels-and-goroutines-in-golang-35f7
-func mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
-	defer close(c)
-	val, ok := <-left
-	val2, ok2 := <-right
-	for ok && ok2 {
-		if less(val, val2) {
-			c <- val
-			val, ok = <-left
-		} else {
-			c <- val2
-			val2, ok2 = <-right
-		}
-	}
-	for ok {
-		c <- val
-		val, ok = <-left
-	}
-	for ok2 {
-		c <- val2
-		val2, ok2 = <-right
-	}
-}
-
-func mergeLogEventChan(left, right chan ecs.LogEvent) chan ecs.LogEvent {
-	if left == nil {
-		return right
-	}
-	if right == nil {
-		return left
-	}
-	out := make(chan ecs.LogEvent)
-	go mergech(left, right, out, func(i1, i2 ecs.LogEvent) bool {
-		return *i1.Timestamp < *i2.Timestamp
-	})
-	return out
 }
 
 func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {

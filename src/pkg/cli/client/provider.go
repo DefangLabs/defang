@@ -119,6 +119,13 @@ type PrepareDomainDelegationResponse struct {
 	DelegationSetId string
 }
 
+type ServerStream[Res any] interface {
+	Close() error
+	Receive() bool
+	Msg() *Res
+	Err() error
+}
+
 type Provider interface {
 	AccountInfo(context.Context) (AccountInfo, error)
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)

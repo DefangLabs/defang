@@ -9,13 +9,6 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-type ServerStream[Res any] interface {
-	Close() error
-	Receive() bool
-	Msg() *Res
-	Err() error
-}
-
 type ProjectLoader interface {
 	LoadProjectName(context.Context) (string, error)
 	LoadProject(context.Context) (*composeTypes.Project, error)
