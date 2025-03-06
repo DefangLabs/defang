@@ -215,6 +215,8 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 	var since, until *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		since = timestamppb.New(options.Since)
+	} else {
+		options.Since = time.Now() // this is used to continue from the last timestamp
 	}
 	if pkg.IsValidTime(options.Until) {
 		until = timestamppb.New(options.Until)

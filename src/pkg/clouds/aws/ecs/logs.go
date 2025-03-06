@@ -36,6 +36,7 @@ func TailLogGroups(ctx context.Context, start time.Time, logGroups ...LogGroupIn
 	for _, lgi := range logGroups {
 		es, err := QueryAndTailLogGroup(ctx, lgi, start)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 		go func() {
