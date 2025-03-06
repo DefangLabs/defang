@@ -1,7 +1,7 @@
 package ecs
 
 // Inspired by https://dev.to/vinaygo/concurrency-merge-sort-using-channels-and-goroutines-in-golang-35f7
-func mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
+func Mergech[T any](left chan T, right chan T, c chan T, less func(T, T) bool) {
 	defer close(c)
 	val, ok := <-left
 	val2, ok2 := <-right
@@ -32,7 +32,7 @@ func mergeLogEventChan(left, right chan LogEvent) chan LogEvent {
 		return left
 	}
 	out := make(chan LogEvent)
-	go mergech(left, right, out, func(i1, i2 LogEvent) bool {
+	go Mergech(left, right, out, func(i1, i2 LogEvent) bool {
 		return *i1.Timestamp < *i2.Timestamp
 	})
 	return out

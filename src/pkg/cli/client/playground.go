@@ -121,7 +121,7 @@ func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (AccountInfo, erro
 	return PlaygroundAccountInfo{}, nil
 }
 
-func (g *PlaygroundProvider) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	return nil
 }
 

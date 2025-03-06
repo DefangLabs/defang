@@ -112,7 +112,7 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		Since:    sinceTime,
 		Until:    untilTime,
 	}
-	err := debugConfig.Provider.Query(ctx, &req)
+	err := debugConfig.Provider.QueryForDebug(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -25,7 +25,7 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func TailLogGroups(ctx context.Context, start time.Time, logGroups ...LogGroupInput) (EventStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -34,13 +34,14 @@ func TailLogGroups(ctx context.Context, start time.Time, logGroups ...LogGroupIn
 	}
 
 	for _, lgi := range logGroups {
-		es, err := QueryAndTailLogGroup(ctx, lgi, start)
+		es, err := QueryAndTailLogGroup(ctx, lgi, start, end)
 		if err != nil {
 			cancel()
 			return nil, err
 		}
 		go func() {
 			defer es.Close()
+			// FIXME: this should *merge* the events from all log groups
 			e.pipeEvents(ctx, es)
 		}()
 	}
@@ -56,7 +57,7 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
-func TailLogGroup(ctx context.Context, input LogGroupInput) (EventStream, error) {
+func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, error) {
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -171,14 +172,15 @@ func newCloudWatchLogsClient(ctx context.Context, region aws.Region) (*cloudwatc
 
 type LogEvent = types.LiveTailSessionLogEvent
 
-// EventStream is an interface that represents a stream of events from a call to StartLiveTail.
-type EventStream interface {
+// EventStream is a generic interface that represents a stream of events
+type EventStream[T any] interface {
+	Events() <-chan T
 	Close() error
-	Events() <-chan types.StartLiveTailResponseStream
 	Err() error
 }
 
-var _ EventStream = (*cloudwatchlogs.StartLiveTailEventStream)(nil)
+// Deprecated: LiveTailStream is a stream of events from a call to StartLiveTail
+type LiveTailStream = EventStream[types.StartLiveTailResponseStream]
 
 func GetLogEvents(e types.StartLiveTailResponseStream) ([]LogEvent, error) {
 	switch ev := e.(type) {

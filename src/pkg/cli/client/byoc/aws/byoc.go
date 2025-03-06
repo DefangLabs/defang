@@ -596,7 +596,7 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	// tailRequest := &defangv1.TailRequest{
 	// 	Etag:     req.Etag,
 	// 	Project:  req.Project,
@@ -695,11 +695,11 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	//  * Etag, service:		tail that task/service
 	var err error
 	var taskArn ecs.TaskArn
-	var eventStream ecs.EventStream
+	var tailStream ecs.LiveTailStream
 	stopWhenCDTaskDone := false
 	logType := logs.LogType(req.LogType)
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		eventStream, err = b.driver.TailTaskID(ctx, etag)
+		tailStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
 		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
@@ -709,7 +709,14 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
+		var start, end time.Time
+		if req.Since.IsValid() {
+			start = req.Since.AsTime()
+		}
+		if req.Until.IsValid() {
+			end = req.Until.AsTime()
+		}
+		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
 		taskArn = b.cdTaskArn
 	}
 	if err != nil {
@@ -731,7 +738,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		}()
 	}
 
-	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
+	return newByocServerStream(ctx, tailStream, etag, req.GetServices(), b), nil
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {

@@ -24,12 +24,12 @@ type byocServerStream struct {
 	etag     string
 	response *defangv1.TailResponse
 	services []string
-	stream   ecs.EventStream
+	stream   ecs.LiveTailStream
 
 	ecsEventsHandler ECSEventHandler
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.EventStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
+func newByocServerStream(ctx context.Context, stream ecs.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
 	return &byocServerStream{
 		ctx:      ctx,
 		etag:     etag,

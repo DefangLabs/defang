@@ -11,7 +11,7 @@ import (
 // QueryAndTailLogGroup queries the log group from the give start time and initiates a Live Tail session.
 // This function also handles the case where the log group does not exist yet.
 // The caller should call `Close()` on the returned EventStream when done.
-func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start time.Time) (EventStream, error) {
+func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start, end time.Time) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	es := &eventStream{
@@ -19,12 +19,19 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start time.Tim
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
-	// First call TailLogGroup once to check if the log group exists or we have another error
-	eventStream, err := TailLogGroup(ctx, lgi)
-	if err != nil {
-		var resourceNotFound *types.ResourceNotFoundException
-		if !errors.As(err, &resourceNotFound) {
-			return nil, err
+	doTail := !end.IsZero()
+
+	var tailStream LiveTailStream
+	if doTail {
+		// First call TailLogGroup once to check if the log group exists or we have another error
+		var err error
+		tailStream, err = TailLogGroup(ctx, lgi)
+		if err != nil {
+			var resourceNotFound *types.ResourceNotFoundException
+			if !errors.As(err, &resourceNotFound) {
+				return nil, err
+			}
+			// Doesn't exist yet, continue to poll for it
 		}
 	}
 
@@ -32,17 +39,23 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start time.Tim
 	go func() {
 		defer close(es.ch)
 
-		if eventStream == nil {
+		if doTail {
 			// If the log group does not exist yet, poll until it does
-			eventStream, err = pollTailLogGroup(ctx, lgi)
-			if err != nil {
-				es.err = err
-				return
+			if tailStream == nil {
+				var err error
+				tailStream, err = pollTailLogGroup(ctx, lgi)
+				if err != nil {
+					es.err = err
+					return
+				}
 			}
+			defer tailStream.Close()
 		}
-		defer eventStream.Close()
 
 		if !start.IsZero() {
+			if end.IsZero() {
+				end = time.Now()
+			}
 			// Query the logs between the start time and now
 			if err := QueryLogGroup(ctx, lgi, start, time.Now(), func(events []LogEvent) error {
 				es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
@@ -55,14 +68,17 @@ func QueryAndTailLogGroup(ctx context.Context, lgi LogGroupInput, start time.Tim
 			}
 		}
 
-		es.pipeEvents(ctx, eventStream)
+		if doTail {
+			// Pipe the events from the tail stream to the internal channel
+			es.pipeEvents(ctx, tailStream)
+		}
 	}()
 
 	return es, nil
 }
 
 // pollTailLogGroup polls the log group and starts the Live Tail session once it's available
-func pollTailLogGroup(ctx context.Context, lgi LogGroupInput) (EventStream, error) {
+func pollTailLogGroup(ctx context.Context, lgi LogGroupInput) (LiveTailStream, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -88,7 +104,7 @@ type eventStream struct {
 	err    error
 }
 
-var _ EventStream = (*eventStream)(nil)
+var _ LiveTailStream = (*eventStream)(nil)
 
 func (es *eventStream) Close() error {
 	es.cancel()
@@ -105,13 +121,13 @@ func (es *eventStream) Events() <-chan types.StartLiveTailResponseStream {
 
 // pipeEvents copies events from the given EventStream to the internal channel,
 // until the context is canceled or an error occurs in the given EventStream.
-func (es *eventStream) pipeEvents(ctx context.Context, eventStream EventStream) {
+func (es *eventStream) pipeEvents(ctx context.Context, tailStream LiveTailStream) {
 	for {
 		// Double select to make sure context cancellation is not blocked by either the receive or send
 		// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
 		select {
-		case event := <-eventStream.Events(): // blocking
-			if err := eventStream.Err(); err != nil {
+		case event := <-tailStream.Events(): // blocking
+			if err := tailStream.Err(); err != nil {
 				es.err = err
 				// Don't return, but continue to send any events to the caller so they can see the error
 			}

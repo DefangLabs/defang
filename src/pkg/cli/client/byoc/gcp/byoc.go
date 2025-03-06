@@ -735,7 +735,7 @@ func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntr
 	return entries, nil
 }
 
-func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
 	if err != nil {
 		return annotateGcpError(err)

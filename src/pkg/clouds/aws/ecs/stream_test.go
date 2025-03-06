@@ -15,7 +15,7 @@ func TestPendingStream(t *testing.T) {
 
 	ps, _ := QueryAndTailLogGroup(context.Background(), LogGroupInput{
 		LogGroupARN: "arn:aws:logs:us-west-2:532501343364:log-group:/ecs/lio/logss:*",
-	}, time.Now().Add(-time.Minute))
+	}, time.Now().Add(-time.Minute), time.Time{})
 
 	go func() {
 		time.Sleep(5 * time.Second)
