@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -35,10 +35,7 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups 
 	}
 
 	// We must close the channel when all log groups are done
-	var counter atomic.Int32
-	// Start with 1 to prevent closing the channel when the first log group is done while others haven't started yet
-	counter.Add(1)
-
+	var wg sync.WaitGroup
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
@@ -46,28 +43,25 @@ func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups 
 		if err != nil {
 			break // abort if there is any fatal error
 		}
-		counter.Add(1)
+		wg.Add(1)
 		go func() {
 			defer es.Close()
+			defer wg.Done()
 			// FIXME: this should *merge* the events from all log groups
 			e.err = e.pipeEvents(ctx, es)
-			// Decrement the counter and close the channel if all log groups are done
-			if counter.Add(-1) == 0 {
-				close(e.ch)
-			}
 		}()
 	}
 
-	// Close the channel early if there are no pending log groups
-	if counter.Add(-1) == 0 {
+	go func() {
+		wg.Wait()
 		close(e.ch)
-		err = io.EOF // return an error to indicate that the caller need not call Close()
-	}
+	}()
 
 	if err != nil {
-		cancel() // abort any goroutines
+		cancel() // abort any goroutines (caller won't call Close)
 		return nil, err
 	}
+
 	return e, nil
 }
 

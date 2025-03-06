@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"context"
-	"io"
 	"testing"
 	"time"
 )
@@ -34,10 +33,18 @@ func TestSplitClusterTask(t *testing.T) {
 
 func TestQueryAndTailLogGroups(t *testing.T) {
 	e, err := QueryAndTailLogGroups(context.Background(), time.Now(), time.Time{})
-	if err != io.EOF {
-		t.Errorf("Expected EOF, but got %v", err)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
 	}
-	if e != nil {
-		t.Errorf("Expected nil, but got %v", e)
+	if e.Err() != nil {
+		t.Errorf("Expected no error, but got: %v", e.Err())
+	}
+	err = e.Close()
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	_, ok := <-e.Events()
+	if ok {
+		t.Error("Expected channel to be closed")
 	}
 }
