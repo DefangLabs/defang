@@ -590,7 +590,15 @@ var generateCmd = &cobra.Command{
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
-			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+			nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+
+			var confirm bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: nonEmptyFolder + " Continue creating project?",
+			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+			if err == nil && !confirm {
+				os.Exit(1)
+			}
 		}
 
 		if sample != "" {
@@ -1130,6 +1138,10 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	case cliClient.ProviderDO:
 		if !doInEnv() {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
+		}
+	case cliClient.ProviderGCP:
+		if !gcpInEnv() {
+			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
 		}
 	case cliClient.ProviderDefang:
 		// Ignore any env vars when explicitly using the Defang playground provider

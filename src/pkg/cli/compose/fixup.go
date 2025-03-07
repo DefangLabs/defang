@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -42,15 +43,20 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 			svccfg.Build.Context = url
 
+			removedArgs := []string{}
 			for key, value := range svccfg.Build.Args {
 				if key == "" || value == nil {
-					term.Warnf("service %q: skipping unset build argument %q", svccfg.Name, key)
+					removedArgs = append(removedArgs, key)
 					delete(svccfg.Build.Args, key) // remove the empty key; this is safe
 					continue
 				}
 
 				val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, BuildArgs)
 				svccfg.Build.Args[key] = &val
+			}
+
+			if len(removedArgs) > 0 {
+				term.Warnf("service %q: skipping unset build argument %s", svccfg.Name, pkg.QuotedArray(removedArgs))
 			}
 		}
 
@@ -64,10 +70,16 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		svccfg.Secrets = nil
 
 		// Fixup environment variables
+		shownOnce := false
+		useCfg := []string{}
+		overriddenCfg := []string{}
 		for key, value := range svccfg.Environment {
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
-				term.Warnf("service %q: skipping unset environment variable key", svccfg.Name)
+				if !shownOnce {
+					term.Warnf("service %q: skipping unset environment variable key", svccfg.Name)
+					shownOnce = true
+				}
 				delete(svccfg.Environment, key) // remove the empty key; this is safe
 				continue
 			}
@@ -78,12 +90,20 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
 				if svcNameReplacer.HasServiceName(*value) {
-					term.Warnf("service %q: environment variable %q will use the `defang config` value instead of adjusted service name", svccfg.Name, key)
+					useCfg = append(useCfg, key)
 				} else {
-					term.Warnf("service %q: environment variable %q overridden by config", svccfg.Name, key)
+					overriddenCfg = append(overriddenCfg, key)
 				}
 				svccfg.Environment[key] = nil
 				continue
+			}
+
+			if len(useCfg) > 0 {
+				term.Warnf("service %q: environment variable(s) %s will use the `defang config` value instead of adjusted service name", svccfg.Name, pkg.QuotedArray(useCfg))
+			}
+
+			if len(overriddenCfg) > 0 {
+				term.Warnf("service %q: environment variable %s overridden by config", svccfg.Name, pkg.QuotedArray(overriddenCfg))
 			}
 
 			val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
