@@ -98,16 +98,16 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				continue
 			}
 
-			if len(useCfg) > 0 {
-				term.Warnf("service %q: environment variable(s) %s will use the `defang config` value instead of adjusted service name", svccfg.Name, pkg.QuotedArray(useCfg))
-			}
-
-			if len(overriddenCfg) > 0 {
-				term.Warnf("service %q: environment variable %s overridden by config", svccfg.Name, pkg.QuotedArray(overriddenCfg))
-			}
-
 			val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
 			svccfg.Environment[key] = &val
+		}
+
+		if len(useCfg) > 0 {
+			term.Warnf("service %q: environment variable(s) %s will use the `defang config` value instead of adjusted service name", svccfg.Name, pkg.QuotedArray(useCfg))
+		}
+
+		if len(overriddenCfg) > 0 {
+			term.Warnf("service %q: environment variable(s) %s overridden by config", svccfg.Name, pkg.QuotedArray(overriddenCfg))
 		}
 
 		_, redis := svccfg.Extensions["x-defang-redis"]
