@@ -23,7 +23,7 @@ import (
 func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description string, permissions []string) (string, error) {
 	client, err := iamadm.NewIamClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("iam.NewIamClient: %w", err)
+		return "", fmt.Errorf("unable to check role exists, failed to create Iam client: %w", err)
 	}
 	defer client.Close()
 
@@ -91,7 +91,7 @@ func (gcp Gcp) EnsureRoleExists(ctx context.Context, roleId, title, description 
 func (gcp Gcp) EnsureServiceAccountExists(ctx context.Context, serviceAccountId, displayName, description string) (string, error) {
 	client, err := iamadm.NewIamClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("iam.NewIamClient: %w", err)
+		return "", fmt.Errorf("unable to check Service Account exists, failed to create Iam Client: %w", err)
 	}
 	defer client.Close()
 
@@ -218,7 +218,7 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context, repo, serviceAccount string, roles []string) error {
 	client, err := artifactregistry.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create artifact registry client: %w", err)
+		return fmt.Errorf("unable to check service account artifact registry role, failed to create artifact registry client: %w", err)
 	}
 	defer client.Close()
 
@@ -229,7 +229,7 @@ func (gcp Gcp) EnsureServiceAccountHasArtifactRegistryRoles(ctx context.Context,
 func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, serviceAccount string, roles []string) error {
 	client, err := iamadm.NewIamClient(ctx)
 	if err != nil {
-		log.Fatalf("failed to create artifact registry client: %v", err)
+		log.Fatalf("unable to check user service account role, failed to create artifact registry client: %v", err)
 	}
 	defer client.Close()
 

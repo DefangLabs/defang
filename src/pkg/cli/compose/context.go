@@ -294,7 +294,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
-			term.Warnf("The build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit)
+			term.Warnf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit)
 		}
 
 		bufLen := buf.Len()
@@ -303,7 +303,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
 		if bufLen <= ContextSizeSoftLimit && buf.Len() > ContextSizeSoftLimit {
-			term.Warnf("The build context is more than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
+			term.Warnf("the build context is more than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
 		}
 		return err
 	})

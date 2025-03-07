@@ -235,7 +235,7 @@ func waitForCNAME(ctx context.Context, domain string, targets []string, client c
 		if serverSideVerified || serverVerifyRpcFailure >= 3 {
 			locallyVerified := dns.CheckDomainDNSReady(ctx, domain, targets)
 			if serverSideVerified && !locallyVerified {
-				term.Warnf("The DNS configuration for %v has been successfully verified. However, your local environment may still be using cached data, so it could take several minutes for the DNS changes to propagate on your system.", domain)
+				term.Warnf("DNS settings for %v are verified, but changes may take a few minutes to propagate due to caching.", domain)
 				return nil
 			}
 			if locallyVerified {

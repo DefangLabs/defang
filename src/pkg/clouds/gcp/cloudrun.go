@@ -157,7 +157,7 @@ func (gcp Gcp) GetExecutionEnv(ctx context.Context, executionName string) (map[s
 
 	executionName = path.Base(executionName)
 	if len(executionName) < 6 {
-		return nil, fmt.Errorf("invalid execution name %q", executionName)
+		return nil, fmt.Errorf("invalid execution name: %q", executionName)
 	}
 	jobName := executionName[:len(executionName)-6]
 

@@ -14,14 +14,14 @@ import (
 func (gcp Gcp) EnsureArtifactRegistryExists(ctx context.Context, repoName string) (string, error) {
 	client, err := artifactregistry.NewClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("artifactregistry.NewClient: %w", err)
+		return "", fmt.Errorf("failed to create artifactregistry client: %w", err)
 	}
 
 	parent := fmt.Sprintf("projects/%s/locations/%s", gcp.ProjectId, gcp.Region)
 	fullRepoName := fmt.Sprintf("%s/repositories/%s", parent, repoName)
 	if resp, err := client.GetRepository(ctx, &artifactregistrypb.GetRepositoryRequest{Name: fullRepoName}); err != nil {
 		if IsNotFound(err) {
-			return "", fmt.Errorf("artifactregistry.GetRepository: %w", err)
+			return "", fmt.Errorf("failed to get artifactregistry repository: %w", err)
 		}
 	} else if resp != nil {
 		return resp.Name, nil

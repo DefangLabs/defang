@@ -647,7 +647,7 @@ func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
 			}
 			return nil
 		}); err != nil {
-			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
+			term.Warnf("CloudWatch query error: %v", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
