@@ -14,19 +14,8 @@
             "extensions": [
                 "golang.go",
                 "ms-vscode.makefile-tools"
-            ],
-            "settings": {
-                "go.goroot": "/nix/store/04msvrmcjls73nl4aakz74rvq0rj3hwv-go-1.22.12",
-                "go.toolsGopath": "/nix/store/04msvrmcjls73nl4aakz74rvq0rj3hwv-go-1.22.12",
-                "go.useSystemGopath": false,
-                "go.alternateTools": {
-                    "go": "/nix/store/04msvrmcjls73nl4aakz74rvq0rj3hwv-go-1.22.12/bin/go"
-                }
-            }
+            ]
         }
     },
-    "mounts": [
-        "source=/Users/eric.liu/codebase/experimental,target=/workspaces/experimental,type=bind"
-    ],
     "postAttachCommand": "nix develop --command bash && make setup"
 }
