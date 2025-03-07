@@ -1087,7 +1087,6 @@ func IsCompletionCommand(cmd *cobra.Command) bool {
 }
 
 func isUpgradeCommand(cmd *cobra.Command) bool {
-	os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint
 	return cmd.Name() == "upgrade"
 }
 
