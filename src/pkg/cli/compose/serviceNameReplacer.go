@@ -28,11 +28,10 @@ func NewServiceNameReplacer(provider client.Provider, services composeTypes.Serv
 	var hostServiceNames []string
 	var ingressServiceNames []string
 	for _, svccfg := range services {
-		var fixedServiceName = strings.ReplaceAll(svccfg.Name, "_", "-")
 		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, isHostPort) {
-			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(fixedServiceName))
+			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(svccfg.Name))
 		} else if len(svccfg.Ports) > 0 {
-			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(fixedServiceName))
+			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(svccfg.Name))
 		}
 	}
 
