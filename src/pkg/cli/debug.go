@@ -33,6 +33,7 @@ var (
 type DebugConfig struct {
 	Etag           types.ETag
 	FailedServices []string
+	ModelId        string
 	Project        *compose.Project
 	Provider       client.Provider
 	Since          time.Time
@@ -107,6 +108,7 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 	req := defangv1.DebugRequest{
 		Etag:     debugConfig.Etag,
 		Files:    files,
+		ModelId:  debugConfig.ModelId,
 		Project:  debugConfig.Project.Name,
 		Services: debugConfig.FailedServices,
 		Since:    sinceTime,
