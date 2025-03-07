@@ -148,6 +148,7 @@ func LiveTailStreamToChannel(ctx context.Context, tailStream LiveTailStream, err
 	eventCh := make(chan LogEvent)
 	go func() {
 		defer close(eventCh)
+		defer tailStream.Close()
 		for {
 			// Double select to make sure context cancellation is not blocked by either the receive or send
 			// See: https://stackoverflow.com/questions/60030756/what-does-it-mean-when-one-channel-uses-two-arrows-to-write-to-another-channel
