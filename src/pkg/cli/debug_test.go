@@ -41,7 +41,7 @@ type MustHaveProjectNameQueryProvider struct {
 	client.Provider
 }
 
-func (m MustHaveProjectNameQueryProvider) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (m MustHaveProjectNameQueryProvider) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	if req.Project == "" {
 		return errors.New("project name is missing")
 	}

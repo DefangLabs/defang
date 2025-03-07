@@ -57,7 +57,7 @@ func (a *AwsEcs) GetTaskArn(taskID string) (TaskArn, error) {
 	return &taskArn, nil
 }
 
-func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (EventStream, error) {
+func (a *AwsEcs) TailTaskID(ctx context.Context, taskID string) (LiveTailStream, error) {
 	if taskID == "" {
 		return nil, errors.New("taskID is empty")
 	}

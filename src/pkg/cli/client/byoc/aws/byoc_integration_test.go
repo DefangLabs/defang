@@ -40,7 +40,7 @@ func TestDeploy(t *testing.T) {
 func TestTail(t *testing.T) {
 	b := NewByocProvider(ctx, "TestTail")
 
-	ss, err := b.Follow(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
+	ss, err := b.QueryLogs(context.Background(), &defangv1.TailRequest{Project: "byoc_integration_test"})
 	if err != nil {
 		// the only acceptable error is "unauthorized"
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {

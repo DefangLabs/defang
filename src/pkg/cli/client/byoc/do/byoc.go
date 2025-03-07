@@ -369,7 +369,7 @@ func (b *ByocDo) PutConfig(ctx context.Context, config *defangv1.PutConfigReques
 	return err
 }
 
-func (b *ByocDo) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocDo) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	var appID, deploymentID string
 
 	if req.Etag != "" && req.Etag == b.cdEtag {
@@ -598,7 +598,7 @@ func (s *subscribeStream) Close() error {
 	return nil
 }
 
-func (b *ByocDo) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocDo) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	return client.ErrNotImplemented("AI debugging is not yet supported for DO BYOC")
 }
 
