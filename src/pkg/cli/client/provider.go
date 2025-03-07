@@ -119,6 +119,13 @@ type PrepareDomainDelegationResponse struct {
 	DelegationSetId string
 }
 
+type ServerStream[Res any] interface {
+	Close() error
+	Receive() bool
+	Msg() *Res
+	Err() error
+}
+
 type Provider interface {
 	AccountInfo(context.Context) (AccountInfo, error)
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
@@ -130,12 +137,12 @@ type Provider interface {
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	DelayBeforeRetry(context.Context) error
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
-	Follow(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
-	Query(context.Context, *defangv1.DebugRequest) error
+	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)

@@ -596,67 +596,89 @@ func (b *ByocAws) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRe
 	}, nil
 }
 
-func (b *ByocAws) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
+	// tailRequest := &defangv1.TailRequest{
+	// 	Etag:     req.Etag,
+	// 	Project:  req.Project,
+	// 	Services: req.Services,
+	// 	Since:    req.Since,
+	// 	Until:    req.Until,
+	// }
+
 	// The LogStreamNamePrefix filter can only be used with one service name
 	var service string
 	if len(req.Services) == 1 {
 		service = req.Services[0]
 	}
 
-	since := b.cdStart // TODO: get start time from req.Etag
-	if since.IsZero() {
-		since = time.Now().Add(-time.Hour) // TODO: get start time from req
+	start := b.cdStart // TODO: get start time from req.Etag
+	if req.Since.IsValid() {
+		start = req.Since.AsTime()
+	} else if start.IsZero() {
+		start = time.Now().Add(-time.Hour)
 	}
 
-	// get stack information
+	end := time.Now()
+	if req.Until.IsValid() {
+		end = req.Until.AsTime()
+	}
+
+	// get stack information (for log group ARN)
 	err := b.driver.FillOutputs(ctx)
 	if err != nil {
 		return AnnotateAwsError(err)
 	}
 
-	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB (to stay well below the 1MB gRPC payload limit)
-
 	// Gather logs from the CD task, kaniko, ECS events, and all services
+	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	if evtsChan == nil {
+		return <-errsChan
+	}
+
+	const maxQuerySizePerLogGroup = 128 * 1024 // 128KB per LogGroup (to stay well below the 1MB gRPC payload limit)
+
 	sb := strings.Builder{}
-	for _, lgi := range b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll) {
-		parseECSEventRecords := strings.HasSuffix(lgi.LogGroupARN, "/ecs")
-		if err := ecs.Query(ctx, lgi, since, time.Now(), func(logEvents []ecs.LogEvent) error {
-			for _, event := range logEvents {
-				msg := term.StripAnsi(*event.Message)
-				if parseECSEventRecords {
-					if event, err := ecs.ParseECSEvent([]byte(msg)); err == nil {
-						// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
-						if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
-							continue
-						}
-						if event.Service() != "" && len(req.Services) > 0 && !slices.Contains(req.Services, event.Service()) {
-							continue
-						}
-						// This matches the status messages in the Defang Playground Loki logs
-						sb.WriteString("status=")
-						sb.WriteString(event.Status())
-						sb.WriteByte('\n')
+loop:
+	for {
+		select {
+		case event, ok := <-evtsChan:
+			if !ok {
+				break loop
+			}
+			parseECSEventRecords := strings.HasSuffix(*event.LogGroupIdentifier, "/ecs")
+			if parseECSEventRecords {
+				if event, err := ecs.ParseECSEvent([]byte(*event.Message)); err == nil {
+					// TODO: once we know the AWS deploymentId from TaskStateChangeEvent detail.startedBy, we can do a 2nd query to filter by deploymentId
+					if event.Etag() != "" && req.Etag != "" && event.Etag() != req.Etag {
 						continue
 					}
-				}
-				sb.WriteString(msg)
-				sb.WriteByte('\n')
-				if sb.Len() > maxQuerySizePerLogGroup {
-					return errors.New("query result was truncated")
+					if event.Service() != "" && len(req.Services) > 0 && !slices.Contains(req.Services, event.Service()) {
+						continue
+					}
+					// This matches the status messages in the Defang Playground Loki logs
+					sb.WriteString("status=")
+					sb.WriteString(event.Status())
+					sb.WriteByte('\n')
+					continue
 				}
 			}
-			return nil
-		}); err != nil {
+			msg := term.StripAnsi(*event.Message)
+			sb.WriteString(msg)
+			sb.WriteByte('\n')
+			if sb.Len() > maxQuerySizePerLogGroup { // FIXME: this limit was supposed to be per LogGroup
+				term.Warn("Query result was truncated")
+				break loop
+			}
+		case err := <-errsChan:
 			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
 			// continue reading other log groups
 		}
 	}
-
 	req.Logs = sb.String()
 	return nil
 }
 
-func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	// FillOutputs is needed to get the CD task ARN or the LogGroup ARNs
 	if err := b.driver.FillOutputs(ctx); err != nil {
 		return nil, AnnotateAwsError(err)
@@ -673,11 +695,11 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	//  * Etag, service:		tail that task/service
 	var err error
 	var taskArn ecs.TaskArn
-	var eventStream ecs.EventStream
+	var tailStream ecs.LiveTailStream
 	stopWhenCDTaskDone := false
 	logType := logs.LogType(req.LogType)
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
-		eventStream, err = b.driver.TailTaskID(ctx, etag)
+		tailStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
 		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
@@ -687,7 +709,14 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		if len(req.Services) == 1 {
 			service = req.Services[0]
 		}
-		eventStream, err = ecs.TailLogGroups(ctx, req.Since.AsTime(), b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
+		var start, end time.Time
+		if req.Since.IsValid() {
+			start = req.Since.AsTime()
+		}
+		if req.Until.IsValid() {
+			end = req.Until.AsTime()
+		}
+		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
 		taskArn = b.cdTaskArn
 	}
 	if err != nil {
@@ -709,7 +738,7 @@ func (b *ByocAws) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		}()
 	}
 
-	return newByocServerStream(ctx, eventStream, etag, req.GetServices(), b), nil
+	return newByocServerStream(ctx, tailStream, etag, req.GetServices(), b), nil
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {
