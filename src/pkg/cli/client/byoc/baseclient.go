@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -16,25 +14,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
-
-const (
-	CdDefaultImageTag = "public-beta" // for when a project has no cd version, this would be a old deployment
-	CdLatestImageTag  = "public-beta" // Update this to the latest CD service major version number whenever cd major is changed
-	CdTaskPrefix      = "defang-cd"   // WARNING: renaming this practically deletes the Pulumi state
-)
-
-var (
-	DefangPrefix = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
-)
-
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func DnsSafeLabel(fqn string) string {
-	return strings.ReplaceAll(DnsSafe(fqn), ".", "-")
-}
-
-func DnsSafe(fqdn string) string {
-	return strings.ToLower(fqdn)
-}
 
 type ErrMultipleProjects struct {
 	ProjectNames []string
@@ -82,37 +61,6 @@ func MakeEnv(key string, value any) string {
 	return fmt.Sprintf("%s=%q", key, value)
 }
 
-func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
-	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
-	command.Dir = dir
-	command.Env = env
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	return command.Run()
-}
-
-func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
-	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
-	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
-	term.Debug(strings.Join(append(env, localCmd...), " "))
-
-	dir := os.Getenv("DEFANG_PULUMI_DIR")
-	if dir == "" {
-		return nil // show the shell command, but use regular Pulumi command in cloud task
-	}
-
-	// Run the Pulumi command locally
-	env = append([]string{
-		"PATH=" + os.Getenv("PATH"),
-		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
-	}, env...)
-	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
-		return err
-	}
-	// We always return an error to stop the CLI from "tailing" the cloud logs
-	return errors.New("local pulumi command succeeded; stopping")
-}
-
 func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName string) (string, error) {
 	projUpdate, err := b.projectBackend.GetProjectUpdate(ctx, projectName)
 	if err != nil {
@@ -126,22 +74,12 @@ func (b *ByocBaseClient) GetProjectLastCDImage(ctx context.Context, projectName 
 	return projUpdate.CdVersion, nil
 }
 
-func ExtractImageTag(fullQualifiedImageURI string) string {
-	index := strings.LastIndex(fullQualifiedImageURI, ":")
-	return fullQualifiedImageURI[index+1:]
-}
-
 func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error) {
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
 func (b *ByocBaseClient) SetCDImage(image string) {
 	b.CDImage = image
-}
-
-func (b *ByocBaseClient) GetVersions(context.Context) (*defangv1.Version, error) {
-	// we want only the latest version of the CD service this CLI was compiled to expect
-	return &defangv1.Version{Fabric: CdLatestImageTag}, nil
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
@@ -194,7 +132,7 @@ func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, deleg
 		serviceInfo.Etag = etag // same etag for all services
 		serviceInfoMap[service.Name] = &Node{
 			Name:        service.Name,
-			Deps:        getDependencies(service),
+			Deps:        service.GetDependencies(),
 			ServiceInfo: serviceInfo,
 		}
 	}
@@ -232,14 +170,6 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 		visit(node)
 	}
 	return serviceInfos
-}
-
-func getDependencies(service composeTypes.ServiceConfig) []string {
-	deps := []string{}
-	for depServiceName := range service.DependsOn {
-		deps = append(deps, depServiceName)
-	}
-	return deps
 }
 
 // This function was based on update function from Fabric controller and slightly modified to work with BYOC
@@ -339,8 +269,4 @@ func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) 
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := DnsSafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
-}
-
-func GetPrivateDomain(projectName string) string {
-	return DnsSafeLabel(projectName) + ".internal"
 }

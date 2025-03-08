@@ -401,16 +401,19 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) map[string]string {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region)
+	pulumiBackendKey, pulumiBackendValue := byoc.GetPulumiBackend(defangStateUrl)
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
+		"DEFANG_STATE_URL":           defangStateUrl,
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
-		"PROJECT":                    projectName, // may be empty
-		"PULUMI_BACKEND_URL":         fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region),
-		"PULUMI_CONFIG_PASSPHRASE":   pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
+		"PROJECT":                    projectName,                 // may be empty
+		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
+		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}

@@ -630,6 +630,8 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 
 func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVariableDefinition {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+	defangStateUrl := fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region)
+	pulumiBackendKey, pulumiBackendValue := byoc.GetPulumiBackend(defangStateUrl)
 	env := []*godo.AppVariableDefinition{
 		{
 			Key:   "DEFANG_PREFIX",
@@ -656,12 +658,18 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Value: projectName,
 		},
 		{
-			Key:   "PULUMI_BACKEND_URL",
-			Value: fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region),
+			Key:   pulumiBackendKey,
+			Value: pulumiBackendValue,
+			Type:  godo.AppVariableType_Secret,
+		},
+		{
+			Key:   "DEFANG_STATE_URL",
+			Value: defangStateUrl,
 		},
 		{
 			Key:   "PULUMI_CONFIG_PASSPHRASE",
-			Value: pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),
+			Value: byoc.PulumiConfigPassphrase,
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "STACK",
@@ -678,6 +686,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		{
 			Key:   "DIGITALOCEAN_TOKEN",
 			Value: os.Getenv("DIGITALOCEAN_TOKEN"),
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
@@ -698,16 +707,16 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Value: b.buildRepo,
 		},
 		{
-			Key:   "AWS_REGION", // Needed for CD S3 functions
+			Key:   "AWS_REGION", // Needed for CD S3 functions; FIXME: remove this
 			Value: region.String(),
 		},
 		{
-			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions
+			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions; FIXME: remove this
 			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
-			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions
+			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions; FIXME: remove this
 			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
 			Type:  godo.AppVariableType_Secret,
 		},
