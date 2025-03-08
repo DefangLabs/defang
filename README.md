@@ -118,6 +118,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
+- `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; defaults to a self-hosted backend
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 - `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
 
