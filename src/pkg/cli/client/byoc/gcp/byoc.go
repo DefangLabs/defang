@@ -333,16 +333,17 @@ type cdCommand struct {
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
 	env := map[string]string{
+		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_ORG":               "defang",
+		"DEFANG_PREFIX":            byoc.DefangPrefix,
+		"DEFANG_STATE_URL":         `gs://` + b.bucket,
+		"GCP_PROJECT":              b.driver.ProjectId,
 		"PROJECT":                  cmd.Project,
-		"PULUMI_BACKEND_URL":       `gs://` + b.bucket,
+		"PULUMI_ACCESS_TOKEN":      os.Getenv("PULUMI_ACCESS_TOKEN"),
 		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
 		"REGION":                   b.driver.Region,
-		"DEFANG_ORG":               "defang",
-		"GCP_PROJECT":              b.driver.ProjectId,
 		"STACK":                    "beta",
-		"DEFANG_PREFIX":            byoc.DefangPrefix,
-		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
-		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 	}
 
 	if !term.StdoutCanColor() {

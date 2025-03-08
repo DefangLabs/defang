@@ -656,7 +656,11 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Value: projectName,
 		},
 		{
-			Key:   "PULUMI_BACKEND_URL",
+			Key:   "PULUMI_ACCESS_TOKEN",
+			Value: os.Getenv("PULUMI_ACCESS_TOKEN"),
+		},
+		{
+			Key:   "DEFANG_STATE_URL",
 			Value: fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region),
 		},
 		{
