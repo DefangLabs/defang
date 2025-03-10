@@ -208,7 +208,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	generateCmd.Flags().String("model", modelId, "LLM model to use for generating the code (Pro users only)")
+	generateCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(newCmd)
 
@@ -253,7 +253,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
-	debugCmd.Flags().String("model", modelId, "LLM model to use for debugging (Pro users only)")
+	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
@@ -480,8 +480,6 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		model, _ := cmd.Flags().GetString("model")
-
 		var sample, language, defaultFolder string
 		if len(args) > 0 {
 			sample = args[0]
@@ -596,7 +594,7 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", model))
+		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
@@ -615,7 +613,7 @@ var generateCmd = &cobra.Command{
 				Description: prompt.Description,
 				Folder:      prompt.Folder,
 				Language:    language,
-				ModelId:     model,
+				ModelId:     modelId,
 			}
 			_, err := cli.GenerateWithAI(cmd.Context(), client, args)
 			if err != nil {
@@ -856,7 +854,6 @@ var debugCmd = &cobra.Command{
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
-		model, _ := cmd.Flags().GetString("model")
 
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -872,7 +869,7 @@ var debugCmd = &cobra.Command{
 		var debugConfig = cli.DebugConfig{
 			Etag:           etag,
 			FailedServices: args,
-			ModelId:        model,
+			ModelId:        modelId,
 			Project:        project,
 			Provider:       provider,
 		}
