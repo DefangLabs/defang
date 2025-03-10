@@ -47,6 +47,7 @@ var (
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
@@ -207,6 +208,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
+	generateCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(newCmd)
 
@@ -251,6 +253,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
@@ -591,7 +594,7 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder))
+		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
@@ -606,7 +609,13 @@ var generateCmd = &cobra.Command{
 			}
 		} else {
 			term.Info("Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Folder, prompt.Description)
+			args := cli.GenerateArgs{
+				Description: prompt.Description,
+				Folder:      prompt.Folder,
+				Language:    language,
+				ModelId:     modelId,
+			}
+			_, err := cli.GenerateWithAI(cmd.Context(), client, args)
 			if err != nil {
 				return err
 			}
@@ -860,6 +869,7 @@ var debugCmd = &cobra.Command{
 		var debugConfig = cli.DebugConfig{
 			Etag:           etag,
 			FailedServices: args,
+			ModelId:        modelId,
 			Project:        project,
 			Provider:       provider,
 		}
