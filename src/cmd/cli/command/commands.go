@@ -46,6 +46,7 @@ var (
 	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
+	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
@@ -136,7 +137,7 @@ func Execute(ctx context.Context) error {
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
-	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
+	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
@@ -341,8 +342,12 @@ var RootCmd = &cobra.Command{
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
-				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
+				hideUpdate = true // hide the upgrade hint at the end
 			}
+		}
+
+		if isUpgradeCommand(cmd) {
+			hideUpdate = true
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
