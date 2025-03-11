@@ -174,6 +174,7 @@ func makeComposeUpCmd() *cobra.Command {
 						var debugConfig = cli.DebugConfig{
 							Etag:           deploy.Etag,
 							FailedServices: failedServices,
+							ModelId:        modelId,
 							Project:        project,
 							Provider:       provider,
 							Since:          since,
