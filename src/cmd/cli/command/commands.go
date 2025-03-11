@@ -1057,22 +1057,36 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	if err != nil {
 		panic(err)
 	}
-	// Avoid common mistakes: using -p with a provider name instead of -P
+
+	// Avoid common mistakes
 	var prov cliClient.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
+		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
-		if !nonInteractive {
-			var confirm bool
-			err := survey.AskOne(&survey.Confirm{
-				Message: "Continue with project: " + projectName + "?",
-			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-			track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
-			if err == nil && !confirm {
-				os.Exit(1)
-			}
-		}
+		doubleCheck(projectName)
+	} else if strings.HasPrefix(projectName, "roject-name") {
+		// -project-name= instead of --project-name
+		term.Warn("Did you mean to use --project-name instead of -project-name?")
+		doubleCheck(projectName)
+	} else if strings.HasPrefix(projectName, "rovider") {
+		// -provider= instead of --provider
+		term.Warn("Did you mean to use --provider instead of -provider?")
+		doubleCheck(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+}
+
+func doubleCheck(projectName string) {
+	if !nonInteractive {
+		var confirm bool
+		err := survey.AskOne(&survey.Confirm{
+			Message: "Continue with project: " + projectName + "?",
+		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+		track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
+		if err == nil && !confirm {
+			os.Exit(1)
+		}
+	}
 }
 
 func awsInEnv() bool {
