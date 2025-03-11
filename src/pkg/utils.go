@@ -156,3 +156,7 @@ func IsValidTime(t time.Time) bool {
 	// We could be even more conservative and check for > 2000 or so, but this is more predictable.
 	return t.Year() > 1970
 }
+
+func QuotedArray(s []string) string {
+	return "[\"" + strings.Join(s, "\", \"") + "\"]"
+}

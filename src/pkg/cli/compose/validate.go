@@ -42,6 +42,7 @@ func ValidateService(service *types.ServiceConfig) error {
 		// hasHost = hasHost || port.Mode == v1.Mode_HOST
 		uniquePorts[port.Target] = true
 	}
+
 	if service.HealthCheck != nil && len(service.HealthCheck.Test) > 0 {
 		// Technically this should test for <= but both interval and timeout have 30s as the default value in compose spec
 		interval := getOrZero(service.HealthCheck.Interval)

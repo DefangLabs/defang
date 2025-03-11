@@ -114,7 +114,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 					if !skipExisting || !os.IsExist(err) {
 						return err
 					}
-					term.Warnf("File %q already exists, skipping", path)
+					term.Warnf("File already exists, skipping: %q", path)
 				}
 			}
 		}

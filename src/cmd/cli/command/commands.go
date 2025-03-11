@@ -600,7 +600,15 @@ var generateCmd = &cobra.Command{
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
-			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+			nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+
+			var confirm bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: nonEmptyFolder + " Continue creating project?",
+			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+			if err == nil && !confirm {
+				os.Exit(1)
+			}
 		}
 
 		if sample != "" {
@@ -1166,6 +1174,10 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		if !doInEnv() {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
+	case cliClient.ProviderGCP:
+		if !gcpInEnv() {
+			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
+		}
 	case cliClient.ProviderDefang:
 		// Ignore any env vars when explicitly using the Defang playground provider
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
@@ -1203,13 +1215,13 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		var err error
 		projectName, err = loader.LoadProjectName(ctx)
 		if err != nil {
-			term.Warn("Unable to load project:", err)
+			term.Warnf("Unable to load project: %v", err)
 		}
 
 		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
-				term.Warn("Unable to get selected provider:", err)
+				term.Warnf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 				providerID.SetEnumValue(resp.Provider)
 				return "stored preference", nil
@@ -1251,7 +1263,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	// Save the selected provider to the fabric
 	if projectName != "" {
 		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
-			term.Warn("Unable to save selected provider to defang server:", err)
+			term.Warnf("Unable to save selected provider to defang server: %v", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 		}

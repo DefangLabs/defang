@@ -27,7 +27,7 @@ func fixupPort(port *composeTypes.ServicePortConfig) {
 				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
 			if (port.Protocol == Protocol_TCP || port.Protocol == Protocol_UDP) && port.AppProtocol != "http" {
-				// term.Warnf("TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)")
+				// TCP ingress is not supported; assuming HTTP (remove 'protocol' to silence)"
 				port.AppProtocol = "http"
 			}
 			break
