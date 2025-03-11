@@ -1049,22 +1049,25 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	}
 
 	// Avoid common mistakes
-	var doubleCheck bool
 	var prov cliClient.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
 		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
-		doubleCheck = true
+		doubleCheck(projectName)
 	} else if strings.HasPrefix(projectName, "roject-name") {
 		// -project-name= instead of --project-name
 		term.Warn("Did you mean to use --project-name instead of -project-name?")
-		doubleCheck = true
+		doubleCheck(projectName)
 	} else if strings.HasPrefix(projectName, "rovider") {
 		// -provider= instead of --provider
 		term.Warn("Did you mean to use --provider instead of -provider?")
-		doubleCheck = true
+		doubleCheck(projectName)
 	}
-	if !nonInteractive && doubleCheck {
+	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+}
+
+func doubleCheck(projectName string) {
+	if !nonInteractive {
 		var confirm bool
 		err := survey.AskOne(&survey.Confirm{
 			Message: "Continue with project: " + projectName + "?",
@@ -1074,7 +1077,6 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 			os.Exit(1)
 		}
 	}
-	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
 }
 
 func awsInEnv() bool {
