@@ -1,7 +1,9 @@
 package ecs
 
 import (
+	"context"
 	"testing"
+	"time"
 )
 
 func TestLogGroupIdentifier(t *testing.T) {
@@ -26,5 +28,23 @@ func TestSplitClusterTask(t *testing.T) {
 	}
 	if taskID != "12345678123412341234123456789012" {
 		t.Errorf("Expected task ID %q, but got %q", taskArn, taskID)
+	}
+}
+
+func TestQueryAndTailLogGroups(t *testing.T) {
+	e, err := QueryAndTailLogGroups(context.Background(), time.Now(), time.Time{})
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	if e.Err() != nil {
+		t.Errorf("Expected no error, but got: %v", e.Err())
+	}
+	err = e.Close()
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	_, ok := <-e.Events()
+	if ok {
+		t.Error("Expected channel to be closed")
 	}
 }

@@ -332,17 +332,23 @@ type cdCommand struct {
 }
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
+	defangStateUrl := `gs://` + b.bucket
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return "", err
+	}
 	env := map[string]string{
-		"PROJECT":                  cmd.Project,
-		"PULUMI_BACKEND_URL":       `gs://` + b.bucket,
-		"PULUMI_CONFIG_PASSPHRASE": pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"), // TODO: make customizable
-		"REGION":                   b.driver.Region,
-		"DEFANG_ORG":               "defang",
-		"GCP_PROJECT":              b.driver.ProjectId,
-		"STACK":                    "beta",
-		"DEFANG_PREFIX":            byoc.DefangPrefix,
-		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
+		"DEFANG_ORG":               "defang",
+		"DEFANG_PREFIX":            byoc.DefangPrefix,
+		"DEFANG_STATE_URL":         defangStateUrl,
+		"GCP_PROJECT":              b.driver.ProjectId,
+		"PROJECT":                  cmd.Project,
+		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
+		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
+		"REGION":                   b.driver.Region,
+		"STACK":                    "beta",
 	}
 
 	if !term.StdoutCanColor() {
@@ -480,7 +486,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	return subscribeStream, nil
 }
 
-func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
 		subscribeStream, err := NewSubscribeStream(ctx, b.driver)
 		if err != nil {
@@ -488,7 +494,7 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 		}
 		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 		var since time.Time
-		if req.Since != nil {
+		if req.Since.IsValid() {
 			since = req.Since.AsTime()
 		}
 		subscribeStream.Start(since)
@@ -520,10 +526,14 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 	}
 
 	startTime := time.Now()
-	if req.Since != nil {
+	if req.Since.IsValid() {
 		startTime = req.Since.AsTime()
 	}
-	if req.Since != nil || req.Etag != "" {
+	var endTime time.Time
+	if req.Until.IsValid() {
+		endTime = req.Until.AsTime()
+	}
+	if req.Since.IsValid() || req.Etag != "" {
 		execName := path.Base(b.cdExecution)
 		if execName == "." {
 			execName = ""
@@ -541,6 +551,7 @@ func (b *ByocGcp) Follow(ctx context.Context, req *defangv1.TailRequest) (client
 			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
+		logStream.AddUntil(endTime)
 		logStream.AddFilter(req.Pattern)
 	}
 	logStream.Start(startTime)
@@ -648,9 +659,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 }
 
 func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
-	var since time.Time
-	if req.Since != nil {
+	var since, until time.Time
+	if req.Since.IsValid() {
 		since = req.Since.AsTime()
+	}
+	if req.Until.IsValid() {
+		until = req.Until.AsTime()
 	}
 	query := NewLogQuery(b.driver.ProjectId)
 	if b.cdExecution != "" {
@@ -662,6 +676,7 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
 	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
+	query.AddUntil(until)
 
 	// Service status updates
 	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
@@ -735,7 +750,7 @@ func (b *ByocGcp) query(ctx context.Context, query string) ([]*loggingpb.LogEntr
 	return entries, nil
 }
 
-func (b *ByocGcp) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (b *ByocGcp) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	logEntries, err := b.query(ctx, b.createDeploymentLogQuery(req))
 	if err != nil {
 		return annotateGcpError(err)

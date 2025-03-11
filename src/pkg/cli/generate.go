@@ -13,7 +13,14 @@ import (
 
 var SupportedLanguages = []string{"Nodejs", "Golang", "Python"}
 
-func GenerateWithAI(ctx context.Context, client client.FabricClient, language, dir, description string) ([]string, error) {
+type GenerateArgs struct {
+	Description string
+	Folder      string
+	Language    string
+	ModelId     string
+}
+
+func GenerateWithAI(ctx context.Context, client client.FabricClient, args GenerateArgs) ([]string, error) {
 	if DoDryRun {
 		term.Warn("Dry run, no project files will be generated")
 		return nil, ErrDryRun
@@ -21,8 +28,9 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, language, d
 
 	response, err := client.GenerateFiles(ctx, &defangv1.GenerateFilesRequest{
 		AgreeTos: true, // agreement was already checked by the caller
-		Language: language,
-		Prompt:   description,
+		Language: args.Language,
+		ModelId:  args.ModelId,
+		Prompt:   args.Description,
 	})
 	if err != nil {
 		return nil, err
@@ -41,14 +49,14 @@ func GenerateWithAI(ctx context.Context, client client.FabricClient, language, d
 
 	// Write each file to disk
 	term.Info("Writing files to disk...")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(args.Folder, 0755); err != nil {
 		return nil, err
 	}
 	for _, file := range response.Files {
 		// Print the files that were generated
 		fmt.Println("   -", file.Name)
 		// TODO: this will overwrite existing files
-		if err = os.WriteFile(filepath.Join(dir, file.Name), []byte(file.Content), 0644); err != nil {
+		if err = os.WriteFile(filepath.Join(args.Folder, file.Name), []byte(file.Content), 0644); err != nil {
 			return nil, err
 		}
 	}

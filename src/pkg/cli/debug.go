@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -32,9 +33,11 @@ var (
 type DebugConfig struct {
 	Etag           types.ETag
 	FailedServices []string
+	ModelId        string
 	Project        *compose.Project
 	Provider       client.Provider
 	Since          time.Time
+	Until          time.Time
 }
 
 func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
@@ -95,18 +98,23 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		return ErrDryRun
 	}
 
-	var sinceTime *timestamppb.Timestamp = nil
-	if !debugConfig.Since.IsZero() {
+	var sinceTime, untilTime *timestamppb.Timestamp
+	if pkg.IsValidTime(debugConfig.Since) {
 		sinceTime = timestamppb.New(debugConfig.Since)
+	}
+	if pkg.IsValidTime(debugConfig.Until) {
+		untilTime = timestamppb.New(debugConfig.Until)
 	}
 	req := defangv1.DebugRequest{
 		Etag:     debugConfig.Etag,
 		Files:    files,
+		ModelId:  debugConfig.ModelId,
 		Project:  debugConfig.Project.Name,
 		Services: debugConfig.FailedServices,
 		Since:    sinceTime,
+		Until:    untilTime,
 	}
-	err := debugConfig.Provider.Query(ctx, &req)
+	err := debugConfig.Provider.QueryForDebug(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -63,7 +63,7 @@ func (g *PlaygroundProvider) Subscribe(ctx context.Context, req *defangv1.Subscr
 	return g.GetController().Subscribe(ctx, connect.NewRequest(req))
 }
 
-func (g *PlaygroundProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
+func (g *PlaygroundProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error) {
 	return g.GetController().Tail(ctx, connect.NewRequest(req))
 }
 
@@ -121,7 +121,7 @@ func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (AccountInfo, erro
 	return PlaygroundAccountInfo{}, nil
 }
 
-func (g *PlaygroundProvider) Query(ctx context.Context, req *defangv1.DebugRequest) error {
+func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
 	return nil
 }
 

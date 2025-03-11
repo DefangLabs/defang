@@ -78,7 +78,7 @@ type mockTailProvider struct {
 	Reqs          []*defangv1.TailRequest
 }
 
-func (m *mockTailProvider) Follow(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	dup, _ := proto.Clone(req).(*defangv1.TailRequest)
 	m.Reqs = append(m.Reqs, dup)
 	if len(m.ServerStreams) == 0 {

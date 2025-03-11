@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -173,6 +174,7 @@ func makeComposeUpCmd() *cobra.Command {
 						var debugConfig = cli.DebugConfig{
 							Etag:           deploy.Etag,
 							FailedServices: failedServices,
+							ModelId:        modelId,
 							Project:        project,
 							Provider:       provider,
 							Since:          since,
@@ -422,6 +424,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
 			var filter, _ = cmd.Flags().GetString("filter")
+			var until, _ = cmd.Flags().GetString("until")
 
 			if !cmd.Flags().Changed("verbose") {
 				verbose = true // default verbose for explicit tail command
@@ -431,17 +434,27 @@ func makeComposeLogsCmd() *cobra.Command {
 				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
 			}
 
-			ts, err := cli.ParseTimeOrDuration(since, time.Now())
+			now := time.Now()
+			sinceTs, err := cli.ParseTimeOrDuration(since, now)
 			if err != nil {
-				return fmt.Errorf("invalid duration or time: %w", err)
+				return fmt.Errorf("invalid 'since' duration or time: %w", err)
 			}
+			sinceTs = sinceTs.UTC()
+			untilTs, err := cli.ParseTimeOrDuration(until, now)
+			if err != nil {
+				return fmt.Errorf("invalid 'until' duration or time: %w", err)
+			}
+			untilTs = untilTs.UTC()
 
-			ts = ts.UTC()
-			sinceStr := ""
-			if pkg.IsValidTime(ts) {
-				sinceStr = " since " + ts.Format(time.RFC3339Nano) + " "
+			rangeStr := ""
+			if pkg.IsValidTime(sinceTs) {
+				rangeStr = " since " + sinceTs.Format(time.RFC3339Nano)
 			}
-			term.Infof("Showing logs%s; press Ctrl+C to stop:", sinceStr)
+			if pkg.IsValidTime(untilTs) {
+				rangeStr += " until " + untilTs.Format(time.RFC3339Nano)
+			}
+			term.Infof("Showing logs%s; press Ctrl+C to stop:", rangeStr)
+
 			services := args
 			if len(name) > 0 {
 				services = append(args, strings.Split(name, ",")...) // backwards compat
@@ -464,7 +477,8 @@ func makeComposeLogsCmd() *cobra.Command {
 				LogType:  logType,
 				Raw:      raw,
 				Services: services,
-				Since:    ts,
+				Since:    sinceTs,
+				Until:    untilTs,
 				Verbose:  verbose,
 			}
 
@@ -477,7 +491,8 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
 	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")
-	logsCmd.Flags().StringP("since", "S", "", "show logs since duration/time")
+	logsCmd.Flags().String("since", "", "show logs since duration/time")
+	logsCmd.Flags().String("until", "", "show logs until duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
 	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
@@ -506,6 +521,7 @@ services:
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
+	composeCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())
