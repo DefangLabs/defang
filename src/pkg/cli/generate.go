@@ -22,7 +22,7 @@ type GenerateArgs struct {
 
 func GenerateWithAI(ctx context.Context, client client.FabricClient, args GenerateArgs) ([]string, error) {
 	if DoDryRun {
-		term.Warn("Dry run, not generating files")
+		term.Warn("Dry run, no project files will be generated")
 		return nil, ErrDryRun
 	}
 

@@ -20,7 +20,7 @@ import (
 func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, error) {
 	existing, err := gcp.GetBucketWithPrefix(ctx, prefix)
 	if err != nil {
-		return "", fmt.Errorf("GetBucketWithPrefix: %w", err)
+		return "", fmt.Errorf("failed to get bucket with prefix %q: %w", prefix, err)
 	}
 	if existing != "" {
 		term.Debugf("Bucket %q already exists\n", existing)
@@ -29,7 +29,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("storage.NewClient: %w", err)
+		return "", fmt.Errorf("failed to create storeage client: %w", err)
 	}
 	defer client.Close()
 
@@ -41,7 +41,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 		Location:     gcp.Region,
 		StorageClass: "STANDARD", // No minimum storage duration
 	}); err != nil {
-		return "", fmt.Errorf("bucket.Create: %w", err)
+		return "", fmt.Errorf("failed to create bucket %q: %w", newBucketName, err)
 	}
 
 	return newBucketName, nil
@@ -50,7 +50,7 @@ func (gcp Gcp) EnsureBucketExists(ctx context.Context, prefix string) (string, e
 func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("storage.NewClient: %w", err)
+		return "", fmt.Errorf("failed to get stoage bucket with prefix %q: %w", prefix, err)
 	}
 	defer client.Close()
 
@@ -75,7 +75,7 @@ func (gcp Gcp) GetBucketWithPrefix(ctx context.Context, prefix string) (string, 
 func (gcp Gcp) CreateUploadURL(ctx context.Context, bucketName, objectName, serviceAccount string) (string, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("storage.NewClient: %w", err)
+		return "", fmt.Errorf("unable to create upload URL, failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
@@ -134,14 +134,14 @@ func (gcp Gcp) SignBytes(ctx context.Context, b []byte, name string) ([]byte, er
 func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("storage.NewClient: %w", err)
+		return nil, fmt.Errorf("unable to get bucket object, failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
 	bucket := client.Bucket(bucketName)
 	r, err := bucket.Object(objectName).NewReader(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("bucket.Object(%q).NewReader: %w", objectName, err)
+		return nil, fmt.Errorf("failed to get bucket object (%q) reader: %w", objectName, err)
 	}
 	defer r.Close()
 
@@ -151,7 +151,7 @@ func (gcp Gcp) GetBucketObject(ctx context.Context, bucketName, objectName strin
 func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix string, f func(*storage.ObjectAttrs) error) error {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("storage.NewClient: %w", err)
+		return fmt.Errorf("unable to iterate on bucket object, failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
@@ -163,7 +163,7 @@ func (gcp Gcp) IterateBucketObjects(ctx context.Context, bucketName, prefix stri
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("bucket.Objects iterator error: %w", err)
+			return fmt.Errorf("failed to iterate on bucket object %q: %w", bucketName, err)
 		}
 
 		if err := f(attrs); err != nil {

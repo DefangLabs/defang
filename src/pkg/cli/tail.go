@@ -188,7 +188,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warn("Service does not exist (yet):", service)
+					term.Warnf("Service does not exist (yet): %q", service)
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:

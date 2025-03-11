@@ -10,7 +10,7 @@ import (
 func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, description string) (*dns.ManagedZone, error) {
 	dnsSvc, err := dns.NewService(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("dns.NewService: %w", err)
+		return nil, fmt.Errorf("unable to check DNS zone, failed to create DNS service: %w", err)
 	}
 
 	zoneSvc := dns.NewManagedZonesService(dnsSvc)
@@ -20,7 +20,7 @@ func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, descriptio
 	}
 
 	if !IsNotFound(err) {
-		return nil, fmt.Errorf("zoneSvc.Get: %w", err)
+		return nil, fmt.Errorf("failed to get DNS managed zone service: %w", err)
 	}
 
 	if domain[len(domain)-1] != '.' {
@@ -31,7 +31,7 @@ func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, descriptio
 		DnsName:     domain,
 		Description: description,
 	}).Do(); err != nil {
-		return nil, fmt.Errorf("zoneSvc.Create: %w", err)
+		return nil, fmt.Errorf("failed to create zone service: %w", err)
 	} else {
 		return zone, nil
 	}
@@ -40,13 +40,13 @@ func (gcp Gcp) EnsureDNSZoneExists(ctx context.Context, name, domain, descriptio
 func (gcp Gcp) GetDNSZone(ctx context.Context, name string) (*dns.ManagedZone, error) {
 	dnsSvc, err := dns.NewService(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("dns.NewService: %w", err)
+		return nil, fmt.Errorf("unable to get DNS zone, failed to create DNS service: %w", err)
 	}
 
 	zoneSvc := dns.NewManagedZonesService(dnsSvc)
 	zone, err := zoneSvc.Get(gcp.ProjectId, name).Do()
 	if err != nil {
-		return nil, fmt.Errorf("zoneSvc.Get: %w", err)
+		return nil, fmt.Errorf("failed to get DNS zone service: %w", err)
 	}
 
 	return zone, nil

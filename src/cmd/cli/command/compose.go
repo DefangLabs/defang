@@ -395,7 +395,6 @@ func makeComposePsCmd() *cobra.Command {
 				}
 
 				term.Warn(err)
-
 				printDefangHint("To start a new project, do:", "new")
 				return nil
 			}

@@ -78,7 +78,7 @@ func InteractiveLogin(ctx context.Context, client client.FabricClient, gitHubCli
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
 	if err := saveAccessToken(fabric, at); err != nil {
-		term.Warn("Failed to save access token:", err)
+		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
 	}
 	return nil
 }

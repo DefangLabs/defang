@@ -22,7 +22,7 @@ func ConfigList(ctx context.Context, projectName string, provider client.Provide
 
 	numConfigs := len(config.Names)
 	if numConfigs == 0 {
-		_, err := term.Warnf("No configs found")
+		_, err := term.Warn("No configs found")
 		return err
 	}
 
