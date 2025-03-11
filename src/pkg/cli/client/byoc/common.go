@@ -25,7 +25,7 @@ func getPulumiAccessToken() (string, error) {
 	pat := os.Getenv("PULUMI_ACCESS_TOKEN")
 	if pat == "" {
 		// TODO: could consider parsing ~/.pulumi/credentials.json
-		return "", errors.New("PULUMI_ACCESS_TOKEN not set")
+		return "", errors.New("PULUMI_ACCESS_TOKEN must be set for Pulumi Cloud")
 	}
 	return pat, nil
 }
