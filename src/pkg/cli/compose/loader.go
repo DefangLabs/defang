@@ -155,7 +155,7 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 						if inEnv {
 							term.Warnf("Environment variable %q is not used; add it to `.env` if needed", key)
 						} else {
-							term.Debugf("Unresolved variable %q", key)
+							term.Debugf("Unresolved environment variable %q", key)
 						}
 						return "", false
 					}

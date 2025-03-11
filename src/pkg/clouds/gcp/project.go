@@ -103,7 +103,7 @@ type Gcp struct {
 func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*resourcemanagerpb.Project, error) {
 	client, err := resourcemanager.NewProjectsClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to check project exists, failed to create project client: %w", err)
+		return nil, fmt.Errorf("unable to ensure project exists, failed to create project client: %w", err)
 	}
 	defer client.Close()
 
@@ -122,7 +122,7 @@ func (gcp Gcp) EnsureProjectExists(ctx context.Context, projectName string) (*re
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to check project exists, failed getting next iteration: %w", err)
+			return nil, fmt.Errorf("unable to ensure project exists, failed getting next iteration: %w", err)
 		}
 		id := ProjectId(resp.ProjectId)
 		if resp.State != resourcemanagerpb.Project_ACTIVE {
