@@ -175,6 +175,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(cdCmd)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
+	cdCmd.AddCommand(cdExportCmd)
 	cdCmd.AddCommand(cdRefreshCmd)
 	cdTearDownCmd.Flags().Bool("force", false, "force the teardown of the CD stack")
 	cdCmd.AddCommand(cdTearDownCmd)
@@ -182,6 +183,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
 	cdCmd.AddCommand(cdPreviewCmd)
+	cdCmd.AddCommand(cdUpgradeCmd)
 
 	// Eula command
 	tosCmd.Flags().Bool("agree-tos", false, "agree to the Defang terms of service")
