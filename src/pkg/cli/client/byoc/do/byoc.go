@@ -607,7 +607,10 @@ func (b *ByocDo) PrepareDomainDelegation(ctx context.Context, req client.Prepare
 }
 
 func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain string, cmd ...string) (*godo.App, error) { // nolint:unparam
-	env := b.environment(projectName, delegateDomain)
+	env, err := b.environment(projectName, delegateDomain)
+	if err != nil {
+		return nil, err
+	}
 	if term.DoDebug() {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := make([]string, len(env))
@@ -628,8 +631,13 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 	return app, nil
 }
 
-func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVariableDefinition {
+func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVariableDefinition, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+	defangStateUrl := fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return nil, err
+	}
 	env := []*godo.AppVariableDefinition{
 		{
 			Key:   "DEFANG_PREFIX",
@@ -656,12 +664,18 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Value: projectName,
 		},
 		{
-			Key:   "PULUMI_BACKEND_URL",
-			Value: fmt.Sprintf(`s3://%s?endpoint=%s.digitaloceanspaces.com`, b.driver.BucketName, region),
+			Key:   pulumiBackendKey,
+			Value: pulumiBackendValue,
+			Type:  godo.AppVariableType_Secret,
+		},
+		{
+			Key:   "DEFANG_STATE_URL",
+			Value: defangStateUrl,
 		},
 		{
 			Key:   "PULUMI_CONFIG_PASSPHRASE",
-			Value: pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf"),
+			Value: byoc.PulumiConfigPassphrase,
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "STACK",
@@ -678,6 +692,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 		{
 			Key:   "DIGITALOCEAN_TOKEN",
 			Value: os.Getenv("DIGITALOCEAN_TOKEN"),
+			Type:  godo.AppVariableType_Secret,
 		},
 		{
 			Key:   "SPACES_ACCESS_KEY_ID",
@@ -698,16 +713,16 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 			Value: b.buildRepo,
 		},
 		{
-			Key:   "AWS_REGION", // Needed for CD S3 functions
+			Key:   "AWS_REGION", // Needed for CD S3 functions; FIXME: remove this
 			Value: region.String(),
 		},
 		{
-			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions
+			Key:   "AWS_ACCESS_KEY_ID", // Needed for CD S3 functions; FIXME: remove this
 			Value: os.Getenv("SPACES_ACCESS_KEY_ID"),
 			Type:  godo.AppVariableType_Secret,
 		},
 		{
-			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions
+			Key:   "AWS_SECRET_ACCESS_KEY", // Needed for CD S3 functions; FIXME: remove this
 			Value: os.Getenv("SPACES_SECRET_ACCESS_KEY"),
 			Type:  godo.AppVariableType_Secret,
 		},
@@ -715,7 +730,7 @@ func (b *ByocDo) environment(projectName, delegateDomain string) []*godo.AppVari
 	if !term.StdoutCanColor() {
 		env = append(env, &godo.AppVariableDefinition{Key: "NO_COLOR", Value: "1"})
 	}
-	return env
+	return env, nil
 }
 
 func (b *ByocDo) setUp(ctx context.Context) error {
