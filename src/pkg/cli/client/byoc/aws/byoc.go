@@ -399,10 +399,13 @@ func (b *ByocAws) bucketName() string {
 	return pkg.Getenv("DEFANG_CD_BUCKET", b.driver.BucketName)
 }
 
-func (b *ByocAws) environment(projectName string) map[string]string {
+func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
 	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region)
-	pulumiBackendKey, pulumiBackendValue := byoc.GetPulumiBackend(defangStateUrl)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return nil, err
+	}
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
@@ -422,7 +425,7 @@ func (b *ByocAws) environment(projectName string) map[string]string {
 		env["NO_COLOR"] = "1"
 	}
 
-	return env
+	return env, nil
 }
 
 type cdCmd struct {
@@ -435,7 +438,10 @@ type cdCmd struct {
 
 func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, error) {
 	// Setup the deployment environment
-	env := b.environment(cmd.project)
+	env, err := b.environment(cmd.project)
+	if err != nil {
+		return nil, err
+	}
 	if cmd.delegationSetId != "" {
 		env["DELEGATION_SET_ID"] = cmd.delegationSetId
 	}

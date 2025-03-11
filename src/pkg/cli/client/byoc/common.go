@@ -21,14 +21,24 @@ var (
 	PulumiConfigPassphrase = pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf")
 )
 
-func GetPulumiBackend(stateUrl string) (string, string) {
+func getPulumiAccessToken() (string, error) {
+	pat := os.Getenv("PULUMI_ACCESS_TOKEN")
+	if pat == "" {
+		// TODO: could consider parsing ~/.pulumi/credentials.json
+		return "", errors.New("PULUMI_ACCESS_TOKEN not set")
+	}
+	return pat, nil
+}
+
+func GetPulumiBackend(stateUrl string) (string, string, error) {
 	switch strings.ToLower(DefangPulumiBackend) {
 	case "pulumi-cloud":
-		return "PULUMI_ACCESS_TOKEN", os.Getenv("PULUMI_ACCESS_TOKEN")
+		pat, err := getPulumiAccessToken()
+		return "PULUMI_ACCESS_TOKEN", pat, err
 	case "":
-		return "PULUMI_BACKEND_URL", stateUrl
+		return "PULUMI_BACKEND_URL", stateUrl, nil
 	default:
-		return "PULUMI_BACKEND_URL", DefangPulumiBackend
+		return "PULUMI_BACKEND_URL", DefangPulumiBackend, nil
 	}
 }
 

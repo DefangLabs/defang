@@ -333,7 +333,10 @@ type cdCommand struct {
 
 func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
 	defangStateUrl := `gs://` + b.bucket
-	pulumiBackendKey, pulumiBackendValue := byoc.GetPulumiBackend(defangStateUrl)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return "", err
+	}
 	env := map[string]string{
 		"DEFANG_DEBUG":             os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
 		"DEFANG_MODE":              strings.ToLower(cmd.Mode.String()),
