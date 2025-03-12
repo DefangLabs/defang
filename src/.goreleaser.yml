@@ -16,7 +16,7 @@ builds:
       post:
         - ./bin/codesign.sh "{{ .Path }}"
 
-  - id: defang-cli
+  - id: defang-linux
     main: ./cmd/cli
     binary: defang
     goos:
