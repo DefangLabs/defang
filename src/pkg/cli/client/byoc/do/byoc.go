@@ -211,6 +211,21 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}, nil
 }
 
+func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
+	deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, b.cdAppID, b.cdDeploymentID)
+	if err != nil {
+		return err
+	}
+	switch deploymentInfo.GetPhase() {
+	default:
+		return nil
+	case godo.DeploymentPhase_Active:
+		return io.EOF
+	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
+		return errors.New("deployment failed")
+	}
+}
+
 func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
 	if err := b.setUp(ctx); err != nil {
 		return "", err
