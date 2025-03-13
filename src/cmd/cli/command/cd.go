@@ -1,6 +1,8 @@
 package command
 
 import (
+	"time"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -14,6 +16,15 @@ var cdCmd = &cobra.Command{
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			time.Local = time.UTC // set the timezone to UTC
+		}
+
+		return nil
+	},
 }
 
 var cdDestroyCmd = &cobra.Command{
@@ -22,6 +33,7 @@ var cdDestroyCmd = &cobra.Command{
 	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
@@ -49,6 +61,7 @@ var cdDownCmd = &cobra.Command{
 	Short:       "Refresh and then destroy the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
+
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
@@ -74,6 +87,7 @@ var cdRefreshCmd = &cobra.Command{
 	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Refresh the service stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
@@ -100,6 +114,7 @@ var cdCancelCmd = &cobra.Command{
 	Args:        cobra.NoArgs,         // TODO: set MaximumNArgs(1),
 	Short:       "Cancel the current CD operation",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
 		if err != nil {
@@ -125,6 +140,7 @@ var cdTearDownCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Short: "Destroy the CD cluster without destroying the services",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		force, _ := cmd.Flags().GetBool("force")
 
 		loader := configureLoader(cmd)
