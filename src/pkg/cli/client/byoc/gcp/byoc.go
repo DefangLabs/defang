@@ -396,6 +396,10 @@ func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*de
 	return b.deploy(ctx, req, "preview")
 }
 
+func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
+	return nil // FIXME: get execution status
+}
+
 func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
