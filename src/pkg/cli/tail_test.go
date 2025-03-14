@@ -236,7 +236,7 @@ func TestUTC(t *testing.T) {
 	localMock := &mockTailProvider{}
 	localMock = localMock.MockTimestamp(localTime)
 
-	// Start the terminal
+	// Start the terminal for local time test
 	err := Tail(context.Background(), localMock, projectName, TailOptions{Verbose: true}) // Output host
 	if err != nil {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
@@ -260,8 +260,7 @@ func TestUTC(t *testing.T) {
 	// Create the UTC time object
 	utcTime := time.Now().Truncate(time.Second)
 
-	// Make a new Terminal object with new stream buffer for UTC time
-	// Setup terminal for local time test
+	// Setup terminal for UTC time test
 	stdout2, stderr, cleanup2 := setupTestTerminal()
 	if stderr.Len() > 0 {
 		t.Errorf("Unexpected stderr output: %v", stderr.String())
