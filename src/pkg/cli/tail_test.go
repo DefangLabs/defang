@@ -89,6 +89,20 @@ func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequ
 	return ss, nil
 }
 
+func (m *mockTailProvider) MockTimestamp(timestamp time.Time) *mockTailProvider {
+	return &mockTailProvider{
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&client.MockServerStream{
+				Resps: []*defangv1.TailResponse{
+					{Entries: []*defangv1.LogEntry{
+						{Timestamp: timestamppb.New(timestamp)},
+					}},
+				},
+			}, &client.MockServerStream{Error: io.EOF},
+		},
+	}
+}
+
 func TestTail(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
@@ -187,5 +201,90 @@ func TestTail(t *testing.T) {
 	}
 	if p.Reqs[1].Since == nil {
 		t.Errorf("Tail() sent request with since nil, want not nil")
+	}
+}
+
+func setupTestTerminal() (*bytes.Buffer, *bytes.Buffer, func()) {
+	var stdout, stderr bytes.Buffer
+	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
+	testTerm.ForceColor(true)
+	defaultTerm := term.DefaultTerm
+	term.DefaultTerm = testTerm
+
+	// Cleanup function to reset the terminal
+	cleanup := func() {
+		term.DefaultTerm = defaultTerm
+	}
+
+	return &stdout, &stderr, cleanup
+}
+
+func TestUTC(t *testing.T) {
+	// Setup terminal for local time test
+	stdout, stderr, cleanup := setupTestTerminal()
+	if stderr.Len() > 0 {
+		t.Errorf("Unexpected stderr output: %v", stderr.String())
+	}
+
+	t.Cleanup(cleanup)
+
+	// Testing local time
+	localTime := time.Now().Truncate(time.Second)
+
+	// Create mock data for tail with local time
+	const projectName = "project"
+	localMock := &mockTailProvider{}
+	localMock = localMock.MockTimestamp(localTime)
+
+	// Start the terminal for local time test
+	err := Tail(context.Background(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	if err != nil {
+		t.Errorf("Tail() error = %v, want io.EOF", err)
+	}
+
+	format := time.RFC3339Nano
+
+	localTimeparse := strings.TrimSpace(term.StripAnsi(stdout.String()))
+	convertedLocalTime, err := time.Parse(format, localTimeparse)
+	if err != nil {
+		t.Error("Error parsing time:", err)
+	}
+
+	if !convertedLocalTime.Equal(localTime) {
+		t.Errorf("Original local time:%v != parse local time:%v", localTime, convertedLocalTime)
+	}
+
+	// Set "local" to "UTC"
+	time.Local = time.UTC
+
+	// Create the UTC time object
+	utcTime := time.Now().Truncate(time.Second)
+
+	// Setup terminal for UTC time test
+	stdout2, stderr, cleanup2 := setupTestTerminal()
+	if stderr.Len() > 0 {
+		t.Errorf("Unexpected stderr output: %v", stderr.String())
+	}
+
+	t.Cleanup(cleanup2)
+
+	// Create new mock data for tail with UTC time
+	utcMock := &mockTailProvider{}
+	utcMock = utcMock.MockTimestamp(utcTime)
+
+	err = Tail(context.Background(), utcMock, projectName, TailOptions{Verbose: true})
+	if err != nil {
+		t.Errorf("Tail() error = %v, want io.EOF", err)
+	}
+
+	// Parse the time from the terminal for UTC time
+	utcTimeParse := strings.TrimSpace(term.StripAnsi(stdout2.String()))
+	convertedUTCTime, err := time.Parse(format, utcTimeParse)
+	if err != nil {
+		t.Error("Error parsing time:", err)
+	}
+
+	if !convertedUTCTime.Equal(utcTime) {
+		t.Errorf("Original utc time:%v != parse utc time:%v", utcTime, convertedUTCTime)
 	}
 }
