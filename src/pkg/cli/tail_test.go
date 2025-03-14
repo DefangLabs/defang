@@ -89,6 +89,97 @@ func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequ
 	return ss, nil
 }
 
+func TestUTC(t *testing.T) {
+	// Make a new Terminal object for local time
+	var stdout, stderr bytes.Buffer
+	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
+	testTerm.ForceColor(true)
+	defaultTerm := term.DefaultTerm
+	term.DefaultTerm = testTerm
+	t.Cleanup(func() {
+		term.DefaultTerm = defaultTerm
+	})
+
+	// Testing local time
+	format := time.RFC3339Nano
+	localTime := time.Now().Truncate(time.Second)
+
+	// Create mock data for tail with local time
+	const projectName = "project"
+	localMock := &mockTailProvider{
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&client.MockServerStream{
+				Resps: []*defangv1.TailResponse{
+					{Entries: []*defangv1.LogEntry{
+						{Timestamp: timestamppb.New(localTime)},
+					}},
+				},
+			}, &client.MockServerStream{Error: io.EOF},
+		},
+	}
+
+	// Start the terminal
+	err := Tail(context.Background(), localMock, projectName, TailOptions{Verbose: true}) // Output host
+	if err != nil {
+		t.Errorf("Tail() error = %v, want io.EOF", err)
+	}
+
+	localTimeparse := strings.TrimSpace(term.StripAnsi(stdout.String()))
+	convertedLocalTime, err := time.Parse(format, localTimeparse)
+	if err != nil {
+		t.Error("Error parsing time:", err)
+	}
+
+	if !convertedLocalTime.Equal(localTime) {
+		t.Errorf("Original local time:%v != parse local time:%v", localTime, convertedLocalTime)
+	}
+
+	// Set "local" to "UTC"
+	time.Local = time.UTC
+
+	// Create the UTC time object
+	utcTime := time.Now().Truncate(time.Second)
+
+	// Make a new Terminal object with new stream buffer for UTC time
+	var stdout2, stderr2 bytes.Buffer
+	testTerm2 := term.NewTerm(os.Stdin, &stdout2, &stderr2)
+	testTerm2.ForceColor(true)
+	defaultTerm2 := term.DefaultTerm
+	term.DefaultTerm = testTerm2
+	t.Cleanup(func() {
+		term.DefaultTerm = defaultTerm2
+	})
+
+	// Create new mock data for tail with UTC time
+	utcMock := &mockTailProvider{
+		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
+			&client.MockServerStream{
+				Resps: []*defangv1.TailResponse{
+					{Entries: []*defangv1.LogEntry{
+						{Timestamp: timestamppb.New(utcTime)},
+					}},
+				},
+			}, &client.MockServerStream{Error: io.EOF},
+		},
+	}
+
+	err = Tail(context.Background(), utcMock, projectName, TailOptions{Verbose: true})
+	if err != nil {
+		t.Errorf("Tail() error = %v, want io.EOF", err)
+	}
+
+	// Parse the time from the terminal for UTC time
+	utcTimeParse := strings.TrimSpace(term.StripAnsi(stdout2.String()))
+	convertedUTCTime, err := time.Parse(format, utcTimeParse)
+	if err != nil {
+		t.Error("Error parsing time:", err)
+	}
+
+	if !convertedUTCTime.Equal(utcTime) {
+		t.Errorf("Original utc time:%v != parse utc time:%v", utcTime, convertedUTCTime)
+	}
+}
+
 func TestTail(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	testTerm := term.NewTerm(os.Stdin, &stdout, &stderr)
