@@ -226,7 +226,7 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Unexpected stderr output: %v", stderr.String())
 	}
 
-	defer cleanup()
+	t.Cleanup(cleanup)
 
 	// Testing local time
 	localTime := time.Now().Truncate(time.Second)
@@ -266,7 +266,7 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Unexpected stderr output: %v", stderr.String())
 	}
 
-	defer cleanup2()
+	t.Cleanup(cleanup2)
 
 	// Create new mock data for tail with UTC time
 	utcMock := &mockTailProvider{}
