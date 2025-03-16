@@ -216,13 +216,14 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	switch deploymentInfo.GetPhase() {
 	default:
 		return nil
 	case godo.DeploymentPhase_Active:
 		return io.EOF
 	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
-		return errors.New("deployment failed")
+		return pkg.ErrDeploymentFailed{}
 	}
 }
 

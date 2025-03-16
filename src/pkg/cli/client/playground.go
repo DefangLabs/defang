@@ -22,7 +22,7 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployReq
 }
 
 func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
-	return nil // TODO: implement for Playground
+	return g.GetDeploymentStatus(ctx) // TODO: implement for Playground
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {

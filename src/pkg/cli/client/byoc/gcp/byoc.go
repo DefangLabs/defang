@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	run "cloud.google.com/go/run/apiv2"
+	"cloud.google.com/go/run/apiv2/runpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -32,6 +35,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ client.Provider = (*ByocGcp)(nil)
@@ -397,7 +401,34 @@ func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*de
 }
 
 func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
-	return nil // FIXME: get execution status
+	client, err := run.NewExecutionsClient(ctx)
+	if err != nil {
+		return err
+	}
+	execution, err := client.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
+	if err != nil {
+		log.Fatal("Failed to get execution:", err)
+	}
+
+	var lastTransitionTime *timestamppb.Timestamp
+	var lastState runpb.Condition_State
+
+	// find latest state
+	for _, condition := range execution.GetConditions() {
+		if condition.LastTransitionTime.AsTime().After(lastTransitionTime.AsTime()) {
+			lastTransitionTime = condition.LastTransitionTime
+			lastState = condition.State
+		}
+	}
+
+	switch lastState {
+	default:
+		return nil
+	case runpb.Condition_CONDITION_SUCCEEDED:
+		return io.EOF
+	case runpb.Condition_CONDITION_FAILED:
+		return pkg.ErrDeploymentFailed{}
+	}
 }
 
 func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {

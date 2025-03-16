@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -189,20 +190,26 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
+	errCh := make(chan error, 2)
 	if waitTimeout >= 0 {
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
 	}
 
-	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
-
+	errCompleted := pkg.ErrDeploymentCompleted{}
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+	var wg sync.WaitGroup
+
+	wg.Add(2)
 	go func() {
+		// block on waiting for services to reach target state
 		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 			var errDeploymentFailed pkg.ErrDeploymentFailed
 			if errors.As(err, &errDeploymentFailed) {
+				errCh <- err
+				wg.Done()
 				cancelTail(err)
 			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
@@ -212,19 +219,30 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 				service.State = targetState
 			}
 
+			errCh <- errCompleted
+			wg.Done()
 			cancelTail(errCompleted)
 		}
+	}()
+	go func() {
+		// block on waiting for cdTask to complete
+		errCh <- WaitCdTaskState(ctx, provider)
+		wg.Done()
 	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
-	err := TailUp(ctx, provider, project, deploy, tailOptions)
-	var errDeploymentFailed pkg.ErrDeploymentFailed
-	if errors.As(context.Cause(ctx), &errDeploymentFailed) {
-		return errDeploymentFailed
-	}
-	if !errors.Is(context.Cause(ctx), errCompleted) {
-		return err
+	TailUp(ctx, provider, project, deploy, tailOptions)
+	wg.Wait()
+
+	close(errCh)
+	var errsFound int = 0
+	for errDeployment := range errCh {
+		errsFound++
+		var errDeploymentCompleted pkg.ErrDeploymentCompleted
+		if !errors.As(errDeployment, &errDeploymentCompleted) {
+			return errDeployment
+		}
 	}
 
 	return nil
