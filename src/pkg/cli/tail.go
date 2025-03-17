@@ -34,28 +34,6 @@ var (
 	colorKeyRegex = regexp.MustCompile(`"(?:\\["\\/bfnrt]|[^\x00-\x1f"\\]|\\u[0-9a-fA-F]{4})*"\s*:|[^\x00-\x20"=&?]+=`) // handles JSON, logfmt, and query params
 )
 
-type ServiceStatus string
-
-const (
-	ServiceUnspecified ServiceStatus = "UNSPECIFIED"
-
-	// build states
-	ServiceBuildQueued       ServiceStatus = "BUILD_QUEUED"
-	ServiceBuildProvisioning ServiceStatus = "BUILD_PROVISIONING"
-	ServiceBuildPending      ServiceStatus = "BUILD_PENDING"
-	ServiceBuildActivating   ServiceStatus = "BUILD_ACTIVATING"
-	ServiceBuildRunning      ServiceStatus = "BUILD_RUNNING"
-	ServiceBuildDeactivating ServiceStatus = "BUILD_DEACTIVATING" // build completed
-
-	// update states
-	ServiceUpdateQueued ServiceStatus = "UPDATE_QUEUED" // queued for deployment
-
-	// deplpyment states
-	ServicePending   ServiceStatus = "PENDING"
-	ServiceCompleted ServiceStatus = "COMPLETED"
-	ServiceFailed    ServiceStatus = "FAILED"
-)
-
 // Deprecated: use Subscribe instead #851
 type EndLogConditional struct {
 	Service  string
