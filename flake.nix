@@ -37,6 +37,25 @@
               ++ lib.optionals stdenv.isDarwin [
                 darwin.apple_sdk.frameworks.CoreServices
               ];
+
+            # Add a shellHook to set up the pre-push Git hook
+            shellHook = ''
+              # Check if the .git directory exists
+              if [ ! -d .git ]; then
+                echo "Initializing Git repository..."
+                git init
+              fi
+
+              # Ensure the .git/hooks directory exists
+              mkdir -p .git/hooks
+
+              # Install the pre-push Git hook
+              if [ ! -f .git/hooks/pre-push ]; then
+                ln -sf ../../scripts/git-hooks/pre-push .git/hooks/pre-push
+                chmod +x .git/hooks/pre-push
+                echo "Pre-push hook installed."
+              fi
+            '';
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
