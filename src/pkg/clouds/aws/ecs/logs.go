@@ -113,7 +113,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 		lgEvtChan := make(chan LogEvent)
 		// Start a go routine for each log group
 		go func(lgi LogGroupInput) {
-			defer close(errsChan)
+			defer close(lgEvtChan)
 			if err := QueryLogGroup(ctx, lgi, start, end, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
