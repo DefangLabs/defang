@@ -110,6 +110,11 @@ func (to TailOptions) String() string {
 
 var P = track.P
 
+// SetLocaltoUTC sets the local time zone to UTC.
+func SetLocaltoUTC() {
+	time.Local = time.UTC
+}
+
 // Deprecated: use Subscribe instead #851
 func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
 	return func(services []string, host string, eventLog string) bool {

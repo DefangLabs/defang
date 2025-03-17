@@ -62,7 +62,7 @@ func makeComposeUpCmd() *cobra.Command {
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
 
 			if utc {
-				time.Local = time.UTC // set the timezone to UTC
+				cli.SetLocaltoUTC()
 			}
 
 			upload := compose.UploadModeDigest
@@ -269,7 +269,7 @@ func makeComposeDownCmd() *cobra.Command {
 			var utc, _ = cmd.Flags().GetBool("utc")
 
 			if utc {
-				time.Local = time.UTC // set the timezone to UTC
+				cli.SetLocaltoUTC()
 			}
 
 			loader := configureLoader(cmd)
@@ -439,7 +439,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			var until, _ = cmd.Flags().GetString("until")
 
 			if utc {
-				time.Local = time.UTC // set the timezone to UTC
+				cli.SetLocaltoUTC()
 			}
 
 			if !cmd.Flags().Changed("verbose") {
