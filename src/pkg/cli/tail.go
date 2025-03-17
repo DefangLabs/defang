@@ -352,7 +352,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild"
+			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
