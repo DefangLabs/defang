@@ -254,7 +254,7 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Original local time:%v != parse local time:%v", localTime, convertedLocalTime)
 	}
 
-	SetLocaltoUTC()
+	EnableUTCMode()
 
 	// Create the UTC time object
 	utcTime := time.Date(2025, 1, 2, 3, 4, 5, 0, time.Local)
