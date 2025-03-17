@@ -678,8 +678,10 @@ loop:
 				term.Warn("Query result was truncated")
 				break loop
 			}
-		case err := <-errsChan:
-			term.Warn("CloudWatch query error:", AnnotateAwsError(err))
+		case err, ok := <-errsChan:
+			if ok {
+				term.Warn("CloudWatch query error:", AnnotateAwsError(err))
+			}
 			// continue reading other log groups
 		}
 	}
