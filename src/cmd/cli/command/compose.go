@@ -169,27 +169,27 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
+					debugConfig := cli.DebugConfig{
+						Etag:     deploy.Etag,
+						ModelId:  modelId,
+						Project:  project,
+						Provider: provider,
+						Since:    since,
+					}
+					if errDeploymentFailed.Service != "" {
+						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
+					}
 					if !nonInteractive {
-						var failedServices []string
-						if errDeploymentFailed.Service != "" {
-							failedServices = []string{errDeploymentFailed.Service}
-						}
-						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+						track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
-						var debugConfig = cli.DebugConfig{
-							Etag:           deploy.Etag,
-							FailedServices: failedServices,
-							ModelId:        modelId,
-							Project:        project,
-							Provider:       provider,
-							Since:          since,
-						}
 						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-						if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
-							return err // don't show the defang hint if debugging was successful
+						if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+							// don't show this defang hint if debugging was successful
+							tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
+							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 						}
-						tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
-						printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
+					} else {
+						printDefangHint("To debug the deployment, do:", debugConfig.String())
 					}
 				}
 				return err

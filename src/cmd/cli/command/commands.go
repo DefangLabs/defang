@@ -256,6 +256,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
+	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
 	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
@@ -865,6 +867,8 @@ var debugCmd = &cobra.Command{
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
+		since, _ := cmd.Flags().GetString("since")
+		until, _ := cmd.Flags().GetString("until")
 
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -877,14 +881,25 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		var debugConfig = cli.DebugConfig{
+		now := time.Now()
+		sinceTs, err := cli.ParseTimeOrDuration(since, now)
+		if err != nil {
+			return fmt.Errorf("invalid 'since' time: %w", err)
+		}
+		untilTs, err := cli.ParseTimeOrDuration(until, now)
+		if err != nil {
+			return fmt.Errorf("invalid 'until' time: %w", err)
+		}
+
+		debugConfig := cli.DebugConfig{
 			Etag:           etag,
 			FailedServices: args,
 			ModelId:        modelId,
 			Project:        project,
 			Provider:       provider,
+			Since:          sinceTs.UTC(),
+			Until:          untilTs.UTC(),
 		}
-
 		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }

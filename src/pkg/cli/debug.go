@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -38,6 +39,33 @@ type DebugConfig struct {
 	Provider       client.Provider
 	Since          time.Time
 	Until          time.Time
+}
+
+func (dc DebugConfig) String() string {
+	cmd := "debug"
+	if dc.Etag != "" {
+		cmd += " --etag=" + string(dc.Etag)
+	}
+	if dc.ModelId != "" {
+		cmd += " --model=" + dc.ModelId
+	}
+	if !dc.Since.IsZero() {
+		cmd += " --since=" + dc.Since.UTC().Format(time.RFC3339Nano)
+	}
+	if !dc.Until.IsZero() {
+		cmd += " --until=" + dc.Until.UTC().Format(time.RFC3339Nano)
+	}
+	if dc.Project.WorkingDir != "" {
+		cmd += " --cwd=" + dc.Project.WorkingDir
+	}
+	if dc.Project != nil {
+		cmd += " --project-name=" + dc.Project.Name
+	}
+	if len(dc.FailedServices) > 0 {
+		cmd += " " + strings.Join(dc.FailedServices, " ")
+	}
+	// TODO: do we need to add --provider= or rely on the Fabric-supplied value?
+	return cmd
 }
 
 func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
