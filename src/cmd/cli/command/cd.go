@@ -1,8 +1,6 @@
 package command
 
 import (
-	"time"
-
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -20,7 +18,7 @@ var cdCmd = &cobra.Command{
 		var utc, _ = cmd.Flags().GetBool("utc")
 
 		if utc {
-			time.Local = time.UTC // set the timezone to UTC
+			cli.SetLocaltoUTC()
 		}
 
 		return nil
