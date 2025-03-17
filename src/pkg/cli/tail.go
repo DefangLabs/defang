@@ -110,8 +110,8 @@ func (to TailOptions) String() string {
 
 var P = track.P
 
-// SetLocalToUTC sets the local time zone to UTC.
-func SetLocalToUTC() {
+// EnableUTCMode sets the local time zone to UTC.
+func EnableUTCMode() {
 	time.Local = time.UTC
 }
 

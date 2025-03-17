@@ -18,7 +18,7 @@ var cdCmd = &cobra.Command{
 		var utc, _ = cmd.Flags().GetBool("utc")
 
 		if utc {
-			cli.SetLocalToUTC()
+			cli.EnableUTCMode()
 		}
 
 		return nil
