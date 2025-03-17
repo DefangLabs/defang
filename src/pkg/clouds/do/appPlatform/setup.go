@@ -229,7 +229,7 @@ func waitForActiveDeployment(ctx context.Context, apps godo.AppsService, appID s
 		attempts++
 		pkg.SleepWithContext(ctx, 10*time.Second) // was changed from time.Sleep
 	}
-	return fmt.Errorf("timeout waiting to app (%s) deployment", appID)
+	return fmt.Errorf("timeout waiting for app (%s) deployment", appID)
 }
 
 func NewClient(ctx context.Context) *godo.Client {

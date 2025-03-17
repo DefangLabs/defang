@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -57,7 +58,12 @@ func makeComposeUpCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var force, _ = cmd.Flags().GetBool("force")
 			var detach, _ = cmd.Flags().GetBool("detach")
+			var utc, _ = cmd.Flags().GetBool("utc")
 			var waitTimeout, _ = cmd.Flags().GetInt("wait-timeout")
+
+			if utc {
+				cli.EnableUTCMode()
+			}
 
 			upload := compose.UploadModeDigest
 			if force {
@@ -173,6 +179,7 @@ func makeComposeUpCmd() *cobra.Command {
 						var debugConfig = cli.DebugConfig{
 							Etag:           deploy.Etag,
 							FailedServices: failedServices,
+							ModelId:        modelId,
 							Project:        project,
 							Provider:       provider,
 							Since:          since,
@@ -197,6 +204,7 @@ func makeComposeUpCmd() *cobra.Command {
 	}
 	composeUpCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
 	composeUpCmd.Flags().Bool("force", false, "force a build of the image even if nothing has changed")
+	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
 	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
@@ -258,6 +266,11 @@ func makeComposeDownCmd() *cobra.Command {
 		Short:       "Reads a Compose file and deprovisions its services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var detach, _ = cmd.Flags().GetBool("detach")
+			var utc, _ = cmd.Flags().GetBool("utc")
+
+			if utc {
+				cli.EnableUTCMode()
+			}
 
 			loader := configureLoader(cmd)
 			provider, err := getProvider(cmd.Context(), loader)
@@ -322,6 +335,7 @@ func makeComposeDownCmd() *cobra.Command {
 		},
 	}
 	composeDownCmd.Flags().BoolP("detach", "d", false, "run in detached mode")
+	composeDownCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	return composeDownCmd
@@ -393,7 +407,6 @@ func makeComposePsCmd() *cobra.Command {
 				}
 
 				term.Warn(err)
-
 				printDefangHint("To start a new project, do:", "new")
 				return nil
 			}
@@ -425,12 +438,12 @@ func makeComposeLogsCmd() *cobra.Command {
 			var filter, _ = cmd.Flags().GetString("filter")
 			var until, _ = cmd.Flags().GetString("until")
 
-			if !cmd.Flags().Changed("verbose") {
-				verbose = true // default verbose for explicit tail command
+			if utc {
+				cli.EnableUTCMode()
 			}
 
-			if utc {
-				os.Setenv("TZ", "") // used by Go's "time" package, see https://pkg.go.dev/time#Location
+			if !cmd.Flags().Changed("verbose") {
+				verbose = true // default verbose for explicit tail command
 			}
 
 			now := time.Now()
@@ -520,6 +533,7 @@ services:
 	// composeCmd.Flags().Int("parallel", -1, "Control max parallelism, -1 for unlimited (default -1)"); TODO: Implement compose option
 	// composeCmd.Flags().String("profile", "", "Specify a profile to enable"); TODO: Implement compose option
 	// composeCmd.Flags().String("project-directory", "", "Specify an alternate working directory"); TODO: Implement compose option
+	composeCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	composeCmd.AddCommand(makeComposeUpCmd())
 	composeCmd.AddCommand(makeComposeConfigCmd())
 	composeCmd.AddCommand(makeComposeDownCmd())

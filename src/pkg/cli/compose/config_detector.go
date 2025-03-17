@@ -23,13 +23,13 @@ func detectConfig(input string) (detectorTypes []string, err error) {
 	// create a scanner from scanner config
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to make a config detector: %w", err)
+		return nil, fmt.Errorf("failed to make a config detector: %w", err)
 	}
 
 	// scan the input
 	ds, err := scannerClient.Scan(input)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to scan input: %w", err)
+		return nil, fmt.Errorf("failed to scan input: %w", err)
 	}
 
 	// return a list of detector types

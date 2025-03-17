@@ -14,6 +14,15 @@ var cdCmd = &cobra.Command{
 	Aliases: []string{"bootstrap"},
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
+		return nil
+	},
 }
 
 var cdDestroyCmd = &cobra.Command{

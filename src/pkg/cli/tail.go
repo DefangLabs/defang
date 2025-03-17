@@ -110,6 +110,11 @@ func (to TailOptions) String() string {
 
 var P = track.P
 
+// EnableUTCMode sets the local time zone to UTC.
+func EnableUTCMode() {
+	time.Local = time.UTC
+}
+
 // Deprecated: use Subscribe instead #851
 func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
 	return func(services []string, host string, eventLog string) bool {
@@ -188,7 +193,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 			if _, err := provider.GetService(ctx, &defangv1.GetRequest{Project: projectName, Name: service}); err != nil {
 				switch connect.CodeOf(err) {
 				case connect.CodeNotFound:
-					term.Warn("Service does not exist (yet):", service)
+					term.Warnf("Service does not exist (yet): %q", service)
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
@@ -347,7 +352,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			etag := valueOrDefault(e.Etag, msg.Etag)
 
 			// HACK: skip noisy CI/CD logs (except errors)
-			isInternal := service == "cd" || service == "ci" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild"
+			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
 				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {

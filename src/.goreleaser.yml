@@ -16,11 +16,21 @@ builds:
       post:
         - ./bin/codesign.sh "{{ .Path }}"
 
-  - id: defang-cli
+  - id: defang-linux
     main: ./cmd/cli
     binary: defang
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+
+  - id: defang-win
+    main: ./cmd/cli
+    binary: defang
+    goos:
       - windows
     goarch:
       - amd64
@@ -126,13 +136,14 @@ winget:
       owner: DefangLabs
       name: winget-pkgs
       branch: "Defang-{{.Version}}"
-      # pull_request:
-      #   enabled: true
-      #   draft: true
-      #   base:
-      #     owner: microsoft
-      #     name: winget-pkgs
-      #     branch: master
+      pull_request:
+        check_boxes: true
+        draft: true
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
 
 announce:
   discord:

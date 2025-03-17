@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -46,6 +47,8 @@ var (
 	doDebug        = false
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
+	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
@@ -135,7 +138,7 @@ func Execute(ctx context.Context) error {
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
-	if hasTty && !pkg.GetenvBool("DEFANG_HIDE_UPDATE") && rand.Intn(10) == 0 {
+	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
@@ -171,6 +174,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
+	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
 	cdCmd.AddCommand(cdRefreshCmd)
@@ -206,6 +211,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
+	generateCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(newCmd)
 
@@ -223,6 +229,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// Config Command (was: secrets)
 	configSetCmd.Flags().BoolP("name", "n", false, "name of the config (backwards compat)")
 	configSetCmd.Flags().BoolP("env", "e", false, "set the config from an environment variable")
+	configSetCmd.Flags().Bool("random", false, "set a secure randomly generated value for config")
 	_ = configSetCmd.Flags().MarkHidden("name")
 
 	configCmd.AddCommand(configSetCmd)
@@ -249,6 +256,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
@@ -335,10 +343,14 @@ var RootCmd = &cobra.Command{
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
-			if hasTty && isNewer(version, v.CliMin) {
+			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
-				os.Setenv("DEFANG_HIDE_UPDATE", "1") // hide the upgrade hint at the end
+				hideUpdate = true // hide the upgrade hint at the end
 			}
+		}
+
+		if isUpgradeCommand(cmd) {
+			hideUpdate = true
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -585,11 +597,19 @@ var generateCmd = &cobra.Command{
 			}
 		}
 
-		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder))
+		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
 
 		// Check if the current folder is empty
 		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
-			term.Warnf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+			nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
+
+			var confirm bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: nonEmptyFolder + " Continue creating project?",
+			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+			if err == nil && !confirm {
+				os.Exit(1)
+			}
 		}
 
 		if sample != "" {
@@ -600,7 +620,13 @@ var generateCmd = &cobra.Command{
 			}
 		} else {
 			term.Info("Working on it. This may take 1 or 2 minutes...")
-			_, err := cli.GenerateWithAI(cmd.Context(), client, language, prompt.Folder, prompt.Description)
+			args := cli.GenerateArgs{
+				Description: prompt.Description,
+				Folder:      prompt.Folder,
+				Language:    language,
+				ModelId:     modelId,
+			}
+			_, err := cli.GenerateWithAI(cmd.Context(), client, args)
 			if err != nil {
 				return err
 			}
@@ -699,6 +725,7 @@ var configSetCmd = &cobra.Command{
 	Short:       "Adds or updates a sensitive config value",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fromEnv, _ := cmd.Flags().GetBool("env")
+		random, _ := cmd.Flags().GetBool("random")
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
@@ -749,6 +776,10 @@ var configSetCmd = &cobra.Command{
 			}
 			// Trim the newline at the end because single line values are common
 			value = strings.TrimSuffix(string(bytes), "\n")
+		} else if random {
+			// Generate a random value for the config
+			value = CreateRandomConfigValue()
+			term.Info("Generated random value: " + value)
 		} else {
 			// Prompt for sensitive value
 			var sensitivePrompt = &survey.Password{
@@ -849,6 +880,7 @@ var debugCmd = &cobra.Command{
 		var debugConfig = cli.DebugConfig{
 			Etag:           etag,
 			FailedServices: args,
+			ModelId:        modelId,
 			Project:        project,
 			Provider:       provider,
 		}
@@ -1036,22 +1068,36 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	if err != nil {
 		panic(err)
 	}
-	// Avoid common mistakes: using -p with a provider name instead of -P
+
+	// Avoid common mistakes
 	var prov cliClient.ProviderID
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
+		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
-		if !nonInteractive {
-			var confirm bool
-			err := survey.AskOne(&survey.Confirm{
-				Message: "Continue with project: " + projectName + "?",
-			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-			track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
-			if err == nil && !confirm {
-				os.Exit(1)
-			}
-		}
+		doubleCheck(projectName)
+	} else if strings.HasPrefix(projectName, "roject-name") {
+		// -project-name= instead of --project-name
+		term.Warn("Did you mean to use --project-name instead of -project-name?")
+		doubleCheck(projectName)
+	} else if strings.HasPrefix(projectName, "rovider") {
+		// -provider= instead of --provider
+		term.Warn("Did you mean to use --provider instead of -provider?")
+		doubleCheck(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+}
+
+func doubleCheck(projectName string) {
+	if !nonInteractive {
+		var confirm bool
+		err := survey.AskOne(&survey.Confirm{
+			Message: "Continue with project: " + projectName + "?",
+		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+		track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
+		if err == nil && !confirm {
+			os.Exit(1)
+		}
+	}
 }
 
 func awsInEnv() bool {
@@ -1073,6 +1119,10 @@ func awsInConfig(ctx context.Context) bool {
 
 func IsCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
+}
+
+func isUpgradeCommand(cmd *cobra.Command) bool {
+	return cmd.Name() == "upgrade"
 }
 
 var providerDescription = map[cliClient.ProviderID]string{
@@ -1125,6 +1175,10 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		if !doInEnv() {
 			term.Warn("DigitalOcean provider was selected, but DIGITALOCEAN_TOKEN environment variable is not set")
 		}
+	case cliClient.ProviderGCP:
+		if !gcpInEnv() {
+			term.Warn("GCP provider was selected, but GCP_PROJECT_ID environment variable is not set")
+		}
 	case cliClient.ProviderDefang:
 		// Ignore any env vars when explicitly using the Defang playground provider
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
@@ -1162,13 +1216,13 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		var err error
 		projectName, err = loader.LoadProjectName(ctx)
 		if err != nil {
-			term.Warn("Unable to load project:", err)
+			term.Warnf("Unable to load project: %v", err)
 		}
 
 		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
-				term.Warn("Unable to get selected provider:", err)
+				term.Warnf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 				providerID.SetEnumValue(resp.Provider)
 				return "stored preference", nil
@@ -1210,7 +1264,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	// Save the selected provider to the fabric
 	if projectName != "" {
 		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
-			term.Warn("Unable to save selected provider to defang server:", err)
+			term.Warnf("Unable to save selected provider to defang server: %v", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 		}
