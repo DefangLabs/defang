@@ -228,8 +228,10 @@ func TestUTC(t *testing.T) {
 
 	t.Cleanup(cleanup)
 
+	format := time.RFC3339Nano
+
 	// Testing local time
-	localTime := time.Now().Truncate(time.Second)
+	localTime := time.Date(2025, 1, 2, 3, 4, 5, 0, time.Local)
 
 	// Create mock data for tail with local time
 	const projectName = "project"
@@ -242,8 +244,6 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Tail() error = %v, want io.EOF", err)
 	}
 
-	format := time.RFC3339Nano
-
 	localTimeparse := strings.TrimSpace(term.StripAnsi(stdout.String()))
 	convertedLocalTime, err := time.Parse(format, localTimeparse)
 	if err != nil {
@@ -254,11 +254,10 @@ func TestUTC(t *testing.T) {
 		t.Errorf("Original local time:%v != parse local time:%v", localTime, convertedLocalTime)
 	}
 
-	// Set "local" to "UTC"
-	time.Local = time.UTC
+	SetLocaltoUTC()
 
 	// Create the UTC time object
-	utcTime := time.Now().Truncate(time.Second)
+	utcTime := time.Date(2025, 1, 2, 3, 4, 5, 0, time.Local)
 
 	// Setup terminal for UTC time test
 	stdout2, stderr, cleanup2 := setupTestTerminal()
