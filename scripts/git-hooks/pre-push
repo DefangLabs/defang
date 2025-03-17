@@ -1,15 +1,20 @@
 #!/bin/sh
 
-# Get the branch being pushed
+# The branch being pushed is passed as an argument to the pre-push hook
 protected_branch="branchProtection"
-current_branch=$(git rev-parse --abbrev-ref HEAD)
 
-# Check if the current branch is the protected branch
-if [ "$current_branch" = "$protected_branch" ]; then
-  echo "🚫 Direct pushes to the '$protected_branch' branch are not allowed."
-  echo "Please create a pull request instead."
-  exit 1
-fi
+# Read the local and remote refs from stdin
+while read local_ref local_sha remote_ref remote_sha; do
+  # Extract the branch name from the remote ref
+  branch_name=$(echo "$remote_ref" | sed 's|refs/heads/||')
+
+  # Check if the branch being pushed is the protected branch
+  if [ "$branch_name" = "$protected_branch" ]; then
+    echo "🚫 Direct pushes to the '$protected_branch' branch are not allowed."
+    echo "Please create a pull request instead."
+    exit 1
+  fi
+done
 
 # Allow the push if it's not the protected branch
 exit 0
