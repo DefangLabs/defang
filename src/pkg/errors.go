@@ -19,13 +19,13 @@ func (e ErrDeploymentFailed) Error() string {
 type ErrDeploymentCompleted struct{}
 
 func (e ErrDeploymentCompleted) Error() string {
-	return fmt.Sprint("deployment COMPLETED")
+	return "deployment COMPLETED"
 }
 
 type ErrCdTaskCompleted struct{}
 
 func (e ErrCdTaskCompleted) Error() string {
-	return fmt.Sprint("cd Task COMPLETED")
+	return "cd Task COMPLETED"
 }
 
 type ErrCdTaskFailed struct {
@@ -33,5 +33,5 @@ type ErrCdTaskFailed struct {
 }
 
 func (e ErrCdTaskFailed) Error() string {
-	return fmt.Sprintf("cd Task failed: %s", e.Message)
+	return "cd Task failed: " + e.Message
 }

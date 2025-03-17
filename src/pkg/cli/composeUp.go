@@ -202,14 +202,14 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
 	var wg sync.WaitGroup
 
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		// block on waiting for services to reach target state
 		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 			var errDeploymentFailed pkg.ErrDeploymentFailed
 			if errors.As(err, &errDeploymentFailed) {
 				errCh <- err
-				wg.Done()
 				cancelTail(err)
 			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
@@ -220,14 +220,20 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 			}
 
 			errCh <- errCompleted
-			wg.Done()
 			cancelTail(errCompleted)
 		}
 	}()
+
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		// block on waiting for cdTask to complete
-		errCh <- WaitCdTaskState(ctx, provider)
-		wg.Done()
+		err := WaitCdTaskState(ctx, provider)
+		errCh <- err
+		var errDeploymentFailed pkg.ErrDeploymentFailed
+		if errors.As(err, &errDeploymentFailed) {
+			cancelTail(err)
+		}
 	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)

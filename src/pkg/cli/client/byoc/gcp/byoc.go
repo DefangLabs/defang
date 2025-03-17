@@ -35,7 +35,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ client.Provider = (*ByocGcp)(nil)
@@ -409,25 +408,24 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 	if err != nil {
 		log.Fatal("Failed to get execution:", err)
 	}
+	defer client.Close()
 
-	var lastTransitionTime *timestamppb.Timestamp
-	var lastState runpb.Condition_State
-
-	// find latest state
+	isCompleted := false
 	for _, condition := range execution.GetConditions() {
-		if condition.LastTransitionTime.AsTime().After(lastTransitionTime.AsTime()) {
-			lastTransitionTime = condition.LastTransitionTime
-			lastState = condition.State
+		if condition.GetType() == "Completed" {
+			isCompleted = condition.GetState() == runpb.Condition_CONDITION_SUCCEEDED ||
+				condition.GetState() == runpb.Condition_CONDITION_FAILED
+			break
 		}
 	}
 
-	switch lastState {
-	default:
-		return nil
-	case runpb.Condition_CONDITION_SUCCEEDED:
-		return io.EOF
-	case runpb.Condition_CONDITION_FAILED:
+	if isCompleted {
+		if execution.GetSucceededCount() > 0 {
+			return io.EOF
+		}
 		return pkg.ErrDeploymentFailed{}
+	} else {
+		return nil // no completed yet
 	}
 }
 
