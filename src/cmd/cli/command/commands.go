@@ -174,6 +174,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
+	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
