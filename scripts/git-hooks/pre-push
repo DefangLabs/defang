@@ -1,11 +1,15 @@
 #!/bin/sh
 
-# The branch being pushed is passed as an argument to the pre-push hook
-protected_branch="branchProtection"
+protected_branch="main"
 
 # Read the local and remote refs from stdin
 while read local_ref local_sha remote_ref remote_sha; do
-  # Extract the branch name from the remote ref
+  # Handle empty remote_ref (e.g., creating a new branch)
+  if [ -z "$remote_ref" ]; then
+    echo "🚫 Cannot push to an unspecified branch."
+    exit 1
+  fi
+
   branch_name=$(echo "$remote_ref" | sed 's|refs/heads/||')
 
   # Check if the branch being pushed is the protected branch
