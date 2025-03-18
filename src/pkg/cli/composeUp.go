@@ -190,7 +190,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
-	errCh := make(chan error, 2)
+	deploymentStatusCh := make(chan error, 2)
 	if waitTimeout >= 0 {
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
@@ -210,7 +210,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 			var errDeploymentFailed pkg.ErrDeploymentFailed
 			if errors.As(err, &errDeploymentFailed) {
-				errCh <- err
+				deploymentStatusCh <- err
 				cancelTail(err)
 			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
@@ -220,7 +220,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 				service.State = targetState
 			}
 
-			errCh <- errCompleted
+			deploymentStatusCh <- errCompleted
 			cancelTail(errCompleted)
 		}
 	}()
@@ -230,7 +230,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 
 		// block on waiting for cdTask to complete
 		err := WaitCdTaskState(ctx, provider)
-		errCh <- err
+		deploymentStatusCh <- err
 		var errDeploymentFailed pkg.ErrDeploymentFailed
 		if errors.As(err, &errDeploymentFailed) {
 			cancelTail(err)
@@ -242,10 +242,8 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	TailUp(ctx, provider, project, deploy, tailOptions)
 	wg.Wait()
 
-	close(errCh)
-	var errsFound int = 0
-	for errDeployment := range errCh {
-		errsFound++
+	close(deploymentStatusCh)
+	for errDeployment := range deploymentStatusCh {
 		var errDeploymentCompleted pkg.ErrDeploymentCompleted
 		if !errors.As(errDeployment, &errDeploymentCompleted) {
 			return errDeployment
