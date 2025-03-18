@@ -82,7 +82,7 @@ func (to TailOptions) String() string {
 	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
 	if to.Until.IsZero() {
 		// No --until implies --follow
-		cmd += "tail" + cmd
+		cmd = "tail" + cmd
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
