@@ -597,7 +597,11 @@ func (s *subscribeStream) Receive() bool {
 			State:  phaseToState(deployment.Phase),
 		}
 	}
-	s.msg = <-s.queue
+	select {
+	case s.msg = <-s.queue:
+	default:
+		s.msg = nil
+	}
 	return err == nil
 }
 

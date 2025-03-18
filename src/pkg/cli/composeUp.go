@@ -202,9 +202,10 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
 	var wg sync.WaitGroup
 
-	wg.Add(1)
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
+
 		// block on waiting for services to reach target state
 		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 			var errDeploymentFailed pkg.ErrDeploymentFailed
@@ -224,9 +225,9 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		}
 	}()
 
-	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
 		// block on waiting for cdTask to complete
 		err := WaitCdTaskState(ctx, provider)
 		errCh <- err
