@@ -2,14 +2,11 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
-
-var ErrNoCdTaskToMonitor = errors.New("no cd taask to monitor")
 
 func WaitCdTaskState(
 	ctx context.Context,
