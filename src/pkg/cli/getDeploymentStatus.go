@@ -21,8 +21,8 @@ func WaitCdTaskState(
 		return ErrDryRun
 	}
 
-	ctx, cancel := context.WithCancel(context.Background()) // Create a cancellable context
-	defer cancel()                                          // Ensure cancel is called to avoid context leak
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()

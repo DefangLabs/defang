@@ -404,11 +404,12 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer client.Close()
+
 	execution, err := client.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
 	if err != nil {
 		log.Fatal("Failed to get execution:", err)
 	}
-	defer client.Close()
 
 	isCompleted := false
 	for _, condition := range execution.GetConditions() {
