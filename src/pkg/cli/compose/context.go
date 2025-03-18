@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,34 +41,6 @@ const (
 	DefaultContextSizeHardLimit = 100 * MiB
 
 	sourceDateEpoch = 315532800 // 1980-01-01, same as nix-shell
-	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
-	defaultDockerIgnore = `# Default .dockerignore file for Defang
-**/__pycache__
-**/.direnv
-**/.DS_Store
-**/.envrc
-**/.git
-**/.github
-**/.idea
-**/.next
-**/.vscode
-**/compose.*.yaml
-**/compose.*.yml
-**/compose.yaml
-**/compose.yml
-**/docker-compose.*.yaml
-**/docker-compose.*.yml
-**/docker-compose.yaml
-**/docker-compose.yml
-**/node_modules
-**/Thumbs.db
-Dockerfile
-*.Dockerfile
-# Ignore our own binary, but only in the root to avoid ignoring subfolders
-defang
-defang.exe
-# Ignore our project-level state
-.defang`
 )
 
 func parseContextLimit(limit string, def int64) int64 {
@@ -166,6 +139,86 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	return reader
 }
 
+func writeDockerIgnoreFile(cwd string) error {
+	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
+	defaultDockerIgnore := `# Default .dockerignore file for Defang
+**/__pycache__
+**/.direnv
+**/.DS_Store
+**/.envrc
+**/.git
+**/.github
+**/.idea
+**/.next
+**/.vscode
+**/compose.*.yaml
+**/compose.*.yml
+**/compose.yaml
+**/compose.yml
+**/docker-compose.*.yaml
+**/docker-compose.*.yml
+**/docker-compose.yaml
+**/docker-compose.yml
+**/node_modules
+**/Thumbs.db
+Dockerfile
+*.Dockerfile
+# Ignore our own binary, but only in the root to avoid ignoring subfolders
+defang
+defang.exe
+# Ignore our project-level state
+.defang`
+
+	path := filepath.Join(cwd, ".dockerignore")
+	term.Debug("Writing .dockerignore file to", path)
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	_, err = file.WriteString(defaultDockerIgnore)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getDockerIgnoreReader retrieves the appropriate ignore file reader.
+// It prioritizes Dockerfile-specific ignore files (e.g., Dockerfile.dockerignore) over the default .dockerignore file.
+func getDockerIgnoreReader(root, dockerfile string) (io.ReadCloser, string, error) {
+	// Check for Dockerfile-specific ignore file
+	dockerignore := dockerfile + ".dockerignore"
+	reader := tryReadIgnoreFile(root, dockerignore)
+	if reader != nil {
+		return reader, dockerignore, nil
+	}
+
+	// Fallback to .dockerignore
+	dockerignore = ".dockerignore"
+	reader = tryReadIgnoreFile(root, dockerignore)
+	if reader != nil {
+		return reader, dockerignore, nil
+	}
+
+	// If no ignore file exists, generate a default .dockerignore file
+	term.Info("No .dockerignore file found; generating default .dockerignore")
+	err := writeDockerIgnoreFile(root)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
+	}
+
+	// Try reading the newly created .dockerignore file
+	reader = tryReadIgnoreFile(root, dockerignore)
+	if reader == nil {
+		return nil, "", errors.New("failed to read default .dockerignore file")
+	}
+
+	return reader, dockerignore, nil
+}
+
 func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
 	foundDockerfile := false
 	if dockerfile == "" {
@@ -174,19 +227,14 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		dockerfile = filepath.Clean(dockerfile)
 	}
 
-	// A Dockerfile-specific ignore-file takes precedence over the .dockerignore file at the root of the build context if both exist.
-	dockerignore := dockerfile + ".dockerignore"
-	reader := tryReadIgnoreFile(root, dockerignore)
-	if reader == nil {
-		dockerignore = ".dockerignore"
-		reader = tryReadIgnoreFile(root, dockerignore)
-		if reader == nil {
-			term.Debug("No .dockerignore file found; using defaults")
-			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
-		}
+	// Get the appropriate ignore file reader
+	reader, dockerignore, err := getDockerIgnoreReader(root, dockerfile)
+	if err != nil {
+		return err
 	}
+	defer reader.Close()
+
 	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
-	reader.Close()
 	if err != nil {
 		return err
 	}
