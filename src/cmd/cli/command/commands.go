@@ -211,7 +211,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	generateCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for generating the code (Pro users only)")
+	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(newCmd)
 
@@ -256,7 +256,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
-	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
+	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
