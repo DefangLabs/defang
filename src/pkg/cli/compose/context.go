@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +40,34 @@ const (
 	DefaultContextSizeHardLimit = 100 * MiB
 
 	sourceDateEpoch = 315532800 // 1980-01-01, same as nix-shell
+	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
+	defaultDockerIgnore = `# Default .dockerignore file for Defang
+**/__pycache__
+**/.direnv
+**/.DS_Store
+**/.envrc
+**/.git
+**/.github
+**/.idea
+**/.next
+**/.vscode
+**/compose.*.yaml
+**/compose.*.yml
+**/compose.yaml
+**/compose.yml
+**/docker-compose.*.yaml
+**/docker-compose.*.yml
+**/docker-compose.yaml
+**/docker-compose.yml
+**/node_modules
+**/Thumbs.db
+Dockerfile
+*.Dockerfile
+# Ignore our own binary, but only in the root to avoid ignoring subfolders
+defang
+defang.exe
+# Ignore our project-level state
+.defang`
 )
 
 func parseContextLimit(limit string, def int64) int64 {
@@ -140,35 +167,6 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 }
 
 func writeDockerIgnoreFile(cwd string) error {
-	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
-	defaultDockerIgnore := `# Default .dockerignore file for Defang
-**/__pycache__
-**/.direnv
-**/.DS_Store
-**/.envrc
-**/.git
-**/.github
-**/.idea
-**/.next
-**/.vscode
-**/compose.*.yaml
-**/compose.*.yml
-**/compose.yaml
-**/compose.yml
-**/docker-compose.*.yaml
-**/docker-compose.*.yml
-**/docker-compose.yaml
-**/docker-compose.yml
-**/node_modules
-**/Thumbs.db
-Dockerfile
-*.Dockerfile
-# Ignore our own binary, but only in the root to avoid ignoring subfolders
-defang
-defang.exe
-# Ignore our project-level state
-.defang`
-
 	path := filepath.Join(cwd, ".dockerignore")
 	term.Debug("Writing .dockerignore file to", path)
 	file, err := os.Create(path)
@@ -213,7 +211,7 @@ func getDockerIgnoreReader(root, dockerfile string) (io.ReadCloser, string, erro
 	// Try reading the newly created .dockerignore file
 	reader = tryReadIgnoreFile(root, dockerignore)
 	if reader == nil {
-		return nil, "", errors.New("failed to read default .dockerignore file")
+		return nil, "", fmt.Errorf("failed to read default .dockerignore file: %s at the path: %s", dockerignore, root)
 	}
 
 	return reader, dockerignore, nil

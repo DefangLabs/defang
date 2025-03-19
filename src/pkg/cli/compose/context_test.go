@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -181,4 +182,98 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
+}
+
+func TestGetDockerIgnoreReader(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name              string
+		dockerfile        string
+		ignoreFileName    string
+		ignoreFileContent string
+		expectedFileName  string
+	}{
+		{
+			name:              "dockerfile-specific and ignore file exists",
+			dockerfile:        "DefangDockerfile",
+			ignoreFileName:    "DefangDockerfile.dockerignore",
+			ignoreFileContent: "**/node_modules\n**/build",
+			expectedFileName:  "DefangDockerfile.dockerignore",
+		},
+		{
+			name:              "Regular dockerfile and dockerignore exists",
+			dockerfile:        "Dockerfile",
+			ignoreFileName:    ".dockerignore",
+			ignoreFileContent: "**/dist\n**/.env",
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No .dockerignore, but dockerfile exists",
+			dockerfile:        "Dockerfile",
+			ignoreFileName:    "",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No dockerfile, but dockerignore exists",
+			dockerfile:        "",
+			ignoreFileName:    ".dockerignore",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No dockerfile, but dockerignore exists",
+			dockerfile:        "",
+			ignoreFileName:    ".dockerignore",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new temporary directory for this test case
+			tempDir, err := os.MkdirTemp("", "test-dockerignore")
+			if err != nil {
+				t.Fatalf("Failed to create temp directory: %v", err)
+			}
+			defer os.RemoveAll(tempDir) // Clean up after the test
+
+			// Create specified ignore file if the name is not empty
+			if tt.ignoreFileName != "" {
+				ignoreFilePath := filepath.Join(tempDir, tt.ignoreFileName)
+				err := os.WriteFile(ignoreFilePath, []byte(tt.ignoreFileContent), 0644)
+				if err != nil {
+					t.Fatalf("Failed to create ignore file: %v", err)
+				}
+			}
+
+			// Call the function under test
+			reader, fileName, err := getDockerIgnoreReader(tempDir, tt.dockerfile)
+			if err != nil {
+				t.Fatalf("Failed to get ignore file reader: %v", err)
+			}
+
+			// Verify the returned file name
+			if fileName != tt.expectedFileName {
+				t.Errorf("Expected file name %s, but got %s", tt.expectedFileName, fileName)
+			}
+
+			// Verify the content of the reader if applicable
+			if tt.ignoreFileContent != "" {
+				content, err := io.ReadAll(reader)
+				if err != nil {
+					t.Fatalf("Failed to read content from reader: %v", err)
+				}
+				if string(content) != tt.ignoreFileContent {
+					t.Errorf("Expected content %q, but got %q", tt.ignoreFileContent, string(content))
+				}
+			}
+
+			// Close the reader
+			if reader != nil {
+				reader.Close()
+			}
+		})
+	}
 }
