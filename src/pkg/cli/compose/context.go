@@ -156,6 +156,7 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+// tryReadIgnoreFile attempts to read the specified ignore file.
 func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	path := filepath.Join(cwd, ignorefile)
 	reader, err := os.Open(path)
@@ -166,6 +167,8 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	return reader
 }
 
+// writeDockerIgnoreFile writes a default
+// .dockerignore file to the specified directory.
 func writeDockerIgnoreFile(cwd string) error {
 	path := filepath.Join(cwd, ".dockerignore")
 	term.Debug("Writing .dockerignore file to", path)
