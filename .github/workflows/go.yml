@@ -207,10 +207,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') # skip this step for snapshots because we don't know the name of the archive
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          # the prefix "defang-win" should match the id in the build section of .goreleaser.yml
         run: |
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
-          Compress-Archive -Path defang-cli_windows_amd64_v1\* -DestinationPath "defang_${version}_windows_amd64.zip" -Update
-          Compress-Archive -Path defang-cli_windows_arm64*\* -DestinationPath "defang_${version}_windows_arm64.zip" -Update
+          Compress-Archive -Path defang-win_windows_amd64_v1\* -DestinationPath "defang_${version}_windows_amd64.zip" -Update
+          Compress-Archive -Path defang-win_windows_arm64*\* -DestinationPath "defang_${version}_windows_arm64.zip" -Update
         shell: pwsh
         working-directory: src\dist\windows
 
