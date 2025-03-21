@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/moby/patternmatcher/ignorefile"
 )
 
 func Test_parseContextLimit(t *testing.T) {
@@ -123,7 +125,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{".dockerignore", "Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -181,4 +183,93 @@ func TestCreateTarballReader(t *testing.T) {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
+}
+
+func TestGetDockerIgnorePatterns(t *testing.T) {
+	tests := []struct {
+		name              string
+		dockerfile        string
+		ignoreFileName    string
+		ignoreFileContent string
+		expectedFileName  string
+	}{
+		{
+			name:              "dockerfile-specific and ignore file exists",
+			dockerfile:        "DefangDockerfile",
+			ignoreFileName:    "DefangDockerfile.dockerignore",
+			ignoreFileContent: "**/node_modules\n**/build",
+			expectedFileName:  "DefangDockerfile.dockerignore",
+		},
+		{
+			name:              "Regular dockerfile and dockerignore exists",
+			dockerfile:        "Dockerfile",
+			ignoreFileName:    ".dockerignore",
+			ignoreFileContent: "**/dist\n**/.env",
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No .dockerignore, but dockerfile exists",
+			dockerfile:        "Dockerfile",
+			ignoreFileName:    "",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No dockerfile, but dockerignore exists",
+			dockerfile:        "",
+			ignoreFileName:    ".dockerignore",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+		{
+			name:              "No dockerfile, and no dockerignore exists",
+			dockerfile:        "",
+			ignoreFileName:    "",
+			ignoreFileContent: defaultDockerIgnore,
+			expectedFileName:  ".dockerignore",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new temporary directory for this test case
+			tempDir, err := os.MkdirTemp("", "test-dockerignore")
+			if err != nil {
+				t.Fatalf("Failed to create temp directory: %v", err)
+			}
+			t.Cleanup(func() { os.RemoveAll(tempDir) }) // Clean up after the test
+
+			// Create specified ignore file if the name is not empty
+			if tt.ignoreFileName != "" {
+				ignoreFilePath := filepath.Join(tempDir, tt.ignoreFileName)
+				err := os.WriteFile(ignoreFilePath, []byte(tt.ignoreFileContent), 0644)
+				if err != nil {
+					t.Fatalf("Failed to create ignore file: %v", err)
+				}
+			}
+
+			// Call the function under test
+			patterns, fileName, err := getDockerIgnorePatterns(tempDir, tt.dockerfile)
+			if err != nil {
+				t.Fatalf("Failed to get ignore file pattern: %v", err)
+			}
+
+			// Verify the returned file name
+			if fileName != tt.expectedFileName {
+				t.Errorf("Expected file name %s, but got %s", tt.expectedFileName, fileName)
+			}
+
+			// Verify the content of the patterns
+			if tt.ignoreFileContent != "" {
+				// Make expected patterns to test against
+				expectedPatterns, err := ignorefile.ReadAll(strings.NewReader(tt.ignoreFileContent))
+				if err != nil {
+					t.Fatalf("Failed to retrieve expected patterns: %v", err)
+				}
+				if !reflect.DeepEqual(patterns, expectedPatterns) {
+					t.Errorf("Expected patterns %v, but got %v", expectedPatterns, patterns)
+				}
+			}
+		})
+	}
 }
