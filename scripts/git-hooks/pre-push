@@ -1,0 +1,24 @@
+#!/bin/sh
+
+protected_branch="main"
+
+# Read the local and remote refs from stdin
+while read local_ref local_sha remote_ref remote_sha; do
+  # Handle empty remote_ref (e.g., creating a new branch)
+  if [ -z "$remote_ref" ]; then
+    echo "🚫 Cannot push to an unspecified branch."
+    exit 1
+  fi
+
+  branch_name=$(echo "$remote_ref" | sed 's|refs/heads/||')
+
+  # Check if the branch being pushed is the protected branch
+  if [ "$branch_name" = "$protected_branch" ]; then
+    echo "🚫 Direct pushes to the '$protected_branch' branch are not allowed."
+    echo "Please create a pull request instead."
+    exit 1
+  fi
+done
+
+# Allow the push if it's not the protected branch
+exit 0
