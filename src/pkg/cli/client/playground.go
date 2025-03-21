@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -19,6 +20,10 @@ var _ Provider = (*PlaygroundProvider)(nil)
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
+}
+
+func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
+	return pkg.ErrDeploymentCompleted{} // TODO: implement on fabric, for now assume service is deployed
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
