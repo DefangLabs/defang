@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/moby/patternmatcher/ignorefile"
 )
 
 func Test_parseContextLimit(t *testing.T) {
@@ -184,7 +185,7 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 }
 
-func TestGetDockerIgnoreReader(t *testing.T) {
+func TestGetDockerIgnorePatterns(t *testing.T) {
 	tests := []struct {
 		name              string
 		dockerfile        string
@@ -236,7 +237,7 @@ func TestGetDockerIgnoreReader(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create temp directory: %v", err)
 			}
-			defer os.RemoveAll(tempDir) // Clean up after the test
+			t.Cleanup(func() { os.RemoveAll(tempDir) }) // Clean up after the test
 
 			// Create specified ignore file if the name is not empty
 			if tt.ignoreFileName != "" {
@@ -248,9 +249,9 @@ func TestGetDockerIgnoreReader(t *testing.T) {
 			}
 
 			// Call the function under test
-			reader, fileName, err := getDockerIgnoreReader(tempDir, tt.dockerfile)
+			patterns, fileName, err := getDockerIgnorePatterns(tempDir, tt.dockerfile)
 			if err != nil {
-				t.Fatalf("Failed to get ignore file reader: %v", err)
+				t.Fatalf("Failed to get ignore file pattern: %v", err)
 			}
 
 			// Verify the returned file name
@@ -258,20 +259,16 @@ func TestGetDockerIgnoreReader(t *testing.T) {
 				t.Errorf("Expected file name %s, but got %s", tt.expectedFileName, fileName)
 			}
 
-			// Verify the content of the reader if applicable
+			// Verify the content of the patterns
 			if tt.ignoreFileContent != "" {
-				content, err := io.ReadAll(reader)
+				// Make expected patterns to test against
+				expectedPatterns, err := ignorefile.ReadAll(strings.NewReader(tt.ignoreFileContent))
 				if err != nil {
-					t.Fatalf("Failed to read content from reader: %v", err)
+					t.Fatalf("Failed to retrieve expected patterns: %v", err)
 				}
-				if string(content) != tt.ignoreFileContent {
-					t.Errorf("Expected content %q, but got %q", tt.ignoreFileContent, string(content))
+				if !reflect.DeepEqual(patterns, expectedPatterns) {
+					t.Errorf("Expected patterns %v, but got %v", expectedPatterns, patterns)
 				}
-			}
-
-			// Close the reader
-			if reader != nil {
-				reader.Close()
 			}
 		})
 	}
