@@ -742,7 +742,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
 			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
-				isTaskFailure := !errors.Is(err, io.EOF)
+				isTaskFailure := errors.As(err, &ecs.TaskFailure{})
 				if stopWhenCDTaskDone || isTaskFailure {
 					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
 					if isTaskFailure {

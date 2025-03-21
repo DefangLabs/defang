@@ -14,10 +14,6 @@ func WaitCdTaskState(
 ) error {
 	term.Debug("waiting for cdTask to complete.\n") // TODO: don't print in Go-routine
 
-	if DoDryRun {
-		return ErrDryRun
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

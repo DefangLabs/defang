@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -187,21 +188,44 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 }
 
 func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
+	if DoDryRun {
+		// If we are in dry-run mode, we don't need to wait for the deployment to complete
+		return ErrDryRun
+	}
+
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
-	deploymentStatusCh := make(chan error, 2)
 	if waitTimeout >= 0 {
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
 	}
 
-	errCompleted := pkg.ErrDeploymentCompleted{}
+	var deploymentStatusCh = make(chan error, 2)
+	wg := waitForDeploymentCompleted(ctx, provider, project, deploy, cancelTail, deploymentStatusCh)
+
+	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
+	// blocking call to tail
+	TailUp(ctx, provider, project, deploy, tailOptions)
+	wg.Wait()
+
+	close(deploymentStatusCh)
+	for errDeployment := range deploymentStatusCh {
+		var errDeploymentCompleted pkg.ErrDeploymentCompleted
+		if !errors.As(errDeployment, &errDeploymentCompleted) && !(strings.Contains(errDeployment.Error(), "EOF")) {
+			return errDeployment
+		}
+	}
+
+	return nil
+}
+
+func waitForDeploymentCompleted(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, cancelTail context.CancelCauseFunc, deploymentStatusCh chan error) *sync.WaitGroup {
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
-	var wg sync.WaitGroup
 
+	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -220,8 +244,9 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 				service.State = targetState
 			}
 
-			deploymentStatusCh <- errCompleted
-			cancelTail(errCompleted)
+			var errDeploymentCompleted = pkg.ErrDeploymentCompleted{}
+			deploymentStatusCh <- errDeploymentCompleted
+			cancelTail(errDeploymentCompleted)
 		}
 	}()
 
@@ -237,20 +262,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		}
 	}()
 
-	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
-	// blocking call to tail
-	TailUp(ctx, provider, project, deploy, tailOptions)
-	wg.Wait()
-
-	close(deploymentStatusCh)
-	for errDeployment := range deploymentStatusCh {
-		var errDeploymentCompleted pkg.ErrDeploymentCompleted
-		if !errors.As(errDeployment, &errDeploymentCompleted) {
-			return errDeployment
-		}
-	}
-
-	return nil
+	return &wg
 }
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
