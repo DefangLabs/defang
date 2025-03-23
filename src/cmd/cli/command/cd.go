@@ -178,23 +178,24 @@ var cdPreviewCmd = &cobra.Command{
 	Annotations: authNeededAnnotation, // FIXME: because it still needs a delegated domain
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var ctx = cmd.Context()
 		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			return err
 		}
 
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := getProvider(ctx, loader)
 		if err != nil {
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, project.Name)
+		err = canIUseProvider(ctx, provider, project.Name)
 		if err != nil {
 			return err
 		}
 
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+		resp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 		if err != nil {
 			return err
 		}
@@ -204,6 +205,6 @@ var cdPreviewCmd = &cobra.Command{
 			Verbose: verbose,
 			LogType: logs.LogTypeAll,
 		}
-		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
+		return cli.Tail(ctx, provider, project.Name, tailOptions)
 	},
 }

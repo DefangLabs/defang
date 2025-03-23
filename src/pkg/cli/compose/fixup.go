@@ -15,7 +15,7 @@ import (
 // HACK: Use magic network name "public" to determine if the service is public
 const NetworkPublic = "public"
 
-func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
+func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
@@ -33,6 +33,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	}
 	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
 
+	var replicaLimitWarning = []string{}
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
@@ -59,6 +60,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				term.Warnf("service %q: skipping unset build argument %s", svccfg.Name, pkg.QuotedArray(removedArgs))
 			}
 		}
+
+		// Deployment fixup
+		replicaLimitWarning = serviceDeployFixup(&svccfg, userTier, replicaLimitWarning)
 
 		// Fixup secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
@@ -164,5 +168,26 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		project.Services[svccfg.Name] = svccfg
 	}
 
+	if len(replicaLimitWarning) > 0 {
+		term.Warnf("replica limit of 1 exceeded for services %s; consider upgrading to Pro", replicaLimitWarning)
+	}
 	return nil
+}
+
+func serviceDeployFixup(svccfg *types.ServiceConfig, userTier defangv1.SubscriptionTier, replicaLimitWarning []string) []string {
+	if svccfg.Deploy == nil {
+		svccfg.Deploy = &types.DeployConfig{}
+	}
+
+	if svccfg.Deploy.Replicas == nil {
+		replicas := 1
+		svccfg.Deploy.Replicas = &replicas
+	}
+
+	if *svccfg.Deploy.Replicas > 1 && userTier != defangv1.SubscriptionTier_PRO {
+		replicas := 1
+		svccfg.Deploy.Replicas = &replicas
+		replicaLimitWarning = append(replicaLimitWarning, svccfg.Name)
+	}
+	return replicaLimitWarning
 }
