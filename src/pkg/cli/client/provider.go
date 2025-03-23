@@ -144,6 +144,7 @@ type Provider interface {
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
+	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)
 	ServiceDNS(string) string

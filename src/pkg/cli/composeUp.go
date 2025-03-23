@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -186,6 +188,11 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 }
 
 func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
+	if DoDryRun {
+		// If we are in dry-run mode, we don't need to wait for the deployment to complete
+		return ErrDryRun
+	}
+
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
 
@@ -195,14 +202,39 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		defer cancelTimeout()
 	}
 
-	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+	var deploymentStatusCh = make(chan error, 2)
+	wg := waitForDeploymentCompleted(ctx, provider, project, deploy, cancelTail, deploymentStatusCh)
 
+	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
+	// blocking call to tail
+	TailUp(ctx, provider, project, deploy, tailOptions)
+	wg.Wait()
+
+	close(deploymentStatusCh)
+	for errDeployment := range deploymentStatusCh {
+		var errDeploymentCompleted pkg.ErrDeploymentCompleted
+		if !errors.As(errDeployment, &errDeploymentCompleted) && !(strings.Contains(errDeployment.Error(), "EOF")) {
+			return errDeployment
+		}
+	}
+
+	return nil
+}
+
+func waitForDeploymentCompleted(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, cancelTail context.CancelCauseFunc, deploymentStatusCh chan error) *sync.WaitGroup {
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
+
+		// block on waiting for services to reach target state
 		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 			var errDeploymentFailed pkg.ErrDeploymentFailed
 			if errors.As(err, &errDeploymentFailed) {
+				deploymentStatusCh <- err
 				cancelTail(err)
 			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
@@ -212,22 +244,25 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 				service.State = targetState
 			}
 
-			cancelTail(errCompleted)
+			var errDeploymentCompleted = pkg.ErrDeploymentCompleted{}
+			deploymentStatusCh <- errDeploymentCompleted
+			cancelTail(errDeploymentCompleted)
 		}
 	}()
 
-	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
-	// blocking call to tail
-	err := TailUp(ctx, provider, project, deploy, tailOptions)
-	var errDeploymentFailed pkg.ErrDeploymentFailed
-	if errors.As(context.Cause(ctx), &errDeploymentFailed) {
-		return errDeploymentFailed
-	}
-	if !errors.Is(context.Cause(ctx), errCompleted) {
-		return err
-	}
+	go func() {
+		defer wg.Done()
 
-	return nil
+		// block on waiting for cdTask to complete
+		err := WaitCdTaskState(ctx, provider)
+		deploymentStatusCh <- err
+		var errDeploymentFailed pkg.ErrDeploymentFailed
+		if errors.As(err, &errDeploymentFailed) {
+			cancelTail(err)
+		}
+	}()
+
+	return &wg
 }
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {

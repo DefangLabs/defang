@@ -186,6 +186,10 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 	return nil
 }
 
+func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
+	return ecs.GetTaskStatus(ctx, b.cdTaskArn)
+}
+
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
@@ -705,8 +709,8 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	var err error
 	var taskArn ecs.TaskArn
 	var tailStream ecs.LiveTailStream
-	stopWhenCDTaskDone := false
-	logType := logs.LogType(req.LogType)
+	var stopWhenCDTaskDone bool
+
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		tailStream, err = b.driver.TailTaskID(ctx, etag)
 		taskArn, _ = b.driver.GetTaskArn(etag)
@@ -725,20 +729,23 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
+		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
 		taskArn = b.cdTaskArn
+		stopWhenCDTaskDone = false
 	}
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
 	if taskArn != nil {
+		// When we have a CD task, override the context so we can cancel the tailing when the CD task is done
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		go func() {
 			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
-				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
+				isTaskFailure := errors.As(err, &ecs.TaskFailure{})
+				if stopWhenCDTaskDone || isTaskFailure {
 					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
-					if !errors.Is(err, io.EOF) {
+					if isTaskFailure {
 						err = pkg.ErrDeploymentFailed{Message: err.Error()}
 					}
 					cancel(err)
