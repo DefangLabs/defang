@@ -138,7 +138,7 @@ winget:
       branch: "Defang-{{.Version}}"
       pull_request:
         check_boxes: true
-        draft: true
+        draft: false
         enabled: true
         base:
           owner: microsoft
