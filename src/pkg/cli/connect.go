@@ -43,7 +43,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 	accessToken := GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantName, "for cluster", host)
 	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
-	track.Fabric = grpcClient // Update track client
+	track.Tracker = grpcClient // Update track client
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
