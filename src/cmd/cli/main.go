@@ -24,21 +24,17 @@ func main() {
 	}()
 
 	// Handle Ctrl+C so we can exit gracefully
-	ctx, cancel := context.WithCancel(context.Background())
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt)
-
-	go func() {
-		<-sigs
-		signal.Stop(sigs)
-		track.Evt("User Interrupted", track.P("version", version))
-		cancel()
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	slog.SetDefault(logs.NewTermLogger(term.DefaultTerm))
 	command.SetupCommands(ctx, version)
 	err := command.Execute(ctx)
-	track.FlushAllTracking() // TODO: track errors/panics
+	if ctx.Err() != nil {
+		// The context was cancelled by the Interrupt signal handler
+		track.Evt("User Interrupted", track.P("version", version))
+	}
+	stop()
+	track.FlushAllTracking()
 
 	if err != nil {
 		// If the error is a command.ExitCode, use its value as the exit code

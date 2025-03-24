@@ -35,9 +35,7 @@ import (
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
-func P(name string, value interface{}) cliClient.Property {
-	return cliClient.Property{Name: name, Value: value}
-}
+var P = track.P
 
 // GLOBALS
 var (

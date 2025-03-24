@@ -44,7 +44,7 @@ type DebugConfig struct {
 func (dc DebugConfig) String() string {
 	cmd := "debug"
 	if dc.Etag != "" {
-		cmd += " --etag=" + string(dc.Etag)
+		cmd += " --etag=" + dc.Etag
 	}
 	if dc.ModelId != "" {
 		cmd += " --model=" + dc.ModelId
