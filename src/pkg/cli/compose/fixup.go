@@ -62,7 +62,9 @@ func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, prov
 		}
 
 		// Deployment fixup
-		replicaLimitWarning = serviceDeployFixup(&svccfg, userTier, replicaLimitWarning)
+		if fixedupService := serviceDeployFixup(&svccfg, userTier); fixedupService != "" {
+			replicaLimitWarning = append(replicaLimitWarning, fixedupService)
+		}
 
 		// Fixup secret references; secrets are supposed to be files, not env, but it's kept for backward compatibility
 		for i, secret := range svccfg.Secrets {
@@ -174,20 +176,15 @@ func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, prov
 	return nil
 }
 
-func serviceDeployFixup(svccfg *types.ServiceConfig, userTier defangv1.SubscriptionTier, replicaLimitWarning []string) []string {
-	if svccfg.Deploy == nil {
-		svccfg.Deploy = &types.DeployConfig{}
-	}
+func serviceDeployFixup(svccfg *types.ServiceConfig, userTier defangv1.SubscriptionTier) string {
+	if userTier != defangv1.SubscriptionTier_PRO {
+		if svccfg.Deploy == nil {
+			svccfg.Deploy = &types.DeployConfig{}
+		}
 
-	if svccfg.Deploy.Replicas == nil {
 		replicas := 1
 		svccfg.Deploy.Replicas = &replicas
+		return svccfg.Name
 	}
-
-	if *svccfg.Deploy.Replicas > 1 && userTier != defangv1.SubscriptionTier_PRO {
-		replicas := 1
-		svccfg.Deploy.Replicas = &replicas
-		replicaLimitWarning = append(replicaLimitWarning, svccfg.Name)
-	}
-	return replicaLimitWarning
+	return ""
 }

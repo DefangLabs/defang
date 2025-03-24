@@ -38,84 +38,89 @@ func TestFixup(t *testing.T) {
 		}
 	})
 }
+
+func makeIntPtr(val int) *int {
+	return &val
+}
+
 func TestServiceDeployFixup(t *testing.T) {
 	tests := []struct {
-		name             string
-		svccfg           composeTypes.ServiceConfig
-		userTier         defangv1.SubscriptionTier
-		expectedReplicas int
-		expectedWarnings []string
+		name     string
+		svccfg   *composeTypes.ServiceConfig
+		userTier defangv1.SubscriptionTier
+		expected string
+		replicas *int
 	}{
 		{
-			name: "NoDeployConfig",
-			svccfg: composeTypes.ServiceConfig{
-				Name: "service1",
-			},
-			userTier:         defangv1.SubscriptionTier_HOBBY,
-			expectedReplicas: 1,
-			expectedWarnings: []string{},
+			name:     "Non-PRO tier with nil DeployConfig",
+			svccfg:   &composeTypes.ServiceConfig{Name: "test-service"},
+			userTier: defangv1.SubscriptionTier_HOBBY,
+			expected: "test-service",
+			replicas: makeIntPtr(1),
 		},
 		{
-			name: "NoReplicasConfig",
-			svccfg: composeTypes.ServiceConfig{
-				Name:   "service2",
+			name: "Non-PRO tier with existing DeployConfig",
+			svccfg: &composeTypes.ServiceConfig{
+				Name:   "test-service",
 				Deploy: &composeTypes.DeployConfig{},
 			},
-			userTier:         defangv1.SubscriptionTier_HOBBY,
-			expectedReplicas: 1,
-			expectedWarnings: []string{},
+			userTier: defangv1.SubscriptionTier_HOBBY,
+			expected: "test-service",
+			replicas: makeIntPtr(1),
 		},
 		{
-			name: "ReplicasMoreThanOneNonPro",
-			svccfg: composeTypes.ServiceConfig{
-				Name: "service3",
+			name: "Non-PRO tier with existing DeployConfig at 10 replicas",
+			svccfg: &composeTypes.ServiceConfig{
+				Name: "test-service",
 				Deploy: &composeTypes.DeployConfig{
-					Replicas: intPtr(3),
+					Replicas: makeIntPtr(10),
 				},
 			},
-			userTier:         defangv1.SubscriptionTier_HOBBY,
-			expectedReplicas: 1,
-			expectedWarnings: []string{"service3"},
+			userTier: defangv1.SubscriptionTier_HOBBY,
+			expected: "test-service",
+			replicas: makeIntPtr(1),
 		},
 		{
-			name: "ReplicasMoreThanOnePro",
-			svccfg: composeTypes.ServiceConfig{
-				Name: "service4",
+			name: "PRO tier with nil DeployConfig",
+			svccfg: &composeTypes.ServiceConfig{
+				Name: "test-service",
+			},
+			userTier: defangv1.SubscriptionTier_PRO,
+			expected: "",
+			replicas: nil,
+		},
+		{
+			name: "PRO tier with existing DeployConfig",
+			svccfg: &composeTypes.ServiceConfig{
+				Name: "test-service",
 				Deploy: &composeTypes.DeployConfig{
-					Replicas: intPtr(3),
+					Replicas: makeIntPtr(10),
 				},
 			},
-			userTier:         defangv1.SubscriptionTier_PRO,
-			expectedReplicas: 3,
-			expectedWarnings: []string{},
+			userTier: defangv1.SubscriptionTier_PRO,
+			expected: "",
+			replicas: makeIntPtr(10),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			warnings := serviceDeployFixup(&tt.svccfg, tt.userTier, []string{})
-			if *(tt.svccfg.Deploy.Replicas) != tt.expectedReplicas {
-				t.Errorf("expected %d replicas, got %d", tt.expectedReplicas, *tt.svccfg.Deploy.Replicas)
+			result := serviceDeployFixup(tt.svccfg, tt.userTier)
+			if result != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, result)
 			}
-			if !equal(warnings, tt.expectedWarnings) {
-				t.Errorf("expected warnings %v, got %v", tt.expectedWarnings, warnings)
+
+			if tt.replicas == nil && (tt.svccfg.Deploy == nil || tt.svccfg.Deploy.Replicas == nil) {
+				return
+			}
+
+			if tt.svccfg.Deploy != nil && tt.svccfg.Deploy.Replicas != nil {
+				if *tt.svccfg.Deploy.Replicas != *tt.replicas {
+					t.Errorf("expected replicas %d, got %d", tt.replicas, *tt.svccfg.Deploy.Replicas)
+				}
+			} else {
+				t.Errorf("expected replicas %d, got nil", tt.replicas)
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func equal(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
