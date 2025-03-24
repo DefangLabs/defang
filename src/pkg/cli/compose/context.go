@@ -156,6 +156,7 @@ func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+// tryReadIgnoreFile attempts to read the specified ignore file.
 func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	path := filepath.Join(cwd, ignorefile)
 	reader, err := os.Open(path)
@@ -166,6 +167,57 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 	return reader
 }
 
+// writeDefaultIgnoreFile writes a default
+// .dockerignore file to the specified directory.
+func writeDefaultIgnoreFile(cwd string) error {
+	path := filepath.Join(cwd, ".dockerignore")
+	term.Debug("Writing .dockerignore file to", path)
+
+	err := os.WriteFile(path, []byte(defaultDockerIgnore), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write default .dockerignore file: %w", err)
+	}
+
+	return nil
+}
+
+// getDockerIgnorePatterns attempts to read the ignore file
+// for the specified Dockerfile and returns the patterns and
+// the name of the ignore file.
+func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) {
+	// Check for Dockerfile-specific ignore file
+	// Attempt to read Dockerfile-specific ignore file
+	dockerignore := dockerfile + ".dockerignore"
+	reader := tryReadIgnoreFile(root, dockerignore)
+	if reader == nil {
+		// Fallback to .dockerignore
+		dockerignore = ".dockerignore"
+		reader = tryReadIgnoreFile(root, dockerignore)
+		if reader == nil {
+			// Generate a default .dockerignore file if none exists
+			term.Info("No .dockerignore file found; generating default .dockerignore")
+			err := writeDefaultIgnoreFile(root)
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
+			}
+			// Try reading the newly created .dockerignore file
+			reader = tryReadIgnoreFile(root, dockerignore)
+			if reader == nil {
+				return nil, "", fmt.Errorf("failed to read default .dockerignore file: %s at the path: %s", dockerignore, root)
+			}
+		}
+	}
+
+	defer reader.Close()
+
+	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read ignore file: %w", err)
+	}
+
+	return patterns, dockerignore, nil
+}
+
 func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
 	foundDockerfile := false
 	if dockerfile == "" {
@@ -174,22 +226,12 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		dockerfile = filepath.Clean(dockerfile)
 	}
 
-	// A Dockerfile-specific ignore-file takes precedence over the .dockerignore file at the root of the build context if both exist.
-	dockerignore := dockerfile + ".dockerignore"
-	reader := tryReadIgnoreFile(root, dockerignore)
-	if reader == nil {
-		dockerignore = ".dockerignore"
-		reader = tryReadIgnoreFile(root, dockerignore)
-		if reader == nil {
-			term.Debug("No .dockerignore file found; using defaults")
-			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
-		}
-	}
-	patterns, err := ignorefile.ReadAll(reader) // handles comments and empty lines
-	reader.Close()
+	// Get the ignore patterns from the .dockerignore file
+	patterns, dockerignore, err := getDockerIgnorePatterns(root, dockerfile)
 	if err != nil {
 		return err
 	}
+
 	pm, err := patternmatcher.New(patterns)
 	if err != nil {
 		return err
