@@ -1,4 +1,3 @@
- ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [cmd-shell curl flask1 flask2 none wget]
  ! service "cmd-shell": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "curl": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "flask1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

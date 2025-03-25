@@ -1,11 +1,6 @@
 {
   "no-ext": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "postgres",
     "networks": {
@@ -21,11 +16,6 @@
   },
   "no-ports": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "postgres",
     "networks": {
@@ -41,11 +31,6 @@
   },
   "no-ports-override": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "environment": {
       "PGPORT": "5433"
@@ -64,11 +49,6 @@
   },
   "with-ext": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "postgres",
     "networks": {
@@ -84,11 +64,6 @@
   },
   "wrong-image": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {

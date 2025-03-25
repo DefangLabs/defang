@@ -1,11 +1,6 @@
 {
   "service1": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {

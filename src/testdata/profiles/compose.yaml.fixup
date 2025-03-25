@@ -1,11 +1,6 @@
 {
   "always": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "alpine",
     "networks": {
@@ -17,11 +12,6 @@
       "defang"
     ],
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "alpine",
     "networks": {

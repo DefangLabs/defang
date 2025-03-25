@@ -1,11 +1,6 @@
 {
   "long": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {
@@ -22,11 +17,6 @@
   },
   "long-published": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {
@@ -44,11 +34,6 @@
   },
   "short": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {
@@ -65,11 +50,6 @@
   },
   "short-published": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {
@@ -87,11 +67,6 @@
   },
   "short-udp": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {
@@ -107,11 +82,6 @@
   },
   "short-udp-published": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "bogus",
     "networks": {

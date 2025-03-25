@@ -62,7 +62,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, whopAmIResp.GetTier(), mode, p, fixedProject, upload); err != nil {
+	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 
@@ -82,7 +82,9 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
+	var allowScaling = mode == defangv1.DeploymentMode_PRODUCTION && whopAmIResp.GetTier() == defangv1.SubscriptionTier_PRO
 	deployRequest := &defangv1.DeployRequest{
+		AllowScaling:   allowScaling,
 		Mode:           mode,
 		Project:        project.Name,
 		Compose:        bytes,

@@ -73,7 +73,7 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := FixupServices(context.Background(), defangv1.SubscriptionTier_PRO, defangv1.DeploymentMode_DEVELOPMENT, mockClient, project, UploadModeIgnore); err != nil {
+		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}

@@ -1,5 +1,4 @@
  ! Environment variable "NODE_ENV" is not used; add it to `.env` if needed
  ! Environment variable "NODE_ENV" is not used; add it to `.env` or it may be resolved from config during deployment
- ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [interpolate]
  ! service "interpolate": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
 missing configs ["NODE_ENV" "POSTGRES_PASSWORD" "def"] (https://docs.defang.io/docs/concepts/configuration)

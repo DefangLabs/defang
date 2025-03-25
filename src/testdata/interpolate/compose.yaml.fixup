@@ -1,11 +1,6 @@
 {
   "interpolate": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "environment": {
       "BRACED": "interpolate",

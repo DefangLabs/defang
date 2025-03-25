@@ -1,11 +1,6 @@
 {
   "service1": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {
@@ -14,11 +9,6 @@
   },
   "service2": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {
@@ -27,11 +17,6 @@
   },
   "service3": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {
@@ -40,11 +25,6 @@
   },
   "service4": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "example",
     "networks": {

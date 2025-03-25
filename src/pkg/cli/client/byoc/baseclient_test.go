@@ -1,7 +1,6 @@
 package byoc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -74,45 +73,36 @@ func NewMockGetServiceInfosProvider() *mockGetServiceInfosProvider {
 
 // The array order has to be 3, 2, 1 because of the dependencies
 var expectedServiceInfosJson = `[
-          {
-            "service": {
-              "name": "service3",
-              "deploy": {
-                "replicas": 1
-              }
-            },
-            "project": "test-project",
-            "etag": "test-etag",
-            "status": "UPDATE_QUEUED",
-            "zone_id": "test-zone-id",
-            "state": 7
-          },
-          {
-            "service": {
-              "name": "service2",
-              "deploy": {
-                "replicas": 1
-              }
-            },
-            "project": "test-project",
-            "etag": "test-etag",
-            "status": "UPDATE_QUEUED",
-            "zone_id": "test-zone-id",
-            "state": 7
-          },
-          {
-            "service": {
-              "name": "service1",
-              "deploy": {
-                "replicas": 1
-              }
-            },
-            "project": "test-project",
-            "etag": "test-etag",
-            "status": "UPDATE_QUEUED",
-            "zone_id": "test-zone-id",
-            "state": 7
-          }
+  {
+    "service": {
+      "name": "service3"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  },
+  {
+    "service": {
+      "name": "service2"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  },
+  {
+    "service": {
+      "name": "service1"
+    },
+    "project": "test-project",
+    "etag": "test-etag",
+    "status": "UPDATE_QUEUED",
+    "zone_id": "test-zone-id",
+    "state": 7
+  }
 ]`
 
 func TestGetServiceInfos(t *testing.T) {
@@ -142,16 +132,8 @@ func TestGetServiceInfos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error while marshalling serviceInfos to json: %v", err)
 	}
-
-	var expectedJson bytes.Buffer
-	err = json.Indent(&expectedJson, []byte(expectedServiceInfosJson), "", "  ")
-	if err != nil {
-		fmt.Printf("Error formatting JSON: %v\n", err)
-		return
-	}
-
-	if string(b) != expectedJson.String() {
-		t.Errorf("expected \n%s\n, got \n%s\n", expectedJson.String(), string(b))
+	if string(b) != expectedServiceInfosJson {
+		t.Errorf("expected %s, got %s", expectedServiceInfosJson, string(b))
 	}
 }
 

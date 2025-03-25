@@ -180,18 +180,11 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
 
-	replicas := uint32(1)
-	if service.Deploy != nil && service.Deploy.Replicas != nil {
-		replicas = uint32(*service.Deploy.Replicas)
-	}
 	si := &defangv1.ServiceInfo{
 		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 		Project: projectName,    // was: tenant
 		Service: &defangv1.Service{
 			Name: service.Name,
-			Deploy: &defangv1.Deploy{
-				Replicas: replicas, // default
-			},
 		},
 		Domainname: service.DomainName,
 	}

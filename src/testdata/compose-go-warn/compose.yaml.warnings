@@ -1,4 +1,3 @@
  ! "yes" for boolean is not supported by YAML 1.2, please use `true`
- ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [echo]
  ! service "echo": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "echo": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

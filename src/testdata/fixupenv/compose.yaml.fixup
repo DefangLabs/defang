@@ -1,11 +1,6 @@
 {
   "Mistral": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "mistral:latest",
     "networks": {
@@ -21,11 +16,6 @@
   },
   "bad-service": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "image": "somedb:latest",
     "networks": {
@@ -42,11 +32,6 @@
   },
   "env-in-config": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "environment": {
       "CONFIG1": "http://mistral:8000"
@@ -65,11 +50,6 @@
       }
     },
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "networks": {
       "default": null
@@ -77,11 +57,6 @@
   },
   "ui": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "environment": {
       "API_URL": "http://mistral:8000",
@@ -94,11 +69,6 @@
   },
   "use-bad-service": {
     "command": null,
-    "deploy": {
-      "replicas": 1,
-      "resources": {},
-      "placement": {}
-    },
     "entrypoint": null,
     "environment": {
       "DB_URL": "bad-service:5432"

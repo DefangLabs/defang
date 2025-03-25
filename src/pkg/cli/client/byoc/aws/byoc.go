@@ -225,9 +225,10 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	// Ensure all service endpoints are unique
+	// Ensure all service endpoints are unique and scaling flag is set
 	endpoints := make(map[string]bool)
 	for _, serviceInfo := range serviceInfos {
+		serviceInfo.AllowScaling = req.AllowScaling
 		for _, endpoint := range serviceInfo.Endpoints {
 			if endpoints[endpoint] {
 				return nil, fmt.Errorf("duplicate endpoint: %s", endpoint) // CodeInvalidArgument

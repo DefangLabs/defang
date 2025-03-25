@@ -1,2 +1,1 @@
- ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [dfnx]
  * Packaging the project files for dfnx at .

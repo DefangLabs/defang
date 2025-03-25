@@ -1,4 +1,3 @@
- ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [dfnx]
  ! port 4567: UDP ports default to 'host' mode (add 'mode: host' to silence)
  ! service "dfnx": secrets will be exposed as environment variables, not files (use 'environment' instead)
  ! service "dfnx": service name was adjusted: build argument "DNS" assigned value "mock-dfnx"
