@@ -10,6 +10,11 @@
       "shm_size": "2147483648"
     },
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "networks": {
       "default": null
@@ -26,6 +31,11 @@
       "shm_size": "2147483648"
     },
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "networks": {
       "default": null

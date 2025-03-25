@@ -10,6 +10,7 @@
     },
     "command": null,
     "deploy": {
+      "replicas": 1,
       "resources": {
         "limits": {
           "cpus": 2,

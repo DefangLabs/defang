@@ -1,6 +1,11 @@
 {
   "x": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "blah",
     "networks": {
@@ -9,6 +14,11 @@
   },
   "y": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "blah",
     "networks": {

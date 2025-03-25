@@ -1,6 +1,11 @@
 {
   "cmd-shell": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [
@@ -24,6 +29,11 @@
   },
   "curl": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [
@@ -48,6 +58,11 @@
   },
   "flask1": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [
@@ -74,6 +89,11 @@
   },
   "flask2": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [
@@ -99,6 +119,11 @@
   },
   "none": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [
@@ -124,6 +149,11 @@
   },
   "wget": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "healthcheck": {
       "test": [

@@ -62,7 +62,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, whopAmIResp.GetTier(), p, fixedProject, upload); err != nil {
+	if err := compose.FixupServices(ctx, whopAmIResp.GetTier(), mode, p, fixedProject, upload); err != nil {
 		return nil, project, err
 	}
 

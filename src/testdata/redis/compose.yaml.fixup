@@ -1,6 +1,11 @@
 {
   "no-ext": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "redis",
     "networks": {
@@ -16,6 +21,11 @@
   },
   "no-ports": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "redis",
     "networks": {
@@ -34,6 +44,11 @@
       "--port",
       "6380"
     ],
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "redis",
     "networks": {
@@ -49,6 +64,11 @@
   },
   "with-ext": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "redis",
     "networks": {
@@ -64,6 +84,11 @@
   },
   "wrong-image": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "example",
     "networks": {

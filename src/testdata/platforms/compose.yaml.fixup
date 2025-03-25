@@ -1,6 +1,11 @@
 {
   "intel2": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "busybox",
     "networks": {

@@ -11,6 +11,11 @@
         "required": true
       }
     },
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "alpine",
     "networks": {
@@ -25,6 +30,11 @@
         "required": true
       }
     },
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "alpine",
     "networks": {
@@ -38,6 +48,11 @@
         "condition": "service_started",
         "required": true
       }
+    },
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
     },
     "entrypoint": null,
     "image": "alpine",

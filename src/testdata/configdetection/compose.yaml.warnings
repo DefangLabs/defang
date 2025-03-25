@@ -1,3 +1,4 @@
+ ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [configdetection]
  ! service "configdetection": environment "API_KEY" may contain sensitive information; consider using 'defang config set API_KEY' to securely store this value
  ! service "configdetection": environment "AWS_CLIENT_ID" may contain sensitive information; consider using 'defang config set AWS_CLIENT_ID' to securely store this value
  ! service "configdetection": environment "GH_PAT" may contain sensitive information; consider using 'defang config set GH_PAT' to securely store this value

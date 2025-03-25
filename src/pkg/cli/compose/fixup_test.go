@@ -17,7 +17,7 @@ func TestFixup(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(context.Background(), defangv1.SubscriptionTier_HOBBY, client.MockProvider{}, proj, UploadModeIgnore)
+		err = FixupServices(context.Background(), defangv1.SubscriptionTier_HOBBY, defangv1.DeploymentMode_DEVELOPMENT, client.MockProvider{}, proj, UploadModeIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,11 +48,13 @@ func TestServiceDeployFixup(t *testing.T) {
 		name     string
 		svccfg   *composeTypes.ServiceConfig
 		userTier defangv1.SubscriptionTier
+		mode     defangv1.DeploymentMode
 		expected string
 		replicas *int
 	}{
 		{
 			name:     "Non-PRO tier with nil DeployConfig",
+			mode:     defangv1.DeploymentMode_DEVELOPMENT,
 			svccfg:   &composeTypes.ServiceConfig{Name: "test-service"},
 			userTier: defangv1.SubscriptionTier_HOBBY,
 			expected: "test-service",
@@ -60,6 +62,7 @@ func TestServiceDeployFixup(t *testing.T) {
 		},
 		{
 			name: "Non-PRO tier with existing DeployConfig",
+			mode: defangv1.DeploymentMode_PRODUCTION,
 			svccfg: &composeTypes.ServiceConfig{
 				Name:   "test-service",
 				Deploy: &composeTypes.DeployConfig{},
@@ -81,7 +84,18 @@ func TestServiceDeployFixup(t *testing.T) {
 			replicas: makeIntPtr(1),
 		},
 		{
+			name: "PRO tier with nil DeployConfig - DEV mode",
+			mode: defangv1.DeploymentMode_DEVELOPMENT,
+			svccfg: &composeTypes.ServiceConfig{
+				Name: "test-service",
+			},
+			userTier: defangv1.SubscriptionTier_PRO,
+			expected: "test-service",
+			replicas: makeIntPtr(1),
+		},
+		{
 			name: "PRO tier with nil DeployConfig",
+			mode: defangv1.DeploymentMode_PRODUCTION,
 			svccfg: &composeTypes.ServiceConfig{
 				Name: "test-service",
 			},
@@ -91,6 +105,7 @@ func TestServiceDeployFixup(t *testing.T) {
 		},
 		{
 			name: "PRO tier with existing DeployConfig",
+			mode: defangv1.DeploymentMode_PRODUCTION,
 			svccfg: &composeTypes.ServiceConfig{
 				Name: "test-service",
 				Deploy: &composeTypes.DeployConfig{
@@ -105,7 +120,7 @@ func TestServiceDeployFixup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := serviceDeployFixup(tt.svccfg, tt.userTier)
+			result := serviceDeployFixup(tt.svccfg, tt.userTier, tt.mode)
 			if result != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, result)
 			}

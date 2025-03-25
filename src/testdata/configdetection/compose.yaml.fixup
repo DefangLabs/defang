@@ -1,6 +1,11 @@
 {
   "configdetection": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "environment": {
       "API_KEY": "50m34p1k3y",

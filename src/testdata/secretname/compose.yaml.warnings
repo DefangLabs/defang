@@ -1,3 +1,4 @@
+ ! can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) [app]
  ! service "app": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "app": secrets will be exposed as environment variables, not files (use 'environment' instead)
  * Packaging the project files for app at .

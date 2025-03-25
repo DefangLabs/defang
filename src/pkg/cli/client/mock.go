@@ -98,6 +98,12 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 	}, nil
 }
 
+func (m MockFabricClient) WhoAmI(ctx context.Context) (*defangv1.WhoAmIResponse, error) {
+	return &defangv1.WhoAmIResponse{
+		Tier: defangv1.SubscriptionTier_PERSONAL,
+	}, nil
+}
+
 type MockLoader struct {
 	Project *composeTypes.Project
 }

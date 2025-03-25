@@ -5,6 +5,11 @@
       "dockerfile": "Dockerfile"
     },
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "networks": {
       "default": null
@@ -16,6 +21,11 @@
       "dockerfile": "Dockerfile"
     },
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "networks": {
       "default": null

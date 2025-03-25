@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"slices"
+	"sort"
 	"strconv"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -15,7 +16,7 @@ import (
 // HACK: Use magic network name "public" to determine if the service is public
 const NetworkPublic = "public"
 
-func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, provider client.Provider, project *types.Project, upload UploadMode) error {
+func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, mode defangv1.DeploymentMode, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
@@ -62,7 +63,7 @@ func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, prov
 		}
 
 		// Deployment fixup
-		if fixedupService := serviceDeployFixup(&svccfg, userTier); fixedupService != "" {
+		if fixedupService := serviceDeployFixup(&svccfg, userTier, mode); fixedupService != "" {
 			replicaLimitWarning = append(replicaLimitWarning, fixedupService)
 		}
 
@@ -171,13 +172,14 @@ func FixupServices(ctx context.Context, userTier defangv1.SubscriptionTier, prov
 	}
 
 	if len(replicaLimitWarning) > 0 {
-		term.Warnf("replica limit of 1 exceeded for services %s; consider upgrading to Pro", replicaLimitWarning)
+		sort.Strings(replicaLimitWarning)
+		term.Warnf("can only have more than one replica for PRO tier and PRODUCTION deployment mode. Will set replicas to 1 for service(s) %s", replicaLimitWarning)
 	}
 	return nil
 }
 
-func serviceDeployFixup(svccfg *types.ServiceConfig, userTier defangv1.SubscriptionTier) string {
-	if userTier != defangv1.SubscriptionTier_PRO {
+func serviceDeployFixup(svccfg *types.ServiceConfig, userTier defangv1.SubscriptionTier, mode defangv1.DeploymentMode) string {
+	if userTier != defangv1.SubscriptionTier_PRO || mode != defangv1.DeploymentMode_PRODUCTION {
 		if svccfg.Deploy == nil {
 			svccfg.Deploy = &types.DeployConfig{}
 		}

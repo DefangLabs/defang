@@ -1,6 +1,11 @@
 {
   "echo": {
     "command": null,
+    "deploy": {
+      "replicas": 1,
+      "resources": {},
+      "placement": {}
+    },
     "entrypoint": null,
     "image": "ealen/echo-server",
     "networks": {
