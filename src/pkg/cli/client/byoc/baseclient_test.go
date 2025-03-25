@@ -146,7 +146,7 @@ func TestGetServiceInfos(t *testing.T) {
 	var expectedJson bytes.Buffer
 	err = json.Indent(&expectedJson, []byte(expectedServiceInfosJson), "", "  ")
 	if err != nil {
-		fmt.Println("Error formatting JSON:", err)
+		fmt.Printf("Error formatting JSON: %v\n", err)
 		return
 	}
 
