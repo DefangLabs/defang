@@ -162,7 +162,7 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 					if inEnv {
 						term.Warnf("Environment variable %q is not used; add it to `.env` or it may be resolved from config during deployment", key)
 					} else {
-						term.Debugf("Unresolved variable %q may be resolved from config during deployment", key)
+						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
 					}
 					// Leave unresolved variables as-is for resolution later by CD
 					return "${" + key + "}", true
