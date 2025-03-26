@@ -13,30 +13,35 @@ import (
 
 var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
-func P(name string, value interface{}) cliClient.Property {
-	return cliClient.Property{Name: name, Value: value}
+type Property = cliClient.Property
+
+func P(name string, value interface{}) Property {
+	return Property{Name: name, Value: value}
 }
 
-var Fabric cliClient.FabricClient
+var Tracker interface {
+	Track(string, ...Property) error
+}
 
-// trackWG is used to wait for all tracking to complete.
+// trackWG is used to wait for all asynchronous tracking to complete.
 var trackWG = sync.WaitGroup{}
 
-// Track sends a tracking event to the server in a separate goroutine.
-func Evt(name string, props ...cliClient.Property) {
+// Evt sends a tracking event to the server in a separate goroutine.
+func Evt(name string, props ...Property) {
 	if disableAnalytics {
+		return
+	}
+	tracker := Tracker
+	if tracker == nil {
+		term.Debugf("untracked event %q: %v", name, props)
 		return
 	}
 	term.Debugf("tracking event %q: %v", name, props)
 	trackWG.Add(1)
-	go func(fabric cliClient.FabricClient) {
+	go func() {
 		defer trackWG.Done()
-		if fabric == nil {
-			term.Debugf("No FabricClient to track event: %v", name)
-			return
-		}
-		fabric.Track(name, props...)
-	}(Fabric)
+		tracker.Track(name, props...)
+	}()
 }
 
 // FlushAllTracking waits for all tracking goroutines to complete.
@@ -48,8 +53,8 @@ func isCompletionCommand(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd || (cmd.Parent() != nil && cmd.Parent().Name() == "completion")
 }
 
-// trackCmd sends a tracking event for a Cobra command and its arguments.
-func Cmd(cmd *cobra.Command, verb string, props ...cliClient.Property) {
+// Cmd sends a tracking event for a Cobra command and its arguments.
+func Cmd(cmd *cobra.Command, verb string, props ...Property) {
 	command := "Implicit"
 	if cmd != nil {
 		// Ignore tracking for shell completion requests
