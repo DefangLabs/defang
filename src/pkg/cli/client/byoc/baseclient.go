@@ -36,6 +36,12 @@ type HasStackSupport interface {
 	GetStackName() string
 }
 
+type Quotas struct {
+	CDImage      string
+	AllowScaling bool
+	AllowGPU     bool
+}
+
 type ByocBaseClient struct {
 	client.RetryDelayer
 
@@ -43,7 +49,7 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantName              string
-	CDImage                 string
+	Quotas
 
 	projectBackend ProjectBackend
 }
@@ -78,8 +84,11 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
-func (b *ByocBaseClient) SetCDImage(image string) {
-	b.CDImage = image
+func (b *ByocBaseClient) SetQuotas(quotas *defangv1.CanIUseResponse) {
+	// Allow local override of the CD image
+	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
+	b.AllowScaling = quotas.AllowScaling
+	b.AllowGPU = quotas.Gpu
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
@@ -122,7 +131,20 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	return domain
 }
 
+const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
+
+type ErrNoPermission string
+
+func (e ErrNoPermission) Error() string {
+	return TIER_ERROR_MESSAGE + string(e)
+}
+
 func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, delegateDomain, etag string, services map[string]composeTypes.ServiceConfig) ([]*defangv1.ServiceInfo, error) {
+	numGPUS := compose.GetNumOfGPUs(services)
+	if numGPUS > 0 && !b.AllowGPU {
+		return nil, ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
+	}
+
 	serviceInfoMap := make(map[string]*Node)
 	for _, service := range services {
 		serviceInfo, err := b.update(ctx, projectName, delegateDomain, service)
@@ -138,7 +160,20 @@ func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, deleg
 	}
 
 	// Reorder the serviceInfos to make sure the dependencies are created first
-	return topologicalSort(serviceInfoMap), nil
+	serviceInfos := topologicalSort(serviceInfoMap)
+
+	// Ensure all service endpoints are unique
+	endpoints := make(map[string]bool)
+	for _, serviceInfo := range serviceInfos {
+		for _, endpoint := range serviceInfo.Endpoints {
+			if endpoints[endpoint] {
+				return nil, fmt.Errorf("duplicate endpoint: %s", endpoint) // CodeInvalidArgument
+			}
+			endpoints[endpoint] = true
+		}
+	}
+
+	return serviceInfos, nil
 }
 
 // Simple DFS topological sort to make sure the dependencies are created first
@@ -180,10 +215,11 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
-		Etag:       pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project:    projectName,    // was: tenant
-		Service:    &defangv1.Service{Name: service.Name},
-		Domainname: service.DomainName,
+		AllowScaling: b.AllowScaling,
+		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project:      projectName,    // was: tenant
+		Service:      &defangv1.Service{Name: service.Name},
+		Domainname:   service.DomainName,
 	}
 
 	hasHost := false

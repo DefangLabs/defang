@@ -95,32 +95,15 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
+			// Check if the user has permission to use the provider
 			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
 			}
 
 			managedServices, _ := cli.SplitManagedAndUnmanagedServices(project.Services)
-
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
-			}
-
-			numGPUS := compose.GetNumOfGPUs(ctx, project)
-			if numGPUS > 0 {
-				req := &defangv1.CanIUseRequest{
-					Project:  project.Name,
-					Provider: providerID.EnumValue(),
-				}
-
-				resp, err := client.CanIUse(ctx, req)
-				if err != nil {
-					return err
-				}
-
-				if !resp.Gpu {
-					return ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
-				}
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
