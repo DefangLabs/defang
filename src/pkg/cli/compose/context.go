@@ -170,7 +170,7 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 
 // writeDefaultIgnoreFile writes a default
 // .dockerignore file to the specified directory.
-// Returns a path to the written file and an error.
+// Returns the filename of the written file and an error.
 func writeDefaultIgnoreFile(cwd string) (string, error) {
 	path := filepath.Join(cwd, dotdockerignore)
 	term.Debug("Writing .dockerignore file to", path)
