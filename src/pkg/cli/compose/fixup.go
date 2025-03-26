@@ -156,6 +156,14 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
+		_, llm := svccfg.Extensions["x-defang-llm"]
+		if llm {
+			if _, ok := provider.(*client.PlaygroundProvider); ok {
+				term.Warnf("service %q: managed LLM is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+				delete(svccfg.Extensions, "x-defang-llm")
+			}
+		}
+
 		if !redis && !postgres && isStatefulImage(svccfg.Image) {
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
