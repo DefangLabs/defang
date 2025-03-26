@@ -32,7 +32,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 		upload = compose.UploadModeIgnore
 	}
 
-	whopAmIResp, err := c.WhoAmI(ctx)
+	whoAmIResp, err := c.WhoAmI(ctx)
 	if err != nil {
 		return nil, project, err
 	}
@@ -82,7 +82,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 		return nil, project, errors.New("failed to get delegate domain")
 	}
 
-	var allowScaling = mode == defangv1.DeploymentMode_PRODUCTION && whopAmIResp.GetTier() == defangv1.SubscriptionTier_PRO
+	var allowScaling = mode == defangv1.DeploymentMode_PRODUCTION && whoAmIResp.GetTier() == defangv1.SubscriptionTier_PRO
 	deployRequest := &defangv1.DeployRequest{
 		AllowScaling:   allowScaling,
 		Mode:           mode,

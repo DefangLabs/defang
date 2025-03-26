@@ -181,11 +181,9 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	pkg.Ensure(projectName != "", "ProjectName not set")
 
 	si := &defangv1.ServiceInfo{
-		Etag:    pkg.RandomID(), // TODO: could be hash for dedup/idempotency
-		Project: projectName,    // was: tenant
-		Service: &defangv1.Service{
-			Name: service.Name,
-		},
+		Etag:       pkg.RandomID(), // TODO: could be hash for dedup/idempotency
+		Project:    projectName,    // was: tenant
+		Service:    &defangv1.Service{Name: service.Name},
 		Domainname: service.DomainName,
 	}
 
