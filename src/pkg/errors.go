@@ -14,9 +14,3 @@ func (e ErrDeploymentFailed) Error() string {
 	}
 	return fmt.Sprintf("deployment failed%s: %s", service, e.Message)
 }
-
-type ErrDeploymentCompleted struct{}
-
-func (e ErrDeploymentCompleted) Error() string {
-	return "deployment COMPLETED"
-}

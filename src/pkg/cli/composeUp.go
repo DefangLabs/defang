@@ -213,8 +213,8 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 
 	close(deploymentStatusCh)
 	for errDeployment := range deploymentStatusCh {
-		var errDeploymentCompleted pkg.ErrDeploymentCompleted
-		if !errors.As(errDeployment, &errDeploymentCompleted) && !(strings.Contains(errDeployment.Error(), "EOF")) {
+		var errDeploymentCompleted = errors.New("deployment succeeded")
+		if !errors.Is(errDeployment, errDeploymentCompleted) && !(strings.Contains(errDeployment.Error(), "EOF")) {
 			return errDeployment
 		}
 	}
@@ -244,7 +244,7 @@ func startDeploymentWatchers(ctx context.Context, provider client.Provider, proj
 				service.State = targetState
 			}
 
-			var errDeploymentCompleted = pkg.ErrDeploymentCompleted{}
+			var errDeploymentCompleted = errors.New("deployment succeeded")
 			deploymentStatusCh <- errDeploymentCompleted
 			cancelTail(errDeploymentCompleted)
 		}
