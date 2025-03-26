@@ -40,6 +40,7 @@ const (
 	DefaultContextSizeHardLimit = 100 * MiB
 
 	sourceDateEpoch = 315532800 // 1980-01-01, same as nix-shell
+	dotdockerignore = ".dockerignore"
 	// The default .dockerignore for projects that don't have one. Keep in sync with upload.ts in pulumi-defang repo.
 	defaultDockerIgnore = `# Default .dockerignore file for Defang
 **/__pycache__
@@ -169,16 +170,17 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 
 // writeDefaultIgnoreFile writes a default
 // .dockerignore file to the specified directory.
-func writeDefaultIgnoreFile(cwd string) error {
-	path := filepath.Join(cwd, ".dockerignore")
+// Returns a path to the written file and an error.
+func writeDefaultIgnoreFile(cwd string) (string, error) {
+	path := filepath.Join(cwd, dotdockerignore)
 	term.Debug("Writing .dockerignore file to", path)
 
 	err := os.WriteFile(path, []byte(defaultDockerIgnore), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write default .dockerignore file: %w", err)
+		return "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
 	}
 
-	return nil
+	return dotdockerignore, nil
 }
 
 // getDockerIgnorePatterns attempts to read the ignore file
@@ -187,16 +189,17 @@ func writeDefaultIgnoreFile(cwd string) error {
 func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) {
 	// Check for Dockerfile-specific ignore file
 	// Attempt to read Dockerfile-specific ignore file
-	dockerignore := dockerfile + ".dockerignore"
+	dockerignore := dockerfile + dotdockerignore
 	reader := tryReadIgnoreFile(root, dockerignore)
 	if reader == nil {
 		// Fallback to .dockerignore
-		dockerignore = ".dockerignore"
+		dockerignore = dotdockerignore
 		reader = tryReadIgnoreFile(root, dockerignore)
 		if reader == nil {
 			// Generate a default .dockerignore file if none exists
-			term.Info("No .dockerignore file found; generating default .dockerignore")
-			err := writeDefaultIgnoreFile(root)
+			term.Warn("No .dockerignore file found; generating default .dockerignore")
+			var err error
+			dockerignore, err = writeDefaultIgnoreFile(root)
 			if err != nil {
 				return nil, "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
 			}
@@ -259,7 +262,7 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		if relPath == dockerfile {
 			foundDockerfile = true
 		} else if relPath == dockerignore {
-			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile
+			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile, but is needed by the builder
 		} else {
 			// Ignore files using the dockerignore patternmatcher
 			ignore, err := pm.MatchesOrParentMatches(slashPath) // always use forward slashes
