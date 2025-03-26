@@ -8,7 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func WaitCdTaskState(
+func WaitForCdTaskExit(
 	ctx context.Context,
 	provider client.Provider,
 ) error {

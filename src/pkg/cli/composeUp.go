@@ -203,7 +203,8 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	}
 
 	var deploymentStatusCh = make(chan error, 2)
-	wg := waitForDeploymentCompleted(ctx, provider, project, deploy, cancelTail, deploymentStatusCh)
+	wg := &sync.WaitGroup{}
+	startDeploymentWatchers(ctx, provider, project, deploy, cancelTail, deploymentStatusCh, wg)
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
@@ -221,11 +222,10 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	return nil
 }
 
-func waitForDeploymentCompleted(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, cancelTail context.CancelCauseFunc, deploymentStatusCh chan error) *sync.WaitGroup {
+func startDeploymentWatchers(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, cancelTail context.CancelCauseFunc, deploymentStatusCh chan error, wg *sync.WaitGroup) {
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
 
-	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -254,15 +254,13 @@ func waitForDeploymentCompleted(ctx context.Context, provider client.Provider, p
 		defer wg.Done()
 
 		// block on waiting for cdTask to complete
-		err := WaitCdTaskState(ctx, provider)
+		err := WaitForCdTaskExit(ctx, provider)
 		deploymentStatusCh <- err
 		var errDeploymentFailed pkg.ErrDeploymentFailed
 		if errors.As(err, &errDeploymentFailed) {
 			cancelTail(err)
 		}
 	}()
-
-	return &wg
 }
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
