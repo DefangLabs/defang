@@ -1,6 +1,6 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
 
-# Defang
+# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/images/headers/defang-white-colour-small.png)
 
 Defang is a radically simpler way for developers to develop, deploy, and debug cloud applications.
 
