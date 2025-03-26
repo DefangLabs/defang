@@ -59,7 +59,7 @@ func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 				"service1.internal",
 			},
 		}})
-	const expectedOutput = `Id  Name      State          Endpoints
+	const expectedOutput = `Id  Name      Status         Endpoints
     service1  NOT_SPECIFIED  example.com, service1.internal
 `
 	receivedLines := strings.Split(stdout.String(), "\n")
@@ -103,7 +103,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			},
 		}})
 	expectedLines := []string{
-		"Id  Name      State          Endpoints                       DomainName",
+		"Id  Name      Status         Endpoints                       DomainName",
 		"    service1  NOT_SPECIFIED  example.com, service1.internal  https://example.com",
 		" * Run `defang cert generate` to get a TLS certificate for your service(s)",
 		"",

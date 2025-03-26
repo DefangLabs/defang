@@ -24,7 +24,7 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 
 type ServiceTableItem struct {
 	Id         string `json:"Id"`
-	State      string `json:"State"`
+	Status     string `json:"Status"`
 	Name       string `json:"Name"`
 	DomainName string `json:"DomainName"`
 	Endpoints  string `json:"Endpoints"`
@@ -47,7 +47,7 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 		serviceTableItems = append(serviceTableItems, ServiceTableItem{
 			Id:         serviceInfo.Etag,
 			Name:       serviceInfo.Service.Name,
-			State:      serviceInfo.State.String(),
+			Status:     serviceInfo.State.String(),
 			DomainName: domainname,
 			Endpoints:  strings.Join(serviceInfo.Endpoints, ", "),
 		})
@@ -55,9 +55,9 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 
 	var attrs []string
 	if showDomainNameColumn {
-		attrs = []string{"Id", "Name", "State", "Endpoints", "DomainName"}
+		attrs = []string{"Id", "Name", "Status", "Endpoints", "DomainName"}
 	} else {
-		attrs = []string{"Id", "Name", "State", "Endpoints"}
+		attrs = []string{"Id", "Name", "Status", "Endpoints"}
 	}
 
 	err := term.Table(serviceTableItems, attrs)
