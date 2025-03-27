@@ -36,7 +36,7 @@ type HasStackSupport interface {
 	GetStackName() string
 }
 
-type Quotas struct {
+type Policy struct {
 	CDImage      string
 	AllowScaling bool
 	AllowGPU     bool
@@ -49,7 +49,7 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantName              string
-	Quotas
+	Policy
 
 	projectBackend ProjectBackend
 }
@@ -84,7 +84,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
-func (b *ByocBaseClient) SetQuotas(quotas *defangv1.CanIUseResponse) {
+func (b *ByocBaseClient) SetUserPolicy(quotas *defangv1.CanIUseResponse) {
 	// Allow local override of the CD image
 	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
 	b.AllowScaling = quotas.AllowScaling
@@ -131,12 +131,10 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	return domain
 }
 
-const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
-
 type ErrNoPermission string
 
 func (e ErrNoPermission) Error() string {
-	return fmt.Errorf("current subscription tier does not allow this action: %w", e)
+	return "current subscription tier does not allow this action: " + string(e)
 }
 
 func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, delegateDomain, etag string, services map[string]composeTypes.ServiceConfig) ([]*defangv1.ServiceInfo, error) {
@@ -216,10 +214,10 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
 		AllowScaling: b.AllowScaling,
+		Domainname:   service.DomainName,
 		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
 		Project:      projectName,    // was: tenant
 		Service:      &defangv1.Service{Name: service.Name},
-		Domainname:   service.DomainName,
 	}
 
 	hasHost := false

@@ -147,7 +147,7 @@ type Provider interface {
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	RemoteProjectName(context.Context) (string, error)
 	ServiceDNS(string) string
-	SetQuotas(*defangv1.CanIUseResponse)
+	SetUserPolicy(*defangv1.CanIUseResponse)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error
 }

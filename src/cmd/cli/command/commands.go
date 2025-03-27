@@ -1208,7 +1208,7 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	if err != nil {
 		return err
 	}
-	provider.SetQuotas(resp)
+	provider.SetUserPolicy(resp)
 	return nil
 }
 
