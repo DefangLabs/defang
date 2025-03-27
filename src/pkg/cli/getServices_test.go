@@ -35,10 +35,10 @@ func (g *mockGetServicesHandler) GetServices(ctx context.Context, req *connect.R
 				Service: &defangv1.Service{
 					Name: "foo",
 				},
+				State:       defangv1.ServiceState_BUILD_ACTIVATING,
 				Endpoints:   []string{},
 				Project:     "test",
 				Etag:        "a1b2c3",
-				Status:      "UNKNOWN",
 				PublicFqdn:  "test-foo.prod1.defang.dev",
 				PrivateFqdn: "",
 				CreatedAt:   timestamppb.New(mockCreatedAt),
@@ -82,8 +82,8 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := `Service  Deployment  PublicFqdn                 PrivateFqdn  Status
-foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
+		expectedOutput := `Service  Deployment  PublicFqdn                 PrivateFqdn  State
+foo      a1b2c3      test-foo.prod1.defang.dev               BUILD_ACTIVATING
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
@@ -125,7 +125,7 @@ foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 			"      publicFqdn: test-foo.prod1.defang.dev\n" +
 			"      service:\n" +
 			"        name: foo\n" +
-			"      status: UNKNOWN\n\n"
+			"      state: BUILD_ACTIVATING\n\n"
 
 		receivedLines := stdout.String()
 		expectedLines := expectedOutput
