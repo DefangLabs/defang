@@ -126,12 +126,13 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		return ErrDryRun
 	}
 
-	var sinceTime, untilTime *timestamppb.Timestamp
+	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(debugConfig.Since) {
-		sinceTime = timestamppb.New(debugConfig.Since)
+		sinceTs = timestamppb.New(debugConfig.Since)
 	}
 	if pkg.IsValidTime(debugConfig.Until) {
-		untilTime = timestamppb.New(debugConfig.Until)
+		until := debugConfig.Until.Add(time.Millisecond) // add a millisecond to make it inclusive
+		untilTs = timestamppb.New(until)
 	}
 	req := defangv1.DebugRequest{
 		Etag:     debugConfig.Etag,
@@ -139,8 +140,8 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 		ModelId:  debugConfig.ModelId,
 		Project:  debugConfig.Project.Name,
 		Services: debugConfig.FailedServices,
-		Since:    sinceTime,
-		Until:    untilTime,
+		Since:    sinceTs,
+		Until:    untilTs,
 	}
 	err := debugConfig.Provider.QueryForDebug(ctx, &req)
 	if err != nil {
