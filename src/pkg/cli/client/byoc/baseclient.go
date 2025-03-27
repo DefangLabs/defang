@@ -136,7 +136,7 @@ const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action
 type ErrNoPermission string
 
 func (e ErrNoPermission) Error() string {
-	return TIER_ERROR_MESSAGE + string(e)
+	return fmt.Errorf("current subscription tier does not allow this action: %w", e)
 }
 
 func (b *ByocBaseClient) GetServiceInfos(ctx context.Context, projectName, delegateDomain, etag string, services map[string]composeTypes.ServiceConfig) ([]*defangv1.ServiceInfo, error) {
