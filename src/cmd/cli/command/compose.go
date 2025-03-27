@@ -305,7 +305,7 @@ func makeComposeDownCmd() *cobra.Command {
 			term.Info("Deleted services, deployment ID", etag)
 
 			if detach {
-				printDefangHint("To track the update, do:", "tail --etag "+etag)
+				printDefangHint("To track the update, do:", "tail --deployment "+etag)
 				return nil
 			}
 
@@ -434,12 +434,17 @@ func makeComposeLogsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
+			var deployment, _ = cmd.Flags().GetString("deployment")
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
 			var filter, _ = cmd.Flags().GetString("filter")
 			var until, _ = cmd.Flags().GetString("until")
+
+			if etag != "" && deployment == "" {
+				deployment = etag
+			}
 
 			if utc {
 				cli.EnableUTCMode()
@@ -487,7 +492,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			tailOptions := cli.TailOptions{
-				Etag:     etag,
+				Etag:     deployment,
 				Filter:   filter,
 				LogType:  logType,
 				Raw:      raw,
@@ -503,6 +508,8 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
 	logsCmd.Flags().MarkHidden("name")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().MarkHidden("etag")
+	logsCmd.Flags().String("deployment", "", "deployment ID of the service")
 	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
 	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")

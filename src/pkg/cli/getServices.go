@@ -20,8 +20,8 @@ func (e ErrNoServices) Error() string {
 }
 
 type printService struct {
-	Service string
-	ID      string
+	Service    string
+	Deployment string
 	*defangv1.ServiceInfo
 }
 
@@ -56,11 +56,11 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 	for i, si := range servicesResponse.Services {
 		printServices[i] = printService{
 			Service:     si.Service.Name,
-			ID:          si.Etag,
+			Deployment:  si.Etag,
 			ServiceInfo: si,
 		}
 		servicesResponse.Services[i] = nil
 	}
 
-	return term.Table(printServices, []string{"Service", "ID", "PublicFqdn", "PrivateFqdn", "Status"})
+	return term.Table(printServices, []string{"Service", "Deployment", "PublicFqdn", "PrivateFqdn", "Status"})
 }

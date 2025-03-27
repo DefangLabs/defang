@@ -65,7 +65,7 @@ func (to TailOptions) String() string {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
 	if to.Etag != "" {
-		cmd += " --etag=" + to.Etag
+		cmd += " --deployment=" + to.Etag
 	}
 	if to.Raw {
 		cmd += " --raw"

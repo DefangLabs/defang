@@ -254,6 +254,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	debugCmd.Flags().MarkHidden("etag")
+	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
 	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
 	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
 	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
@@ -865,8 +867,13 @@ var debugCmd = &cobra.Command{
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
+		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
 		until, _ := cmd.Flags().GetString("until")
+
+		if etag != "" && deployment == "" {
+			deployment = etag
+		}
 
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -890,7 +897,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		debugConfig := cli.DebugConfig{
-			Etag:           etag,
+			Etag:           deployment,
 			FailedServices: args,
 			ModelId:        modelId,
 			Project:        project,
@@ -943,7 +950,7 @@ var deleteCmd = &cobra.Command{
 		term.Info("Deleted service", names, "with deployment ID", etag)
 
 		if !tail {
-			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			printDefangHint("To track the update, do:", "tail --deployment "+etag)
 			return nil
 		}
 
