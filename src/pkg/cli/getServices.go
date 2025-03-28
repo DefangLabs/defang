@@ -62,5 +62,5 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		servicesResponse.Services[i] = nil
 	}
 
-	return term.Table(printServices, []string{"Service", "Deployment", "PublicFqdn", "PrivateFqdn", "State"})
+	return term.Table(printServices, []string{"Service", "Deployment", "PublicFqdn", "PrivateFqdn", "Status"})
 }
