@@ -36,7 +36,7 @@ type HasStackSupport interface {
 	GetStackName() string
 }
 
-type Policy struct {
+type CanIUseConfig struct {
 	CDImage      string
 	AllowScaling bool
 	AllowGPU     bool
@@ -49,7 +49,7 @@ type ByocBaseClient struct {
 	SetupDone               bool
 	ShouldDelegateSubdomain bool
 	TenantName              string
-	Policy
+	CanIUseConfig
 
 	projectBackend ProjectBackend
 }
@@ -84,7 +84,7 @@ func (b *ByocBaseClient) Debug(context.Context, *defangv1.DebugRequest) (*defang
 	return nil, client.ErrNotImplemented("AI debugging is not yet supported for BYOC")
 }
 
-func (b *ByocBaseClient) SetUserPolicy(quotas *defangv1.CanIUseResponse) {
+func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	// Allow local override of the CD image
 	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
 	b.AllowScaling = quotas.AllowScaling
