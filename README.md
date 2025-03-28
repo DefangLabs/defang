@@ -1,9 +1,8 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
 
-# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/images/headers/defang-white-colour-small.png)
+# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Defang is a radically simpler way for developers to develop, deploy, and debug cloud applications.
-
+Develop Anything, Deploy Anywhere
 This repo includes:
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version

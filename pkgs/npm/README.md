@@ -1,6 +1,6 @@
-# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/images/headers/defang-white-colour-small.png)
+# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Defang is a radically simpler way for developers to develop, deploy, and debug cloud applications.
+Develop Anything, Deploy Anywhere.
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Sample projects in Golang, Python, Node.js, and many more languages and frameworks, that show you how to accomplish various tasks and deploy them to the DOP using a Docker Compose file and the Defang CLI.
