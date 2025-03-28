@@ -73,8 +73,8 @@ func TestDeploymentsList(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := `Id      Provider    DeployedAt
-a1b2c3  playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
+		expectedOutput := `Deployment  Provider    DeployedAt
+a1b2c3      playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")
