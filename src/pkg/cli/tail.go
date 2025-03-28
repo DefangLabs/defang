@@ -46,7 +46,7 @@ type TailDetectStopEventFunc func(services []string, host string, eventlog strin
 
 type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
-	Etag               types.ETag
+	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
 	Raw                bool
@@ -64,8 +64,8 @@ func (to TailOptions) String() string {
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if to.Etag != "" {
-		cmd += " --deployment=" + to.Etag
+	if to.Deployment != "" {
+		cmd += " --deployment=" + to.Deployment
 	}
 	if to.Raw {
 		cmd += " --raw"
@@ -216,7 +216,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	tailRequest := &defangv1.TailRequest{
-		Etag:     options.Etag,
+		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
 		Pattern:  options.Filter,
 		Project:  projectName,
@@ -379,7 +379,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
 					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
-					if options.Etag == "" {
+					if options.Deployment == "" {
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}

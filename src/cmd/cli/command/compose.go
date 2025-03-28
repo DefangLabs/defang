@@ -170,11 +170,11 @@ func makeComposeUpCmd() *cobra.Command {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
 					debugConfig := cli.DebugConfig{
-						Etag:     deploy.Etag,
-						ModelId:  modelId,
-						Project:  project,
-						Provider: provider,
-						Since:    since,
+						Deployment: deploy.Etag,
+						ModelId:    modelId,
+						Project:    project,
+						Provider:   provider,
+						Since:      since,
 					}
 					if errDeploymentFailed.Service != "" {
 						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
@@ -292,7 +292,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -302,10 +302,10 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			term.Info("Deleted services, deployment ID", etag)
+			term.Info("Deleted services, deployment ID", deployment)
 
 			if detach {
-				printDefangHint("To track the update, do:", "tail --deployment "+etag)
+				printDefangHint("To track the update, do:", "tail --deployment "+deployment)
 				return nil
 			}
 
@@ -314,7 +314,7 @@ func makeComposeDownCmd() *cobra.Command {
 				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 			}
 			tailOptions := cli.TailOptions{
-				Etag:               etag,
+				Deployment:         deployment,
 				Since:              since,
 				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
 				Verbose:            verbose,
@@ -492,14 +492,14 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			tailOptions := cli.TailOptions{
-				Etag:     deployment,
-				Filter:   filter,
-				LogType:  logType,
-				Raw:      raw,
-				Services: services,
-				Since:    sinceTs,
-				Until:    untilTs,
-				Verbose:  verbose,
+				Deployment: deployment,
+				Filter:     filter,
+				LogType:    logType,
+				Raw:        raw,
+				Services:   services,
+				Since:      sinceTs,
+				Until:      untilTs,
+				Verbose:    verbose,
 			}
 
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)

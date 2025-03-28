@@ -64,7 +64,7 @@ func TestQueryHasProject(t *testing.T) {
 
 	var mockClient = MockDebugFabricClient{}
 	var debugConfig = DebugConfig{
-		Etag:           "etag",
+		Deployment:     "etag",
 		FailedServices: []string{"service"},
 		Project:        project,
 		Provider:       MustHaveProjectNameQueryProvider{},

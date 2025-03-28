@@ -897,7 +897,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		debugConfig := cli.DebugConfig{
-			Etag:           deployment,
+			Deployment:     deployment,
 			FailedServices: args,
 			ModelId:        modelId,
 			Project:        project,
@@ -937,7 +937,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
+		deployment, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -947,20 +947,20 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		term.Info("Deleted service", names, "with deployment ID", etag)
+		term.Info("Deleted service", names, "with deployment ID", deployment)
 
 		if !tail {
-			printDefangHint("To track the update, do:", "tail --deployment "+etag)
+			printDefangHint("To track the update, do:", "tail --deployment "+deployment)
 			return nil
 		}
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 
 		tailOptions := cli.TailOptions{
-			Etag:    etag,
-			LogType: logs.LogTypeAll,
-			Since:   since,
-			Verbose: verbose,
+			Deployment: deployment,
+			LogType:    logs.LogTypeAll,
+			Since:      since,
+			Verbose:    verbose,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
