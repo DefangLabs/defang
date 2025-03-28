@@ -23,7 +23,7 @@ let
     aarch64-darwin = "https://github.com/DefangLabs/defang/releases/download/v1.1.9/defang_1.1.9_macOS.zip";
   };
 in
-stdenvNoCC.mkDerivation {
+lib.warn "This binary derivation for defang-cli is deprecated and no longer updated" stdenvNoCC.mkDerivation {
   pname = "defang";
   version = "1.1.9";
   src = fetchurl {
