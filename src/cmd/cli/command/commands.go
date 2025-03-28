@@ -60,14 +60,6 @@ func getCluster() string {
 	return org + "@" + cluster
 }
 
-const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
-
-type ErrNoPermission string
-
-func (e ErrNoPermission) Error() string {
-	return TIER_ERROR_MESSAGE + string(e)
-}
-
 func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
@@ -1223,10 +1215,7 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	if err != nil {
 		return err
 	}
-	// Allow local override of the CD image
-	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
-	provider.SetCDImage(cdImage)
-
+	provider.SetCanIUseConfig(resp)
 	return nil
 }
 
