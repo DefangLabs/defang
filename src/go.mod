@@ -1,6 +1,6 @@
 module github.com/DefangLabs/defang/src
 
-go 1.22.12
+go 1.23
 
 require (
 	cloud.google.com/go/artifactregistry v1.16.0
