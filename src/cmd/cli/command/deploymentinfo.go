@@ -1,6 +1,8 @@
 package command
 
 import (
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -20,31 +22,50 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
 	}
 }
 
-func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) {
+type ServiceTableItem struct {
+	Deployment string `json:"Deployment"`
+	Status     string `json:"Status"`
+	Name       string `json:"Name"`
+	DomainName string `json:"DomainName"`
+	Endpoints  string `json:"Endpoints"`
+}
+
+func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error {
+	serviceTableItems := make([]ServiceTableItem, 0, len(serviceInfos))
+
+	showDomainNameColumn := false
+	showCertGenerateHint := false
 	for _, serviceInfo := range serviceInfos {
-		andEndpoints := ""
-		if len(serviceInfo.Endpoints) > 0 {
-			andEndpoints = "and will be available at:"
-		}
-
-		serviceConditionText := "has status " + serviceInfo.Status
-		if serviceInfo.State != defangv1.ServiceState_NOT_SPECIFIED {
-			serviceConditionText = "is in state " + serviceInfo.State.String()
-		}
-
-		term.Info("Service", serviceInfo.Service.Name, serviceConditionText, andEndpoints)
-		for i, endpoint := range serviceInfo.Endpoints {
-			if serviceInfo.Service.Ports[i].Mode == defangv1.Mode_INGRESS {
-				endpoint = "https://" + endpoint
-			}
-			term.Println("   -", endpoint)
-		}
+		var domainname string
 		if serviceInfo.Domainname != "" {
-			if serviceInfo.ZoneId != "" {
-				term.Println("   -", "https://"+serviceInfo.Domainname)
-			} else {
-				term.Println("   -", "https://"+serviceInfo.Domainname+" (after `defang cert generate` to get a TLS certificate)")
+			showDomainNameColumn = true
+			domainname = "https://" + serviceInfo.Domainname
+			if serviceInfo.ZoneId == "" {
+				showCertGenerateHint = true
 			}
 		}
+		serviceTableItems = append(serviceTableItems, ServiceTableItem{
+			Deployment: serviceInfo.Etag,
+			Name:       serviceInfo.Service.Name,
+			Status:     serviceInfo.State.String(),
+			DomainName: domainname,
+			Endpoints:  strings.Join(serviceInfo.Endpoints, ", "),
+		})
 	}
+
+	attrs := []string{"Deployment", "Name", "Status", "Endpoints"}
+	if showDomainNameColumn {
+		attrs = append(attrs, "DomainName")
+	}
+
+	err := term.Table(serviceTableItems, attrs)
+	if err != nil {
+		return err
+	}
+
+	if showCertGenerateHint {
+		term.Info("Run `defang cert generate` to get a TLS certificate for your service(s)")
+	}
+
+	return nil
 }

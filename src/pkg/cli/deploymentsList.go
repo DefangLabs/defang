@@ -10,7 +10,7 @@ import (
 )
 
 type PrintDeployment struct {
-	Id         string
+	Deployment string
 	Provider   string
 	DeployedAt string
 }
@@ -33,11 +33,11 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Grpc
 	deployments := make([]PrintDeployment, numDeployments)
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
-			Id:         d.Id,
+			Deployment: d.Id,
 			Provider:   d.Provider,
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
 		}
 	}
 
-	return term.Table(deployments, []string{"Id", "Provider", "DeployedAt"})
+	return term.Table(deployments, []string{"Deployment", "Provider", "DeployedAt"})
 }
