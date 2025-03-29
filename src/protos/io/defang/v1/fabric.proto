@@ -245,7 +245,6 @@ message GenerateFilesRequest {
   bool agree_tos = 3;
   bool training_opt_out = 4; // only valid for Pro users
   string model_id = 5; // only valid for Pro users
-
 }
 
 message File {
