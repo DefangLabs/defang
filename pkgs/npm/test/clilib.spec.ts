@@ -1,16 +1,10 @@
-//********************************
-// To run these tests do the following:
-//    1. In package.json set/add the field "type": "module"
-//    2. Run `npm test`
-//********************************
-import * as mocha from "mocha";
-import * as sinon from "sinon";
+import axios, { AxiosResponse } from "axios";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
-
-import axios, { AxiosResponse } from "axios";
 import fs from "fs";
-import clilib from "../src/clilib.ts";
+import "mocha";
+import * as sinon from "sinon";
+import clilib from "../src/clilib";
 
 chai.use(chaiAsPromised);
 const { assert, expect } = chai;

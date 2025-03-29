@@ -18,7 +18,7 @@ const HTTP_STATUS_OK = 200;
 const exec = promisify(child_process.exec);
 async function getLatestVersion(): Promise<string> {
   const response = await axios.get(URL_LATEST_RELEASE);
-  if (response?.status !== HTTP_STATUS_OK) {
+  if (response.status !== HTTP_STATUS_OK) {
     throw new Error(
       `Failed to get latest version from GitHub. Status code: ${response.status}`
     );
@@ -49,7 +49,7 @@ async function downloadFile(
       },
     });
 
-    if (response?.data === undefined) {
+    if (response.data == null) {
       throw new Error(
         `Failed to download ${downloadUrl}. No data in response.`
       );
