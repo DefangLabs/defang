@@ -21,6 +21,10 @@ func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployReq
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
 }
 
+func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
+	return errors.New("deployment succeeded") // TODO: implement on fabric, for now assume service is deployed
+}
+
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
 }
