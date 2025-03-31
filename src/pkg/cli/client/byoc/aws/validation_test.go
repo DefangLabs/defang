@@ -57,7 +57,7 @@ func TestValidateGPUResources(t *testing.T) {
 		quotaClient = mockQuotaClient
 		mockQuotaClient.output = nil
 		mockQuotaClient.err = ErrNoQuotasReceived
-		err := ValidateGPUResources(ctx, &project)
+		err := validateGPUResources(ctx, &project)
 		if err != nil && errors.Is(err, ErrNoQuotasReceived) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected errors %v", err)
 		}
@@ -73,7 +73,7 @@ func TestValidateGPUResources(t *testing.T) {
 
 		quotaClient = nil
 		mockQuotaClient.err = nil
-		err := ValidateGPUResources(ctx, &project)
+		err := validateGPUResources(ctx, &project)
 		if err != nil {
 			t.Fatalf("ValidateGPUResources() failed: expected no errors but got %v", err)
 		}
@@ -97,7 +97,7 @@ func TestValidateGPUResources(t *testing.T) {
 				},
 			},
 		}
-		err := ValidateGPUResources(ctx, &project)
+		err := validateGPUResources(ctx, &project)
 		if err != nil && !errors.Is(err, ErrGPUQuotaZero) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}
@@ -113,7 +113,7 @@ func TestValidateGPUResources(t *testing.T) {
 		}
 
 		quotaClient = nil
-		err := ValidateGPUResources(ctx, &project)
+		err := validateGPUResources(ctx, &project)
 		if err != nil && !errors.Is(err, ErrAWSNoConnection) {
 			t.Fatalf("ValidateGPUResources() failed: Unexpected err %v", err)
 		}

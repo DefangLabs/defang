@@ -35,9 +35,7 @@ import (
 const authNeeded = "auth-needed" // annotation to indicate that a command needs authorization
 var authNeededAnnotation = map[string]string{authNeeded: ""}
 
-func P(name string, value interface{}) cliClient.Property {
-	return cliClient.Property{Name: name, Value: value}
-}
+var P = track.P
 
 // GLOBALS
 var (
@@ -60,14 +58,6 @@ func getCluster() string {
 		return cluster
 	}
 	return org + "@" + cluster
-}
-
-const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
-
-type ErrNoPermission string
-
-func (e ErrNoPermission) Error() string {
-	return TIER_ERROR_MESSAGE + string(e)
 }
 
 func prettyError(err error) error {
@@ -211,7 +201,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(logoutCmd)
 
 	// Generate Command
-	generateCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for generating the code (Pro users only)")
+	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(newCmd)
 
@@ -256,7 +246,11 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
-	debugCmd.Flags().StringVar(&modelId, "model", "", "LLM model to use for debugging (Pro users only)")
+	debugCmd.Flags().MarkHidden("etag")
+	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
+	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
+	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
+	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
 	RootCmd.AddCommand(debugCmd)
 
 	// Tail Command
@@ -865,6 +859,13 @@ var debugCmd = &cobra.Command{
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
+		deployment, _ := cmd.Flags().GetString("deployment")
+		since, _ := cmd.Flags().GetString("since")
+		until, _ := cmd.Flags().GetString("until")
+
+		if etag != "" && deployment == "" {
+			deployment = etag
+		}
 
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -877,14 +878,25 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		var debugConfig = cli.DebugConfig{
-			Etag:           etag,
+		now := time.Now()
+		sinceTs, err := cli.ParseTimeOrDuration(since, now)
+		if err != nil {
+			return fmt.Errorf("invalid 'since' time: %w", err)
+		}
+		untilTs, err := cli.ParseTimeOrDuration(until, now)
+		if err != nil {
+			return fmt.Errorf("invalid 'until' time: %w", err)
+		}
+
+		debugConfig := cli.DebugConfig{
+			Deployment:     deployment,
 			FailedServices: args,
 			ModelId:        modelId,
 			Project:        project,
 			Provider:       provider,
+			Since:          sinceTs.UTC(),
+			Until:          untilTs.UTC(),
 		}
-
 		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
 	},
 }
@@ -917,7 +929,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
+		deployment, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -927,20 +939,20 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		term.Info("Deleted service", names, "with deployment ID", etag)
+		term.Info("Deleted service", names, "with deployment ID", deployment)
 
 		if !tail {
-			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			printDefangHint("To track the update, do:", "tail --deployment "+deployment)
 			return nil
 		}
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 
 		tailOptions := cli.TailOptions{
-			Etag:    etag,
-			LogType: logs.LogTypeAll,
-			Since:   since,
-			Verbose: verbose,
+			Deployment: deployment,
+			LogType:    logs.LogTypeAll,
+			Since:      since,
+			Verbose:    verbose,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
@@ -1203,10 +1215,7 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	if err != nil {
 		return err
 	}
-	// Allow local override of the CD image
-	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
-	provider.SetCDImage(cdImage)
-
+	provider.SetCanIUseConfig(resp)
 	return nil
 }
 

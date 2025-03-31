@@ -82,8 +82,8 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := `Service  Etag    PublicFqdn                 PrivateFqdn  Status
-foo      a1b2c3  test-foo.prod1.defang.dev               UNKNOWN
+		expectedOutput := `Service  Deployment  PublicFqdn                 PrivateFqdn  Status
+foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")

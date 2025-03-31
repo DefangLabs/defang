@@ -95,32 +95,15 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
+			// Check if the user has permission to use the provider
 			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
 			}
 
 			managedServices, _ := cli.SplitManagedAndUnmanagedServices(project.Services)
-
 			if len(managedServices) > 0 {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
-			}
-
-			numGPUS := compose.GetNumOfGPUs(ctx, project)
-			if numGPUS > 0 {
-				req := &defangv1.CanIUseRequest{
-					Project:  project.Name,
-					Provider: providerID.EnumValue(),
-				}
-
-				resp, err := client.CanIUse(ctx, req)
-				if err != nil {
-					return err
-				}
-
-				if !resp.Gpu {
-					return ErrNoPermission("usage of GPUs. Please upgrade on https://s.defang.io/subscription")
-				}
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
@@ -169,34 +152,37 @@ func makeComposeUpCmd() *cobra.Command {
 				if errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
+					debugConfig := cli.DebugConfig{
+						Deployment: deploy.Etag,
+						ModelId:    modelId,
+						Project:    project,
+						Provider:   provider,
+						Since:      since,
+					}
+					if errDeploymentFailed.Service != "" {
+						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
+					}
 					if !nonInteractive {
-						var failedServices []string
-						if errDeploymentFailed.Service != "" {
-							failedServices = []string{errDeploymentFailed.Service}
-						}
-						track.Evt("Debug Prompted", P("failedServices", failedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
+						track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
-						var debugConfig = cli.DebugConfig{
-							Etag:           deploy.Etag,
-							FailedServices: failedServices,
-							ModelId:        modelId,
-							Project:        project,
-							Provider:       provider,
-							Since:          since,
-						}
 						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-						if nil == cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
-							return err // don't show the defang hint if debugging was successful
+						if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+							// don't show this defang hint if debugging was successful
+							tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
+							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 						}
-						tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
-						printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
+					} else {
+						printDefangHint("To debug the deployment, do:", debugConfig.String())
 					}
 				}
 				return err
 			}
 
 			// Print the current service states of the deployment
-			printServiceStatesAndEndpoints(deploy.Services)
+			err = printServiceStatesAndEndpoints(deploy.Services)
+			if err != nil {
+				return err
+			}
 
 			term.Info("Done.")
 			return nil
@@ -289,7 +275,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			since := time.Now()
-			etag, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
+			deployment, err := cli.ComposeDown(cmd.Context(), projectName, client, provider, args...)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
@@ -299,10 +285,10 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			term.Info("Deleted services, deployment ID", etag)
+			term.Info("Deleted services, deployment ID", deployment)
 
 			if detach {
-				printDefangHint("To track the update, do:", "tail --etag "+etag)
+				printDefangHint("To track the update, do:", "tail --deployment "+deployment)
 				return nil
 			}
 
@@ -311,7 +297,7 @@ func makeComposeDownCmd() *cobra.Command {
 				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
 			}
 			tailOptions := cli.TailOptions{
-				Etag:               etag,
+				Deployment:         deployment,
 				Since:              since,
 				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
 				Verbose:            verbose,
@@ -431,12 +417,17 @@ func makeComposeLogsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var name, _ = cmd.Flags().GetString("name")
 			var etag, _ = cmd.Flags().GetString("etag")
+			var deployment, _ = cmd.Flags().GetString("deployment")
 			var raw, _ = cmd.Flags().GetBool("raw")
 			var since, _ = cmd.Flags().GetString("since")
 			var utc, _ = cmd.Flags().GetBool("utc")
 			var verbose, _ = cmd.Flags().GetBool("verbose")
 			var filter, _ = cmd.Flags().GetString("filter")
 			var until, _ = cmd.Flags().GetString("until")
+
+			if etag != "" && deployment == "" {
+				deployment = etag
+			}
 
 			if utc {
 				cli.EnableUTCMode()
@@ -484,14 +475,14 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			tailOptions := cli.TailOptions{
-				Etag:     etag,
-				Filter:   filter,
-				LogType:  logType,
-				Raw:      raw,
-				Services: services,
-				Since:    sinceTs,
-				Until:    untilTs,
-				Verbose:  verbose,
+				Deployment: deployment,
+				Filter:     filter,
+				LogType:    logType,
+				Raw:        raw,
+				Services:   services,
+				Since:      sinceTs,
+				Until:      untilTs,
+				Verbose:    verbose,
 			}
 
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
@@ -500,6 +491,8 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
 	logsCmd.Flags().MarkHidden("name")
 	logsCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	logsCmd.Flags().MarkHidden("etag")
+	logsCmd.Flags().String("deployment", "", "deployment ID of the service")
 	logsCmd.Flags().Bool("follow", false, "follow log output") // NOTE: -f is already used by --file
 	logsCmd.Flags().MarkHidden("follow")                       // TODO: implement this
 	logsCmd.Flags().BoolP("raw", "r", false, "show raw (unparsed) logs")

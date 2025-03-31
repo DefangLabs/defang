@@ -96,19 +96,19 @@ release:
   # replace_existing_draft: true
   # prerelease: "true"
 
-nix:
-  - homepage: https://defang.io/
-    # commit_author: defang-io
-    description: Defang is the easiest way for developers to create and deploy their containerized applications
-    license: "mit"
-    repository:
-      owner: DefangLabs
-      name: defang
-    post_install: |
-      installShellCompletion --cmd defang \
-        --bash <($out/bin/defang completion bash) \
-        --zsh <($out/bin/defang completion zsh) \
-        --fish <($out/bin/defang completion fish)
+# nix:
+#   - homepage: https://defang.io/
+#     # commit_author: defang-io
+#     description: Defang is the easiest way for developers to create and deploy their containerized applications
+#     license: "mit"
+#     repository:
+#       owner: DefangLabs
+#       name: defang
+#     post_install: |
+#       installShellCompletion --cmd defang \
+#         --bash <($out/bin/defang completion bash) \
+#         --zsh <($out/bin/defang completion zsh) \
+#         --fish <($out/bin/defang completion fish)
 
 changelog:
   use: github-native
@@ -138,7 +138,7 @@ winget:
       branch: "Defang-{{.Version}}"
       pull_request:
         check_boxes: true
-        draft: true
+        draft: false
         enabled: true
         base:
           owner: microsoft

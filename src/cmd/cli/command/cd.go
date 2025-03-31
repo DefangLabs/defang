@@ -200,9 +200,9 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		tailOptions := cli.TailOptions{
-			Etag:    resp.Etag,
-			Verbose: verbose,
-			LogType: logs.LogTypeAll,
+			Deployment: resp.Etag,
+			Verbose:    verbose,
+			LogType:    logs.LogTypeAll,
 		}
 		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
 	},
