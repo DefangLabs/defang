@@ -126,7 +126,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	}
 	domain := projectLabel + "." + DnsSafe(zone)
 	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
-		domain = hasStack.GetStackName() + "." + domain
+		domain = hasStack.GetStackName() + "." + domain // TODO: Should we dns-safe the stack name too?
 	}
 	return domain
 }

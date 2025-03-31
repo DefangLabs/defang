@@ -171,3 +171,49 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 		})
 	}
 }
+
+type TestProjectBackendWithStack struct {
+	ProjectBackend
+	stack string
+}
+
+func (t TestProjectBackendWithStack) GetStackName() string {
+	return t.stack
+}
+
+type TestProjectBackendWithoutStack struct {
+	ProjectBackend
+}
+
+func TestGetProjectDomain(t *testing.T) {
+	tests := []struct {
+		projectName    string
+		zone           string
+		tenantName     string
+		projectBackend ProjectBackend
+		expected       string
+	}{
+		{"", "test-zone", "test-tenant", TestProjectBackendWithoutStack{}, ""},
+		{"", "test-zone", "test-tenant", TestProjectBackendWithStack{stack: "test-stack"}, ""},
+		{"test-project", "test-zone", "test-tenant", TestProjectBackendWithoutStack{}, "test-project.test-zone"},
+		{"test-project", "test-zone", "test-tenant", TestProjectBackendWithStack{stack: "test-stack"}, "test-stack.test-project.test-zone"},
+		{"project-is-tenant-name", "test-zone", "project-is-tenant-name", TestProjectBackendWithoutStack{}, "test-zone"},
+		{"project-is-tenant-name", "test-zone", "project-is-tenant-name", TestProjectBackendWithStack{stack: "test-stack"}, "test-zone"}, // Stack is ignored when project name is the same as tenant -- Is that correct?
+		{"Test.Project", "tesT.zonE", "test-tenant", TestProjectBackendWithoutStack{}, "test-project.test.zone"},
+		{"Test.Project", "tesT.zonE", "test-tenant", TestProjectBackendWithStack{stack: "test-stack"}, "test-stack.test-project.test.zone"},
+	}
+
+	for _, tt := range tests {
+		stack := "no-stack"
+		if hasStack, ok := tt.projectBackend.(HasStackSupport); ok {
+			stack = hasStack.GetStackName()
+		}
+		t.Run(fmt.Sprintf("%s-%s-%s-%s", tt.projectName, tt.zone, tt.tenantName, stack), func(t *testing.T) {
+			b := &ByocBaseClient{TenantName: tt.tenantName, projectBackend: tt.projectBackend}
+			actual := b.GetProjectDomain(tt.projectName, tt.zone)
+			if actual != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, actual)
+			}
+		})
+	}
+}
