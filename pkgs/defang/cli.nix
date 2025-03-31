@@ -29,7 +29,7 @@ buildGoModule {
   '';
 
   meta = with lib; {
-    description = "Command-line interface for the Defang Opinionated Platform";
+    description = "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes";
     homepage = "https://defang.io/";
     license = licenses.mit;
     maintainers = with maintainers; [ lionello ];
