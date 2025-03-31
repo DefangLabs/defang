@@ -1,6 +1,6 @@
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Develop Anything, Deploy Anywhere
+Develop Anything, Deploy Anywhere. Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Sample projects in Golang, Python, Node.js, and many more languages and frameworks, that show you how to accomplish various tasks and deploy them to the DOP using a Docker Compose file and the Defang CLI.

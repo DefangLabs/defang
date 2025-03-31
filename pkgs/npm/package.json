@@ -2,7 +2,7 @@
   "name": "defang",
   "version": "<PLACEHOLDER>",
   "author": "Defang Software Labs Inc.",
-  "description": "CLI for a radically simpler way for developers to develop, deploy, and debug cloud applications.",
+  "description": "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes",
   "license": "MIT",
   "bin": {
     "defang": "bin/cli.js"
