@@ -32,23 +32,17 @@
   "scripts": {
     "build": "tsc",
     "postbuild": "chmod +x bin/cli.js",
-    "test": "TS_NODE_PROJECT='./tsconfig-test.json' mocha -r ts-node/register --loader=ts-node/esm -trace-warnings --no-warnings=ExperimentalWarning test/*.spec.ts"
+    "test": "mocha -r ts-node/register -trace-warnings 'test/**/*.spec.ts'"
   },
   "dependencies": {
     "adm-zip": "^0.5.14",
-    "axios": "^1.7.2",
-    "babel-register-esm": "^1.2.5",
-    "https": "^1.0.0",
-    "os": "^0.1.2",
+    "axios": "^1.8.2",
     "tar": "^7.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.24.7",
-    "@babel/preset-env": "^7.24.7",
-    "@babel/preset-typescript": "^7.24.7",
     "@types/adm-zip": "^0.5.5",
-    "@types/chai": "^4.3.16",
-    "@types/chai-as-promised": "^7.1.8",
+    "@types/chai": "^5.1.1",
+    "@types/chai-as-promised": "^8.0.0",
     "@types/mocha": "^10.0.7",
     "@types/node": "^20.12.7",
     "@types/sinon": "^17.0.3",
