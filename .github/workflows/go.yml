@@ -28,6 +28,8 @@ jobs:
       - name: Run Go unit tests
         run: go test -test.short -v ./...
         working-directory: src
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
 
       - name: Verify Go modules
         working-directory: src
