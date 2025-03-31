@@ -2,13 +2,13 @@
   "name": "defang",
   "version": "<PLACEHOLDER>",
   "author": "Defang Software Labs Inc.",
-  "description": "CLI for the Defang Opinionated Platform",
+  "description": "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes",
   "license": "MIT",
   "bin": {
     "defang": "bin/cli.js"
   },
   "keywords": [],
-  "homepage": "https://github.com/DefangLabs/defang#readme",
+  "homepage": "https://defang.io",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DefangLabs/defang.git"
