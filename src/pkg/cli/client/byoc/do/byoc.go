@@ -597,12 +597,19 @@ func (s *subscribeStream) Receive() bool {
 			State:  phaseToState(deployment.Phase),
 		}
 	}
+
 	select {
-	case s.msg = <-s.queue:
-	default:
+	case resp, ok := <-s.queue:
+		if !ok || resp == nil {
+			return false
+		}
+		s.msg = resp
+		return true
+	case <-s.ctx.Done():
+		s.err = s.ctx.Err()
 		s.msg = nil
+		return false
 	}
-	return err == nil
 }
 
 func (s *subscribeStream) Msg() *defangv1.SubscribeResponse {

@@ -26,6 +26,13 @@ func (e ComposeError) Unwrap() error {
 	return e.error
 }
 
+type errDeploymentCompleted struct {
+}
+
+func (e errDeploymentCompleted) Error() string {
+	return "deployment completed"
+}
+
 // ComposeUp validates a compose project and uploads the services using the client
 func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
 	if DoDryRun {
@@ -158,7 +165,7 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 	}
 
 	err := Tail(ctx, provider, project.Name, tailOptions)
-	if err != nil {
+	if err != nil && !errors.Is(err, errDeploymentCompleted{}) {
 		term.Debug("Tail stopped with", err)
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -202,19 +209,32 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		defer cancelTimeout()
 	}
 
-	var deploymentStatusCh = make(chan error, 2)
+	var errCh = make(chan error, 2)
+	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+
 	wg := &sync.WaitGroup{}
-	startDeploymentWatchers(ctx, provider, project, deploy, cancelTail, deploymentStatusCh, wg)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		// block on waiting for services to reach target state
+		startServiceMonitoring(ctx, provider, targetState, project, deploy, unmanagedServices, errCh, cancelTail)
+	}()
+
+	go func() {
+		defer wg.Done()
+		// block on waiting for cdTask to complete
+		startCdTaskMonitoring(ctx, provider, errCh, cancelTail)
+	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
 	TailUp(ctx, provider, project, deploy, tailOptions)
 	wg.Wait()
 
-	close(deploymentStatusCh)
-	for errDeployment := range deploymentStatusCh {
-		var errDeploymentCompleted = errors.New("deployment succeeded")
-		if !errors.Is(errDeployment, errDeploymentCompleted) && !(strings.Contains(errDeployment.Error(), "EOF")) {
+	close(errCh)
+	for errDeployment := range errCh {
+		if !errors.Is(errDeployment, errDeploymentCompleted{}) && !(strings.Contains(errDeployment.Error(), "EOF")) {
 			return errDeployment
 		}
 	}
@@ -222,45 +242,33 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	return nil
 }
 
-func startDeploymentWatchers(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, cancelTail context.CancelCauseFunc, deploymentStatusCh chan error, wg *sync.WaitGroup) {
-	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
-	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+func startCdTaskMonitoring(ctx context.Context, provider client.Provider, errCh chan error, cancelTail context.CancelCauseFunc) {
+	err := WaitForCdTaskExit(ctx, provider)
+	errCh <- err
+	var errDeploymentFailed pkg.ErrDeploymentFailed
+	if errors.As(err, &errDeploymentFailed) {
+		cancelTail(err)
+	}
+}
 
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-
-		// block on waiting for services to reach target state
-		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
-			var errDeploymentFailed pkg.ErrDeploymentFailed
-			if errors.As(err, &errDeploymentFailed) {
-				deploymentStatusCh <- err
-				cancelTail(err)
-			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
-			}
-		} else {
-			for _, service := range deploy.Services {
-				service.State = targetState
-			}
-
-			var errDeploymentCompleted = errors.New("deployment succeeded")
-			deploymentStatusCh <- errDeploymentCompleted
-			cancelTail(errDeploymentCompleted)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		// block on waiting for cdTask to complete
-		err := WaitForCdTaskExit(ctx, provider)
-		deploymentStatusCh <- err
+func startServiceMonitoring(ctx context.Context, provider client.Provider, targetState defangv1.ServiceState, project *compose.Project, deploy *defangv1.DeployResponse, unmanagedServices []string, errCh chan error, cancelTail context.CancelCauseFunc) {
+	if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
 		var errDeploymentFailed pkg.ErrDeploymentFailed
 		if errors.As(err, &errDeploymentFailed) {
+			errCh <- err
 			cancelTail(err)
+		} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+			term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
 		}
-	}()
+	} else {
+		for _, service := range deploy.Services {
+			service.State = targetState
+		}
+
+		var errDeployCompleted = errDeploymentCompleted{}
+		errCh <- errDeployCompleted
+		cancelTail(errDeployCompleted)
+	}
 }
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
