@@ -5,7 +5,7 @@ services:
       API_KEY: 50m34p1k3y
       AWS_CLIENT_ID: AROA1234567890ABCDEF
       GH_PAT: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890
-      HIGH_ENTROPY_STRING: 1234567890abcdef
+      HIGH_ENTROPY_STRING: VEfk5vO0Q53VkK_uicor
       MY_URL: https://user:p455w0rd@example.com
       NOT_SENSITIVE: notsensitive
     image: alpine
