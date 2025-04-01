@@ -5,6 +5,6 @@ services:
       - API_KEY=50m34p1k3y # keyword detector
       - AWS_CLIENT_ID=AROA1234567890ABCDEF # aws_client_id detector
       - GH_PAT=ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890 # github detector
-      - HIGH_ENTROPY_STRING=1234567890abcdef # high_entropy_string detector
+      - HIGH_ENTROPY_STRING=VEfk5vO0Q53VkK_uicor # high_entropy_string detector
       - MY_URL=https://user:p455w0rd@example.com # url_password detector
       - NOT_SENSITIVE=notsensitive
