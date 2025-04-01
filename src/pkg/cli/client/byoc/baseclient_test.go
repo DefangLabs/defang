@@ -198,9 +198,10 @@ func TestGetProjectDomain(t *testing.T) {
 		{"test-project", "test-zone", "test-tenant", TestProjectBackendWithoutStack{}, "test-project.test-zone"},
 		{"test-project", "test-zone", "test-tenant", TestProjectBackendWithStack{stack: "test-stack"}, "test-stack.test-project.test-zone"},
 		{"project-is-tenant-name", "test-zone", "project-is-tenant-name", TestProjectBackendWithoutStack{}, "test-zone"},
-		{"project-is-tenant-name", "test-zone", "project-is-tenant-name", TestProjectBackendWithStack{stack: "test-stack"}, "test-zone"}, // Stack is ignored when project name is the same as tenant -- Is that correct?
+		{"project-is-tenant-name", "test-zone", "project-is-tenant-name", TestProjectBackendWithStack{stack: "test-stack"}, "test-stack.test-zone"},
 		{"Test.Project", "tesT.zonE", "test-tenant", TestProjectBackendWithoutStack{}, "test-project.test.zone"},
 		{"Test.Project", "tesT.zonE", "test-tenant", TestProjectBackendWithStack{stack: "test-stack"}, "test-stack.test-project.test.zone"},
+		{"test-project", "test-zone", "test-tenant", TestProjectBackendWithStack{stack: "tEst.sTack"}, "test-stack.test-project.test-zone"},
 	}
 
 	for _, tt := range tests {
