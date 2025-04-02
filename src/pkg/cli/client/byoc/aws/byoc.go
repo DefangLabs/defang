@@ -441,7 +441,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 
-	if term.DoDebug() {
+	if term.DoDebug() || os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
