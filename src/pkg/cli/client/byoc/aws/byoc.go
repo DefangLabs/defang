@@ -464,6 +464,10 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		if err := byoc.DebugPulumi(ctx, debugEnv, cmd.cmd...); err != nil {
 			return nil, err
 		}
+	} else {
+		if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+			return nil, errors.New("DEFANG_PULUMI_DIR is only evaluated with --debug")
+		}
 	}
 	return b.driver.Run(ctx, env, cmd.cmd...)
 }
