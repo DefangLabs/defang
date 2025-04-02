@@ -154,8 +154,8 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 }
 
 func TailUp(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, tailOptions TailOptions) error {
-	if tailOptions.Etag == "" {
-		tailOptions.Etag = deploy.Etag
+	if tailOptions.Deployment == "" {
+		tailOptions.Deployment = deploy.Etag
 	}
 	if tailOptions.Since.IsZero() {
 		tailOptions.Since = time.Now()
@@ -273,11 +273,11 @@ func startServiceMonitoring(ctx context.Context, provider client.Provider, targe
 
 func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
 	return TailOptions{
-		Etag:    deploy.Etag,
-		Since:   since,
-		Raw:     false,
-		Verbose: verbose,
-		LogType: logs.LogTypeAll,
+		Deployment: deploy.Etag,
+		Since:      since,
+		Raw:        false,
+		Verbose:    verbose,
+		LogType:    logs.LogTypeAll,
 	}
 }
 

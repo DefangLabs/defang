@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"context"
 	"slices"
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -27,9 +26,9 @@ func gpuDeviceCount(service *composeTypes.ServiceConfig) int {
 	return count
 }
 
-func GetNumOfGPUs(ctx context.Context, project *composeTypes.Project) int {
+func GetNumOfGPUs(services composeTypes.Services) int {
 	numGPUs := 0
-	for _, service := range project.Services {
+	for _, service := range services {
 		numGPUs += gpuDeviceCount(&service)
 	}
 	return numGPUs

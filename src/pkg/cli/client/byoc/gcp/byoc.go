@@ -444,7 +444,6 @@ func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, comma
 	}
 
 	etag := pkg.RandomID()
-
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err

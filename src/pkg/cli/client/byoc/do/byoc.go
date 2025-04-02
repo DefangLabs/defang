@@ -146,21 +146,9 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}
 
 	etag := pkg.RandomID()
-
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
-	}
-
-	// Ensure all service endpoints are unique
-	endpoints := make(map[string]bool)
-	for _, serviceInfo := range serviceInfos {
-		for _, endpoint := range serviceInfo.Endpoints {
-			if endpoints[endpoint] {
-				return nil, fmt.Errorf("duplicate endpoint: %s", endpoint) // CodeInvalidArgument
-			}
-			endpoints[endpoint] = true
-		}
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{

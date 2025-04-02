@@ -7,7 +7,7 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-tLjXqnA8zkLtJrchO/FpIjimtC5YzW/0f7mL6RJLnSQ=";
+  vendorHash = "sha256-Q2dwaHlxzbJBMTuIKiLmJNdT0LfoHgmTOHprFTK3BTc=";
 
   subPackages = [ "cmd/cli" ];
 
@@ -29,7 +29,7 @@ buildGoModule {
   '';
 
   meta = with lib; {
-    description = "Command-line interface for the Defang Opinionated Platform";
+    description = "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes";
     homepage = "https://defang.io/";
     license = licenses.mit;
     maintainers = with maintainers; [ lionello ];

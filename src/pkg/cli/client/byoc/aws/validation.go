@@ -25,7 +25,7 @@ var ErrAWSNoConnection = errors.New("no connect to AWS service quotas")
 var ErrGPUQuotaZero = errors.New("no GPUs enabled. To resolve see https://docs.defang.io/docs/tutorials/deploy-with-gpu")
 var ErrNoQuotasReceived = errors.New("no service quotas received")
 
-func NewServiceQuotasClient(ctx context.Context, cfg aws.Config) *servicequotas.Client {
+func NewServiceQuotasClient(cfg aws.Config) *servicequotas.Client {
 	return servicequotas.NewFromConfig(cfg)
 }
 
@@ -69,12 +69,11 @@ func hasGPUQuota(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func ValidateGPUResources(ctx context.Context, project *composeTypes.Project) error {
+func validateGPUResources(ctx context.Context, project *composeTypes.Project) error {
 	// return after checking if there are actually non-zero GPUs requested
 	gpusAvailable, quotaErr := hasGPUQuota(ctx)
 
-	gpuCount := compose.GetNumOfGPUs(ctx, project)
-
+	gpuCount := compose.GetNumOfGPUs(project.Services)
 	if gpuCount == 0 {
 		return nil
 	}

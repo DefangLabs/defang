@@ -213,6 +213,7 @@ message CanIUseResponse {
   reserved 1;
   string cd_image = 2;
   bool gpu = 3;
+  bool allow_scaling = 4;
 }
 
 message DeployRequest {
@@ -244,7 +245,6 @@ message GenerateFilesRequest {
   bool agree_tos = 3;
   bool training_opt_out = 4; // only valid for Pro users
   string model_id = 5; // only valid for Pro users
-
 }
 
 message File {
@@ -307,8 +307,7 @@ message ServiceInfo {
   ServiceState state = 15; // enumerated status of the service
   string domainname = 16;  // domain name for the service
   string lb_dns_name = 17; // fully qualified domain name for the load-balancer
-
-  // bool is_function = 5; // true if service is a function
+  bool allow_scaling = 18; // true if service is allowed to autoscale
 }
 
 message Secrets {

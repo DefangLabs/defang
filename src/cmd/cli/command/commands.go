@@ -60,14 +60,6 @@ func getCluster() string {
 	return org + "@" + cluster
 }
 
-const TIER_ERROR_MESSAGE = "current subscription tier does not allow this action: "
-
-type ErrNoPermission string
-
-func (e ErrNoPermission) Error() string {
-	return TIER_ERROR_MESSAGE + string(e)
-}
-
 func prettyError(err error) error {
 	// To avoid printing the internal gRPC error code
 	var cerr *connect.Error
@@ -254,6 +246,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
+	debugCmd.Flags().MarkHidden("etag")
+	debugCmd.Flags().String("deployment", "", "deployment ID of the service")
 	debugCmd.Flags().String("since", "", "start time for logs (RFC3339 format)")
 	debugCmd.Flags().String("until", "", "end time for logs (RFC3339 format)")
 	debugCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for debugging (Pro users only)")
@@ -865,8 +859,13 @@ var debugCmd = &cobra.Command{
 	Short:       "Debug a build, deployment, or service failure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		etag, _ := cmd.Flags().GetString("etag")
+		deployment, _ := cmd.Flags().GetString("deployment")
 		since, _ := cmd.Flags().GetString("since")
 		until, _ := cmd.Flags().GetString("until")
+
+		if etag != "" && deployment == "" {
+			deployment = etag
+		}
 
 		loader := configureLoader(cmd)
 		provider, err := getProvider(cmd.Context(), loader)
@@ -890,7 +889,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		debugConfig := cli.DebugConfig{
-			Etag:           etag,
+			Deployment:     deployment,
 			FailedServices: args,
 			ModelId:        modelId,
 			Project:        project,
@@ -930,7 +929,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		since := time.Now()
-		etag, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
+		deployment, err := cli.Delete(cmd.Context(), projectName, client, provider, names...)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
@@ -940,20 +939,20 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		term.Info("Deleted service", names, "with deployment ID", etag)
+		term.Info("Deleted service", names, "with deployment ID", deployment)
 
 		if !tail {
-			printDefangHint("To track the update, do:", "tail --etag "+etag)
+			printDefangHint("To track the update, do:", "tail --deployment "+deployment)
 			return nil
 		}
 
 		term.Info("Tailing logs for update; press Ctrl+C to detach:")
 
 		tailOptions := cli.TailOptions{
-			Etag:    etag,
-			LogType: logs.LogTypeAll,
-			Since:   since,
-			Verbose: verbose,
+			Deployment: deployment,
+			LogType:    logs.LogTypeAll,
+			Since:      since,
+			Verbose:    verbose,
 		}
 		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 	},
@@ -1216,10 +1215,7 @@ func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectNa
 	if err != nil {
 		return err
 	}
-	// Allow local override of the CD image
-	cdImage := pkg.Getenv("DEFANG_CD_IMAGE", resp.CdImage)
-	provider.SetCDImage(cdImage)
-
+	provider.SetCanIUseConfig(resp)
 	return nil
 }
 

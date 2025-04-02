@@ -46,7 +46,7 @@ type TailDetectStopEventFunc func(services []string, host string, eventlog strin
 
 type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
-	Etag               types.ETag
+	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
 	Raw                bool
@@ -64,8 +64,8 @@ func (to TailOptions) String() string {
 	} else {
 		cmd = "logs" + cmd + " --until=" + to.Until.UTC().Format(time.RFC3339Nano)
 	}
-	if to.Etag != "" {
-		cmd += " --etag=" + to.Etag
+	if to.Deployment != "" {
+		cmd += " --deployment=" + to.Deployment
 	}
 	if to.Raw {
 		cmd += " --raw"
@@ -198,30 +198,31 @@ func isTransientError(err error) bool {
 }
 
 func tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
-	var since, until *timestamppb.Timestamp
+	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
-		since = timestamppb.New(options.Since)
+		sinceTs = timestamppb.New(options.Since)
 	} else {
 		options.Since = time.Now() // this is used to continue from the last timestamp
 	}
 	if pkg.IsValidTime(options.Until) {
-		until = timestamppb.New(options.Until)
+		until := options.Until.Add(time.Millisecond) // add a millisecond to make it inclusive
+		untilTs = timestamppb.New(until)
 		// If the user specifies a deadline in the future, we should respect it
-		if options.Until.After(time.Now()) {
+		if until.After(time.Now()) {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithDeadline(ctx, options.Until)
+			ctx, cancel = context.WithDeadline(ctx, until)
 			defer cancel()
 		}
 	}
 
 	tailRequest := &defangv1.TailRequest{
-		Etag:     options.Etag,
+		Etag:     options.Deployment,
 		LogType:  uint32(options.LogType),
 		Pattern:  options.Filter,
 		Project:  projectName,
 		Services: options.Services,
-		Since:    since, // this is also used to continue from the last timestamp
-		Until:    until,
+		Since:    sinceTs, // this is also used to continue from the last timestamp
+		Until:    untilTs,
 	}
 
 	serverStream, err := provider.QueryLogs(ctx, tailRequest)
@@ -378,7 +379,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 			for i, line := range strings.Split(trimmed, "\n") {
 				if i == 0 {
 					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
-					if options.Etag == "" {
+					if options.Deployment == "" {
 						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
 						prefixLen += l
 					}

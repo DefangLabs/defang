@@ -23,7 +23,7 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		return err
 	}
 
-	return tail(ctx, p, projectName, TailOptions{Etag: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
+	return tail(ctx, p, projectName, TailOptions{Deployment: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {

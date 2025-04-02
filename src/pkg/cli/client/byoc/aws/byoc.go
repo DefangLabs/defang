@@ -214,26 +214,15 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		return nil, err
 	}
 
-	etag := pkg.RandomID()
-	quotaClient = NewServiceQuotasClient(ctx, cfg)
-	if err = ValidateGPUResources(ctx, project); err != nil {
+	quotaClient = NewServiceQuotasClient(cfg)
+	if err = validateGPUResources(ctx, project); err != nil {
 		return nil, err
 	}
 
+	etag := pkg.RandomID()
 	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
-	}
-
-	// Ensure all service endpoints are unique
-	endpoints := make(map[string]bool)
-	for _, serviceInfo := range serviceInfos {
-		for _, endpoint := range serviceInfo.Endpoints {
-			if endpoints[endpoint] {
-				return nil, fmt.Errorf("duplicate endpoint: %s", endpoint) // CodeInvalidArgument
-			}
-			endpoints[endpoint] = true
-		}
 	}
 
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
@@ -456,7 +445,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 	}
 	env["DEFANG_MODE"] = strings.ToLower(cmd.mode.String())
 
-	if term.DoDebug() {
+	if term.DoDebug() || os.Getenv("DEFANG_PULUMI_DIR") != "" {
 		// Convert the environment to a human-readable array of KEY=VALUE strings for debugging
 		debugEnv := []string{"AWS_REGION=" + b.driver.Region.String()}
 		if awsProfile := os.Getenv("AWS_PROFILE"); awsProfile != "" {
