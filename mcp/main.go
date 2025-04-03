@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -19,19 +19,63 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
 	host           = "fabric-prod1.defang.dev:443"
 	gitHubClientId = "7b41848ca116eac4b125" // Default GitHub OAuth app ID
+	logFilePath    = "logs/defang_mcp.log"
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-	Level: slog.LevelInfo,
-}))
+// Global logger
+var logger *zap.Logger
 
-// Global token for use across resources
-var globalToken string
+// Sugar logger for more convenient logging
+var sugar *zap.SugaredLogger
+
+// Initialize logger
+func initLogger() {
+	// Create logs directory if it doesn't exist
+	if err := os.MkdirAll("logs", 0755); err != nil {
+		fmt.Printf("Failed to create logs directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Configure zap logger
+	config := zap.NewProductionConfig()
+	config.OutputPaths = []string{"stdout", logFilePath}
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	// Disable buffering for real-time updates
+	config.DisableStacktrace = false
+	config.DisableCaller = false
+	config.OutputPaths = []string{"stdout", logFilePath}
+	config.ErrorOutputPaths = []string{"stderr", logFilePath}
+
+	// Create logger with custom options for real-time logging
+	var err error
+	logger, err = config.Build(zap.WithCaller(true))
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create sugar logger
+	sugar = logger.Sugar()
+
+	// Set up periodic flushing of logs
+	go func() {
+		for {
+			time.Sleep(100 * time.Millisecond)
+			logger.Sync()
+		}
+	}()
+
+	// Note: We'll call logger.Sync() in the main function
+}
 
 func getTokenFile(fabric string) string {
 	if host, _, _ := net.SplitHostPort(fabric); host != "" {
@@ -60,38 +104,57 @@ func getExistingToken(fabric string) string {
 func saveToken(fabric, token string) error {
 	tokenFile := getTokenFile(fabric)
 
+	sugar.Infow("Saving token to file", "file", tokenFile)
+
 	// Create state directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(tokenFile), 0700); err != nil {
+		sugar.Errorw("Failed to create state directory", "error", err)
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
 	// Write token to file
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
+		sugar.Errorw("Failed to save token", "error", err)
 		return fmt.Errorf("failed to save token: %w", err)
 	}
 
+	sugar.Info("Token saved successfully")
 	return nil
 }
 
 func validateToken(ctx context.Context, token string) bool {
 	if token == "" {
+		sugar.Debug("Empty token provided for validation")
 		return false
 	}
+
+	sugar.Debug("Validating token")
 
 	// Create a temporary client to validate token
 	tempClient := client.NewGrpcClient(host, token, types.TenantName(""))
 
 	// Try to get user info
 	_, err := tempClient.WhoAmI(ctx)
-	return err == nil
+	if err != nil {
+		sugar.Debugw("Token validation failed", "error", err)
+		return false
+	}
+
+	sugar.Debug("Token validated successfully")
+	return true
 }
 
 func login(ctx context.Context, grpcClient client.GrpcClient) (string, error) {
+	sugar.Info("Starting GitHub authentication flow")
+
 	// Start GitHub auth flow
 	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId)
 	if err != nil {
+		sugar.Errorw("Failed to start auth flow", "error", err)
 		return "", fmt.Errorf("failed to start auth flow: %w", err)
 	}
+
+	sugar.Info("Successfully obtained GitHub auth code, exchanging for token")
 
 	// Exchange code for token with unrestricted access
 	resp, err := grpcClient.Token(ctx, &defangv1.TokenRequest{
@@ -101,19 +164,30 @@ func login(ctx context.Context, grpcClient client.GrpcClient) (string, error) {
 		ExpiresIn: uint32(24 * time.Hour.Seconds()),
 	})
 	if err != nil {
+		sugar.Errorw("Failed to exchange code for token", "error", err)
 		return "", fmt.Errorf("failed to exchange code for token: %w", err)
 	}
 
+	sugar.Info("Successfully obtained access token")
 	return resp.AccessToken, nil
 }
 
 func getValidToken(ctx context.Context) (string, error) {
+	sugar.Info("Getting valid token")
+
 	// Try to get existing token
 	token := getExistingToken(host)
 
 	// Validate token if we have one
-	if token != "" && validateToken(ctx, token) {
-		return token, nil
+	if token != "" {
+		sugar.Debug("Found existing token, validating")
+		if validateToken(ctx, token) {
+			sugar.Info("Using existing valid token")
+			return token, nil
+		}
+		sugar.Info("Existing token is invalid, getting new token")
+	} else {
+		sugar.Info("No existing token found, getting new token")
 	}
 
 	// Create a temporary gRPC client for login
@@ -122,148 +196,208 @@ func getValidToken(ctx context.Context) (string, error) {
 	// Get token through GitHub auth flow
 	token, err := login(ctx, tempClient)
 	if err != nil {
+		sugar.Errorw("Failed to login", "error", err)
 		return "", fmt.Errorf("failed to login: %w", err)
 	}
 
 	// Save token to file and environment
 	if err := saveToken(host, token); err != nil {
-		logger.Warn("failed to save token", "error", err)
+		sugar.Warnw("Failed to save token", "error", err)
 	}
 	os.Setenv("DEFANG_ACCESS_TOKEN", token)
+	sugar.Info("Token saved to environment variable")
 
 	return token, nil
 }
 
-type ServicesResponse struct {
-	Error    string                        `json:"error,omitempty"`
-	Services *defangv1.GetServicesResponse `json:"services,omitempty"`
-}
+func getServices(ctx context.Context, token string, composePath string) (*defangv1.GetServicesResponse, error) {
+	sugar.Info("Getting services")
+	sugar.Infow("Using compose path", "path", composePath)
 
-func getServices(ctx context.Context, token string, request *mcp.CallToolRequest) (*defangv1.GetServicesResponse, error) {
-	// Get project directory from request
-	projectDirVal, ok := request.Params.Arguments["project directory"]
-	if !ok {
-		return nil, fmt.Errorf("missing project directory")
-	}
-	projectDir, ok := projectDirVal.(string)
-	if !ok {
-		return nil, fmt.Errorf("project directory must be a string")
+	// Check if the path exists
+	fileInfo, err := os.Stat(composePath)
+	if err != nil {
+		sugar.Errorw("Failed to access compose path", "error", err, "path", composePath)
+		return nil, fmt.Errorf("failed to access compose path %s: %w", composePath, err)
 	}
 
-	// change into directory
-	if err := os.Chdir(projectDir); err != nil {
-		return nil, fmt.Errorf("failed to change directory: %v", err)
+	var configPaths []string
+	if fileInfo.IsDir() {
+		// If it's a directory, look for compose.yaml in that directory
+		composeFilePath := filepath.Join(composePath, "compose.yaml")
+		if _, err := os.Stat(composeFilePath); err != nil {
+			sugar.Errorw("No compose.yaml found in directory", "error", err, "dir", composePath)
+			return nil, fmt.Errorf("no compose.yaml found in directory %s: %w", composePath, err)
+		}
+		configPaths = []string{composeFilePath}
+		sugar.Infow("Found compose.yaml in directory", "path", composeFilePath)
+	} else {
+		// If it's a file, use it directly
+		configPaths = []string{composePath}
 	}
 
-	// Create a loader
-	loader := compose.NewLoader()
+	// Create a loader with explicit config paths
+	loader := compose.NewLoader(compose.WithPath(configPaths...))
 
 	// Get project name from loader
 	projectName, err := loader.LoadProjectName(ctx)
-	if err != nil && strings.Contains(err.Error(), "no compose.yaml file found") {
-		// Return error indicating we need a directory
-		return nil, fmt.Errorf("no compose.yaml found. Please provide a directory path containing compose.yaml")
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to load project name: %v", err)
+	if err != nil {
+		sugar.Errorw("Failed to load project name", "error", err)
+		return nil, fmt.Errorf("failed to load project name: %w", err)
 	}
 
-	// If we got here, we have a project name
+	sugar.Infow("Project name loaded", "project", projectName)
+
 	// Create a gRPC client with token
 	grpcClient := client.NewGrpcClient(host, token, types.TenantName(""))
 
 	// Create a provider using cli.NewProvider
 	provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create provider: %v", err)
+		sugar.Errorw("Failed to create provider", "error", err)
+		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
 
-	logger.Info("Getting services for project", projectName)
+	sugar.Infow("Getting services for project", "project", projectName)
 
+	// First try to get services for the specific project
 	servicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get services: %v", err)
+		sugar.Warnw("Failed to get services for specific project, trying to list all services", "error", err, "project", projectName)
+		
+		// If getting services for the specific project fails, try to get all services
+		allServicesResponse, allErr := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: ""})
+		if allErr != nil {
+			sugar.Errorw("Failed to get all services", "error", allErr)
+			return nil, fmt.Errorf("failed to get services for project %s: %w and failed to get all services: %v", projectName, err, allErr)
+		}
+		
+		sugar.Infow("Retrieved all services", "count", len(allServicesResponse.Services))
+		return allServicesResponse, nil
 	}
 
+	sugar.Infow("Successfully retrieved services for project", "project", projectName, "count", len(servicesResponse.Services))
 	return servicesResponse, nil
 }
 
 func main() {
-	slog.SetDefault(logger)
+	// Initialize logger
+	initLogger()
+	defer logger.Sync()
+
+	sugar.Info("Starting Defang MCP server")
+
+	// Parse flags
+	projectDir := flag.String("C", ".", "Project directory containing compose.yaml")
+	flag.Parse()
+
+	sugar.Infow("Command line flags parsed", "projectDir", *projectDir)
 
 	// Set up context
 	ctx := context.Background()
 
-	// Parse flags (for any other flags that might be added later)
-	flag.Parse()
-
-	// Get valid token for server initialization
-	token, err := getValidToken(ctx)
-	if err != nil {
-		logger.Error("failed to get valid token", "error", err)
+	// Change to project directory
+	sugar.Infow("Changing to project directory", "dir", *projectDir)
+	if err := os.Chdir(*projectDir); err != nil {
+		sugar.Errorw("Failed to change directory", "error", err, "dir", *projectDir)
 		os.Exit(1)
 	}
-	// Set the global token
-	globalToken = token
+
+	// Get valid token
+	sugar.Info("Getting authentication token")
+	token, err := getValidToken(ctx)
+	if err != nil {
+		sugar.Errorw("Failed to get valid token", "error", err)
+		os.Exit(1)
+	}
 
 	// Create a new MCP server
+	sugar.Info("Creating MCP server")
 	s := server.NewMCPServer(
 		"Defang Services",
 		"1.0.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithLogging(),
 	)
-
-	// Create a login tool
-	loginTool := mcp.NewTool("login",
-		mcp.WithDescription("Log in to Defang and obtain an access token"),
-	)
-
-	// Add the login tool handler
-	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		token, err := getValidToken(ctx)
-		if err != nil {
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to log in: %v", err)), nil
-		}
-		// Update the global token
-		globalToken = token
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully logged in to Defang. Token saved.")), nil
-	})
+	sugar.Info("MCP server created successfully")
 
 	// Create a tool for listing services
+	sugar.Info("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang"),
-		mcp.WithString("project directory",
-			mcp.Description("Project directory containing compose.yaml"),
+		mcp.WithString("compose",
+			mcp.Required(),
+			mcp.Description("The server should check in the current working directory if not ask the user to provide a path to the directory containing the compose.yaml file"),
 		),
 	)
+	sugar.Debug("Services tool created")
 
-	// Add the services tool handler
+	// Add the services tool handler - make it non-blocking
+	sugar.Info("Adding services tool handler")
 	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Get project directory from request
-		servicesResp, err := getServices(ctx, globalToken, &request)
-		if err != nil {
-			return mcp.NewToolResultText(err.Error()), nil
+		// Get services
+		sugar.Info("Services tool called - fetching services from Defang")
+
+		composePath, ok := request.Params.Arguments["compose"].(string)
+		if !ok {
+			sugar.Errorw("Compose parameter is missing", "error", errors.New("compose parameter is missing"))
 		}
 
-		// Format output
-		var output strings.Builder
-		fmt.Fprintf(&output, "Number of services: %d\n\n", len(servicesResp.Services))
+		// zap log as well
+		sugar.Info("Compose directory path: ", composePath)
+		fmt.Println("Compose directory path:", composePath)
 
-		for _, service := range servicesResp.Services {
-			fmt.Fprintf(&output, "Service: %s\n", service.Service.Name)
-			fmt.Fprintf(&output, "Deployment: %s\n", service.Etag)
-			fmt.Fprintf(&output, "Public FQDN: %s\n", service.PublicFqdn)
-			fmt.Fprintf(&output, "Private FQDN: %s\n", service.PrivateFqdn)
-			fmt.Fprintf(&output, "Status: %s\n\n", service.Status)
+		// Create a timeout context
+		timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		// Use a goroutine to prevent blocking
+		resultChan := make(chan *defangv1.GetServicesResponse, 1)
+		errChan := make(chan error, 1)
+
+		go func() {
+			sugar.Debug("Starting goroutine to fetch services")
+			// Get services
+			resp, err := getServices(timeoutCtx, token, composePath)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			resultChan <- resp
+		}()
+
+		// Wait for result with a timeout
+		select {
+		case services := <-resultChan:
+			sugar.Infow("Successfully retrieved services", "count", len(services.Services))
+
+			// Format output
+			var output strings.Builder
+			fmt.Fprintf(&output, "Number of services: %d\n\n", len(services.Services))
+
+			for _, service := range services.Services {
+				fmt.Fprintf(&output, "Service: %s\n", service.Service.Name)
+				fmt.Fprintf(&output, "Deployment: %s\n", service.Etag)
+				fmt.Fprintf(&output, "Public FQDN: %s\n", service.PublicFqdn)
+				fmt.Fprintf(&output, "Private FQDN: %s\n", service.PrivateFqdn)
+				fmt.Fprintf(&output, "Status: %s\n\n", service.Status)
+			}
+
+			return mcp.NewToolResultText(output.String()), nil
+		case err := <-errChan:
+			sugar.Errorw("Failed to get services in tool handler", "error", err)
+			return mcp.NewToolResultText(fmt.Sprintf("Failed to get services: %v", err)), nil
+		case <-timeoutCtx.Done():
+			sugar.Warn("Services operation timed out")
+			return mcp.NewToolResultText("Operation timed out. Please try again later."), nil
 		}
-
-		return mcp.NewToolResultText(output.String()), nil
 	})
 
 	// Start the server
-	logger.Info("Starting Defang Services MCP server")
+	sugar.Info("Starting Defang Services MCP server")
 	if err := server.ServeStdio(s); err != nil {
-		logger.Error("server error", "error", err)
+		sugar.Errorw("Server error", "error", err)
 		os.Exit(1)
 	}
+	sugar.Info("Server shutdown")
 }

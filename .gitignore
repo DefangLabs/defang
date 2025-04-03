@@ -9,3 +9,8 @@ node_modules/
 
 *.log
 *.txt
+
+# MCP specific files
+mcp/logs/
+mcp/knowledge_base.json
+
