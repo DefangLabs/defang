@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -408,26 +407,23 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 
 	execution, err := client.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
 	if err != nil {
-		log.Fatal("Failed to get execution:", err)
+		return err
 	}
 
-	isCompleted := false
 	for _, condition := range execution.GetConditions() {
 		if condition.GetType() == "Completed" {
-			isCompleted = condition.GetState() == runpb.Condition_CONDITION_SUCCEEDED ||
-				condition.GetState() == runpb.Condition_CONDITION_FAILED
+			if condition.GetState() == runpb.Condition_CONDITION_SUCCEEDED ||
+				condition.GetState() == runpb.Condition_CONDITION_FAILED {
+				if execution.GetSucceededCount() > 0 { // should be only one CD service
+					return io.EOF
+				} else {
+					return pkg.ErrDeploymentFailed{}
+				}
+			}
 			break
 		}
 	}
-
-	if isCompleted {
-		if execution.GetSucceededCount() > 0 {
-			return io.EOF
-		}
-		return pkg.ErrDeploymentFailed{}
-	} else {
-		return nil // no completed yet
-	}
+	return nil // no completed yet
 }
 
 func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {

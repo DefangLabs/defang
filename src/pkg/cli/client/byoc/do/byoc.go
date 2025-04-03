@@ -207,7 +207,7 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 
 	switch deploymentInfo.GetPhase() {
 	default:
-		return nil
+		return nil // pending
 	case godo.DeploymentPhase_Active:
 		return io.EOF
 	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
@@ -587,10 +587,7 @@ func (s *subscribeStream) Receive() bool {
 	}
 
 	select {
-	case resp, ok := <-s.queue:
-		if !ok || resp == nil {
-			return false
-		}
+	case resp := <-s.queue:
 		s.msg = resp
 		return true
 	case <-s.ctx.Done():

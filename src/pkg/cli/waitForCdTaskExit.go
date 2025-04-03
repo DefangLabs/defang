@@ -14,9 +14,6 @@ func WaitForCdTaskExit(
 ) error {
 	term.Debug("waiting for cdTask to complete.\n") // TODO: don't print in Go-routine
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
