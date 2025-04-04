@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
@@ -28,40 +29,39 @@ func getLogGroupIdentifier(arnOrId string) string {
 func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
-	errCh := make(chan error)
-
-	var eventCh chan LogEvent
-	for _, lgi := range logGroups {
-		es, err := QueryAndTailLogGroup(ctx, lgi, start, end)
-		if err != nil {
-			cancel()
-			return nil, err
-		}
-		newCh := LiveTailStreamToChannel(ctx, es, errCh)
-		eventCh = mergeLogEventChan(eventCh, newCh)
-	}
-
 	e := &eventStream{
 		cancel: cancel,
 		ch:     make(chan types.StartLiveTailResponseStream),
 	}
 
-	go func() {
-		defer close(e.ch)
-		for {
-			select {
-			case event := <-eventCh:
-				e.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-					Value: types.LiveTailSessionUpdate{SessionResults: []types.LiveTailSessionLogEvent{event}},
-				}
-			case err := <-errCh:
-				e.err = err
-				return // defered close of e.ch will unblock the caller to pick up the error
-			case <-ctx.Done():
-				return
-			}
+	// We must close the channel when all log groups are done
+	var wg sync.WaitGroup
+	var err error
+	for _, lgi := range logGroups {
+		var es LiveTailStream
+		es, err = QueryAndTailLogGroup(ctx, lgi, start, end)
+		if err != nil {
+			break // abort if there is any fatal error
 		}
+		wg.Add(1)
+		go func() {
+			defer es.Close()
+			defer wg.Done()
+			// FIXME: this should *merge* the events from all log groups
+			e.err = e.pipeEvents(ctx, es)
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(e.ch)
 	}()
+
+	if err != nil {
+		cancel() // abort any goroutines (caller won't call Close)
+		return nil, err
+	}
+
 	return e, nil
 }
 
