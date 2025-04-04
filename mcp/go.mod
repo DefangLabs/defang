@@ -5,6 +5,7 @@ go 1.23.5
 require (
 	github.com/DefangLabs/defang/src v0.0.0-20250331203354-6fc858622e6f
 	github.com/mark3labs/mcp-go v0.17.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -116,7 +117,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
 	golang.org/x/mod v0.17.0 // indirect
@@ -138,3 +138,5 @@ require (
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/DefangLabs/defang/src => ../src

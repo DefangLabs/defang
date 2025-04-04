@@ -13,4 +13,5 @@ node_modules/
 # MCP specific files
 mcp/logs/
 mcp/knowledge_base.json
-
+mcp/samples_examples.json
+mcp/mcp_server
