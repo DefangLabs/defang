@@ -186,20 +186,20 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 	return nil
 }
 
-func WaitAndTail(tailCtx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
+func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
 	if DoDryRun {
 		// If we are in dry-run mode, we don't need to wait for the deployment to complete
 		return ErrDryRun
 	}
 	if waitTimeout >= 0 {
 		var cancelTimeout context.CancelFunc
-		tailCtx, cancelTimeout = context.WithTimeout(tailCtx, waitTimeout)
+		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
 	}
 
-	tailCtx, cancelTail := context.WithCancelCause(tailCtx)
+	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
-	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(tailCtx)
+	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
 	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
 
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
@@ -217,23 +217,25 @@ func WaitAndTail(tailCtx context.Context, project *compose.Project, client clien
 	go func() {
 		defer wg.Done()
 		// block on waiting for cdTask to complete
-		if err := WaitForCdTaskExit(tailCtx, provider); err != nil && !errors.Is(err, io.EOF) {
+		if err := WaitForCdTaskExit(ctx, provider); err != nil && !errors.Is(err, io.EOF) {
 			cdErr = err
+			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
 		}
 	}()
 
 	go func() {
 		wg.Wait()
+		// a delay before cancelling tail to make sure we get last status messages
 		time.Sleep(2 * time.Second)
 		cancelTail(nil) // cancel the tail when both goroutines are done
 	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
-	TailUp(tailCtx, provider, project, deploy, tailOptions)
+	tailErr := TailUp(ctx, provider, project, deploy, tailOptions)
 
-	if err := errors.Join(cdErr, svcErr); err != nil {
+	if err := errors.Join(cdErr, svcErr, tailErr); err != nil {
 		return err
 	}
 

@@ -696,16 +696,11 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var taskArn ecs.TaskArn
 	var tailStream ecs.LiveTailStream
-	var stopWhenCDTaskDone bool
 
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		tailStream, err = b.driver.TailTaskID(ctx, etag)
-		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debugf("Tailing task %s", *taskArn)
 		etag = "" // no need to filter by etag
-		stopWhenCDTaskDone = true
 	} else {
 		var service string
 		if len(req.Services) == 1 {
@@ -719,28 +714,9 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			end = req.Until.AsTime()
 		}
 		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
-		taskArn = b.cdTaskArn
-		stopWhenCDTaskDone = false
 	}
 	if err != nil {
 		return nil, AnnotateAwsError(err)
-	}
-	if taskArn != nil {
-		// When we have a CD task, override the context so we can cancel the tailing when the CD task is done
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
-				isTaskFailure := errors.As(err, &ecs.TaskFailure{})
-				if stopWhenCDTaskDone || isTaskFailure {
-					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
-					if isTaskFailure {
-						err = pkg.ErrDeploymentFailed{Message: err.Error()}
-					}
-					cancel(err)
-				}
-			}
-		}()
 	}
 
 	return newByocServerStream(ctx, tailStream, etag, req.GetServices(), b), nil
