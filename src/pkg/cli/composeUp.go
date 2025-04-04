@@ -170,10 +170,10 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 
 		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
 		if errors.Is(context.Cause(ctx), context.Canceled) {
-			// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
-			term.Warn("Deployment is not finished. Service(s) might not be running.")
+			// Tail was canceled either by user or deployment monitors
 			return err
 		}
+
 		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
 			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
@@ -233,7 +233,10 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
-	tailErr := TailUp(ctx, provider, project, deploy, tailOptions)
+	var tailErr error
+	if err := TailUp(ctx, provider, project, deploy, tailOptions); err != nil && !errors.Is(err, context.Canceled) {
+		tailErr = err
+	}
 
 	if err := errors.Join(cdErr, svcErr, tailErr); err != nil {
 		return err
