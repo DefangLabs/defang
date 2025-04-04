@@ -416,9 +416,16 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 		return nil
 	} else {
 		// cd is done
+		var msgs []string
 		var failedTasks = execution.GetFailedCount()
 		if failedTasks > 0 {
-			return pkg.ErrDeploymentFailed{Message: "GCP CD Execution failed"}
+			for _, condition := range execution.GetConditions() {
+				if condition.GetType() == "Completed" && condition.GetMessage() != "" {
+					msgs = append(msgs, condition.GetMessage())
+				}
+			}
+
+			return pkg.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
 		}
 
 		// completed successfully
