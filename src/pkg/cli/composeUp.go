@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"sync"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -23,6 +24,8 @@ type ComposeError struct {
 func (e ComposeError) Unwrap() error {
 	return e.error
 }
+
+var errMonitoringDone = errors.New("monitoring done")
 
 // ComposeUp validates a compose project and uploads the services using the client
 func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
@@ -167,12 +170,16 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 			err = context.Cause(ctx)
 		}
 
+		if errors.Is(context.Cause(ctx), errMonitoringDone) {
+			return nil // the monitoring stopped the tail, it will log reason
+		}
+
 		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
 		if errors.Is(context.Cause(ctx), context.Canceled) {
-			// Tail was canceled by the user before deployment completion/failure; show a warning and exit with an error
 			term.Warn("Deployment is not finished. Service(s) might not be running.")
 			return err
 		}
+
 		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
 			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
@@ -186,45 +193,63 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 }
 
 func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
-	ctx, cancelTail := context.WithCancelCause(ctx)
-	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
-
+	if DoDryRun {
+		// If we are in dry-run mode, we don't need to wait for the deployment to complete
+		return ErrDryRun
+	}
 	if waitTimeout >= 0 {
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
 	}
 
-	errCompleted := errors.New("deployment succeeded") // tail canceled because of deployment completion
+	ctx, cancelTail := context.WithCancelCause(ctx)
+	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
+	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
 
 	const targetState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
-	go func() {
-		if err := WaitServiceState(ctx, provider, targetState, project.Name, deploy.Etag, unmanagedServices); err != nil {
-			var errDeploymentFailed pkg.ErrDeploymentFailed
-			if errors.As(err, &errDeploymentFailed) {
-				cancelTail(err)
-			} else if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-				term.Warnf("error waiting for deployment completion: %v", err) // TODO: don't print in Go-routine
-			}
-		} else {
-			for _, service := range deploy.Services {
-				service.State = targetState
-			}
 
-			cancelTail(errCompleted)
+	var cdErr, svcErr error
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		// block on waiting for services to reach target state
+		svcErr = WaitServiceState(svcStatusCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices)
+	}()
+
+	go func() {
+		defer wg.Done()
+		// block on waiting for cdTask to complete
+		if err := WaitForCdTaskExit(ctx, provider); err != nil && !errors.Is(err, io.EOF) {
+			cdErr = err
+			// When CD fails, stop WaitServiceState
+			cancelSvcStatus(cdErr)
 		}
+	}()
+
+	go func() {
+		wg.Wait()
+		// a delay before cancelling tail to make sure we get last status messages
+		time.Sleep(2 * time.Second)
+		cancelTail(errMonitoringDone) // cancel the tail when both goroutines are done
 	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
-	err := TailUp(ctx, provider, project, deploy, tailOptions)
-	var errDeploymentFailed pkg.ErrDeploymentFailed
-	if errors.As(context.Cause(ctx), &errDeploymentFailed) {
-		return errDeploymentFailed
+	var tailErr error
+	if err := TailUp(ctx, provider, project, deploy, tailOptions); err != nil && !errors.Is(err, context.Canceled) {
+		tailErr = err
 	}
-	if !errors.Is(context.Cause(ctx), errCompleted) {
+
+	if err := errors.Join(cdErr, svcErr, tailErr); err != nil {
 		return err
+	}
+
+	for _, service := range deploy.Services {
+		service.State = targetState
 	}
 
 	return nil

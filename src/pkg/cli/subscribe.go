@@ -22,10 +22,6 @@ func WaitServiceState(
 ) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
-	if DoDryRun {
-		return ErrDryRun
-	}
-
 	if len(services) == 0 {
 		return ErrNothingToMonitor
 	}
