@@ -25,6 +25,8 @@ func (e ComposeError) Unwrap() error {
 	return e.error
 }
 
+var errMonitoringDone = errors.New("monitoring done")
+
 // ComposeUp validates a compose project and uploads the services using the client
 func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
 	if DoDryRun {
@@ -168,9 +170,13 @@ func TailUp(ctx context.Context, provider client.Provider, project *compose.Proj
 			err = context.Cause(ctx)
 		}
 
+		if errors.Is(context.Cause(ctx), errMonitoringDone) {
+			return nil // the monitoring stopped the tail, it will log reason
+		}
+
 		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
 		if errors.Is(context.Cause(ctx), context.Canceled) {
-			// Tail was canceled either by user or deployment monitors
+			term.Warn("Deployment is not finished. Service(s) might not be running.")
 			return err
 		}
 
@@ -228,7 +234,7 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 		wg.Wait()
 		// a delay before cancelling tail to make sure we get last status messages
 		time.Sleep(2 * time.Second)
-		cancelTail(nil) // cancel the tail when both goroutines are done
+		cancelTail(errMonitoringDone) // cancel the tail when both goroutines are done
 	}()
 
 	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)

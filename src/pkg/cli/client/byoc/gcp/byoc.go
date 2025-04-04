@@ -410,21 +410,22 @@ func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
 		return err
 	}
 
-	for _, condition := range execution.GetConditions() {
-		if condition.GetType() == "Completed" &&
-			(condition.GetState() == runpb.Condition_CONDITION_SUCCEEDED ||
-				condition.GetState() == runpb.Condition_CONDITION_FAILED) {
-			break
-		}
-		return nil // no completed yet
-	}
-
-	if execution.GetSucceededCount() > 0 { // should be only one CD service
-		return io.EOF
+	var completionTime = execution.GetCompletionTime()
+	if completionTime == nil {
+		// still running
+		return nil
 	} else {
-		return pkg.ErrDeploymentFailed{}
+		// cd is done
+		var failedTasks = execution.GetFailedCount()
+		if failedTasks > 0 {
+			return pkg.ErrDeploymentFailed{Message: "GCP CD Execution failed"}
+		}
+
+		// completed successfully
+		return io.EOF
 	}
 }
+
 func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {
 	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
 	project, err := compose.LoadFromContent(ctx, req.Compose, "")
