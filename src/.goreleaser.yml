@@ -124,7 +124,7 @@ winget:
   - publisher: DefangLabs
     name: Defang
     short_description: The Defang command-line interface (CLI)
-    description: Defang is the easiest way to develop, deploy, and debug cloud applications.
+    description: Develop Anything, Deploy Anywhere.
     copyright: Defang Software Labs Inc.
     url_template: https://s.defang.io/defang_{{ .Version }}_{{ .Os }}_{{ .Arch }}.zip?x-defang-source=winget
     license: MIT
