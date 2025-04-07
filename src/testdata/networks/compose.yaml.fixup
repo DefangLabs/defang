@@ -1,5 +1,21 @@
 {
-  "service1": {
+  "service-default": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null
+    }
+  },
+  "service-internal": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "internal": null
+    }
+  },
+  "service-invalid": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -7,7 +23,24 @@
       "invalid-network-name": {}
     }
   },
-  "service2": {
+  "service-multi": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null,
+      "internal": null
+    }
+  },
+  "service-private": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "private": null
+    }
+  },
+  "service-public": {
     "command": null,
     "entrypoint": null,
     "image": "example",
@@ -15,20 +48,12 @@
       "public": {}
     }
   },
-  "service3": {
+  "service-public-list": {
     "command": null,
     "entrypoint": null,
     "image": "example",
     "networks": {
       "public": null
-    }
-  },
-  "service4": {
-    "command": null,
-    "entrypoint": null,
-    "image": "example",
-    "networks": {
-      "private": null
     }
   }
 }
