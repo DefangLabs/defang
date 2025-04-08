@@ -326,7 +326,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm":
+		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
