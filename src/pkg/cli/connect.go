@@ -47,7 +47,11 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
+		if strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "connection reset by peer") || strings.Contains(err.Error(), "no Grpc-Status trailer") {
+			term.Fatalf("Unable to connect; please check your internet, VPN, or firewall settings and try again.")
+		} else {
+			term.Debug("Unable to validate tenant ID with server:", err)
+		}
 	} else if string(tenantName) != resp.Tenant {
 		if tenantName != types.DEFAULT_TENANT {
 			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
