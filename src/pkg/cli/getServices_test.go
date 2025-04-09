@@ -82,7 +82,7 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := `Service  Deployment  PublicFqdn                 PrivateFqdn  Status
+		expectedOutput := "\x1b[1m\nService  Deployment  PublicFqdn                 PrivateFqdn  Status   \x1b[0m" + `
 foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 `
 

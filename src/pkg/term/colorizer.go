@@ -33,6 +33,7 @@ const (
 	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
 	DebugColor = termenv.ANSIBrightBlack // Gray
 
+	boldColorStr  = termenv.CSI + termenv.BoldSeq + "m"
 	resetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 )
 
@@ -136,7 +137,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	var buf strings.Builder
 	if doColor(w) {
-		fprintc(&buf, doColor(w), c, msg)
+		fprintc(&buf, true, c, msg)
 		msg = buf.String() // this uses the buffer to avoid allocation, so make sure buf is not garbage collected
 	}
 	return w.WriteString(msg)
