@@ -71,7 +71,7 @@ func TestConfigList(t *testing.T) {
 			t.Fatalf("ConfigList() error = %v", err)
 		}
 
-		expectedOutput := `Name
+		expectedOutput := "\x1b[1m\nName  \x1b[0m" + `
 foo
 bar
 `
