@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -202,7 +201,7 @@ func TestWaitServiceState(t *testing.T) {
 			if err == nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !errors.As(err, &pkg.ErrDeploymentFailed{}) {
+			if !errors.As(err, &client.ErrDeploymentFailed{}) {
 				t.Errorf("Expected ErrDeploymentFailed but got %v", err)
 			}
 		})

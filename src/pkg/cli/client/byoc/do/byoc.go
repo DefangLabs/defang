@@ -211,7 +211,7 @@ func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
 	case godo.DeploymentPhase_Active:
 		return io.EOF
 	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
-		return pkg.ErrDeploymentFailed{}
+		return client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
 	}
 }
 

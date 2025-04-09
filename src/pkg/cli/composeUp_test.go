@@ -13,9 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 type mockDeployProvider struct {
@@ -239,21 +237,23 @@ func TestComposeUpStops(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		cdStatus     error
-		subscribeErr error
-		svcFailed    *defangv1.SubscribeResponse
-		wantError    string
+		name                  string
+		cdStatus              error
+		subscribeErr          error
+		svcFailed             *defangv1.SubscribeResponse
+		wantError             string
+		isErrDeploymentFailed bool
 	}{
-		{"CD task fails", ecs.TaskFailure{Reason: types.TaskStopCodeEssentialContainerExited, Detail: "exit code 1"}, nil, nil, "EssentialContainerExited: exit code 1"},
-		{"CD task done, service1 build fails", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_BUILD_FAILED, Name: "service1"}, `deployment failed for service "service1": `},
-		{"CD task done, service1 fails", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_FAILED, Name: "service1"}, `deployment failed for service "service1": `},
-		{"CD task done, subscription fails", io.EOF, errors.New("subscribe error"), nil, "subscribe error"},
-		{"CD task done, service1 done", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_COMPLETED, Name: "service1"}, ""},
-		{"CD task pending, service1 build fails", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_BUILD_FAILED, Name: "service1"}, "context deadline exceeded\ndeployment failed for service \"service1\": "},
-		{"CD task pending, service1 fails", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_FAILED, Name: "service1"}, "context deadline exceeded\ndeployment failed for service \"service1\": "},
-		{"CD task pending, subscription fails", nil, errors.New("subscribe error"), nil, "context deadline exceeded\nsubscribe error"},
-		{"CD task pending, service1 done", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_COMPLETED, Name: "service1"}, "context deadline exceeded"},
+		{"CD task fails", errors.New("not a deployment failure"), nil, nil, "not a deployment failure", false},
+		{"CD task fails deployment", client.ErrDeploymentFailed{Message: "EssentialContainerExited: exit code 1"}, nil, nil, "deployment failed: EssentialContainerExited: exit code 1", true},
+		{"CD task done, service1 build fails", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_BUILD_FAILED, Name: "service1"}, `deployment failed for service "service1": `, true},
+		{"CD task done, service1 fails", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_FAILED, Name: "service1"}, `deployment failed for service "service1": `, true},
+		{"CD task done, subscription fails", io.EOF, errors.New("subscribe error"), nil, "subscribe error", false},
+		{"CD task done, service1 done", io.EOF, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_COMPLETED, Name: "service1"}, "", false},
+		{"CD task pending, service1 build fails", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_BUILD_FAILED, Name: "service1"}, "context deadline exceeded\ndeployment failed for service \"service1\": ", true},
+		{"CD task pending, service1 fails", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_FAILED, Name: "service1"}, "context deadline exceeded\ndeployment failed for service \"service1\": ", true},
+		{"CD task pending, subscription fails", nil, errors.New("subscribe error"), nil, "context deadline exceeded\nsubscribe error", false},
+		{"CD task pending, service1 done", nil, nil, &defangv1.SubscribeResponse{State: defangv1.ServiceState_DEPLOYMENT_COMPLETED, Name: "service1"}, "context deadline exceeded", false},
 	}
 
 	for _, tt := range tests {
@@ -280,6 +280,10 @@ func TestComposeUpStops(t *testing.T) {
 				}
 			} else if tt.wantError != "" {
 				t.Errorf("expected error: %v, got: nil", tt.wantError)
+			}
+			var errDeploymentFailed client.ErrDeploymentFailed
+			if errors.As(err, &errDeploymentFailed) != tt.isErrDeploymentFailed {
+				t.Errorf("expected ErrDeploymentFailed: %v, got: %v", tt.isErrDeploymentFailed, err)
 			}
 		})
 	}

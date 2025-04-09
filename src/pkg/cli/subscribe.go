@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -79,7 +78,7 @@ func WaitServiceState(
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return pkg.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			return client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
 		serviceStates[msg.Name] = msg.State
 

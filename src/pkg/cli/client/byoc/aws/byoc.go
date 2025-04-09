@@ -187,7 +187,14 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 }
 
 func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
-	return ecs.GetTaskStatus(ctx, b.cdTaskArn)
+	if err := ecs.GetTaskStatus(ctx, b.cdTaskArn); err != nil {
+		// check if the task failed; if so, return the a ErrDeploymentFailed error
+		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
+			return client.ErrDeploymentFailed{Message: taskErr.Error()}
+		}
+		return err
+	}
+	return nil
 }
 
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {

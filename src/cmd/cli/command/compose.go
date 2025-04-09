@@ -149,7 +149,7 @@ func makeComposeUpCmd() *cobra.Command {
 			tailOptions := cli.NewTailOptionsForDeploy(deploy, since, verbose)
 			err = cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				var errDeploymentFailed pkg.ErrDeploymentFailed
+				var errDeploymentFailed cliClient.ErrDeploymentFailed
 				if errors.As(err, &errDeploymentFailed) {
 					// Tail got canceled because of deployment failure: prompt to show the debugger
 					term.Warn(errDeploymentFailed)
@@ -179,9 +179,9 @@ func makeComposeUpCmd() *cobra.Command {
 				return err
 			}
 
-			// for _, service := range deploy.Services {
-			// 	service.State = targetState
-			// }
+			for _, service := range deploy.Services {
+				service.State = cli.TargetServiceState
+			}
 
 			// Print the current service states of the deployment
 			err = printServiceStatesAndEndpoints(deploy.Services)
