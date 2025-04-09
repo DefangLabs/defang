@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -25,10 +24,8 @@ func (e ComposeError) Unwrap() error {
 	return e.error
 }
 
-var errMonitoringDone = errors.New("monitoring done")
-
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, project *compose.Project, fabric client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
 	if DoDryRun {
 		upload = compose.UploadModeIgnore
 	}
@@ -72,7 +69,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 		return nil, project, ErrDryRun
 	}
 
-	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx)
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
@@ -105,7 +102,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 	} else {
 		if delegation != nil && len(delegation.NameServers) > 0 {
 			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
-			_, err = c.DelegateSubdomainZone(ctx, req)
+			_, err = fabric.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
 			}
@@ -122,7 +119,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 			return nil, project, err
 		}
 
-		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 			Deployment: &defangv1.Deployment{
 				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
 				Id:                resp.Etag,
@@ -147,64 +144,19 @@ func ComposeUp(ctx context.Context, project *compose.Project, c client.FabricCli
 	return resp, project, nil
 }
 
-func TailUp(ctx context.Context, provider client.Provider, project *compose.Project, deploy *defangv1.DeployResponse, tailOptions TailOptions) error {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) error {
 	if tailOptions.Deployment == "" {
-		tailOptions.Deployment = deploy.Etag
+		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
-	if tailOptions.Since.IsZero() {
-		tailOptions.Since = time.Now()
-	}
-	if tailOptions.LogType == logs.LogTypeUnspecified {
-		tailOptions.LogType = logs.LogTypeAll
-	}
-
-	err := Tail(ctx, provider, project.Name, tailOptions)
-	if err != nil {
-		term.Debug("Tail stopped with", err)
-
-		if connect.CodeOf(err) == connect.CodePermissionDenied {
-			term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
-			// If tail fails because of missing permission, we wait for the deployment to finish
-			<-ctx.Done()
-			// Get the actual error from the context so we won't print "Error: missing tail permission"
-			err = context.Cause(ctx)
-		}
-
-		if errors.Is(context.Cause(ctx), errMonitoringDone) {
-			return nil // the monitoring stopped the tail, it will log reason
-		}
-
-		// The tail was canceled; check if it was because of deployment failure or explicit cancelation or wait-timeout reached
-		if errors.Is(context.Cause(ctx), context.Canceled) {
-			term.Warn("Deployment is not finished. Service(s) might not be running.")
-			return err
-		}
-
-		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
-			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
-			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
-			return err
-		}
-
-		return err
-	}
-
-	return nil
-}
-
-func WaitAndTail(ctx context.Context, project *compose.Project, client client.FabricClient, provider client.Provider, deploy *defangv1.DeployResponse, waitTimeout time.Duration, since time.Time, verbose bool) error {
-	if DoDryRun {
-		// If we are in dry-run mode, we don't need to wait for the deployment to complete
-		return ErrDryRun
-	}
-	if waitTimeout >= 0 {
+	if waitTimeout > 0 {
 		var cancelTimeout context.CancelFunc
 		ctx, cancelTimeout = context.WithTimeout(ctx, waitTimeout)
 		defer cancelTimeout()
 	}
 
-	ctx, cancelTail := context.WithCancelCause(ctx)
-	defer cancelTail(nil) // to cancel WaitServiceState and clean-up context
+	tailCtx, cancelTail := context.WithCancelCause(context.Background())
+	defer cancelTail(nil) // to cancel tail and clean-up context
+
 	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
 	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
 
@@ -217,52 +169,58 @@ func WaitAndTail(ctx context.Context, project *compose.Project, client client.Fa
 	go func() {
 		defer wg.Done()
 		// block on waiting for services to reach target state
-		svcErr = WaitServiceState(svcStatusCtx, provider, targetState, project.Name, deploy.Etag, unmanagedServices)
+		svcErr = WaitServiceState(svcStatusCtx, provider, targetState, project.Name, tailOptions.Deployment, unmanagedServices)
 	}()
 
 	go func() {
 		defer wg.Done()
 		// block on waiting for cdTask to complete
-		if err := WaitForCdTaskExit(ctx, provider); err != nil && !errors.Is(err, io.EOF) {
+		if err := client.WaitForCdTaskExit(ctx, provider); err != nil {
 			cdErr = err
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
 		}
 	}()
 
+	errMonitoringDone := errors.New("monitoring done") // pseudo error to signal that monitoring is done
+
 	go func() {
 		wg.Wait()
-		// a delay before cancelling tail to make sure we get last status messages
-		time.Sleep(2 * time.Second)
-		cancelTail(errMonitoringDone) // cancel the tail when both goroutines are done
+		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we get last status messages
+		cancelTail(errMonitoringDone)            // cancel the tail when both goroutines are done
 	}()
 
-	tailOptions := NewTailOptionsForDeploy(deploy, since, verbose)
 	// blocking call to tail
 	var tailErr error
-	if err := TailUp(ctx, provider, project, deploy, tailOptions); err != nil && !errors.Is(err, context.Canceled) {
-		tailErr = err
+	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
+		term.Debug("Tail stopped with", err, errors.Unwrap(err))
+
+		if connect.CodeOf(err) == connect.CodePermissionDenied {
+			term.Warn("Unable to tail logs. Waiting for the deployment to finish.")
+			// If tail fails because of missing permission, we wait for the deployment to finish
+			<-tailCtx.Done()
+			// Get the actual error from the context so we won't print "Error: missing tail permission"
+			err = context.Cause(tailCtx)
+		}
+
+		switch {
+		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
+			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
+
+		case errors.Is(context.Cause(ctx), context.Canceled):
+			term.Warn("Deployment is not finished. Service(s) might not be running.")
+
+		case errors.Is(context.Cause(ctx), context.DeadlineExceeded):
+			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
+			term.Warn("Wait-timeout exceeded, detaching from logs. Deployment still in progress.")
+			fallthrough
+
+		default:
+			tailErr = err
+		}
 	}
 
-	if err := errors.Join(cdErr, svcErr, tailErr); err != nil {
-		return err
-	}
-
-	for _, service := range deploy.Services {
-		service.State = targetState
-	}
-
-	return nil
-}
-
-func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
-	return TailOptions{
-		Deployment: deploy.Etag,
-		Since:      since,
-		Raw:        false,
-		Verbose:    verbose,
-		LogType:    logs.LogTypeAll,
-	}
+	return errors.Join(cdErr, svcErr, tailErr)
 }
 
 func isManagedService(service compose.ServiceConfig) bool {

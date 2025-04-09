@@ -13,34 +13,7 @@ import (
 )
 
 // MockSubscribeServerStream mocks the stream response for Subscribe.
-type MockSubscribeServerStream struct {
-	index int
-	Resps []*defangv1.SubscribeResponse
-	Error error
-}
-
-func (*MockSubscribeServerStream) Close() error {
-	return nil
-}
-
-func (m *MockSubscribeServerStream) Receive() bool {
-	if m.index >= len(m.Resps) {
-		return false
-	}
-	m.index++
-	return true
-}
-
-func (m *MockSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
-	if m.index == 0 || m.index > len(m.Resps) {
-		return nil
-	}
-	return m.Resps[m.index-1]
-}
-
-func (m *MockSubscribeServerStream) Err() error {
-	return m.Error
-}
+type MockSubscribeServerStream = client.MockServerStream[defangv1.SubscribeResponse]
 
 // mockSubscribeProvider mocks the provider for Subscribe.
 type mockSubscribeProvider struct {
@@ -276,14 +249,6 @@ func (m *mockSubscribeProviderForReconnectTest) Subscribe(
 	_ *defangv1.SubscribeRequest,
 ) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	return m.stream, nil
-}
-
-func (m *mockSubscribeProviderForReconnectTest) Receive() bool {
-	return false
-}
-
-func (m *mockSubscribeProviderForReconnectTest) Err() bool {
-	return false
 }
 
 func TestWaitServiceStateStreamReceive(t *testing.T) {

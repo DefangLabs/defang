@@ -131,21 +131,21 @@ type Provider interface {
 	BootstrapCommand(context.Context, BootstrapCommandRequest) (types.ETag, error)
 	BootstrapList(context.Context) ([]string, error)
 	CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
-	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
+	DelayBeforeRetry(context.Context) error
 	Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	DeleteConfig(context.Context, *defangv1.Secrets) error
 	Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
-	DelayBeforeRetry(context.Context) error
 	Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error)
-	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
+	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error)
 	GetService(context.Context, *defangv1.GetRequest) (*defangv1.ServiceInfo, error)
 	GetServices(context.Context, *defangv1.GetServicesRequest) (*defangv1.GetServicesResponse, error)
 	ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error)
-	QueryForDebug(context.Context, *defangv1.DebugRequest) error
+	PrepareDomainDelegation(context.Context, PrepareDomainDelegationRequest) (*PrepareDomainDelegationResponse, error)
 	Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error)
-	GetDeploymentStatus(context.Context) error // nil means deployment is pending/running; io.EOF means deployment is done
 	PutConfig(context.Context, *defangv1.PutConfigRequest) error
+	QueryForDebug(context.Context, *defangv1.DebugRequest) error
+	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
 	ServiceDNS(string) string
 	SetCanIUseConfig(*defangv1.CanIUseResponse)

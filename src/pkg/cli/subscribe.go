@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -16,8 +17,8 @@ func WaitServiceState(
 	ctx context.Context,
 	provider client.Provider,
 	targetState defangv1.ServiceState,
-	project string,
-	etag string,
+	projectName string,
+	etag types.ETag,
 	services []string,
 ) error {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
@@ -27,11 +28,19 @@ func WaitServiceState(
 	}
 
 	// Assume "services" are normalized service names
-	subscribeRequest := defangv1.SubscribeRequest{Project: project, Etag: etag, Services: services}
+	subscribeRequest := defangv1.SubscribeRequest{Project: projectName, Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
 		return err
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // to ensure we close the stream and clean-up this context
+
+	go func() {
+		<-ctx.Done()
+		serverStream.Close()
+	}()
 
 	serviceStates := make(map[string]defangv1.ServiceState, len(services))
 	for _, name := range services {
