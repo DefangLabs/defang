@@ -170,6 +170,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
+		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
+		if scaling {
+			if _, ok := provider.(*client.PlaygroundProvider); ok {
+				term.Warnf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+			}
+		}
+
 		// update the concrete service with the fixed up object
 		project.Services[svccfg.Name] = svccfg
 	}

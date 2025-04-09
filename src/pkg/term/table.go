@@ -8,6 +8,10 @@ import (
 )
 
 func Table(slice interface{}, attributes []string) error {
+	return DefaultTerm.Table(slice, attributes...)
+}
+
+func (t *Term) Table(slice interface{}, attributes ...string) error {
 	// Ensure slice is a slice
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {
@@ -15,9 +19,15 @@ func Table(slice interface{}, attributes []string) error {
 	}
 
 	// Create a tabwriter
-	w := tabwriter.NewWriter(DefaultTerm.stdout, 0, 0, 2, ' ', 0)
+	w := tabwriter.NewWriter(t.out, 0, 0, 2, ' ', 0)
 
 	var err error
+
+	var resetBold string
+	if t.StdoutCanColor() {
+		fmt.Fprintln(w, boldColorStr) // must be separate line or it will be counted as part of the 1st header
+		resetBold = resetColorStr
+	}
 
 	// Print headers
 	for _, attr := range attributes {
@@ -26,7 +36,7 @@ func Table(slice interface{}, attributes []string) error {
 			return err
 		}
 	}
-	_, err = fmt.Fprintln(w)
+	_, err = fmt.Fprintln(w, resetBold)
 	if err != nil {
 		return err
 	}
