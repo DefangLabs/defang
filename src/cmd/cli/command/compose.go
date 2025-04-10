@@ -316,6 +316,7 @@ func makeComposeDownCmd() *cobra.Command {
 				}
 				return err
 			}
+
 			term.Info("Done.")
 			return nil
 		},

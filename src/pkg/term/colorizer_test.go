@@ -157,3 +157,85 @@ func TestIsTerminal(t *testing.T) {
 		t.Error("Expected IsTerminal() to return false")
 	}
 }
+func TestWarn(t *testing.T) {
+	tests := []struct {
+		msgs     []string
+		expected []string
+	}{
+		{[]string{"", ""}, []string{" ! \n"}},
+		{[]string{"A", "A"}, []string{" ! A\n"}},
+		{[]string{"A", "B"}, []string{" ! A\n", " ! B\n"}},
+		{[]string{"B", "C", "A"}, []string{" ! A\n", " ! B\n", " ! C\n"}},
+	}
+
+	for i, test := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			defaultTerm := NewTerm(os.Stdin, os.Stdout, os.Stderr)
+			for _, msg := range test.msgs {
+				defaultTerm.Warn(msg)
+			}
+
+			uniqueWarnings := defaultTerm.GetAllWarnings()
+			if len(uniqueWarnings) != len(test.expected) {
+				t.Errorf("Expected %d unique warnings, got %d", len(test.expected), len(uniqueWarnings))
+			}
+			for j, expected := range test.expected {
+				if uniqueWarnings[j] != expected {
+					t.Errorf("Expected %s unique warnings, got %s", expected, uniqueWarnings[j])
+				}
+			}
+		})
+	}
+}
+func TestFlushWarnings(t *testing.T) {
+	tests := []struct {
+		warnings  []string
+		expected  []string
+		expectErr bool
+	}{
+		{
+			warnings:  []string{},
+			expected:  []string{},
+			expectErr: false,
+		},
+		{
+			warnings:  []string{"Warning 1"},
+			expected:  []string{" ! Warning 1\n"},
+			expectErr: false,
+		},
+		{
+			warnings:  []string{"Warning 1", "Warning 2"},
+			expected:  []string{" ! Warning 1\n", " ! Warning 2\n"},
+			expectErr: false,
+		},
+		{
+			warnings:  []string{"Warning 2", "Warning 1", "Warning 1"},
+			expected:  []string{" ! Warning 1\n", " ! Warning 2\n"},
+			expectErr: false,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			term := NewTerm(os.Stdin, &stdout, &stderr)
+
+			for _, warning := range test.warnings {
+				term.Warn(warning)
+			}
+
+			bytesWritten, err := term.FlushWarnings()
+			if (err != nil) != test.expectErr {
+				t.Errorf("FlushWarnings() error = %v, expectErr %v", err, test.expectErr)
+			}
+			bytesInExpected := 0
+			for _, msg := range test.expected {
+				bytesInExpected += len(msg)
+			}
+
+			if bytesInExpected != bytesWritten {
+				t.Errorf("FlushWarnings() expected %d byteWritten, got %d", bytesInExpected, bytesWritten)
+			}
+		})
+	}
+}

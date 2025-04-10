@@ -125,6 +125,8 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
+		term.Info("Some warnings were seen during this command:")
+		term.FlushWarnings()
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
