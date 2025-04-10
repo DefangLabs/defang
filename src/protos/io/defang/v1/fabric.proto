@@ -453,6 +453,7 @@ message ProjectUpdate {
   bytes compose = 4;
   string cd_version = 5;
   DeploymentMode mode = 6;
+  Provider provider = 7;
 }
 
 enum Platform {
