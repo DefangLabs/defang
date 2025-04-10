@@ -9,15 +9,15 @@ services:
     environment:
       - "API_URL=http://Mistral:8000"
       - "SENSITIVE_DATA"
-  bad-service:
+  ingress-service:
     image: "somedb:latest"
     ports:
       - mode: ingress
         target: 5432
-  use-bad-service:
+  use-ingress-service:
     image: "service:latest"
     environment:
-      - "DB_URL=bad-service:5432"
+      - "DB_URL=ingress-service:5432"
   env-in-config:
     image: "service:latest"
     environment:

@@ -23,12 +23,13 @@ type ServiceNameReplacer struct {
 	ingressServiceNameRegex *regexp.Regexp
 }
 
-func NewServiceNameReplacer(provider client.Provider, services composeTypes.Services) ServiceNameReplacer {
+func NewServiceNameReplacer(provider client.Provider, project *composeTypes.Project) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
-	var hostServiceNames []string
-	var ingressServiceNames []string
-	for _, svccfg := range services {
-		if _, public := svccfg.Networks["public"]; !public && slices.ContainsFunc(svccfg.Ports, isHostPort) {
+	var hostServiceNames []string    // services with private "host" ports
+	var ingressServiceNames []string // services with "ingress" ports
+	for _, svccfg := range project.Services {
+		public := false // HACK: we only check the ports for "host" mode and don't care about the networks
+		if !public && slices.ContainsFunc(svccfg.Ports, isHostPort) {
 			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(svccfg.Name))
 		} else if len(svccfg.Ports) > 0 {
 			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(svccfg.Name))
@@ -62,7 +63,7 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	if val != value {
 		term.Warnf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
 	} else if s.ingressServiceNameRegex != nil && s.ingressServiceNameRegex.MatchString(value) {
-		term.Warnf("service %q: service name in the %s %q was not adjusted, only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
+		term.Warnf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
 	}
 
 	return val

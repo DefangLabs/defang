@@ -45,7 +45,11 @@ func setup() ServiceNameReplacer {
 		},
 	}
 
-	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, services)
+	project := &composeTypes.Project{
+		Services: services,
+	}
+
+	return NewServiceNameReplacer(serviceNameReplacerMockProvider{}, project)
 }
 
 func TestServiceNameReplacer(t *testing.T) {

@@ -12,9 +12,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 )
 
-// HACK: Use magic network name "public" to determine if the service is public
-const NetworkPublic = "public"
-
 func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
@@ -31,7 +28,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Ports[i] = port
 		}
 	}
-	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
+	svcNameReplacer := NewServiceNameReplacer(provider, project)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize

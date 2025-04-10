@@ -8,14 +8,6 @@ services:
       - mode: host
         target: 8000
         protocol: tcp
-  bad-service:
-    image: somedb:latest
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 5432
-        protocol: tcp
   env-in-config:
     environment:
       CONFIG1: http://Mistral:8000
@@ -30,6 +22,14 @@ services:
         API_URL: http://Mistral:8000
     networks:
       default: null
+  ingress-service:
+    image: somedb:latest
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        protocol: tcp
   ui:
     environment:
       API_URL: http://Mistral:8000
@@ -37,9 +37,9 @@ services:
     image: ui:latest
     networks:
       default: null
-  use-bad-service:
+  use-ingress-service:
     environment:
-      DB_URL: bad-service:5432
+      DB_URL: ingress-service:5432
     image: service:latest
     networks:
       default: null

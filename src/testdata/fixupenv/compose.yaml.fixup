@@ -14,22 +14,6 @@
       }
     ]
   },
-  "bad-service": {
-    "command": null,
-    "entrypoint": null,
-    "image": "somedb:latest",
-    "networks": {
-      "default": null
-    },
-    "ports": [
-      {
-        "mode": "ingress",
-        "target": 5432,
-        "protocol": "tcp",
-        "app_protocol": "http"
-      }
-    ]
-  },
   "env-in-config": {
     "command": null,
     "entrypoint": null,
@@ -55,6 +39,22 @@
       "default": null
     }
   },
+  "ingress-service": {
+    "command": null,
+    "entrypoint": null,
+    "image": "somedb:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5432,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
   "ui": {
     "command": null,
     "entrypoint": null,
@@ -67,11 +67,11 @@
       "default": null
     }
   },
-  "use-bad-service": {
+  "use-ingress-service": {
     "command": null,
     "entrypoint": null,
     "environment": {
-      "DB_URL": "bad-service:5432"
+      "DB_URL": "ingress-service:5432"
     },
     "image": "service:latest",
     "networks": {
