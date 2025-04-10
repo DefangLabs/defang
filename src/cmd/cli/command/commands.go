@@ -1009,12 +1009,6 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		loader := configureLoader(cmd)
-		_, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
