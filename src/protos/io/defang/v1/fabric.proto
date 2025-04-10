@@ -454,6 +454,8 @@ message ProjectUpdate {
   string cd_version = 5;
   DeploymentMode mode = 6;
   Provider provider = 7;
+  uint32 project_outputs_version = 8;
+  bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
 }
 
 enum Platform {
