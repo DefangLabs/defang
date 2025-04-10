@@ -48,8 +48,6 @@ func newByocServerStream(ctx context.Context, liveUrl string, etag types.ETag) (
 	}
 
 	bs := &byocServerStream{
-		// ctx:    ctx,
-		// cancel: cancel,
 		conn: conn,
 		etag: etag,
 	}

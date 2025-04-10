@@ -1,9 +1,8 @@
 package aws
 
 import (
-	"context"
 	"slices"
-	"sync"
+	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -13,13 +12,11 @@ import (
 type byocSubscribeServerStream struct {
 	services []string
 	etag     types.ETag
-	ctx      context.Context
 
-	ch          chan *defangv1.SubscribeResponse
-	resp        *defangv1.SubscribeResponse
-	err         error
-	closed      bool
-	closingLock sync.Mutex
+	ch     chan *defangv1.SubscribeResponse
+	resp   *defangv1.SubscribeResponse
+	err    error
+	closed atomic.Bool
 }
 
 func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
@@ -37,25 +34,18 @@ func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
 }
 
 func (s *byocSubscribeServerStream) Close() error {
-	s.closingLock.Lock()
-	defer s.closingLock.Unlock()
-	s.closed = true
+	s.closed.Store(true)
 	close(s.ch)
 	return nil
 }
 
 func (s *byocSubscribeServerStream) Receive() bool {
-	select {
-	case resp, ok := <-s.ch:
-		if !ok || resp == nil {
-			return false
-		}
-		s.resp = resp
-		return true
-	case <-s.ctx.Done():
-		s.err = s.ctx.Err()
+	resp, ok := <-s.ch
+	if !ok || resp == nil {
 		return false
 	}
+	s.resp = resp
+	return true
 }
 
 func (s *byocSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
@@ -67,13 +57,8 @@ func (s *byocSubscribeServerStream) Err() error {
 }
 
 func (s *byocSubscribeServerStream) send(resp *defangv1.SubscribeResponse) {
-	s.closingLock.Lock()
-	defer s.closingLock.Unlock()
-	if s.closed {
+	if s.closed.Load() {
 		return
 	}
-	select {
-	case s.ch <- resp:
-	case <-s.ctx.Done():
-	}
+	s.ch <- resp
 }

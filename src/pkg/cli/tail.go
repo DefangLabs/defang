@@ -56,6 +56,16 @@ type TailOptions struct {
 	Verbose            bool
 }
 
+func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
+	return TailOptions{
+		Deployment: deploy.Etag,
+		LogType:    logs.LogTypeAll,
+		Raw:        false,
+		Since:      since,
+		Verbose:    verbose,
+	}
+}
+
 func (to TailOptions) String() string {
 	cmd := " --since=" + to.Since.UTC().Format(time.RFC3339Nano)
 	if to.Until.IsZero() {
@@ -231,7 +241,7 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer cancel() // to ensure we close the stream and clean-up this context
 
 	go func() {
 		<-ctx.Done()

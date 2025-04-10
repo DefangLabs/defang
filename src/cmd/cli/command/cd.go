@@ -3,9 +3,6 @@ package command
 import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/logs"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -194,16 +191,6 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
-		if err != nil {
-			return err
-		}
-
-		tailOptions := cli.TailOptions{
-			Deployment: resp.Etag,
-			Verbose:    verbose,
-			LogType:    logs.LogTypeAll,
-		}
-		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
+		return cli.Preview(cmd.Context(), project, client, provider) // TODO: support --mode #1022
 	},
 }

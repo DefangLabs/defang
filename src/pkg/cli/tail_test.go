@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -89,16 +91,18 @@ func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequ
 	return ss, nil
 }
 
+type mockTailStream = client.MockServerStream[defangv1.TailResponse]
+
 func (m *mockTailProvider) MockTimestamp(timestamp time.Time) *mockTailProvider {
 	return &mockTailProvider{
 		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
-			&client.MockServerStream{
+			&mockTailStream{
 				Resps: []*defangv1.TailResponse{
 					{Entries: []*defangv1.LogEntry{
 						{Timestamp: timestamppb.New(timestamp)},
 					}},
 				},
-			}, &client.MockServerStream{Error: io.EOF},
+			}, &mockTailStream{Error: io.EOF},
 		},
 	}
 }
@@ -117,7 +121,7 @@ func TestTail(t *testing.T) {
 
 	p := &mockTailProvider{
 		ServerStreams: []client.ServerStream[defangv1.TailResponse]{
-			&client.MockServerStream{
+			&mockTailStream{
 				Resps: []*defangv1.TailResponse{
 					{Service: "service1", Etag: "SOMEETAG", Host: "SOMEHOST", Entries: []*defangv1.LogEntry{
 						{Message: "e1msg1", Timestamp: timestamppb.Now()},
@@ -136,7 +140,7 @@ func TestTail(t *testing.T) {
 				},
 				Error: connect.NewError(connect.CodeInternal, &cwTypes.SessionStreamingException{}), // to test retries
 			},
-			&client.MockServerStream{Error: io.EOF},
+			&mockTailStream{Error: io.EOF},
 		},
 	}
 
@@ -285,5 +289,81 @@ func TestUTC(t *testing.T) {
 
 	if !convertedUTCTime.Equal(utcTime) {
 		t.Errorf("Original utc time:%v != parse utc time:%v", utcTime, convertedUTCTime)
+	}
+}
+
+type mockQueryErrorProvider struct {
+	client.Provider
+	TailStreamError error
+}
+
+func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+	return &mockTailStream{Error: m.TailStreamError}, nil
+}
+
+func TestTailError(t *testing.T) {
+	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	tailOptions := TailOptions{
+		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+	}
+
+	tests := []struct {
+		name      string
+		err       error
+		wantError string
+	}{
+		{"cancel", context.Canceled, cancelError},
+		{"timeout", context.DeadlineExceeded, cancelError},
+		{"cd task failure", ecs.TaskFailure{Reason: types.TaskStopCodeEssentialContainerExited}, "EssentialContainerExited: "},
+		{"eof", io.EOF, "EOF"},
+		{"nil", nil, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockQueryErrorProvider{
+				TailStreamError: tt.err,
+			}
+			err := Tail(context.Background(), mock, "project", tailOptions)
+			if err != nil {
+				if err.Error() != tt.wantError {
+					t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
+				}
+			} else if tt.wantError != "" {
+				t.Errorf("Tail() error = nil, want %q", tt.wantError)
+			}
+		})
+	}
+}
+
+func TestTailContext(t *testing.T) {
+	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	tailOptions := TailOptions{
+		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+	}
+	mock := &mockDeployProvider{}
+
+	tests := []struct {
+		name      string
+		cause     error
+		wantError string
+	}{
+		{"cancel", context.Canceled, cancelError},
+		{"timeout", context.DeadlineExceeded, cancelError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			time.AfterFunc(10*time.Millisecond, func() {
+				mock.tailStream.Send(nil, tt.cause)
+			})
+			err := Tail(ctx, mock, "project", tailOptions)
+			if err.Error() != tt.wantError {
+				t.Errorf("Tail() error = %q, want: %q", err.Error(), tt.wantError)
+			}
+		})
 	}
 }

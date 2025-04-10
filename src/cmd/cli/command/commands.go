@@ -111,7 +111,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
-			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
+			printDefangHint("Detached. The deployment will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
@@ -961,7 +961,7 @@ var deleteCmd = &cobra.Command{
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
 	Short:       "Manage Deployments",
-	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
+	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 }
 
