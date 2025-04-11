@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -19,7 +18,6 @@ import (
 
 // byocServerStream is a wrapper around awsecs.EventStream that implements connect-like ServerStream
 type byocServerStream struct {
-	ctx      context.Context
 	err      error
 	etag     string
 	response *defangv1.TailResponse
@@ -29,9 +27,8 @@ type byocServerStream struct {
 	ecsEventsHandler ECSEventHandler
 }
 
-func newByocServerStream(ctx context.Context, stream ecs.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
+func newByocServerStream(stream ecs.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
 	return &byocServerStream{
-		ctx:      ctx,
 		etag:     etag,
 		stream:   stream,
 		services: services,
@@ -58,24 +55,18 @@ func (bs *byocServerStream) Msg() *defangv1.TailResponse {
 }
 
 func (bs *byocServerStream) Receive() bool {
-	select {
-	case e := <-bs.stream.Events(): // blocking
-		if err := bs.stream.Err(); err != nil {
-			bs.err = AnnotateAwsError(err)
-			return false
-		}
-		evts, err := ecs.GetLogEvents(e)
-		if err != nil {
-			bs.err = err
-			return false
-		}
-		bs.response = bs.parseEvents(evts)
-		return true
-
-	case <-bs.ctx.Done(): // blocking (if not nil)
-		bs.err = context.Cause(bs.ctx)
+	e := <-bs.stream.Events()
+	if err := bs.stream.Err(); err != nil {
+		bs.err = AnnotateAwsError(err)
 		return false
 	}
+	evts, err := ecs.GetLogEvents(e)
+	if err != nil {
+		bs.err = err
+		return false
+	}
+	bs.response = bs.parseEvents(evts)
+	return true
 }
 
 func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailResponse {
