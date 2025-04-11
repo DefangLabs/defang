@@ -2,17 +2,23 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p client.Provider, cmd string) error {
-	term.Infof("Running CD command %q in project %q", cmd, projectName)
+	if projectName == "" { // projectName is empty for "list --remote"
+		term.Infof("Running CD command %q", cmd)
+	} else {
+		term.Infof("Running CD command %q in project %q", cmd, projectName)
+	}
 	if DoDryRun {
 		return ErrDryRun
 	}
@@ -23,7 +29,29 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		return err
 	}
 
-	return tail(ctx, p, projectName, TailOptions{Deployment: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
+	return tailAndWaitForCD(ctx, projectName, p, TailOptions{Deployment: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
+}
+
+func tailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions) error {
+	ctx, cancelTail := context.WithCancelCause(ctx)
+	defer cancelTail(nil) // to cancel tail and clean-up context
+
+	var cdErr error
+	go func() {
+		cdErr = client.WaitForCdTaskExit(ctx, provider)
+		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we got the last logs
+		cancelTail(cdErr)
+	}()
+
+	// blocking call to tail
+	var tailErr error
+	if err := tail(ctx, provider, projectName, tailOptions); err != nil {
+		term.Debug("Tail stopped with", err, errors.Unwrap(err))
+		if !errors.Is(err, context.Canceled) {
+			tailErr = err
+		}
+	}
+	return errors.Join(cdErr, tailErr)
 }
 
 func SplitProjectStack(name string) (projectName string, stackName string) {

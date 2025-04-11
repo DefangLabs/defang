@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
-	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -425,7 +425,7 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 			executionName := path.Base(auditLog.GetResourceName())
 			if cdExecutionNamePattern.MatchString(executionName) {
 				if auditLog.GetStatus().GetCode() != 0 {
-					return nil, pkg.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
+					return nil, client.ErrDeploymentFailed{Message: auditLog.GetStatus().GetMessage()}
 				}
 				cdSuccess = true
 				// Report all ready services when CD is successful, prevents cli deploy stop before cd is done

@@ -186,6 +186,17 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 	return nil
 }
 
+func (b *ByocAws) GetDeploymentStatus(ctx context.Context) error {
+	if err := ecs.GetTaskStatus(ctx, b.cdTaskArn); err != nil {
+		// check if the task failed; if so, return the a ErrDeploymentFailed error
+		if taskErr := new(ecs.TaskFailure); errors.As(err, taskErr) {
+			return client.ErrDeploymentFailed{Message: taskErr.Error()}
+		}
+		return err
+	}
+	return nil
+}
+
 func (b *ByocAws) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "up")
 }
@@ -260,13 +271,13 @@ func (b *ByocAws) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd s
 		delegationSetId: req.DelegationSetId,
 		cmd:             []string{cmd, payloadString},
 	}
-	taskArn, err := b.runCdCommand(ctx, cdCommand)
+	cdTaskArn, err := b.runCdCommand(ctx, cdCommand)
 	if err != nil {
-		return nil, err
+		return nil, AnnotateAwsError(err)
 	}
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = taskArn
+	b.cdTaskArn = cdTaskArn
 
 	for _, si := range serviceInfos {
 		if si.UseAcmeCert {
@@ -471,14 +482,14 @@ func (b *ByocAws) Delete(ctx context.Context, req *defangv1.DeleteRequest) (*def
 		delegateDomain: req.DelegateDomain,
 		cmd:            []string{"up", ""}, // 2nd empty string is a empty payload
 	}
-	taskArn, err := b.runCdCommand(ctx, cmd)
+	cdTaskArn, err := b.runCdCommand(ctx, cmd)
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	etag := ecs.GetTaskID(taskArn) // TODO: this is the CD task ID, not the etag
+	etag := ecs.GetTaskID(cdTaskArn) // TODO: this is the CD task ID, not the etag
 	b.cdEtag = etag
 	b.cdStart = time.Now()
-	b.cdTaskArn = taskArn
+	b.cdTaskArn = cdTaskArn
 	return &defangv1.DeleteResponse{Etag: etag}, nil
 }
 
@@ -692,16 +703,14 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var taskArn ecs.TaskArn
 	var tailStream ecs.LiveTailStream
-	stopWhenCDTaskDone := false
-	logType := logs.LogType(req.LogType)
+
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		tailStream, err = b.driver.TailTaskID(ctx, etag)
-		taskArn, _ = b.driver.GetTaskArn(etag)
-		term.Debugf("Tailing task %s", *taskArn)
-		etag = "" // no need to filter by etag
-		stopWhenCDTaskDone = true
+		if err == nil {
+			b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+			etag = "" // no need to filter by etag
+		}
 	} else {
 		var service string
 		if len(req.Services) == 1 {
@@ -714,29 +723,14 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logType)...)
-		taskArn = b.cdTaskArn
+		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
 	}
+
 	if err != nil {
 		return nil, AnnotateAwsError(err)
 	}
-	if taskArn != nil {
-		var cancel context.CancelCauseFunc
-		ctx, cancel = context.WithCancelCause(ctx)
-		go func() {
-			if err := ecs.WaitForTask(ctx, taskArn, 2*time.Second); err != nil {
-				if stopWhenCDTaskDone || errors.As(err, &ecs.TaskFailure{}) {
-					time.Sleep(2 * time.Second) // make sure we got all the logs from the task/ecs before cancelling
-					if !errors.Is(err, io.EOF) {
-						err = pkg.ErrDeploymentFailed{Message: err.Error()}
-					}
-					cancel(err)
-				}
-			}
-		}()
-	}
 
-	return newByocServerStream(ctx, tailStream, etag, req.GetServices(), b), nil
+	return newByocServerStream(tailStream, etag, req.GetServices(), b), nil
 }
 
 func (b *ByocAws) makeLogGroupARN(name string) string {
@@ -817,10 +811,14 @@ func (b *ByocAws) BootstrapCommand(ctx context.Context, req client.BootstrapComm
 		cmd:     []string{req.Command},
 	}
 	cdTaskArn, err := b.runCdCommand(ctx, cmd) // TODO: make domain optional for defang cd
-	if err != nil || cdTaskArn == nil {
+	if err != nil {
 		return "", AnnotateAwsError(err)
 	}
-	return ecs.GetTaskID(cdTaskArn), nil
+	etag := ecs.GetTaskID(cdTaskArn) // TODO: this is the CD task ID, not the etag
+	b.cdEtag = etag
+	b.cdStart = time.Now()
+	b.cdTaskArn = cdTaskArn
+	return etag, nil
 }
 
 func (b *ByocAws) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (string, error) {
@@ -912,7 +910,6 @@ func (b *ByocAws) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	s := &byocSubscribeServerStream{
 		services: req.Services,
 		etag:     req.Etag,
-		ctx:      ctx,
 
 		ch: make(chan *defangv1.SubscribeResponse),
 	}

@@ -6,41 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
 
 // MockSubscribeServerStream mocks the stream response for Subscribe.
-type MockSubscribeServerStream struct {
-	index int
-	Resps []*defangv1.SubscribeResponse
-	Error error
-}
-
-func (*MockSubscribeServerStream) Close() error {
-	return nil
-}
-
-func (m *MockSubscribeServerStream) Receive() bool {
-	if m.index >= len(m.Resps) {
-		return false
-	}
-	m.index++
-	return true
-}
-
-func (m *MockSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
-	if m.index == 0 || m.index > len(m.Resps) {
-		return nil
-	}
-	return m.Resps[m.index-1]
-}
-
-func (m *MockSubscribeServerStream) Err() error {
-	return m.Error
-}
+type MockSubscribeServerStream = client.MockServerStream[defangv1.SubscribeResponse]
 
 // mockSubscribeProvider mocks the provider for Subscribe.
 type mockSubscribeProvider struct {
@@ -229,7 +201,7 @@ func TestWaitServiceState(t *testing.T) {
 			if err == nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !errors.As(err, &pkg.ErrDeploymentFailed{}) {
+			if !errors.As(err, &client.ErrDeploymentFailed{}) {
 				t.Errorf("Expected ErrDeploymentFailed but got %v", err)
 			}
 		})
@@ -276,14 +248,6 @@ func (m *mockSubscribeProviderForReconnectTest) Subscribe(
 	_ *defangv1.SubscribeRequest,
 ) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	return m.stream, nil
-}
-
-func (m *mockSubscribeProviderForReconnectTest) Receive() bool {
-	return false
-}
-
-func (m *mockSubscribeProviderForReconnectTest) Err() bool {
-	return false
 }
 
 func TestWaitServiceStateStreamReceive(t *testing.T) {
