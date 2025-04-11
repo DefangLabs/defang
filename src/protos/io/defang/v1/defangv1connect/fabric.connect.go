@@ -107,6 +107,9 @@ const (
 	// FabricControllerListConfigsProcedure is the fully-qualified name of the FabricController's
 	// ListConfigs RPC.
 	FabricControllerListConfigsProcedure = "/io.defang.v1.FabricController/ListConfigs"
+	// FabricControllerGetActiveDeploymentsProcedure is the fully-qualified name of the
+	// FabricController's GetActiveDeployments RPC.
+	FabricControllerGetActiveDeploymentsProcedure = "/io.defang.v1.FabricController/GetActiveDeployments"
 	// FabricControllerPutDeploymentProcedure is the fully-qualified name of the FabricController's
 	// PutDeployment RPC.
 	FabricControllerPutDeploymentProcedure = "/io.defang.v1.FabricController/PutDeployment"
@@ -186,6 +189,7 @@ type FabricControllerClient interface {
 	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.ListConfigsResponse], error)
+	GetActiveDeployments(context.Context, *connect_go.Request[v1.ActiveDeploymentsRequest]) (*connect_go.Response[v1.ActiveDeploymentsResponse], error)
 	PutDeployment(context.Context, *connect_go.Request[v1.PutDeploymentRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListDeployments(context.Context, *connect_go.Request[v1.ListDeploymentsRequest]) (*connect_go.Response[v1.ListDeploymentsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -355,6 +359,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		getActiveDeployments: connect_go.NewClient[v1.ActiveDeploymentsRequest, v1.ActiveDeploymentsResponse](
+			httpClient,
+			baseURL+FabricControllerGetActiveDeploymentsProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
 		putDeployment: connect_go.NewClient[v1.PutDeploymentRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutDeploymentProcedure,
@@ -466,6 +476,7 @@ type fabricControllerClient struct {
 	putConfig                *connect_go.Client[v1.PutConfigRequest, emptypb.Empty]
 	deleteConfigs            *connect_go.Client[v1.DeleteConfigsRequest, emptypb.Empty]
 	listConfigs              *connect_go.Client[v1.ListConfigsRequest, v1.ListConfigsResponse]
+	getActiveDeployments     *connect_go.Client[v1.ActiveDeploymentsRequest, v1.ActiveDeploymentsResponse]
 	putDeployment            *connect_go.Client[v1.PutDeploymentRequest, emptypb.Empty]
 	listDeployments          *connect_go.Client[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
@@ -624,6 +635,11 @@ func (c *fabricControllerClient) ListConfigs(ctx context.Context, req *connect_g
 	return c.listConfigs.CallUnary(ctx, req)
 }
 
+// GetActiveDeployments calls io.defang.v1.FabricController.GetActiveDeployments.
+func (c *fabricControllerClient) GetActiveDeployments(ctx context.Context, req *connect_go.Request[v1.ActiveDeploymentsRequest]) (*connect_go.Response[v1.ActiveDeploymentsResponse], error) {
+	return c.getActiveDeployments.CallUnary(ctx, req)
+}
+
 // PutDeployment calls io.defang.v1.FabricController.PutDeployment.
 func (c *fabricControllerClient) PutDeployment(ctx context.Context, req *connect_go.Request[v1.PutDeploymentRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.putDeployment.CallUnary(ctx, req)
@@ -731,6 +747,7 @@ type FabricControllerHandler interface {
 	PutConfig(context.Context, *connect_go.Request[v1.PutConfigRequest]) (*connect_go.Response[emptypb.Empty], error)
 	DeleteConfigs(context.Context, *connect_go.Request[v1.DeleteConfigsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.ListConfigsResponse], error)
+	GetActiveDeployments(context.Context, *connect_go.Request[v1.ActiveDeploymentsRequest]) (*connect_go.Response[v1.ActiveDeploymentsResponse], error)
 	PutDeployment(context.Context, *connect_go.Request[v1.PutDeploymentRequest]) (*connect_go.Response[emptypb.Empty], error)
 	ListDeployments(context.Context, *connect_go.Request[v1.ListDeploymentsRequest]) (*connect_go.Response[v1.ListDeploymentsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
@@ -896,6 +913,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerGetActiveDeploymentsHandler := connect_go.NewUnaryHandler(
+		FabricControllerGetActiveDeploymentsProcedure,
+		svc.GetActiveDeployments,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	fabricControllerPutDeploymentHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutDeploymentProcedure,
 		svc.PutDeployment,
@@ -1030,6 +1053,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerDeleteConfigsHandler.ServeHTTP(w, r)
 		case FabricControllerListConfigsProcedure:
 			fabricControllerListConfigsHandler.ServeHTTP(w, r)
+		case FabricControllerGetActiveDeploymentsProcedure:
+			fabricControllerGetActiveDeploymentsHandler.ServeHTTP(w, r)
 		case FabricControllerPutDeploymentProcedure:
 			fabricControllerPutDeploymentHandler.ServeHTTP(w, r)
 		case FabricControllerListDeploymentsProcedure:
@@ -1169,6 +1194,10 @@ func (UnimplementedFabricControllerHandler) DeleteConfigs(context.Context, *conn
 
 func (UnimplementedFabricControllerHandler) ListConfigs(context.Context, *connect_go.Request[v1.ListConfigsRequest]) (*connect_go.Response[v1.ListConfigsResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.ListConfigs is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GetActiveDeployments(context.Context, *connect_go.Request[v1.ActiveDeploymentsRequest]) (*connect_go.Response[v1.ActiveDeploymentsResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetActiveDeployments is not implemented"))
 }
 
 func (UnimplementedFabricControllerHandler) PutDeployment(context.Context, *connect_go.Request[v1.PutDeploymentRequest]) (*connect_go.Response[emptypb.Empty], error) {

@@ -82,6 +82,10 @@ func (g GrpcClient) Publish(ctx context.Context, req *defangv1.PublishRequest) e
 	return err
 }
 
+func (g GrpcClient) GetActiveDeployments(ctx context.Context, req *defangv1.ActiveDeploymentsRequest) (*defangv1.ActiveDeploymentsResponse, error) {
+	return getMsg(g.client.GetActiveDeployments(ctx, connect.NewRequest(req)))
+}
+
 func (g GrpcClient) PutDeployment(ctx context.Context, req *defangv1.PutDeploymentRequest) error {
 	_, err := g.client.PutDeployment(ctx, connect.NewRequest(req))
 	return err

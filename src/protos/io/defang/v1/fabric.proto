@@ -14,7 +14,7 @@ service FabricController {
   }; // public
   rpc GetVersion(google.protobuf.Empty) returns (Version) {
     option idempotency_level = NO_SIDE_EFFECTS;
-  };                                               // public
+  }; // public
   rpc Token(TokenRequest) returns (TokenResponse); // public
 
   rpc RevokeToken(google.protobuf.Empty) returns (google.protobuf.Empty);
@@ -80,7 +80,10 @@ service FabricController {
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }; // no values
-
+  rpc GetActiveDeployments(ActiveDeploymentsRequest)
+      returns (ActiveDeploymentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }; // no values
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   };
@@ -244,8 +247,7 @@ message GenerateFilesRequest {
   string language = 2;
   bool agree_tos = 3;
   bool training_opt_out = 4; // only valid for Pro users
-  string model_id = 5; // only valid for Pro users
-
+  string model_id = 5;       // only valid for Pro users
 }
 
 message File {
@@ -375,6 +377,12 @@ message Deployment {
   DeploymentAction action = 6;
 }
 
+message StringList { repeated string values = 1; }
+
+message ActiveDeploymentsRequest {}
+
+message ActiveDeploymentsResponse { map<string, StringList> deployments = 1; }
+
 message PutDeploymentRequest { Deployment deployment = 1; }
 
 message ListDeploymentsRequest { string project = 1; }
@@ -456,18 +464,21 @@ message ProjectUpdate {
   DeploymentMode mode = 6;
   Provider provider = 7;
   uint32 project_outputs_version = 8;
-  bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema versioned using project_outputs_version
+  bytes project_outputs = 9; // JSON serialization of pulumi outputs. schema
+                             // versioned using project_outputs_version
 }
 
 enum Platform {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   LINUX_AMD64 = 0;
   LINUX_ARM64 = 1;
   LINUX_ANY = 2;
 }
 
 message ServiceID {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   string name = 1;
   string project = 2;
 }
@@ -478,30 +489,34 @@ message GetRequest { // was ServiceID
 }
 
 message Device {
-  option deprecated = true;         // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   repeated string capabilities = 1; // "gpu", "tpu", etc.
   string driver = 2;                // "nvidia", "amd", etc.
   uint32 count = 3;                 // number of devices to reserve
 }
 
 message Resource {
-  option deprecated = true;    // still used by pulumi-defang provider in state files
-  float memory = 1;            // in MiB
-  float cpus = 2;              // fractional vCPUs
+  option deprecated =
+      true;         // still used by pulumi-defang provider in state files
+  float memory = 1; // in MiB
+  float cpus = 2;   // fractional vCPUs
   repeated Device devices = 3; // devices & capabilities
 }
 
 message Resources {
-  option deprecated = true;  // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   Resource reservations = 1; // requested resources
 
   // Resource limits = 2; // hard limits
 }
 
 message Deploy {
-  option deprecated = true; // still used by pulumi-defang provider in state files
-  uint32 replicas = 1;      // number of initial replicas
-  Resources resources = 2;  // reservations and limits
+  option deprecated =
+      true;            // still used by pulumi-defang provider in state files
+  uint32 replicas = 1; // number of initial replicas
+  Resources resources = 2; // reservations and limits
 
   // Placement placement = 3;
   // EndpointMode endpoint_mode
@@ -509,8 +524,9 @@ message Deploy {
 }
 
 enum Protocol {
-  option deprecated = true; // still used by pulumi-defang provider in state files
-  ANY = 0;                  // unspecified means any protocol
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
+  ANY = 0;  // unspecified means any protocol
   UDP = 1;
   TCP = 2;
   HTTP = 3;
@@ -519,13 +535,15 @@ enum Protocol {
 }
 
 enum Mode {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true;    // still used by pulumi-defang provider in state files
   HOST = 0;    // no load-balancer; suitable for internal services and functions
   INGRESS = 1; // with load-balancer; suitable for public services
 }
 
 message Port {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   uint32 target = 1;
   Protocol protocol = 2;
   Mode mode = 3; // load-balanced (ingress) or not (host)
@@ -535,22 +553,25 @@ message Port {
 }
 
 message Secret {
-  option deprecated = true; // still used by pulumi-defang provider in state files
-  string source = 1;        // name of the secret
+  option deprecated =
+      true;          // still used by pulumi-defang provider in state files
+  string source = 1; // name of the secret
   // string target = 2;
 }
 
 message Build {
-  option deprecated = true;     // still used by pulumi-defang provider in state files
-  string context = 1;           // path or URL to the build context
-  string dockerfile = 2;        // path to the Dockerfile
+  option deprecated =
+      true;              // still used by pulumi-defang provider in state files
+  string context = 1;    // path or URL to the build context
+  string dockerfile = 2; // path to the Dockerfile
   map<string, string> args = 3; // build-time variables
   float shm_size = 4;           // in MiB
   string target = 5;
 }
 
 message HealthCheck {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   repeated string test = 1;
   uint32 interval = 2; // in seconds
   uint32 timeout = 3;  // in seconds; must be less than interval
@@ -558,14 +579,16 @@ message HealthCheck {
 }
 
 enum Network {
-  option deprecated = true; // still used by pulumi-defang provider in state files
-  UNSPECIFIED = 0;          // was: internal=false
-  PRIVATE = 1;              // was: internal=true
+  option deprecated =
+      true;        // still used by pulumi-defang provider in state files
+  UNSPECIFIED = 0; // was: internal=false
+  PRIVATE = 1;     // was: internal=true
   PUBLIC = 2;
 }
 
 message Service {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   string name = 1;
   string image = 2;
   Platform platform = 3;
@@ -589,7 +612,8 @@ message Service {
 }
 
 message StaticFiles {
-  option deprecated = true; // still used by pulumi-defang provider in state files
+  option deprecated =
+      true; // still used by pulumi-defang provider in state files
   string folder = 1;
   repeated string redirects = 2;
 }
