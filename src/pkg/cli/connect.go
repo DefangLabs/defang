@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/bufbuild/connect-go"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
@@ -47,12 +48,9 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		switch {
-		case strings.Contains(err.Error(), "no such host"),
-			strings.Contains(err.Error(), "connection reset by peer"),
-			strings.Contains(err.Error(), "no Grpc-Status trailer: unexpected EOF"):
+		if connect.CodeOf(err) == connect.CodeUnavailable {
 			term.Fatalf("Unable to connect; please check your internet, VPN, or firewall settings and try again.")
-		default:
+		} else {
 			term.Debug("Unable to validate tenant ID with server:", err)
 		}
 	} else if string(tenantName) != resp.Tenant {
