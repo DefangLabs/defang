@@ -517,8 +517,8 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 	if req.Etag == b.cdEtag {
 		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
-	subscribeStream.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
-	subscribeStream.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
+	subscribeStream.AddJobStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 	subscribeStream.Start(time.Now())
 	return subscribeStream, nil
 }
@@ -580,12 +580,12 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			etag = ""
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName)                      // CD log when there is an execution name
-			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
+			logStream.AddJobExecutionLog(execName)                                     // CD log when there is an execution name
+			logStream.AddJobLog(b.PulumiStack, req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+			logStream.AddCloudBuildLog(b.PulumiStack, req.Project, etag, req.Services) // CloudBuild logs
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
+			logStream.AddServiceLog(b.PulumiStack, req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
 		logStream.AddUntil(endTime)
@@ -709,17 +709,17 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 	}
 
 	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	query.AddJobLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
+	query.AddServiceLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery(b.PulumiStack, req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
 	// Service status updates
-	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate(req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateRequestQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate(b.PulumiStack, req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }

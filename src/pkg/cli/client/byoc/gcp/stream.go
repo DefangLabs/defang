@@ -189,17 +189,17 @@ func (s *LogStream) AddJobExecutionLog(executionName string) {
 	s.query.AddJobExecutionQuery(executionName)
 }
 
-func (s *LogStream) AddJobLog(project, etag string, services []string) {
-	s.query.AddJobLogQuery(project, etag, services)
+func (s *LogStream) AddJobLog(stack, project, etag string, services []string) {
+	s.query.AddJobLogQuery(stack, project, etag, services)
 }
 
-func (s *LogStream) AddServiceLog(project, etag string, services []string) {
-	s.query.AddServiceLogQuery(project, etag, services)
-	s.query.AddComputeEngineLogQuery(project, etag, services)
+func (s *LogStream) AddServiceLog(stack, project, etag string, services []string) {
+	s.query.AddServiceLogQuery(stack, project, etag, services)
+	s.query.AddComputeEngineLogQuery(stack, project, etag, services)
 }
 
-func (s *LogStream) AddCloudBuildLog(project, etag string, services []string) {
-	s.query.AddCloudBuildLogQuery(project, etag, services)
+func (s *LogStream) AddCloudBuildLog(stack, project, etag string, services []string) {
+	s.query.AddCloudBuildLogQuery(stack, project, etag, services)
 }
 
 func (s *LogStream) AddSince(start time.Time) {
@@ -231,15 +231,15 @@ func (s *SubscribeStream) AddJobExecutionUpdate(executionName string) {
 	s.query.AddJobExecutionUpdateQuery(executionName)
 }
 
-func (s *SubscribeStream) AddJobStatusUpdate(project, etag string, services []string) {
-	s.query.AddJobStatusUpdateRequestQuery(project, etag, services)
-	s.query.AddJobStatusUpdateResponseQuery(project, etag, services)
+func (s *SubscribeStream) AddJobStatusUpdate(stack, project, etag string, services []string) {
+	s.query.AddJobStatusUpdateRequestQuery(stack, project, etag, services)
+	s.query.AddJobStatusUpdateResponseQuery(stack, project, etag, services)
 }
 
-func (s *SubscribeStream) AddServiceStatusUpdate(project, etag string, services []string) {
-	s.query.AddServiceStatusRequestUpdate(project, etag, services)
-	s.query.AddServiceStatusReponseUpdate(project, etag, services)
-	s.query.AddComputeEngineInstanceGroupInsertOrPatch(project, etag, services)
+func (s *SubscribeStream) AddServiceStatusUpdate(stack, project, etag string, services []string) {
+	s.query.AddServiceStatusRequestUpdate(stack, project, etag, services)
+	s.query.AddServiceStatusReponseUpdate(stack, project, etag, services)
+	s.query.AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupAddInstances()
 }
 
@@ -253,6 +253,17 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 		}
 
 		msg := entry.GetTextPayload()
+		if msg == "" && entry.GetJsonPayload() != nil {
+			msg = entry.GetJsonPayload().GetFields()["message"].GetStringValue()
+		}
+		var stderr bool
+		if entry.LogName != "" {
+			stderr = strings.HasSuffix(entry.LogName, "run.googleapis.com%2Fstderr")
+		} else if entry.GetJsonPayload() != nil && entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"] != nil {
+			stderr = entry.GetJsonPayload().GetFields()["cos.googleapis.com/stream"].GetStringValue() == "stderr"
+		}
+
+		// fmt.Printf("ENTRY: %+v\n", entry)
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
@@ -261,7 +272,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 		// Log from service
 		if serviceName != "" {
 			etag = entry.Labels["defang-etag"]
-			host = entry.Labels["instanceId"]
+			host = entry.Resource.Labels["instance_id"]
 			if len(host) > 8 {
 				host = host[:8]
 			}
@@ -316,7 +327,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 						Etag:      etag,
 						Service:   serviceName,
 						Host:      host,
-						Stderr:    strings.HasSuffix(entry.LogName, "run.googleapis.com%2Fstderr"),
+						Stderr:    stderr,
 					},
 				},
 			},
