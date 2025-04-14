@@ -377,11 +377,11 @@ message Deployment {
   DeploymentAction action = 6;
 }
 
-message StringList { repeated string values = 1; }
+message ProjectNames { repeated string values = 1; }
 
 message ActiveDeploymentsRequest {}
 
-message ActiveDeploymentsResponse { map<string, StringList> deployments = 1; }
+message ActiveDeploymentsResponse { map<string, ProjectNames> deployments = 1; }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
 

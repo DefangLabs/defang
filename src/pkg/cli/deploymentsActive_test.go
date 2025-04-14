@@ -16,12 +16,12 @@ type mockActiveDeploymentsHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-var emptyDeployments = map[string]*defangv1.StringList{}
-var activeDeployments = map[string]*defangv1.StringList{
-	"AWS":    {Values: []string{"projectAA", "projectAB", "projectAC"}},
-	"Defang": {Values: []string{"projectPlayground"}},
-	"DO":     {Values: []string{"projectDA", "projectDB"}},
-	"GCP":    {Values: []string{"projectGA", "projectGB"}},
+var emptyDeployments map[string]*defangv1.ProjectNames
+var activeDeployments = map[string]*defangv1.ProjectNames{
+	"AWS":          {Values: []string{"projectAA", "projectAB", "projectAC"}},
+	"DEFANG":       {Values: []string{"projectPlayground"}},
+	"DIGITALOCEAN": {Values: []string{"projectDA", "projectDB"}},
+	"GCP":          {Values: []string{"projectGA", "projectGB"}},
 }
 var testDeploymentsData = emptyDeployments
 
