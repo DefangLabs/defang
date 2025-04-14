@@ -50,6 +50,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeUnavailable {
 			term.Fatalf("Unable to connect; please check your internet, VPN, or firewall settings and try again.")
+			term.Debug("Connection error details:", err)
 		} else {
 			term.Debug("Unable to validate tenant ID with server:", err)
 		}
