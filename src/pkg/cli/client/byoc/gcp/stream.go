@@ -218,8 +218,8 @@ type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser(), filters...)
+func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+	ss, err := NewServerStream(ctx, gcp, getActivityParser(waitForCD), filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,10 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 		// Log from service
 		if serviceName != "" {
 			etag = entry.Labels["defang-etag"]
-			host = entry.Resource.Labels["instance_id"]
+			host = entry.Labels["instanceId"] // cloudrun instance
+			if host == "" {
+				host = entry.Resource.Labels["instance_id"] // compute engine instance
+			}
 			if len(host) > 8 {
 				host = host[:8]
 			}
@@ -337,7 +340,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 
 const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
 
-func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+func getActivityParser(waitForCD bool) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
 
@@ -376,7 +379,7 @@ func getActivityParser() func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeR
 				}
 				var state defangv1.ServiceState
 				if status.GetCode() == 0 {
-					if cdSuccess {
+					if cdSuccess || !waitForCD {
 						state = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 					} else {
 						state = defangv1.ServiceState_DEPLOYMENT_PENDING // Report later
