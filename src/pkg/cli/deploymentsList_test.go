@@ -9,7 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	"github.com/bufbuild/connect-go"
+	connect "github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
