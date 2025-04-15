@@ -1,9 +1,12 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"strings"
 )
 
 // PostForValues issues a POST to the specified URL and returns the response body as url.Values.
@@ -27,4 +30,17 @@ func PostForValues(_url, contentType string, body io.Reader) (url.Values, error)
 		return nil, fmt.Errorf("failed to parse response body: %w", err)
 	}
 	return values, nil
+}
+
+func PostFormWithContext(ctx context.Context, url string, data url.Values) (*http.Response, error) {
+	return PostWithContext(ctx, url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+}
+
+func PostWithContext(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+	hreq.Header.Set("Content-Type", contentType)
+	return DefaultClient.Do(hreq)
 }

@@ -41,7 +41,7 @@ func TestGetExistingToken(t *testing.T) {
 }
 
 type MockGitHubAuthService struct {
-	GitHubAuthService
+	OpenAuthService
 	MockLogin func(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string, prompt bool) (string, error)
 }
 
