@@ -114,6 +114,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
+- `DEFANG_ORG` - The name of the organization to use; defaults to the user's GitHub name
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
 - `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
