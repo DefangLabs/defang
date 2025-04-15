@@ -11,12 +11,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
-func Token(ctx context.Context, client client.FabricClient, clientId string, tenant types.TenantName, dur time.Duration, scope scope.Scope) error {
+func Token(ctx context.Context, client client.FabricClient, tenant types.TenantName, dur time.Duration, scope scope.Scope) error {
 	if DoDryRun {
 		return ErrDryRun
 	}
 
-	code, err := auth.StartAuthCodeFlow(ctx, clientId, true)
+	code, err := auth.StartAuthCodeFlow(ctx, true)
 	if err != nil {
 		return err
 	}

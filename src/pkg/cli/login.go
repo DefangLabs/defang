@@ -38,17 +38,17 @@ func GetExistingToken(fabric string) string {
 }
 
 type AuthService interface {
-	login(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string, prompt bool) (string, error)
+	login(ctx context.Context, client client.FabricClient, fabric string, prompt bool) (string, error)
 }
 
 type OpenAuthService struct{}
 
 func (g OpenAuthService) login(
-	ctx context.Context, client client.FabricClient, gitHubClientId, fabric string, prompt bool,
+	ctx context.Context, client client.FabricClient, fabric string, prompt bool,
 ) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := auth.StartAuthCodeFlow(ctx, gitHubClientId, prompt)
+	code, err := auth.StartAuthCodeFlow(ctx, prompt)
 	if err != nil {
 		return "", err
 	}
@@ -69,8 +69,8 @@ func saveAccessToken(fabric, at string) error {
 	return nil
 }
 
-func InteractiveLogin(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string, prompt bool) error {
-	at, err := githubAuthService.login(ctx, client, gitHubClientId, fabric, prompt)
+func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt bool) error {
+	at, err := githubAuthService.login(ctx, client, fabric, prompt)
 	if err != nil {
 		return err
 	}

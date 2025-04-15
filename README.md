@@ -121,6 +121,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 - `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
+- `DEFANG_ISSUER` - The OAuth2 issuer to use for authentication; defaults to `https://auth.defang.io`
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_ORG` - The name of the organization to use; defaults to the user's GitHub name

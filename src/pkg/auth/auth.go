@@ -15,8 +15,7 @@ import (
 	"github.com/pkg/browser"
 )
 
-// var authorizeBaseUrl = "https://auth.defang.io/login/oauth/authorize?"
-var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_AUTH", "https://auth.defang.io"))
+var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
 
 const (
 	authTemplateString = `<!DOCTYPE html>
@@ -67,7 +66,7 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
-func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (AuthCodeFlow, error) {
+func StartAuthCodeFlow(ctx context.Context, prompt bool) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -106,13 +105,14 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (AuthC
 	defer server.Close()
 
 	redirectUri := server.URL + "/auth"
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType) // TODO:, WithPkce())
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
 
 	state = ar.state
 	authorizeUrl = ar.url.String()
+	term.Debug("Authorization URL:", authorizeUrl)
 
 	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
@@ -157,7 +157,7 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.T
 		scopes = append(scopes, s.String())
 	}
 
-	term.Debug("Generating token for tenant", tenant, "with scopes", scopes)
+	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
 
 	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scopes, TTL
 	if err != nil {
