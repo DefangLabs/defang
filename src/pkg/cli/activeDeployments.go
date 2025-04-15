@@ -2,14 +2,14 @@ package cli
 
 import (
 	"context"
-	"slices"
+	"sort"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-type PrintActiveDeployment struct {
+type PrintableActiveDeployments struct {
 	Provider    string
 	ProjectName string
 }
@@ -20,38 +20,28 @@ func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
 		return err
 	}
 
-	numDeployments := len(response.Deployments)
-	if numDeployments == 0 {
+	if len(response.Deployments) == 0 {
 		_, err := term.Warn("No active deployments")
 		return err
 	}
 
-	// map to Deployment struct
-	deployments := []PrintActiveDeployment{}
-	i := 0
+	// map to PrintableActiveDeployments struct
+	var deployments []PrintableActiveDeployments
 	for providerName, projectNames := range response.Deployments {
 		for _, projectName := range projectNames.Values {
-			deployments = append(deployments, PrintActiveDeployment{
+			deployments = append(deployments, PrintableActiveDeployments{
 				Provider:    providerName,
 				ProjectName: projectName,
 			})
-			i++
 		}
 	}
 
 	// sort by provider then project name
-	slices.SortFunc(deployments, func(i, j PrintActiveDeployment) int {
-		switch {
-		case i.Provider == j.Provider:
-			if i.ProjectName < j.ProjectName {
-				return -1
-			}
-			return 1
-		case i.Provider < j.Provider:
-			return -1
-		default:
-			return 1
+	sort.Slice(deployments, func(i, j int) bool {
+		if deployments[i].Provider == deployments[j].Provider {
+			return deployments[i].ProjectName < deployments[j].ProjectName
 		}
+		return deployments[i].Provider < deployments[j].Provider
 	})
 
 	return term.Table(deployments, []string{"Provider", "ProjectName"})

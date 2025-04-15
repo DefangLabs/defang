@@ -266,6 +266,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
+	deploymentsListCmd.Flags().Bool("active", false, "get the list of deployed projects")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -972,13 +973,19 @@ var deploymentsListCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			return err
-		}
+		activeOnly, _ := cmd.Flags().GetBool("active")
 
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		if activeOnly {
+			return cli.ActiveDeployments(cmd.Context(), client)
+		} else {
+			loader := configureLoader(cmd)
+			projectName, err := loader.LoadProjectName(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			return cli.DeploymentsList(cmd.Context(), projectName, client)
+		}
 	},
 }
 

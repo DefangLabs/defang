@@ -18,10 +18,10 @@ type mockActiveDeploymentsHandler struct {
 
 var emptyDeployments map[string]*defangv1.ProjectNames
 var activeDeployments = map[string]*defangv1.ProjectNames{
-	"AWS":          {Values: []string{"projectAA", "projectAB", "projectAC"}},
-	"DEFANG":       {Values: []string{"projectPlayground"}},
-	"DIGITALOCEAN": {Values: []string{"projectDA", "projectDB"}},
-	"GCP":          {Values: []string{"projectGA", "projectGB"}},
+	defangv1.Provider_AWS.String():          {Values: []string{"projectAA", "projectAB", "projectAC"}},
+	defangv1.Provider_DEFANG.String():       {Values: []string{"projectPlayground"}},
+	defangv1.Provider_DIGITALOCEAN.String(): {Values: []string{"projectDA", "projectDB"}},
+	defangv1.Provider_GCP.String():          {Values: []string{"projectGA", "projectGB"}},
 }
 var testDeploymentsData = emptyDeployments
 
@@ -56,7 +56,7 @@ func TestActiveDeployments(t *testing.T) {
 		receivedOutput := stdout.String()
 		expectedOutput := "No active deployments"
 
-		if !strings.Contains(stdout.String(), expectedOutput) {
+		if !strings.Contains(receivedOutput, expectedOutput) {
 			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
 		}
 	})
@@ -69,24 +69,21 @@ func TestActiveDeployments(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ActiveDeployments() error = %v", err)
 		}
-		receivedLines := strings.Split(stdout.String(), "\n")
-		receivedLines = receivedLines[2:] // remove the space and header
 
-		// check every entry in activeDeployments is found in the output
+		lines := strings.Split(stdout.String(), "\n")[2:] // Skip first two lines (space and header)
+
+		// Verify each provider and project name exists in the output
 		for provider, projectNames := range activeDeployments {
 			for _, projectName := range projectNames.Values {
-				found := false
-				for i, line := range receivedLines {
+				match := false
+				for _, line := range lines {
 					if strings.Contains(line, provider) && strings.Contains(line, projectName) {
-						found = true
-						// remove the line from receivedLines
-						receivedLines = append(receivedLines[:i], receivedLines[i+1:]...)
+						match = true
 						break
 					}
 				}
-
-				if !found {
-					t.Errorf("Expected %s - %s to be found in output", provider, projectName)
+				if !match {
+					t.Errorf("Missing expected output for provider %q and project %q", provider, projectName)
 				}
 			}
 		}
