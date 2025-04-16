@@ -124,8 +124,10 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 			{
 				Id:                "a1b2c3",
 				Project:           "test",
-				Provider:          "aws",
+				Provider:          defangv1.Provider_AWS,
 				ProviderAccountId: "1234567890",
+				ProviderString:    "aws",
+				Region:            "us-test-2",
 				Timestamp:         timestamppb.Now(),
 			},
 		},

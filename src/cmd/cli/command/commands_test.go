@@ -64,10 +64,10 @@ func (m *mockFabricService) CheckToS(context.Context, *connect.Request[emptypb.E
 
 func (m *mockFabricService) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
-		Tenant:  "default",
-		Account: "default",
-		Region:  "us-west-2",
-		Tier:    defangv1.SubscriptionTier_HOBBY,
+		Tenant:            "default",
+		ProviderAccountId: "default",
+		Region:            "us-west-2",
+		Tier:              defangv1.SubscriptionTier_HOBBY,
 	}), nil
 }
 

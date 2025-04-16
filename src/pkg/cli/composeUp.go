@@ -121,8 +121,10 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
 				Id:                resp.Etag,
 				Project:           project.Name,
-				Provider:          string(accountInfo.Provider()),
+				Provider:          accountInfo.Provider().EnumValue(),
 				ProviderAccountId: accountInfo.AccountID(),
+				ProviderString:    string(accountInfo.Provider()),
+				Region:            accountInfo.Region(),
 				Timestamp:         timestamppb.New(timestamp),
 			},
 		})
