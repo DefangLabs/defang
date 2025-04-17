@@ -13,7 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/auth"
-	"github.com/DefangLabs/defang/src/pkg/mcp/logger"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -22,7 +22,7 @@ import (
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
 func setupDeployTool(s *server.MCPServer) {
-	logger.Sugar.Info("Creating deployment tool")
+	term.Info("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
 
@@ -30,19 +30,19 @@ func setupDeployTool(s *server.MCPServer) {
 			mcp.Description("Path to current working directory"),
 		),
 	)
-	logger.Sugar.Debug("Deployment tool created")
+	term.Debug("Deployment tool created")
 
 	// Add the deployment tool handler - make it non-blocking
-	logger.Sugar.Info("Adding deployment tool handler")
+	term.Info("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Get compose path
-		logger.Sugar.Info("Compose up tool called - deploying services")
+		term.Info("Compose up tool called - deploying services")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {
-				logger.Sugar.Errorw("Failed to change working directory", "error", err)
+				term.Error("Failed to change working directory", "error", err)
 			}
 		}
 
@@ -51,7 +51,7 @@ func setupDeployTool(s *server.MCPServer) {
 		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
-			logger.Sugar.Errorw("Failed to deploy services", "error", err)
+			term.Error("Failed to deploy services", "error", err)
 
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
@@ -62,28 +62,28 @@ func setupDeployTool(s *server.MCPServer) {
 		grpcClient := client.NewGrpcClient(auth.Host, token, types.TenantName(""))
 		provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
 		if err != nil {
-			logger.Sugar.Errorw("Failed to get new provider", "error", err)
+			term.Error("Failed to get new provider", "error", err)
 
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to get new provider: %v", err)), nil
 		}
 
 		// Deploy the services
-		logger.Sugar.Info("Deploying services for project %s...", project.Name)
+		term.Infof("Deploying services for project %s...", project.Name)
 
 		managedServices, unmanagedServices := cli.SplitManagedAndUnmanagedServices(project.Services)
-		logger.Sugar.Infof("Defang managed services: %v and unmanaged services: %v", managedServices, unmanagedServices)
+		term.Infof("Defang managed services: %v and unmanaged services: %v", managedServices, unmanagedServices)
 
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, grpcClient, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			err = fmt.Errorf("failed to compose up services: %w", err)
-			logger.Sugar.Errorw("Failed to compose up services", "error", err)
+			term.Error("Failed to compose up services", "error", err)
 
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to compose up services: %v", err)), nil
 		}
 
 		if len(deployResp.Services) == 0 {
-			logger.Sugar.Errorw("Failed to deploy services", "error", errors.New("no services deployed"))
+			term.Error("Failed to deploy services", "error", errors.New("no services deployed"))
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
 		}
 
@@ -92,37 +92,37 @@ func setupDeployTool(s *server.MCPServer) {
 
 		// Open the portal URL in the browser if available
 		if portalURL != "" {
-			logger.Sugar.Infof("Opening portal URL in browser: %s", portalURL)
+			term.Infof("Opening portal URL in browser: %s", portalURL)
 			go func() {
 				err := browser.OpenURL(portalURL)
 				if err != nil {
-					logger.Sugar.Errorw("Failed to open URL in browser", "error", err, "url", portalURL)
+					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
 				}
 			}()
 		}
 
 		// Success case
-		logger.Sugar.Infow("Successfully started deployed services", "etag", deployResp.Etag)
+		term.Info("Successfully started deployed services", "etag", deployResp.Etag)
 
 		// Create a simple output for the tool result
 		var output strings.Builder
 
 		// Log deployment success
-		logger.Sugar.Info("Deployment Started!")
-		logger.Sugar.Infof("Deployment ID: %s", deployResp.Etag)
+		term.Info("Deployment Started!")
+		term.Infof("Deployment ID: %s", deployResp.Etag)
 
 		// Add minimal information to output for tool result
 		output.WriteString("Deployment Started. See logs tool for details.")
 
 		// Log browser preview information
-		logger.Sugar.Infof("🌐 %s available", portalURL)
+		term.Infof("🌐 %s available", portalURL)
 
 		// Log service details
-		logger.Sugar.Info("Services:")
+		term.Info("Services:")
 		for _, serviceInfo := range deployResp.Services {
-			logger.Sugar.Infof("- %s", serviceInfo.Service.Name)
-			logger.Sugar.Infof("  Public URL: %s", serviceInfo.PublicFqdn)
-			logger.Sugar.Infof("  Status: %s", serviceInfo.Status)
+			term.Infof("- %s", serviceInfo.Service.Name)
+			term.Infof("  Public URL: %s", serviceInfo.PublicFqdn)
+			term.Infof("  Status: %s", serviceInfo.Status)
 		}
 
 		// Return the etag data as text
@@ -137,14 +137,14 @@ const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
 // and returns the first URL for browser preview
 func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) string {
 	// Log portal URLs for monitoring services
-	logger.Sugar.Info("Monitor your services' status in the defang portal")
+	term.Info("Monitor your services' status in the defang portal")
 
 	// Store the first URL to return for browser preview
 	var firstURL string
 
 	for _, serviceInfo := range serviceInfos {
 		serviceURL := SERVICE_PORTAL_URL + "/" + serviceInfo.Service.Name
-		logger.Sugar.Infof("   - %s", serviceURL)
+		term.Infof("   - %s", serviceURL)
 
 		// Save the first URL we encounter
 		if firstURL == "" {

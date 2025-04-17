@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/mcp/logger"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -24,7 +24,7 @@ func SetupResources(s *server.MCPServer) {
 
 // setupDocumentationResource configures and adds the documentation resource to the MCP server
 func setupDocumentationResource(s *server.MCPServer) {
-	logger.Sugar.Info("Creating documentation resource")
+	term.Info("Creating documentation resource")
 	docResource := mcp.NewResource(
 		"doc:///knowledge_base/knowledge_base.json",
 		"knowledge_base",
@@ -36,7 +36,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile("knowledge_base/knowledge_base.json")
 		if err != nil {
-			logger.Sugar.Errorw("Failed to read resource file", "error", err, "path", "knowledge_base.json")
+			term.Error("Failed to read resource file", "error", err, "path", "knowledge_base.json")
 			return nil, fmt.Errorf("failed to read resource file knowledge_base.json: %w", err)
 		}
 
@@ -53,7 +53,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 
 // setupSamplesResource configures and adds the samples examples resource to the MCP server
 func setupSamplesResource(s *server.MCPServer) {
-	logger.Sugar.Info("Creating samples examples resource")
+	term.Info("Creating samples examples resource")
 	samplesResource := mcp.NewResource(
 		"doc:///knowledge_base/samples_examples.json",
 		"samples_examples",
@@ -66,7 +66,7 @@ func setupSamplesResource(s *server.MCPServer) {
 		// Read the file
 		file, err := os.ReadFile("knowledge_base/samples_examples.json")
 		if err != nil {
-			logger.Sugar.Errorw("Failed to read resource file", "error", err, "path", "samples_examples.json")
+			term.Error("Failed to read resource file", "error", err, "path", "samples_examples.json")
 			return nil, fmt.Errorf("failed to read resource file samples_examples.json: %w", err)
 		}
 
@@ -95,7 +95,7 @@ func setupSamplePrompt(s *server.MCPServer) {
 		projectPath, ok := request.Params.Arguments["project_path"]
 		if !ok || projectPath == "" {
 			projectPath = "."
-			logger.Sugar.Warnw("Project path not provided, using current directory", "dir", projectPath)
+			term.Warn("Project path not provided, using current directory", "dir", projectPath)
 		}
 
 		return mcp.NewGetPromptResult(

@@ -8,7 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/auth"
-	"github.com/DefangLabs/defang/src/pkg/mcp/logger"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
@@ -18,7 +18,7 @@ import (
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
 func setupDestroyTool(s *server.MCPServer) {
-	logger.Sugar.Info("Creating destroy tool")
+	term.Info("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
 		mcp.WithDescription("Remove services using defang. Only one argument should be given and used at a time"),
 
@@ -26,19 +26,19 @@ func setupDestroyTool(s *server.MCPServer) {
 			mcp.Description("Path to current working directory"),
 		),
 	)
-	logger.Sugar.Debug("Destroy tool created")
+	term.Debug("Destroy tool created")
 
 	// Add the destroy tool handler - make it non-blocking
-	logger.Sugar.Info("Adding destroy tool handler")
+	term.Info("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		logger.Sugar.Info("Compose down tool called - removing services")
+		term.Info("Compose down tool called - removing services")
 
 		token := auth.GetExistingToken()
 
 		grpcClient := client.NewGrpcClient(auth.Host, token, types.TenantName(""))
 		provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
 		if err != nil {
-			logger.Sugar.Errorw("Failed to get new provider", "error", err)
+			term.Error("Failed to get new provider", "error", err)
 
 			return mcp.NewToolResultText("Failed to get new provider. See logs for details."), nil
 		}
@@ -47,7 +47,7 @@ func setupDestroyTool(s *server.MCPServer) {
 		if !ok || wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {
-				logger.Sugar.Errorw("Failed to change working directory", "error", err)
+				term.Error("Failed to change working directory", "error", err)
 			}
 		}
 
@@ -55,13 +55,13 @@ func setupDestroyTool(s *server.MCPServer) {
 
 		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
-			logger.Sugar.Errorw("Failed to load project name", "error", err)
+			term.Error("Failed to load project name", "error", err)
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to load project name: %v", err)), nil
 		}
 
 		err = canIUseProvider(ctx, grpcClient, projectName, provider)
 		if err != nil {
-			logger.Sugar.Errorw("Failed to use provider", "error", err)
+			term.Error("Failed to use provider", "error", err)
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to use provider: %v", err)), nil
 		}
 
@@ -69,7 +69,7 @@ func setupDestroyTool(s *server.MCPServer) {
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				logger.Sugar.Warnw("Project not found", "error", err)
+				term.Warn("Project not found", "error", err)
 				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), nil
 			}
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to destroy project: %v", err)), nil
@@ -87,7 +87,7 @@ func canIUseProvider(ctx context.Context, grpcClient client.GrpcClient, projectN
 
 	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		logger.Sugar.Errorw("Failed to use provider", "error", err)
+		term.Error("Failed to use provider", "error", err)
 		return fmt.Errorf("failed to use provider: %w", err)
 	}
 

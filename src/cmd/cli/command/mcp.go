@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/logger"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
@@ -28,24 +28,17 @@ var mcpServerCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Initialize the terminal with our custom writers
-		logger.InitTerminal()
-
-		// Initialize logger
-		logger.InitLogger()
-
-		defer logger.Logger.Sync()
 
 		// Setup knowledge base
 		if err := mcp.SetupKnowledgeBase(); err != nil {
-			logger.Sugar.Errorw("Failed to setup knowledge base", "error", err)
+			term.Error("Failed to setup knowledge base", "error", err)
 			return err
 		}
 
-		logger.Sugar.Info("Starting Defang MCP server")
+		term.Info("Starting Defang MCP server")
 
 		// Create a new MCP server
-		logger.Sugar.Info("Creating MCP server")
+		term.Info("Creating MCP server")
 		s := server.NewMCPServer(
 			"Defang Services",
 			"1.0.0",
@@ -56,7 +49,7 @@ var mcpServerCmd = &cobra.Command{
 			server.WithInstructions("You are an MCP server for Defang Services. Your role is to manage and deploy services efficiently using the provided tools and resources."),
 		)
 
-		logger.Sugar.Info("MCP server created successfully")
+		term.Info("MCP server created successfully")
 
 		// Setup resources
 		resources.SetupResources(s)
@@ -65,13 +58,13 @@ var mcpServerCmd = &cobra.Command{
 		tools.SetupTools(s)
 
 		// Start the server
-		logger.Sugar.Info("Starting Defang Services MCP server")
+		term.Info("Starting Defang Services MCP server")
 		if err := server.ServeStdio(s); err != nil {
-			logger.Sugar.Errorw("Server error", "error", err)
+			term.Error("Server error", "error", err)
 			return err
 		}
 
-		logger.Sugar.Info("Server shutdown")
+		term.Info("Server shutdown")
 
 		return nil
 	},

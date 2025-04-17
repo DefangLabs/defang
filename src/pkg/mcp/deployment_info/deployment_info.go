@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/logger"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -26,7 +26,7 @@ type Service struct {
 }
 
 func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]Service, error) {
-	logger.Sugar.Infof("Listing services in project %q", projectName)
+	term.Infof("Listing services in project %q", projectName)
 
 	getServicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
