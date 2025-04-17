@@ -194,7 +194,7 @@ func getClientConfigPath(client string) (string, error) {
 func getDefangMCPConfig() MCPServerConfig {
 	return MCPServerConfig{
 		Command: "defang",
-		Args:    []string{"-C", "/Users/defang/bin", "mcp", "serve"},
+		Args:    []string{"mcp", "serve"},
 	}
 }
 
@@ -203,7 +203,7 @@ func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
 	return VSCodeMCPServerConfig{
 		Type:    "stdio",
 		Command: "defang",
-		Args:    []string{"-C", "/Users/defang/bin", "mcp", "serve"},
+		Args:    []string{"mcp", "serve"},
 	}
 }
 
