@@ -105,7 +105,7 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
-	// This is used to open the browser for GitHub Auth before blocking
+	// TODO:This is used to open the browser for GitHub Auth before blocking
 	browser.OpenURL(server.URL)
 
 	input := term.NewNonBlockingStdin()

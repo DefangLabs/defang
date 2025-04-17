@@ -269,6 +269,11 @@ func SetupCommands(ctx context.Context, version string) {
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
+	// MCP Command
+	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpCmd.AddCommand(mcpServerCmd)
+	RootCmd.AddCommand(mcpCmd)
+
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
 	sendCmd.Flags().StringP("type", "t", "", "type of message to send (required)")
