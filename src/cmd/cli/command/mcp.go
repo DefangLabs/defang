@@ -307,15 +307,13 @@ var mcpSetupCmd = &cobra.Command{
 			return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, GetValidClientsString())
 		}
 
-		fmt.Printf("Setting up MCP client for: %s\n", client)
-
 		// Get the config path for the client
 		configPath, err := getClientConfigPath(client)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Config path: %s\n", configPath)
+		term.Infof("Updating %q\n", configPath)
 
 		// Create the directory if it doesn't exist
 		configDir := filepath.Dir(configPath)
@@ -368,12 +366,7 @@ var mcpSetupCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("Successfully configured %s to use Defang MCP server\n", client)
-
-		// Prompt to restart the client if it's running
-		if err := PromptForRestart(client); err != nil {
-			fmt.Printf("Warning: Failed to restart client: %v\n", err)
-		}
+		term.Infof("Restart %s for the changes to take effect.\n", client)
 
 		return nil
 	},
