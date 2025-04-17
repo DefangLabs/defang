@@ -6,14 +6,16 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 const (
 	AskDefangBaseURL      = "https://ask.defang.io"
 	DocumentationEndpoint = "data"
-	KnowledgeBaseDir      = "./knowledge_base"
 )
+
+var KnowledgeBaseDir = client.StateDir
 
 func SetupKnowledgeBase() error {
 	term.Info("Setting up knowledge base")
