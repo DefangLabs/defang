@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -125,12 +126,7 @@ var ValidClients = []string{
 
 // IsValidClient checks if the provided client is in the list of valid clients
 func IsValidClient(client string) bool {
-	for _, validClient := range ValidClients {
-		if validClient == client {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ValidClients, client)
 }
 
 // getClientConfigPath returns the path to the config file for the given client
