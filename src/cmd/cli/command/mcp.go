@@ -146,7 +146,7 @@ func getClientConfigPath(client string) (string, error) {
 	}
 
 	var configPath string
-	switch client {
+	switch strings.ToLower(client) {
 	case "windsurf", "cascade", "codeium":
 		configPath = filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json")
 	case "claude":
