@@ -9,5 +9,5 @@ defang-arm64
 dist/
 distx/
 defang.exe
-
-
+samples_examples.json
+knowledge_base.json

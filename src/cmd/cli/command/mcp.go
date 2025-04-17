@@ -30,6 +30,7 @@ var mcpServerCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		// Write a log file
 		logFile, err := os.OpenFile(filepath.Join(cilCilent.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			term.Error("Failed to open log file", "error", err)
@@ -37,6 +38,7 @@ var mcpServerCmd = &cobra.Command{
 		}
 		defer logFile.Close()
 
+		// TODO: Should we still write to a file or we can go back to stderr
 		term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
 
 		// Setup knowledge base
@@ -193,8 +195,8 @@ func getClientConfigPath(client string) (string, error) {
 // getDefangMCPConfig returns the default MCP config for Defang
 func getDefangMCPConfig() MCPServerConfig {
 	return MCPServerConfig{
-		Command: "defang",
-		Args:    []string{"-C", "/Users/defang/bin", "mcp", "serve"},
+		Command: "npx",
+		Args:    []string{"-y", "defang", "mcp", "serve"},
 	}
 }
 
@@ -202,8 +204,8 @@ func getDefangMCPConfig() MCPServerConfig {
 func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
 	return VSCodeMCPServerConfig{
 		Type:    "stdio",
-		Command: "defang",
-		Args:    []string{"-C", "/Users/defang/bin", "mcp", "serve"},
+		Command: "npx",
+		Args:    []string{"-y", "defang", "mcp", "serve"},
 	}
 }
 
