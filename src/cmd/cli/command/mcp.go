@@ -294,72 +294,80 @@ var mcpSetupCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _ := cmd.Flags().GetString("client")
 		client = strings.ToLower(client)
-		// Validate client
-		if !IsValidClient(client) {
-			return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, strings.Join(ValidClients, ", "))
-		}
-
-		// Get the config path for the client
-		configPath, err := getClientConfigPath(client)
-		if err != nil {
+		if err := SetupMCPClient(client); err != nil {
 			return err
 		}
 
-		term.Infof("Updating %q\n", configPath)
+		return nil
+	},
+}
 
-		// Create the directory if it doesn't exist
-		configDir := filepath.Dir(configPath)
-		if err := os.MkdirAll(configDir, 0755); err != nil {
-			return fmt.Errorf("failed to create config directory: %w", err)
+func SetupMCPClient(client string) error {
+	// Validate client
+	if !IsValidClient(client) {
+		return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, strings.Join(ValidClients, ", "))
+	}
+
+	// Get the config path for the client
+	configPath, err := getClientConfigPath(client)
+	if err != nil {
+		return err
+	}
+
+	term.Infof("Updating %q\n", configPath)
+
+	// Create the directory if it doesn't exist
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Handle VSCode settings.json specially
+	if client == "vscode" {
+		if err := handleVSCodeConfig(configPath); err != nil {
+			return err
 		}
+	} else {
+		// For all other clients, use the standard format
+		var config MCPConfig
 
-		// Handle VSCode settings.json specially
-		if client == "vscode" {
-			if err := handleVSCodeConfig(configPath); err != nil {
-				return err
+		// Check if the file exists
+		if _, err := os.Stat(configPath); err == nil {
+			// File exists, read it
+			data, err := os.ReadFile(configPath)
+			if err != nil {
+				return fmt.Errorf("failed to read config file: %w", err)
 			}
-		} else {
-			// For all other clients, use the standard format
-			var config MCPConfig
 
-			// Check if the file exists
-			if _, err := os.Stat(configPath); err == nil {
-				// File exists, read it
-				data, err := os.ReadFile(configPath)
-				if err != nil {
-					return fmt.Errorf("failed to read config file: %w", err)
-				}
-
-				// Parse the JSON
-				if err := json.Unmarshal(data, &config); err != nil {
-					// If we can't parse it, start fresh
-					config = MCPConfig{
-						MCPServers: make(map[string]MCPServerConfig),
-					}
-				}
-			} else {
-				// File doesn't exist, create a new config
+			// Parse the JSON
+			if err := json.Unmarshal(data, &config); err != nil {
+				// If we can't parse it, start fresh
 				config = MCPConfig{
 					MCPServers: make(map[string]MCPServerConfig),
 				}
 			}
-
-			// Add or update the Defang MCP server config
-			config.MCPServers["defang"] = getDefangMCPConfig()
-
-			// Write the config to the file
-			data, err := json.MarshalIndent(config, "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to marshal config: %w", err)
-			}
-
-			if err := os.WriteFile(configPath, data, 0644); err != nil {
-				return fmt.Errorf("failed to write config file: %w", err)
+		} else {
+			// File doesn't exist, create a new config
+			config = MCPConfig{
+				MCPServers: make(map[string]MCPServerConfig),
 			}
 		}
 
-		term.Infof("Restart %s for the changes to take effect.\n", client)
+		// Add or update the Defang MCP server config
+		config.MCPServers["defang"] = getDefangMCPConfig()
 
-		return nil
-	},
+		// Write the config to the file
+		data, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal config: %w", err)
+		}
+
+		if err := os.WriteFile(configPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write config file: %w", err)
+		}
+	}
+
+	term.Infof("Restart %s for the changes to take effect.\n", client)
+
+	return nil
 }
