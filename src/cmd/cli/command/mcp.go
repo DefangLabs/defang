@@ -297,6 +297,7 @@ var mcpSetupCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _ := cmd.Flags().GetString("client")
+		client = strings.ToLower(client)
 		// Validate client
 		if !IsValidClient(client) {
 			return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, strings.Join(ValidClients, ", "))
