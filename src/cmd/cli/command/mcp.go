@@ -133,11 +133,6 @@ func IsValidClient(client string) bool {
 	return false
 }
 
-// GetValidClientsString returns a formatted string of valid clients
-func GetValidClientsString() string {
-	return strings.Join(ValidClients, ", ")
-}
-
 // getClientConfigPath returns the path to the config file for the given client
 func getClientConfigPath(client string) (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -304,7 +299,7 @@ var mcpSetupCmd = &cobra.Command{
 		client, _ := cmd.Flags().GetString("client")
 		// Validate client
 		if !IsValidClient(client) {
-			return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, GetValidClientsString())
+			return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, strings.Join(ValidClients, ", "))
 		}
 
 		// Get the config path for the client
