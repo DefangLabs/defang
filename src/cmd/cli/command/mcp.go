@@ -367,6 +367,12 @@ var mcpSetupCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Successfully configured %s to use Defang MCP server\n", client)
+
+		// Prompt to restart the client if it's running
+		if err := PromptForRestart(client); err != nil {
+			fmt.Printf("Warning: Failed to restart client: %v\n", err)
+		}
+
 		return nil
 	},
 }
