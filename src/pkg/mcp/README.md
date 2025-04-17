@@ -2,7 +2,7 @@
 
 # Defang MCP Server
 
-This folder contains a Model Context Protocol (MCP) server with built-in Defang tools (`deploy`, `destroy`, `login`, `services`) to allow users to manage their services with AI coding agents in a supported IDE.
+This folder contains a Model Context Protocol (MCP) server with built-in Defang tools (`deploy`, `services`, `destroy`) to allow users to manage their services with AI coding agents in a supported IDE.
 
 Below is an installation guide to get started.
 
@@ -60,14 +60,10 @@ Below are the tools available in the Defang MCP Server.
 
 The `deploy` tool scans your project directory for Dockerfiles and `compose.yaml` files, then deploys the detected service(s) using Defang. You can monitor the deployment process in the Defang Portal.
 
-### `destroy`
-
-Given a project name or directory, the `destroy` tool identifies any services deployed with Defang and terminates them. If no services are found, it will display an appropriate message.
-
-### `login`
-
-The `login` tool will open a browser to the Portal to authenticate to Defang. Once you are logged in, a session token is stored, and you will not need to log in again until the session expires or you manually log out.
-
 ### `services`
 
 The `services` tool displays the details of all your services that are currently deployed with Defang. It shows the Service Name, Deployment ID, Public URL and Service Status. If there are no services found, it will display an appropriate message.
+
+### `destroy`
+
+Given a project name or directory, the `destroy` tool identifies any services deployed with Defang and terminates them. If no services are found, it will display an appropriate message.
