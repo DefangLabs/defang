@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	cilCilent "github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -30,7 +30,7 @@ var mcpServerCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		logFile, err := os.OpenFile(filepath.Join(cilCilent.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			term.Error("Failed to open log file", "error", err)
 			return err
