@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/browser"
 
@@ -104,15 +103,9 @@ func setupDeployTool(s *server.MCPServer) {
 		// Success case
 		term.Info("Successfully started deployed services", "etag", deployResp.Etag)
 
-		// Create a simple output for the tool result
-		var output strings.Builder
-
 		// Log deployment success
 		term.Info("Deployment Started!")
 		term.Infof("Deployment ID: %s", deployResp.Etag)
-
-		// Add minimal information to output for tool result
-		output.WriteString("Deployment Started. See logs tool for details.")
 
 		// Log browser preview information
 		term.Infof("🌐 %s available", portalURL)
@@ -139,6 +132,8 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) stri
 	// Log portal URLs for monitoring services
 	term.Info("Monitor your services' status in the defang portal")
 
+	// TODO: print all of the urls instead of just the first one.
+	// the user may have many publicly accessible services
 	// Store the first URL to return for browser preview
 	var firstURL string
 
