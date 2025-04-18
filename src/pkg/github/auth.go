@@ -103,29 +103,30 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (strin
 	}
 	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
 
+	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
+	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
+
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if !prompt {
 		browser.OpenURL(server.URL)
-	} else {
-		n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
-		defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
-		input := term.NewNonBlockingStdin()
-		defer input.Close() // abort the read
-		go func() {
-			var b [1]byte
-			for {
-				if _, err := input.Read(b[:]); err != nil {
-					return // exit goroutine
-				}
-				switch b[0] {
-				case 3: // Ctrl-C
-					cancel()
-				case 10, 13: // Enter or Return
-					browser.OpenURL(server.URL)
-				}
-			}
-		}()
 	}
+
+	input := term.NewNonBlockingStdin()
+	defer input.Close() // abort the read
+	go func() {
+		var b [1]byte
+		for {
+			if _, err := input.Read(b[:]); err != nil {
+				return // exit goroutine
+			}
+			switch b[0] {
+			case 3: // Ctrl-C
+				cancel()
+			case 10, 13: // Enter or Return
+				browser.OpenURL(server.URL)
+			}
+		}
+	}()
 
 	select {
 	case <-ctx.Done():
