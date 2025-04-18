@@ -7,9 +7,8 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/auth"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,7 +16,7 @@ import (
 )
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
-func setupDestroyTool(s *server.MCPServer) {
+func setupDestroyTool(s *server.MCPServer, client client.GrpcClient) {
 	term.Info("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
 		mcp.WithDescription("Remove services using defang. Only one argument should be given and used at a time"),
@@ -33,14 +32,11 @@ func setupDestroyTool(s *server.MCPServer) {
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Info("Compose down tool called - removing services")
 
-		token := auth.GetExistingToken()
-
-		grpcClient := client.NewGrpcClient(auth.Host, token, types.TenantName(""))
-		provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
+		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
-			return mcp.NewToolResultText("Failed to get new provider. See logs for details."), nil
+			return mcp.NewToolResultText(fmt.Sprintf("Failed to get new provider: %v", err)), nil
 		}
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
@@ -53,19 +49,19 @@ func setupDestroyTool(s *server.MCPServer) {
 
 		loader := configureLoader(request)
 
-		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			term.Error("Failed to load project name", "error", err)
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to load project name: %v", err)), nil
 		}
 
-		err = canIUseProvider(ctx, grpcClient, projectName, provider)
+		err = canIUseProvider(ctx, client, projectName, provider)
 		if err != nil {
 			term.Error("Failed to use provider", "error", err)
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to use provider: %v", err)), nil
 		}
 
-		deployment, err := cli.ComposeDown(ctx, projectName, grpcClient, provider)
+		deployment, err := cli.ComposeDown(ctx, projectName, client, provider)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found

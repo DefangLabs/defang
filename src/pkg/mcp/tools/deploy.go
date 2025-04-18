@@ -11,17 +11,16 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/mcp/auth"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer) {
+func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
 	term.Info("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -56,11 +55,7 @@ func setupDeployTool(s *server.MCPServer) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
-		token := auth.GetExistingToken()
-
-		// Get fabric client and provider
-		grpcClient := client.NewGrpcClient(auth.Host, token, types.TenantName(""))
-		provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
+		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
@@ -74,7 +69,7 @@ func setupDeployTool(s *server.MCPServer) {
 		term.Infof("Defang managed services: %v and unmanaged services: %v", managedServices, unmanagedServices)
 
 		// Use ComposeUp to deploy the services
-		deployResp, project, err := cli.ComposeUp(ctx, project, grpcClient, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			err = fmt.Errorf("failed to compose up services: %w", err)
 			term.Error("Failed to compose up services", "error", err)

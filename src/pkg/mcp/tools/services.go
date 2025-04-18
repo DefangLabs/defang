@@ -10,17 +10,16 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/auth"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer) {
+func setupServicesTool(s *server.MCPServer, client client.GrpcClient) {
 	term.Info("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang"),
@@ -46,17 +45,14 @@ func setupServicesTool(s *server.MCPServer) {
 
 		loader := configureLoader(request)
 
-		token := auth.GetExistingToken()
-
 		// Create a Defang client
-		grpcClient := client.NewGrpcClient(auth.Host, token, types.TenantName(""))
-		provider, err := cli.NewProvider(ctx, client.ProviderDefang, grpcClient)
+		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to create provider", "error", err)
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to create provider: %v", err)), nil
 		}
 
-		projectName, err := client.LoadProjectNameWithFallback(ctx, loader, provider)
+		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		term.Info("Project name loaded", "project", projectName)
 		if err != nil {
 			if strings.Contains(err.Error(), "no projects found") {
