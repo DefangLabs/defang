@@ -66,7 +66,6 @@ var mcpServerCmd = &cobra.Command{
 		// Start the server
 		term.Info("Starting Defang Services MCP server")
 		if err := server.ServeStdio(s); err != nil {
-			term.Error("Server error", "error", err)
 			return err
 		}
 
