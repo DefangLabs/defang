@@ -23,7 +23,7 @@ func setupLoginTool(s *server.MCPServer, client client.GrpcClient, cluster strin
 	term.Info("Adding login tool handler")
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Test token
-		err := cli.InteractiveLogin(ctx, client, gitHubClientId, cluster)
+		err := cli.InteractiveLogin(ctx, client, gitHubClientId, cluster, true)
 		if err != nil {
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to login: %v", err)), nil
 		}
