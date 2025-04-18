@@ -28,7 +28,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 	docResource := mcp.NewResource(
 		"doc:///knowledge_base/knowledge_base.json",
 		"knowledge_base",
-		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the samples examples resource"),
+		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the samples resource"),
 		mcp.WithMIMEType("application/json"),
 	)
 
