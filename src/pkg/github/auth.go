@@ -107,7 +107,7 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (strin
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
-	if !prompt {
+	if prompt {
 		browser.OpenURL(server.URL)
 	}
 

@@ -369,7 +369,7 @@ var RootCmd = &cobra.Command{
 				term.Warn("Please log in to continue.")
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster()); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
 					return err
 				}
 
@@ -407,7 +407,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster())
+			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false)
 			if err != nil {
 				return err
 			}
