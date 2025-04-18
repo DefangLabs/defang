@@ -64,7 +64,6 @@ func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
 		// Deploy the services
 		term.Infof("Deploying services for project %s...", project.Name)
 
-
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
