@@ -272,7 +272,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpCmd.AddCommand(mcpServerCmd)
-	mcpSetupCmd.Flags().String("client", "", "MCP client to setup (supported options: claude, windsurf, cursor, vscode)")
+	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
 	mcpSetupCmd.MarkFlagRequired("client")
 	RootCmd.AddCommand(mcpCmd)
 

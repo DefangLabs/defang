@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/browser"
 
@@ -65,8 +64,6 @@ func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
 		// Deploy the services
 		term.Infof("Deploying services for project %s...", project.Name)
 
-		managedServices, unmanagedServices := cli.SplitManagedAndUnmanagedServices(project.Services)
-		term.Infof("Defang managed services: %v and unmanaged services: %v", managedServices, unmanagedServices)
 
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
@@ -99,15 +96,9 @@ func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
 		// Success case
 		term.Info("Successfully started deployed services", "etag", deployResp.Etag)
 
-		// Create a simple output for the tool result
-		var output strings.Builder
-
 		// Log deployment success
 		term.Info("Deployment Started!")
 		term.Infof("Deployment ID: %s", deployResp.Etag)
-
-		// Add minimal information to output for tool result
-		output.WriteString("Deployment Started. See logs tool for details.")
 
 		// Log browser preview information
 		term.Infof("🌐 %s available", portalURL)
@@ -134,6 +125,8 @@ func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) stri
 	// Log portal URLs for monitoring services
 	term.Info("Monitor your services' status in the defang portal")
 
+	// TODO: print all of the urls instead of just the first one.
+	// the user may have many publicly accessible services
 	// Store the first URL to return for browser preview
 	var firstURL string
 

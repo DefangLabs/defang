@@ -1,78 +1,69 @@
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
-# defang-mcp
-This repository contains a Model Context Protocol (MCP) server with built-in tools to allow users to deploy with [Defang](https://defang.io/) through a supported IDE. Below are the instructions and installation guide to get started.
 
+# Defang MCP Server
 
-## Prerequisites
-You need to have Golang installed on your machine.
+This folder contains a Model Context Protocol (MCP) server with built-in Defang tools (`deploy`, `services`, `destroy`) to allow users to manage their services with AI coding agents in a supported IDE.
 
-- Install with brew
-    ```sh
-    brew install go
-    ```
-
-- Install with [Go installtion wizard](https://go.dev/doc/install)<br>
-
-<br>
-
-One of the supported IDEs:
-  - Cursor
-  - Windsurf
-  - VSCode 
-  - Claude Desktop (while not an IDE, it supports MCP servers)
-
-
-
-## Manual Installation
-1. Clone this repo and cd into it
-```sh
-git clone https://github.com/DefangLabs/defang-mcp.git
-cd defang-mcp
-```
-
-2. Run `go run main.go` to make the server start without any issues
-
-3. Then set up the config file for your IDE with the MCP client you are using with 
-```json
-{
-  "mcpServers": {
-  "defang": {
-        "command": "<Your-path>/go",
-        "args": ["-C", "<Your-path-to-Repository>/defang-mcp", "run", "main.go"]
-      }
-  }
-}
-```
-
-Config file locations:
-
-- [Cursor](https://docs.cursor.com/context/model-context-protocol#configuring-mcp-servers): `~/.cursor/mcp.json`
-- [Windsurf](https://docs.windsurf.com/windsurf/mcp#adding-a-new-server): `~/.codeium/windsurf/mcp_config.json`
-- [VSCode](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server): `~/.vscode/mcp.json`
-- [Claude Desktop](https://modelcontextprotocol.io/quickstart/user): `~/.claude/mcp_config.json`
+Below is an installation guide to get started.
 
 ## Installation
 
-Run 
-```sh
- go install github.com/DefangLabs/defang-mcp@latest
+Connect the MCP server with your IDE by running the following command in your terminal:
+
+```bash
+defang mcp setup --client=<your-ide>
 ```
 
-### [VSCode and VSCode Insiders](https://code.visualstudio.com/)
-```sh
-code --add-mcp "{\"name\":\"defang\",\"command\":\"~/go/bin/defang-mcp\",\"args\": [\"serve\"]}"
+Replace `<your-ide>` with the name of your preferred IDE. See our list of [Supported IDEs](#supported-ides).
+
+After setup, you can start the MCP server with the command:
+
+```bash
+defang mcp serve
 ```
 
-### [Claude Desktop](https://claude.ai/)
-```sh
-claude mcp add defang -- /Users/defang/go/bin/defang-mcp serve
+Once the server is running, you can access the Defang MCP tools directly through the AI agent chat in your IDE.
+
+## Supported IDEs
+
+### Cursor
+
+```bash
+defang mcp setup --client=cursor
 ```
 
-### [Windsurf](https://windsurf.com/editor)
-- Refer to [Manual Installation](#manual-installation)
+### Windsurf
 
-### [Cursor](https://cursor.sh/)
-- Refer to [Manual Installation](#manual-installation)
+```bash
+defang mcp setup --client=windsurf
+```
 
+### VSCode
 
+```bash
+defang mcp setup --client=vscode
+```
 
+### Claude Desktop
+
+(While this is not an IDE in the traditional sense, it can support MCP servers.)
+
+```bash
+defang mcp setup --client=claude
+```
+
+## MCP Tools
+
+Below are the tools available in the Defang MCP Server.
+
+### `deploy`
+
+The `deploy` tool scans your project directory for Dockerfiles and `compose.yaml` files, then deploys the detected service(s) using Defang. You can monitor the deployment process in the Defang Portal.
+
+### `services`
+
+The `services` tool displays the details of all your services that are currently deployed with Defang. It shows the Service Name, Deployment ID, Public URL and Service Status. If there are no services found, it will display an appropriate message.
+
+### `destroy`
+
+Given a project name or directory, the `destroy` tool identifies any services deployed with Defang and terminates them. If no services are found, it will display an appropriate message.

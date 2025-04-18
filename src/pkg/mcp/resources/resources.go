@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -22,19 +23,22 @@ func SetupResources(s *server.MCPServer) {
 	setupSamplePrompt(s)
 }
 
+var knowledgeBasePath = client.StateDir + "/knowledge_base.json"
+var samplesExamplesPath = client.StateDir + "/samples_examples.json"
+
 // setupDocumentationResource configures and adds the documentation resource to the MCP server
 func setupDocumentationResource(s *server.MCPServer) {
 	term.Info("Creating documentation resource")
 	docResource := mcp.NewResource(
 		"doc:///knowledge_base/knowledge_base.json",
 		"knowledge_base",
-		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the samples examples resource"),
+		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the samples resource"),
 		mcp.WithMIMEType("application/json"),
 	)
 
 	s.AddResource(docResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		// Read the file
-		file, err := os.ReadFile("knowledge_base/knowledge_base.json")
+		file, err := os.ReadFile(knowledgeBasePath)
 		if err != nil {
 			term.Error("Failed to read resource file", "error", err, "path", "knowledge_base.json")
 			return nil, fmt.Errorf("failed to read resource file knowledge_base.json: %w", err)
@@ -64,7 +68,7 @@ func setupSamplesResource(s *server.MCPServer) {
 	// Add samples examples resource
 	s.AddResource(samplesResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		// Read the file
-		file, err := os.ReadFile("knowledge_base/samples_examples.json")
+		file, err := os.ReadFile(samplesExamplesPath)
 		if err != nil {
 			term.Error("Failed to read resource file", "error", err, "path", "samples_examples.json")
 			return nil, fmt.Errorf("failed to read resource file samples_examples.json: %w", err)
