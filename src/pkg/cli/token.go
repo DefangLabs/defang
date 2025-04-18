@@ -17,7 +17,7 @@ func Token(ctx context.Context, client client.FabricClient, clientId string, ten
 		return ErrDryRun
 	}
 
-	code, err := github.StartAuthCodeFlow(ctx, clientId)
+	code, err := github.StartAuthCodeFlow(ctx, clientId, false)
 	if err != nil {
 		return err
 	}
