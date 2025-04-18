@@ -116,8 +116,8 @@ func getClientConfigPath(client string) (string, error) {
 // getDefangMCPConfig returns the default MCP config for Defang
 func getDefangMCPConfig() MCPServerConfig {
 	return MCPServerConfig{
-		Command: "defang",
-		Args:    []string{"mcp", "serve"},
+		Command: "npx",
+		Args:    []string{"-y", "defang", "mcp", "serve"},
 	}
 }
 
@@ -125,8 +125,8 @@ func getDefangMCPConfig() MCPServerConfig {
 func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
 	return VSCodeMCPServerConfig{
 		Type:    "stdio",
-		Command: "defang",
-		Args:    []string{"mcp", "serve"},
+		Command: "npx",
+		Args:    []string{"-y", "defang", "mcp", "serve"},
 	}
 }
 
