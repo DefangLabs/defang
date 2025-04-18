@@ -55,8 +55,6 @@ var mcpServerCmd = &cobra.Command{
 			server.WithInstructions("You are an MCP server for Defang Services. Your role is to manage and deploy services efficiently using the provided tools and resources."),
 		)
 
-		term.Info("MCP server created successfully")
-
 		// Setup resources
 		resources.SetupResources(s)
 
