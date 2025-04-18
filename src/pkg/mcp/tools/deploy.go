@@ -69,8 +69,6 @@ func setupDeployTool(s *server.MCPServer) {
 		// Deploy the services
 		term.Infof("Deploying services for project %s...", project.Name)
 
-		managedServices, unmanagedServices := cli.SplitManagedAndUnmanagedServices(project.Services)
-		term.Infof("Defang managed services: %v and unmanaged services: %v", managedServices, unmanagedServices)
 
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, grpcClient, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
