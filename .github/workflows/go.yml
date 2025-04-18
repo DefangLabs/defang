@@ -436,7 +436,7 @@ jobs:
 
   on-failure:
     runs-on: ubuntu-latest
-    if: failure()
+    if: failure() && github.ref == 'refs/heads/main'
     needs: [go-test, go-playground-test, build-and-sign-mac, build-and-sign, nix-shell-test]
     steps:
     - name: Slack Notification
