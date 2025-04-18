@@ -8,10 +8,12 @@ Below is an installation guide to get started.
 
 ## Installation
 
+First, make sure you have the [npm package manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) installed.
+
 Connect the MCP server with your IDE by running the following command in your terminal:
 
 ```bash
-defang mcp setup --client=<your-ide>
+npx -y defang mcp setup --client=<your-ide>
 ```
 
 Replace `<your-ide>` with the name of your preferred IDE. See our list of [Supported IDEs](#supported-ides).
@@ -19,7 +21,7 @@ Replace `<your-ide>` with the name of your preferred IDE. See our list of [Suppo
 After setup, you can start the MCP server with the command:
 
 ```bash
-defang mcp serve
+npx -y defang mcp serve
 ```
 
 Once the server is running, you can access the Defang MCP tools directly through the AI agent chat in your IDE.
@@ -29,19 +31,19 @@ Once the server is running, you can access the Defang MCP tools directly through
 ### Cursor
 
 ```bash
-defang mcp setup --client=cursor
+npx -y defang mcp setup --client=cursor
 ```
 
 ### Windsurf
 
 ```bash
-defang mcp setup --client=windsurf
+npx -y defang mcp setup --client=windsurf
 ```
 
 ### VSCode
 
 ```bash
-defang mcp setup --client=vscode
+npx -y defang mcp setup --client=vscode
 ```
 
 ### Claude Desktop
@@ -49,7 +51,7 @@ defang mcp setup --client=vscode
 (While this is not an IDE in the traditional sense, it can support MCP servers.)
 
 ```bash
-defang mcp setup --client=claude
+npx -y defang mcp setup --client=claude
 ```
 
 ## MCP Tools
