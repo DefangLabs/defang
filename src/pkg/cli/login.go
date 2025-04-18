@@ -47,7 +47,7 @@ func (g GitHubAuthService) login(
 ) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId)
+	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId, true)
 	if err != nil {
 		return "", err
 	}
