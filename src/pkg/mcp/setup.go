@@ -117,7 +117,7 @@ func getClientConfigPath(client string) (string, error) {
 func getDefangMCPConfig() MCPServerConfig {
 	return MCPServerConfig{
 		Command: "npx",
-		Args:    []string{"-y", "defang", "mcp", "serve"},
+		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
 	}
 }
 
@@ -126,7 +126,7 @@ func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
 	return VSCodeMCPServerConfig{
 		Type:    "stdio",
 		Command: "npx",
-		Args:    []string{"-y", "defang", "mcp", "serve"},
+		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
 	}
 }
 
