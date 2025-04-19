@@ -69,8 +69,13 @@ labels."run.googleapis.com/execution_name" = %q`, executionName)
 	q.AddQuery(query)
 }
 
-func (q *Query) AddJobLogQuery(project, etag string, services []string) {
+func (q *Query) AddJobLogQuery(stack, project, etag string, services []string) {
 	query := `resource.type = "cloud_run_job"`
+
+	if stack != "" {
+		query += fmt.Sprintf(`
+labels."defang-stack" = %q`, stack)
+	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
@@ -79,7 +84,7 @@ labels."defang-project" = %q`, project)
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag"=%q`, etag)
+labels."defang-etag" = %q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -90,12 +95,22 @@ labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	q.AddQuery(query)
 }
 
-func (q *Query) AddServiceLogQuery(project, etag string, services []string) {
+func (q *Query) AddServiceLogQuery(stack, project, etag string, services []string) {
 	query := `resource.type="cloud_run_revision"`
 
+	if stack != "" {
+		query += fmt.Sprintf(`
+labels."defang-stack" = %q`, stack)
+	}
+
+	if project != "" {
+		query += fmt.Sprintf(`
+labels."defang-project" = %q`, project)
+	}
+
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag"=%q`, etag)
+labels."defang-etag" = %q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -103,20 +118,25 @@ labels."defang-etag"=%q`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project"=%q`, project)
-	}
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddComputeEngineLogQuery(project, etag string, services []string) {
+func (q *Query) AddComputeEngineLogQuery(stack, project, etag string, services []string) {
 	query := `resource.type="gce_instance"`
 
+	if stack != "" {
+		query += fmt.Sprintf(`
+labels."defang-stack" = %q`, stack)
+	}
+
+	if project != "" {
+		query += fmt.Sprintf(`
+labels."defang-project" = %q`, project)
+	}
+
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag"=%q`, etag)
+labels."defang-etag" = %q`, etag)
 	}
 
 	if len(services) > 0 {
@@ -124,17 +144,13 @@ labels."defang-etag"=%q`, etag)
 labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
 	}
 
-	if project != "" {
-		query += fmt.Sprintf(`
-labels."defang-project"=%q`, project)
-	}
-
 	q.AddQuery(query)
 }
 
-func (q *Query) AddCloudBuildLogQuery(project, etag string, services []string) {
+func (q *Query) AddCloudBuildLogQuery(stack, project, etag string, services []string) {
 	query := `resource.type="build"`
 
+	// FIXME: Support stack
 	servicesRegex := `[a-zA-Z0-9-]{1,63}`
 	if len(services) > 0 {
 		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|"))
@@ -152,8 +168,13 @@ func (q *Query) AddJobExecutionUpdateQuery(executionName string) {
 	q.AddQuery(fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, executionName))
 }
 
-func (q *Query) AddJobStatusUpdateRequestQuery(project string, etag string, services []string) {
+func (q *Query) AddJobStatusUpdateRequestQuery(stack, project, etag string, services []string) {
 	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Jobs.UpdateJob" OR "google.cloud.run.v2.Jobs.CreateJob"`
+
+	if stack != "" {
+		reqQuery += fmt.Sprintf(`
+protoPayload.request.job.template.labels."defang-stack"=%q`, stack)
+	}
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
@@ -173,8 +194,13 @@ protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, strings.Jo
 	q.AddQuery(reqQuery)
 }
 
-func (q *Query) AddJobStatusUpdateResponseQuery(project string, etag string, services []string) {
+func (q *Query) AddJobStatusUpdateResponseQuery(stack, project, etag string, services []string) {
 	resQuery := `protoPayload.methodName="/Jobs.RunJob" OR "/Jobs.CreateJob" OR "/Jobs.UpdateJob"`
+
+	if stack != "" {
+		resQuery += fmt.Sprintf(`
+protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, stack)
+	}
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
@@ -194,12 +220,17 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 	q.AddQuery(resQuery)
 }
 
-func (q *Query) AddServiceStatusRequestUpdate(project, etag string, services []string) {
+func (q *Query) AddServiceStatusRequestUpdate(stack, project, etag string, services []string) {
 	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService"`
+
+	if stack != "" {
+		reqQuery += fmt.Sprintf(`
+protoPayload.request.service.template.labels."defang-stack"=%q`, stack)
+	}
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"=%q`, project)
+protoPayload.request.service.template.labels."defang-project"=%q`, project)
 	}
 
 	if etag != "" {
@@ -215,8 +246,13 @@ protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, string
 	q.AddQuery(reqQuery)
 }
 
-func (q *Query) AddServiceStatusReponseUpdate(project, etag string, services []string) {
+func (q *Query) AddServiceStatusReponseUpdate(stack, project, etag string, services []string) {
 	resQuery := `protoPayload.methodName="/Services.CreateService" OR "/Services.UpdateService" OR "/Services.ReplaceService" OR "/Services.DeleteService"`
+
+	if stack != "" {
+		resQuery += fmt.Sprintf(`
+protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, stack)
+	}
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
@@ -236,8 +272,14 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 	q.AddQuery(resQuery)
 }
 
-func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(project, etag string, services []string) {
+func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag string, services []string) {
 	query := `protoPayload.methodName=~"beta.compute.regionInstanceGroupManagers.(insert|patch)" AND operation.first="true"`
+
+	if stack != "" {
+		query += fmt.Sprintf(`
+protoPayload.request.allInstancesConfig.properties.labels.key="defang-stack"
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, stack)
+	}
 
 	if project != "" {
 		query += fmt.Sprintf(`

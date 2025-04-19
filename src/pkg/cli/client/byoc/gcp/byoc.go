@@ -510,22 +510,24 @@ func (b *ByocGcp) GetStackName() string {
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
-	subscribeStream, err := NewSubscribeStream(ctx, b.driver, ignoreCdSuccess)
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
 	if req.Etag == b.cdEtag {
 		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
-	subscribeStream.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
-	subscribeStream.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
+
+	// TODO: update stack (1st param) to b.PulumiStack
+	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.Start(time.Now())
 	return subscribeStream, nil
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true)
 		if err != nil {
 			return nil, err
 		}
@@ -580,12 +582,14 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			etag = ""
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName)                      // CD log when there is an execution name
-			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
+			logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
+			// TODO: update stack (1st param) to b.PulumiStack
+			logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+			logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
+			// TODO: update stack (1st param) to b.PulumiStack
+			logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
 		logStream.AddUntil(endTime)
@@ -708,18 +712,18 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
 
-	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	// Logs TODO: update stack (1st param) to b.PulumiStack
+	query.AddJobLogQuery("", req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
+	query.AddServiceLogQuery("", req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery("", req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
-	// Service status updates
-	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate(req.Project, req.Etag, req.Services)
+	// Service status updates TODO: update stack (1st param) to b.PulumiStack
+	query.AddJobStatusUpdateRequestQuery("", req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery("", req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate("", req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate("", req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }
