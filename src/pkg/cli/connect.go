@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/bufbuild/connect-go"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
@@ -47,7 +48,12 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
+		if connect.CodeOf(err) == connect.CodeUnavailable {
+			term.Fatalf("Unable to connect; please check your internet, VPN, or firewall settings and try again.")
+			term.Debug("Connection error details:", err)
+		} else {
+			term.Debug("Unable to validate tenant ID with server:", err)
+		}
 	} else if string(tenantName) != resp.Tenant {
 		if tenantName != types.DEFAULT_TENANT {
 			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
