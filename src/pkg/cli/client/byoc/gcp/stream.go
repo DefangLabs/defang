@@ -214,6 +214,10 @@ func (s *LogStream) AddFilter(filter string) {
 	s.query.AddFilter(filter)
 }
 
+func (s *LogStream) AddCustomQuery(query string) {
+	s.query.AddQuery(query)
+}
+
 type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
@@ -241,6 +245,10 @@ func (s *SubscribeStream) AddServiceStatusUpdate(stack, project, etag string, se
 	s.query.AddServiceStatusReponseUpdate(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupAddInstances()
+}
+
+func (s *SubscribeStream) AddCustomQuery(query string) {
+	s.query.AddQuery(query)
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
