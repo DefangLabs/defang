@@ -40,7 +40,7 @@ npx -y defang@latest mcp setup --client=cursor
 npx -y defang@latest mcp setup --client=windsurf
 ```
 
-### VSCode
+### VS Code / VS Code Insiders
 
 ```bash
 npx -y defang@latest mcp setup --client=vscode
