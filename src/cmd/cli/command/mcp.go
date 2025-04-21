@@ -47,7 +47,7 @@ var mcpServerCmd = &cobra.Command{
 		term.Info("Creating MCP server")
 		s := server.NewMCPServer(
 			"Defang Services",
-			"1.0.0",
+			RootCmd.Version,
 			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
 			server.WithPromptCapabilities(true),         // Enable interactive prompts
 			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
