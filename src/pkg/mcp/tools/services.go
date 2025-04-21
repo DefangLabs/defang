@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -19,7 +18,7 @@ import (
 )
 
 // setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer, client client.GrpcClient) {
+func setupServicesTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang"),
@@ -44,6 +43,8 @@ func setupServicesTool(s *server.MCPServer, client client.GrpcClient) {
 		}
 
 		loader := configureLoader(request)
+
+		client := cli.NewGrpcClient(ctx, cluster)
 
 		// Create a Defang client
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
