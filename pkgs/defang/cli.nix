@@ -7,13 +7,13 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-Q2dwaHlxzbJBMTuIKiLmJNdT0LfoHgmTOHprFTK3BTc=";
+  vendorHash = "sha256-wy6S3alGpeXveCPR8BnyaGcsIHzgclv3yrofwE5X3oI="; # TODO: use fetchFromGitHub
 
   subPackages = [ "cmd/cli" ];
 
   nativeBuildInputs = [ installShellFiles ];
 
-  CGO_ENABLED = 0;
+  env.CGO_ENABLED = 0;
   ldflags = [
     "-s"
     "-w"
