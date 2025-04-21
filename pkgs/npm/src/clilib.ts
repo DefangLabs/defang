@@ -5,6 +5,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as tar from "tar";
 import { promisify } from "util";
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // regex to match semantic version (from semver.org)
 const SEMVER_REGEX =
@@ -178,7 +183,7 @@ function getPathToExecutable(): string | null {
 
   const executablePath = path.join(__dirname, `${EXECUTABLE}${extension}`);
   try {
-    return require.resolve(executablePath);
+    return fs.existsSync(executablePath) ? executablePath : null;
   } catch (e) {
     return null;
   }
@@ -194,18 +199,19 @@ function extractCLIVersions(versionInfo: string): {
   // Latest CLI:    v0.5.24
   // Defang Fabric: v0.5.0-643-abcdef012
   //
+  const regex = /^([A-Za-z ]+):\s*v?(\d+\.\d+\.\d+(?:-[\w.-]+)?)$/gm;
+  const versions: any = {
+    defangCLI: null,
+    latestCLI: null,
+  };
 
-  const versionRegex = /\d+\.\d+\.\d+/g;
-  const matches = versionInfo.match(versionRegex);
-
-  if (matches != null && matches.length >= 2) {
-    return {
-      defangCLI: matches[0],
-      latestCLI: matches[1],
-    };
-  } else {
-    throw new Error("Could not extract CLI versions from the output.");
+  for (const [, label, version] of versionInfo.matchAll(regex)) {
+    const key = label.trim().toLowerCase();
+    if (key === "defang cli") versions.defangCLI = version;
+    else if (key === "latest cli") versions.latestCLI = version;
   }
+
+  return versions;
 }
 
 export type VersionInfo = {
@@ -231,6 +237,10 @@ async function getVersionInfo(): Promise<VersionInfo> {
     const verInfo = extractCLIVersions(versionInfo.stdout);
     result.current = verInfo.defangCLI;
     result.latest = verInfo.latestCLI;
+
+    verInfo.defangCLI ?? console.warn("Defang CLI version not found");
+    verInfo.latestCLI ?? console.warn("Latest CLI version not found");
+
   } catch (error) {
     console.error(error);
   }

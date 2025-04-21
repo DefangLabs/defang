@@ -1,10 +1,10 @@
-import axios, { AxiosResponse } from "axios";
+import axios, {type AxiosResponse } from "axios";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
 import fs from "fs";
 import "mocha";
 import * as sinon from "sinon";
-import clilib from "../src/clilib";
+import clilib from "../src/clilib.ts";
 
 chai.use(chaiAsPromised);
 const { assert, expect } = chai;
@@ -173,7 +173,7 @@ describe("Testing getAppArchiveFilename()", () => {
 describe("Testing extractCLIVersions()", () => {
   it("sanity", async () => {
     const versionInfo =
-      "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
+      "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\nDefang Fabric: v0.7.0-643";
     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
 
     expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
@@ -181,28 +181,36 @@ describe("Testing extractCLIVersions()", () => {
 
   it("missing v in version text", async () => {
     const versionInfo =
-      "Defang CLI: 0.5.24\nLatest CLI: 0.5.32\nDefang Fabric: v0.5.0-643";
+      "Defang CLI: 0.5.24\nLatest CLI: 0.5.32\nDefang Fabric: v0.7.0-643";
     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
-
     expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
   });
 
   it("missing Defang CLI", () => {
     const versionInfo =
-      "Defang CLI: \nLatest CLI: v0.5.32\nDefang Fabric: v0.5.0-643";
-    assert.doesNotThrow(() => clilib.extractCLIVersions(versionInfo));
+      "Defang CLI: \nLatest CLI: v0.5.32\nDefang Fabric: v0.7.0-643";
+    const expected = { defangCLI: null, latestCLI: "0.5.32" };
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
   });
 
   it("missing Latest CLI", () => {
     const versionInfo =
-      "Defang CLI: v0.5.24\nLatest CLI: \nDefang Fabric: v0.5.0-643";
-    assert.doesNotThrow(() => clilib.extractCLIVersions(versionInfo));
+      "Defang CLI: v0.5.24\nLatest CLI: \nDefang Fabric: v0.7.0-643";
+    const expected = { defangCLI: "0.5.24", latestCLI: null };
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
   });
 
   it("no fabric version in input", async () => {
     const versionInfo = "Defang CLI: v0.5.24\nLatest CLI: v0.5.32\n";
     const expected = { defangCLI: "0.5.24", latestCLI: "0.5.32" };
-
     expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
   });
+
+  it("ill-formed semver v in version text", async () => {
+    const versionInfo =
+      "Defang CLI: a8f4c7a0\nLatest CLI: 0.5.32\nDefang Fabric: v0.5.0-643";
+    const expected = { defangCLI: null, latestCLI: "0.5.32" };
+    expect(clilib.extractCLIVersions(versionInfo)).to.be.deep.equal(expected);
+  });
+
 });
