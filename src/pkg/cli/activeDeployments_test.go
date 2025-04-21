@@ -16,17 +16,24 @@ type mockActiveDeploymentsHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-var emptyDeployments map[string]*defangv1.ProjectNames
-var activeDeployments = map[string]*defangv1.ProjectNames{
-	defangv1.Provider_AWS.String():          {Values: []string{"projectAA", "projectAB", "projectAC"}},
-	defangv1.Provider_DEFANG.String():       {Values: []string{"projectPlayground"}},
-	defangv1.Provider_DIGITALOCEAN.String(): {Values: []string{"projectDA", "projectDB"}},
-	defangv1.Provider_GCP.String():          {Values: []string{"projectGA", "projectGB"}},
+var emptyDeployments []*defangv1.Deployment
+var activeDeployments = []*defangv1.Deployment{
+	{Project: "projectAA", Provider: defangv1.Provider_AWS, Region: "us-east-1"},
+	{Project: "projectAB", Provider: defangv1.Provider_AWS, Region: "us-east-2"},
+	{Project: "projectAC", Provider: defangv1.Provider_AWS, Region: "us-east-3"},
+
+	{Project: "projectPlayground", Provider: defangv1.Provider_DEFANG, Region: "us-west-1"},
+
+	{Project: "projectDA", Provider: defangv1.Provider_DIGITALOCEAN, Region: "us-central-1"},
+	{Project: "projectDB", Provider: defangv1.Provider_DIGITALOCEAN, Region: "us-central-1"},
+
+	{Project: "projectGA", Provider: defangv1.Provider_GCP, Region: "us-central-2"},
+	{Project: "projectGB", Provider: defangv1.Provider_GCP, Region: "us-central-3"},
 }
 var testDeploymentsData = emptyDeployments
 
-func (g *mockActiveDeploymentsHandler) GetActiveDeployments(ctx context.Context, req *connect.Request[defangv1.ActiveDeploymentsRequest]) (*connect.Response[defangv1.ActiveDeploymentsResponse], error) {
-	return connect.NewResponse(&defangv1.ActiveDeploymentsResponse{
+func (g *mockActiveDeploymentsHandler) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
+	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
 		Deployments: testDeploymentsData,
 	}), nil
 }

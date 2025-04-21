@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -19,6 +20,10 @@ var _ Provider = (*PlaygroundProvider)(nil)
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
+}
+
+func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
+	return io.EOF // TODO: implement on fabric, for now assume service is deployed
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {

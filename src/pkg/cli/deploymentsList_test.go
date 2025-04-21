@@ -27,8 +27,10 @@ func (g *mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *c
 			{
 				Id:                "a1b2c3",
 				Project:           "test",
-				Provider:          "playground",
+				Provider:          defangv1.Provider_DEFANG,
 				ProviderAccountId: "1234567890",
+				ProviderString:    "playground",
+				Region:            "us-test-2",
 				Timestamp:         timestamppb.Now(),
 			},
 		}

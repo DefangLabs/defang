@@ -10,8 +10,7 @@ import (
 
 type MockProvider struct {
 	Provider
-	UploadUrl    string
-	ServerStream ServerStream[defangv1.TailResponse]
+	UploadUrl string
 }
 
 func (m MockProvider) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
@@ -26,37 +25,72 @@ func (m MockProvider) ServiceDNS(service string) string {
 	return service
 }
 
-type MockServerStream struct {
-	state int
-	Resps []*defangv1.TailResponse
+// MockServerStream mocks a ServerStream.
+type MockServerStream[Msg any] struct {
+	index int
+	Resps []*Msg
 	Error error
 }
 
-func (m *MockServerStream) Close() error {
+func (*MockServerStream[T]) Close() error {
 	return nil
 }
 
-func (m *MockServerStream) Receive() bool {
-	if len(m.Resps) == 0 {
+func (m *MockServerStream[T]) Receive() bool {
+	if m.index >= len(m.Resps) {
 		return false
 	}
-	if m.state == 0 {
-		m.state = 1
-	} else {
-		m.Resps = m.Resps[1:]
-	}
+	m.index++
 	return true
 }
 
-func (m *MockServerStream) Msg() *defangv1.TailResponse {
-	if len(m.Resps) == 0 {
+func (m *MockServerStream[T]) Msg() *T {
+	if m.index == 0 || m.index > len(m.Resps) {
 		return nil
 	}
-	return m.Resps[0]
+	return m.Resps[m.index-1]
 }
 
-func (m *MockServerStream) Err() error {
+func (m *MockServerStream[T]) Err() error {
 	return m.Error
+}
+
+// MockWaitStream is a mock implementation of the ServerStream interface that
+// returns messages and errors from channels. It blocks until the channels are
+// closed or an error is received. It is used for testing purposes.
+type MockWaitStream[T any] struct {
+	msg   *T
+	err   error
+	msgCh chan *T
+}
+
+// NewMockWaitStream returns a ServerStream that will block until closed.
+func NewMockWaitStream[T any]() *MockWaitStream[T] {
+	return &MockWaitStream[T]{msgCh: make(chan *T)}
+}
+
+func (m *MockWaitStream[T]) Send(msg *T, err error) {
+	m.err = err
+	m.msgCh <- msg
+}
+
+func (m *MockWaitStream[T]) Receive() bool {
+	msg, ok := <-m.msgCh
+	m.msg = msg
+	return ok && msg != nil
+}
+
+func (m *MockWaitStream[T]) Msg() *T {
+	return m.msg
+}
+
+func (m *MockWaitStream[T]) Err() error {
+	return m.err
+}
+
+func (m *MockWaitStream[T]) Close() error {
+	close(m.msgCh)
+	return nil
 }
 
 type MockFabricClient struct {
@@ -90,8 +124,10 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 			{
 				Id:                "a1b2c3",
 				Project:           "test",
-				Provider:          "aws",
+				Provider:          defangv1.Provider_AWS,
 				ProviderAccountId: "1234567890",
+				ProviderString:    "aws",
+				Region:            "us-test-2",
 				Timestamp:         timestamppb.Now(),
 			},
 		},

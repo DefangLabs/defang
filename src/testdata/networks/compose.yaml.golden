@@ -1,22 +1,40 @@
 name: networks
 services:
-  service1:
+  service-default:
+    image: example
+    networks:
+      default: null
+  service-internal:
+    image: example
+    networks:
+      internal: null
+  service-invalid:
     image: example
     networks:
       invalid-network-name: {}
-  service2:
+  service-multi:
     image: example
     networks:
-      public: {}
-  service3:
-    image: example
-    networks:
-      public: null
-  service4:
+      default: null
+      internal: null
+  service-private:
     image: example
     networks:
       private: null
+  service-public:
+    image: example
+    networks:
+      public: {}
+  service-public-list:
+    image: example
+    networks:
+      public: null
 networks:
+  default:
+    name: networks_default
+  internal:
+    name: networks_internal
+    internal: true
   public:
     name: public
     external: true

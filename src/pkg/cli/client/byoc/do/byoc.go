@@ -199,6 +199,22 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	}, nil
 }
 
+func (b *ByocDo) GetDeploymentStatus(ctx context.Context) error {
+	deploymentInfo, _, err := b.client.Apps.GetDeployment(ctx, b.cdAppID, b.cdDeploymentID)
+	if err != nil {
+		return err
+	}
+
+	switch deploymentInfo.GetPhase() {
+	default:
+		return nil // pending
+	case godo.DeploymentPhase_Active:
+		return io.EOF
+	case godo.DeploymentPhase_Error, godo.DeploymentPhase_Canceled:
+		return client.ErrDeploymentFailed{Message: deploymentInfo.Cause}
+	}
+}
+
 func (b *ByocDo) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (string, error) {
 	if err := b.setUp(ctx); err != nil {
 		return "", err
@@ -569,8 +585,16 @@ func (s *subscribeStream) Receive() bool {
 			State:  phaseToState(deployment.Phase),
 		}
 	}
-	s.msg = <-s.queue
-	return err == nil
+
+	select {
+	case resp := <-s.queue:
+		s.msg = resp
+		return true
+	case <-s.ctx.Done():
+		s.err = s.ctx.Err()
+		s.msg = nil
+		return false
+	}
 }
 
 func (s *subscribeStream) Msg() *defangv1.SubscribeResponse {

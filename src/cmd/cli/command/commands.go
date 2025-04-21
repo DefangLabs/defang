@@ -111,7 +111,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
-			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
+			printDefangHint("Detached. The deployment will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
@@ -146,7 +146,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -269,6 +269,13 @@ func SetupCommands(ctx context.Context, version string) {
 	deploymentsListCmd.Flags().Bool("active", false, "get the list of deployed projects")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
+
+	// MCP Command
+	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpCmd.AddCommand(mcpServerCmd)
+	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
+	mcpSetupCmd.MarkFlagRequired("client")
+	RootCmd.AddCommand(mcpCmd)
 
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
@@ -962,7 +969,7 @@ var deleteCmd = &cobra.Command{
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
 	Short:       "Manage Deployments",
-	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
+	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 }
 
@@ -1015,12 +1022,6 @@ var tokenCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
-
-		loader := configureLoader(cmd)
-		_, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
 
 		// TODO: should default to use the current tenant, not the default tenant
 		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
