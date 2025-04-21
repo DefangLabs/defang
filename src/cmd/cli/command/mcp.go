@@ -15,16 +15,14 @@ import (
 )
 
 var mcpCmd = &cobra.Command{
-	Use:         "mcp",
-	Short:       "Manage MCP Server for defang",
-	Annotations: authNeededAnnotation,
+	Use:   "mcp",
+	Short: "Manage MCP Server for defang",
 }
 
 var mcpServerCmd = &cobra.Command{
-	Use:         "serve",
-	Short:       "Start defang MCP server",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
+	Use:   "serve",
+	Short: "Start defang MCP server",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -75,10 +73,9 @@ var mcpServerCmd = &cobra.Command{
 }
 
 var mcpSetupCmd = &cobra.Command{
-	Use:         "setup",
-	Short:       "Setup MCP client for defang mcp server",
-	Annotations: authNeededAnnotation,
-	Args:        cobra.NoArgs,
+	Use:   "setup",
+	Short: "Setup MCP client for defang mcp server",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, _ := cmd.Flags().GetString("client")
 		client = strings.ToLower(client)
