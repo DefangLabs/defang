@@ -49,7 +49,7 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeUnavailable {
-			term.Debugf("Unable to connect to Defang servers; please check your internet, VPN, or firewall settings and try again.")
+			term.Errorf("Unable to connect to Defang servers; please check your internet, VPN, or firewall settings and try again.")
 			term.Debug("Connection error details:", err)
 		} else {
 			term.Debug("Unable to validate tenant ID with server:", err)
