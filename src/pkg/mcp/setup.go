@@ -48,13 +48,23 @@ type VSCodeMCPServerConfig struct {
 	Headers map[string]string `json:"headers,omitempty"` // For sse
 }
 
-// ValidClients is a list of supported MCP clients
-var ValidClients = []string{
-	"claude",
-	"windsurf",
-	"cursor",
+// ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
+var ValidVSCodeClients = []string{
 	"vscode",
+	"code",
+	"vscode-insiders",
+	"insiders",
 }
+
+// ValidClients is a list of supported MCP clients
+var ValidClients = append(
+	[]string{
+		"claude",
+		"windsurf",
+		"cursor",
+	},
+	ValidVSCodeClients...,
+)
 
 // IsValidClient checks if the provided client is in the list of valid clients
 func IsValidClient(client string) bool {
@@ -90,7 +100,7 @@ func getClientConfigPath(client string) (string, error) {
 		}
 	case "cursor":
 		configPath = filepath.Join(homeDir, ".cursor", "mcp.json")
-	case "vscode":
+	case "vscode", "code":
 		if runtime.GOOS == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
 		} else if runtime.GOOS == "windows" {
@@ -106,7 +116,7 @@ func getClientConfigPath(client string) (string, error) {
 			}
 			configPath = filepath.Join(configHome, "Code/User/settings.json")
 		}
-	case "vscode-insiders", "vscodeInsiders", "insiders":
+	case "vscode-insiders", "insiders":
 		if runtime.GOOS == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
 		} else if runtime.GOOS == "windows" {
@@ -255,7 +265,7 @@ func SetupClient(client string) error {
 	}
 
 	// Handle VSCode settings.json specially
-	if client == "vscode" {
+	if slices.Contains(ValidVSCodeClients, client) {
 		if err := handleVSCodeConfig(configPath); err != nil {
 			return err
 		}
