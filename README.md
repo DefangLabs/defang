@@ -4,8 +4,11 @@
 
 Develop Anything, Deploy Anywhere. Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
+With Defang MCP, you can deploy your vibe-coded project directly from any IDE—whether it’s Cursor, VSCode, VsCode Insiders, Claude, or Windsurf.
+
 This repo includes:
 
+- Built-in support for Defang MCP — the Model Context Protocol that makes cloud deployment as simple as a single prompt. Learn more [here](https://docs.defang.io/docs/concepts/mcp).
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
 - Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
