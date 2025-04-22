@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -47,7 +48,17 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		term.Debug("Unable to validate tenant ID with server:", err)
+		networkErrors := []string{
+			"no such host",
+			"connection reset by peer",
+			"unexpected EOF",
+		}
+		if slices.Contains(networkErrors, err.Error()) {
+			term.Fatal("Unable to connect to Defang; please check network settings and try again.")
+			term.Debug("Connection error details:", err)
+		} else {
+			term.Debug("Unable to validate tenant ID with server:", err)
+		}
 	} else if string(tenantName) != resp.Tenant {
 		if tenantName != types.DEFAULT_TENANT {
 			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
