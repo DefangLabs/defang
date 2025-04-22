@@ -83,9 +83,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if len(svccfg.DeviceCgroupRules) != 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: device_cgroup_rules", svccfg.Name)
 	}
-	if len(svccfg.Entrypoint) > 0 {
-		return fmt.Errorf("service %q: unsupported compose directive: entrypoint", svccfg.Name)
-	}
 	if len(svccfg.GroupAdd) > 0 {
 		return fmt.Errorf("service %q: unsupported compose directive: group_add", svccfg.Name)
 	}
