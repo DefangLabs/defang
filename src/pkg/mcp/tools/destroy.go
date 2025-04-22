@@ -19,7 +19,7 @@ import (
 func setupDestroyTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
-		mcp.WithDescription("Remove services using defang. Only one argument should be given and used at a time"),
+		mcp.WithDescription("Remove services using defang."),
 
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
