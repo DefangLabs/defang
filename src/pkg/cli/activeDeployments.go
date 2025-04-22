@@ -12,27 +12,30 @@ import (
 type PrintableActiveDeployments struct {
 	Provider    string
 	ProjectName string
+	Region      string
 }
 
 func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
-	response, err := client.GetActiveDeployments(ctx, &defangv1.ActiveDeploymentsRequest{})
+	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+		Type: *defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE.Enum(),
+	})
 	if err != nil {
 		return err
 	}
 
-	if len(response.Deployments) == 0 {
-		_, err := term.Warn("No active deployments")
+	numDeployments := len(response.Deployments)
+	if numDeployments == 0 {
+		_, err := term.Warn("No active deployments found")
 		return err
 	}
 
 	// map to PrintableActiveDeployments struct
-	var deployments []PrintableActiveDeployments
-	for providerName, projectNames := range response.Deployments {
-		for _, projectName := range projectNames.Values {
-			deployments = append(deployments, PrintableActiveDeployments{
-				Provider:    providerName,
-				ProjectName: projectName,
-			})
+	deployments := make([]PrintableActiveDeployments, numDeployments)
+	for i, d := range response.Deployments {
+		deployments[i] = PrintableActiveDeployments{
+			Provider:    d.Provider.String(),
+			ProjectName: d.Project,
+			Region:      d.Region,
 		}
 	}
 
@@ -44,5 +47,5 @@ func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
 		return deployments[i].Provider < deployments[j].Provider
 	})
 
-	return term.Table(deployments, []string{"Provider", "ProjectName"})
+	return term.Table(deployments, []string{"Provider", "Region", "ProjectName"})
 }

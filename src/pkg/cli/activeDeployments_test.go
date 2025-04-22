@@ -80,18 +80,18 @@ func TestActiveDeployments(t *testing.T) {
 		lines := strings.Split(stdout.String(), "\n")[2:] // Skip first two lines (space and header)
 
 		// Verify each provider and project name exists in the output
-		for provider, projectNames := range activeDeployments {
-			for _, projectName := range projectNames.Values {
-				match := false
-				for _, line := range lines {
-					if strings.Contains(line, provider) && strings.Contains(line, projectName) {
-						match = true
-						break
-					}
+		for _, deployment := range activeDeployments {
+			match := false
+			for _, line := range lines {
+				if strings.Contains(line, deployment.Provider.String()) &&
+					strings.Contains(line, deployment.Project) &&
+					strings.Contains(line, deployment.Region) {
+					match = true
+					break
 				}
-				if !match {
-					t.Errorf("Missing expected output for provider %q and project %q", provider, projectName)
-				}
+			}
+			if !match {
+				t.Errorf("Missing expected output for provider %q and project %q", deployment.Provider.String(), deployment.Project)
 			}
 		}
 	})

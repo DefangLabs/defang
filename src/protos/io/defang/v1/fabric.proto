@@ -361,6 +361,11 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
+enum DeploymentListType {
+  DEPLOYMENT_LIST_TYPE_PROJECT = 0; // default
+  DEPLOYMENT_LIST_TYPE_ACTIVE = 1;
+}
+
 enum DeploymentAction {
   DEPLOYMENT_ACTION_UNSPECIFIED = 0;
   DEPLOYMENT_ACTION_UP = 1;
@@ -380,7 +385,10 @@ message Deployment {
 
 message PutDeploymentRequest { Deployment deployment = 1; }
 
-message ListDeploymentsRequest { string project = 1; }
+message ListDeploymentsRequest { 
+  string project = 1; 
+  DeploymentListType type = 2; // active or all
+}
 
 message ListDeploymentsResponse { repeated Deployment deployments = 1; }
 
