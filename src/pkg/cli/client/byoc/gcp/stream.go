@@ -18,6 +18,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	logtype "google.golang.org/genproto/googleapis/logging/type"
 )
 
 type LogParser[T any] func(*loggingpb.LogEntry) ([]T, error)
@@ -223,7 +225,7 @@ type SubscribeStream struct {
 }
 
 func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser(waitForCD), filters...)
+	ss, err := NewServerStream(ctx, gcp, getActivityParser(ctx, gcp, waitForCD), filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +247,7 @@ func (s *SubscribeStream) AddServiceStatusUpdate(stack, project, etag string, se
 	s.query.AddServiceStatusReponseUpdate(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupAddInstances()
+	s.query.AddCloudBuildActivityQuery()
 }
 
 func (s *SubscribeStream) AddCustomQuery(query string) {
@@ -253,7 +256,7 @@ func (s *SubscribeStream) AddCustomQuery(query string) {
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
 
-func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
+func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 	envCache := make(map[string]map[string]string)
 	return func(entry *loggingpb.LogEntry) ([]*defangv1.TailResponse, error) {
 		if entry == nil {
@@ -295,7 +298,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			env, ok := envCache[executionName]
 			if !ok {
 				var err error
-				env, err = gcp.GetExecutionEnv(ctx, executionName)
+				env, err = gcpClient.GetExecutionEnv(ctx, executionName)
 				if err != nil {
 					return nil, err
 				}
@@ -312,12 +315,12 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 			etag = env["DEFANG_ETAG"]
 			host = "pulumi" // Hardcoded to match end condition detector in cmd/cli/command/compose.go
 		} else if buildTags != "" {
-			parts := strings.Split(buildTags, "_")
-			if len(parts) < 3 {
-				return nil, errors.New("invalid cloudbuild build tags value: " + buildTags)
+			var bt gcp.BuildTag
+			if err := bt.Parse(buildTags); err != nil {
+				return nil, err
 			}
-			serviceName = parts[len(parts)-2]
-			etag = parts[len(parts)-1]
+			serviceName = bt.Service
+			etag = bt.Etag
 			host = "cloudbuild"
 		} else {
 			var err error
@@ -348,7 +351,7 @@ func getLogEntryParser(ctx context.Context, gcp *gcp.Gcp) func(entry *loggingpb.
 
 const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
 
-func getActivityParser(waitForCD bool) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
 
@@ -533,6 +536,33 @@ func getActivityParser(waitForCD bool) func(entry *loggingpb.LogEntry) ([]*defan
 				Status: status,
 			}}, nil
 		// TODO: Add cloud build activities for building status update
+		case "build": // Cloudbuild events
+			buildId := entry.Resource.Labels["build_id"]
+			if buildId == "" {
+				return nil, nil // Ignore activities without build id
+			}
+			bt, err := gcp.GetBuildInfo(ctx, buildId) // TODO: Cache the build IDs?
+			if err != nil {
+				term.Warnf("failed to get build tag for build %v: %v", buildId, err)
+				return nil, nil
+			}
+			var state defangv1.ServiceState
+			if entry.Operation.First {
+				state = defangv1.ServiceState_BUILD_ACTIVATING
+			} else if entry.Operation.Last {
+				if entry.Severity == logtype.LogSeverity_ERROR {
+					state = defangv1.ServiceState_BUILD_FAILED
+				} else {
+					state = defangv1.ServiceState_BUILD_STOPPING
+				}
+			} else {
+				state = defangv1.ServiceState_BUILD_RUNNING
+			}
+			return []*defangv1.SubscribeResponse{{
+				Name:   bt.Service,
+				State:  state,
+				Status: "",
+			}}, nil
 		default:
 			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
 			return nil, nil

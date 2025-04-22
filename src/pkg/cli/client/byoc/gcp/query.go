@@ -161,6 +161,13 @@ labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
 	q.AddQuery(query)
 }
 
+func (q *Query) AddCloudBuildActivityQuery() {
+	query := `resource.type="cloud_run_job"
+logName=~"logs/cloudaudit.googleapis.com%2Factivity$"
+`
+	q.AddQuery(query)
+}
+
 func (q *Query) AddJobExecutionUpdateQuery(executionName string) {
 	if executionName == "" {
 		return
