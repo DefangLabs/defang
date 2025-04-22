@@ -106,6 +106,22 @@ func getClientConfigPath(client string) (string, error) {
 			}
 			configPath = filepath.Join(configHome, "Code/User/settings.json")
 		}
+	case "vscode-insiders", "vscodeInsiders", "insiders":
+		if runtime.GOOS == "darwin" {
+			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
+		} else if runtime.GOOS == "windows" {
+			appData := os.Getenv("APPDATA")
+			if appData == "" {
+				appData = filepath.Join(homeDir, "AppData", "Roaming")
+			}
+			configPath = filepath.Join(appData, "Code - Insiders", "User", "settings.json")
+		} else {
+			configHome := os.Getenv("XDG_CONFIG_HOME")
+			if configHome == "" {
+				configHome = filepath.Join(homeDir, ".config")
+			}
+			configPath = filepath.Join(configHome, "Code - Insiders/User/settings.json")
+		}
 	default:
 		return "", fmt.Errorf("unsupported client: %s", client)
 	}
