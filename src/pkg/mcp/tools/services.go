@@ -21,7 +21,7 @@ import (
 func setupServicesTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating services tool")
 	servicesTool := mcp.NewTool("services",
-		mcp.WithDescription("List information about services in Defang"),
+		mcp.WithDescription("List information about services in Defang Playground"),
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
 		),
