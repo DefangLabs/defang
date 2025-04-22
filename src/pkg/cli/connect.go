@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -13,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
-	"github.com/bufbuild/connect-go"
 )
 
 const DefaultCluster = "fabric-prod1.defang.dev"
@@ -48,8 +48,13 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		if connect.CodeOf(err) == connect.CodeUnavailable {
-			term.Error("Unable to connect to Defang; please check network settings and try again.")
+		networkErrors := []string{
+			"no such host",
+			"connection reset by peer",
+			"unexpected EOF",
+		}
+		if slices.Contains(networkErrors, err.Error()) {
+			term.Fatal("Unable to connect to Defang; please check network settings and try again.")
 			term.Debug("Connection error details:", err)
 		} else {
 			term.Debug("Unable to validate tenant ID with server:", err)
