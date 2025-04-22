@@ -107,8 +107,11 @@ func (a *AwsEcs) Run(ctx context.Context, env map[string]string, cmd ...string) 
 	for i, f := range ecsOutput.Failures {
 		failures[i] = TaskFailure{types.TaskStopCode(*f.Reason), *f.Detail}
 	}
-	if err := errors.Join(failures...); err != nil || len(ecsOutput.Tasks) == 0 {
+	if err := errors.Join(failures...); err != nil {
 		return nil, err
+	}
+	if len(ecsOutput.Tasks) == 0 || ecsOutput.Tasks[0].TaskArn == nil {
+		return nil, errors.New("no task started")
 	}
 	// bytes, _ := json.MarshalIndent(ecsOutput.Tasks, "", "  ")
 	// println(string(bytes))

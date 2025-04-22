@@ -13,9 +13,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/logging/apiv2/loggingpb"
+	run "cloud.google.com/go/run/apiv2"
+	"cloud.google.com/go/run/apiv2/runpb"
 	"cloud.google.com/go/storage"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
@@ -394,6 +397,41 @@ func (b *ByocGcp) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*def
 
 func (b *ByocGcp) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	return b.deploy(ctx, req, "preview")
+}
+
+func (b *ByocGcp) GetDeploymentStatus(ctx context.Context) error {
+	client, err := run.NewExecutionsClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	execution, err := client.GetExecution(ctx, &runpb.GetExecutionRequest{Name: b.cdExecution})
+	if err != nil {
+		return err
+	}
+
+	var completionTime = execution.GetCompletionTime()
+	if completionTime != nil {
+		// cd is done
+		var failedTasks = execution.GetFailedCount()
+		if failedTasks > 0 {
+			var msgs []string
+			for _, condition := range execution.GetConditions() {
+				if condition.GetType() == "Completed" && condition.GetMessage() != "" {
+					msgs = append(msgs, condition.GetMessage())
+				}
+			}
+
+			return cliClient.ErrDeploymentFailed{Message: strings.Join(msgs, ",")}
+		}
+
+		// completed successfully
+		return io.EOF
+	}
+
+	// still running
+	return nil
 }
 
 func (b *ByocGcp) deploy(ctx context.Context, req *defangv1.DeployRequest, command string) (*defangv1.DeployResponse, error) {

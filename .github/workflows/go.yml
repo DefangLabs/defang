@@ -319,7 +319,7 @@ jobs:
           DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
           DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
 
-  nighly-release:
+  nightly-release:
     if: ${{ github.event_name == 'schedule' }}
     environment: release
     needs:
@@ -373,19 +373,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: go-release
     steps:
-      # - name: Update Windows s.defang.io/defang_win_amd64.zip short link
-      #   run: |
-      #     curl --request POST \
-      #       --url https://api.short.io/links/$DEFANG_WIN_AMD64_LNK \
-      #       --header "Authorization: $SHORTIO_PK" \
-      #       --header 'accept: application/json' \
-      #       --header 'content-type: application/json' \
-      #       --data "{\"originalURL\":\"https://github.com/DefangLabs/defang/releases/download/${TAG}/defang_${TAG#v}_windows_amd64.zip\"}"
-      #   env:
-      #     SHORTIO_PK: ${{ secrets.SHORTIO_PK }}
-      #     TAG: ${{ github.ref_name }}
-      #     DEFANG_WIN_AMD64_LNK: "lnk_4vSQ_CDukZ5POEE4o0mMDysr2U"
-
       - name: Trigger CLI Autodoc
         uses: peter-evans/repository-dispatch@v3
         with:
@@ -436,7 +423,7 @@ jobs:
 
   cleanup-nightly:
     runs-on: ubuntu-latest
-    needs: nighly-release
+    needs: nightly-release
     steps:
       - name: "Clean up nightly releases"
         uses: dev-drprasad/delete-older-releases@v0.3.4
@@ -446,3 +433,27 @@ jobs:
           delete_tag_pattern: nightly
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is limited to the current repository
+
+  on-failure:
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: [go-test, go-playground-test, build-and-sign-mac, build-and-sign, nix-shell-test]
+    steps:
+    - name: Slack Notification
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_TITLE: Defang CLI workflow failed
+        MSG_MINIMAL: actions url
+        SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}
+
+  on-release-failure:
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [go-release, post-release]
+    steps:
+    - name: Slack Notification
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_TITLE: Defang CLI release workflow failed
+        MSG_MINIMAL: actions url
+        SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}

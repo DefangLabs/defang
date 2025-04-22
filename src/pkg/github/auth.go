@@ -56,8 +56,9 @@ var (
 	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
 )
 
-func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
+func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (string, error) {
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// Generate random state
 	state := uuid.NewString()
@@ -104,6 +105,11 @@ func StartAuthCodeFlow(ctx context.Context, clientId string) (string, error) {
 
 	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
+
+	// TODO:This is used to open the browser for GitHub Auth before blocking
+	if prompt {
+		browser.OpenURL(server.URL)
+	}
 
 	input := term.NewNonBlockingStdin()
 	defer input.Close() // abort the read
