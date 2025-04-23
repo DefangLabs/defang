@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -537,6 +538,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(e
 			}}, nil
 		// TODO: Add cloud build activities for building status update
 		case "build": // Cloudbuild events
+			fmt.Printf("Received Cloudbuild Event: %+v\n", entry)
 			buildId := entry.Resource.Labels["build_id"]
 			if buildId == "" {
 				return nil, nil // Ignore activities without build id
