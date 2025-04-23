@@ -328,6 +328,10 @@ export async function install(
   }
 }
 
+function quoteIfNeeded(p: string): string {
+  return /\s/.test(p) ? `"${p}"` : p;
+}
+
 // js wrapper to use by npx or npm exec, this will call the defang binary with
 // the arguments passed to the npx line. NPM installer will create a symlink
 // in the user PATH to the cli.js to execute. The symlink will name the same as
@@ -356,7 +360,8 @@ export async function run(): Promise<void> {
       throw new Error("Could not find the defang executable.");
     }
 
-    const commandline = ["npx", getEndNameFromPath(pathToExec)]
+    const quotedPathToExec = quoteIfNeeded(pathToExec);
+    const commandline = ["npx", getEndNameFromPath(quotedPathToExec)]
       .join(" ")
       .trim();
 
