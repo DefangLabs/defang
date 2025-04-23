@@ -100,7 +100,11 @@ async function extractZip(
 ): Promise<boolean> {
   try {
     const zip = new AdmZip(zipPath);
-    const executableFullName = EXECUTABLE + ".exe";
+    let extension = "";
+    if (["win32", "cygwin"].includes(process.platform)) {
+      extension = ".exe";
+    }
+    const executableFullName = EXECUTABLE + extension;
     const result = zip.extractEntryTo(executableFullName, outputPath, true, true);
     await fs.promises.chmod(path.join(outputPath, executableFullName), 755);
     return result;

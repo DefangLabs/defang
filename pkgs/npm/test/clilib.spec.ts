@@ -4,7 +4,7 @@ import chaiAsPromised from "chai-as-promised";
 import fs from "fs";
 import "mocha";
 import * as sinon from "sinon";
-import clilib from "../src/clilib.ts";
+import clilib from "../src/clilib";
 
 chai.use(chaiAsPromised);
 const { assert, expect } = chai;

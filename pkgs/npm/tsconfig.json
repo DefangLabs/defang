@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "allowImportingTsExtensions": false,
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "declaration": false,
@@ -11,7 +11,7 @@
     "lib": ["es2021"],
     "module": "ESNext",
     "moduleResolution": "node",
-    "noEmit": false,
+    "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
