@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -538,7 +537,6 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(e
 			}}, nil
 		// TODO: Add cloud build activities for building status update
 		case "build": // Cloudbuild events
-			fmt.Printf("Received Cloudbuild Event: %+v\n", entry)
 			buildId := entry.Resource.Labels["build_id"]
 			if buildId == "" {
 				return nil, nil // Ignore activities without build id
@@ -549,11 +547,15 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(e
 				return nil, nil
 			}
 			var state defangv1.ServiceState
+			status := ""
 			if entry.Operation.First {
 				state = defangv1.ServiceState_BUILD_ACTIVATING
 			} else if entry.Operation.Last {
 				if entry.Severity == logtype.LogSeverity_ERROR {
 					state = defangv1.ServiceState_BUILD_FAILED
+					if auditLog.GetStatus() != nil {
+						status = auditLog.GetStatus().String()
+					}
 				} else {
 					state = defangv1.ServiceState_BUILD_STOPPING
 				}
@@ -563,7 +565,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(e
 			return []*defangv1.SubscribeResponse{{
 				Name:   bt.Service,
 				State:  state,
-				Status: "",
+				Status: status,
 			}}, nil
 		default:
 			term.Warnf("unexpected resource type : %v", entry.Resource.Type)
