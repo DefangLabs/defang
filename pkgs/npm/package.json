@@ -34,9 +34,9 @@
     "recursive": true
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json",
     "postbuild": "chmod +x bin/cli.js",
-    "test": "tsx mocha.ts"
+    "test": "tsx --tsconfig tsconfig.test.json mocha.ts"
   },
   "dependencies": {
     "adm-zip": "^0.5.14",
