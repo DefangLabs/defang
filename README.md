@@ -2,16 +2,29 @@
 
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Develop Anything, Deploy Anywhere. Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
+**Develop Anything. Deploy Anywhere.**
 
-With Defang MCP, you can deploy your vibe-coded project directly from any IDE—whether it’s Cursor, VSCode, VsCode Insiders, Claude, or Windsurf.
+Take your app from Docker Compose to a secure, scalable deployment on your favorite cloud in minutes — with zero config stress. Whether you prefer the command line or your favorite IDE, Defang gives you full control over how you deploy projects.
 
-This repo includes:
+**Defang CLI**  
+For power users who live in the terminal. The Defang CLI gives you full access to everything Defang offers — from local dev to live cloud deployments. Build, test, and deploy directly from your shell.
 
-- Built-in support for Defang MCP — the Model Context Protocol that makes cloud deployment as simple as a single prompt. Learn more [here](https://docs.defang.io/docs/concepts/mcp).
-- Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
-- Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
-- Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
+**Defang MCP Server**  
+Prefer to work inside your IDE? The Defang MCP Server supports seamless deployments from tools like Cursor, VSCode, VSCode Insiders, Claude, and Windsurf. It's built for developers who want powerful cloud deployment baked directly into their editor workflow — no context switching required.
+
+**What’s in This Repo**
+
+- **Latest Defang CLI**  
+  Grab the [latest release](https://github.com/DefangLabs/defang/releases/latest) and start deploying.
+
+- **Built-in Support for MCP Server**  
+  The **Model Context Protocol** (MCP) makes cloud deployment as easy as a single prompt. [Learn more](https://docs.defang.io/docs/concepts/mcp).
+
+- **Sample Projects**  
+  [Code samples](https://github.com/DefangLabs/samples) in **Golang**, **Python**, and **Node.js** to help you go from zero to deployed using Docker Compose and the Defang CLI.
+
+- **Pulumi Integration**  
+  Prefer infrastructure as code? Check out our [Pulumi Provider](https://github.com/DefangLabs/pulumi-defang) for deploying with Pulumi + Defang.
 
 ## Getting started
 
