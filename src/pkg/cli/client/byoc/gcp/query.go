@@ -162,7 +162,7 @@ labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
 }
 
 func (q *Query) AddCloudBuildActivityQuery() {
-	query := `resource.type="cloud_run_job"
+	query := `resource.type="build"
 logName=~"logs/cloudaudit.googleapis.com%2Factivity$"
 `
 	q.AddQuery(query)
