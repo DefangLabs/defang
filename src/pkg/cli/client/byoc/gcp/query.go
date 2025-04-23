@@ -51,7 +51,8 @@ logName="projects/%s/logs/cos_containers"
 func NewSubscribeQuery() *Query {
 	return NewQuery(`(
 protoPayload.serviceName="run.googleapis.com" OR
-protoPayload.serviceName="compute.googleapis.com"
+protoPayload.serviceName="compute.googleapis.com" OR
+protoPayload.serviceName="cloudbuild.googleapis.com"
 )`)
 }
 
@@ -163,8 +164,7 @@ labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
 
 func (q *Query) AddCloudBuildActivityQuery() {
 	query := `resource.type="build"
-logName=~"logs/cloudaudit.googleapis.com%2Factivity$"
-`
+logName=~"logs/cloudaudit.googleapis.com%2Factivity$"`
 	q.AddQuery(query)
 }
 
