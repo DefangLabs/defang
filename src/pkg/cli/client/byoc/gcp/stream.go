@@ -224,8 +224,8 @@ type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser(ctx, gcp, waitForCD), filters...)
+func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+	ss, err := NewServerStream(ctx, gcp, getActivityParser(ctx, gcp, waitForCD, etag), filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 
 const defangCD = "#defang-cd" // Special service name for CD, # is used to avoid conflict with service names
 
-func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
+func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag string) func(entry *loggingpb.LogEntry) ([]*defangv1.SubscribeResponse, error) {
 	cdSuccess := false
 	readyServices := make(map[string]string)
 
@@ -546,6 +546,11 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool) func(e
 				term.Warnf("failed to get build tag for build %v: %v", buildId, err)
 				return nil, nil
 			}
+
+			if bt.Etag != etag {
+				return nil, nil
+			}
+
 			var state defangv1.ServiceState
 			status := ""
 			if entry.Operation.First {
