@@ -100,8 +100,9 @@ async function extractZip(
 ): Promise<boolean> {
   try {
     const zip = new AdmZip(zipPath);
-    const result = zip.extractEntryTo(EXECUTABLE, outputPath, true, true);
-    await fs.promises.chmod(path.join(outputPath, EXECUTABLE), 755);
+    const executableFullName = EXECUTABLE + ".exe";
+    const result = zip.extractEntryTo(executableFullName, outputPath, true, true);
+    await fs.promises.chmod(path.join(outputPath, executableFullName), 755);
     return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
