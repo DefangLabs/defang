@@ -237,7 +237,7 @@ async function getVersionInfo(): Promise<VersionInfo> {
     }
 
     // Exec output contains both stderr and stdout outputs
-    const versionInfo = await exec(execPath + " version");
+    const versionInfo = await exec(quoteIfNeeded(execPath) + " version");
 
     const verInfo = extractCLIVersions(versionInfo.stdout);
     result.current = verInfo.defangCLI;
@@ -360,8 +360,7 @@ export async function run(): Promise<void> {
       throw new Error("Could not find the defang executable.");
     }
 
-    const quotedPathToExec = quoteIfNeeded(pathToExec);
-    const commandline = ["npx", getEndNameFromPath(quotedPathToExec)]
+    const commandline = ["npx", quoteIfNeeded(getEndNameFromPath(pathToExec))]
       .join(" ")
       .trim();
 
