@@ -37,14 +37,16 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
+type Prompt = auth.Prompt
+
 type AuthService interface {
-	login(ctx context.Context, client client.FabricClient, fabric string, prompt bool) (string, error)
+	login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
 }
 
 type OpenAuthService struct{}
 
 func (g OpenAuthService) login(
-	ctx context.Context, client client.FabricClient, fabric string, prompt bool,
+	ctx context.Context, client client.FabricClient, fabric string, prompt Prompt,
 ) (string, error) {
 	term.Debug("Logging in to", fabric)
 
@@ -57,7 +59,7 @@ func (g OpenAuthService) login(
 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
 
-var githubAuthService AuthService = OpenAuthService{}
+var authService AuthService = OpenAuthService{}
 
 func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
@@ -69,8 +71,16 @@ func saveAccessToken(fabric, at string) error {
 	return nil
 }
 
-func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt bool) error {
-	at, err := githubAuthService.login(ctx, client, fabric, prompt)
+func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
+	return interactiveLogin(ctx, client, fabric, false)
+}
+
+func InteractiveLoginPrompt(ctx context.Context, client client.FabricClient, fabric string) error {
+	return interactiveLogin(ctx, client, fabric, true)
+}
+
+func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
+	at, err := authService.login(ctx, client, fabric, prompt)
 	if err != nil {
 		return err
 	}

@@ -66,7 +66,14 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
-func StartAuthCodeFlow(ctx context.Context, prompt bool) (AuthCodeFlow, error) {
+type Prompt bool
+
+const (
+	PromptNo  Prompt = false
+	PromptYes Prompt = true
+)
+
+func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
