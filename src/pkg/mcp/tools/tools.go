@@ -6,10 +6,10 @@ import (
 )
 
 // SetupTools configures and adds all the MCP tools to the server
-func SetupTools(s *server.MCPServer, cluster string, gitHubClientId string) {
+func SetupTools(s *server.MCPServer, cluster string) {
 	// Create a tool for logging in and getting a new token
 	term.Info("Setting up login tool")
-	setupLoginTool(s, cluster, gitHubClientId)
+	setupLoginTool(s, cluster)
 
 	// Create a tool for listing services
 	term.Info("Setting up services tool")

@@ -11,7 +11,7 @@ import (
 )
 
 // setupLoginTool configures and adds the login tool to the MCP server
-func setupLoginTool(s *server.MCPServer, cluster string, gitHubClientId string) {
+func setupLoginTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating login tool")
 	loginTool := mcp.NewTool("login",
 		mcp.WithDescription("Login to Defang"),
@@ -23,7 +23,7 @@ func setupLoginTool(s *server.MCPServer, cluster string, gitHubClientId string) 
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Test token
 		client := cli.NewGrpcClient(ctx, cluster)
-		err := cli.InteractiveLogin(ctx, client, gitHubClientId, cluster, true)
+		err := cli.InteractiveLogin(ctx, client, cluster, true)
 		if err != nil {
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to login: %v", err)), nil
 		}

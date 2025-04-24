@@ -58,7 +58,7 @@ var mcpServerCmd = &cobra.Command{
 		resources.SetupResources(s)
 
 		// Setup tools
-		tools.SetupTools(s, getCluster(), gitHubClientId)
+		tools.SetupTools(s, getCluster())
 
 		// Start the server
 		term.Info("Starting Defang Services MCP server")
