@@ -93,6 +93,7 @@ linters:
     # - testableexamples
     # - testifylint
     # - testpackage
+    - tenv
     # - thelper - more trouble than it's worth
     # - tparallel
     - unconvert
