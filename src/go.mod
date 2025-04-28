@@ -4,7 +4,7 @@ go 1.23.0
 
 toolchain go1.23.5
 
-replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v0.1.0
+replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
 
 require (
 	cloud.google.com/go/artifactregistry v1.16.0

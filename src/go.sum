@@ -34,8 +34,8 @@ github.com/AlecAivazis/survey/v2 v2.3.7/go.mod h1:xUTIdE4KCOIjsBAE1JYsUPoCqYdZ1r
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/DefangLabs/cobra v0.1.0 h1:q1a62Ap3ORROuNLFMgdXBCubRzS8X1xFj6xpqG8EDSg=
-github.com/DefangLabs/cobra v0.1.0/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
+github.com/DefangLabs/cobra v1.8.0-defang h1:rTzAg1XbEk3yXUmQPumcwkLgi8iNCby5CjyG3sCwzKk=
+github.com/DefangLabs/cobra v1.8.0-defang/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
 github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f h1:RTbUqLhPxejgK92ifVdMTIW9H23QLlscy8QXPDTfaL4=
 github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f/go.mod h1:2UjtD/G/Sy2FxoHpxKnzHTXMpRURecwYal8HgbxcvkY=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 h1:pB2F2JKCj1Znmp2rwxxt1J0Fg0wezTMgWYk5Mpbi1kg=
