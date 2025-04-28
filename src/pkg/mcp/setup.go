@@ -72,7 +72,7 @@ func IsValidClient(client string) bool {
 }
 
 // getClientConfigPath returns the path to the config file for the given client
-func getClientConfigPath(client string) (string, error) {
+var getClientConfigPath = func(client string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
