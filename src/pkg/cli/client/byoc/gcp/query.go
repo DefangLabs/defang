@@ -228,7 +228,7 @@ protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`,
 }
 
 func (q *Query) AddServiceStatusRequestUpdate(stack, project, etag string, services []string) {
-	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService"`
+	reqQuery := `protoPayload.methodName="google.cloud.run.v2.Services.CreateService" OR "google.cloud.run.v2.Services.UpdateService" OR "google.cloud.run.v2.Services.ReplaceService" OR "google.cloud.run.v2.Services.DeleteService"`
 
 	if stack != "" {
 		reqQuery += fmt.Sprintf(`

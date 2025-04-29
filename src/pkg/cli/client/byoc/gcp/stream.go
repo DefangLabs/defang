@@ -567,6 +567,9 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 			} else {
 				state = defangv1.ServiceState_BUILD_RUNNING
 			}
+			if status == "" {
+				status = state.String()
+			}
 			return []*defangv1.SubscribeResponse{{
 				Name:   bt.Service,
 				State:  state,

@@ -171,6 +171,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.instanceAdmin.v1",        // For creating compute instances
 		"roles/cloudsql.admin",                  // For creating cloud sql instances
 		"roles/redis.admin",                     // For creating redis instances/clusters
+		"roles/certificatemanager.owner",        // For creating certificates
 	}); err != nil {
 		return err
 	}
