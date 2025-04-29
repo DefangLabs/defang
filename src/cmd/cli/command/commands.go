@@ -146,7 +146,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -269,6 +269,13 @@ func SetupCommands(ctx context.Context, version string) {
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
+	// MCP Command
+	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpCmd.AddCommand(mcpServerCmd)
+	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
+	mcpSetupCmd.MarkFlagRequired("client")
+	RootCmd.AddCommand(mcpCmd)
+
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
 	sendCmd.Flags().StringP("type", "t", "", "type of message to send (required)")
@@ -362,7 +369,7 @@ var RootCmd = &cobra.Command{
 				term.Warn("Please log in to continue.")
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster()); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
 					return err
 				}
 
@@ -400,7 +407,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster())
+			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false)
 			if err != nil {
 				return err
 			}

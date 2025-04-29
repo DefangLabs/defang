@@ -4,6 +4,8 @@ go 1.23.0
 
 toolchain go1.23.5
 
+replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
+
 require (
 	cloud.google.com/go/artifactregistry v1.16.1
 	cloud.google.com/go/cloudbuild v1.22.2
@@ -37,6 +39,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
+	github.com/mark3labs/mcp-go v0.21.0
 	github.com/miekg/dns v1.1.59
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.15.2
@@ -45,7 +48,7 @@ require (
 	github.com/ross96D/cancelreader v0.2.6
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	golang.org/x/mod v0.18.0
 	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sys v0.32.0
@@ -71,7 +74,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250121191232-2f005788dc42 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
@@ -94,6 +97,7 @@ require (
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.34.0 // indirect

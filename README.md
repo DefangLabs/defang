@@ -2,13 +2,22 @@
 
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Develop Anything, Deploy Anywhere. Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
+**Develop Anything. Deploy Anywhere.** <br>
+Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
-This repo includes:
+**Defang CLI**  
+The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
+
+**Defang MCP Server**  
+The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
+
+**This repo includes:**
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
-- Samples in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
+- Built-in support for MCP Server — the Defang MCP Server makes cloud deployment as easy as a single prompt. [Learn more](https://docs.defang.io/docs/concepts/mcp)  
+- [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them to the DOP using a Docker Compose file using the Defang CLI.
 - Samples that show how to deploy an app using the [Defang Pulumi Provider](https://github.com/DefangLabs/pulumi-defang).
+
 
 ## Getting started
 
@@ -114,6 +123,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
+- `DEFANG_ORG` - The name of the organization to use; defaults to the user's GitHub name
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
 - `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `digitalocean`, `gcp`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend

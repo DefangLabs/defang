@@ -367,12 +367,14 @@ enum DeploymentAction {
 }
 
 message Deployment {
-  string id = 1;
+  string id = 1; // aka etag
   string project = 2;
-  string provider = 3;
+  string provider_string = 3 [ deprecated = true ]; // was: provider
   string provider_account_id = 4;
   google.protobuf.Timestamp timestamp = 5;
   DeploymentAction action = 6;
+  string region = 7;
+  Provider provider = 8;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
@@ -660,7 +662,7 @@ message SetOptionsRequest {
 
 message WhoAmIResponse {
   string tenant = 1;
-  string account = 2;
+  string provider_account_id = 2;
   string region = 3;
   string user_id = 4;
   SubscriptionTier tier = 5;
