@@ -53,13 +53,16 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
-		client := cli.Connect(ctx, cluster)
+		client, err := cli.Connect(ctx, cluster)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+		}
 
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to get new provider: %v", err)), nil
+			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
 		}
 
 		// Deploy the services
@@ -71,7 +74,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			err = fmt.Errorf("failed to compose up services: %w", err)
 			term.Error("Failed to compose up services", "error", err)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to compose up services: %v", err)), nil
+			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), nil
 		}
 
 		if len(deployResp.Services) == 0 {

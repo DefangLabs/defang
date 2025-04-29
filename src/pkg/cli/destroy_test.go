@@ -10,19 +10,24 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type grpcDestroyMockHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (g *grpcDestroyMockHandler) Delete(context.Context, *connect.Request[defangv1.DeleteRequest]) (*connect.Response[defangv1.DeleteResponse], error) {
+func (grpcDestroyMockHandler) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{}), nil
+}
+
+func (grpcDestroyMockHandler) Delete(context.Context, *connect.Request[defangv1.DeleteRequest]) (*connect.Response[defangv1.DeleteResponse], error) {
 	return connect.NewResponse(&defangv1.DeleteResponse{
 		Etag: "test-etag",
 	}), nil
 }
 
-func (g *grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
+func (grpcDestroyMockHandler) GetServices(context.Context, *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
 	return connect.NewResponse(&defangv1.GetServicesResponse{
 		Project: "tenantx",
 		Services: []*defangv1.ServiceInfo{
@@ -42,7 +47,7 @@ func TestDestroy(t *testing.T) {
 
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient := Connect(ctx, url)
+	grpcClient, _ := Connect(ctx, url)
 	client := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	etag, err := client.Destroy(ctx, &defangv1.DestroyRequest{Project: "test-project"})

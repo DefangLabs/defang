@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"net"
-	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -35,12 +34,8 @@ func SplitTenantHost(cluster string) (types.TenantName, string) {
 	return tenant, cluster
 }
 
-func Connect(ctx context.Context, cluster string) client.GrpcClient {
-	var tenantName types.TenantName
-	tenant, host := SplitTenantHost(cluster)
-	if tenant != types.DEFAULT_TENANT {
-		tenantName = tenant
-	}
+func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+	tenantName, host := SplitTenantHost(cluster)
 	accessToken := GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantName, "for cluster", host)
 	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
@@ -48,24 +43,28 @@ func Connect(ctx context.Context, cluster string) client.GrpcClient {
 
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
-		networkErrors := []string{
-			"no such host",
-			"connection reset by peer",
-			"unexpected EOF",
-		}
-		if slices.Contains(networkErrors, err.Error()) {
-			term.Fatal("Unable to connect to Defang; please check network settings and try again.")
-			term.Debug("Connection error details:", err)
-		} else {
-			term.Debug("Unable to validate tenant ID with server:", err)
-		}
-	} else if string(tenantName) != resp.Tenant {
+		term.Debug("Unable to validate tenant ID with server:", err)
+		return nil, err
+		// networkErrors := []string{
+		// 	"no such host",
+		// 	"connection reset by peer",
+		// 	"unexpected EOF",
+		// 	"network is unreachable",
+		// 	"connection refused",
+		// }
+		// if slices.ContainsFunc(networkErrors, func(suffix string) bool { return strings.HasSuffix(err.Error(), suffix) }) {
+		// 	term.Debug("Connection error details:", err)
+		// 	term.Fatal("Unable to connect to Defang; please check network settings and try again.")
+		// }
+	}
+
+	if string(tenantName) != resp.Tenant {
 		if tenantName != types.DEFAULT_TENANT {
 			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
 		}
 		grpcClient.TenantName = types.TenantName(resp.Tenant)
 	}
-	return grpcClient
+	return &grpcClient, nil
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {

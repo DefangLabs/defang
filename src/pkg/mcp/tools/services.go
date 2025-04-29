@@ -44,13 +44,16 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
-		client := cli.Connect(ctx, cluster)
+		client, err := cli.Connect(ctx, cluster)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+		}
 
 		// Create a Defang client
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to create provider", "error", err)
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to create provider: %v", err)), nil
+			return mcp.NewToolResultErrorFromErr("Failed to create provider", err), nil
 		}
 
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
@@ -61,7 +64,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 				return mcp.NewToolResultText("No projects found on Playground"), nil
 			}
 			term.Errorf("Failed to load project name, error: %v", err)
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to load project name: %v", err)), nil
+			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
 		}
 
 		serviceResponse, err := deployment_info.GetServices(ctx, projectName, provider)
