@@ -52,7 +52,7 @@ func TestDeploymentsList(t *testing.T) {
 	})
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	client := NewGrpcClient(ctx, url)
+	client := Connect(ctx, url)
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)

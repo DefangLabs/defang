@@ -53,7 +53,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
-		client := cli.NewGrpcClient(ctx, cluster)
+		client := cli.Connect(ctx, cluster)
 
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {

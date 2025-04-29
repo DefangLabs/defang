@@ -159,7 +159,7 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	_ = cli.NewGrpcClient(ctx, cluster)
+	_ = cli.Connect(ctx, cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -338,7 +338,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client = cli.NewGrpcClient(cmd.Context(), getCluster())
+		client = cli.Connect(cmd.Context(), getCluster())
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -372,7 +372,7 @@ var RootCmd = &cobra.Command{
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), getCluster()) // reconnect with the new token
+				client = cli.Connect(cmd.Context(), getCluster()) // reconnect with the new token
 
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success

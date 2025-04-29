@@ -32,7 +32,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Info("Compose down tool called - removing services")
 
-		client := cli.NewGrpcClient(ctx, cluster)
+		client := cli.Connect(ctx, cluster)
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)

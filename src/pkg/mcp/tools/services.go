@@ -44,7 +44,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
-		client := cli.NewGrpcClient(ctx, cluster)
+		client := cli.Connect(ctx, cluster)
 
 		// Create a Defang client
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)

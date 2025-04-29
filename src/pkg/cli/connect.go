@@ -35,7 +35,7 @@ func SplitTenantHost(cluster string) (types.TenantName, string) {
 	return tenant, cluster
 }
 
-func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
+func Connect(ctx context.Context, cluster string) client.GrpcClient {
 	var tenantName types.TenantName
 	tenant, host := SplitTenantHost(cluster)
 	if tenant != types.DEFAULT_TENANT {
