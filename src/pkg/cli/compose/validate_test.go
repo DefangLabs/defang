@@ -53,7 +53,6 @@ func TestValidateService(t *testing.T) {
 					Timeout:  duration(2),
 				},
 			},
-			wantErr: "invalid healthcheck: timeout must be less than the interval",
 		},
 		{
 			name: "invalid CMD healthcheck",

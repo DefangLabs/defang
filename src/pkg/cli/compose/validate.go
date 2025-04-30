@@ -44,12 +44,6 @@ func ValidateService(service *types.ServiceConfig) error {
 	}
 
 	if service.HealthCheck != nil && len(service.HealthCheck.Test) > 0 {
-		// Technically this should test for <= but both interval and timeout have 30s as the default value in compose spec
-		interval := getOrZero(service.HealthCheck.Interval)
-		timeout := getOrZero(service.HealthCheck.Timeout)
-		if interval > 0 && interval < timeout {
-			return errors.New("invalid healthcheck: timeout must be less than the interval")
-		}
 		switch service.HealthCheck.Test[0] {
 		case "CMD", "CMD-SHELL":
 			if hasIngress {
@@ -76,12 +70,4 @@ func ValidateService(service *types.ServiceConfig) error {
 	}
 
 	return nil
-}
-
-func getOrZero[T any](v *T) T {
-	if v == nil {
-		var zero T
-		return zero
-	}
-	return *v
 }
