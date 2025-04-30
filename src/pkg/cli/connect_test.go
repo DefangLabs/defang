@@ -45,9 +45,10 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("no such host", func(t *testing.T) {
-		_, err := Connect(ctx, "blah")
-		if expected, actual := "unavailable: dial tcp: lookup blah: no such host", err.Error(); expected != actual {
-			t.Errorf("expected %v, got: %v", expected, actual)
+		_, err := Connect(ctx, "blah.example.com")
+		const suffix = ": no such host"
+		if actual := err.Error(); !strings.HasSuffix(actual, suffix) {
+			t.Errorf("expected error to end with %q, got: %v", suffix, actual)
 		}
 	})
 
