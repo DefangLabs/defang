@@ -165,6 +165,10 @@ func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]T, error)
 	return newResps, nil
 }
 
+func (s *ServerStream[T]) AddCustomQuery(query string) {
+	s.query.AddQuery(query)
+}
+
 func (s *ServerStream[T]) Err() error {
 	return s.lastErr
 }
@@ -216,10 +220,6 @@ func (s *LogStream) AddFilter(filter string) {
 	s.query.AddFilter(filter)
 }
 
-func (s *LogStream) AddCustomQuery(query string) {
-	s.query.AddQuery(query)
-}
-
 type SubscribeStream struct {
 	*ServerStream[*defangv1.SubscribeResponse]
 }
@@ -248,10 +248,6 @@ func (s *SubscribeStream) AddServiceStatusUpdate(stack, project, etag string, se
 	s.query.AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag, services)
 	s.query.AddComputeEngineInstanceGroupAddInstances()
 	s.query.AddCloudBuildActivityQuery()
-}
-
-func (s *SubscribeStream) AddCustomQuery(query string) {
-	s.query.AddQuery(query)
 }
 
 var cdExecutionNamePattern = regexp.MustCompile(`^defang-cd-[a-z0-9]{5}$`)
@@ -547,7 +543,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 				return nil, nil
 			}
 
-			if bt.Etag != etag {
+			if etag != "" && bt.Etag != etag {
 				return nil, nil
 			}
 
