@@ -5,91 +5,329 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
+	"strings"
 	"testing"
 )
 
-// mock ValidClients and ValidVSCodeClients if needed
-// Otherwise, ensure they are accessible from the test
+// VScodeConfig structure
+type VScodeConfig struct {
+	MCP struct {
+		Servers map[string]VSCodeMCPServerConfig `json:"servers"`
+	} `json:"mcp"`
+	// Other VSCode settings can be included as needed
+	Other map[string]interface{} `json:"-"`
+}
 
 func TestSetupClient_TableDriven(t *testing.T) {
 	tests := []struct {
-		name          string
-		client        string
-		initialConfig string // "" for no file, otherwise initial JSON
-		expectError   bool
-		expectDefang  bool
-		expectCommand string
+		name           string // Test name
+		ideClient      string // IDE client name
+		clientInstall  bool   // Flag to indicate if the client is installed
+		initialConfig  string // Initial configuration to be written to the config file if there is any
+		expectedConfig string // Expected configuration after running SetupClient
+		expectError    string // Expected error message if any
 	}{
 		{
-			name:         "invalid client",
-			client:       "code",
-			expectError:  true,
-			expectDefang: false,
+			name:          "Misspelled client name",
+			ideClient:     "windsrf",
+			clientInstall: true,
+			expectError:   "invalid MCP client: windsrf.",
 		},
 		{
-			name:          "new config file",
-			client:        "testclient",
-			expectError:   false,
-			expectDefang:  true,
-			expectCommand: "npx",
+			name:          "Unsupported client",
+			ideClient:     "goland",
+			clientInstall: true,
+			expectError:   "invalid MCP client: goland.",
 		},
 		{
-			name:          "existing config missing MCPServers",
-			client:        "testclient2",
-			initialConfig: `{"SomeOtherField":123}`,
-			expectError:   false,
-			expectDefang:  true,
-			expectCommand: "npx",
+			name:          "windsurf client",
+			ideClient:     "windsurf",
+			clientInstall: true,
+			initialConfig: "",
+			expectedConfig: `{	
+				"mcpServers": {
+				  "defang": {
+					"command": "npx",
+					"args": [
+					  "-y",
+					  "defang@latest",
+					  "mcp",
+					  "serve"
+					]
+				  }
+				}
+			  }`,
+		},
+		{
+			name:          "windsurf client not installed",
+			ideClient:     "windsurf",
+			clientInstall: false,
+			initialConfig: "",
+			expectedConfig: `{
+				"mcpServers": {
+				  "defang": {
+					"command": "npx",
+					"args": [
+					  "-y",
+					  "defang@latest",
+					  "mcp",
+					  "serve"
+					]
+				  }
+				}
+			  }`,
+			expectError: "The client windsurf you are trying to setup is not install or not found in your system path, please try again after installing.",
+		},
+		{
+			name:          "cursor client",
+			ideClient:     "cursor",
+			clientInstall: true,
+			initialConfig: "",
+			expectedConfig: `{
+				"mcpServers": {
+				  "defang": {
+					"command": "npx",
+					"args": [
+					  "-y",
+					  "defang@latest",
+					  "mcp",
+					  "serve"
+					]
+				  }
+				}
+			  }`,
+		},
+		{
+			name:          "cursor client not installed",
+			ideClient:     "cursor",
+			clientInstall: false,
+			initialConfig: "",
+			expectedConfig: `{
+				"mcpServers": {
+				  "defang": {
+					"command": "npx",
+					"args": [
+					  "-y",
+					  "defang@latest",
+					  "mcp",
+					  "serve"
+					]
+				  }
+				}
+			  }`,
+			expectError: "The client cursor you are trying to setup is not install or not found in your system path, please try again after installing.",
+		},
+		{
+			name:          "Vscode config with other mcp servers",
+			ideClient:     "vscode",
+			clientInstall: true,
+			initialConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+				  "servers": {
+					"defang": {
+					  "args": [
+						"mcp",
+						"serve"
+					  ],
+					  "command": "defang",
+					  "type": "stdio"
+					},
+					"git": {
+					  "args": [
+						"mcp-server-git"
+					  ],
+					  "command": "uvx"
+					}
+				  }
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+			  }`,
+			expectedConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+				  "servers": {
+					"defang": {
+					  "args": [
+						"-y",
+						"defang@latest",
+						"mcp",
+						"serve"
+					  ],
+					  "command": "npx",
+					  "type": "stdio"
+					},
+					"git": {
+					  "args": [
+						"mcp-server-git"
+					  ],
+					  "command": "uvx"
+					}
+				  }
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+			  }`,
+		},
+		{
+			name:          "Vscode insiders config with only defang mcp server",
+			ideClient:     "insiders",
+			clientInstall: true,
+			initialConfig: "",
+			expectedConfig: `{
+				"mcp": {
+				"servers": {
+					"defang": {
+					"args": [
+						"-y",
+						"defang@latest",
+						"mcp",
+						"serve"
+					],
+					"command": "npx",
+					"type": "stdio"
+					}
+				}
+				}
+			}`,
+		},
+		{
+			name:          "Fresh install of claude config",
+			ideClient:     "claude",
+			clientInstall: true,
+			initialConfig: "",
+			expectedConfig: `{
+			"mcpServers": {
+				"defang": {
+				"command": "npx",
+				"args": [
+					"-y",
+					"defang@latest",
+					"mcp",
+					"serve"
+				]
+				}
+			}
+			}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			client := tt.client
+			client := tt.ideClient
+			orgGetClientConfigPath := getClientConfigPath
 
+			// Mock getClientConfigPath by overriding for this test, there is a
 			getClientConfigPath = func(client string) (string, error) {
-				return filepath.Join(tempDir, client+".json"), nil
+				var configPath string
+				switch strings.ToLower(client) {
+				case "windsurf", "codeium":
+					configPath = filepath.Join(tempDir, ".codeium", "windsurf", "mcp_config.json")
+				case "claude":
+					configPath = filepath.Join(tempDir, ".config", "Claude", "claude_desktop_config.json")
+				case "cursor":
+					configPath = filepath.Join(tempDir, ".cursor", "mcp.json")
+				case "vscode", "code":
+					configPath = filepath.Join(tempDir, "Library", "Application Support", "Code", "User", "settings.json")
+				case "vscode-insiders", "insiders":
+					configPath = filepath.Join(tempDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
+				default:
+					return "", fmt.Errorf("unsupported client: %s", client)
+				}
+
+				return configPath, nil
 			}
 
 			configPath, _ := getClientConfigPath(client)
+			// If client install is needed we need to mock the install path to the temp directory
+			if tt.clientInstall {
+				configDir := filepath.Dir(configPath)
+				if err := os.MkdirAll(configDir, 0755); err != nil {
+					t.Fatalf("failed to create config directory: %v", err)
+				}
+			}
 
-			fmt.Println(configPath)
+			fmt.Println("Config path:", configPath)
 
-			// Write initial config if needed
 			if tt.initialConfig != "" {
-				if err := os.WriteFile(configPath, []byte(tt.initialConfig), 0644); err != nil {
-					t.Fatalf("failed to write initial config: %v", err)
+				// Write the initial config to the config file
+				err := os.WriteFile(configPath, []byte(tt.initialConfig), 0644)
+				if err != nil {
+					t.Fatalf("failed to write initial config file: %v", err)
 				}
 			}
 
 			// Call SetupClient
 			err := SetupClient(client)
-			if tt.expectError {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			} else if err != nil {
+			if err != nil && tt.expectError == "" {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Check config file
-			data, err := os.ReadFile(configPath)
-			if err != nil {
-				t.Fatalf("failed to read config file: %v", err)
+			if err != nil && tt.expectError != "" {
+				if strings.Contains(err.Error(), tt.expectError) {
+					// We expect this error, so we can continue
+					return
+				}
+
+				t.Fatalf("expected error: %v, got: %v", tt.expectError, err)
 			}
-			var config MCPConfig
-			if err := json.Unmarshal(data, &config); err != nil {
-				t.Fatalf("failed to unmarshal config: %v", err)
+
+			// Check if the config file was written correctly
+			if tt.expectedConfig != "" {
+				data, err := os.ReadFile(configPath)
+				if err != nil {
+					t.Fatalf("failed to read config file: %v", err)
+				}
+
+				if slices.Contains(ValidVSCodeClients, client) {
+					var config VScodeConfig
+					var expectedConfig VScodeConfig
+
+					err = json.Unmarshal([]byte(tt.expectedConfig), &expectedConfig)
+
+					if err != nil {
+						t.Fatalf("failed to unmarshal expected config: %v", err)
+					}
+
+					err = json.Unmarshal(data, &config)
+					if err != nil {
+						t.Fatalf("failed to unmarshal config file: %v", err)
+					}
+
+					if !reflect.DeepEqual(config, expectedConfig) {
+						t.Fatalf("expected config: %v, got: %v", expectedConfig, config)
+					}
+				} else {
+					var config MCPConfig
+					var expectedConfig MCPConfig
+
+					err = json.Unmarshal([]byte(tt.expectedConfig), &expectedConfig)
+					if err != nil {
+						t.Fatalf("failed to unmarshal expected config: %v", err)
+					}
+					err = json.Unmarshal(data, &config)
+					if err != nil {
+						t.Fatalf("failed to unmarshal config file: %v", err)
+					}
+
+					if !reflect.DeepEqual(config, expectedConfig) {
+						t.Fatalf("expected config: %v, got: %v", expectedConfig, config)
+					}
+				}
 			}
-			defang, ok := config.MCPServers["defang"]
-			if tt.expectDefang && !ok {
-				t.Errorf("expected defang server config, not found")
-			}
-			if tt.expectCommand != "" && defang.Command != tt.expectCommand {
-				t.Errorf("expected Command %q, got %q", tt.expectCommand, defang.Command)
-			}
+
+			t.Cleanup(func() {
+				os.Remove(configPath)
+				getClientConfigPath = orgGetClientConfigPath
+			})
 		})
 	}
 }
