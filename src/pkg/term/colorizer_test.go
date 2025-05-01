@@ -175,7 +175,7 @@ func TestWarn(t *testing.T) {
 				defaultTerm.Warn(msg)
 			}
 
-			uniqueWarnings := defaultTerm.GetAllWarnings()
+			uniqueWarnings := defaultTerm.getAllWarnings()
 			if len(uniqueWarnings) != len(test.expected) {
 				t.Errorf("Expected %d unique warnings, got %d", len(test.expected), len(uniqueWarnings))
 			}

@@ -95,10 +95,6 @@ func (t *Term) IsTerminal() bool {
 	return t.isTerminal
 }
 
-func (t *Term) ClearCachedWarnings() {
-	t.warnings = nil
-}
-
 func (t *Term) HadWarnings() bool {
 	return len(t.warnings) > 0
 }
@@ -250,14 +246,16 @@ func (t *Term) Fatalf(format string, v ...any) {
 	os.Exit(1)
 }
 
-func (t *Term) GetAllWarnings() []string {
+func (t *Term) getAllWarnings() []string {
 	slices.Sort(t.warnings)
 	return slices.Compact(t.warnings)
 }
 
 func (t *Term) FlushWarnings() (int, error) {
-	uniqueWarnings := t.GetAllWarnings()
+	uniqueWarnings := t.getAllWarnings()
 	bytesWritten := 0
+
+	// unique warnings only
 	for _, w := range uniqueWarnings {
 		bytes, err := output(t.out, WarnColor, w)
 		bytesWritten += bytes
@@ -347,10 +345,6 @@ func HasDarkBackground() bool {
 
 func IsTerminal() bool {
 	return DefaultTerm.IsTerminal()
-}
-
-func ClearCachedWarnings() {
-	DefaultTerm.ClearCachedWarnings()
 }
 
 func HadWarnings() bool {
