@@ -45,9 +45,7 @@ type AuthService interface {
 
 type OpenAuthService struct{}
 
-func (g OpenAuthService) login(
-	ctx context.Context, client client.FabricClient, fabric string, prompt Prompt,
-) (string, error) {
+func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error) {
 	term.Debug("Logging in to", fabric)
 
 	code, err := auth.StartAuthCodeFlow(ctx, prompt)

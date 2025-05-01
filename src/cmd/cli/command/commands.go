@@ -70,7 +70,7 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
-	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
+	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
 		defer restore()
 	}
@@ -338,8 +338,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
-			return err
+		client, err = cli.Connect(cmd.Context(), getCluster())
+		if cli.IsNetworkError(err) {
+			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
 		}
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
@@ -370,8 +371,9 @@ var RootCmd = &cobra.Command{
 					return err
 				}
 
-				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil { // reconnect with the new token
-
+				// Reconnect with the new token
+				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
+					return err
 				}
 
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)

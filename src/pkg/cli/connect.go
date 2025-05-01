@@ -44,27 +44,30 @@ func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
 	resp, err := grpcClient.WhoAmI(ctx)
 	if err != nil {
 		term.Debug("Unable to validate tenant ID with server:", err)
-		return nil, err
-		// networkErrors := []string{
-		// 	"no such host",
-		// 	"connection reset by peer",
-		// 	"unexpected EOF",
-		// 	"network is unreachable",
-		// 	"connection refused",
-		// }
-		// if slices.ContainsFunc(networkErrors, func(suffix string) bool { return strings.HasSuffix(err.Error(), suffix) }) {
-		// 	term.Debug("Connection error details:", err)
-		// 	term.Fatal("Unable to connect to Defang; please check network settings and try again.")
-		// }
-	}
-
-	if string(tenantName) != resp.Tenant {
+	} else if string(tenantName) != resp.Tenant {
 		if tenantName != types.DEFAULT_TENANT {
 			term.Debugf("Overriding tenant %q with server provided value %q", tenantName, resp.Tenant)
 		}
 		grpcClient.TenantName = types.TenantName(resp.Tenant)
 	}
-	return &grpcClient, nil
+	return grpcClient, err
+}
+
+func IsNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	lastColon := strings.LastIndexByte(errStr, ':')
+	switch errStr[lastColon+1:] { // +1 to skip the colon and handle the case where there is no colon
+	case " connection refused",
+		" i/o timeout",
+		" network is unreachable",
+		" no such host",
+		" unexpected EOF":
+		return true
+	}
+	return false
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {

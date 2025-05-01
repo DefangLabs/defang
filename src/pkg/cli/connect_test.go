@@ -15,18 +15,22 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("unreachable", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("unreachable test only triggers when the wifi is off")
 		_, err := Connect(ctx, "1.2.3.4")
 		if expected, actual := "unavailable: dial tcp 1.2.3.4:443: connect: network is unreachable", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
+		if !IsNetworkError(err) {
+			t.Errorf("expected network error, got: %v", err)
+		}
 	})
 
 	t.Run("timeout", func(t *testing.T) {
+		t.Parallel()
 		if testing.Short() {
 			t.Skip("skipping slow test in short mode")
 		}
@@ -35,24 +39,36 @@ func TestConnect(t *testing.T) {
 		if expected, actual := `deadline_exceeded: Post "https://240.0.0.1:443/io.defang.v1.FabricController/WhoAmI": dial tcp 240.0.0.1:443: i/o timeout`, err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
+		if !IsNetworkError(err) {
+			t.Errorf("expected network error, got: %v", err)
+		}
 	})
 
 	t.Run("connection refused", func(t *testing.T) {
+		t.Parallel()
 		_, err := Connect(ctx, "127.0.0.1:1234")
 		if expected, actual := "unavailable: dial tcp 127.0.0.1:1234: connect: connection refused", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
+		if !IsNetworkError(err) {
+			t.Errorf("expected network error, got: %v", err)
+		}
 	})
 
 	t.Run("no such host", func(t *testing.T) {
+		t.Parallel()
 		_, err := Connect(ctx, "blah.example.com")
 		const suffix = ": no such host"
 		if actual := err.Error(); !strings.HasSuffix(actual, suffix) {
 			t.Errorf("expected error to end with %q, got: %v", suffix, actual)
 		}
+		if !IsNetworkError(err) {
+			t.Errorf("expected network error, got: %v", err)
+		}
 	})
 
 	t.Run("unexpected EOF", func(t *testing.T) {
+		t.Parallel()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		t.Cleanup(server.Close)
 
@@ -60,9 +76,13 @@ func TestConnect(t *testing.T) {
 		if expected, actual := "internal: protocol error: no Grpc-Status trailer: unexpected EOF", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
+		if !IsNetworkError(err) {
+			t.Errorf("expected network error, got: %v", err)
+		}
 	})
 
 	t.Run("success", func(t *testing.T) {
+		t.Parallel()
 		handler := mockWhoAmI{}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
@@ -78,6 +98,7 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("success ignore tenant", func(t *testing.T) {
+		t.Parallel()
 		const expected = "tenant1"
 		handler := mockWhoAmI{tenant: expected}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
@@ -95,6 +116,7 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("success tenant from header", func(t *testing.T) {
+		t.Parallel()
 		handler := mockWhoAmI{}
 		_, h := defangv1connect.NewFabricControllerHandler(handler)
 		server := httptest.NewServer(h)
