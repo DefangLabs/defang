@@ -66,7 +66,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		return nil, project, ErrDryRun
 	}
 
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
@@ -98,7 +98,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		}
 	} else {
 		if delegation != nil && len(delegation.NameServers) > 0 {
-			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers}
+			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers, Project: project.Name}
 			_, err = fabric.DelegateSubdomainZone(ctx, req)
 			if err != nil {
 				return nil, project, err
