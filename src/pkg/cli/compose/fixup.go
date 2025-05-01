@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -154,7 +155,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		}
 
 		_, llm := svccfg.Extensions["x-defang-llm"]
-		if llm {
+		if llm && strings.Contains(svccfg.Image, "openai-access-gateway") {
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
 				term.Warnf("service %q: managed LLM is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 				delete(svccfg.Extensions, "x-defang-llm")
