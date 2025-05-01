@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/browser"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -19,7 +18,7 @@ import (
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
+func setupDeployTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -53,6 +52,8 @@ func setupDeployTool(s *server.MCPServer, client client.GrpcClient) {
 
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
+
+		client := cli.NewGrpcClient(ctx, cluster)
 
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {

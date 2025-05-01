@@ -48,13 +48,23 @@ type VSCodeMCPServerConfig struct {
 	Headers map[string]string `json:"headers,omitempty"` // For sse
 }
 
-// ValidClients is a list of supported MCP clients
-var ValidClients = []string{
-	"claude",
-	"windsurf",
-	"cursor",
+// ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
+var ValidVSCodeClients = []string{
 	"vscode",
+	"code",
+	"vscode-insiders",
+	"insiders",
 }
+
+// ValidClients is a list of supported MCP clients
+var ValidClients = append(
+	[]string{
+		"claude",
+		"windsurf",
+		"cursor",
+	},
+	ValidVSCodeClients...,
+)
 
 // IsValidClient checks if the provided client is in the list of valid clients
 func IsValidClient(client string) bool {
@@ -90,7 +100,7 @@ func getClientConfigPath(client string) (string, error) {
 		}
 	case "cursor":
 		configPath = filepath.Join(homeDir, ".cursor", "mcp.json")
-	case "vscode":
+	case "vscode", "code":
 		if runtime.GOOS == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
 		} else if runtime.GOOS == "windows" {
@@ -106,6 +116,22 @@ func getClientConfigPath(client string) (string, error) {
 			}
 			configPath = filepath.Join(configHome, "Code/User/settings.json")
 		}
+	case "vscode-insiders", "insiders":
+		if runtime.GOOS == "darwin" {
+			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
+		} else if runtime.GOOS == "windows" {
+			appData := os.Getenv("APPDATA")
+			if appData == "" {
+				appData = filepath.Join(homeDir, "AppData", "Roaming")
+			}
+			configPath = filepath.Join(appData, "Code - Insiders", "User", "settings.json")
+		} else {
+			configHome := os.Getenv("XDG_CONFIG_HOME")
+			if configHome == "" {
+				configHome = filepath.Join(homeDir, ".config")
+			}
+			configPath = filepath.Join(configHome, "Code - Insiders/User/settings.json")
+		}
 	default:
 		return "", fmt.Errorf("unsupported client: %s", client)
 	}
@@ -117,7 +143,7 @@ func getClientConfigPath(client string) (string, error) {
 func getDefangMCPConfig() MCPServerConfig {
 	return MCPServerConfig{
 		Command: "npx",
-		Args:    []string{"-y", "defang", "mcp", "serve"},
+		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
 	}
 }
 
@@ -126,7 +152,7 @@ func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
 	return VSCodeMCPServerConfig{
 		Type:    "stdio",
 		Command: "npx",
-		Args:    []string{"-y", "defang", "mcp", "serve"},
+		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
 	}
 }
 
@@ -239,7 +265,7 @@ func SetupClient(client string) error {
 	}
 
 	// Handle VSCode settings.json specially
-	if client == "vscode" {
+	if slices.Contains(ValidVSCodeClients, client) {
 		if err := handleVSCodeConfig(configPath); err != nil {
 			return err
 		}

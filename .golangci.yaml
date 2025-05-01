@@ -43,7 +43,7 @@ linters:
     # - gofumpt
     - goheader
     - goimports
-    - gomoddirectives
+    # - gomoddirectives
     - gomodguard
     - goprintffuncname
     # - gosec
@@ -90,10 +90,10 @@ linters:
     # - stylecheck
     # - tagalign
     # - tagliatelle
-    - tenv
     # - testableexamples
     # - testifylint
     # - testpackage
+    # - tenv
     # - thelper - more trouble than it's worth
     # - tparallel
     - unconvert

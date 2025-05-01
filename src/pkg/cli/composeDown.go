@@ -53,7 +53,7 @@ func ComposeDown(ctx context.Context, projectName string, c client.FabricClient,
 		return etag, nil
 	}
 
-	delegateDomain, err := c.GetDelegateSubdomainZone(ctx)
+	delegateDomain, err := c.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return "", errors.New("failed to get delegate domain")

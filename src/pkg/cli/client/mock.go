@@ -102,11 +102,11 @@ func (m MockFabricClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequ
 	return &defangv1.CanIUseResponse{CdImage: "beta", Gpu: true}, nil
 }
 
-func (m MockFabricClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
+func (m MockFabricClient) GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
 	return &defangv1.DelegateSubdomainZoneResponse{Zone: m.DelegateDomain}, nil
 }
 
-func (m MockFabricClient) DeleteSubdomainZone(ctx context.Context) error {
+func (m MockFabricClient) DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error {
 	return nil
 }
 

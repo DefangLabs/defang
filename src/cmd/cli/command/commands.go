@@ -142,6 +142,8 @@ func Execute(ctx context.Context) error {
 }
 
 func SetupCommands(ctx context.Context, version string) {
+	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
+
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
@@ -164,7 +166,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -370,7 +373,7 @@ var RootCmd = &cobra.Command{
 				term.Warn("Please log in to continue.")
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster()); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
 					return err
 				}
 
@@ -408,7 +411,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster())
+			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false)
 			if err != nil {
 				return err
 			}

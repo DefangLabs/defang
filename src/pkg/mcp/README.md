@@ -2,26 +2,26 @@
 
 # Defang MCP Server
 
-This folder contains a Model Context Protocol (MCP) server with built-in Defang tools (`deploy`, `services`, `destroy`) to allow users to manage their services with AI coding agents in a supported IDE.
+This directory hosts the Model Context Protocol (MCP) Server, equipped with Defang tools (`deploy`, `services`, `destroy`) to help users manage their services seamlessly using AI coding agents within supported IDEs.
 
-Below is an installation guide to get started.
+Follow the guide below to get started.
 
 ## Installation
 
-First, make sure you have the [npm package manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) installed.
+Make sure you have the [npm package manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) installed, as `npx` commands are required for setup.
 
-Connect the MCP server with your IDE by running the following command in your terminal:
+To connect the MCP Server to your IDE, execute the following command in your
 
 ```bash
-npx -y defang mcp setup --client=<your-ide>
+npx -y defang@latest mcp setup --client=<your-ide>
 ```
 
-Replace `<your-ide>` with the name of your preferred IDE. See our list of [Supported IDEs](#supported-ides).
+Replace `<your-ide>` with the name of your [preferred IDE](#supported-ides).
 
-After setup, you can start the MCP server with the command:
+After setup, you can start the MCP Server with the command:
 
 ```bash
-npx -y defang mcp serve
+npx -y defang@latest mcp serve
 ```
 
 Once the server is running, you can access the Defang MCP tools directly through the AI agent chat in your IDE.
@@ -31,27 +31,33 @@ Once the server is running, you can access the Defang MCP tools directly through
 ### Cursor
 
 ```bash
-npx -y defang mcp setup --client=cursor
+npx -y defang@latest mcp setup --client=cursor
 ```
 
 ### Windsurf
 
 ```bash
-npx -y defang mcp setup --client=windsurf
+npx -y defang@latest mcp setup --client=windsurf
 ```
 
-### VSCode
+### VS Code
 
 ```bash
-npx -y defang mcp setup --client=vscode
+npx -y defang@latest mcp setup --client=vscode
+```
+
+### VS Code Insiders
+
+```bash
+npx -y defang@latest mcp setup --client=vscode-insiders
 ```
 
 ### Claude Desktop
 
-(While this is not an IDE in the traditional sense, it can support MCP servers.)
+While this is not an IDE in the traditional sense, it can support MCP servers.
 
 ```bash
-npx -y defang mcp setup --client=claude
+npx -y defang@latest mcp setup --client=claude
 ```
 
 ## MCP Tools
@@ -69,3 +75,7 @@ The `services` tool displays the details of all your services that are currently
 ### `destroy`
 
 Given a project name or directory, the `destroy` tool identifies any services deployed with Defang and terminates them. If no services are found, it will display an appropriate message.
+
+## Additional Information
+
+For more details about the Defang MCP Server, please see our [official documentation](https://docs.defang.io/docs/concepts/mcp).
