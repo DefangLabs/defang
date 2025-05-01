@@ -133,8 +133,8 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 		"state":         {state},
 		"redirect_uri":  {redirectURI},
 		"response_type": {string(response)},
-		// "scope":        {"read:org user:email"}, // required for membership check; space-delimited
-		// "login":     {";TODO: from state file"},
+		// "scope":         {"read:org user:email"}, TODO: add scope AuthorizeOption
+		// "login":         {";TODO: from state file"},
 	}
 	if as.provider != "" {
 		values.Set("provider", as.provider)
@@ -167,7 +167,6 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (Exch
 		"grant_type":    {"authorization_code"},
 		"client_id":     {c.clientID},
 		"code_verifier": {verifier},
-		// "expires_in":   {"3600"}, TODO: not supported in OpenAuth
 	}
 
 	resp, err := http.PostForm(c.issuer+"/token", body)
@@ -239,46 +238,12 @@ func (c client) Refresh(refresh string, opts ...RefreshOption) (RefreshSuccess, 
 	}, nil
 }
 
-/*
 func (c client) Verify(token string, opts ...VerifyOption) (VerifyResult, error) {
 	var vs VerifyOptions
 	for _, o := range opts {
 		o(&vs)
 	}
 
-	// TODO: Implement JWKS fetching and caching
-	claims := jwt.MapClaims{}
-	parser := new(jwt.Parser)
-	parsedToken, err := parser.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		// TODO: Implement key lookup from JWKS
-		return nil, fmt.Errorf("key lookup not implemented")
-	})
-
-	if err != nil {
-		if validationErr, ok := err.(*jwt.ValidationError); ok {
-			if validationErr.Errors&jwt.ValidationErrorExpired != 0 && vs.refresh != "" {
-				// Token is expired and we have a refresh token - try to refresh
-				refreshResult, err := c.Refresh(vs.refresh)
-				if err != nil {
-					return VerifyResult{}, err
-				}
-
-				// Recursively verify the new access token
-				return c.Verify(refreshResult.AccessToken, WithRefreshToken(refreshResult.RefreshToken))
-			}
-		}
-		return VerifyResult{}, fmt.Errorf("invalid access token: %w", err)
-	}
-
-	if !parsedToken.Valid {
-		return VerifyResult{}, fmt.Errorf("invalid token")
-	}
-
-	return VerifyResult{
-		Tokens: &Tokens{
-			AccessToken:  token,
-			RefreshToken: vs.refresh,
-		},
-	}, nil
+	// The CLI doesn't have to verify the access token, because the server will.
+	return VerifyResult{}, errors.ErrUnsupported
 }
-*/
