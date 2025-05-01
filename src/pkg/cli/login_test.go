@@ -40,15 +40,13 @@ func TestGetExistingToken(t *testing.T) {
 	})
 }
 
-type MockGitHubAuthService struct {
-	OpenAuthService
-	MockLogin func(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
+type mockGitHubAuthService struct {
+	accessToken string
+	err         error
 }
 
-func (g MockGitHubAuthService) login(
-	ctx context.Context, client client.FabricClient, fabric string, prompt Prompt,
-) (string, error) {
-	return g.MockLogin(ctx, client, fabric, prompt)
+func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error) {
+	return g.accessToken, g.err
 }
 
 func TestInteractiveLogin(t *testing.T) {
@@ -67,13 +65,7 @@ func TestInteractiveLogin(t *testing.T) {
 	tokenFile := getTokenFile(fabric)
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
-		authService = MockGitHubAuthService{
-			MockLogin: func(
-				ctx context.Context, client client.FabricClient, fabric string, prompt Prompt,
-			) (string, error) {
-				return accessToken, nil
-			},
-		}
+		authService = mockGitHubAuthService{accessToken: accessToken}
 
 		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
 		if err != nil {
@@ -89,11 +81,7 @@ func TestInteractiveLogin(t *testing.T) {
 	})
 
 	t.Run("Expect error when InteractiveLogin fails", func(t *testing.T) {
-		authService = MockGitHubAuthService{
-			MockLogin: func(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error) {
-				return "", errors.New("test-error")
-			},
-		}
+		authService = mockGitHubAuthService{err: errors.New("test-error")}
 
 		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
 		if err == nil {
