@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/browser"
 )
 
-const issuer = "http://localhost:3001" // "https://auth.defang.io"
-
 func TestAuthorize(t *testing.T) {
+	const issuer = "https://auth.defang.io"
+
 	client := NewClient("defang-cli", issuer)
 	result, err := client.Authorize("http://localhost:1234/", CodeResponseType, WithPkce())
 	if err != nil {
@@ -32,7 +32,7 @@ func TestAuthorize(t *testing.T) {
 
 func TestExchange(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping test in short mode.")
+		t.Skip("skipping browser test in short mode.")
 	}
 
 	redirectCh := make(chan url.URL)
@@ -41,10 +41,14 @@ func TestExchange(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/callback":
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<html><script>window.close()</script></html>`))
 			redirectCh <- *r.URL
-			http.Redirect(w, r, "/ok", http.StatusFound)
-		case "/ok":
-			w.WriteHeader(http.StatusOK)
+		case "/authorize":
+			http.Redirect(w, r, "/callback?code=1234&state="+r.URL.Query().Get("state"), http.StatusFound)
+		case "/token":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"access_token":"access-token","refresh_token":"1234"}`))
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
@@ -59,7 +63,7 @@ func TestExchange(t *testing.T) {
 		{name: "with pkce", opts: []AuthorizeOption{WithPkce()}},
 	}
 
-	client := NewClient("defang-cli", issuer)
+	client := NewClient("defang-cli", server.URL)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
