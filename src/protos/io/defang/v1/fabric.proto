@@ -93,9 +93,11 @@ service FabricController {
 
   rpc DelegateSubdomainZone(DelegateSubdomainZoneRequest)
       returns (DelegateSubdomainZoneResponse);
-  rpc DeleteSubdomainZone(google.protobuf.Empty)
-      returns (google.protobuf.Empty);
-  rpc GetDelegateSubdomainZone(google.protobuf.Empty)
+  rpc DeleteSubdomainZone(DeleteSubdomainZoneRequest)
+      returns (google.protobuf.Empty) {
+    option idempotency_level = IDEMPOTENT;
+  };
+  rpc GetDelegateSubdomainZone(GetDelegateSubdomainZoneRequest)
       returns (DelegateSubdomainZoneResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
@@ -647,6 +649,14 @@ message DelegateSubdomainZoneRequest {
 }
 
 message DelegateSubdomainZoneResponse { string zone = 1; }
+
+message DeleteSubdomainZoneRequest {
+  string project = 1;
+}
+
+message GetDelegateSubdomainZoneRequest {
+  string project = 1;
+}
 
 enum SubscriptionTier {
   SUBSCRIPTION_TIER_UNSPECIFIED = 0;
