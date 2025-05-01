@@ -657,7 +657,11 @@ func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVar
 		},
 		{
 			Key:   "DEFANG_DEBUG",
-			Value: pkg.Getenv("DEFANG_DEBUG", "false"),
+			Value: os.Getenv("DEFANG_DEBUG"),
+		},
+		{
+			Key:   "DEFANG_JSON",
+			Value: os.Getenv("DEFANG_JSON"),
 		},
 		{
 			Key:   "DEFANG_ORG",
