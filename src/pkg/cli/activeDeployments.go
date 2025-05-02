@@ -47,5 +47,5 @@ func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
 		return deployments[i].Provider < deployments[j].Provider
 	})
 
-	return term.Table(deployments, []string{"Provider", "Region", "ProjectName"})
+	return term.Table(deployments, []string{"Provider", "ProjectName", "Region"})
 }
