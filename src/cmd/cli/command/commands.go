@@ -640,11 +640,11 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cmdd := exec.Command("code", prompt.Folder)
+		editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
+		cmdd := exec.Command(editor, prompt.Folder)
 		err = cmdd.Start()
 		if err != nil {
-			term.Debug("unable to launch VS Code:", err)
-			// TODO: should we use EDITOR env var instead?
+			term.Debugf("unable to launch editor %q: %v", editor, err)
 		}
 
 		cd := ""
