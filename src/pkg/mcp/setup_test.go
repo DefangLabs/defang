@@ -20,7 +20,7 @@ type VScodeConfig struct {
 	Other map[string]interface{} `json:"-"`
 }
 
-func TestSetupClient_TableDriven(t *testing.T) {
+func TestSetupClient(t *testing.T) {
 	tests := []struct {
 		name           string // Test name
 		ideClient      string // IDE client name
