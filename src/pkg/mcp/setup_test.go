@@ -42,7 +42,7 @@ func TestSetupClient_TableDriven(t *testing.T) {
 			expectError:   "invalid MCP client: goland.",
 		},
 		{
-			name:          "windsurf client",
+			name:          "windsurf client fresh install",
 			ideClient:     "windsurf",
 			clientInstall: true,
 			initialConfig: "",
@@ -78,10 +78,10 @@ func TestSetupClient_TableDriven(t *testing.T) {
 				  }
 				}
 			  }`,
-			expectError: "The client windsurf you are trying to setup is not install or not found in your system path, please try again after installing.",
+			expectError: "the client windsurf you are trying to setup is not install or not found in your system path. Please try again after installing.",
 		},
 		{
-			name:          "cursor client",
+			name:          "cursor client fresh install",
 			ideClient:     "cursor",
 			clientInstall: true,
 			initialConfig: "",
@@ -117,10 +117,10 @@ func TestSetupClient_TableDriven(t *testing.T) {
 				  }
 				}
 			  }`,
-			expectError: "The client cursor you are trying to setup is not install or not found in your system path, please try again after installing.",
+			expectError: "the client cursor you are trying to setup is not install or not found in your system path. Please try again after installing.",
 		},
 		{
-			name:          "Vscode config with other mcp servers",
+			name:          "Vscode pre-existing config with other mcp servers",
 			ideClient:     "vscode",
 			clientInstall: true,
 			initialConfig: `{
@@ -177,7 +177,93 @@ func TestSetupClient_TableDriven(t *testing.T) {
 			  }`,
 		},
 		{
-			name:          "Vscode insiders config with only defang mcp server",
+			name:          "Vscode pre-existing config with no mcp servers",
+			ideClient:     "vscode",
+			clientInstall: true,
+			initialConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+					"servers": {
+					}
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+				}`,
+			expectedConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+					"servers": {
+						"defang": {
+							"args": [
+							"-y",
+							"defang@latest",
+							"mcp",
+							"serve"
+							],
+							"command": "npx",
+							"type": "stdio"
+						}
+					}
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+			}`,
+		},
+		{
+			name:          "Vscode insider pre-existing config with 1 pre-existing mcp server",
+			ideClient:     "insiders",
+			clientInstall: true,
+			initialConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+				  "servers": {
+					"git": {
+					  "args": [
+						"mcp-server-git"
+					  ],
+					  "command": "uvx"
+					}
+				  }
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+			  }`,
+			expectedConfig: `{
+				"git.blame.editorDecoration.enabled": true,
+				"gitlens.ai.model": "vscode",
+				"gitlens.ai.vscode.model": "copilot:gpt-4o",
+				"go.languageServerFlags": [],
+				"mcp": {
+				  "servers": {
+					"defang": {
+					  "args": [
+						"-y",
+						"defang@latest",
+						"mcp",
+						"serve"
+					  ],
+					  "command": "npx",
+					  "type": "stdio"
+					},
+					"git": {
+					  "args": [
+						"mcp-server-git"
+					  ],
+					  "command": "uvx"
+					}
+				  }
+				},
+				"security.workspace.trust.untrustedFiles": "open"
+			  }`,
+		},
+		{
+			name:          "Vscode insiders no config",
 			ideClient:     "insiders",
 			clientInstall: true,
 			initialConfig: "",
@@ -217,6 +303,63 @@ func TestSetupClient_TableDriven(t *testing.T) {
 			}
 			}`,
 		},
+		{
+			name:          "claude config with empty mcpServers field",
+			ideClient:     "claude",
+			clientInstall: true,
+			initialConfig: `{
+				"mcpServers": {}
+				}`,
+			expectedConfig: `{
+			"mcpServers": {
+				"defang": {
+				"command": "npx",
+				"args": [
+					"-y",
+					"defang@latest",
+					"mcp",
+					"serve"
+				]
+				}
+			}
+			}`,
+		},
+		{
+			name:          "cursor pre-existing config with 1 mcp server",
+			ideClient:     "cursor",
+			clientInstall: true,
+			initialConfig: `{
+				"mcpServers": {
+					"git": {
+					"command": "python3",
+					"args": [
+					"-m",
+					"mcp_server_git"
+					]
+					}
+				}
+				}`,
+			expectedConfig: `{
+				"mcpServers": {
+					"defang": {
+					"command": "npx",
+					"args": [
+					"-y",
+					"defang@latest",
+					"mcp",
+					"serve"
+					]
+					},
+					"git": {
+					"command": "python3",
+					"args": [
+					"-m",
+					"mcp_server_git"
+					]
+					}
+				}
+				}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -225,7 +368,7 @@ func TestSetupClient_TableDriven(t *testing.T) {
 			client := tt.ideClient
 			orgGetClientConfigPath := getClientConfigPath
 
-			// Mock getClientConfigPath by overriding for this test, there is a
+			// Mock getClientConfigPath by overriding for this test, there is a separate already covering this function
 			getClientConfigPath = func(client string) (string, error) {
 				var configPath string
 				switch strings.ToLower(client) {
@@ -255,8 +398,7 @@ func TestSetupClient_TableDriven(t *testing.T) {
 				}
 			}
 
-			fmt.Println("Config path:", configPath)
-
+			// If there is an initial config, write it to the config file
 			if tt.initialConfig != "" {
 				// Write the initial config to the config file
 				err := os.WriteFile(configPath, []byte(tt.initialConfig), 0644)
@@ -271,6 +413,7 @@ func TestSetupClient_TableDriven(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
+			// If we expect an error, check if it matches the expected error
 			if err != nil && tt.expectError != "" {
 				if strings.Contains(err.Error(), tt.expectError) {
 					// We expect this error, so we can continue

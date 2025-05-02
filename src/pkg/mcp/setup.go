@@ -71,25 +71,44 @@ func IsValidClient(client string) bool {
 	return slices.Contains(ValidClients, client)
 }
 
+func getConfigHome(homeDir string) string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return xdg
+	}
+	return filepath.Join(homeDir, ".config")
+}
+
+func getAppData(homeDir string) string {
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		return appData
+	}
+	return filepath.Join(homeDir, "AppData", "Roaming")
+}
+
+// getPlatformPath returns the appropriate file path for a specific client based on the operating system
+func getPlatformPath(homeDir, clientDir string) string {
+	var fileName string
+	if clientDir == "Code" || clientDir == "Code - Insiders" {
+		fileName = filepath.Join(clientDir, "User", "settings.json")
+	} else {
+		fileName = filepath.Join("Claude", "claude_desktop_config.json")
+	}
+
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(homeDir, "Library", "Application Support", fileName)
+	case "windows":
+		return filepath.Join(getAppData(homeDir), fileName)
+	default:
+		return filepath.Join(getConfigHome(homeDir), fileName)
+	}
+}
+
 // getClientConfigPath returns the path to the config file for the given client
 var getClientConfigPath = func(client string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	getConfigHome := func() string {
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			return xdg
-		}
-		return filepath.Join(homeDir, ".config")
-	}
-
-	getAppData := func() string {
-		if appData := os.Getenv("APPDATA"); appData != "" {
-			return appData
-		}
-		return filepath.Join(homeDir, "AppData", "Roaming")
 	}
 
 	clientKey := strings.ToLower(client)
@@ -99,32 +118,11 @@ var getClientConfigPath = func(client string) (string, error) {
 	case "windsurf", "codeium":
 		return filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"), nil
 	case "claude":
-		switch runtime.GOOS {
-		case "darwin":
-			return filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"), nil
-		case "windows":
-			return filepath.Join(getAppData(), "Claude", "claude_desktop_config.json"), nil
-		default:
-			return filepath.Join(getConfigHome(), "Claude", "claude_desktop_config.json"), nil
-		}
+		return getPlatformPath(homeDir, "Claude"), nil
 	case "vscode", "code":
-		switch runtime.GOOS {
-		case "darwin":
-			return filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json"), nil
-		case "windows":
-			return filepath.Join(getAppData(), "Code", "User", "settings.json"), nil
-		default:
-			return filepath.Join(getConfigHome(), "Code/User/settings.json"), nil
-		}
+		return getPlatformPath(homeDir, "Code"), nil
 	case "vscode-insiders", "insiders":
-		switch runtime.GOOS {
-		case "darwin":
-			return filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json"), nil
-		case "windows":
-			return filepath.Join(getAppData(), "Code - Insiders", "User", "settings.json"), nil
-		default:
-			return filepath.Join(getConfigHome(), "Code - Insiders/User/settings.json"), nil
-		}
+		return getPlatformPath(homeDir, "Code - Insiders"), nil
 	default:
 		return "", fmt.Errorf("unsupported client: %s", client)
 	}
@@ -248,18 +246,21 @@ func SetupClient(client string) error {
 
 	term.Infof("Updating %q\n", configPath)
 
-	// Create the directory path
+	// Get the directory path
 	configDir := filepath.Dir(configPath)
-	// Check if the directory exists and is a directory
+	// Check if the directory exists, which proves that the IDE client is installed
+	// If the directory doesn't exist, we assume the client is not installed
+	// and we return an error
 	info, err := os.Stat(configDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("The client %s you are trying to setup is not install or not found in your system path, please try again after installing.", client)
+			return fmt.Errorf("the client %s you are trying to setup is not install or not found in your system path. Please try again after installing.", client)
 		}
 		return fmt.Errorf("failed to check config directory: %w", err)
 	}
+
 	if !info.IsDir() {
-		return fmt.Errorf("Config path %s exists but is not a directory, please try again after installing or update the client %s to support mcp.", configDir, client)
+		return fmt.Errorf("the config path %s exists but is not a directory. Please try again after installing or update the client %s to support mcp", configDir, client)
 	}
 
 	// Handle VSCode case
@@ -271,25 +272,24 @@ func SetupClient(client string) error {
 		// For all other clients, use the standard format
 		var config MCPConfig
 
-		// Check if the file exists
-		if _, err := os.Stat(configPath); err == nil {
-			// File exists, read it
-			data, err := os.ReadFile(configPath)
-			if err != nil {
+		// Read the file, handle if it doesn't exist
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// File doesn't exist, create a new config
+				config = MCPConfig{
+					MCPServers: make(map[string]MCPServerConfig),
+				}
+			} else {
 				return fmt.Errorf("failed to read config file: %w", err)
 			}
-
+		} else {
 			// Parse the JSON
 			if err := json.Unmarshal(data, &config); err != nil {
 				// If we can't parse it, start fresh
 				config = MCPConfig{
 					MCPServers: make(map[string]MCPServerConfig),
 				}
-			}
-		} else {
-			// File doesn't exist, create a new config
-			config = MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
 			}
 		}
 
@@ -301,7 +301,7 @@ func SetupClient(client string) error {
 		config.MCPServers["defang"] = getDefangMCPConfig()
 
 		// Write the config to the file
-		data, err := json.MarshalIndent(config, "", "  ")
+		data, err = json.MarshalIndent(config, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal config: %w", err)
 		}
@@ -309,9 +309,9 @@ func SetupClient(client string) error {
 		if err := os.WriteFile(configPath, data, 0644); err != nil {
 			return fmt.Errorf("failed to write config file: %w", err)
 		}
-	}
 
-	term.Infof("Restart %s for the changes to take effect.\n", client)
+		term.Infof("Restart %s for the changes to take effect.\n", client)
+	}
 
 	return nil
 }
