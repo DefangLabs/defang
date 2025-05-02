@@ -124,6 +124,8 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
+		fmt.Println("Some warnings were seen during this command:")
+		term.FlushWarnings()
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
@@ -141,6 +143,8 @@ func Execute(ctx context.Context) error {
 }
 
 func SetupCommands(ctx context.Context, version string) {
+	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
+
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
@@ -163,7 +167,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)

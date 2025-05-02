@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/muesli/termenv"
@@ -15,11 +16,12 @@ type Term struct {
 	stdin          FileReader
 	stdout, stderr io.Writer
 	out, err       *termenv.Output
-	hadWarnings    bool
 	debug          bool
 
 	isTerminal bool
 	hasDarkBg  bool
+
+	warnings []string
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
@@ -95,11 +97,7 @@ func (t *Term) IsTerminal() bool {
 }
 
 func (t *Term) HadWarnings() bool {
-	return t.hadWarnings
-}
-
-func (t *Term) SetHadWarnings(had bool) {
-	t.hadWarnings = had
+	return len(t.warnings) > 0
 }
 
 func (t *Term) StdoutCanColor() bool {
@@ -219,13 +217,15 @@ func (t *Term) Infof(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
-	t.hadWarnings = true
-	return output(t.out, WarnColor, ensurePrefix(fmt.Sprintln(v...), " ! "))
+	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
+	t.warnings = append(t.warnings, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
-	t.hadWarnings = true
-	return output(t.out, WarnColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! ")))
+	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
+	t.warnings = append(t.warnings, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
@@ -245,6 +245,27 @@ func (t *Term) Fatal(msg any) {
 func (t *Term) Fatalf(format string, v ...any) {
 	Errorf("Error: "+format, v...)
 	os.Exit(1)
+}
+
+func (t *Term) getAllWarnings() []string {
+	slices.Sort(t.warnings)
+	return slices.Compact(t.warnings)
+}
+
+func (t *Term) FlushWarnings() (int, error) {
+	uniqueWarnings := t.getAllWarnings()
+	bytesWritten := 0
+
+	// unique warnings only
+	for _, w := range uniqueWarnings {
+		bytes, err := output(t.out, WarnColor, w)
+		bytesWritten += bytes
+		if err != nil {
+			return bytesWritten, err
+		}
+	}
+
+	return bytesWritten, nil
 }
 
 func Print(v ...any) (int, error) {
@@ -303,6 +324,10 @@ func Fatalf(format string, v ...any) {
 	DefaultTerm.Fatalf(format, v...)
 }
 
+func FlushWarnings() (int, error) {
+	return DefaultTerm.FlushWarnings()
+}
+
 func ForceColor(color bool) {
 	DefaultTerm.ForceColor(color)
 }
@@ -325,10 +350,6 @@ func IsTerminal() bool {
 
 func HadWarnings() bool {
 	return DefaultTerm.HadWarnings()
-}
-
-func SetHadWarnings(had bool) {
-	DefaultTerm.SetHadWarnings(had)
 }
 
 func StdoutCanColor() bool {

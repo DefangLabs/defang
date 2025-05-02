@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"slices"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -23,10 +22,6 @@ var (
 
 	errDNSNotInSync = errors.New("DNS not in sync")
 )
-
-func Normalize(domain string) string {
-	return strings.TrimSuffix(domain, ".")
-}
 
 // The DNS is considered ready if the CNAME of the domain is pointing to the ALB domain and in sync
 // OR if the A record of the domain is pointing to the same IP addresses of the ALB domain and in sync

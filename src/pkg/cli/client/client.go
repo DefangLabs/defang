@@ -20,10 +20,10 @@ type FabricClient interface {
 	CheckLoginAndToS(context.Context) error
 	Debug(context.Context, *defangv1.DebugRequest) (*defangv1.DebugResponse, error)
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
-	DeleteSubdomainZone(context.Context) error
+	DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
 	GetController() defangv1connect.FabricControllerClient
-	GetDelegateSubdomainZone(context.Context) (*defangv1.DelegateSubdomainZoneResponse, error)
+	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	GetSelectedProvider(context.Context, *defangv1.GetSelectedProviderRequest) (*defangv1.GetSelectedProviderResponse, error)
 	GetTenantName() types.TenantName
 	GetVersions(context.Context) (*defangv1.Version, error)
