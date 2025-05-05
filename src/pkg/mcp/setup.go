@@ -97,7 +97,7 @@ func getPlatformPath(homeDir, clientDir string) string {
 		fileName = filepath.Join("Claude", "claude_desktop_config.json")
 	}
 
-	switch runtime.GOOS {
+	switch currentOS {
 	case "darwin":
 		return filepath.Join(homeDir, "Library", "Application Support", fileName)
 	case "windows":
