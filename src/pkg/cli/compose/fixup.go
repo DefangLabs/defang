@@ -155,11 +155,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
-			if _, ok := provider.(*client.PlaygroundProvider); ok {
-				term.Warnf("service %q: managed LLM is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-				delete(svccfg.Extensions, "x-defang-llm")
-			}
-
 			if strings.Contains(svccfg.Image, "openai-access-gateway") && len(svccfg.Ports) == 0 {
 				// HACK: we must have at least one host port to get a CNAME for the service
 				var port uint32 = 80
