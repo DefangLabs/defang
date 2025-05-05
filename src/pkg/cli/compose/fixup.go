@@ -155,7 +155,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
-			if strings.Contains(svccfg.Image, "openai-access-gateway") && len(svccfg.Ports) == 0 {
+			image := strings.ToLower(svccfg.Image)
+			image, _, _ = strings.Cut(image, ":")
+			if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
 				// HACK: we must have at least one host port to get a CNAME for the service
 				var port uint32 = 80
 				term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)

@@ -1,0 +1,14 @@
+services:
+  llm:
+    x-defang-llm: true
+    image: "llm:latest"
+
+  gateway-with-ports:
+    x-defang-llm: true
+    image: "defang.io/openai-access-gateway:latest"
+    ports:
+      - 5678:5678
+
+  gateway-without-ports:
+    x-defang-llm: true
+    image: "defang.io/openai-access-gateway:latest"
