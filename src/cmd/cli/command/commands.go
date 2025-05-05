@@ -270,7 +270,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Deployments Command
 	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
-	deploymentsListCmd.Flags().Uint("limit", 10, "the maximum number of returned deployed projects")
+	deploymentsListCmd.Flags().Uint("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -992,10 +992,6 @@ var deploymentsListCmd = &cobra.Command{
 		limit, err := cmd.Flags().GetUint32("limit")
 		if err != nil {
 			return err
-		}
-
-		if limit == 0 {
-			return errors.New("limit must be greater than 0")
 		}
 
 		projectName, err := cmd.Flags().GetString("project-name")
