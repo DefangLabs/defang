@@ -477,10 +477,6 @@ func TestSetupClient(t *testing.T) {
 
 func TestGetClientConfigPath(t *testing.T) {
 	// Save original OS and restore it after tests
-	originalOS := currentOS
-	defer func() {
-		currentOS = originalOS
-	}()
 
 	tests := []struct {
 		name       string
@@ -492,34 +488,126 @@ func TestGetClientConfigPath(t *testing.T) {
 			name:       "windsurf on darwin",
 			clientName: "windsurf",
 			os:         "darwin",
-			expected:   filepath.Join(os.Getenv("HOME"), ".codeium", "windsurf", "mcp_config.json"),
+			expected:   filepath.Join(".codeium", "windsurf", "mcp_config.json"),
+		},
+		{
+			name:       "windsurf on linux",
+			clientName: "windsurf",
+			os:         "linux",
+			expected:   filepath.Join(".codeium", "windsurf", "mcp_config.json"),
+		},
+		{
+			name:       "windsurf on windows",
+			clientName: "windsurf",
+			os:         "windows",
+			expected:   filepath.Join(".codeium", "windsurf", "mcp_config.json"),
 		},
 		{
 			name:       "codeium on darwin",
 			clientName: "codeium",
 			os:         "darwin",
-			expected:   filepath.Join(os.Getenv("HOME"), ".codeium", "windsurf", "mcp_config.json"),
+			expected:   filepath.Join(".codeium", "windsurf", "mcp_config.json"),
 		},
 		{
 			name:       "vscode on darwin",
 			clientName: "vscode",
 			os:         "darwin",
-			expected:   filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "Code", "User", "settings.json"),
+			expected:   filepath.Join("Library", "Application Support", "Code", "User", "settings.json"),
+		},
+		{
+			name:       "vscode on linux",
+			clientName: "vscode",
+			os:         "linux",
+			expected:   filepath.Join(".config", "Code", "User", "settings.json"),
+		},
+		{
+			name:       "vscode on windows",
+			clientName: "vscode",
+			os:         "windows",
+			expected:   filepath.Join("AppData", "Roaming", "Code", "User", "settings.json"),
+		},
+		{
+			name:       "vscode-insiders on darwin",
+			clientName: "vscode-insiders",
+			os:         "darwin",
+			expected:   filepath.Join("Library", "Application Support", "Code - Insiders", "User", "settings.json"),
+		},
+		{
+			name:       "vscode-insiders on linux",
+			clientName: "vscode-insiders",
+			os:         "linux",
+			expected:   filepath.Join(".config", "Code - Insiders", "User", "settings.json"),
+		},
+		{
+			name:       "vscode-insiders on windows",
+			clientName: "vscode-insiders",
+			os:         "windows",
+			expected:   filepath.Join("AppData", "Roaming", "Code - Insiders", "User", "settings.json"),
+		},
+		{
+			name:       "claude on darwin",
+			clientName: "claude",
+			os:         "darwin",
+			expected:   filepath.Join("Library", "Application Support", "Claude", "claude_desktop_config.json"),
+		},
+		{
+			name:       "claude on linux",
+			clientName: "claude",
+			os:         "linux",
+			expected:   filepath.Join(".config", "Claude", "claude_desktop_config.json"),
+		},
+		{
+			name:       "claude on windows",
+			clientName: "claude",
+			os:         "windows",
+			expected:   filepath.Join("AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+		},
+		{
+			name:       "cursor on darwin",
+			clientName: "cursor",
+			os:         "darwin",
+			expected:   filepath.Join(".cursor", "mcp.json"),
+		},
+		{
+			name:       "cursor on linux",
+			clientName: "cursor",
+			os:         "linux",
+			expected:   filepath.Join(".cursor", "mcp.json"),
+		},
+		{
+			name:       "cursor on windows",
+			clientName: "cursor",
+			os:         "windows",
+			expected:   filepath.Join(".cursor", "mcp.json"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Set mock OS for this test case
+			originalOS := currentOS
 			currentOS = test.os
+			fmt.Println("Current OS:", currentOS)
+
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				t.Fatalf("failed to get home directory: %v", err)
+			}
+
+			fmt.Println("Home directory test:", homeDir)
+			t.Log("Home directory test:", homeDir)
 
 			result, err := getClientConfigPath(test.clientName)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if result != test.expected {
-				t.Fatalf("expected %s, got %s", test.expected, result)
+			if result != filepath.Join(homeDir, test.expected) {
+				t.Fatalf("expected %s, got %s", filepath.Join(homeDir, test.expected), result)
 			}
+
+			t.Cleanup(func() {
+				currentOS = originalOS
+			})
 		})
 	}
 }

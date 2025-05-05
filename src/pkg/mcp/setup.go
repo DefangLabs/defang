@@ -97,6 +97,8 @@ func getPlatformPath(homeDir, clientDir string) string {
 		fileName = filepath.Join("Claude", "claude_desktop_config.json")
 	}
 
+	fmt.Println("Current OS in function:", currentOS)
+
 	switch currentOS {
 	case "darwin":
 		return filepath.Join(homeDir, "Library", "Application Support", fileName)
@@ -113,6 +115,8 @@ var getClientConfigPath = func(client string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
+
+	fmt.Println("Home directory function:", homeDir)
 
 	clientKey := strings.ToLower(client)
 	switch clientKey {
