@@ -85,6 +85,9 @@ func getAppData(homeDir string) string {
 	return filepath.Join(homeDir, "AppData", "Roaming")
 }
 
+// For testing purposes, this can be overridden
+var currentOS = runtime.GOOS
+
 // getPlatformPath returns the appropriate file path for a specific client based on the operating system
 func getPlatformPath(homeDir, clientDir string) string {
 	var fileName string

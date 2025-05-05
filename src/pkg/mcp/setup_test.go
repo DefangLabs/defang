@@ -474,3 +474,52 @@ func TestSetupClient(t *testing.T) {
 		})
 	}
 }
+
+func TestGetClientConfigPath(t *testing.T) {
+	// Save original OS and restore it after tests
+	originalOS := currentOS
+	defer func() {
+		currentOS = originalOS
+	}()
+
+	tests := []struct {
+		name       string
+		clientName string
+		os         string
+		expected   string
+	}{
+		{
+			name:       "windsurf on darwin",
+			clientName: "windsurf",
+			os:         "darwin",
+			expected:   filepath.Join(os.Getenv("HOME"), ".codeium", "windsurf", "mcp_config.json"),
+		},
+		{
+			name:       "codeium on darwin",
+			clientName: "codeium",
+			os:         "darwin",
+			expected:   filepath.Join(os.Getenv("HOME"), ".codeium", "windsurf", "mcp_config.json"),
+		},
+		{
+			name:       "vscode on darwin",
+			clientName: "vscode",
+			os:         "darwin",
+			expected:   filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "Code", "User", "settings.json"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Set mock OS for this test case
+			currentOS = test.os
+
+			result, err := getClientConfigPath(test.clientName)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != test.expected {
+				t.Fatalf("expected %s, got %s", test.expected, result)
+			}
+		})
+	}
+}
