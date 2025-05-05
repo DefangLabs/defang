@@ -12,10 +12,6 @@ import (
 	connect "github.com/bufbuild/connect-go"
 )
 
-type mockActiveDeploymentsHandler struct {
-	defangv1connect.UnimplementedFabricControllerHandler
-}
-
 var emptyDeployments []*defangv1.Deployment
 var activeDeployments = []*defangv1.Deployment{
 	{Project: "projectAA", Provider: defangv1.Provider_AWS, Region: "us-east-1"},
@@ -30,11 +26,15 @@ var activeDeployments = []*defangv1.Deployment{
 	{Project: "projectGA", Provider: defangv1.Provider_GCP, Region: "us-central-2"},
 	{Project: "projectGB", Provider: defangv1.Provider_GCP, Region: "us-central-3"},
 }
-var testDeploymentsData = emptyDeployments
+
+type mockActiveDeploymentsHandler struct {
+	defangv1connect.UnimplementedFabricControllerHandler
+	testDeploymentsData []*defangv1.Deployment
+}
 
 func (g *mockActiveDeploymentsHandler) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
 	return connect.NewResponse(&defangv1.ListDeploymentsResponse{
-		Deployments: testDeploymentsData,
+		Deployments: g.testDeploymentsData,
 	}), nil
 }
 
@@ -52,7 +52,7 @@ func TestActiveDeployments(t *testing.T) {
 	client := NewGrpcClient(ctx, url)
 
 	t.Run("no active deployments", func(t *testing.T) {
-		testDeploymentsData = emptyDeployments
+		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
 		err := ActiveDeployments(ctx, client)
@@ -69,7 +69,7 @@ func TestActiveDeployments(t *testing.T) {
 	})
 
 	t.Run("some active deployments", func(t *testing.T) {
-		testDeploymentsData = activeDeployments
+		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
 		err := ActiveDeployments(ctx, client)

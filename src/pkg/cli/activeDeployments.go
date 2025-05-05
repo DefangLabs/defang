@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -10,8 +11,10 @@ import (
 )
 
 type PrintableActiveDeployments struct {
+	Deployment  string
 	Provider    string
 	ProjectName string
+	DeployedAt  string
 	Region      string
 }
 
@@ -33,8 +36,10 @@ func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
 	deployments := make([]PrintableActiveDeployments, numDeployments)
 	for i, d := range response.Deployments {
 		deployments[i] = PrintableActiveDeployments{
+			Deployment:  d.Id,
 			Provider:    d.Provider.String(),
 			ProjectName: d.Project,
+			DeployedAt:  d.Timestamp.AsTime().Format(time.RFC3339),
 			Region:      d.Region,
 		}
 	}
@@ -47,5 +52,5 @@ func ActiveDeployments(ctx context.Context, client client.GrpcClient) error {
 		return deployments[i].Provider < deployments[j].Provider
 	})
 
-	return term.Table(deployments, []string{"Provider", "ProjectName", "Region"})
+	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "ProjectName", "DeployedAt"})
 }
