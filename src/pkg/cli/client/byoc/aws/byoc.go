@@ -409,6 +409,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	env := map[string]string{
 		// "AWS_REGION":               region.String(), should be set by ECS (because of CD task role)
 		"DEFANG_DEBUG":               os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_STATE_URL":           defangStateUrl,

@@ -197,7 +197,7 @@ func waitForTLS(ctx context.Context, domain string) error {
 
 func waitForCNAME(ctx context.Context, domain string, targets []string, client client.FabricClient) error {
 	for i, target := range targets {
-		targets[i] = dns.Normalize(strings.ToLower(target))
+		targets[i] = dns.Normalize(target)
 	}
 
 	ticker := time.NewTicker(5 * time.Second)

@@ -125,6 +125,8 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
+		fmt.Println("Some warnings were seen during this command:")
+		term.FlushWarnings()
 		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
 	}
 
@@ -142,6 +144,8 @@ func Execute(ctx context.Context) error {
 }
 
 func SetupCommands(ctx context.Context, version string) {
+	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
+
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
@@ -164,7 +168,8 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -635,11 +640,11 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cmdd := exec.Command("code", prompt.Folder)
+		editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
+		cmdd := exec.Command(editor, prompt.Folder)
 		err = cmdd.Start()
 		if err != nil {
-			term.Debug("unable to launch VS Code:", err)
-			// TODO: should we use EDITOR env var instead?
+			term.Debugf("unable to launch editor %q: %v", editor, err)
 		}
 
 		cd := ""

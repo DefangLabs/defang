@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -42,15 +43,6 @@ func GetPulumiBackend(stateUrl string) (string, string, error) {
 	}
 }
 
-// This function was copied from Fabric controller and slightly modified to work with BYOC
-func DnsSafeLabel(fqn string) string {
-	return strings.ReplaceAll(DnsSafe(fqn), ".", "-")
-}
-
-func DnsSafe(fqdn string) string {
-	return strings.ToLower(fqdn)
-}
-
 func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
 	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	command.Dir = dir
@@ -83,5 +75,5 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 }
 
 func GetPrivateDomain(projectName string) string {
-	return DnsSafeLabel(projectName) + ".internal"
+	return dns.SafeLabel(projectName) + ".internal"
 }
