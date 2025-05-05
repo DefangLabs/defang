@@ -315,7 +315,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Use:           "defang",
 	Args:          cobra.NoArgs,
-	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
+	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		term.SetDebug(doDebug)
 
