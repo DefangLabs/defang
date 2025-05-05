@@ -125,9 +125,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
-		fmt.Println("Some warnings were seen during this command:")
-		term.FlushWarnings()
-		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
@@ -372,6 +370,7 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
+				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
@@ -966,7 +965,8 @@ var deleteCmd = &cobra.Command{
 			Since:      since,
 			Verbose:    verbose,
 		}
-		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
+		return cli.Tail(tailCtx, provider, projectName, tailOptions)
 	},
 }
 

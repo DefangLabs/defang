@@ -236,6 +236,10 @@ func TestFlushWarnings(t *testing.T) {
 			if bytesInExpected != bytesWritten {
 				t.Errorf("FlushWarnings() expected %d byteWritten, got %d", bytesInExpected, bytesWritten)
 			}
+
+			if term.getAllWarnings() != nil {
+				t.Errorf("after FlushWarnings() expected no warnings, got %v", term.getAllWarnings())
+			}
 		})
 	}
 }
