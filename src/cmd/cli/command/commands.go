@@ -269,7 +269,8 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
-	deploymentsListCmd.Flags().Bool("active", false, "get the list of deployed projects")
+	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
+	deploymentsListCmd.Flags().Uint("limit", 10, "the maximum number of returned deployed projects")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -983,18 +984,39 @@ var deploymentsListCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		activeOnly, _ := cmd.Flags().GetBool("active")
+		historyOnly, err := cmd.Flags().GetBool("history")
+		if err != nil {
+			return err
+		}
 
-		if activeOnly {
-			return cli.ActiveDeployments(cmd.Context(), client)
-		} else {
+		limit, err := cmd.Flags().GetUint32("limit")
+		if err != nil {
+			return err
+		}
+
+		if limit == 0 {
+			return errors.New("limit must be greater than 0")
+		}
+
+		projectName, err := cmd.Flags().GetString("project-name")
+		if err != nil {
+			return err
+		}
+
+		if historyOnly {
 			loader := configureLoader(cmd)
-			projectName, err := loader.LoadProjectName(cmd.Context())
-			if err != nil {
-				return err
+			if projectName == "" {
+				projName, err := loader.LoadProjectName(cmd.Context())
+				if err != nil {
+					return err
+				}
+
+				projectName = projName
 			}
 
-			return cli.DeploymentsList(cmd.Context(), projectName, client)
+			return cli.DeploymentsList(cmd.Context(), projectName, client, limit)
+		} else {
+			return cli.ActiveDeployments(cmd.Context(), client, projectName, limit)
 		}
 	},
 }

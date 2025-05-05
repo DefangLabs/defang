@@ -390,6 +390,7 @@ message PutDeploymentRequest { Deployment deployment = 1; }
 message ListDeploymentsRequest { 
   string project = 1; 
   DeploymentListType type = 2; // active or all
+  uint32 limit = 3; // number of deployments to return
 }
 
 message ListDeploymentsResponse { repeated Deployment deployments = 1; }

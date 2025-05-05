@@ -55,7 +55,7 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := ActiveDeployments(ctx, client)
+		err := ActiveDeployments(ctx, client, "", 10)
 		if err != nil {
 			t.Fatalf("ActiveDeployments() error = %v", err)
 		}
@@ -72,7 +72,7 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
-		err := ActiveDeployments(ctx, client)
+		err := ActiveDeployments(ctx, client, "", 10)
 		if err != nil {
 			t.Fatalf("ActiveDeployments() error = %v", err)
 		}

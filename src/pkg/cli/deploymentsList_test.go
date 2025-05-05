@@ -56,7 +56,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "empty", client)
+		err := DeploymentsList(ctx, "empty", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -71,7 +71,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "test", client)
+		err := DeploymentsList(ctx, "test", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}

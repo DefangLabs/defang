@@ -16,9 +16,10 @@ type PrintDeployment struct {
 	Region     string
 }
 
-func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient) error {
+func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient, limit uint32) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Project: projectName,
+		Limit:   limit,
 	})
 	if err != nil {
 		return err
