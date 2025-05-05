@@ -41,5 +41,5 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Grpc
 		}
 	}
 
-	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "DeployedAt"}) // TODO: add region
+	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "DeployedAt"})
 }
