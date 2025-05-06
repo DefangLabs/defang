@@ -198,6 +198,6 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, client, provider) // TODO: support --mode #1022
+		return cli.Preview(cmd.Context(), project, client, provider, mode.Value())
 	},
 }
