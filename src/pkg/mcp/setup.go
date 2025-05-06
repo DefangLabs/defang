@@ -295,6 +295,10 @@ func SetupClient(client string) error {
 			}
 		}
 
+		if config.MCPServers == nil {
+			config.MCPServers = make(map[string]MCPServerConfig)
+		}
+
 		// Add or update the Defang MCP server config
 		config.MCPServers["defang"] = getDefangMCPConfig()
 

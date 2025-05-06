@@ -103,13 +103,13 @@ func (g GrpcClient) DelegateSubdomainZone(ctx context.Context, req *defangv1.Del
 	return getMsg(g.client.DelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
-func (g GrpcClient) DeleteSubdomainZone(ctx context.Context) error {
-	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+func (g GrpcClient) DeleteSubdomainZone(ctx context.Context, req *defangv1.DeleteSubdomainZoneRequest) error {
+	_, err := getMsg(g.client.DeleteSubdomainZone(ctx, connect.NewRequest(req)))
 	return err
 }
 
-func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context) (*defangv1.DelegateSubdomainZoneResponse, error) {
-	return getMsg(g.client.GetDelegateSubdomainZone(ctx, &connect.Request[emptypb.Empty]{}))
+func (g GrpcClient) GetDelegateSubdomainZone(ctx context.Context, req *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error) {
+	return getMsg(g.client.GetDelegateSubdomainZone(ctx, connect.NewRequest(req)))
 }
 
 func (g GrpcClient) AgreeToS(ctx context.Context) error {
