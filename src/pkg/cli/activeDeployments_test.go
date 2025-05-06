@@ -44,9 +44,7 @@ func TestActiveDeployments(t *testing.T) {
 	fabricServer := &mockActiveDeploymentsHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
-	t.Cleanup(func() {
-		server.Close()
-	})
+	t.Cleanup(server.Close())
 
 	url := strings.TrimPrefix(server.URL, "http://")
 	client := NewGrpcClient(ctx, url)

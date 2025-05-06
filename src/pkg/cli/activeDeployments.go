@@ -20,7 +20,7 @@ type PrintableActiveDeployments struct {
 
 func ActiveDeployments(ctx context.Context, client client.GrpcClient, project string, limit uint32) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
-		Type:    *defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE.Enum(),
+		Type:    defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE,
 		Project: project,
 		Limit:   limit,
 	})
