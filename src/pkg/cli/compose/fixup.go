@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -153,12 +154,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
-		_, llm := svccfg.Extensions["x-defang-llm"]
-		if llm {
-			if _, ok := provider.(*client.PlaygroundProvider); ok {
-				term.Warnf("service %q: managed LLM is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-				delete(svccfg.Extensions, "x-defang-llm")
-			} else if len(svccfg.Ports) == 0 {
+		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
+			image := getImageRepo(svccfg.Image)
+			if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
 				// HACK: we must have at least one host port to get a CNAME for the service
 				var port uint32 = 80
 				term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
@@ -182,4 +180,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	}
 
 	return nil
+}
+
+func getImageRepo(imageRepo string) string {
+	image := strings.ToLower(imageRepo)
+	image, _, _ = strings.Cut(image, ":")
+	return image
 }

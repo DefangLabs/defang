@@ -1,0 +1,30 @@
+name: llm
+services:
+  alt-repo:
+    image: altrepo.com/openai-access-gateway:latest
+    networks:
+      default: null
+    x-defang-llm: true
+  gateway-with-ports:
+    image: defang.io/openai-access-gateway:latest
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5678
+        published: "5678"
+        protocol: tcp
+    x-defang-llm: true
+  gateway-without-ports:
+    image: defang.io/openai-access-gateway:latest
+    networks:
+      default: null
+    x-defang-llm: true
+  llm:
+    image: llm:latest
+    networks:
+      default: null
+    x-defang-llm: true
+networks:
+  default:
+    name: llm_default
