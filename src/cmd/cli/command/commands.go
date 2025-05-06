@@ -269,7 +269,6 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
-	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -972,17 +971,10 @@ var deleteCmd = &cobra.Command{
 
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Short:       "Manage Deployments",
+	Short:       "Show Deployments",
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
-}
-
-var deploymentsListCmd = &cobra.Command{
-	Use:         "list",
-	Aliases:     []string{"ls"},
-	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
