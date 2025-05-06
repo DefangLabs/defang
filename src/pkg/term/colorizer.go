@@ -237,11 +237,13 @@ func (t *Term) Errorf(format string, v ...any) (int, error) {
 	return output(t.err, ErrorColor, line)
 }
 
+// Deprecated: use proper error handling instead
 func (t *Term) Fatal(msg any) {
 	Error("Error:", msg)
 	os.Exit(1)
 }
 
+// Deprecated: use proper error handling instead
 func (t *Term) Fatalf(format string, v ...any) {
 	Errorf("Error: "+format, v...)
 	os.Exit(1)
@@ -254,6 +256,7 @@ func (t *Term) getAllWarnings() []string {
 
 func (t *Term) FlushWarnings() (int, error) {
 	uniqueWarnings := t.getAllWarnings()
+	t.ResetWarnings()
 	bytesWritten := 0
 
 	// unique warnings only
@@ -266,6 +269,10 @@ func (t *Term) FlushWarnings() (int, error) {
 	}
 
 	return bytesWritten, nil
+}
+
+func (t *Term) ResetWarnings() {
+	t.warnings = nil
 }
 
 func Print(v ...any) (int, error) {
@@ -316,16 +323,22 @@ func Errorf(format string, v ...any) (int, error) {
 	return DefaultTerm.Errorf(format, v...)
 }
 
+// Deprecated: use proper error handling instead
 func Fatal(msg any) {
 	DefaultTerm.Fatal(msg)
 }
 
+// Deprecated: use proper error handling instead
 func Fatalf(format string, v ...any) {
 	DefaultTerm.Fatalf(format, v...)
 }
 
 func FlushWarnings() (int, error) {
 	return DefaultTerm.FlushWarnings()
+}
+
+func ResetWarnings() {
+	DefaultTerm.ResetWarnings()
 }
 
 func ForceColor(color bool) {

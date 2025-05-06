@@ -73,6 +73,9 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 
 	project, err := c.LoadProject(ctx)
 	if err != nil {
+		if errors.Is(err, types.ErrComposeFileNotFound) {
+			return "", fmt.Errorf("no --project-name specified and %w", err)
+		}
 		return "", err
 	}
 

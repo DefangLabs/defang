@@ -124,9 +124,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
-		fmt.Println("Some warnings were seen during this command:")
-		term.FlushWarnings()
-		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
@@ -314,7 +312,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Use:           "defang",
 	Args:          cobra.NoArgs,
-	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
+	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		term.SetDebug(doDebug)
 
@@ -370,6 +368,7 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
+				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
@@ -641,11 +640,11 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cmdd := exec.Command("code", prompt.Folder)
+		editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
+		cmdd := exec.Command(editor, prompt.Folder)
 		err = cmdd.Start()
 		if err != nil {
-			term.Debug("unable to launch VS Code:", err)
-			// TODO: should we use EDITOR env var instead?
+			term.Debugf("unable to launch editor %q: %v", editor, err)
 		}
 
 		cd := ""
@@ -967,7 +966,8 @@ var deleteCmd = &cobra.Command{
 			Since:      since,
 			Verbose:    verbose,
 		}
-		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
+		return cli.Tail(tailCtx, provider, projectName, tailOptions)
 	},
 }
 
