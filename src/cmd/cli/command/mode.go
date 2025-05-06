@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -10,16 +11,21 @@ import (
 type Mode defangv1.DeploymentMode
 
 func (b Mode) String() string {
+	if b == 0 {
+		return ""
+	}
 	return strings.ToLower(defangv1.DeploymentMode_name[int32(b)])
 }
+
 func (b *Mode) Set(s string) error {
 	mode, ok := defangv1.DeploymentMode_value[strings.ToUpper(s)]
 	if !ok {
-		return fmt.Errorf("invalid mode: %s, valid values are: %v", s, strings.Join(allModes(), ", "))
+		return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
 	}
 	*b = Mode(mode)
 	return nil
 }
+
 func (b Mode) Type() string {
 	return "mode"
 }
@@ -36,5 +42,6 @@ func allModes() []string {
 		}
 		modes = append(modes, strings.ToLower(mode))
 	}
+	slices.Sort(modes) // TODO: sort by enum value instead of string
 	return modes
 }
