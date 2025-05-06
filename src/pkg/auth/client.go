@@ -79,7 +79,7 @@ func WithRefreshToken(refresh string) VerifyOption {
 type Tokens struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	// ExpiresIn   int    `json:"expires_in"`
+	// ExpiresIn   int    `json:"expires_in"` TODO: uncomment once we deploy https://github.com/toolbeam/openauth/pull/187
 	// Scope       string `json:"scope"`
 }
 
