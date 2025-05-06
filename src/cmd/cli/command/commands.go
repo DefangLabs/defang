@@ -269,6 +269,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
+	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -969,12 +970,31 @@ var deleteCmd = &cobra.Command{
 	},
 }
 
+// deploymentsCmd and deploymentsListCmd do the same thing. deploymentsListCmd is for backward compatibility.
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Short:       "Show Deployments",
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
+	Short:       "List deployments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), projectName, client)
+	},
+}
+
+var deploymentsListCmd = &cobra.Command{
+	Use:         "list",
+	Aliases:     []string{"ls"},
+	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployments",
+	Deprecated:  "use 'deployments' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
