@@ -190,6 +190,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			term.Info("Done.")
+			flushWarnings()
 			return nil
 		},
 	}
@@ -205,6 +206,13 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func flushWarnings() {
+	if hasTty && term.HadWarnings() {
+		fmt.Println("\nSome warnings were seen during this command:")
+		term.FlushWarnings()
+	}
 }
 
 func makeComposeStartCmd() *cobra.Command {
@@ -308,7 +316,7 @@ func makeComposeDownCmd() *cobra.Command {
 				Verbose:            verbose,
 				LogType:            logs.LogTypeAll,
 			}
-			tailCtx := cmd.Context()
+			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
 			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
@@ -489,7 +497,6 @@ func makeComposeLogsCmd() *cobra.Command {
 				Until:      untilTs,
 				Verbose:    verbose,
 			}
-
 			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
 		},
 	}
