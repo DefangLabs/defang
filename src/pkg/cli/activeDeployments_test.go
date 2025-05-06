@@ -44,7 +44,7 @@ func TestActiveDeployments(t *testing.T) {
 	fabricServer := &mockActiveDeploymentsHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close())
+	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
 	client := NewGrpcClient(ctx, url)
@@ -53,13 +53,13 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := ActiveDeployments(ctx, client, "", 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, "", client, 10)
 		if err != nil {
-			t.Fatalf("ActiveDeployments() error = %v", err)
+			t.Fatalf("DeploymentsList() error = %v", err)
 		}
 
 		receivedOutput := stdout.String()
-		expectedOutput := "No active deployments"
+		expectedOutput := "No deployments found"
 
 		if !strings.Contains(receivedOutput, expectedOutput) {
 			t.Errorf("Expected %s to contain %s", receivedOutput, expectedOutput)
@@ -70,9 +70,9 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
-		err := ActiveDeployments(ctx, client, "", 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, "", client, 10)
 		if err != nil {
-			t.Fatalf("ActiveDeployments() error = %v", err)
+			t.Fatalf("DeploymentsList() error = %v", err)
 		}
 
 		lines := strings.Split(stdout.String(), "\n")[2:] // Skip first two lines (space and header)

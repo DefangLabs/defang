@@ -364,8 +364,9 @@ message ListConfigsRequest {
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
 enum DeploymentListType {
-  DEPLOYMENT_LIST_TYPE_PROJECT = 0; // default
-  DEPLOYMENT_LIST_TYPE_ACTIVE = 1;
+  DEPLOYMENT_LIST_TYPE_UNSPECIFIED = 0;
+  DEPLOYMENT_LIST_TYPE_PROJECT = 1;
+  DEPLOYMENT_LIST_TYPE_ACTIVE = 2;
 }
 
 enum DeploymentAction {

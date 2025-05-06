@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -10,14 +11,16 @@ import (
 )
 
 type PrintDeployment struct {
-	Deployment string
-	Provider   string
-	DeployedAt string
-	Region     string
+	Deployment  string
+	DeployedAt  string
+	ProjectName string
+	Provider    string
+	Region      string
 }
 
-func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient, limit uint32) error {
+func DeploymentsList(ctx context.Context, listType defangv1.DeploymentListType, projectName string, client client.GrpcClient, limit uint32) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+		Type:    listType,
 		Project: projectName,
 		Limit:   limit,
 	})
@@ -27,7 +30,12 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Grpc
 
 	numDeployments := len(response.Deployments)
 	if numDeployments == 0 {
-		_, err := term.Warnf("No deployments found for project %q", projectName)
+		var err error
+		if projectName == "" {
+			_, err = term.Warn("No deployments found")
+		} else {
+			_, err = term.Warnf("No deployments found for project %q", projectName)
+		}
 		return err
 	}
 
@@ -35,12 +43,21 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Grpc
 	deployments := make([]PrintDeployment, numDeployments)
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
-			Deployment: d.Id,
-			Provider:   d.ProviderString, // TODO: use Provider
-			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-			Region:     d.Region,
+			Deployment:  d.Id,
+			DeployedAt:  d.Timestamp.AsTime().Format(time.RFC3339),
+			ProjectName: d.Project,
+			Provider:    d.Provider.String(), // TODO: use Provider
+			Region:      d.Region,
 		}
 	}
 
-	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "DeployedAt"})
+	// sort by provider then project name
+	sort.SliceStable(deployments, func(i, j int) bool {
+		if deployments[i].Provider == deployments[j].Provider {
+			return deployments[i].ProjectName < deployments[j].ProjectName
+		}
+		return deployments[i].Provider < deployments[j].Provider
+	})
+
+	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "ProjectName", "DeployedAt"})
 }

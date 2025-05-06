@@ -56,7 +56,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "empty", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT, "empty", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -71,12 +71,12 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "test", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT, "test", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nDeployment  Provider    Region     DeployedAt            \x1b[0m" + `
-a1b2c3      playground  us-test-2  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
+		expectedOutput := "\x1b[1m\nDeployment  Provider  Region     ProjectName  DeployedAt            \x1b[0m" + `
+a1b2c3      DEFANG    us-test-2  test         ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")

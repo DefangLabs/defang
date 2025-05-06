@@ -1010,9 +1010,9 @@ var deploymentsListCmd = &cobra.Command{
 				projectName = projName
 			}
 
-			return cli.DeploymentsList(cmd.Context(), projectName, client, limit)
+			return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT, projectName, client, limit)
 		} else {
-			return cli.ActiveDeployments(cmd.Context(), client, projectName, limit)
+			return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, projectName, client, limit)
 		}
 	},
 }
