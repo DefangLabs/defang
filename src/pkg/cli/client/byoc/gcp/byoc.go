@@ -129,6 +129,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"sqladmin.googleapis.com",             // For Cloud SQL
 		"servicenetworking.googleapis.com",    // For VPC peering
 		"redis.googleapis.com",                // For Redis
+		"certificatemanager.googleapis.com",   // For SSL certs
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
