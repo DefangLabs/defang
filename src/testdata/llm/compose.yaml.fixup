@@ -38,5 +38,13 @@
     "networks": {
       "default": null
     }
+  },
+  "not-our-gateway": {
+    "command": null,
+    "entrypoint": null,
+    "image": "fakerepo.com/openai-access-gateway:latest",
+    "networks": {
+      "default": null
+    }
   }
 }

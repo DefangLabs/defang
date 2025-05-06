@@ -20,6 +20,11 @@ services:
     networks:
       default: null
     x-defang-llm: true
+  not-our-gateway:
+    image: fakerepo.com/openai-access-gateway:latest
+    networks:
+      default: null
+    x-defang-llm: true
 networks:
   default:
     name: llm_default

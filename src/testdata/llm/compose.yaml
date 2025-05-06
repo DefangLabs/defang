@@ -12,3 +12,7 @@ services:
   gateway-without-ports:
     x-defang-llm: true
     image: "defang.io/openai-access-gateway:latest"
+
+  not-our-gateway:
+    x-defang-llm: true
+    image: "fakerepo.com/openai-access-gateway:latest"
