@@ -1,4 +1,19 @@
 {
+  "alt-repo": {
+    "command": null,
+    "entrypoint": null,
+    "image": "altrepo.com/openai-access-gateway:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 80,
+        "protocol": "tcp"
+      }
+    ]
+  },
   "gateway-with-ports": {
     "command": null,
     "entrypoint": null,
@@ -35,14 +50,6 @@
     "command": null,
     "entrypoint": null,
     "image": "llm:latest",
-    "networks": {
-      "default": null
-    }
-  },
-  "not-our-gateway": {
-    "command": null,
-    "entrypoint": null,
-    "image": "fakerepo.com/openai-access-gateway:latest",
     "networks": {
       "default": null
     }

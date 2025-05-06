@@ -304,7 +304,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
 		// Ensure the image is a valid Redis image
-		image := getImageRoot(svccfg.Image)
+		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
@@ -315,7 +315,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
 		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
-		image := getImageRoot(svccfg.Image)
+		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}

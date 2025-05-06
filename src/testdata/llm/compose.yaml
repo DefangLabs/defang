@@ -13,6 +13,6 @@ services:
     x-defang-llm: true
     image: "defang.io/openai-access-gateway:latest"
 
-  not-our-gateway:
+  alt-repo:
     x-defang-llm: true
-    image: "fakerepo.com/openai-access-gateway:latest"
+    image: "altrepo.com/openai-access-gateway:latest"
