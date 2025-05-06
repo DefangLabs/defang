@@ -116,6 +116,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 
 	term.Infof("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.ProjectId)
 	// 1. Enable required APIs
+	// TODO: enable minimum APIs needed for bootstrap the cd image, let CD enable the rest of the APIs
 	apis := []string{
 		"storage.googleapis.com",              // Cloud Storage API
 		"artifactregistry.googleapis.com",     // Artifact Registry API
