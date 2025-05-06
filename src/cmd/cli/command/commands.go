@@ -270,7 +270,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Deployments Command
 	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
-	deploymentsListCmd.Flags().Uint("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
+	deploymentsListCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
