@@ -271,8 +271,10 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
+	deploymentsListCmd.Flags().BoolP("all", "a", false, "all deployed projects")
 	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
 	deploymentsListCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
+	deploymentsCmd.Flags().BoolP("all", "a", false, "all deployed projects")
 	deploymentsCmd.Flags().Bool("history", false, "get the history of deployed project")
 	deploymentsCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
@@ -1001,13 +1003,26 @@ var deploymentsListCmd = &cobra.Command{
 }
 
 func getDeploymentInfo(cmd *cobra.Command) error {
+	allProjects, _ := cmd.Flags().GetBool("all")
 	historyOnly, _ := cmd.Flags().GetBool("history")
 	limit, _ := cmd.Flags().GetUint32("limit")
+	projectName, _ := cmd.Flags().GetString("project-name")
 
-	loader := configureLoader(cmd)
-	projectName, err := loader.LoadProjectName(cmd.Context())
-	if err != nil {
-		return err
+	if allProjects && historyOnly {
+		return errors.New("cannot use --all and --history flags together")
+	}
+
+	if allProjects && projectName != "" {
+		return errors.New("cannot use --all and --project-name flags together")
+	}
+
+	var err error
+	if !allProjects {
+		loader := configureLoader(cmd)
+		projectName, err = loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
 	}
 
 	deploymentType := defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
