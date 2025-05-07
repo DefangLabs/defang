@@ -1,8 +1,12 @@
 package auth
 
+// This file is a 1:1 translation of the official TypeScript client from the OpenAuth repo
+// https://github.com/toolbeam/openauth/blob/%40openauthjs/openauth%400.4.3/packages/openauth/src/client.ts
+
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,6 +20,12 @@ type ResponseType string
 const (
 	CodeResponseType  ResponseType = "code"
 	TokenResponseType ResponseType = "token"
+)
+
+var (
+	ErrInvalidAccessToken       = errors.New("invalid access token")
+	ErrInvalidAuthorizationCode = errors.New("invalid authorization code")
+	ErrInvalidRefreshToken      = errors.New("invalid refresh token")
 )
 
 type AuthorizeOptions struct {
@@ -61,7 +71,7 @@ func WithAccessToken(access string) RefreshOption {
 }
 
 type RefreshSuccess struct {
-	*Tokens
+	Tokens
 }
 
 type VerifyOptions struct {
@@ -77,10 +87,27 @@ func WithRefreshToken(refresh string) VerifyOption {
 }
 
 type Tokens struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	// ExpiresIn   int    `json:"expires_in"` TODO: uncomment once we deploy https://github.com/toolbeam/openauth/pull/187
-	// Scope       string `json:"scope"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	// ExpiresIn     int    `json:"expires_in,omitempty"` TODO: uncomment once we deploy https://github.com/toolbeam/openauth/pull/187
+	// Scope       string `json:"scope,omitempty"`
+}
+
+type OAuthError struct {
+	ErrorCode        string `json:"error,omitempty"`
+	ErrorDescription string `json:"error_description,omitempty"`
+}
+
+func (oe OAuthError) Error() string {
+	if oe.ErrorDescription != "" {
+		return oe.ErrorDescription
+	}
+	return oe.ErrorCode
+}
+
+type tokenResponse struct {
+	Tokens
+	*OAuthError
 }
 
 type VerifyResult struct {
@@ -92,20 +119,20 @@ type Client interface {
 	 * Start the autorization flow.
 	 * This returns a redirect URL and a challenge that you need to use later to verify the code.
 	 */
-	Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (AuthorizeResult, error)
+	Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (*AuthorizeResult, error)
 	/**
 	 * Exchange the code for access and refresh tokens.
 	 */
-	Exchange(code string, redirectURI string, verifier string) (ExchangeSuccess, error)
+	Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error)
 	/**
 	 * Refreshes the tokens if they have expired. This is used in an SPA app to maintain the
 	 * session, without logging the user out.
 	 */
-	Refresh(refresh string, opts ...RefreshOption) (RefreshSuccess, error)
+	Refresh(refresh string, opts ...RefreshOption) (*RefreshSuccess, error)
 	/**
 	 * Verify the token in the incoming request.
 	 */
-	Verify(token string, opts ...VerifyOption) (VerifyResult, error)
+	Verify(token string, opts ...VerifyOption) (*VerifyResult, error)
 }
 
 type client struct {
@@ -120,7 +147,7 @@ func NewClient(clientID, issuer string) *client {
 	}
 }
 
-func (c client) Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (AuthorizeResult, error) {
+func (c client) Authorize(redirectURI string, response ResponseType, opts ...AuthorizeOption) (*AuthorizeResult, error) {
 	var as AuthorizeOptions
 	for _, o := range opts {
 		o(&as)
@@ -143,14 +170,14 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 	if as.pkce && response == "code" {
 		pkce, err := GeneratePKCE(64)
 		if err != nil {
-			return AuthorizeResult{}, err
+			return nil, err
 		}
 		values.Set("code_challenge_method", string(pkce.Method))
 		values.Set("code_challenge", pkce.Challenge)
 		verifier = pkce.Verifier
 	}
 	result.RawQuery = values.Encode()
-	return AuthorizeResult{
+	return &AuthorizeResult{
 		state:    state,
 		verifier: verifier,
 		url:      *result,
@@ -160,7 +187,7 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 /**
  * Exchange the code for access and refresh tokens.
  */
-func (c client) Exchange(code string, redirectURI string, verifier string) (ExchangeSuccess, error) {
+func (c client) Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error) {
 	body := url.Values{
 		"code":          {code},
 		"redirect_uri":  {redirectURI},
@@ -171,28 +198,31 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (Exch
 
 	resp, err := http.PostForm(c.issuer+"/token", body)
 	if err != nil {
-		return ExchangeSuccess{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return ExchangeSuccess{}, errors.New("invalid authorization code: " + resp.Status)
-	}
-
-	var tokens Tokens
+	var tokens tokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
-		return ExchangeSuccess{}, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
 	}
 
-	return ExchangeSuccess{
-		Tokens: tokens,
+	if resp.StatusCode != http.StatusOK {
+		if tokens.OAuthError == nil {
+			return nil, ErrInvalidAuthorizationCode
+		}
+		return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, tokens.OAuthError)
+	}
+
+	return &ExchangeSuccess{
+		Tokens: tokens.Tokens,
 	}, nil
 }
 
 /**
  * Refreshes the tokens if they have expired.
  */
-func (c client) Refresh(refresh string, opts ...RefreshOption) (RefreshSuccess, error) {
+func (c client) Refresh(refresh string, opts ...RefreshOption) (*RefreshSuccess, error) {
 	var rs RefreshOptions
 	for _, o := range opts {
 		o(&rs)
@@ -201,12 +231,12 @@ func (c client) Refresh(refresh string, opts ...RefreshOption) (RefreshSuccess, 
 		var claims jwt.RegisteredClaims
 		_, _, err := new(jwt.Parser).ParseUnverified(rs.access, &claims)
 		if err != nil {
-			return RefreshSuccess{}, errors.New("invalid access token")
+			return nil, fmt.Errorf("%w: %w", ErrInvalidAccessToken, err)
 		}
-		// allow 30s window for expiration
+		// allow 30s window for expiration (don't refresh if the token is still valid for > 30s)
 		if claims.ExpiresAt.Unix() > time.Now().Unix()+30 {
-			return RefreshSuccess{
-				Tokens: &Tokens{
+			return &RefreshSuccess{
+				Tokens: Tokens{
 					AccessToken:  rs.access,
 					RefreshToken: refresh,
 				},
@@ -220,30 +250,33 @@ func (c client) Refresh(refresh string, opts ...RefreshOption) (RefreshSuccess, 
 	}
 	resp, err := http.PostForm(c.issuer+"/token", body)
 	if err != nil {
-		return RefreshSuccess{}, err
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return RefreshSuccess{}, errors.New("invalid refresh token")
-	}
-
-	var tokens Tokens
+	var tokens tokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
-		return RefreshSuccess{}, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, err)
 	}
 
-	return RefreshSuccess{
-		Tokens: &tokens,
+	if resp.StatusCode != http.StatusOK {
+		if tokens.OAuthError == nil {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, tokens.OAuthError)
+	}
+
+	return &RefreshSuccess{
+		Tokens: tokens.Tokens,
 	}, nil
 }
 
-func (c client) Verify(token string, opts ...VerifyOption) (VerifyResult, error) {
+func (c client) Verify(token string, opts ...VerifyOption) (*VerifyResult, error) {
 	var vs VerifyOptions
 	for _, o := range opts {
 		o(&vs)
 	}
 
 	// The CLI doesn't have to verify the access token, because the server will.
-	return VerifyResult{}, errors.ErrUnsupported
+	return nil, errors.ErrUnsupported
 }

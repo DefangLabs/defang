@@ -96,13 +96,13 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 		}
 		var msg string
 		query := r.URL.Query()
-		if query.Get("state") != state {
-			msg = "Authentication error: wrong state"
-		} else {
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+		case query.Get("state") != state:
+			msg = "Authentication error: state mismatch"
+		default:
 			msg = "Authentication successful"
-			if query.Get("error") != "" {
-				msg = "Authentication failed: " + query.Get("error_description")
-			}
 			ch <- query.Get("code")
 		}
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
