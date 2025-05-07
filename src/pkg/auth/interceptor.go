@@ -7,18 +7,22 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
+const XDefangOrgID = "x-defang-orgid"
+
 type authInterceptor struct {
 	authorization string
+	orgID         string
 }
 
-func NewAuthInterceptor(token string) connect.Interceptor {
-	return &authInterceptor{"Bearer " + strings.TrimSpace(token)}
+func NewAuthInterceptor(token, orgID string) connect.Interceptor {
+	return &authInterceptor{"Bearer " + strings.TrimSpace(token), orgID}
 }
 
 func (a *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		req.Header().Set("authorization", a.authorization)
 		req.Header().Set("content-type", "application/grpc") // same as the gRPC client
+		req.Header().Set(XDefangOrgID, a.orgID)
 		return next(ctx, req)
 	}
 }
@@ -28,6 +32,7 @@ func (a *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 		conn := next(ctx, spec)
 		conn.RequestHeader().Set("authorization", a.authorization)
 		conn.RequestHeader().Set("content-type", "application/grpc") // same as the gRPC client
+		conn.RequestHeader().Set(XDefangOrgID, a.orgID)
 		return conn
 	}
 }

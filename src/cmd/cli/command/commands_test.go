@@ -109,10 +109,11 @@ func testCommand(args []string, cluster string) error {
 }
 
 func TestVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live tests in short mode.")
+	}
+
 	t.Run("live", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("skipping live test in short mode.")
-		}
 		err := testCommand([]string{"version"}, "")
 		if err != nil {
 			t.Fatalf("Version() failed: %v", err)
@@ -253,7 +254,7 @@ func TestGetProvider(t *testing.T) {
 		canIUseResponse: defangv1.CanIUseResponse{},
 	}
 	mockClient.SetClient(mockCtrl)
-	client = mockClient
+	client = &mockClient
 	loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
@@ -268,8 +269,9 @@ func TestGetProvider(t *testing.T) {
 		return cmd
 	}
 
+	ctx := context.Background()
+
 	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
-		ctx := context.Background()
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
@@ -284,7 +286,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider should get provider from client", func(t *testing.T) {
-		ctx := context.Background()
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
@@ -312,7 +313,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider with no saved provider should go interactive and save", func(t *testing.T) {
-		ctx := context.Background()
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		t.Setenv("AWS_REGION", "us-west-2")
@@ -349,7 +349,9 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Interactive provider prompt infer default provider from environment variable", func(t *testing.T) {
-		ctx := context.Background()
+		if testing.Short() {
+			t.Skip("Skip digitalocean test")
+		}
 		providerID = "auto"
 		os.Unsetenv("DEFANG_PROVIDER")
 		os.Unsetenv("AWS_PROFILE")
@@ -385,7 +387,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Auto provider from param with saved provider should go interactive and save", func(t *testing.T) {
-		ctx := context.Background()
 		os.Unsetenv("GCP_PROJECT_ID") // To trigger error
 		os.Unsetenv("DEFANG_PROVIDER")
 		providerID = "auto"
@@ -419,7 +420,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Should take provider from param without updating saved provider", func(t *testing.T) {
-		ctx := context.Background()
 		os.Unsetenv("DIGITALOCEAN_TOKEN")
 		os.Unsetenv("DEFANG_PROVIDER")
 		mockCtrl.savedProvider = map[string]defangv1.Provider{"empty": defangv1.Provider_AWS}
@@ -441,7 +441,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Should take provider from env aws", func(t *testing.T) {
-		ctx := context.Background()
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
 		RootCmd = FakeRootWithProviderParam("")
@@ -461,7 +460,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Should take provider from env gcp", func(t *testing.T) {
-		ctx := context.Background()
 		t.Setenv("DEFANG_PROVIDER", "gcp")
 		t.Setenv("GCP_PROJECT_ID", "test_proj_id")
 		RootCmd = FakeRootWithProviderParam("")
@@ -481,7 +479,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Should set cd image from canIUse response", func(t *testing.T) {
-		ctx := context.Background()
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
 		sts := aws.StsClient
@@ -513,7 +510,6 @@ func TestGetProvider(t *testing.T) {
 	})
 
 	t.Run("Can override cd image from environment variable", func(t *testing.T) {
-		ctx := context.Background()
 		t.Setenv("DEFANG_PROVIDER", "aws")
 		t.Setenv("AWS_REGION", "us-west-2")
 		sts := aws.StsClient
