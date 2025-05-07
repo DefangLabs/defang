@@ -363,10 +363,10 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
-enum DeploymentListType {
-  DEPLOYMENT_LIST_TYPE_UNSPECIFIED = 0;
-  DEPLOYMENT_LIST_TYPE_PROJECT = 1;
-  DEPLOYMENT_LIST_TYPE_ACTIVE = 2;
+enum DeploymentType {
+  DEPLOYMENT_TYPE_UNSPECIFIED = 0;
+  DEPLOYMENT_TYPE_HISTORY = 1;
+  DEPLOYMENT_TYPE_ACTIVE = 2;
 }
 
 enum DeploymentAction {
@@ -388,9 +388,9 @@ message Deployment {
 
 message PutDeploymentRequest { Deployment deployment = 1; }
 
-message ListDeploymentsRequest { 
-  string project = 1; 
-  DeploymentListType type = 2; // active or all
+message ListDeploymentsRequest {
+  string project = 1;
+  DeploymentType type = 2; // active or all
   uint32 limit = 3; // number of deployments to return
 }
 

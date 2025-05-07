@@ -46,6 +46,7 @@ var (
 	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
@@ -125,9 +126,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	if hasTty && term.HadWarnings() {
-		fmt.Println("Some warnings were seen during this command:")
-		term.FlushWarnings()
-		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
@@ -179,6 +178,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
+	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
@@ -273,6 +273,8 @@ func SetupCommands(ctx context.Context, version string) {
 	// Deployments Command
 	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
 	deploymentsListCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
+	deploymentsCmd.Flags().Bool("history", false, "get the history of deployed project")
+	deploymentsCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -374,6 +376,7 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
+				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
 				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
@@ -968,15 +971,21 @@ var deleteCmd = &cobra.Command{
 			Since:      since,
 			Verbose:    verbose,
 		}
-		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
+		return cli.Tail(tailCtx, provider, projectName, tailOptions)
 	},
 }
 
+// deploymentsCmd and deploymentsListCmd do the same thing. deploymentsListCmd is for backward compatibility.
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Short:       "Manage Deployments",
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return getDeploymentInfo(cmd)
+	},
 }
 
 var deploymentsListCmd = &cobra.Command{
@@ -985,23 +994,28 @@ var deploymentsListCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
+	Deprecated:  "use 'deployments' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		historyOnly, _ := cmd.Flags().GetBool("history")
-		limit, _ := cmd.Flags().GetUint32("limit")
-
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		deploymentType := defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE
-		if historyOnly {
-			deploymentType = defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT
-		}
-
-		return cli.DeploymentsList(cmd.Context(), deploymentType, projectName, client, limit)
+		return getDeploymentInfo(cmd)
 	},
+}
+
+func getDeploymentInfo(cmd *cobra.Command) error {
+	historyOnly, _ := cmd.Flags().GetBool("history")
+	limit, _ := cmd.Flags().GetUint32("limit")
+
+	loader := configureLoader(cmd)
+	projectName, err := loader.LoadProjectName(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	deploymentType := defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
+	if historyOnly {
+		deploymentType = defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY
+	}
+
+	return cli.DeploymentsList(cmd.Context(), deploymentType, projectName, client, limit)
 }
 
 var sendCmd = &cobra.Command{

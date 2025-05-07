@@ -53,7 +53,7 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, "", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -70,7 +70,7 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, "", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", client, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
