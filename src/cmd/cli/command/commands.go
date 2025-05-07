@@ -986,15 +986,8 @@ var deploymentsListCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		historyOnly, err := cmd.Flags().GetBool("history")
-		if err != nil {
-			return err
-		}
-
-		limit, err := cmd.Flags().GetUint32("limit")
-		if err != nil {
-			return err
-		}
+		historyOnly, _ := cmd.Flags().GetBool("history")
+		limit, _ := cmd.Flags().GetUint32("limit")
 
 		projectName, err := cmd.Flags().GetString("project-name")
 		if err != nil {
