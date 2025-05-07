@@ -989,26 +989,18 @@ var deploymentsListCmd = &cobra.Command{
 		historyOnly, _ := cmd.Flags().GetBool("history")
 		limit, _ := cmd.Flags().GetUint32("limit")
 
-		projectName, err := cmd.Flags().GetString("project-name")
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
 
+		deploymentType := defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE
 		if historyOnly {
-			loader := configureLoader(cmd)
-			if projectName == "" {
-				projName, err := loader.LoadProjectName(cmd.Context())
-				if err != nil {
-					return err
-				}
-
-				projectName = projName
-			}
-
-			return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT, projectName, client, limit)
-		} else {
-			return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_ACTIVE, projectName, client, limit)
+			deploymentType = defangv1.DeploymentListType_DEPLOYMENT_LIST_TYPE_PROJECT
 		}
+
+		return cli.DeploymentsList(cmd.Context(), deploymentType, projectName, client, limit)
 	},
 }
 
