@@ -1,17 +1,21 @@
-package github
+package auth
 
 import (
 	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
+	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/google/uuid"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/pkg/browser"
 )
+
+var openAuthClient = NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
 
 const (
 	authTemplateString = `<!DOCTYPE html>
@@ -56,12 +60,25 @@ var (
 	authTemplate = template.Must(template.New("auth").Parse(authTemplateString))
 )
 
-func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (string, error) {
+type AuthCodeFlow struct {
+	code        string
+	redirectUri string
+	verifier    string
+}
+
+type Prompt bool
+
+const (
+	PromptNo  Prompt = false
+	PromptYes Prompt = true
+)
+
+func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Generate random state
-	state := uuid.NewString()
+	var state string
 
 	// Create a channel to wait for the server to finish
 	ch := make(chan string)
@@ -79,13 +96,13 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (strin
 		}
 		var msg string
 		query := r.URL.Query()
-		if query.Get("state") != state {
-			msg = "Authentication error: wrong state"
-		} else {
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+		case query.Get("state") != state:
+			msg = "Authentication error: state mismatch"
+		default:
 			msg = "Authentication successful"
-			if query.Get("error") != "" {
-				msg = "Authentication failed: " + query.Get("error_description")
-			}
 			ch <- query.Get("code")
 		}
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
@@ -94,14 +111,15 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (strin
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	values := url.Values{
-		"client_id":    {clientId},
-		"state":        {state},
-		"redirect_uri": {server.URL + "/auth"},
-		"scope":        {"read:org user:email"}, // required for membership check; space-delimited
-		// "login":     {";TODO: from state file"},
+	redirectUri := server.URL + "/auth"
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
+	if err != nil {
+		return AuthCodeFlow{}, err
 	}
-	authorizeUrl = "https://github.com/login/oauth/authorize?" + values.Encode()
+
+	state = ar.state
+	authorizeUrl = ar.url.String()
+	term.Debug("Authorization URL:", authorizeUrl)
 
 	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
@@ -130,8 +148,27 @@ func StartAuthCodeFlow(ctx context.Context, clientId string, prompt bool) (strin
 
 	select {
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return AuthCodeFlow{}, ctx.Err()
 	case code := <-ch:
-		return code, nil
+		return AuthCodeFlow{code: code, redirectUri: redirectUri, verifier: ar.verifier}, nil
 	}
+}
+
+func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.TenantName, ttl time.Duration, ss ...scope.Scope) (string, error) {
+	var scopes []string
+	for _, s := range ss {
+		if s == scope.Admin {
+			scopes = nil
+			break
+		}
+		scopes = append(scopes, s.String())
+	}
+
+	term.Debugf("Generating token for tenant %q with scopes %v", tenant, scopes)
+
+	token, err := openAuthClient.Exchange(code.code, code.redirectUri, code.verifier) // TODO: scopes, TTL
+	if err != nil {
+		return "", err
+	}
+	return token.AccessToken, nil
 }

@@ -11,13 +11,18 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type grpcListSecretsMockHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (g *grpcListSecretsMockHandler) ListSecrets(ctx context.Context, req *connect.Request[defangv1.ListConfigsRequest]) (*connect.Response[defangv1.Secrets], error) {
+func (grpcListSecretsMockHandler) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{}), nil
+}
+
+func (grpcListSecretsMockHandler) ListSecrets(ctx context.Context, req *connect.Request[defangv1.ListConfigsRequest]) (*connect.Response[defangv1.Secrets], error) {
 	var names []string
 
 	if req.Msg.Project == "emptyconfigs" {
@@ -39,12 +44,13 @@ func TestConfigList(t *testing.T) {
 	fabricServer := &grpcListSecretsMockHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
-	t.Cleanup(func() {
-		server.Close()
-	})
+	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient := NewGrpcClient(ctx, url)
+	grpcClient, err := Connect(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
 	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no configs", func(t *testing.T) {
