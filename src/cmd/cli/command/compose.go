@@ -18,7 +18,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +48,6 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 }
 
 func makeComposeUpCmd() *cobra.Command {
-	mode := Mode(defangv1.DeploymentMode_DEVELOPMENT)
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
 		Annotations: authNeededAnnotation,
@@ -199,7 +197,7 @@ func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	composeUpCmd.Flags().Bool("tail", false, "tail the service logs after updating") // obsolete, but keep for backwards compatibility
 	_ = composeUpCmd.Flags().MarkHidden("tail")
-	composeUpCmd.Flags().VarP(&mode, "mode", "m", "deployment mode, possible values: "+strings.Join(allModes(), ", "))
+	composeUpCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	composeUpCmd.Flags().Bool("build", true, "build the image before starting the service") // docker-compose compatibility
 	_ = composeUpCmd.Flags().MarkHidden("build")
 	composeUpCmd.Flags().Bool("wait", true, "wait for services to be running|healthy") // docker-compose compatibility
@@ -511,7 +509,7 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().String("since", "", "show logs since duration/time")
 	logsCmd.Flags().String("until", "", "show logs until duration/time")
 	logsCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
-	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf(`show logs of type; one of %v`, logs.AllLogTypes))
+	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
 }

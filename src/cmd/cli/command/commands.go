@@ -45,6 +45,7 @@ var (
 	doDebug        = false
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
@@ -176,6 +177,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
+	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
