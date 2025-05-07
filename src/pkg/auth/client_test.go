@@ -33,6 +33,37 @@ func TestAuthorize(t *testing.T) {
 }
 
 func TestExchange(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			w.Write([]byte(`{"error":"invalid_request","error_description":"Invalid request"}`))
+		default:
+			http.Error(w, "Not Found", http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.CloseClientConnections)
+
+	client := NewClient("defang-cli", server.URL)
+
+	t.Run("error json", func(t *testing.T) {
+		_, err := client.Exchange("invalid-code", "http://asdf", "")
+		const expected = "invalid authorization code: Invalid request"
+		if err.Error() != expected {
+			t.Fatalf("Expected error %q, got: %v", expected, err)
+		}
+	})
+
+	t.Run("http error", func(t *testing.T) {
+		client.issuer = server.URL + "/404"
+		_, err := client.Exchange("invalid-code", "http://asdf", "")
+		const expected = `token exchange failed: invalid character 'N' looking for beginning of value: 404 Not Found`
+		if err.Error() != expected {
+			t.Fatalf("Expected error %q, got: %v", expected, err)
+		}
+	})
+}
+
+func TestAuthorizeExchange(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping browser test in short mode.")
 	}
@@ -114,14 +145,11 @@ func TestRefresh(t *testing.T) {
 			if r.Method != http.MethodPost {
 				t.Errorf("Expected POST method, got %s", r.Method)
 			}
-			if err := r.ParseForm(); err != nil {
-				t.Errorf("Failed to parse form: %v", err)
-			}
-			if expected, got := "refresh_token", r.FormValue("grant_type"); expected != got {
+			if expected, got := "refresh_token", r.PostFormValue("grant_type"); expected != got {
 				t.Errorf("Expected grant_type %s, got: %s", expected, got)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			if expected, got := "refresh-token", r.FormValue("refresh_token"); expected != got {
+			if expected, got := "refresh-token", r.PostFormValue("refresh_token"); expected != got {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(`{"error":"invalid_request","error_description":"Invalid refresh token"}`))
 			} else {
@@ -168,6 +196,23 @@ func TestRefresh(t *testing.T) {
 		}
 		if refreshResult != nil {
 			t.Error("Expected nil refresh result, got non-nil")
+		}
+	})
+
+	t.Run("invalid access token", func(t *testing.T) {
+		_, err := client.Refresh("invalid-token", WithAccessToken("invalid-token"))
+		const wantErr = "invalid access token: token is malformed: token contains an invalid number of segments"
+		if err.Error() != wantErr {
+			t.Errorf("Expected error %q, got: %v", wantErr, err)
+		}
+	})
+
+	t.Run("http error", func(t *testing.T) {
+		client.issuer = server.URL + "/404"
+		_, err := client.Refresh("invalid-token")
+		const expected = `token refresh failed: invalid character 'N' looking for beginning of value: 404 Not Found`
+		if err.Error() != expected {
+			t.Fatalf("Expected error %q, got: %v", expected, err)
 		}
 	})
 }

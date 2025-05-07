@@ -184,18 +184,7 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 	}, nil
 }
 
-/**
- * Exchange the code for access and refresh tokens.
- */
-func (c client) Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error) {
-	body := url.Values{
-		"code":          {code},
-		"redirect_uri":  {redirectURI},
-		"grant_type":    {"authorization_code"},
-		"client_id":     {c.clientID},
-		"code_verifier": {verifier},
-	}
-
+func (c client) callToken(body url.Values) (*Tokens, error) {
 	resp, err := http.PostForm(c.issuer+"/token", body)
 	if err != nil {
 		return nil, err
@@ -204,18 +193,41 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (*Exc
 
 	var tokens tokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
+		return nil, fmt.Errorf("%w: %s", err, resp.Status)
 	}
 
+	if tokens.OAuthError != nil {
+		return nil, tokens.OAuthError
+	}
 	if resp.StatusCode != http.StatusOK {
-		if tokens.OAuthError == nil {
-			return nil, ErrInvalidAuthorizationCode
+		return nil, errors.New(resp.Status)
+	}
+
+	return &tokens.Tokens, nil
+}
+
+/**
+ * Exchange the code for access and refresh tokens.
+ */
+func (c client) Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error) {
+	body := url.Values{
+		"client_id":     {c.clientID},
+		"code_verifier": {verifier},
+		"code":          {code},
+		"grant_type":    {"authorization_code"},
+		"redirect_uri":  {redirectURI},
+	}
+	tokens, err := c.callToken(body)
+	if err != nil {
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
 		}
-		return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, tokens.OAuthError)
+		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
 	return &ExchangeSuccess{
-		Tokens: tokens.Tokens,
+		Tokens: *tokens,
 	}, nil
 }
 
@@ -245,29 +257,21 @@ func (c client) Refresh(refresh string, opts ...RefreshOption) (*RefreshSuccess,
 	}
 
 	body := url.Values{
+		"client_id":     {c.clientID},
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
 	}
-	resp, err := http.PostForm(c.issuer+"/token", body)
+	tokens, err := c.callToken(body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var tokens tokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		if tokens.OAuthError == nil {
-			return nil, ErrInvalidRefreshToken
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, err)
 		}
-		return nil, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, tokens.OAuthError)
+		return nil, fmt.Errorf("token refresh failed: %w", err)
 	}
 
 	return &RefreshSuccess{
-		Tokens: tokens.Tokens,
+		Tokens: *tokens,
 	}, nil
 }
 
