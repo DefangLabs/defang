@@ -112,7 +112,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	defer server.Close()
 
 	redirectUri := server.URL + "/auth"
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
