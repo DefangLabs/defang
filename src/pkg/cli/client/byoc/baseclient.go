@@ -242,7 +242,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)
 	}
-	if hasHost {
+	if hasHost { // TODO: this should be network based instead of host vs ingress
 		si.PrivateFqdn = b.GetPrivateFqdn(projectName, fqn)
 	}
 
