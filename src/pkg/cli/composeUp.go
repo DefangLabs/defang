@@ -66,12 +66,11 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		return nil, project, ErrDryRun
 	}
 
-	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{Project: project.Name}) // TODO: pass projectName
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return nil, project, errors.New("failed to get delegate domain")
 	}
-	fmt.Println("Delegate domain:", delegateDomain.Zone)
 
 	deployRequest := &defangv1.DeployRequest{
 		Mode:           mode,
