@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ var mcpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//set global nonInteractive to false
 		nonInteractive = false
+		fmt.Println("mcp")
 		return nil
 	},
 }

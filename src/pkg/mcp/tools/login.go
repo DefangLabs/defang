@@ -20,10 +20,11 @@ func setupLoginTool(s *server.MCPServer, cluster string) {
 	// Add the login tool handler - make it non-blocking
 	term.Info("Adding login tool handler")
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		term.Infof("Login tool called")
 		// Test token
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			// return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
 
 		err = cli.InteractiveLoginPrompt(ctx, client, cluster)

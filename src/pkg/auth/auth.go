@@ -109,7 +109,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 
 	// Use a fixed port instead of a random one
 	serverURL := "http://127.0.0.1:47071"
-	server := &http.Server{Addr: ":47071", Handler: handler}
+	server := &http.Server{Addr: "0.0.0.0:47071", Handler: handler}
 
 	// Start the server in a goroutine
 	go func() {
