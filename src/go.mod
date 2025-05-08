@@ -33,6 +33,7 @@ require (
 	github.com/compose-spec/compose-go/v2 v2.4.3
 	github.com/digitalocean/godo v1.131.1
 	github.com/docker/docker v25.0.6+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.13.0
 	github.com/gorilla/websocket v1.5.0

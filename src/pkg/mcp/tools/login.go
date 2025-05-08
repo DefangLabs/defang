@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -11,7 +10,7 @@ import (
 )
 
 // setupLoginTool configures and adds the login tool to the MCP server
-func setupLoginTool(s *server.MCPServer, cluster string, gitHubClientId string) {
+func setupLoginTool(s *server.MCPServer, cluster string) {
 	term.Info("Creating login tool")
 	loginTool := mcp.NewTool("login",
 		mcp.WithDescription("Login to Defang"),
@@ -22,10 +21,14 @@ func setupLoginTool(s *server.MCPServer, cluster string, gitHubClientId string) 
 	term.Info("Adding login tool handler")
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Test token
-		client := cli.NewGrpcClient(ctx, cluster)
-		err := cli.InteractiveLogin(ctx, client, gitHubClientId, cluster, true)
+		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultText(fmt.Sprintf("Failed to login: %v", err)), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+		}
+
+		err = cli.InteractiveLoginPrompt(ctx, client, cluster)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
 		}
 
 		output := "Successfully logged in to Defang"

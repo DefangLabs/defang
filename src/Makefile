@@ -26,7 +26,7 @@ install: $(BINARY_NAME) test
 .PHONY: test
 test: $(PROTOS)
 	go mod tidy
-	set -o pipefail ; go test -test.short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
+	set -o pipefail ; go test -short ./... | sed -e 's/\(--- FAIL.*\)/[0;31m\1[0m/g'
 
 .PHONY: integ
 integ: $(PROTOS)
