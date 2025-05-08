@@ -47,13 +47,13 @@ func TestActiveDeployments(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	client := NewGrpcClient(ctx, url)
+	grpcClient, _ := Connect(ctx, url)
 
 	t.Run("no active deployments", func(t *testing.T) {
 		fabricServer.testDeploymentsData = emptyDeployments
 		stdout, _ := term.SetupTestTerm(t)
 
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -70,7 +70,7 @@ func TestActiveDeployments(t *testing.T) {
 		fabricServer.testDeploymentsData = activeDeployments
 
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", client, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}

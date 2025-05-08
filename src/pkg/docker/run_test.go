@@ -1,3 +1,5 @@
+//go:build integration
+
 package docker
 
 import (
@@ -11,13 +13,12 @@ import (
 
 func TestRun(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping test in short mode.")
+		t.Skip("skipping Docker test")
 	}
 
 	d := New()
 
 	err := d.SetUp(context.Background(), []types.Container{{Image: "alpine:latest", Platform: d.platform}})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,6 +34,7 @@ func TestRun(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+
 	err = d.Tail(ctx, id)
 	if err != nil {
 		t.Fatal(err)
