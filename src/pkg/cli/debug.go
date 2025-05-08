@@ -184,9 +184,9 @@ func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, proje
 
 func printDebugReport(resp *defangv1.DebugResponse) {
 	term.Println("")
-	term.Println("===================")
+	term.Println("=================")
 	term.Println("Debugging Summary")
-	term.Println("===================")
+	term.Println("=================")
 	term.Println(resp.General)
 	term.Println("")
 	term.Println("")
@@ -201,7 +201,7 @@ func printDebugReport(resp *defangv1.DebugResponse) {
 
 		if (len(service.CodeChanges)) > 0 {
 			for _, changes := range service.CodeChanges {
-				term.Println(fmt.Sprintf("Updated %s:", changes.File))
+				term.Println(fmt.Sprintf("Suggested %s:", changes.File))
 				term.Println("-------------------")
 				term.Println(changes.Change)
 				term.Println("")
