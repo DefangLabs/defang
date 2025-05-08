@@ -19,8 +19,8 @@ FROM alpine:latest
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
-# Create a non-root user and group
-RUN addgroup -S defang && adduser -S defang -G defang
+# Create a non-root user to run the application
+RUN adduser -D -h /home/defang defang
 
 # Set working directory
 WORKDIR /app
@@ -28,10 +28,7 @@ WORKDIR /app
 # Copy the binary from the builder stage
 COPY --from=builder /app/defang /usr/local/bin/
 
-# Make sure defang user can access needed directories
-RUN mkdir -p /home/defang/.defang && chown -R defang:defang /home/defang
-
-# Switch to non-root user
+# Set the user to run the application
 USER defang
 
 EXPOSE 47071

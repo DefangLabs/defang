@@ -24,13 +24,13 @@ func setupLoginTool(s *server.MCPServer, cluster string) {
 		// Test token
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			// return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			err = cli.InteractiveLoginPrompt(ctx, client, cluster)
+			if err != nil {
+				return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
+			}
 		}
 
-		err = cli.InteractiveLoginPrompt(ctx, client, cluster)
-		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
-		}
+		client.Track("MCP Login Tool")
 
 		output := "Successfully logged in to Defang"
 
