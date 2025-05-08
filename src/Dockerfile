@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23.5-alpine AS builder
+FROM golang:alpine AS builder
 
 # Install required build dependencies
 RUN apk add --no-cache git make zip curl bash
@@ -19,18 +19,16 @@ FROM alpine:latest
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
-# Create a non-root user to run the application
-RUN adduser -D -h /home/defang defang
-WORKDIR /home/defang
+# Set working directory
+WORKDIR /app
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/defang /usr/local/bin/
 
-# Set the user to run the application
-USER defang
+EXPOSE 32768
 
-# Set the entrypoint
 ENTRYPOINT ["defang"]
 
-# Default command
 CMD ["--help"]
+
+

@@ -92,11 +92,11 @@ DOCKER_IMAGE_AMD64:=$(DOCKER_IMAGE_NAME):amd64-$(VERSION)
 
 .PHONY: image-amd64
 image-amd64:
-	docker build --platform linux/amd64 -f ../Dockerfile -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_AMD64) --provenance false .
+	docker build --platform linux/amd64 -f ./Dockerfile -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_AMD64) --provenance false .
 
 .PHONY: image-arm64
 image-arm64:
-	docker build --platform linux/arm64 -f ../Dockerfile -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_ARM64) --provenance false .
+	docker build --platform linux/arm64 -f ./Dockerfile -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_ARM64) --provenance false .
 
 .PHONY: images
 images: image-amd64 image-arm64 ## Build all docker images and manifest
@@ -113,3 +113,4 @@ push-images: images login ## Push all docker images
 .PHONY: login
 login: ## Login to docker
 	@docker login
+	

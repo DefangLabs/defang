@@ -17,6 +17,11 @@ import (
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
 	Short: "Manage MCP Server for defang",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		//set global nonInteractive to false
+		nonInteractive = false
+		return nil
+	},
 }
 
 var mcpServerCmd = &cobra.Command{
@@ -62,6 +67,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Start the server
 		term.Info("Starting Defang Services MCP server")
+		term.Println("Starting Defang MCP server")
 		if err := server.ServeStdio(s); err != nil {
 			return err
 		}
