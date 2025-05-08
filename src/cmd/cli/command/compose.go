@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -520,6 +521,71 @@ func makeComposeLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
+func makeComposeEstimateCmd() *cobra.Command {
+	var estimateCmd = &cobra.Command{
+		Use:         "estimate",
+		Args:        cobra.NoArgs,
+		Annotations: authNeededAnnotation,
+		Short:       "Estimate the cost of deploying the current project",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			region, _ := cmd.Flags().GetString("region")
+			loader := configureLoader(cmd)
+			project, err := loader.LoadProject(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			provider, err := getProvider(cmd.Context(), loader)
+			if err != nil {
+				return err
+			}
+
+			err = canIUseProvider(ctx, provider, project.Name)
+			if err != nil {
+				return err
+			}
+
+			buffer := &bytes.Buffer{}
+			oldTerm := term.DefaultTerm
+			term.DefaultTerm = term.NewTerm(os.Stdin, buffer, os.Stderr)
+			err = cli.Preview(cmd.Context(), project, client, provider, mode.Value())
+			if err != nil {
+				return err
+			}
+			term.DefaultTerm = oldTerm
+
+			pulumiPreview := buffer.Bytes()
+			estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
+				Provider:      providerID.EnumValue(),
+				Region:        region,
+				PulumiPreview: pulumiPreview,
+			})
+
+			if err != nil {
+				return fmt.Errorf("failed to estimate: %w", err)
+			}
+
+			fmt.Printf("Estimate:\n")
+			for _, lineItem := range estimate.LineItems {
+				fmt.Printf("$%.2f\t%.2f %s\t%s\n",
+					lineItem.Cost,
+					lineItem.Quantity, lineItem.Unit,
+					lineItem.Description,
+				)
+			}
+			fmt.Printf("Estimated Total: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
+			fmt.Printf("Estimate does not include tax or discounts.\n")
+
+			return nil
+		},
+	}
+
+	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
+	estimateCmd.Flags().StringP("region", "r", pkg.Getenv("AWS_REGION", "us-west-2"), "which cloud region to estimate")
+	return estimateCmd
+}
+
 func setupComposeCommand() *cobra.Command {
 	var composeCmd = &cobra.Command{
 		Use:     "compose",
@@ -553,5 +619,7 @@ services:
 	composeCmd.AddCommand(makeComposeStartCmd())
 	composeCmd.AddCommand(makeComposeRestartCmd())
 	composeCmd.AddCommand(makeComposeStopCmd())
+	composeCmd.AddCommand(makeComposeEstimateCmd())
+
 	return composeCmd
 }
