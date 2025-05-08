@@ -639,6 +639,23 @@ func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (ty
 
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
+
+	oldzone, err := b.driver.GetDNSZone(ctx, "defang")
+	if err != nil {
+		var apiErr *googleapi.Error
+		if !errors.As(err, &apiErr) || apiErr.Code != 404 {
+			return nil, err
+		}
+	}
+	if oldzone != nil {
+		term.Infof("Deprecated per tenant delegation zone %q(%s) found, removing in favor of new per-project delegation zone", oldzone.Name, oldzone.DnsName)
+		if err := b.driver.DeleteDNSZone(ctx, oldzone.Name); err != nil {
+			if stat, ok := status.FromError(err); ok && stat.Code() != codes.NotFound {
+				return nil, fmt.Errorf("failed to delete old defang zone %q: %w", oldzone.Name, err)
+			}
+		}
+	}
+
 	// Ignore preview, always create the zone for the defang stack
 	name := "defang-" + dns.SafeLabel(req.DelegateDomain)
 	if zone, err := b.driver.EnsureDNSZoneExists(ctx, name, req.DelegateDomain, "defang delegate domain"); err != nil {
