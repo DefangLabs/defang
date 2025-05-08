@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -639,7 +640,8 @@ func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (ty
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
 	// Ignore preview, always create the zone for the defang stack
-	if zone, err := b.driver.EnsureDNSZoneExists(ctx, "defang", req.DelegateDomain, "defang delegate domain"); err != nil {
+	name := "defang-" + dns.SafeLabel(req.DelegateDomain)
+	if zone, err := b.driver.EnsureDNSZoneExists(ctx, name, req.DelegateDomain, "defang delegate domain"); err != nil {
 		return nil, err
 	} else {
 		b.delegateDomainZone = zone.Name

@@ -39,13 +39,13 @@ var P = track.P
 
 // GLOBALS
 var (
-	client         cliClient.GrpcClient
+	client         *cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
 	doDebug        = false
-	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
@@ -71,7 +71,7 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
-	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
+	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
 		defer restore()
 	}
@@ -162,7 +162,7 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	_ = cli.NewGrpcClient(ctx, cluster)
+	cli.Connect(ctx, cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
@@ -177,6 +177,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
+	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
@@ -342,7 +343,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client = cli.NewGrpcClient(cmd.Context(), getCluster())
+		client, err = cli.Connect(cmd.Context(), getCluster())
+		if cli.IsNetworkError(err) {
+			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
+		}
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -351,10 +355,6 @@ var RootCmd = &cobra.Command{
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				hideUpdate = true // hide the upgrade hint at the end
 			}
-		}
-
-		if isUpgradeCommand(cmd) {
-			hideUpdate = true
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -373,11 +373,14 @@ var RootCmd = &cobra.Command{
 				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), getCluster()) // reconnect with the new token
+				// Reconnect with the new token
+				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
+					return err
+				}
 
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
@@ -411,7 +414,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster(), false)
+			err := cli.InteractiveLogin(cmd.Context(), client, getCluster())
 			if err != nil {
 				return err
 			}
@@ -970,11 +973,22 @@ var deleteCmd = &cobra.Command{
 	},
 }
 
+// deploymentsCmd and deploymentsListCmd do the same thing. deploymentsListCmd is for backward compatibility.
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Short:       "Manage Deployments",
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), projectName, client)
+	},
 }
 
 var deploymentsListCmd = &cobra.Command{
@@ -983,6 +997,7 @@ var deploymentsListCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
+	Deprecated:  "use 'deployments' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
@@ -1022,7 +1037,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 
@@ -1072,6 +1087,7 @@ var upgradeCmd = &cobra.Command{
 	Aliases: []string{"update"},
 	Short:   "Upgrade the Defang CLI to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		hideUpdate = true
 		return cli.Upgrade(cmd.Context())
 	},
 }

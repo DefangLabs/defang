@@ -84,6 +84,7 @@ service FabricController {
   rpc PutDeployment(PutDeploymentRequest) returns (google.protobuf.Empty) {
     option idempotency_level = IDEMPOTENT;
   };
+
   rpc ListDeployments(ListDeploymentsRequest)
       returns (ListDeploymentsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -362,6 +363,12 @@ message ListConfigsRequest {
 
 message ListConfigsResponse { repeated ConfigKey configs = 1; }
 
+enum DeploymentType {
+  DEPLOYMENT_TYPE_UNSPECIFIED = 0;
+  DEPLOYMENT_TYPE_HISTORY = 1;
+  DEPLOYMENT_TYPE_ACTIVE = 2;
+}
+
 enum DeploymentAction {
   DEPLOYMENT_ACTION_UNSPECIFIED = 0;
   DEPLOYMENT_ACTION_UP = 1;
@@ -381,7 +388,11 @@ message Deployment {
 
 message PutDeploymentRequest { Deployment deployment = 1; }
 
-message ListDeploymentsRequest { string project = 1; }
+message ListDeploymentsRequest {
+  string project = 1;
+  DeploymentType type = 2; // active or all
+  uint32 limit = 3; // number of deployments to return
+}
 
 message ListDeploymentsResponse { repeated Deployment deployments = 1; }
 

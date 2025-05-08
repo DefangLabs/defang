@@ -2,16 +2,16 @@
 
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-**Develop Anything. Deploy Anywhere.** <br>
+### Develop Anything. Deploy Anywhere.
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
-**Defang CLI**
+### Defang CLI
 The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
 
-**Defang MCP Server**
+### Defang MCP Server
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
 
-**This repo includes:**
+## This repo includes:
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Built-in support for MCP Server — the Defang MCP Server makes cloud deployment as easy as a single prompt. [Learn more](https://docs.defang.io/docs/concepts/mcp)
@@ -123,6 +123,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_JSON` - If set to `true`, outputs JSON instead of human-readable output; defaults to `false`
 - `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`
 - `DEFANG_HIDE_UPDATE` - If set to `true`, hides the update notification; defaults to `false`
+- `DEFANG_ISSUER` - The OAuth2 issuer to use for authentication; defaults to `https://auth.defang.io`
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_ORG` - The name of the organization to use; defaults to the user's GitHub name

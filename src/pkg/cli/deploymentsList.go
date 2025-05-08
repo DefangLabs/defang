@@ -16,8 +16,9 @@ type PrintDeployment struct {
 	Region     string
 }
 
-func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient) error {
+func DeploymentsList(ctx context.Context, projectName string, client client.FabricClient) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+		Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
 		Project: projectName,
 	})
 	if err != nil {

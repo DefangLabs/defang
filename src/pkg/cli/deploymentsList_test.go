@@ -10,6 +10,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -17,7 +18,11 @@ type mockListDeploymentsHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (g *mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
+func (mockListDeploymentsHandler) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{}), nil
+}
+
+func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *connect.Request[defangv1.ListDeploymentsRequest]) (*connect.Response[defangv1.ListDeploymentsResponse], error) {
 	var deployments []*defangv1.Deployment
 
 	if req.Msg.Project == "empty" {
@@ -47,16 +52,14 @@ func TestDeploymentsList(t *testing.T) {
 	fabricServer := &mockListDeploymentsHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
-	t.Cleanup(func() {
-		server.Close()
-	})
+	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	client := NewGrpcClient(ctx, url)
+	grpcClient, _ := Connect(ctx, url)
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "empty", client)
+		err := DeploymentsList(ctx, "empty", grpcClient)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -71,7 +74,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "test", client)
+		err := DeploymentsList(ctx, "test", grpcClient)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
