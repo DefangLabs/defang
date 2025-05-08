@@ -4,7 +4,6 @@ import (
 	"context"
 	"html/template"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"time"
 
@@ -108,10 +107,27 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})
 
-	server := httptest.NewServer(handler)
-	defer server.Close()
+	// Use a fixed port instead of a random one
+	serverURL := "http://127.0.0.1:47071"
+	server := &http.Server{Addr: ":47071", Handler: handler}
 
-	redirectUri := server.URL + "/auth"
+	// Start the server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			// Log error but continue
+			term.Debugf("HTTP server error: %v", err)
+			// If port is in use, the auth flow will fail with context cancellation
+		}
+	}()
+
+	// Ensure server is closed when we're done
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(ctx)
+	}()
+
+	redirectUri := serverURL + "/auth"
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
 		return AuthCodeFlow{}, err
@@ -121,12 +137,12 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	authorizeUrl = ar.url.String()
 	term.Debug("Authorization URL:", authorizeUrl)
 
-	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
+	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", serverURL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if prompt {
-		browser.OpenURL(server.URL)
+		browser.OpenURL(serverURL)
 	}
 
 	input := term.NewNonBlockingStdin()
@@ -141,7 +157,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 			case 3: // Ctrl-C
 				cancel()
 			case 10, 13: // Enter or Return
-				browser.OpenURL(server.URL)
+				browser.OpenURL(serverURL)
 			}
 		}
 	}()

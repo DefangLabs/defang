@@ -25,7 +25,7 @@ WORKDIR /app
 # Copy the binary from the builder stage
 COPY --from=builder /app/defang /usr/local/bin/
 
-EXPOSE 32768
+EXPOSE 47071
 
 ENTRYPOINT ["defang"]
 
