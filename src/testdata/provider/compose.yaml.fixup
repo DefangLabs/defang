@@ -1,0 +1,30 @@
+{
+  "ai_runner": {
+    "command": null,
+    "entrypoint": null,
+    "provider": {
+      "driver": "model",
+      "options": {
+        "model": "ai/smollm2"
+      }
+    },
+    "image": "defangio/openai-access-gateway",
+    "networks": {
+      "default": null
+    }
+  },
+  "chat": {
+    "command": null,
+    "depends_on": {
+      "ai_runner": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
+    "entrypoint": null,
+    "image": "my-chat-app",
+    "networks": {
+      "default": null
+    }
+  }
+}

@@ -133,6 +133,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
+		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Deploy == nil {
+			svccfg.Image = "defangio/openai-access-gateway"
+		}
+
 		_, postgres := svccfg.Extensions["x-defang-postgres"]
 		if postgres {
 			if _, ok := provider.(*client.PlaygroundProvider); ok {
