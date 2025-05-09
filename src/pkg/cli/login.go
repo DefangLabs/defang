@@ -59,7 +59,7 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 
 var authService AuthService = OpenAuthService{}
 
-func saveAccessToken(fabric, at string) error {
+func SaveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
 	term.Debug("Saving access token to", tokenFile)
 	os.MkdirAll(client.StateDir, 0700)
@@ -86,7 +86,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	tenant, host := SplitTenantHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := saveAccessToken(fabric, at); err != nil {
+	if err := SaveAccessToken(fabric, at); err != nil {
 		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
 	}
 	return nil
@@ -106,5 +106,5 @@ func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric
 	if err != nil {
 		return err
 	}
-	return saveAccessToken(fabric, resp.AccessToken)
+	return SaveAccessToken(fabric, resp.AccessToken)
 }

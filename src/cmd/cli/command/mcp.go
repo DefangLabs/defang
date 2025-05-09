@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
@@ -20,10 +21,9 @@ import (
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
 	Short: "Manage MCP Server for defang",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//set global nonInteractive to false
 		nonInteractive = false
-		return nil
 	},
 }
 
@@ -76,7 +76,11 @@ var mcpServerCmd = &cobra.Command{
 
 		if authPort != 0 {
 			term.Info("Starting Auth Server for Docker login flow")
-			auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, types.DEFAULT_TENANT)
+			go func() {
+				auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, types.DEFAULT_TENANT, func(token string) {
+					cli.SaveAccessToken(getCluster(), token)
+				})
+			}()
 		}
 
 		// Start the server

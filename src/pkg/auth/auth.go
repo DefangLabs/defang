@@ -68,14 +68,6 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
-func NewAuthCodeFlow(ar *AuthorizeResult, code string) AuthCodeFlow {
-	return AuthCodeFlow{
-		code:        code,
-		redirectUri: ar.url.String(),
-		verifier:    ar.verifier,
-	}
-}
-
 type Prompt bool
 
 const (
@@ -83,8 +75,7 @@ const (
 	PromptYes Prompt = true
 )
 
-func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName) {
-
+func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
 	// Generate random state
 	var state string
 
@@ -94,7 +85,7 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 	ar, err := openAuthClient.Authorize(serverURL, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
 		term.Error("Failed to authorize", "error", err)
-		return
+		return err
 	}
 	state = ar.state
 
@@ -121,7 +112,7 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 			if err != nil {
 				msg = "Authentication failed: " + err.Error()
 			}
-			fmt.Println("token", token)
+			saveToken(token)
 		}
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})
@@ -130,17 +121,14 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
 
 	// Start the server in a goroutine that will continue forever
-	go func() {
-		err := server.ListenAndServe()
-		if err != nil {
-			// Log error but continue
-			term.Debugf("HTTP server error: %v", err)
-			// If port is in use, the auth flow will fail with context cancellation
-		}
-	}()
+	err = server.ListenAndServe()
+	if err != nil {
+		// Log error but continue
+		term.Debugf("HTTP server error: %v", err)
+		// If port is in use, the auth flow will fail with context cancellation
+	}
 
-	// We will handle the reader in the caller, which should not block this function since we need it to
-	// run forever
+	return err
 }
 
 func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
