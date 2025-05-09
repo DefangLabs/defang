@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -11,6 +12,7 @@ import (
 )
 
 type PrintDeployment struct {
+	AccountId   string
 	Deployment  string
 	DeployedAt  string
 	ProjectName string
@@ -43,21 +45,31 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 	deployments := make([]PrintDeployment, numDeployments)
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
-			Deployment:  d.Id,
+			AccountId:   d.ProviderAccountId,
 			DeployedAt:  d.Timestamp.AsTime().Format(time.RFC3339),
+			Deployment:  d.Id,
 			ProjectName: d.Project,
-			Provider:    d.Provider.String(), // TODO: use Provider
+			Provider:    getProvider(d.Provider, d.ProviderString),
 			Region:      d.Region,
 		}
 	}
 
-	// sort by provider then project name
-	sort.SliceStable(deployments, func(i, j int) bool {
-		if deployments[i].Provider == deployments[j].Provider {
-			return deployments[i].ProjectName < deployments[j].ProjectName
-		}
-		return deployments[i].Provider < deployments[j].Provider
+	// sort by project name, provider, account id, and region
+	sortKeys := make([]string, numDeployments)
+	for i, d := range deployments {
+		// TODO: allow user to specify sort order
+		sortKeys[i] = strings.Join([]string{d.ProjectName, d.Provider, d.AccountId, d.Region}, "|")
+	}
+	sort.SliceStable(sortKeys, func(i, j int) bool {
+		return sortKeys[i] < sortKeys[j]
 	})
 
-	return term.Table(deployments, []string{"Deployment", "Provider", "Region", "ProjectName", "DeployedAt"})
+	return term.Table(deployments, []string{"ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt"})
+}
+
+func getProvider(provider defangv1.Provider, providerString string) string {
+	if provider == defangv1.Provider_PROVIDER_UNSPECIFIED {
+		return providerString
+	}
+	return strings.ToLower(provider.String())
 }
