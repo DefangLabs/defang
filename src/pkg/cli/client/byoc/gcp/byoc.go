@@ -637,28 +637,35 @@ func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (ty
 	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
+type ConflictDelegateDomainError struct {
+	NewDomain      string
+	ConflictDomain string
+	ConflictZone   string
+	Err            error
+}
+
+func (e ConflictDelegateDomainError) Error() string {
+	return e.Err.Error()
+}
+
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
-
-	oldzone, err := b.driver.GetDNSZone(ctx, "defang")
-	if err != nil {
-		var apiErr *googleapi.Error
-		if !errors.As(err, &apiErr) || apiErr.Code != 404 {
-			return nil, err
-		}
-	}
-	if oldzone != nil {
-		term.Infof("Deprecated per tenant delegation zone %q(%s) found, removing in favor of new per-project delegation zone", oldzone.Name, oldzone.DnsName)
-		if err := b.driver.DeleteDNSZone(ctx, oldzone.Name); err != nil {
-			if stat, ok := status.FromError(err); ok && stat.Code() != codes.NotFound {
-				return nil, fmt.Errorf("failed to delete old defang zone %q: %w", oldzone.Name, err)
-			}
-		}
-	}
-
-	// Ignore preview, always create the zone for the defang stack
 	name := "defang-" + dns.SafeLabel(req.DelegateDomain)
 	if zone, err := b.driver.EnsureDNSZoneExists(ctx, name, req.DelegateDomain, "defang delegate domain"); err != nil {
+		if apiErr := new(googleapi.Error); errors.As(err, &apiErr) {
+			if strings.Contains(apiErr.Message, "Please verify ownership of") ||
+				strings.Contains(apiErr.Message, "may be reserved or registered already") {
+				var cde ConflictDelegateDomainError
+				oldZone, err := b.driver.GetDNSZone(ctx, "defang") // Try if we can find the old defang delegate domain zone
+				if err == nil && oldZone != nil {
+					cde.ConflictDomain = oldZone.DnsName
+					cde.ConflictZone = "defang"
+				}
+				cde.NewDomain = req.DelegateDomain
+				cde.Err = apiErr
+				return nil, cde
+			}
+		}
 		return nil, err
 	} else {
 		b.delegateDomainZone = zone.Name
