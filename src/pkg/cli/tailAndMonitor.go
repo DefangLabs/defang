@@ -63,7 +63,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 
 	// blocking call to tail
 	var tailErr error
-	if err := Tail(tailCtx, provider, project.Name, tailOptions); err != nil {
+	if err := Tail(tailCtx, provider, project.Name, tailOptions, TailEntryHandler); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 
 		if connect.CodeOf(err) == connect.CodePermissionDenied {
