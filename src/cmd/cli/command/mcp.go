@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
@@ -78,25 +76,7 @@ var mcpServerCmd = &cobra.Command{
 
 		if authPort != 0 {
 			term.Info("Starting Auth Server for Docker login flow")
-
-			serverURL := "http://127.0.0.1:" + strconv.Itoa(authPort)
-
-			var openAuthClient = auth.NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
-			// Since we know what out local serverURL is because it pass down by the flag we can get the authorize url early and set it
-			ar, _ := openAuthClient.Authorize(serverURL, auth.CodeResponseType, auth.WithPkce(), auth.WithProvider("github"))
-
-			//code channel
-			ch := make(chan string)
-			go func() {
-				select {
-				case code := <-ch:
-					if err := cli.ExchangeCodeAndSave(cmd.Context(), auth.NewAuthCodeFlow(ar, code), getCluster()); err != nil {
-						term.Error("Failed to exchange auth code for access token", "error", err)
-					}
-					term.Info("Received auth code: ", code)
-				}
-			}()
-			auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, &ch, ar)
+			auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, types.DEFAULT_TENANT)
 		}
 
 		// Start the server

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -82,15 +83,25 @@ const (
 	PromptYes Prompt = true
 )
 
-func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, ch *chan string, ar *AuthorizeResult) {
+func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName) {
 
-	// We want to make the handler for the auth server
-	authorizeUrl := ar.url.String()
-	term.Debug("Authorization URL:", authorizeUrl)
-	state := ar.state
+	// Generate random state
+	var state string
+
+	serverURL := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+
+	// Get the authorization URL before setting up the handler
+	ar, err := openAuthClient.Authorize(serverURL, CodeResponseType, WithPkce(), WithProvider("github"))
+	if err != nil {
+		term.Error("Failed to authorize", "error", err)
+		return
+	}
+	state = ar.state
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, authorizeUrl, http.StatusFound)
+			fmt.Println("Redirecting to", ar.url.String())
+			http.Redirect(w, r, ar.url.String(), http.StatusFound)
 			return
 		}
 		if r.URL.Path != "/auth" {
@@ -106,7 +117,11 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, ch *chan str
 			msg = "Authentication error: state mismatch"
 		default:
 			msg = "Authentication successful"
-			*ch <- query.Get("code")
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: serverURL, verifier: ar.verifier}, tenant, 0)
+			if err != nil {
+				msg = "Authentication failed: " + err.Error()
+			}
+			fmt.Println("token", token)
 		}
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})

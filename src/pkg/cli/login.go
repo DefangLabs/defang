@@ -41,7 +41,6 @@ type Prompt = auth.Prompt
 
 type AuthService interface {
 	login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
-	// loginDocker(ctx context.Context, fabric string, authPort int) (string, error)
 }
 
 type OpenAuthService struct{}
@@ -57,18 +56,6 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 	tenant, _ := SplitTenantHost(fabric)
 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
-
-// func (g OpenAuthService) loginDocker(ctx context.Context, fabric string, authPort int) (string, error) {
-// 	term.Debug("Logging in to", fabric)
-
-// 	code, err := auth.StartAuthCodeFlowWithDocker(ctx, authPort)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	tenant, _ := SplitTenantHost(fabric)
-// 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
-// }
 
 var authService AuthService = OpenAuthService{}
 
@@ -88,30 +75,6 @@ func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric st
 
 func InteractiveLoginPrompt(ctx context.Context, client client.FabricClient, fabric string) error {
 	return interactiveLogin(ctx, client, fabric, auth.PromptYes)
-}
-
-// func InteractiveLoginDocker(ctx context.Context, fabric string, authPort int) error {
-// 	at, err := authService.loginDocker(ctx, fabric, authPort)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	tenant, host := SplitTenantHost(fabric)
-// 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
-
-// 	if err := saveAccessToken(fabric, at); err != nil {
-// 		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
-// 	}
-// 	return nil
-// }
-
-func ExchangeCodeAndSave(ctx context.Context, code auth.AuthCodeFlow, fabric string) error {
-	tenant, _ := SplitTenantHost(fabric)
-	token, _ := auth.ExchangeCodeForToken(ctx, code, tenant, 0)
-	if err := saveAccessToken(fabric, token); err != nil {
-		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
-	}
-	return nil
 }
 
 func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
