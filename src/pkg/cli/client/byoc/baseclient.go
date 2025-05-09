@@ -123,7 +123,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	}
 	domain := dns.Normalize(zone)
 	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
-		domain = hasStack.GetStackName() + "." + domain
+		domain = DnsSafeLabel(hasStack.GetStackName()) + "." + domain
 	}
 	return domain
 }
