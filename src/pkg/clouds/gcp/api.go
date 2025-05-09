@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,48 +19,40 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 
 	projectName := "projects/" + gcp.ProjectId
 
-	// listReq := service.Services.List(projectName).Filter("state:ENABLED")
-	// err = listReq.Pages(ctx, func(page *serviceusage.ListServicesResponse) error {
-	// 	for _, svc := range page.Services {
-	// 		if i := slices.Index(apis, svc.Config.Name); i != -1 {
-	// 			apis = slices.Delete(apis, i, i+1)
-	// 		}
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil { // Ignore service usage API not being used
-	// 	return fmt.Errorf("failed to list enabled services: %w", err)
-	// }
-	//
-	// if len(apis) == 0 {
-	// 	term.Debugf("All services already enabled\n")
-	// 	return nil
-	// }
+	for i := range 3 {
+		term.Debugf("Enabling services: %v\n", apis)
+		req := &serviceusage.BatchEnableServicesRequest{
+			ServiceIds: apis,
+		}
 
-	term.Debugf("Enabling services: %v\n", apis)
-	req := &serviceusage.BatchEnableServicesRequest{
-		ServiceIds: apis,
-	}
-
-	operation, err := service.Services.BatchEnable(projectName, req).Do()
-	if err != nil {
-		return fmt.Errorf("failed to batch enable services: %w", err)
-	}
-
-	opService := serviceusage.NewOperationsService(service)
-	for {
-		op, err := opService.Get(operation.Name).Do()
+		operation, err := service.Services.BatchEnable(projectName, req).Do()
 		if err != nil {
-			return fmt.Errorf("failed to get operation status: %w", err)
+			if i < 2 {
+				term.Infof("Failed to enable services, will retry in 5s: %v\n", err)
+				pkg.SleepWithContext(ctx, 5*time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to batch enable services: %w", err)
 		}
 
-		// Check if the operation is done
-		if op.Done {
-			if op.Error != nil {
-				return fmt.Errorf("error in operation: %v", op.Error)
+		opService := serviceusage.NewOperationsService(service)
+		for {
+			op, err := opService.Get(operation.Name).Do()
+			if err != nil {
+				term.Warnf("Failed to get operation status: %v\n", err)
+			} else if op.Done { // Check if the operation is done
+				if op.Error != nil {
+					if i < 2 {
+						term.Infof("Failed to enable services operation, will retry in 5s: %v\n", op.Error)
+						pkg.SleepWithContext(ctx, 5*time.Second)
+						break
+					}
+					return fmt.Errorf("error in operation: %v", op.Error)
+				}
+				return nil
 			}
-			return nil
+			pkg.SleepWithContext(ctx, 3*time.Second)
 		}
-		pkg.SleepWithContext(ctx, 3*time.Second)
 	}
+	return errors.New("failed to enable services after 3 attempts") // This should never be reached
 }

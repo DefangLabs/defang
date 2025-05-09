@@ -51,3 +51,39 @@ func (gcp Gcp) GetDNSZone(ctx context.Context, name string) (*dns.ManagedZone, e
 
 	return zone, nil
 }
+
+func (gcp Gcp) DeleteDNSZone(ctx context.Context, name string) error {
+	dnsSvc, err := dns.NewService(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create DNS service: %w", err)
+	}
+
+	zoneSvc := dns.NewManagedZonesService(dnsSvc)
+	zone, err := zoneSvc.Get(gcp.ProjectId, name).Do()
+	if err != nil {
+		return fmt.Errorf("failed to get DNS zone service: %w", err)
+	}
+
+	rrsIterator := dnsSvc.ResourceRecordSets.List(gcp.ProjectId, name).Pages(ctx, func(page *dns.ResourceRecordSetsListResponse) error {
+		for _, rrs := range page.Rrsets {
+			if (rrs.Type == "NS" || rrs.Type == "SOA") && rrs.Name == zone.DnsName {
+				continue // Skip NS and SOA records for the zone itself
+			}
+			_, err := dnsSvc.ResourceRecordSets.Delete(gcp.ProjectId, name, rrs.Name, rrs.Type).Do()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err := rrsIterator; err != nil {
+		return fmt.Errorf("failed to delete DNS zone records: %w", err)
+	}
+
+	err = dnsSvc.ManagedZones.Delete(gcp.ProjectId, name).Do()
+	if err != nil {
+		return fmt.Errorf("failed to delete DNS zone: %w", err)
+	}
+	return nil
+}
