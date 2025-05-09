@@ -34,12 +34,8 @@ func SplitTenantHost(cluster string) (types.TenantName, string) {
 	return tenant, cluster
 }
 
-func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
-	var tenantName types.TenantName
-	tenant, host := SplitTenantHost(cluster)
-	if tenant != types.DEFAULT_TENANT {
-		tenantName = tenant
-	}
+func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+	tenantName, host := SplitTenantHost(cluster)
 	accessToken := GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantName, "for cluster", host)
 	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
@@ -54,7 +50,25 @@ func NewGrpcClient(ctx context.Context, cluster string) client.GrpcClient {
 		}
 		grpcClient.TenantName = types.TenantName(resp.Tenant)
 	}
-	return grpcClient
+	return grpcClient, err
+}
+
+func IsNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	lastColon := strings.LastIndexByte(errStr, ':')
+	switch errStr[lastColon+1:] { // +1 to skip the colon and handle the case where there is no colon
+	case " connection refused",
+		" i/o timeout",
+		" network is unreachable",
+		" no such host",
+		" unexpected EOF",
+		" device or resource busy":
+		return true
+	}
+	return false
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {

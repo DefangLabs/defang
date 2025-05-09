@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -36,27 +37,27 @@ func GetExistingToken(fabric string) string {
 	return accessToken
 }
 
-type GitHubAuth interface {
-	login(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) (string, error)
+type Prompt = auth.Prompt
+
+type AuthService interface {
+	login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
 }
 
-type GitHubAuthService struct{}
+type OpenAuthService struct{}
 
-func (g GitHubAuthService) login(
-	ctx context.Context, client client.FabricClient, gitHubClientId, fabric string,
-) (string, error) {
+func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error) {
 	term.Debug("Logging in to", fabric)
 
-	code, err := github.StartAuthCodeFlow(ctx, gitHubClientId)
+	code, err := auth.StartAuthCodeFlow(ctx, prompt)
 	if err != nil {
 		return "", err
 	}
 
 	tenant, _ := SplitTenantHost(fabric)
-	return exchangeCodeForToken(ctx, client, code, tenant, 0) // no scopes = unrestricted
+	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
 
-var githubAuthService GitHubAuth = GitHubAuthService{}
+var authService AuthService = OpenAuthService{}
 
 func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
@@ -68,8 +69,16 @@ func saveAccessToken(fabric, at string) error {
 	return nil
 }
 
-func InteractiveLogin(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) error {
-	at, err := githubAuthService.login(ctx, client, gitHubClientId, fabric)
+func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
+	return interactiveLogin(ctx, client, fabric, false)
+}
+
+func InteractiveLoginPrompt(ctx context.Context, client client.FabricClient, fabric string) error {
+	return interactiveLogin(ctx, client, fabric, true)
+}
+
+func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
+	at, err := authService.login(ctx, client, fabric, prompt)
 	if err != nil {
 		return err
 	}

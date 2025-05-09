@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/muesli/termenv"
@@ -15,11 +16,12 @@ type Term struct {
 	stdin          FileReader
 	stdout, stderr io.Writer
 	out, err       *termenv.Output
-	hadWarnings    bool
 	debug          bool
 
 	isTerminal bool
 	hasDarkBg  bool
+
+	warnings []string
 }
 
 var DefaultTerm = NewTerm(os.Stdin, os.Stdout, os.Stderr)
@@ -33,6 +35,7 @@ const (
 	WarnColor  = termenv.ANSIYellow      // not bright to improve readability on light backgrounds
 	DebugColor = termenv.ANSIBrightBlack // Gray
 
+	boldColorStr  = termenv.CSI + termenv.BoldSeq + "m"
 	resetColorStr = termenv.CSI + termenv.ResetSeq + "m"
 )
 
@@ -94,11 +97,7 @@ func (t *Term) IsTerminal() bool {
 }
 
 func (t *Term) HadWarnings() bool {
-	return t.hadWarnings
-}
-
-func (t *Term) SetHadWarnings(had bool) {
-	t.hadWarnings = had
+	return len(t.warnings) > 0
 }
 
 func (t *Term) StdoutCanColor() bool {
@@ -136,7 +135,7 @@ func output(w *termenv.Output, c Color, msg string) (int, error) {
 	}
 	var buf strings.Builder
 	if doColor(w) {
-		fprintc(&buf, doColor(w), c, msg)
+		fprintc(&buf, true, c, msg)
 		msg = buf.String() // this uses the buffer to avoid allocation, so make sure buf is not garbage collected
 	}
 	return w.WriteString(msg)
@@ -218,13 +217,15 @@ func (t *Term) Infof(format string, v ...any) (int, error) {
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
-	t.hadWarnings = true
-	return output(t.out, WarnColor, ensurePrefix(fmt.Sprintln(v...), " ! "))
+	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
+	t.warnings = append(t.warnings, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
-	t.hadWarnings = true
-	return output(t.out, WarnColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! ")))
+	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
+	t.warnings = append(t.warnings, msg)
+	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
@@ -236,14 +237,42 @@ func (t *Term) Errorf(format string, v ...any) (int, error) {
 	return output(t.err, ErrorColor, line)
 }
 
+// Deprecated: use proper error handling instead
 func (t *Term) Fatal(msg any) {
 	Error("Error:", msg)
 	os.Exit(1)
 }
 
+// Deprecated: use proper error handling instead
 func (t *Term) Fatalf(format string, v ...any) {
 	Errorf("Error: "+format, v...)
 	os.Exit(1)
+}
+
+func (t *Term) getAllWarnings() []string {
+	slices.Sort(t.warnings)
+	return slices.Compact(t.warnings)
+}
+
+func (t *Term) FlushWarnings() (int, error) {
+	uniqueWarnings := t.getAllWarnings()
+	t.ResetWarnings()
+	bytesWritten := 0
+
+	// unique warnings only
+	for _, w := range uniqueWarnings {
+		bytes, err := output(t.out, WarnColor, w)
+		bytesWritten += bytes
+		if err != nil {
+			return bytesWritten, err
+		}
+	}
+
+	return bytesWritten, nil
+}
+
+func (t *Term) ResetWarnings() {
+	t.warnings = nil
 }
 
 func Print(v ...any) (int, error) {
@@ -294,12 +323,22 @@ func Errorf(format string, v ...any) (int, error) {
 	return DefaultTerm.Errorf(format, v...)
 }
 
+// Deprecated: use proper error handling instead
 func Fatal(msg any) {
 	DefaultTerm.Fatal(msg)
 }
 
+// Deprecated: use proper error handling instead
 func Fatalf(format string, v ...any) {
 	DefaultTerm.Fatalf(format, v...)
+}
+
+func FlushWarnings() (int, error) {
+	return DefaultTerm.FlushWarnings()
+}
+
+func ResetWarnings() {
+	DefaultTerm.ResetWarnings()
 }
 
 func ForceColor(color bool) {
@@ -324,10 +363,6 @@ func IsTerminal() bool {
 
 func HadWarnings() bool {
 	return DefaultTerm.HadWarnings()
-}
-
-func SetHadWarnings(had bool) {
-	DefaultTerm.SetHadWarnings(had)
 }
 
 func StdoutCanColor() bool {

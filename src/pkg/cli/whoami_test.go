@@ -19,10 +19,10 @@ type grpcWhoamiMockHandler struct {
 
 func (g *grpcWhoamiMockHandler) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
 	return connect.NewResponse(&defangv1.WhoAmIResponse{
-		Tenant:  "tenant-1",
-		Account: "playground",
-		Region:  "us-test-2",
-		Tier:    defangv1.SubscriptionTier_PRO,
+		Tenant:            "tenant-1",
+		ProviderAccountId: "playground",
+		Region:            "us-test-2",
+		Tier:              defangv1.SubscriptionTier_PRO,
 	}), nil
 }
 
@@ -35,7 +35,7 @@ func TestWhoami(t *testing.T) {
 
 	ctx := context.Background()
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient := NewGrpcClient(ctx, url)
+	grpcClient, _ := Connect(ctx, url)
 	client := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	got, err := Whoami(ctx, grpcClient, &client)

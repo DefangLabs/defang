@@ -7,13 +7,13 @@ buildGoModule {
   pname = "defang-cli";
   version = "git";
   src = ../../src;
-  vendorHash = "sha256-Q2dwaHlxzbJBMTuIKiLmJNdT0LfoHgmTOHprFTK3BTc=";
+  vendorHash = "sha256-bWqMeT8EeO7wv0mXu/x2BLgn0YWnVbAIVbUdRijMHN4="; # TODO: use fetchFromGitHub
 
   subPackages = [ "cmd/cli" ];
 
   nativeBuildInputs = [ installShellFiles ];
 
-  CGO_ENABLED = 0;
+  env.CGO_ENABLED = 0;
   ldflags = [
     "-s"
     "-w"
@@ -29,7 +29,7 @@ buildGoModule {
   '';
 
   meta = with lib; {
-    description = "Command-line interface for the Defang Opinionated Platform";
+    description = "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes";
     homepage = "https://defang.io/";
     license = licenses.mit;
     maintainers = with maintainers; [ lionello ];

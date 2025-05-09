@@ -13,6 +13,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -23,7 +24,11 @@ type mockGetServicesHandler struct {
 	defangv1connect.UnimplementedFabricControllerHandler
 }
 
-func (g *mockGetServicesHandler) GetServices(ctx context.Context, req *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
+func (mockGetServicesHandler) WhoAmI(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[defangv1.WhoAmIResponse], error) {
+	return connect.NewResponse(&defangv1.WhoAmIResponse{}), nil
+}
+
+func (mockGetServicesHandler) GetServices(ctx context.Context, req *connect.Request[defangv1.GetServicesRequest]) (*connect.Response[defangv1.GetServicesResponse], error) {
 	project := req.Msg.Project
 	var services []*defangv1.ServiceInfo
 
@@ -59,12 +64,10 @@ func TestGetServices(t *testing.T) {
 	fabricServer := &mockGetServicesHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)
 	server := httptest.NewServer(handler)
-	t.Cleanup(func() {
-		server.Close()
-	})
+	t.Cleanup(server.Close)
 
 	url := strings.TrimPrefix(server.URL, "http://")
-	grpcClient := NewGrpcClient(ctx, url)
+	grpcClient, _ := Connect(ctx, url)
 	provider := cliClient.PlaygroundProvider{FabricClient: grpcClient}
 
 	t.Run("no services", func(t *testing.T) {
@@ -82,7 +85,7 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		expectedOutput := `Service  Deployment  PublicFqdn                 PrivateFqdn  Status
+		expectedOutput := "\x1b[1m\nService  Deployment  PublicFqdn                 PrivateFqdn  Status   \x1b[0m" + `
 foo      a1b2c3      test-foo.prod1.defang.dev               UNKNOWN
 `
 

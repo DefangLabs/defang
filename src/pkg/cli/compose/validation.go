@@ -304,8 +304,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
 		// Ensure the image is a valid Redis image
-		repo := strings.SplitN(svccfg.Image, ":", 2)[0]
-		if !strings.HasSuffix(repo, "redis") {
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
 		if err = ValidateManagedStore(redisExtension); err != nil {
@@ -315,8 +315,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
 		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
-		repo := strings.SplitN(svccfg.Image, ":", 2)[0]
-		if !strings.HasSuffix(repo, "postgres") {
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if err = ValidateManagedStore(postgresExtension); err != nil {
@@ -326,7 +326,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres":
+		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)

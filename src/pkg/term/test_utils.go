@@ -12,10 +12,10 @@ func SetupTestTerm(t *testing.T) (*bytes.Buffer, *bytes.Buffer) {
 	var stdout, stderr bytes.Buffer
 	testTerm := NewTerm(os.Stdin, &stdout, &stderr)
 	testTerm.ForceColor(true)
-	defaultTerm := DefaultTerm
+	oldTerm := DefaultTerm
 	DefaultTerm = testTerm
 	t.Cleanup(func() {
-		DefaultTerm = defaultTerm
+		DefaultTerm = oldTerm
 	})
 
 	return &stdout, &stderr

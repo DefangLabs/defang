@@ -40,19 +40,17 @@ func TestGetExistingToken(t *testing.T) {
 	})
 }
 
-type MockGitHubAuthService struct {
-	GitHubAuthService
-	MockLogin func(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) (string, error)
+type mockGitHubAuthService struct {
+	accessToken string
+	err         error
 }
 
-func (g MockGitHubAuthService) login(
-	ctx context.Context, client client.FabricClient, gitHubClientId, fabric string,
-) (string, error) {
-	return g.MockLogin(ctx, client, gitHubClientId, fabric)
+func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error) {
+	return g.accessToken, g.err
 }
 
 func TestInteractiveLogin(t *testing.T) {
-	tempGithubAuthService := githubAuthService
+	tempGithubAuthService := authService
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
 	// use a temp dir for the token file
@@ -60,22 +58,16 @@ func TestInteractiveLogin(t *testing.T) {
 	client.StateDir = filepath.Join(t.TempDir(), "defang")
 
 	t.Cleanup(func() {
-		githubAuthService = tempGithubAuthService
+		authService = tempGithubAuthService
 		client.StateDir = tempStateDir
 	})
 
 	tokenFile := getTokenFile(fabric)
 
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
-		githubAuthService = MockGitHubAuthService{
-			MockLogin: func(
-				ctx context.Context, client client.FabricClient, gitHubClientId, fabric string,
-			) (string, error) {
-				return accessToken, nil
-			},
-		}
+		authService = mockGitHubAuthService{accessToken: accessToken}
 
-		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, "github-client-id", fabric)
+		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -89,13 +81,9 @@ func TestInteractiveLogin(t *testing.T) {
 	})
 
 	t.Run("Expect error when InteractiveLogin fails", func(t *testing.T) {
-		githubAuthService = MockGitHubAuthService{
-			MockLogin: func(ctx context.Context, client client.FabricClient, gitHubClientId, fabric string) (string, error) {
-				return "", errors.New("test-error")
-			},
-		}
+		authService = mockGitHubAuthService{err: errors.New("test-error")}
 
-		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, "github-client-id", fabric)
+		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
 		if err == nil {
 			t.Fatalf("expected no error, got %v", err)
 		}

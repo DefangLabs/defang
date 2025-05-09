@@ -16,6 +16,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
@@ -56,7 +57,12 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			}
 			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantName, b)
 
-			const delegateDomain = "example.com"
+			delegateDomain := "example.com"
+			projectLabel := dns.SafeLabel(tt.ProjectName)
+			tenantLabel := dns.SafeLabel(string(tt.TenantName))
+			if projectLabel != tenantLabel { // avoid stuttering
+				delegateDomain = projectLabel + "." + delegateDomain
+			}
 
 			endpoint := b.GetEndpoint(tt.Fqn, tt.ProjectName, delegateDomain, tt.Port)
 			if endpoint != tt.EndPoint {

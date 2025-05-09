@@ -5,6 +5,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as tar from "tar";
 import { promisify } from "util";
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // regex to match semantic version (from semver.org)
 const SEMVER_REGEX =
@@ -18,7 +23,7 @@ const HTTP_STATUS_OK = 200;
 const exec = promisify(child_process.exec);
 async function getLatestVersion(): Promise<string> {
   const response = await axios.get(URL_LATEST_RELEASE);
-  if (response?.status !== HTTP_STATUS_OK) {
+  if (response.status !== HTTP_STATUS_OK) {
     throw new Error(
       `Failed to get latest version from GitHub. Status code: ${response.status}`
     );
@@ -49,7 +54,7 @@ async function downloadFile(
       },
     });
 
-    if (response?.data === undefined) {
+    if (response.data == null) {
       throw new Error(
         `Failed to download ${downloadUrl}. No data in response.`
       );
@@ -95,8 +100,13 @@ async function extractZip(
 ): Promise<boolean> {
   try {
     const zip = new AdmZip(zipPath);
-    const result = zip.extractEntryTo(EXECUTABLE, outputPath, true, true);
-    await fs.promises.chmod(path.join(outputPath, EXECUTABLE), 755);
+    let extension = "";
+    if (["win32", "cygwin"].includes(process.platform)) {
+      extension = ".exe";
+    }
+    const executableFullName = EXECUTABLE + extension;
+    const result = zip.extractEntryTo(executableFullName, outputPath, true, true);
+    await fs.promises.chmod(path.join(outputPath, executableFullName), 755);
     return result;
   } catch (error) {
     console.error(`An error occurred during zip extraction: ${error}`);
@@ -178,7 +188,7 @@ function getPathToExecutable(): string | null {
 
   const executablePath = path.join(__dirname, `${EXECUTABLE}${extension}`);
   try {
-    return require.resolve(executablePath);
+    return fs.existsSync(executablePath) ? executablePath : null;
   } catch (e) {
     return null;
   }
@@ -194,18 +204,19 @@ function extractCLIVersions(versionInfo: string): {
   // Latest CLI:    v0.5.24
   // Defang Fabric: v0.5.0-643-abcdef012
   //
+  const regex = /^([A-Za-z ]+):\s*v?(\d+\.\d+\.\d+(?:-[\w.-]+)?)$/gm;
+  const versions: any = {
+    defangCLI: null,
+    latestCLI: null,
+  };
 
-  const versionRegex = /\d+\.\d+\.\d+/g;
-  const matches = versionInfo.match(versionRegex);
-
-  if (matches != null && matches.length >= 2) {
-    return {
-      defangCLI: matches[0],
-      latestCLI: matches[1],
-    };
-  } else {
-    throw new Error("Could not extract CLI versions from the output.");
+  for (const [, label, version] of versionInfo.matchAll(regex)) {
+    const key = label.trim().toLowerCase();
+    if (key === "defang cli") versions.defangCLI = version;
+    else if (key === "latest cli") versions.latestCLI = version;
   }
+
+  return versions;
 }
 
 export type VersionInfo = {
@@ -226,11 +237,15 @@ async function getVersionInfo(): Promise<VersionInfo> {
     }
 
     // Exec output contains both stderr and stdout outputs
-    const versionInfo = await exec(execPath + " version");
+    const versionInfo = await exec(quoteIfNeeded(execPath) + " version");
 
     const verInfo = extractCLIVersions(versionInfo.stdout);
     result.current = verInfo.defangCLI;
     result.latest = verInfo.latestCLI;
+
+    verInfo.defangCLI ?? console.warn("Defang CLI version not found");
+    verInfo.latestCLI ?? console.warn("Latest CLI version not found");
+
   } catch (error) {
     console.error(error);
   }
@@ -313,6 +328,10 @@ export async function install(
   }
 }
 
+function quoteIfNeeded(p: string): string {
+  return /\s/.test(p) ? `"${p}"` : p;
+}
+
 // js wrapper to use by npx or npm exec, this will call the defang binary with
 // the arguments passed to the npx line. NPM installer will create a symlink
 // in the user PATH to the cli.js to execute. The symlink will name the same as
@@ -341,7 +360,7 @@ export async function run(): Promise<void> {
       throw new Error("Could not find the defang executable.");
     }
 
-    const commandline = ["npx", getEndNameFromPath(pathToExec)]
+    const commandline = ["npx", quoteIfNeeded(getEndNameFromPath(pathToExec))]
       .join(" ")
       .trim();
 

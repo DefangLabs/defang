@@ -1,6 +1,6 @@
-# Defang
+# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-Defang is a radically simpler way for developers to develop, deploy, and debug cloud applications.
+Develop Anything, Deploy Anywhere. Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 - Public releases of the Defang CLI; [click here](https://github.com/DefangLabs/defang/releases/latest/) for the latest version
 - Sample projects in Golang, Python, Node.js, and many more languages and frameworks, that show you how to accomplish various tasks and deploy them to the DOP using a Docker Compose file and the Defang CLI.
@@ -35,3 +35,7 @@ The Defang CLI recognizes the following environment variables:
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 - `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
+
+---
+
+Made by [Defang Labs](https://defang.io)

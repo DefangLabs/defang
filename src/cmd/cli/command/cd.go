@@ -1,27 +1,31 @@
 package command
 
 import (
+	"os"
+
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
-	"github.com/DefangLabs/defang/src/pkg/logs"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
 var cdCmd = &cobra.Command{
 	Use:     "cd",
 	Aliases: []string{"bootstrap"},
+	Args:    cobra.NoArgs,
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		var utc, _ = cmd.Flags().GetBool("utc")
+		var json, _ = cmd.Flags().GetBool("json")
 
 		if utc {
 			cli.EnableUTCMode()
 		}
 
-		return nil
+		if json {
+			os.Setenv("DEFANG_JSON", "1")
+			verbose = true
+		}
 	},
 }
 
@@ -194,16 +198,6 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		resp, project, err := cli.ComposeUp(cmd.Context(), project, client, provider, compose.UploadModePreview, defangv1.DeploymentMode_MODE_UNSPECIFIED)
-		if err != nil {
-			return err
-		}
-
-		tailOptions := cli.TailOptions{
-			Deployment: resp.Etag,
-			Verbose:    verbose,
-			LogType:    logs.LogTypeAll,
-		}
-		return cli.Tail(cmd.Context(), provider, project.Name, tailOptions)
+		return cli.Preview(cmd.Context(), project, client, provider, mode.Value())
 	},
 }

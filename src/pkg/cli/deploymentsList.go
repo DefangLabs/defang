@@ -13,10 +13,12 @@ type PrintDeployment struct {
 	Deployment string
 	Provider   string
 	DeployedAt string
+	Region     string
 }
 
-func DeploymentsList(ctx context.Context, projectName string, client client.GrpcClient) error {
+func DeploymentsList(ctx context.Context, projectName string, client client.FabricClient) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+		Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
 		Project: projectName,
 	})
 	if err != nil {
@@ -34,10 +36,11 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Grpc
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
 			Deployment: d.Id,
-			Provider:   d.Provider,
+			Provider:   d.ProviderString, // TODO: use Provider
 			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
+			Region:     d.Region,
 		}
 	}
 
-	return term.Table(deployments, []string{"Deployment", "Provider", "DeployedAt"})
+	return term.Table(deployments, []string{"Deployment", "Provider", "DeployedAt"}) // TODO: add region
 }

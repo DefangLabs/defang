@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -39,13 +40,13 @@ var P = track.P
 
 // GLOBALS
 var (
-	client         cliClient.GrpcClient
+	client         *cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
 	doDebug        = false
-	gitHubClientId = pkg.Getenv("DEFANG_CLIENT_ID", "7b41848ca116eac4b125") // GitHub OAuth app
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
+	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
@@ -71,7 +72,7 @@ func prettyError(err error) error {
 }
 
 func Execute(ctx context.Context) error {
-	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
+	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
 		defer restore()
 	}
@@ -111,7 +112,7 @@ func Execute(ctx context.Context) error {
 		}
 
 		if cerr := new(cli.CancelError); errors.As(err, &cerr) {
-			printDefangHint("Detached. The process will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
+			printDefangHint("Detached. The deployment will keep running.\nTo continue the logs from where you left off, do:", cerr.Error())
 		}
 
 		code := connect.CodeOf(err)
@@ -121,11 +122,22 @@ func Execute(ctx context.Context) error {
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
 		}
+
+		if cde := new(gcp.ConflictDelegateDomainError); errors.As(err, cde) {
+			hint := fmt.Sprintf("Domain verification is required for the delegated domain %q, as indicated by the Google Cloud API.", cde.NewDomain)
+			if cde.ConflictDomain != "" {
+				hint += fmt.Sprintf(" This is likely due to a legacy tenant-level delegated zone named %v (%v).", cde.ConflictZone, cde.ConflictDomain)
+			} else {
+				hint += " This is likely caused by a conflicting legacy tenant-level delegated DNS zone."
+			}
+			hint += " Please check if this legacy zone is still needed. If not, remove it from your Google Cloud account and try again."
+			printDefangHint(hint)
+		}
 		return ExitCode(code)
 	}
 
 	if hasTty && term.HadWarnings() {
-		fmt.Println("For help with warnings, check our FAQ at https://docs.defang.io/docs/faq")
+		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
 	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
@@ -142,11 +154,13 @@ func Execute(ctx context.Context) error {
 }
 
 func SetupCommands(ctx context.Context, version string) {
+	cobra.EnableTraverseRunHooks = true // we always need to run the RootCmd's pre-run hook
+
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -160,11 +174,12 @@ func SetupCommands(ctx context.Context, version string) {
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
 
 	// Create a temporary gRPC client for tracking events before login
-	_ = cli.NewGrpcClient(ctx, cluster)
+	cli.Connect(ctx, cluster)
 
 	// CD command
 	RootCmd.AddCommand(cdCmd)
-	cdCmd.Flags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
+	cdCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "show logs in JSON format")
 	cdCmd.PersistentFlags().StringVar(&byoc.DefangPulumiBackend, "pulumi-backend", "", `specify an alternate Pulumi backend URL or "pulumi-cloud"`)
 	cdCmd.AddCommand(cdDestroyCmd)
 	cdCmd.AddCommand(cdDownCmd)
@@ -174,6 +189,7 @@ func SetupCommands(ctx context.Context, version string) {
 	cdListCmd.Flags().Bool("remote", false, "invoke the command on the remote cluster")
 	cdCmd.AddCommand(cdListCmd)
 	cdCmd.AddCommand(cdCancelCmd)
+	cdPreviewCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	cdCmd.AddCommand(cdPreviewCmd)
 
 	// Eula command
@@ -269,6 +285,13 @@ func SetupCommands(ctx context.Context, version string) {
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
+	// MCP Command
+	mcpCmd.AddCommand(mcpSetupCmd)
+	mcpCmd.AddCommand(mcpServerCmd)
+	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
+	mcpSetupCmd.MarkFlagRequired("client")
+	RootCmd.AddCommand(mcpCmd)
+
 	// Send Command
 	sendCmd.Flags().StringP("subject", "n", "", "subject to send the message to (required)")
 	sendCmd.Flags().StringP("type", "t", "", "type of message to send (required)")
@@ -303,7 +326,7 @@ var RootCmd = &cobra.Command{
 	SilenceErrors: true,
 	Use:           "defang",
 	Args:          cobra.NoArgs,
-	Short:         "Defang CLI is used to develop, deploy, and debug your cloud services",
+	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		term.SetDebug(doDebug)
 
@@ -332,7 +355,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client = cli.NewGrpcClient(cmd.Context(), getCluster())
+		client, err = cli.Connect(cmd.Context(), getCluster())
+		if cli.IsNetworkError(err) {
+			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
+		}
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -341,10 +367,6 @@ var RootCmd = &cobra.Command{
 				term.Warn("Your CLI version is outdated. Please upgrade to the latest version by running:\n\n  defang upgrade\n")
 				hideUpdate = true // hide the upgrade hint at the end
 			}
-		}
-
-		if isUpgradeCommand(cmd) {
-			hideUpdate = true
 		}
 
 		// Check if we are correctly logged in, but only if the command needs authorization
@@ -360,13 +382,17 @@ var RootCmd = &cobra.Command{
 			if connect.CodeOf(err) == connect.CodeUnauthenticated {
 				term.Debug("Server error:", err)
 				term.Warn("Please log in to continue.")
+				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster()); err != nil {
+				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 					return err
 				}
 
-				client = cli.NewGrpcClient(cmd.Context(), getCluster()) // reconnect with the new token
+				// Reconnect with the new token
+				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
+					return err
+				}
 
 				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
 					return nil // success
@@ -400,7 +426,7 @@ var loginCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, gitHubClientId, getCluster())
+			err := cli.InteractiveLogin(cmd.Context(), client, getCluster())
 			if err != nil {
 				return err
 			}
@@ -628,11 +654,11 @@ var generateCmd = &cobra.Command{
 
 		term.Info("Code generated successfully in folder", prompt.Folder)
 
-		cmdd := exec.Command("code", prompt.Folder)
+		editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
+		cmdd := exec.Command(editor, prompt.Folder)
 		err = cmdd.Start()
 		if err != nil {
-			term.Debug("unable to launch VS Code:", err)
-			// TODO: should we use EDITOR env var instead?
+			term.Debugf("unable to launch editor %q: %v", editor, err)
 		}
 
 		cd := ""
@@ -954,15 +980,27 @@ var deleteCmd = &cobra.Command{
 			Since:      since,
 			Verbose:    verbose,
 		}
-		return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
+		return cli.Tail(tailCtx, provider, projectName, tailOptions)
 	},
 }
 
+// deploymentsCmd and deploymentsListCmd do the same thing. deploymentsListCmd is for backward compatibility.
 var deploymentsCmd = &cobra.Command{
 	Use:         "deployments",
-	Short:       "Manage Deployments",
-	Aliases:     []string{"deployment", "deploys", "deploy", "deps", "dep"},
+	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
+	Args:        cobra.NoArgs,
+	Short:       "List deployments",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loader := configureLoader(cmd)
+		projectName, err := loader.LoadProjectName(cmd.Context())
+		if err != nil {
+			return err
+		}
+
+		return cli.DeploymentsList(cmd.Context(), projectName, client)
+	},
 }
 
 var deploymentsListCmd = &cobra.Command{
@@ -971,6 +1009,7 @@ var deploymentsListCmd = &cobra.Command{
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
+	Deprecated:  "use 'deployments' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
@@ -1009,14 +1048,8 @@ var tokenCmd = &cobra.Command{
 		var s, _ = cmd.Flags().GetString("scope")
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
-		loader := configureLoader(cmd)
-		_, err := getProvider(cmd.Context(), loader)
-		if err != nil {
-			return err
-		}
-
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, gitHubClientId, types.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, types.DEFAULT_TENANT, expires, scope.Scope(s))
 	},
 }
 
@@ -1066,6 +1099,7 @@ var upgradeCmd = &cobra.Command{
 	Aliases: []string{"update"},
 	Short:   "Upgrade the Defang CLI to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		hideUpdate = true
 		return cli.Upgrade(cmd.Context())
 	},
 }

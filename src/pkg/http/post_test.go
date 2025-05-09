@@ -7,7 +7,7 @@ import (
 )
 
 func TestPostForValues(t *testing.T) {
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return an error to test the error handling on /error
 		if r.URL.Path == "/error" {
 			http.Error(w, "error", http.StatusNotFound) // not retried
@@ -20,10 +20,10 @@ func TestPostForValues(t *testing.T) {
 		}
 		w.Write([]byte("foo=bar&baz=qux"))
 	}))
-	t.Cleanup(s.Close)
+	t.Cleanup(server.Close)
 
 	t.Run("success", func(t *testing.T) {
-		values, err := PostForValues(s.URL, "application/text", nil)
+		values, err := PostForValues(server.URL, "application/text", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestPostForValues(t *testing.T) {
 	})
 
 	t.Run("redirect", func(t *testing.T) {
-		values, err := PostForValues(s.URL+"/redirect", "application/text", nil)
+		values, err := PostForValues(server.URL+"/redirect", "application/text", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,7 +43,7 @@ func TestPostForValues(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		_, err := PostForValues(s.URL+"/error", "application/text", nil)
+		_, err := PostForValues(server.URL+"/error", "application/text", nil)
 		if err == nil {
 			t.Fatal("expected an error")
 		}

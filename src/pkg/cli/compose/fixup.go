@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -11,9 +12,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
 )
-
-// HACK: Use magic network name "public" to determine if the service is public
-const NetworkPublic = "public"
 
 func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
@@ -31,7 +29,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Ports[i] = port
 		}
 	}
-	svcNameReplacer := NewServiceNameReplacer(provider, project.Services)
+	svcNameReplacer := NewServiceNameReplacer(provider, project)
 
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
@@ -156,12 +154,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
-		_, llm := svccfg.Extensions["x-defang-llm"]
-		if llm {
-			if _, ok := provider.(*client.PlaygroundProvider); ok {
-				term.Warnf("service %q: managed LLM is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-				delete(svccfg.Extensions, "x-defang-llm")
-			} else {
+		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
+			image := getImageRepo(svccfg.Image)
+			if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
 				// HACK: we must have at least one host port to get a CNAME for the service
 				var port uint32 = 80
 				term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
@@ -173,9 +168,22 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 		}
 
+		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
+		if scaling {
+			if _, ok := provider.(*client.PlaygroundProvider); ok {
+				term.Warnf("service %q: auto-scaling is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+			}
+		}
+
 		// update the concrete service with the fixed up object
 		project.Services[svccfg.Name] = svccfg
 	}
 
 	return nil
+}
+
+func getImageRepo(imageRepo string) string {
+	image := strings.ToLower(imageRepo)
+	image, _, _ = strings.Cut(image, ":")
+	return image
 }

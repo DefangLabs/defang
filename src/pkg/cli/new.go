@@ -76,7 +76,7 @@ func copyFromSamples(ctx context.Context, dir string, names []string, skipExisti
 	}
 	defer tarball.Close()
 	tarReader := tar.NewReader(tarball)
-	term.Info("Writing files to disk...")
+	term.Info("Copying files to disk...")
 
 	sampleFound := false
 

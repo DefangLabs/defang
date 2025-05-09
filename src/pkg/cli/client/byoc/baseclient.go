@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -92,7 +93,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
-	return DnsSafeLabel(name) // TODO: consider merging this with getPrivateFqdn
+	return dns.SafeLabel(name) // TODO: consider merging this with getPrivateFqdn
 }
 
 func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) {
@@ -120,13 +121,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	if projectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := DnsSafeLabel(projectName)
-	var domain string
-	if projectLabel == DnsSafeLabel(b.TenantName) {
-		domain = DnsSafe(zone) // the zone will already have the tenant ID
-	} else {
-		domain = projectLabel + "." + DnsSafe(zone)
-	}
+	domain := dns.Normalize(zone)
 	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
 		domain = DnsSafeLabel(hasStack.GetStackName()) + "." + domain
 	}
@@ -247,7 +242,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)
 	}
-	if hasHost {
+	if hasHost { // TODO: this should be network based instead of host vs ingress
 		si.PrivateFqdn = b.GetPrivateFqdn(projectName, fqn)
 	}
 
@@ -289,7 +284,7 @@ func (b *ByocBaseClient) GetEndpoint(fqn string, projectName, delegateDomain str
 	if projectDomain == "" {
 		return ":443" // placeholder for the public ALB/distribution
 	}
-	safeFqn := DnsSafeLabel(fqn)
+	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s--%d.%s", safeFqn, port.Target, projectDomain)
 }
 
@@ -298,12 +293,12 @@ func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) 
 	if projectName == "" {
 		return "" //b.fqdn
 	}
-	safeFqn := DnsSafeLabel(fqn)
+	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, b.GetProjectDomain(projectName, delegateDomain))
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
-	safeFqn := DnsSafeLabel(fqn)
+	safeFqn := dns.SafeLabel(fqn)
 	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
 }

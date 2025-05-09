@@ -190,8 +190,8 @@ type FabricControllerClient interface {
 	ListDeployments(context.Context, *connect_go.Request[v1.ListDeploymentsRequest]) (*connect_go.Response[v1.ListDeploymentsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
-	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
-	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
+	DeleteSubdomainZone(context.Context, *connect_go.Request[v1.DeleteSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetDelegateSubdomainZone(context.Context, *connect_go.Request[v1.GetDelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	SetOptions(context.Context, *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -377,12 +377,13 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerDelegateSubdomainZoneProcedure,
 			opts...,
 		),
-		deleteSubdomainZone: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
+		deleteSubdomainZone: connect_go.NewClient[v1.DeleteSubdomainZoneRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerDeleteSubdomainZoneProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
-		getDelegateSubdomainZone: connect_go.NewClient[emptypb.Empty, v1.DelegateSubdomainZoneResponse](
+		getDelegateSubdomainZone: connect_go.NewClient[v1.GetDelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse](
 			httpClient,
 			baseURL+FabricControllerGetDelegateSubdomainZoneProcedure,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
@@ -470,8 +471,8 @@ type fabricControllerClient struct {
 	listDeployments          *connect_go.Client[v1.ListDeploymentsRequest, v1.ListDeploymentsResponse]
 	createUploadURL          *connect_go.Client[v1.UploadURLRequest, v1.UploadURLResponse]
 	delegateSubdomainZone    *connect_go.Client[v1.DelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
-	deleteSubdomainZone      *connect_go.Client[emptypb.Empty, emptypb.Empty]
-	getDelegateSubdomainZone *connect_go.Client[emptypb.Empty, v1.DelegateSubdomainZoneResponse]
+	deleteSubdomainZone      *connect_go.Client[v1.DeleteSubdomainZoneRequest, emptypb.Empty]
+	getDelegateSubdomainZone *connect_go.Client[v1.GetDelegateSubdomainZoneRequest, v1.DelegateSubdomainZoneResponse]
 	setOptions               *connect_go.Client[v1.SetOptionsRequest, emptypb.Empty]
 	whoAmI                   *connect_go.Client[emptypb.Empty, v1.WhoAmIResponse]
 	track                    *connect_go.Client[v1.TrackRequest, emptypb.Empty]
@@ -645,12 +646,12 @@ func (c *fabricControllerClient) DelegateSubdomainZone(ctx context.Context, req 
 }
 
 // DeleteSubdomainZone calls io.defang.v1.FabricController.DeleteSubdomainZone.
-func (c *fabricControllerClient) DeleteSubdomainZone(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
+func (c *fabricControllerClient) DeleteSubdomainZone(ctx context.Context, req *connect_go.Request[v1.DeleteSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return c.deleteSubdomainZone.CallUnary(ctx, req)
 }
 
 // GetDelegateSubdomainZone calls io.defang.v1.FabricController.GetDelegateSubdomainZone.
-func (c *fabricControllerClient) GetDelegateSubdomainZone(ctx context.Context, req *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
+func (c *fabricControllerClient) GetDelegateSubdomainZone(ctx context.Context, req *connect_go.Request[v1.GetDelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
 	return c.getDelegateSubdomainZone.CallUnary(ctx, req)
 }
 
@@ -735,8 +736,8 @@ type FabricControllerHandler interface {
 	ListDeployments(context.Context, *connect_go.Request[v1.ListDeploymentsRequest]) (*connect_go.Response[v1.ListDeploymentsResponse], error)
 	CreateUploadURL(context.Context, *connect_go.Request[v1.UploadURLRequest]) (*connect_go.Response[v1.UploadURLResponse], error)
 	DelegateSubdomainZone(context.Context, *connect_go.Request[v1.DelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
-	DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error)
-	GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
+	DeleteSubdomainZone(context.Context, *connect_go.Request[v1.DeleteSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error)
+	GetDelegateSubdomainZone(context.Context, *connect_go.Request[v1.GetDelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error)
 	SetOptions(context.Context, *connect_go.Request[v1.SetOptionsRequest]) (*connect_go.Response[emptypb.Empty], error)
 	WhoAmI(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.WhoAmIResponse], error)
 	Track(context.Context, *connect_go.Request[v1.TrackRequest]) (*connect_go.Response[emptypb.Empty], error)
@@ -921,7 +922,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDeleteSubdomainZoneHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteSubdomainZoneProcedure,
 		svc.DeleteSubdomainZone,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerGetDelegateSubdomainZoneHandler := connect_go.NewUnaryHandler(
 		FabricControllerGetDelegateSubdomainZoneProcedure,
@@ -1187,11 +1189,11 @@ func (UnimplementedFabricControllerHandler) DelegateSubdomainZone(context.Contex
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DelegateSubdomainZone is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) DeleteSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[emptypb.Empty], error) {
+func (UnimplementedFabricControllerHandler) DeleteSubdomainZone(context.Context, *connect_go.Request[v1.DeleteSubdomainZoneRequest]) (*connect_go.Response[emptypb.Empty], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.DeleteSubdomainZone is not implemented"))
 }
 
-func (UnimplementedFabricControllerHandler) GetDelegateSubdomainZone(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
+func (UnimplementedFabricControllerHandler) GetDelegateSubdomainZone(context.Context, *connect_go.Request[v1.GetDelegateSubdomainZoneRequest]) (*connect_go.Response[v1.DelegateSubdomainZoneResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GetDelegateSubdomainZone is not implemented"))
 }
 
