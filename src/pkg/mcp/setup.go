@@ -71,72 +71,68 @@ func IsValidClient(client string) bool {
 	return slices.Contains(ValidClients, client)
 }
 
+func getConfigHome(homeDir string) string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return xdg
+	}
+	return filepath.Join(homeDir, ".config")
+}
+
+func getAppData(homeDir string) string {
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		return appData
+	}
+	return filepath.Join(homeDir, "AppData", "Roaming")
+}
+
+// For testing purposes, this can be overridden
+var currentOS = runtime.GOOS
+
+// getPlatformPath returns the appropriate file path for a specific client based on the operating system
+func getPlatformPath(homeDir, clientDir string) string {
+	var fileName string
+	if clientDir == "Code" || clientDir == "Code - Insiders" {
+		fileName = filepath.Join(clientDir, "User", "settings.json")
+	} else {
+		fileName = filepath.Join("Claude", "claude_desktop_config.json")
+	}
+
+	fmt.Println("Current OS in function:", currentOS)
+
+	switch currentOS {
+	case "darwin":
+		return filepath.Join(homeDir, "Library", "Application Support", fileName)
+	case "windows":
+		return filepath.Join(getAppData(homeDir), fileName)
+	default:
+		return filepath.Join(getConfigHome(homeDir), fileName)
+	}
+}
+
 // getClientConfigPath returns the path to the config file for the given client
-func getClientConfigPath(client string) (string, error) {
+var getClientConfigPath = func(client string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	var configPath string
-	switch strings.ToLower(client) {
-	case "windsurf", "cascade", "codeium":
-		configPath = filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json")
-	case "claude":
-		if runtime.GOOS == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-		} else if runtime.GOOS == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Claude", "claude_desktop_config.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Claude", "claude_desktop_config.json")
-		}
+	fmt.Println("Home directory function:", homeDir)
+
+	clientKey := strings.ToLower(client)
+	switch clientKey {
 	case "cursor":
-		configPath = filepath.Join(homeDir, ".cursor", "mcp.json")
+		return filepath.Join(homeDir, ".cursor", "mcp.json"), nil
+	case "windsurf", "codeium":
+		return filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"), nil
+	case "claude":
+		return getPlatformPath(homeDir, "Claude"), nil
 	case "vscode", "code":
-		if runtime.GOOS == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
-		} else if runtime.GOOS == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Code", "User", "settings.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Code/User/settings.json")
-		}
+		return getPlatformPath(homeDir, "Code"), nil
 	case "vscode-insiders", "insiders":
-		if runtime.GOOS == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
-		} else if runtime.GOOS == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Code - Insiders", "User", "settings.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Code - Insiders/User/settings.json")
-		}
+		return getPlatformPath(homeDir, "Code - Insiders"), nil
 	default:
 		return "", fmt.Errorf("unsupported client: %s", client)
 	}
-
-	return configPath, nil
 }
 
 // getDefangMCPConfig returns the default MCP config for Defang
@@ -181,8 +177,7 @@ func handleVSCodeConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			// If we can't parse it, start fresh
-			existingData = make(map[string]interface{})
+			return fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 
 		// Check if mcp section exists
@@ -258,13 +253,24 @@ func SetupClient(client string) error {
 
 	term.Infof("Updating %q\n", configPath)
 
-	// Create the directory if it doesn't exist
+	// Get the directory path
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+	// Check if the directory exists, which proves that the IDE client is installed
+	// If the directory doesn't exist, we assume the client is not installed
+	// and we return an error
+	info, err := os.Stat(configDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("the client %s you are trying to setup is not install or not found in your system path. Please try again after installing.", client)
+		}
+		return fmt.Errorf("failed to check config directory: %w", err)
 	}
 
-	// Handle VSCode settings.json specially
+	if !info.IsDir() {
+		return fmt.Errorf("the config path %s exists but is not a directory. Please try again after installing or update the client %s to support mcp", configDir, client)
+	}
+
+	// Handle VSCode case
 	if slices.Contains(ValidVSCodeClients, client) {
 		if err := handleVSCodeConfig(configPath); err != nil {
 			return err
@@ -273,14 +279,18 @@ func SetupClient(client string) error {
 		// For all other clients, use the standard format
 		var config MCPConfig
 
-		// Check if the file exists
-		if _, err := os.Stat(configPath); err == nil {
-			// File exists, read it
-			data, err := os.ReadFile(configPath)
-			if err != nil {
+		// Read the file, handle if it doesn't exist
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// File doesn't exist, create a new config
+				config = MCPConfig{
+					MCPServers: make(map[string]MCPServerConfig),
+				}
+			} else {
 				return fmt.Errorf("failed to read config file: %w", err)
 			}
-
+		} else {
 			// Parse the JSON
 			if err := json.Unmarshal(data, &config); err != nil {
 				// If we can't parse it, start fresh
@@ -288,11 +298,10 @@ func SetupClient(client string) error {
 					MCPServers: make(map[string]MCPServerConfig),
 				}
 			}
-		} else {
-			// File doesn't exist, create a new config
-			config = MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
-			}
+		}
+
+		if config.MCPServers == nil {
+			config.MCPServers = make(map[string]MCPServerConfig)
 		}
 
 		if config.MCPServers == nil {
@@ -303,7 +312,7 @@ func SetupClient(client string) error {
 		config.MCPServers["defang"] = getDefangMCPConfig()
 
 		// Write the config to the file
-		data, err := json.MarshalIndent(config, "", "  ")
+		data, err = json.MarshalIndent(config, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal config: %w", err)
 		}
@@ -311,9 +320,9 @@ func SetupClient(client string) error {
 		if err := os.WriteFile(configPath, data, 0644); err != nil {
 			return fmt.Errorf("failed to write config file: %w", err)
 		}
-	}
 
-	term.Infof("Restart %s for the changes to take effect.\n", client)
+		term.Infof("Restart %s for the changes to take effect.\n", client)
+	}
 
 	return nil
 }
