@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
@@ -21,7 +25,6 @@ var mcpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		//set global nonInteractive to false
 		nonInteractive = false
-		fmt.Println("mcp")
 		return nil
 	},
 }
@@ -31,6 +34,12 @@ var mcpServerCmd = &cobra.Command{
 	Short: "Start defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		authPort, err := cmd.Flags().GetInt("auth-server")
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("auth port: ", authPort)
 
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
@@ -66,6 +75,29 @@ var mcpServerCmd = &cobra.Command{
 
 		// Setup tools
 		tools.SetupTools(s, getCluster())
+
+		if authPort != 0 {
+			term.Info("Starting Auth Server for Docker login flow")
+
+			serverURL := "http://127.0.0.1:" + strconv.Itoa(authPort)
+
+			var openAuthClient = auth.NewClient("defang-cli", pkg.Getenv("DEFANG_ISSUER", "https://auth.defang.io"))
+			// Since we know what out local serverURL is because it pass down by the flag we can get the authorize url early and set it
+			ar, _ := openAuthClient.Authorize(serverURL, auth.CodeResponseType, auth.WithPkce(), auth.WithProvider("github"))
+
+			//code channel
+			ch := make(chan string)
+			go func() {
+				select {
+				case code := <-ch:
+					if err := cli.ExchangeCodeAndSave(cmd.Context(), auth.NewAuthCodeFlow(ar, code), getCluster()); err != nil {
+						term.Error("Failed to exchange auth code for access token", "error", err)
+					}
+					term.Info("Received auth code: ", code)
+				}
+			}()
+			auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, &ch, ar)
+		}
 
 		// Start the server
 		term.Info("Starting Defang Services MCP server")

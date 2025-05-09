@@ -4,6 +4,8 @@ import (
 	"context"
 	"html/template"
 	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,12 +67,66 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
+func NewAuthCodeFlow(ar *AuthorizeResult, code string) AuthCodeFlow {
+	return AuthCodeFlow{
+		code:        code,
+		redirectUri: ar.url.String(),
+		verifier:    ar.verifier,
+	}
+}
+
 type Prompt bool
 
 const (
 	PromptNo  Prompt = false
 	PromptYes Prompt = true
 )
+
+func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, ch *chan string, ar *AuthorizeResult) {
+
+	// We want to make the handler for the auth server
+	authorizeUrl := ar.url.String()
+	term.Debug("Authorization URL:", authorizeUrl)
+	state := ar.state
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, authorizeUrl, http.StatusFound)
+			return
+		}
+		if r.URL.Path != "/auth" {
+			http.NotFound(w, r)
+			return
+		}
+		var msg string
+		query := r.URL.Query()
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+		case query.Get("state") != state:
+			msg = "Authentication error: state mismatch"
+		default:
+			msg = "Authentication successful"
+			*ch <- query.Get("code")
+		}
+		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
+	})
+
+	// set the port and the handler to the server
+	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
+
+	// Start the server in a goroutine that will continue forever
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil {
+			// Log error but continue
+			term.Debugf("HTTP server error: %v", err)
+			// If port is in use, the auth flow will fail with context cancellation
+		}
+	}()
+
+	// We will handle the reader in the caller, which should not block this function since we need it to
+	// run forever
+}
 
 func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -107,27 +163,10 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})
 
-	// Use a fixed port instead of a random one
-	serverURL := "http://127.0.0.1:47071"
-	server := &http.Server{Addr: "0.0.0.0:47071", Handler: handler}
+	server := httptest.NewServer(handler)
+	defer server.Close()
 
-	// Start the server in a goroutine
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			// Log error but continue
-			term.Debugf("HTTP server error: %v", err)
-			// If port is in use, the auth flow will fail with context cancellation
-		}
-	}()
-
-	// Ensure server is closed when we're done
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		server.Shutdown(ctx)
-	}()
-
-	redirectUri := serverURL + "/auth"
+	redirectUri := server.URL + "/auth"
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
 		return AuthCodeFlow{}, err
@@ -137,12 +176,12 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	authorizeUrl = ar.url.String()
 	term.Debug("Authorization URL:", authorizeUrl)
 
-	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", serverURL)
+	n, _ := term.Printf("Please visit %s and log in. (Right click the URL or press ENTER to open browser)\r", server.URL)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if prompt {
-		browser.OpenURL(serverURL)
+		browser.OpenURL(server.URL)
 	}
 
 	input := term.NewNonBlockingStdin()
@@ -157,7 +196,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 			case 3: // Ctrl-C
 				cancel()
 			case 10, 13: // Enter or Return
-				browser.OpenURL(serverURL)
+				browser.OpenURL(server.URL)
 			}
 		}
 	}()
