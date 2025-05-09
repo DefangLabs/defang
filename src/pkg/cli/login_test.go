@@ -49,6 +49,10 @@ func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricCl
 	return g.accessToken, g.err
 }
 
+func (g mockGitHubAuthService) loginDocker(ctx context.Context, fabric string, authPort int) (string, error) {
+	return g.accessToken, g.err
+}
+
 func TestInteractiveLogin(t *testing.T) {
 	tempGithubAuthService := authService
 	accessToken := "test-token"

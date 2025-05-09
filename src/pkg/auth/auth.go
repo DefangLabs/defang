@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,6 +74,62 @@ const (
 	PromptNo  Prompt = false
 	PromptYes Prompt = true
 )
+
+func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
+	// Generate random state
+	var state string
+
+	serverURL := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+
+	// Get the authorization URL before setting up the handler
+	ar, err := openAuthClient.Authorize(serverURL, CodeResponseType, WithPkce(), WithProvider("github"))
+	if err != nil {
+		term.Error("Failed to authorize", "error", err)
+		return err
+	}
+	state = ar.state
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			fmt.Println("Redirecting to", ar.url.String())
+			http.Redirect(w, r, ar.url.String(), http.StatusFound)
+			return
+		}
+		if r.URL.Path != "/auth" {
+			http.NotFound(w, r)
+			return
+		}
+		var msg string
+		query := r.URL.Query()
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+		case query.Get("state") != state:
+			msg = "Authentication error: state mismatch"
+		default:
+			msg = "Authentication successful"
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: serverURL, verifier: ar.verifier}, tenant, 0)
+			if err != nil {
+				msg = "Authentication failed: " + err.Error()
+			}
+			saveToken(token)
+		}
+		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
+	})
+
+	// set the port and the handler to the server
+	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
+
+	// Start the server in a goroutine that will continue forever
+	err = server.ListenAndServe()
+	if err != nil {
+		// Log error but continue
+		term.Debugf("HTTP server error: %v", err)
+		// If port is in use, the auth flow will fail with context cancellation
+	}
+
+	return err
+}
 
 func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
