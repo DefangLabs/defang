@@ -1,0 +1,23 @@
+services:
+  chat:
+    image: my-chat-app
+    # image: alpine
+    # command: "sh -c 'export'"
+    # image: node
+    # command: "node -e 'console.log(process.env)'"
+    # image: python
+    # command: "python -c 'import os; print(os.environ)'"
+    # image: golang
+    # command: ["sh", "-c", "printf 'package main\n\nimport \"fmt\"\nimport \"os\"\nfunc main() {\n\tfmt.Println(os.Environ())\n}' > hello.go && go run hello.go"]
+    # image: curlimages/curl
+    # command: "sh -c 'echo $AI-RUNNER_URL'"
+    # environment:
+    #   - AI_RUNNER_URL=a
+    depends_on:
+      - ai_runner
+
+  ai_runner:
+    provider:
+      type: model
+      options:
+        model: ai/smollm2
