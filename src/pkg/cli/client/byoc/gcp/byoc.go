@@ -23,6 +23,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -116,6 +117,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 
 	term.Infof("Setting up defang CD in GCP project %s, this could take a few minutes", b.driver.ProjectId)
 	// 1. Enable required APIs
+	// TODO: enable minimum APIs needed for bootstrap the cd image, let CD enable the rest of the APIs
 	apis := []string{
 		"storage.googleapis.com",              // Cloud Storage API
 		"artifactregistry.googleapis.com",     // Artifact Registry API
@@ -129,6 +131,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"sqladmin.googleapis.com",             // For Cloud SQL
 		"servicenetworking.googleapis.com",    // For VPC peering
 		"redis.googleapis.com",                // For Redis
+		"certificatemanager.googleapis.com",   // For SSL certs
 		// "config.googleapis.com", // Infrastructure Manager API, for future CD stack
 	}
 	if err := b.driver.EnsureAPIsEnabled(ctx, apis...); err != nil {
@@ -171,6 +174,8 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/compute.instanceAdmin.v1",        // For creating compute instances
 		"roles/cloudsql.admin",                  // For creating cloud sql instances
 		"roles/redis.admin",                     // For creating redis instances/clusters
+		"roles/certificatemanager.owner",        // For creating certificates
+		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
 	}); err != nil {
 		return err
 	}
@@ -511,22 +516,24 @@ func (b *ByocGcp) GetStackName() string {
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
 	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
-	subscribeStream, err := NewSubscribeStream(ctx, b.driver, ignoreCdSuccess)
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
 	if req.Etag == b.cdEtag {
 		subscribeStream.AddJobExecutionUpdate(path.Base(b.cdExecution))
 	}
-	subscribeStream.AddJobStatusUpdate(req.Project, req.Etag, req.Services)
-	subscribeStream.AddServiceStatusUpdate(req.Project, req.Etag, req.Services)
+
+	// TODO: update stack (1st param) to b.PulumiStack
+	subscribeStream.AddJobStatusUpdate("", req.Project, req.Etag, req.Services)
+	subscribeStream.AddServiceStatusUpdate("", req.Project, req.Etag, req.Services)
 	subscribeStream.Start(time.Now())
 	return subscribeStream, nil
 }
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag)
 		if err != nil {
 			return nil, err
 		}
@@ -581,12 +588,14 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 			etag = ""
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeBuild) {
-			logStream.AddJobExecutionLog(execName)                      // CD log when there is an execution name
-			logStream.AddJobLog(req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
-			logStream.AddCloudBuildLog(req.Project, etag, req.Services) // CloudBuild logs
+			logStream.AddJobExecutionLog(execName) // CD log when there is an execution name
+			// TODO: update stack (1st param) to b.PulumiStack
+			logStream.AddJobLog("", req.Project, etag, req.Services)        // Kaniko or CD logs when there is no execution name
+			logStream.AddCloudBuildLog("", req.Project, etag, req.Services) // CloudBuild logs
 		}
 		if logs.LogType(req.LogType).Has(logs.LogTypeRun) {
-			logStream.AddServiceLog(req.Project, etag, req.Services) // Service logs
+			// TODO: update stack (1st param) to b.PulumiStack
+			logStream.AddServiceLog("", req.Project, etag, req.Services) // Service logs
 		}
 		logStream.AddSince(startTime)
 		logStream.AddUntil(endTime)
@@ -628,10 +637,35 @@ func (b *ByocGcp) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (ty
 	return b.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: req.Project, Command: "down"})
 }
 
+type ConflictDelegateDomainError struct {
+	NewDomain      string
+	ConflictDomain string
+	ConflictZone   string
+	Err            error
+}
+
+func (e ConflictDelegateDomainError) Error() string {
+	return e.Err.Error()
+}
+
 func (b *ByocGcp) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {
 	term.Debugf("Preparing domain delegation for %s", req.DelegateDomain)
-	// Ignore preview, always create the zone for the defang stack
-	if zone, err := b.driver.EnsureDNSZoneExists(ctx, "defang", req.DelegateDomain, "defang delegate domain"); err != nil {
+	name := "defang-" + dns.SafeLabel(req.DelegateDomain)
+	if zone, err := b.driver.EnsureDNSZoneExists(ctx, name, req.DelegateDomain, "defang delegate domain"); err != nil {
+		if apiErr := new(googleapi.Error); errors.As(err, &apiErr) {
+			if strings.Contains(apiErr.Message, "Please verify ownership of") ||
+				strings.Contains(apiErr.Message, "may be reserved or registered already") {
+				var cde ConflictDelegateDomainError
+				oldZone, err := b.driver.GetDNSZone(ctx, "defang") // Try if we can find the old defang delegate domain zone
+				if err == nil && oldZone != nil {
+					cde.ConflictDomain = oldZone.DnsName
+					cde.ConflictZone = "defang"
+				}
+				cde.NewDomain = req.DelegateDomain
+				cde.Err = apiErr
+				return nil, cde
+			}
+		}
 		return nil, err
 	} else {
 		b.delegateDomainZone = zone.Name
@@ -709,18 +743,18 @@ func (b *ByocGcp) createDeploymentLogQuery(req *defangv1.DebugRequest) string {
 		query.AddJobExecutionQuery(path.Base(b.cdExecution))
 	}
 
-	// Logs
-	query.AddJobLogQuery(req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
-	query.AddServiceLogQuery(req.Project, req.Etag, req.Services)    // Cloudrun service logs
-	query.AddCloudBuildLogQuery(req.Project, req.Etag, req.Services) // CloudBuild logs
+	// Logs TODO: update stack (1st param) to b.PulumiStack
+	query.AddJobLogQuery("", req.Project, req.Etag, req.Services)        // Kaniko OR CD logs
+	query.AddServiceLogQuery("", req.Project, req.Etag, req.Services)    // Cloudrun service logs
+	query.AddCloudBuildLogQuery("", req.Project, req.Etag, req.Services) // CloudBuild logs
 	query.AddSince(since)
 	query.AddUntil(until)
 
-	// Service status updates
-	query.AddJobStatusUpdateRequestQuery(req.Project, req.Etag, req.Services)
-	query.AddJobStatusUpdateResponseQuery(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusRequestUpdate(req.Project, req.Etag, req.Services)
-	query.AddServiceStatusReponseUpdate(req.Project, req.Etag, req.Services)
+	// Service status updates TODO: update stack (1st param) to b.PulumiStack
+	query.AddJobStatusUpdateRequestQuery("", req.Project, req.Etag, req.Services)
+	query.AddJobStatusUpdateResponseQuery("", req.Project, req.Etag, req.Services)
+	query.AddServiceStatusRequestUpdate("", req.Project, req.Etag, req.Services)
+	query.AddServiceStatusReponseUpdate("", req.Project, req.Etag, req.Services)
 
 	return query.GetQuery()
 }

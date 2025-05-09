@@ -64,7 +64,8 @@ func IsNetworkError(err error) bool {
 		" i/o timeout",
 		" network is unreachable",
 		" no such host",
-		" unexpected EOF":
+		" unexpected EOF",
+		" device or resource busy":
 		return true
 	}
 	return false

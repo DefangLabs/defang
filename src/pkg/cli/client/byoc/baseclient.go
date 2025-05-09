@@ -121,12 +121,7 @@ func (b *ByocBaseClient) GetProjectDomain(projectName, zone string) string {
 	if projectName == "" {
 		return "" // no project name => no custom domain
 	}
-	projectLabel := dns.SafeLabel(projectName)
-	tenantLabel := dns.SafeLabel(b.TenantName)
-	if projectLabel == tenantLabel { // avoid stuttering
-		return dns.Normalize(zone) // the zone will already have the tenant ID
-	}
-	domain := projectLabel + "." + dns.Normalize(zone)
+	domain := dns.Normalize(zone)
 	if hasStack, ok := b.projectBackend.(HasStackSupport); ok {
 		domain = hasStack.GetStackName() + "." + domain
 	}
@@ -247,7 +242,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 		// si.LbIps = b.PrivateLbIps // only set LB IPs if there are ingress ports // FIXME: double check this is not being used at all
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)
 	}
-	if hasHost {
+	if hasHost { // TODO: this should be network based instead of host vs ingress
 		si.PrivateFqdn = b.GetPrivateFqdn(projectName, fqn)
 	}
 

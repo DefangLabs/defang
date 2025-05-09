@@ -192,8 +192,17 @@ func (gcp Gcp) EnsureServiceAccountHasBucketRoles(ctx context.Context, bucketNam
 	}
 
 	term.Infof("Updating IAM policy for service account %s on bucket %s", serviceAccount, bucketName)
-	if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
-		return fmt.Errorf("failed to set IAM policy for bucket %s: %w", bucketName, err)
+	for i := range 3 { // Service account might not be visible for a few seconds after creation for policy attachment
+		if err := bucket.IAM().SetPolicy(ctx, policy); err != nil {
+			if i < 2 {
+				term.Infof("Failed to set IAM policy, will retry in 5s: %v\n", err)
+				pkg.SleepWithContext(ctx, 5*time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to set IAM policy for bucket %s: %w", bucketName, err)
+		} else {
+			break
+		}
 	}
 
 	for start := time.Now(); time.Since(start) < 5*time.Minute; {
