@@ -18,13 +18,13 @@ var activeDeployments = []*defangv1.Deployment{
 	{Project: "projectAB", Provider: defangv1.Provider_AWS, Region: "us-east-2"},
 	{Project: "projectAC", Provider: defangv1.Provider_AWS, Region: "us-east-3"},
 
-	{Project: "projectPlayground", Provider: defangv1.Provider_DEFANG, Region: "us-west-1"},
-
 	{Project: "projectDA", Provider: defangv1.Provider_DIGITALOCEAN, Region: "us-central-1"},
 	{Project: "projectDB", Provider: defangv1.Provider_DIGITALOCEAN, Region: "us-central-1"},
 
 	{Project: "projectGA", Provider: defangv1.Provider_GCP, Region: "us-central-2"},
 	{Project: "projectGB", Provider: defangv1.Provider_GCP, Region: "us-central-3"},
+
+	{Project: "projectPlayground", Provider: defangv1.Provider_DEFANG, Region: "us-west-1"},
 }
 
 type mockActiveDeploymentsHandler struct {
@@ -81,7 +81,7 @@ func TestActiveDeployments(t *testing.T) {
 		for _, deployment := range activeDeployments {
 			match := false
 			for _, line := range lines {
-				if strings.Contains(line, deployment.Provider.String()) &&
+				if strings.Contains(line, strings.ToLower(deployment.Provider.String())) &&
 					strings.Contains(line, deployment.Project) &&
 					strings.Contains(line, deployment.Region) {
 					match = true
