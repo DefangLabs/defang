@@ -270,14 +270,6 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(deleteCmd)
 
 	// Deployments Command
-	deploymentsListCmd.Flags().BoolP("all", "a", false, "all deployed projects")
-	deploymentsListCmd.Flags().Bool("history", false, "get the history of deployed project")
-	deploymentsListCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
-	deploymentsListCmd.MarkFlagsMutuallyExclusive("all", "history")
-	deploymentsCmd.Flags().BoolP("all", "a", false, "all deployed projects")
-	deploymentsCmd.Flags().Bool("history", false, "get the history of deployed project")
-	deploymentsCmd.Flags().Uint32("limit", 0, "the maximum number of returned deployed projects, default: 0 (no limit)")
-	deploymentsCmd.MarkFlagsMutuallyExclusive("all", "history")
 	deploymentsCmd.AddCommand(deploymentsListCmd)
 	RootCmd.AddCommand(deploymentsCmd)
 
@@ -989,7 +981,7 @@ var deploymentsCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List deployments",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return getDeploymentInfo(cmd, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
 	},
 }
 
@@ -1001,31 +993,14 @@ var deploymentsListCmd = &cobra.Command{
 	Short:       "List deployments",
 	Deprecated:  "use 'deployments' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return getDeploymentInfo(cmd, client)
-	},
-}
-
-func getDeploymentInfo(cmd *cobra.Command, client *cliClient.GrpcClient) error {
-	allProjects, _ := cmd.Flags().GetBool("all")
-	historyOnly, _ := cmd.Flags().GetBool("history")
-	limit, _ := cmd.Flags().GetUint32("limit")
-
-	projectName := ""
-	if !allProjects {
-		var err error
 		loader := configureLoader(cmd)
-		projectName, err = loader.LoadProjectName(cmd.Context())
+		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
-	}
 
-	deploymentType := defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE
-	if historyOnly {
-		deploymentType = defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY
-	}
-
-	return cli.DeploymentsList(cmd.Context(), deploymentType, projectName, *client, limit)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, *client, 10)
+	},
 }
 
 var sendCmd = &cobra.Command{
