@@ -315,7 +315,7 @@ func makeComposeDownCmd() *cobra.Command {
 				LogType:            logs.LogTypeAll,
 			}
 			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
-			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
+			err = cli.Tail(tailCtx, provider, projectName, tailOptions, cli.TailEntryHandler)
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we show a warning and detach. This is
@@ -495,7 +495,7 @@ func makeComposeLogsCmd() *cobra.Command {
 				Until:      untilTs,
 				Verbose:    verbose,
 			}
-			return cli.Tail(cmd.Context(), provider, projectName, tailOptions)
+			return cli.Tail(cmd.Context(), provider, projectName, tailOptions, cli.TailEntryHandler)
 		},
 	}
 	logsCmd.Flags().StringP("name", "n", "", "name of the service (backwards compat)")
