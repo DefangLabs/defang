@@ -979,7 +979,7 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
+	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
 	},
