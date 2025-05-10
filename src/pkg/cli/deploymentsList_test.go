@@ -9,7 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
-	"github.com/bufbuild/connect-go"
+	connect "github.com/bufbuild/connect-go"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -59,7 +59,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "empty", grpcClient)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "empty", *grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -74,12 +74,12 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, "test", grpcClient)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "test", *grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nDeployment  Provider    DeployedAt            \x1b[0m" + `
-a1b2c3      playground  ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
+		expectedOutput := "\x1b[1m\nProjectName  Provider  AccountId   Region     Deployment  DeployedAt            \x1b[0m" + `
+test         defang    1234567890  us-test-2  a1b2c3      ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
 `
 
 		receivedLines := strings.Split(stdout.String(), "\n")

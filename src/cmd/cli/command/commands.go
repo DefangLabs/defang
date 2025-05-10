@@ -991,15 +991,9 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
+	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
 	},
 }
 
@@ -1017,7 +1011,7 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, *client, 10)
 	},
 }
 
