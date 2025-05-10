@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -10,16 +12,19 @@ import (
 )
 
 type PrintDeployment struct {
-	Deployment string
-	Provider   string
-	DeployedAt string
-	Region     string
+	AccountId   string
+	Deployment  string
+	DeployedAt  string
+	ProjectName string
+	Provider    string
+	Region      string
 }
 
-func DeploymentsList(ctx context.Context, projectName string, client client.FabricClient) error {
+func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.GrpcClient, limit uint32) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
-		Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY,
+		Type:    listType,
 		Project: projectName,
+		Limit:   limit,
 	})
 	if err != nil {
 		return err
@@ -27,7 +32,12 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Fabr
 
 	numDeployments := len(response.Deployments)
 	if numDeployments == 0 {
-		_, err := term.Warnf("No deployments found for project %q", projectName)
+		var err error
+		if projectName == "" {
+			_, err = term.Warn("No deployments found")
+		} else {
+			_, err = term.Warnf("No deployments found for project %q", projectName)
+		}
 		return err
 	}
 
@@ -35,12 +45,31 @@ func DeploymentsList(ctx context.Context, projectName string, client client.Fabr
 	deployments := make([]PrintDeployment, numDeployments)
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
-			Deployment: d.Id,
-			Provider:   d.ProviderString, // TODO: use Provider
-			DeployedAt: d.Timestamp.AsTime().Format(time.RFC3339),
-			Region:     d.Region,
+			AccountId:   d.ProviderAccountId,
+			DeployedAt:  d.Timestamp.AsTime().Format(time.RFC3339),
+			Deployment:  d.Id,
+			ProjectName: d.Project,
+			Provider:    getProvider(d.Provider, d.ProviderString),
+			Region:      d.Region,
 		}
 	}
 
-	return term.Table(deployments, []string{"Deployment", "Provider", "DeployedAt"}) // TODO: add region
+	// sort by project name, provider, account id, and region
+	sortKeys := make([]string, numDeployments)
+	for i, d := range deployments {
+		// TODO: allow user to specify sort order
+		sortKeys[i] = strings.Join([]string{d.ProjectName, d.Provider, d.AccountId, d.Region}, "|")
+	}
+	sort.SliceStable(sortKeys, func(i, j int) bool {
+		return sortKeys[i] < sortKeys[j]
+	})
+
+	return term.Table(deployments, []string{"ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt"})
+}
+
+func getProvider(provider defangv1.Provider, providerString string) string {
+	if provider == defangv1.Provider_PROVIDER_UNSPECIFIED {
+		return providerString
+	}
+	return strings.ToLower(provider.String())
 }
