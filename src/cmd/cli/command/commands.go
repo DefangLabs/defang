@@ -979,7 +979,7 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
+	Short:       "List active deployments across all projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
 	},
@@ -990,8 +990,7 @@ var deploymentsListCmd = &cobra.Command{
 	Aliases:     []string{"ls"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
-	Deprecated:  "use 'deployments' instead",
+	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
