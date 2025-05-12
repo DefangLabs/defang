@@ -1,0 +1,17 @@
+services:
+  chat:
+    image: my-chat-app
+    # image: curlimages/curl
+    # command:
+    #   - "sh"
+    #   - "-c"
+    #   - "curl -sf $${AI_RUNNER_URL}chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"anthropic.claude-3-5-sonnet-20241022-v2:0\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello, world!\"}]}'; sleep 5"
+    depends_on:
+      - ai_runner
+
+  ai_runner:
+    provider:
+      type: model
+      options:
+        model: ai/smollm2
+    # x-defang-llm: true
