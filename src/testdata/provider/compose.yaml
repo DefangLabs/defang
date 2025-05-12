@@ -1,18 +1,11 @@
 services:
   chat:
     image: my-chat-app
-    # image: alpine
-    # command: "sh -c 'export'"
-    # image: node
-    # command: "node -e 'console.log(process.env)'"
-    # image: python
-    # command: "python -c 'import os; print(os.environ)'"
-    # image: golang
-    # command: ["sh", "-c", "printf 'package main\n\nimport \"fmt\"\nimport \"os\"\nfunc main() {\n\tfmt.Println(os.Environ())\n}' > hello.go && go run hello.go"]
     # image: curlimages/curl
-    # command: "sh -c 'echo $AI-RUNNER_URL'"
-    # environment:
-    #   - AI_RUNNER_URL=a
+    # command:
+    #   - "sh"
+    #   - "-c"
+    #   - "curl -sf $${AI_RUNNER_URL}chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"anthropic.claude-3-5-sonnet-20241022-v2:0\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello, world!\"}]}'; sleep 5"
     depends_on:
       - ai_runner
 
@@ -21,3 +14,4 @@ services:
       type: model
       options:
         model: ai/smollm2
+    # x-defang-llm: true

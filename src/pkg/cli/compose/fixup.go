@@ -133,8 +133,35 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
-		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Deploy == nil {
+		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
+			envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
+			urlEnv := envName + "_URL"
+			urlVal := "http://" + provider.ServiceDNS(NormalizeServiceName(svccfg.Name)) + "/api/v1/"
+			modelEnv := envName + "_MODEL"
+			modelVal := svccfg.Provider.Options["model"]
+
+			empty := ""
+			svccfg.Environment = types.MappingWithEquals{"OPENAI_API_KEY": &empty} // disable auth
 			svccfg.Image = "defangio/openai-access-gateway"
+			svccfg.Provider = nil // remove "provider:" because current backend will not accept it
+			svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+			// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
+			// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
+
+			// Set environment variables (url and model) for any service that depends on the provider pseudo service
+			for _, dependency := range project.Services {
+				if _, ok := dependency.DependsOn[svccfg.Name]; ok {
+					if dependency.Environment == nil {
+						dependency.Environment = make(types.MappingWithEquals)
+					}
+					if _, ok := dependency.Environment[urlEnv]; !ok {
+						dependency.Environment[urlEnv] = &urlVal
+					}
+					if _, ok := dependency.Environment[modelEnv]; !ok && modelVal != "" {
+						dependency.Environment[modelEnv] = &modelVal
+					}
+				}
+			}
 		}
 
 		_, postgres := svccfg.Extensions["x-defang-postgres"]

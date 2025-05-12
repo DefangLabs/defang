@@ -2,16 +2,20 @@
   "ai_runner": {
     "command": null,
     "entrypoint": null,
-    "provider": {
-      "driver": "model",
-      "options": {
-        "model": "ai/smollm2"
-      }
+    "environment": {
+      "OPENAI_API_KEY": ""
     },
     "image": "defangio/openai-access-gateway",
     "networks": {
       "default": null
-    }
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 80,
+        "protocol": "tcp"
+      }
+    ]
   },
   "chat": {
     "command": null,
@@ -22,6 +26,10 @@
       }
     },
     "entrypoint": null,
+    "environment": {
+      "AI_RUNNER_MODEL": "ai/smollm2",
+      "AI_RUNNER_URL": "http://ai-runner/api/v1/"
+    },
     "image": "my-chat-app",
     "networks": {
       "default": null
