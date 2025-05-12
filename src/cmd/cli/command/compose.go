@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -530,6 +529,7 @@ func makeComposeEstimateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			region, _ := cmd.Flags().GetString("region")
+			os.Setenv("DEFANG_JSON", "1") // always show JSON output for estimate
 			loader := configureLoader(cmd)
 			project, err := loader.LoadProject(cmd.Context())
 			if err != nil {
@@ -546,20 +546,33 @@ func makeComposeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			buffer := &bytes.Buffer{}
-			oldTerm := term.DefaultTerm
-			term.DefaultTerm = term.NewTerm(os.Stdin, buffer, os.Stderr)
-			err = cli.Preview(cmd.Context(), project, client, provider, mode.Value())
+			since := time.Now()
+
+			resp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModePreview, mode.Value())
 			if err != nil {
 				return err
 			}
-			term.DefaultTerm = oldTerm
 
-			pulumiPreview := buffer.Bytes()
+			var pulumiPreviewLogLines []string
+			options := cli.TailOptions{
+				Deployment: resp.Etag,
+				Since:      since,
+				LogType:    logs.LogTypeBuild,
+				Verbose:    true,
+			}
+
+			err = cli.TailAndWaitForCD(ctx, project.Name, provider, options, func(entry *defangv1.LogEntry, options *cli.TailOptions) error {
+				pulumiPreviewLogLines = append(pulumiPreviewLogLines, entry.GetMessage())
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("failed to tail and wait for cd: %w", err)
+			}
+
 			estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
 				Provider:      providerID.EnumValue(),
 				Region:        region,
-				PulumiPreview: pulumiPreview,
+				PulumiPreview: []byte(strings.Join(pulumiPreviewLogLines, "\n")),
 			})
 
 			if err != nil {
