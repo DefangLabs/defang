@@ -29,10 +29,16 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		return err
 	}
 
-	return tailAndWaitForCD(ctx, projectName, p, TailOptions{Deployment: etag, Since: since, LogType: logs.LogTypeBuild, Verbose: verbose})
+	options := TailOptions{
+		Deployment: etag,
+		Since:      since,
+		LogType:    logs.LogTypeBuild,
+		Verbose:    verbose,
+	}
+	return tailAndWaitForCD(ctx, projectName, p, options, LogEntryPrintHandler)
 }
 
-func tailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions) error {
+func tailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions, handler LogEntryHandler) error {
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
@@ -45,7 +51,7 @@ func tailAndWaitForCD(ctx context.Context, projectName string, provider client.P
 
 	// blocking call to tail
 	var tailErr error
-	if err := streamLogs(ctx, provider, projectName, tailOptions, LogEntryPrintHandler); err != nil {
+	if err := streamLogs(ctx, provider, projectName, tailOptions, handler); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err

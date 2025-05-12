@@ -15,5 +15,6 @@ func Preview(ctx context.Context, project *compose.Project, fabric cliClient.Fab
 		return err
 	}
 
-	return tailAndWaitForCD(ctx, project.Name, provider, TailOptions{Deployment: resp.Etag, LogType: logs.LogTypeBuild, Verbose: true})
+	options := TailOptions{Deployment: resp.Etag, LogType: logs.LogTypeBuild, Verbose: true}
+	return tailAndWaitForCD(ctx, project.Name, provider, options, LogEntryPrintHandler)
 }
