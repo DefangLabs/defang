@@ -35,10 +35,10 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		LogType:    logs.LogTypeBuild,
 		Verbose:    verbose,
 	}
-	return tailAndWaitForCD(ctx, projectName, p, options, LogEntryPrintHandler)
+	return TailAndWaitForCD(ctx, projectName, p, options, LogEntryPrintHandler)
 }
 
-func tailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions, handler LogEntryHandler) error {
+func TailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions, handler LogEntryHandler) error {
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
