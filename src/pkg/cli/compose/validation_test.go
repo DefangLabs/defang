@@ -217,7 +217,7 @@ func TestManagedStoreParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateManagedStore(tt.extension); err != nil {
+			if err := validateManagedStore(tt.extension); err != nil {
 				if len(tt.errors) == 0 {
 					t.Fatalf("ValidateManagedStore() unexpected err = %v", err)
 				}
