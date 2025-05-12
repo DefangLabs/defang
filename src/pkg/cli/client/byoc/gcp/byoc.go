@@ -301,7 +301,7 @@ type GcpAccountInfo struct {
 }
 
 func (g GcpAccountInfo) AccountID() string {
-	return g.email
+	return g.projectId
 }
 
 func (g GcpAccountInfo) Region() string {
@@ -309,7 +309,7 @@ func (g GcpAccountInfo) Region() string {
 }
 
 func (g GcpAccountInfo) Details() string {
-	return g.projectId
+	return g.email
 }
 
 func (g GcpAccountInfo) Provider() client.ProviderID {
