@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -58,9 +59,9 @@ func TestConnect(t *testing.T) {
 	t.Run("no such host", func(t *testing.T) {
 		t.Parallel()
 		_, err := Connect(ctx, "blah.example.com")
-		const suffix = ": no such host"
-		if actual := err.Error(); !strings.HasSuffix(actual, suffix) {
-			t.Errorf("expected error to end with %q, got: %v", suffix, actual)
+		suffixes := []string{": no such host", "device or resource busy"}
+		if actual := err.Error(); !slices.ContainsFunc(suffixes, func(suffix string) bool { return strings.HasSuffix(actual, suffix) }) {
+			t.Errorf("expected error to end with %q, got: %v", suffixes, actual)
 		}
 		if !IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)

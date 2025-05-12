@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
@@ -120,6 +121,17 @@ func Execute(ctx context.Context) error {
 		}
 		if code == connect.CodeFailedPrecondition && (strings.Contains(err.Error(), "EULA") || strings.Contains(err.Error(), "terms")) {
 			printDefangHint("Please use the following command to see the Defang terms of service:", "terms")
+		}
+
+		if cde := new(gcp.ConflictDelegateDomainError); errors.As(err, cde) {
+			hint := fmt.Sprintf("Domain verification is required for the delegated domain %q, as indicated by the Google Cloud API.", cde.NewDomain)
+			if cde.ConflictDomain != "" {
+				hint += fmt.Sprintf(" This is likely due to a legacy tenant-level delegated zone named %v (%v).", cde.ConflictZone, cde.ConflictDomain)
+			} else {
+				hint += " This is likely caused by a conflicting legacy tenant-level delegated DNS zone."
+			}
+			hint += " Please check if this legacy zone is still needed. If not, remove it from your Google Cloud account and try again."
+			printDefangHint(hint)
 		}
 		return ExitCode(code)
 	}
@@ -981,15 +993,9 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
+	Short:       "List active deployments across all projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			return err
-		}
-
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
 	},
 }
 
@@ -998,8 +1004,7 @@ var deploymentsListCmd = &cobra.Command{
 	Aliases:     []string{"ls"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
-	Deprecated:  "use 'deployments' instead",
+	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
@@ -1007,7 +1012,7 @@ var deploymentsListCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, *client, 10)
 	},
 }
 
