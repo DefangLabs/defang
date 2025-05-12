@@ -97,6 +97,9 @@ func getOrCreateDelegationSetByZone(ctx context.Context, zone *types.HostedZone,
 			term.Debug("Route53 delegation set already created:", err)
 			delegationSet, err = aws.GetDelegationSetByZone(ctx, zone.Id, r53Client)
 		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Ensure the zone's NS records match the ones from the delegation set if the zone already exists
