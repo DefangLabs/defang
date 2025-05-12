@@ -41,6 +41,7 @@ type Prompt = auth.Prompt
 
 type AuthService interface {
 	login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
+	loginWithDocker(ctx context.Context, fabric string, authPort int)
 }
 
 type OpenAuthService struct{}
@@ -57,9 +58,24 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
 
+func (g OpenAuthService) loginWithDocker(ctx context.Context, fabric string, authPort int) {
+	term.Debug("Logging in to", fabric)
+
+	tenant, _ := SplitTenantHost(fabric)
+
+	go func() {
+		err := auth.StartAuthCodeFlowWithDocker(ctx, authPort, tenant, func(token string) {
+			saveAccessToken(fabric, token)
+		})
+		if err != nil {
+			term.Error("failed to start auth server", "error", err)
+		}
+	}()
+}
+
 var authService AuthService = OpenAuthService{}
 
-func SaveAccessToken(fabric, at string) error {
+func saveAccessToken(fabric, at string) error {
 	tokenFile := getTokenFile(fabric)
 	term.Debug("Saving access token to", tokenFile)
 	os.MkdirAll(client.StateDir, 0700)
@@ -77,6 +93,10 @@ func InteractiveLoginPrompt(ctx context.Context, client client.FabricClient, fab
 	return interactiveLogin(ctx, client, fabric, auth.PromptYes)
 }
 
+func InteractiveLoginWithDocker(ctx context.Context, fabric string, authPort int) {
+	authService.loginWithDocker(ctx, fabric, authPort)
+}
+
 func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
 	at, err := authService.login(ctx, client, fabric, prompt)
 	if err != nil {
@@ -86,7 +106,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	tenant, host := SplitTenantHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := SaveAccessToken(fabric, at); err != nil {
+	if err := saveAccessToken(fabric, at); err != nil {
 		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
 	}
 	return nil
@@ -106,5 +126,5 @@ func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric
 	if err != nil {
 		return err
 	}
-	return SaveAccessToken(fabric, resp.AccessToken)
+	return saveAccessToken(fabric, resp.AccessToken)
 }

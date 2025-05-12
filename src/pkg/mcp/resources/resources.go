@@ -32,7 +32,7 @@ func setupDocumentationResource(s *server.MCPServer) {
 	docResource := mcp.NewResource(
 		"doc:///knowledge_base/knowledge_base.json",
 		"knowledge_base",
-		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the samples resource"),
+		mcp.WithResourceDescription("Defang documentation for any question or information you need to know about Defang. If you want to look to build dockerfiles and compose files, please use the defang_dockerfile_and_compose_examples resource but you can also use this to aid inaddtion to the defang_dockerfile_and_compose_examples resource as well."),
 		mcp.WithMIMEType("application/json"),
 	)
 
@@ -60,8 +60,8 @@ func setupSamplesResource(s *server.MCPServer) {
 	term.Info("Creating samples examples resource")
 	samplesResource := mcp.NewResource(
 		"doc:///knowledge_base/samples_examples.json",
-		"samples_examples",
-		mcp.WithResourceDescription("Defang sample projects that should be used for reference when trying to create new dockerfiles and compose files."),
+		"defang_dockerfile_and_compose_examples",
+		mcp.WithResourceDescription("Defang sample projects that should be used for reference when trying to create new dockerfiles and compose files for defang deploy."),
 		mcp.WithMIMEType("application/json"),
 	)
 

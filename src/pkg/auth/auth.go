@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -76,22 +75,18 @@ const (
 )
 
 func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
-	// Generate random state
-	var state string
-
-	serverURL := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
 
 	// Get the authorization URL before setting up the handler
-	ar, err := openAuthClient.Authorize(serverURL, CodeResponseType, WithPkce(), WithProvider("github"))
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
 		term.Error("Failed to authorize", "error", err)
 		return err
 	}
-	state = ar.state
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			fmt.Println("Redirecting to", ar.url.String())
+			term.Infof("Redirecting to %s", ar.url.String())
 			http.Redirect(w, r, ar.url.String(), http.StatusFound)
 			return
 		}
@@ -104,12 +99,13 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 		switch {
 		case query.Get("error") != "":
 			msg = "Authentication failed: " + query.Get("error_description")
-		case query.Get("state") != state:
+		case query.Get("state") != ar.state:
 			msg = "Authentication error: state mismatch"
 		default:
 			msg = "Authentication successful"
-			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: serverURL, verifier: ar.verifier}, tenant, 0)
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier}, tenant, 0)
 			if err != nil {
+				term.Error("Failed to exchange code for token", "error", err)
 				msg = "Authentication failed: " + err.Error()
 			}
 			saveToken(token)

@@ -58,6 +58,8 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
 
+		client.Track("MCP Deploy Tool")
+
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)

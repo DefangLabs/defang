@@ -49,6 +49,8 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
 
+		client.Track("MCP Services Tool")
+
 		// Create a Defang client
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
@@ -87,7 +89,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		if jsonErr == nil {
 			term.Info("Successfully loaded services", "count", len(serviceResponse), "data", string(jsonData))
 			// Use NewToolResultText with JSON string
-			return mcp.NewToolResultText(string(jsonData)), nil
+			return mcp.NewToolResultText(string(jsonData) + "\nIf you like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects"), nil
 		}
 
 		// Return the data in a structured format

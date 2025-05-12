@@ -1,19 +1,16 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
@@ -36,8 +33,6 @@ var mcpServerCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
-		fmt.Println("auth port: ", authPort)
 
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
@@ -72,15 +67,12 @@ var mcpServerCmd = &cobra.Command{
 		resources.SetupResources(s)
 
 		// Setup tools
-		tools.SetupTools(s, getCluster())
+		tools.SetupTools(s, getCluster(), authPort)
 
+		// Start auth server for docker login flow
 		if authPort != 0 {
 			term.Info("Starting Auth Server for Docker login flow")
-			go func() {
-				auth.StartAuthCodeFlowWithDocker(cmd.Context(), authPort, types.DEFAULT_TENANT, func(token string) {
-					cli.SaveAccessToken(getCluster(), token)
-				})
-			}()
+			cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), authPort)
 		}
 
 		// Start the server
