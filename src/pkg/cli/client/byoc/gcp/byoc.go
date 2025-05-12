@@ -714,6 +714,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
+				return annotateGcpError(err)
+			}
+			_, err = b.driver.CreateSecret(ctx, secretId)
+		}
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
 			term.Debugf("Secret %q already exists", secretId)
 		} else {
