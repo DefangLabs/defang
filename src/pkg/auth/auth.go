@@ -116,15 +116,14 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 	// set the port and the handler to the server
 	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
 
-	// Start the server in a goroutine that will continue forever
+	// Start the server
 	err = server.ListenAndServe()
 	if err != nil {
-		// Log error but continue
 		term.Debugf("HTTP server error: %v", err)
-		// If port is in use, the auth flow will fail with context cancellation
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
