@@ -302,26 +302,32 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
+	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
+	if managedRedis {
 		// Ensure the image is a valid Redis image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
-		if err = ValidateManagedStore(redisExtension); err != nil {
-			return err
+		if err = validateManagedStore(redisExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
 		}
 	}
 
-	if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
+	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
+	if managedPostgres {
 		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
-		if err = ValidateManagedStore(postgresExtension); err != nil {
-			return err
+		if err = validateManagedStore(postgresExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
 		}
+	}
+
+	if !managedRedis && !managedPostgres && isStatefulImage(svccfg.Image) {
+		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
@@ -436,17 +442,17 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 	return nil
 }
 
-func ValidateManagedStore(managedStore any) error {
+func validateManagedStore(managedStore any) error {
 	if managedStore == nil || managedStore == true || managedStore == false {
 		return nil
 	}
 
-	postgresProps, ok := managedStore.(map[string]any)
+	managedProps, ok := managedStore.(map[string]any)
 	if !ok {
 		return errors.New("expected parameters in managed storage definition field")
 	}
 
-	if downtime, ok := postgresProps["allow-downtime"]; ok {
+	if downtime, ok := managedProps["allow-downtime"]; ok {
 		if _, ok := downtime.(bool); !ok {
 			return errors.New("'allow-downtime' must be a boolean")
 		}
