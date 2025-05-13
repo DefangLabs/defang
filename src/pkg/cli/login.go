@@ -41,6 +41,7 @@ type Prompt = auth.Prompt
 
 type AuthService interface {
 	login(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) (string, error)
+	serveAuthServer(ctx context.Context, fabric string, authPort int) error
 }
 
 type OpenAuthService struct{}
@@ -57,6 +58,20 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
 
+func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
+	term.Debug("Logging in to", fabric)
+
+	tenant, _ := SplitTenantHost(fabric)
+
+	err := auth.ServeAuthCodeFlowServer(ctx, authPort, tenant, func(token string) {
+		saveAccessToken(fabric, token)
+	})
+	if err != nil {
+		term.Error("failed to start auth server", "error", err)
+	}
+	return nil
+}
+
 var authService AuthService = OpenAuthService{}
 
 func saveAccessToken(fabric, at string) error {
@@ -70,11 +85,15 @@ func saveAccessToken(fabric, at string) error {
 }
 
 func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, false)
+	return interactiveLogin(ctx, client, fabric, auth.PromptNo)
 }
 
 func InteractiveLoginPrompt(ctx context.Context, client client.FabricClient, fabric string) error {
-	return interactiveLogin(ctx, client, fabric, true)
+	return interactiveLogin(ctx, client, fabric, auth.PromptYes)
+}
+
+func InteractiveLoginWithDocker(ctx context.Context, fabric string, authPort int) error {
+	return authService.serveAuthServer(ctx, fabric, authPort)
 }
 
 func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
