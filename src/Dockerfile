@@ -1,17 +1,25 @@
 # Build stage
-FROM golang:alpine AS builder
+ARG GOVERSION=1.23
+FROM --platform=${BUILDPLATFORM} golang:${GOVERSION} AS builder
 
-# Install required build dependencies
-RUN apk add --no-cache git make zip curl bash
+# These two are automatically set by docker buildx
+ARG TARGETARCH
+ARG TARGETOS
 
 # Set the working directory
 WORKDIR /app
+
+COPY --link go.mod go.sum ./
+RUN go mod download
 
 # Copy source code
 COPY . /app/
 
 # Build the application
-RUN go build -o defang -ldflags "-X main.version=container-build" ./cmd/cli
+ARG BUILD=./cmd/cli
+ARG VERSION
+ARG OUTPUT=defang
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -buildvcs=false -ldflags="-w -s -X \"main.version=${VERSION}\"" -o "${OUTPUT}" "${BUILD}"
 
 # Final stage
 FROM alpine:latest
@@ -31,6 +39,7 @@ COPY --from=builder /app/defang /usr/local/bin/
 # Set the user to run the application
 USER defang
 
+# For the authentication server
 EXPOSE 47071
 
 ENTRYPOINT ["defang"]
