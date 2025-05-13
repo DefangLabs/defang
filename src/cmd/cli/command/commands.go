@@ -289,8 +289,7 @@ func SetupCommands(ctx context.Context, version string) {
 	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
-	mcpServerCmd.Flags().Int("auth-server", 0, "MCP auth server port")
-	mcpServerCmd.Flags().MarkHidden("auth-server")
+	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpSetupCmd.MarkFlagRequired("client")
 	RootCmd.AddCommand(mcpCmd)
 

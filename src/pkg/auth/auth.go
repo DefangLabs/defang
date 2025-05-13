@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -74,19 +75,21 @@ const (
 	PromptYes Prompt = true
 )
 
-func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
+// ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
+// The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
+// TODO: make the server stop once we have the code
+func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
 	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
 
 	// Get the authorization URL before setting up the handler
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
 	if err != nil {
-		term.Error("Failed to authorize", "error", err)
 		return err
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			term.Infof("Redirecting to %s", ar.url.String())
+			slog.Info("redirecting to " + ar.url.String())
 			http.Redirect(w, r, ar.url.String(), http.StatusFound)
 			return
 		}
@@ -99,13 +102,15 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 		switch {
 		case query.Get("error") != "":
 			msg = "Authentication failed: " + query.Get("error_description")
+			slog.Error("authentication failed", "error", query.Get("error_description"))
 		case query.Get("state") != ar.state:
 			msg = "Authentication error: state mismatch"
+			slog.Error("authentication error: state mismatch", "state", query.Get("state"), "expected", ar.state)
 		default:
 			msg = "Authentication successful"
 			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier}, tenant, 0)
 			if err != nil {
-				term.Error("Failed to exchange code for token", "error", err)
+				slog.Error("failed to exchange code for token", "error", err)
 				msg = "Authentication failed: " + err.Error()
 			}
 			saveToken(token)
@@ -119,7 +124,6 @@ func StartAuthCodeFlowWithDocker(ctx context.Context, authPort int, tenant types
 	// Start the server
 	err = server.ListenAndServe()
 	if err != nil {
-		term.Debugf("HTTP server error: %v", err)
 		return err
 	}
 
