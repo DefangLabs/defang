@@ -520,6 +520,12 @@ func makeComposeLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
+type EstimateLineItemTableItem struct {
+	Cost        string
+	Quantity    string
+	Description string
+}
+
 func makeComposeEstimateCmd() *cobra.Command {
 	var estimateCmd = &cobra.Command{
 		Use:         "estimate",
@@ -578,15 +584,17 @@ func makeComposeEstimateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to estimate: %w", err)
 			}
-
-			fmt.Printf("Estimate:\n")
-			for _, lineItem := range estimate.LineItems {
-				fmt.Printf("$%.2f\t%.2f %s\t%s\n",
-					lineItem.Cost,
-					lineItem.Quantity, lineItem.Unit,
-					lineItem.Description,
-				)
+			lineItems := make([]EstimateLineItemTableItem, len(estimate.LineItems))
+			for i, lineItem := range estimate.LineItems {
+				lineItems[i] = EstimateLineItemTableItem{
+					Cost:        fmt.Sprintf("$%.2f", lineItem.Cost),
+					Quantity:    fmt.Sprintf("%.2f %s", lineItem.Quantity, lineItem.Unit),
+					Description: lineItem.Description,
+				}
 			}
+
+			term.Println("Estimate:")
+			term.Table(lineItems, []string{"Cost", "Quantity", "Description"})
 			fmt.Printf("Estimated Monthly Cost: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
 			fmt.Printf("Estimate does not include tax or discounts.\n")
 
