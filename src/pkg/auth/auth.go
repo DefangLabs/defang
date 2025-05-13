@@ -3,8 +3,10 @@ package auth
 import (
 	"context"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,6 +74,61 @@ const (
 	PromptNo  Prompt = false
 	PromptYes Prompt = true
 )
+
+// ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
+// The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
+// TODO: make the server stop once we have the code
+func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.TenantName, saveToken func(string)) error {
+	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
+
+	// Get the authorization URL before setting up the handler
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
+	if err != nil {
+		return err
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			slog.Info("redirecting to " + ar.url.String())
+			http.Redirect(w, r, ar.url.String(), http.StatusFound)
+			return
+		}
+		if r.URL.Path != "/auth" {
+			http.NotFound(w, r)
+			return
+		}
+		var msg string
+		query := r.URL.Query()
+		switch {
+		case query.Get("error") != "":
+			msg = "Authentication failed: " + query.Get("error_description")
+			slog.Error("authentication failed", "error", query.Get("error_description"))
+		case query.Get("state") != ar.state:
+			msg = "Authentication error: state mismatch"
+			slog.Error("authentication error: state mismatch", "state", query.Get("state"), "expected", ar.state)
+		default:
+			msg = "Authentication successful"
+			token, err := ExchangeCodeForToken(ctx, AuthCodeFlow{code: query.Get("code"), redirectUri: redirectUri, verifier: ar.verifier}, tenant, 0)
+			if err != nil {
+				slog.Error("failed to exchange code for token", "error", err)
+				msg = "Authentication failed: " + err.Error()
+			}
+			saveToken(token)
+		}
+		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
+	})
+
+	// set the port and the handler to the server
+	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
+
+	// Start the server
+	err = server.ListenAndServe()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)

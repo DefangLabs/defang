@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
@@ -17,6 +18,10 @@ import (
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
 	Short: "Manage MCP Server for defang",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		//set global nonInteractive to false
+		nonInteractive = false
+	},
 }
 
 var mcpServerCmd = &cobra.Command{
@@ -24,6 +29,7 @@ var mcpServerCmd = &cobra.Command{
 	Short: "Start defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		authPort, _ := cmd.Flags().GetInt("auth-server")
 
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
@@ -58,15 +64,26 @@ var mcpServerCmd = &cobra.Command{
 		resources.SetupResources(s)
 
 		// Setup tools
-		tools.SetupTools(s, getCluster())
+		tools.SetupTools(s, getCluster(), authPort)
+
+		// Start auth server for docker login flow
+		if authPort != 0 {
+			term.Info("Starting Auth Server for Docker login flow")
+
+			go func() {
+				if err := cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), authPort); err != nil {
+					term.Error("Failed to start auth server", "error", err)
+				}
+			}()
+		}
 
 		// Start the server
-		term.Info("Starting Defang Services MCP server")
+		term.Println("Starting Defang MCP server")
 		if err := server.ServeStdio(s); err != nil {
 			return err
 		}
 
-		term.Info("Server shutdown")
+		term.Println("Server shutdown")
 
 		return nil
 	},
