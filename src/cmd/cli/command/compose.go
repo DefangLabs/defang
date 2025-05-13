@@ -581,7 +581,7 @@ func makeComposeEstimateCmd() *cobra.Command {
 					lineItem.Description,
 				)
 			}
-			fmt.Printf("Estimated Total: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
+			fmt.Printf("Estimated Monthly Cost: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
 			fmt.Printf("Estimate does not include tax or discounts.\n")
 
 			return nil
