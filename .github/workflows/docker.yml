@@ -29,4 +29,6 @@ jobs:
               uses: docker/setup-qemu-action@v3
 
             - name: Build and push Docker images and manifests
-              run: cd src && make push-images
+              working-directory: src
+              run: make push-images
+              
