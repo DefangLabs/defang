@@ -123,7 +123,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
-		if svccfg.Provider != nil && svccfg.Provider.Type == "model" {
+		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, provider, project)
 		}
 
@@ -209,34 +209,39 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) er
 }
 
 func fixupModelProvider(svccfg *types.ServiceConfig, provider client.Provider, project *types.Project) {
-	if svccfg.Image == "" && svccfg.Build == nil {
-		// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
-		envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
-		urlEnv := envName + "_URL"
-		urlVal := "http://" + provider.ServiceDNS(NormalizeServiceName(svccfg.Name)) + "/api/v1/"
-		modelEnv := envName + "_MODEL"
-		modelVal := svccfg.Provider.Options["model"]
+	// Declare a private network for the model provider
+	const modelProviderNetwork = "model_provider_private"
 
-		empty := ""
-		svccfg.Environment = types.MappingWithEquals{"OPENAI_API_KEY": &empty} // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
-		svccfg.Image = "defangio/openai-access-gateway"
-		svccfg.Provider = nil // remove "provider:" because current backend will not accept it
-		svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
-		// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
-		// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
+	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
+	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
+	urlEnv := envName + "_URL"
+	urlVal := "http://" + provider.ServiceDNS(NormalizeServiceName(svccfg.Name)) + "/api/v1/"
+	modelEnv := envName + "_MODEL"
+	modelVal := svccfg.Provider.Options["model"]
 
-		// Set environment variables (url and model) for any service that depends on the provider pseudo service
-		for _, dependency := range project.Services {
-			if _, ok := dependency.DependsOn[svccfg.Name]; ok {
-				if dependency.Environment == nil {
-					dependency.Environment = make(types.MappingWithEquals)
-				}
-				if _, ok := dependency.Environment[urlEnv]; !ok {
-					dependency.Environment[urlEnv] = &urlVal
-				}
-				if _, ok := dependency.Environment[modelEnv]; !ok && modelVal != "" {
-					dependency.Environment[modelEnv] = &modelVal
-				}
+	empty := ""
+	// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
+	svccfg.Environment = types.MappingWithEquals{"OPENAI_API_KEY": &empty} // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
+	svccfg.Image = "defangio/openai-access-gateway"
+	svccfg.Networks[modelProviderNetwork] = nil
+	svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	svccfg.Provider = nil              // remove "provider:" because current backend will not accept it
+	delete(svccfg.Networks, "default") // remove the default network
+	project.Networks[modelProviderNetwork] = types.NetworkConfig{Name: modelProviderNetwork}
+
+	// Set environment variables (url and model) for any service that depends on the provider pseudo service
+	for _, dependency := range project.Services {
+		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
+			if dependency.Environment == nil {
+				dependency.Environment = make(types.MappingWithEquals)
+			}
+			dependency.Networks[modelProviderNetwork] = nil
+			if _, ok := dependency.Environment[urlEnv]; !ok {
+				dependency.Environment[urlEnv] = &urlVal
+			}
+			if _, ok := dependency.Environment[modelEnv]; !ok && modelVal != "" {
+				dependency.Environment[modelEnv] = &modelVal
 			}
 		}
 	}
