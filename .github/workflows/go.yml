@@ -322,8 +322,8 @@ jobs:
 
     push-docker:
     runs-on: ubuntu-latest
-    needs:
-      - go-release
+    #needs:
+    #  - go-release
     steps:
       - uses: actions/checkout@v4
 
