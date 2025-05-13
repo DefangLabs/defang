@@ -531,12 +531,12 @@ func makeComposeEstimateCmd() *cobra.Command {
 			region, _ := cmd.Flags().GetString("region")
 			os.Setenv("DEFANG_JSON", "1") // always show JSON output for estimate
 			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(cmd.Context())
+			project, err := loader.LoadProject(ctx)
 			if err != nil {
 				return err
 			}
 
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := getProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
