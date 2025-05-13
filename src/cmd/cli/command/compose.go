@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -593,7 +594,11 @@ func makeComposeEstimateCmd() *cobra.Command {
 				}
 			}
 
-			term.Println("Estimate:")
+			// sort line items by description
+			sort.Slice(lineItems, func(i, j int) bool {
+				return lineItems[i].Description < lineItems[j].Description
+			})
+
 			term.Table(lineItems, []string{"Cost", "Quantity", "Description"})
 			fmt.Printf("Estimated Monthly Cost: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
 			fmt.Printf("Estimate does not include tax or discounts.\n")
