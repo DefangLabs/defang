@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -519,97 +518,6 @@ func makeComposeLogsCmd() *cobra.Command {
 	logsCmd.Flags().Var(&logType, "type", fmt.Sprintf("show logs of type; one of %v", logs.AllLogTypes))
 	logsCmd.Flags().String("filter", "", "only show logs containing given text; case-insensitive")
 	return logsCmd
-}
-
-type EstimateLineItemTableItem struct {
-	Cost        string
-	Quantity    string
-	Description string
-}
-
-func makeComposeEstimateCmd() *cobra.Command {
-	var estimateCmd = &cobra.Command{
-		Use:         "estimate",
-		Args:        cobra.NoArgs,
-		Annotations: authNeededAnnotation,
-		Short:       "Estimate the cost of deploying the current project",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			region, _ := cmd.Flags().GetString("region")
-			os.Setenv("DEFANG_JSON", "1") // always show JSON output for estimate
-			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(ctx)
-			if err != nil {
-				return err
-			}
-
-			provider, err := getProvider(ctx, loader)
-			if err != nil {
-				return err
-			}
-
-			err = canIUseProvider(ctx, provider, project.Name)
-			if err != nil {
-				return err
-			}
-
-			since := time.Now()
-
-			resp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModePreview, mode.Value())
-			if err != nil {
-				return err
-			}
-
-			var pulumiPreviewLogLines []string
-			options := cli.TailOptions{
-				Deployment: resp.Etag,
-				Since:      since,
-				LogType:    logs.LogTypeBuild,
-				Verbose:    true,
-			}
-
-			err = cli.TailAndWaitForCD(ctx, project.Name, provider, options, func(entry *defangv1.LogEntry, options *cli.TailOptions) error {
-				pulumiPreviewLogLines = append(pulumiPreviewLogLines, entry.GetMessage())
-				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("failed to tail and wait for cd: %w", err)
-			}
-
-			estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-				Provider:      providerID.EnumValue(),
-				Region:        region,
-				PulumiPreview: []byte(strings.Join(pulumiPreviewLogLines, "\n")),
-			})
-
-			if err != nil {
-				return fmt.Errorf("failed to estimate: %w", err)
-			}
-			lineItems := make([]EstimateLineItemTableItem, len(estimate.LineItems))
-			for i, lineItem := range estimate.LineItems {
-				lineItems[i] = EstimateLineItemTableItem{
-					Cost:        lineItem.Cost.String(),
-					Quantity:    fmt.Sprintf("%.2f %s", lineItem.Quantity, lineItem.Unit),
-					Description: lineItem.Description,
-				}
-			}
-
-			// sort line items by description
-			sort.Slice(lineItems, func(i, j int) bool {
-				return lineItems[i].Description < lineItems[j].Description
-			})
-
-			term.Table(lineItems, []string{"Cost", "Quantity", "Description"})
-			fmt.Printf("Estimated Monthly Cost: %s (+ usage)\n", estimate.Subtotal.String())
-			fmt.Printf("Estimate does not include tax or discounts.\n")
-
-			return nil
-		},
-	}
-
-	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
-	estimateCmd.Flags().StringP("region", "r", pkg.Getenv("AWS_REGION", "us-west-2"), "which cloud region to estimate")
-	return estimateCmd
 }
 
 func setupComposeCommand() *cobra.Command {
