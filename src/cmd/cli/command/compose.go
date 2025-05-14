@@ -588,7 +588,7 @@ func makeComposeEstimateCmd() *cobra.Command {
 			lineItems := make([]EstimateLineItemTableItem, len(estimate.LineItems))
 			for i, lineItem := range estimate.LineItems {
 				lineItems[i] = EstimateLineItemTableItem{
-					Cost:        fmt.Sprintf("$%.2f", lineItem.Cost),
+					Cost:        lineItem.Cost.String(),
 					Quantity:    fmt.Sprintf("%.2f %s", lineItem.Quantity, lineItem.Unit),
 					Description: lineItem.Description,
 				}
@@ -600,7 +600,7 @@ func makeComposeEstimateCmd() *cobra.Command {
 			})
 
 			term.Table(lineItems, []string{"Cost", "Quantity", "Description"})
-			fmt.Printf("Estimated Monthly Cost: $%.2f %s (+ usage)\n", estimate.Subtotal, estimate.Currency)
+			fmt.Printf("Estimated Monthly Cost: %s (+ usage)\n", estimate.Subtotal.String())
 			fmt.Printf("Estimate does not include tax or discounts.\n")
 
 			return nil
