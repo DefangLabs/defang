@@ -132,6 +132,8 @@ service FabricController {
   rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  rpc Estimate(EstimateRequest) returns (EstimateResponse);
 }
 
 enum Provider {
@@ -689,4 +691,27 @@ message WhoAmIResponse {
   string user_id = 4;
   SubscriptionTier tier = 5;
   bool training_opt_out = 6;
+}
+
+message EstimateRequest {
+  Provider provider = 1;
+  string region = 2;
+  bytes pulumi_preview = 3;
+  DeploymentMode mode = 4;
+}
+
+message EstimateLineItem {
+  string description = 1;
+  string unit = 2;
+  float quantity = 3;
+  float cost = 4;
+  string currency = 5;
+}
+
+message EstimateResponse {
+  Provider provider = 1;
+  string region = 2;
+  float subtotal = 3;
+  string currency = 4;
+  repeated EstimateLineItem line_items = 5;
 }
