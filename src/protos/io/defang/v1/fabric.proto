@@ -229,6 +229,7 @@ message DeployRequest {
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;
+  bool preview = 7;
 }
 
 message DeployResponse {
