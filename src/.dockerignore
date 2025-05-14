@@ -1,9 +1,0 @@
-# ignore everything
-*
-
-# we only need these files to build the binary
-!/cmd
-!/pkg
-!/protos
-!go.sum
-!go.mod
