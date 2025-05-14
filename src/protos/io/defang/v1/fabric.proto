@@ -7,6 +7,7 @@ package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/type/money.proto";
 
 service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status) {
@@ -705,14 +706,12 @@ message EstimateLineItem {
   string description = 1;
   string unit = 2;
   float quantity = 3;
-  float cost = 4;
-  string currency = 5;
+  google.type.Money cost = 4;
 }
 
 message EstimateResponse {
   Provider provider = 1;
   string region = 2;
-  float subtotal = 3;
-  string currency = 4;
-  repeated EstimateLineItem line_items = 5;
+  google.type.Money subtotal = 3;
+  repeated EstimateLineItem line_items = 4;
 }
