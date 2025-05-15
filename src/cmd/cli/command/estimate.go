@@ -56,13 +56,37 @@ func makeComposeEstimateCmd() *cobra.Command {
 }
 
 func RunEstimate(ctx context.Context, project *compose.Project, provider cliClient.Provider, region string, mode defangv1.DeploymentMode) error {
+	term.Info("Generating deployment preview")
+	preview, err := GeneratePreview(ctx, project, provider, mode)
+	if err != nil {
+		return fmt.Errorf("failed to generate preview: %w", err)
+	}
+	term.Debugf("Preview output: %s\n", preview)
+
+	term.Info("Preparing estimate")
+	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
+		Provider:      providerID.EnumValue(),
+		Region:        region,
+		PulumiPreview: []byte(preview),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to estimate: %w", err)
+	}
+
+	term.Debugf("Estimate: %+v", estimate)
+
+	PrintEstimate(estimate)
+
+	return nil
+}
+
+func GeneratePreview(ctx context.Context, project *compose.Project, provider cliClient.Provider, mode defangv1.DeploymentMode) (string, error) {
 	os.Setenv("DEFANG_JSON", "1") // always show JSON output for estimate
 	since := time.Now()
 
-	term.Info("Generating deployment preview")
 	resp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModePreview, mode)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var pulumiPreviewLogLines []string
@@ -78,33 +102,18 @@ func RunEstimate(ctx context.Context, project *compose.Project, provider cliClie
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to tail and wait for cd: %w", err)
+		return "", fmt.Errorf("failed to tail and wait for cd: %w", err)
 	}
 
-	preview := strings.Join(pulumiPreviewLogLines, "\n")
+	return strings.Join(pulumiPreviewLogLines, "\n"), nil
+}
 
-	term.Debugf("Preview output: %s\n", preview)
-
-	term.Info("Preparing estimate")
-	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-		Provider:      providerID.EnumValue(),
-		Region:        region,
-		PulumiPreview: []byte(preview),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to estimate: %w", err)
-	}
-
-	term.Debugf("Estimate: %+v", estimate)
-
+func PrintEstimate(estimate *defangv1.EstimateResponse) {
 	subtotal := (*money.Money)(estimate.Subtotal)
-
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Table(tableItems, []string{"Cost", "Quantity", "Description"})
-	fmt.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
-	fmt.Printf("Estimate does not include taxes or Discount Programs.\n")
-
-	return nil
+	term.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
+	term.Printf("Estimate does not include taxes or Discount Programs.\n")
 }
 
 type EstimateLineItemTableItem struct {
