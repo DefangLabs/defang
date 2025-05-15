@@ -74,12 +74,12 @@ func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, aut
 
 var authService AuthService = OpenAuthService{}
 
-func saveAccessToken(fabric, at string) error {
+func saveAccessToken(fabric, token string) error {
 	tokenFile := getTokenFile(fabric)
 	term.Debug("Saving access token to", tokenFile)
 	os.MkdirAll(client.StateDir, 0700)
-	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
-		return err
+	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
+		return fmt.Errorf("failed to save access token: %w", err)
 	}
 	return nil
 }
