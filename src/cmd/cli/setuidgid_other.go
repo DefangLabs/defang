@@ -13,7 +13,9 @@ func setUidGidFromFile(path string) error {
 	if err != nil {
 		return err
 	}
-	statt := stat.Sys().(*syscall.Stat_t)
-	syscall.Setgid(int(statt.Gid))
-	return syscall.Setuid(int(statt.Uid))
+	if statt, ok := stat.Sys().(*syscall.Stat_t); ok {
+		syscall.Setgid(int(statt.Gid))
+		return syscall.Setuid(int(statt.Uid))
+	}
+	return nil
 }
