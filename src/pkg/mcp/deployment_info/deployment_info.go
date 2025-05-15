@@ -28,6 +28,7 @@ type Service struct {
 func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]Service, error) {
 	term.Infof("Listing services in project %q", projectName)
 
+	term.Info("Function invoked: provider.GetServices")
 	getServicesResponse, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName})
 	if err != nil {
 		return nil, err

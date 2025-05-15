@@ -31,6 +31,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Info("Compose down tool called - removing services")
 
+		term.Info("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
@@ -38,6 +39,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 
 		client.Track("MCP Destroy Tool")
 
+		term.Info("Function invoked: cli.NewProvider")
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
@@ -55,6 +57,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
+		term.Info("Function invoked: cliClient.LoadProjectNameWithFallback")
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			term.Error("Failed to load project name", "error", err)
@@ -67,6 +70,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), nil
 		}
 
+		term.Info("Function invoked: cli.ComposeDown")
 		deployment, err := cli.ComposeDown(ctx, projectName, client, provider)
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
@@ -87,12 +91,14 @@ func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, pro
 		Provider: defangv1.Provider_DEFANG,
 	}
 
+	term.Info("Function invoked: client.CanIUse")
 	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
 		term.Error("Failed to use provider", "error", err)
 		return fmt.Errorf("failed to use provider: %w", err)
 	}
 
+	term.Info("Function invoked: provider.SetCanIUseConfig")
 	provider.SetCanIUseConfig(resp)
 	return nil
 }

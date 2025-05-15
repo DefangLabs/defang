@@ -45,6 +45,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
+		term.Info("Function invoked: loader.LoadProject")
 		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
@@ -53,6 +54,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
+		term.Info("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
@@ -60,6 +62,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 
 		client.Track("MCP Deploy Tool")
 
+		term.Info("Function invoked: cli.NewProvider")
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
@@ -70,6 +73,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		// Deploy the services
 		term.Infof("Deploying services for project %s...", project.Name)
 
+		term.Info("Function invoked: cli.ComposeUp")
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
