@@ -135,13 +135,14 @@ func (m MockFabricClient) ListDeployments(ctx context.Context, req *defangv1.Lis
 }
 
 type MockLoader struct {
-	Project *composeTypes.Project
+	Project composeTypes.Project
+	Error   error
 }
 
 func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	return m.Project, nil
+	return &m.Project, m.Error
 }
 
 func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {
-	return m.Project.Name, nil
+	return m.Project.Name, m.Error
 }

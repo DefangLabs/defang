@@ -255,7 +255,7 @@ func TestGetProvider(t *testing.T) {
 	}
 	mockClient.SetClient(mockCtrl)
 	client = &mockClient
-	loader := cliClient.MockLoader{Project: &compose.Project{Name: "empty"}}
+	loader := cliClient.MockLoader{Project: compose.Project{Name: "empty"}}
 	oldRootCmd := RootCmd
 	t.Cleanup(func() {
 		RootCmd = oldRootCmd

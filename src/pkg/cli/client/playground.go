@@ -116,9 +116,9 @@ func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, erro
 		return "", err
 	}
 	if resp.Project == "" {
-		return "", errors.New("no projects found")
+		return "", errors.New("no Playground projects found")
 	}
-	term.Debug("Using default playground project: ", resp.Project)
+	term.Debug("Using default Playground project: ", resp.Project)
 	return resp.Project, nil
 }
 
