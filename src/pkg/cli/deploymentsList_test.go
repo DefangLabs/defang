@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -36,7 +37,7 @@ func (mockListDeploymentsHandler) ListDeployments(ctx context.Context, req *conn
 				ProviderAccountId: "1234567890",
 				ProviderString:    "playground",
 				Region:            "us-test-2",
-				Timestamp:         timestamppb.Now(),
+				Timestamp:         timestamppb.New(time.Time{}),
 			},
 		}
 	}
@@ -59,7 +60,7 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("no deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "empty", *grpcClient, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "empty", grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
@@ -74,13 +75,12 @@ func TestDeploymentsList(t *testing.T) {
 
 	t.Run("some deployments", func(t *testing.T) {
 		stdout, _ := term.SetupTestTerm(t)
-		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "test", *grpcClient, 10)
+		err := DeploymentsList(ctx, defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, "test", grpcClient, 10)
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nProjectName  Provider  AccountId   Region     Deployment  DeployedAt            \x1b[0m" + `
-test         defang    1234567890  us-test-2  a1b2c3      ` + timestamppb.Now().AsTime().Format("2006-01-02T15:04:05Z07:00") + `
-`
+		expectedOutput := "\x1b[1m\nProjectName  Provider  AccountId   Region     Deployment  DeployedAt                 \x1b[0m" + `
+test         defang    1234567890  us-test-2  a1b2c3      ` + time.Time{}.Local().Format(time.RFC3339) + "\n"
 
 		receivedLines := strings.Split(stdout.String(), "\n")
 		expectedLines := strings.Split(expectedOutput, "\n")
