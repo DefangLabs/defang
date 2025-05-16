@@ -23,12 +23,14 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Infof("Login tool called")
 		// Test token
+		term.Info("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		client.Track("MCP Login Tool")
 		if err != nil {
 			if authPort != 0 {
 				return mcp.NewToolResultText("Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"), nil
 			}
+			term.Info("Function invoked: cli.InteractiveLoginPrompt")
 			err = cli.InteractiveLoginPrompt(ctx, client, cluster)
 			if err != nil {
 				return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
