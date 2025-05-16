@@ -169,3 +169,7 @@ func (g GrpcClient) SetOptions(ctx context.Context, req *defangv1.SetOptionsRequ
 	_, err := g.client.SetOptions(ctx, connect.NewRequest(req))
 	return err
 }
+
+func (g GrpcClient) Estimate(ctx context.Context, req *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error) {
+	return getMsg(g.client.Estimate(ctx, connect.NewRequest(req)))
+}
