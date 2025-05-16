@@ -20,7 +20,7 @@ type PrintDeployment struct {
 	Region      string
 }
 
-func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.GrpcClient, limit uint32) error {
+func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, projectName string, client client.FabricClient, limit uint32) error {
 	response, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
 		Type:    listType,
 		Project: projectName,
@@ -46,7 +46,7 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 	for i, d := range response.Deployments {
 		deployments[i] = PrintDeployment{
 			AccountId:   d.ProviderAccountId,
-			DeployedAt:  d.Timestamp.AsTime().Format(time.RFC3339),
+			DeployedAt:  d.Timestamp.AsTime().Local().Format(time.RFC3339),
 			Deployment:  d.Id,
 			ProjectName: d.Project,
 			Provider:    getProvider(d.Provider, d.ProviderString),

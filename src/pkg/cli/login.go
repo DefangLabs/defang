@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -74,12 +75,12 @@ func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, aut
 
 var authService AuthService = OpenAuthService{}
 
-func saveAccessToken(fabric, at string) error {
+func saveAccessToken(fabric, token string) error {
 	tokenFile := getTokenFile(fabric)
 	term.Debug("Saving access token to", tokenFile)
 	os.MkdirAll(client.StateDir, 0700)
-	if err := os.WriteFile(tokenFile, []byte(at), 0600); err != nil {
-		return err
+	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
+		return fmt.Errorf("failed to save access token: %w", err)
 	}
 	return nil
 }
@@ -97,7 +98,7 @@ func InteractiveLoginWithDocker(ctx context.Context, fabric string, authPort int
 }
 
 func interactiveLogin(ctx context.Context, client client.FabricClient, fabric string, prompt Prompt) error {
-	at, err := authService.login(ctx, client, fabric, prompt)
+	token, err := authService.login(ctx, client, fabric, prompt)
 	if err != nil {
 		return err
 	}
@@ -105,8 +106,13 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	tenant, host := SplitTenantHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := saveAccessToken(fabric, at); err != nil {
-		term.Warnf("Failed to save access token, try re-authenticating: %v", err)
+	if err := saveAccessToken(fabric, token); err != nil {
+		term.Warn(err)
+		var pathError *os.PathError
+		if errors.As(err, &pathError) {
+			term.Printf("\nTo fix file permissions, run:\n\n  sudo chown -R $(whoami) %q\n", pathError.Path)
+		}
+		// We continue even if we can't save the token; we just won't have it saved for next time
 	}
 	return nil
 }

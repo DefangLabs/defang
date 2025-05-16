@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,20 +32,17 @@ var mcpServerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		authPort, _ := cmd.Flags().GetInt("auth-server")
 
-		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
-			term.Error("Failed to open log file", "error", err)
-			return err
+			term.Warnf("Failed to open log file: %v", err)
+		} else {
+			defer logFile.Close()
+			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
 		}
-		defer logFile.Close()
-
-		// TODO: Should we still write to a file or we can go back to stderr
-		term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
 
 		// Setup knowledge base
 		if err := mcp.SetupKnowledgeBase(); err != nil {
-			term.Error("Failed to setup knowledge base", "error", err)
-			return err
+			return fmt.Errorf("failed to setup knowledge base: %w", err)
 		}
 
 		term.Info("Starting Defang MCP server")

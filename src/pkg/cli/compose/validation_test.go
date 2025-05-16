@@ -79,9 +79,9 @@ func TestValidationAndConvert(t *testing.T) {
 		}
 
 		// The order of the services is not guaranteed, so we sort the logs before comparing
-		logLines := strings.Split(strings.Trim(logs.String(), "\n"), "\n")
+		logLines := strings.SplitAfter(logs.String(), "\n")
 		slices.Sort(logLines)
-		logs = bytes.NewBufferString(strings.Join(logLines, "\n"))
+		logs = bytes.NewBufferString(strings.Join(logLines, ""))
 
 		// Compare the logs with the warnings file
 		if err := compare(logs.Bytes(), path+".warnings"); err != nil {
