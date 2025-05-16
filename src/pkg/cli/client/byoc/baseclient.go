@@ -205,7 +205,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 // This function was based on update function from Fabric controller and slightly modified to work with BYOC
 func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain string, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
 	if err := compose.ValidateService(&service); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("service %q: %w", service.Name, err)
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
@@ -246,12 +246,6 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 		si.PrivateFqdn = b.GetPrivateFqdn(projectName, fqn)
 	}
 
-	if service.DomainName != "" {
-		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
-			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
-		}
-	}
-
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if service.Build != nil {
@@ -261,7 +255,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	if siUpdater, ok := b.projectBackend.(ServiceInfoUpdater); ok {
 		if err := siUpdater.UpdateServiceInfo(ctx, si, projectName, delegateDomain, service); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 	}
 

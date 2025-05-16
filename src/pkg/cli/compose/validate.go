@@ -43,6 +43,12 @@ func ValidateService(service *types.ServiceConfig) error {
 		uniquePorts[port.Target] = true
 	}
 
+	if service.DomainName != "" {
+		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
+			return fmt.Errorf("domainname %q requires at least one ingress port", service.DomainName) // retryable CodeFailedPrecondition
+		}
+	}
+
 	if service.HealthCheck != nil && len(service.HealthCheck.Test) > 0 {
 		// Technically this should test for <= but both interval and timeout have 30s as the default value in compose spec
 		interval := getOrZero(service.HealthCheck.Interval)
