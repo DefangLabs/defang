@@ -30,8 +30,12 @@ func (t *Term) Table(slice interface{}, attributes ...string) error {
 	}
 
 	// Print headers
-	for _, attr := range attributes {
-		_, err = fmt.Fprintf(w, "%s\t", attr)
+	for i, attr := range attributes {
+		var prefix string
+		if i > 0 {
+			prefix = "\t"
+		}
+		_, err = fmt.Fprint(w, prefix, attr)
 		if err != nil {
 			return err
 		}
@@ -51,7 +55,7 @@ func (t *Term) Table(slice interface{}, attributes ...string) error {
 		for _, attr := range attributes {
 			field := item.FieldByName(attr)
 			if !field.IsValid() {
-				_, err = fmt.Fprintf(w, "N/A\t")
+				_, err = fmt.Fprint(w, "N/A\t")
 				if err != nil {
 					return err
 				}
