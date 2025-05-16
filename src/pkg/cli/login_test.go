@@ -54,16 +54,16 @@ func (g mockGitHubAuthService) serveAuthServer(ctx context.Context, fabric strin
 }
 
 func TestInteractiveLogin(t *testing.T) {
-	tempGithubAuthService := authService
+	prevGithubAuthService := authService
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
 	// use a temp dir for the token file
-	tempStateDir := client.StateDir
+	prevStateDir := client.StateDir
 	client.StateDir = filepath.Join(t.TempDir(), "defang")
 
 	t.Cleanup(func() {
-		authService = tempGithubAuthService
-		client.StateDir = tempStateDir
+		authService = prevGithubAuthService
+		client.StateDir = prevStateDir
 	})
 
 	tokenFile := getTokenFile(fabric)
@@ -114,11 +114,11 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Skip("ACTIONS_ID_TOKEN_REQUEST_URL not set")
 		}
 
-		// use a temp dir for the token file
-		temp := client.StateDir
+		// use a prevStateDir dir for the token file
+		prevStateDir := client.StateDir
 		client.StateDir = filepath.Join(t.TempDir(), "defang")
 
-		t.Cleanup(func() { client.StateDir = temp })
+		t.Cleanup(func() { client.StateDir = prevStateDir })
 
 		err := NonInteractiveLogin(ctx, mockClient, fabric)
 		if err != nil {
