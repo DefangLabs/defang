@@ -283,6 +283,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
+	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
@@ -994,7 +995,14 @@ var deploymentsCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List active deployments across all projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, "", *client, 0)
+		var projectName, _ = cmd.Flags().GetString("project-name")
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, client, 0)
 	},
 }
 
@@ -1005,13 +1013,19 @@ var deploymentsListCmd = &cobra.Command{
 	Args:        cobra.NoArgs,
 	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, *client, 10)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, client, 10)
 	},
 }
 
