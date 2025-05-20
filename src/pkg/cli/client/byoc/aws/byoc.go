@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.148.0")
+	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.170.0")
 )
 
 type StsProviderAPI interface {

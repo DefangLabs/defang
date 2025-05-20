@@ -2,7 +2,7 @@ module github.com/DefangLabs/defang/src
 
 go 1.23.0
 
-toolchain go1.23.5
+toolchain go1.23.9
 
 replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
 
