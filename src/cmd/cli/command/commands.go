@@ -260,6 +260,9 @@ func SetupCommands(ctx context.Context, version string) {
 	restart.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(restart)
 
+	estimateCmd := makeEstimateCmd()
+	RootCmd.AddCommand(estimateCmd)
+
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	debugCmd.Flags().MarkHidden("etag")
