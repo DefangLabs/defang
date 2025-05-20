@@ -28,8 +28,8 @@ func NewServiceNameReplacer(provider client.Provider, project *composeTypes.Proj
 	var hostServiceNames []string    // services with private "host" ports
 	var ingressServiceNames []string // services with "ingress" ports
 	for _, svccfg := range project.Services {
-		public := false // HACK: we only check the ports for "host" mode and don't care about the networks
-		if !public && slices.ContainsFunc(svccfg.Ports, isHostPort) {
+		// HACK: we only check the ports for "host" mode and don't care about the networks
+		if slices.ContainsFunc(svccfg.Ports, isHostPort) {
 			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(svccfg.Name))
 		} else if len(svccfg.Ports) > 0 {
 			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(svccfg.Name))

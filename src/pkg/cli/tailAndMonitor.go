@@ -32,7 +32,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
 	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
 
-	_, unmanagedServices := SplitManagedAndUnmanagedServices(project.Services)
+	_, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
 
 	var cdErr, svcErr error
 	wg := &sync.WaitGroup{}
@@ -94,22 +94,24 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	return errors.Join(cdErr, svcErr, tailErr)
 }
 
-func isManagedService(service compose.ServiceConfig) bool {
+func CanMonitorService(service compose.ServiceConfig) bool {
 	if service.Extensions == nil {
-		return false
+		return true
 	}
 
-	return service.Extensions["x-defang-static-files"] != nil || service.Extensions["x-defang-redis"] != nil || service.Extensions["x-defang-postgres"] != nil
+	return service.Extensions["x-defang-static-files"] == nil &&
+		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-postgres"] == nil
 }
 
-func SplitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
+func splitManagedAndUnmanagedServices(serviceInfos compose.Services) ([]string, []string) {
 	var managedServices []string
 	var unmanagedServices []string
 	for _, service := range serviceInfos {
-		if isManagedService(service) {
-			managedServices = append(managedServices, service.Name)
-		} else {
+		if CanMonitorService(service) {
 			unmanagedServices = append(unmanagedServices, service.Name)
+		} else {
+			managedServices = append(managedServices, service.Name)
 		}
 	}
 

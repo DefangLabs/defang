@@ -65,7 +65,7 @@ jobs:
       - name: Check nix-shell default.nix
         run: |
           set -o pipefail
-          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=9::Replace the vendorHash with the correct value:|'
+          nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang 2>&1 | sed -u 's|\s\+got:|::error file=pkgs/defang/cli.nix,line=9::Replace the vendorHash in cli.nix with the correct value:|'
 
   # go-byoc-test:
   #   runs-on: ubuntu-latest
