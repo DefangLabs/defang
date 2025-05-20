@@ -100,14 +100,14 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	// Get the list of projects from remote
 	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
 	for i, name := range projectNames {
 		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
 	}
 
 	if len(projectNames) == 0 {
-		return "", errors.New("no projects found")
+		return "", errors.New("no cloud projects found")
 	}
 
 	if len(projectNames) > 1 {
