@@ -79,9 +79,9 @@ func TestValidationAndConvert(t *testing.T) {
 		}
 
 		// The order of the services is not guaranteed, so we sort the logs before comparing
-		logLines := strings.Split(strings.Trim(logs.String(), "\n"), "\n")
+		logLines := strings.SplitAfter(logs.String(), "\n")
 		slices.Sort(logLines)
-		logs = bytes.NewBufferString(strings.Join(logLines, "\n"))
+		logs = bytes.NewBufferString(strings.Join(logLines, ""))
 
 		// Compare the logs with the warnings file
 		if err := compare(logs.Bytes(), path+".warnings"); err != nil {
@@ -177,55 +177,70 @@ func TestManagedStoreParams(t *testing.T) {
 	tests := []struct {
 		name      string
 		extension any
-		errors    []string
+		wantValue bool
+		wantErr   string
 	}{
 		{
 			name: "sanity check",
 			extension: map[string]any{
 				"allow-downtime": true,
 			},
-			errors: []string{},
+			wantValue: true,
 		},
 		{
 			name:      "empty",
 			extension: nil,
-			errors:    []string{},
+			wantValue: false,
 		},
 		{
 			name:      "true value",
 			extension: true,
-			errors:    []string{},
+			wantValue: true,
 		},
 		{
 			name:      "false value",
 			extension: false,
-			errors:    []string{},
+			wantValue: false,
 		},
 		{
 			name: "invalid downtime",
 			extension: map[string]any{
 				"allow-downtime": "abc",
 			},
-			errors: []string{"'allow-downtime' must be a boolean"},
+			wantErr: "'allow-downtime' must be a boolean",
 		},
 		{
 			name:      "no options",
 			extension: map[string]any{},
-			errors:    []string{},
+			wantValue: true,
+		},
+		{
+			name:      "false string",
+			extension: "false",
+			wantValue: false,
+		},
+		{
+			name:      "true string",
+			extension: "true",
+			wantValue: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateManagedStore(tt.extension); err != nil {
-				if len(tt.errors) == 0 {
-					t.Fatalf("ValidateManagedStore() unexpected err = %v", err)
+			val, err := validateManagedStore(tt.extension)
+			if err != nil {
+				if tt.wantErr == "" {
+					t.Fatalf("unexpected error: %v", err)
+				} else if err.Error() != tt.wantErr {
+					t.Fatalf("unexpected error: %v, expected: %s", err, tt.wantErr)
 				}
-
-				for _, errMsg := range tt.errors {
-					if !strings.Contains(err.Error(), errMsg) {
-						t.Fatalf("ValidateManagedStore() = %v, want %v", err.Error(), tt.errors)
-					}
+			} else {
+				if tt.wantErr != "" {
+					t.Fatalf("expected error: %s, got: nil", tt.wantErr)
+				}
+				if val != tt.wantValue {
+					t.Fatalf("unexpected value: %v, expected: %v", val, tt.wantValue)
 				}
 			}
 		})

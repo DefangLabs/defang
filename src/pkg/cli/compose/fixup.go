@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -30,6 +29,35 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Ports[i] = port
 		}
 	}
+
+	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
+	for _, svccfg := range project.Services {
+		_, managedRedis := svccfg.Extensions["x-defang-redis"]
+		if managedRedis {
+			if err := fixupRedisService(&svccfg, provider); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
+		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
+		if managedPostgres {
+			if err := fixupPostgresService(&svccfg, provider); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
+		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
+			fixupModelProvider(&svccfg, provider, project)
+		}
+
+		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
+			fixupLLM(&svccfg)
+		}
+
+		// update the concrete service with the fixed up object
+		project.Services[svccfg.Name] = svccfg
+	}
+
 	svcNameReplacer := NewServiceNameReplacer(provider, project)
 
 	for _, svccfg := range project.Services {
@@ -55,7 +83,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 
 			if len(removedArgs) > 0 {
-				term.Warnf("service %q: skipping unset build argument %s", svccfg.Name, pkg.QuotedArray(removedArgs))
+				term.Warnf("service %q: skipping unset build argument %q", svccfg.Name, removedArgs)
 			}
 		}
 
@@ -102,33 +130,11 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		}
 
 		if len(useCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %s will use the `defang config` value instead of adjusted service name", svccfg.Name, pkg.QuotedArray(useCfg))
+			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, useCfg)
 		}
 
 		if len(overriddenCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %s overridden by config", svccfg.Name, pkg.QuotedArray(overriddenCfg))
-		}
-
-		_, managedRedis := svccfg.Extensions["x-defang-redis"]
-		if managedRedis {
-			if err := fixupRedisService(&svccfg, provider); err != nil {
-				return fmt.Errorf("service %q: %w", svccfg.Name, err)
-			}
-		}
-
-		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
-		if managedPostgres {
-			if err := fixupPostgresService(&svccfg, provider); err != nil {
-				return fmt.Errorf("service %q: %w", svccfg.Name, err)
-			}
-		}
-
-		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
-			fixupModelProvider(&svccfg, provider, project)
-		}
-
-		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
-			fixupLLM(&svccfg)
+			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overriddenCfg)
 		}
 
 		_, scaling := svccfg.Extensions["x-defang-autoscaling"]

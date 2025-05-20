@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -23,8 +24,8 @@ func SetupResources(s *server.MCPServer) {
 	setupSamplePrompt(s)
 }
 
-var knowledgeBasePath = client.StateDir + "/knowledge_base.json"
-var samplesExamplesPath = client.StateDir + "/samples_examples.json"
+var knowledgeBasePath = filepath.Join(client.StateDir, "knowledge_base.json")
+var samplesExamplesPath = filepath.Join(client.StateDir, "samples_examples.json")
 
 // setupDocumentationResource configures and adds the documentation resource to the MCP server
 func setupDocumentationResource(s *server.MCPServer) {

@@ -118,11 +118,11 @@ func TestComposeUp(t *testing.T) {
 	}
 }
 
-func TestGetUnreferencedManagedResources(t *testing.T) {
+func TestSplitManagedAndUnmanagedServices(t *testing.T) {
 	t.Run("no services", func(t *testing.T) {
 		project := compose.Services{}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resources, got %d (%v)", len(managed), managed)
 		}
@@ -139,7 +139,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 1 {
 			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -154,7 +154,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			"service1": compose.ServiceConfig{},
 		}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -172,7 +172,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 1 {
 			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -188,7 +188,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			"service2": compose.ServiceConfig{},
 		}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 0 {
 			t.Errorf("Expected 0 managed resource, got %d (%v)", len(managed), managed)
 		}
@@ -209,7 +209,7 @@ func TestGetUnreferencedManagedResources(t *testing.T) {
 			},
 		}
 
-		managed, unmanaged := SplitManagedAndUnmanagedServices(project)
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
 		if len(managed) != 2 {
 			t.Errorf("Expected 2 managed resource, got %d (%v)", len(managed), managed)
 		}

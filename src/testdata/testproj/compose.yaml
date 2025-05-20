@@ -53,7 +53,6 @@ services:
     profiles:
       - donotstart
     x-defang-dns-role: arn:aws:iam::123456789012:role/ecs-service-role
-    x-defang-static: ./static
 
 secrets:
   dummy:
