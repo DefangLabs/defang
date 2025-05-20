@@ -32,6 +32,7 @@ var mcpServerCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		authPort, _ := cmd.Flags().GetInt("auth-server")
 
+		term.Info("Creating log file")
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			term.Warnf("Failed to open log file: %v", err)
@@ -41,11 +42,10 @@ var mcpServerCmd = &cobra.Command{
 		}
 
 		// Setup knowledge base
+		term.Info("Function invoked: mcp.SetupKnowledgeBase")
 		if err := mcp.SetupKnowledgeBase(); err != nil {
 			return fmt.Errorf("failed to setup knowledge base: %w", err)
 		}
-
-		term.Info("Starting Defang MCP server")
 
 		// Create a new MCP server
 		term.Info("Creating MCP server")
@@ -59,14 +59,17 @@ var mcpServerCmd = &cobra.Command{
 		)
 
 		// Setup resources
+		term.Info("Setting up resources")
 		resources.SetupResources(s)
 
 		// Setup tools
+		term.Info("Setting up tools")
 		tools.SetupTools(s, getCluster(), authPort)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
 			term.Info("Starting Auth Server for Docker login flow")
+			term.Info("Function invoked: cli.InteractiveLoginWithDocker")
 
 			go func() {
 				if err := cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), authPort); err != nil {
