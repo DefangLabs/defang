@@ -47,7 +47,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		}
 
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
-			fixupModelProvider(&svccfg, provider, project)
+			fixupModelProvider(&svccfg, project)
 		}
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
@@ -214,14 +214,14 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) er
 	return nil
 }
 
-func fixupModelProvider(svccfg *types.ServiceConfig, provider client.Provider, project *types.Project) {
+func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 	// Declare a private network for the model provider
 	const modelProviderNetwork = "model_provider_private"
 
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	urlEnv := envName + "_URL"
-	urlVal := "http://" + provider.ServiceDNS(NormalizeServiceName(svccfg.Name)) + "/api/v1/"
+	urlVal := "http://" + svccfg.Name + "/api/v1/"
 	modelEnv := envName + "_MODEL"
 	modelVal := svccfg.Provider.Options["model"]
 
