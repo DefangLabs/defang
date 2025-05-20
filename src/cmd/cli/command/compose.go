@@ -553,7 +553,6 @@ services:
 	composeCmd.AddCommand(makeComposeStartCmd())
 	composeCmd.AddCommand(makeComposeRestartCmd())
 	composeCmd.AddCommand(makeComposeStopCmd())
-	composeCmd.AddCommand(makeComposeEstimateCmd())
 
 	return composeCmd
 }

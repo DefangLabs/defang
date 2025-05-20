@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func makeComposeEstimateCmd() *cobra.Command {
+func makeEstimateCmd() *cobra.Command {
 	var estimateCmd = &cobra.Command{
 		Use:         "estimate",
 		Args:        cobra.NoArgs,

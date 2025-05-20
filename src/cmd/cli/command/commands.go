@@ -260,7 +260,7 @@ func SetupCommands(ctx context.Context, version string) {
 	restart.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(restart)
 
-	estimateCmd := makeComposeEstimateCmd()
+	estimateCmd := makeEstimateCmd()
 	RootCmd.AddCommand(estimateCmd)
 
 	// Debug Command
