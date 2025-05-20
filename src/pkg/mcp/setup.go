@@ -251,7 +251,7 @@ func SetupClient(client string) error {
 		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
 	}
 
-	track.Evt("MCP Setup Client: ", track.P{"client", client})
+	track.Evt("MCP Setup Client: ", track.P("client", client))
 
 	// Get the config path for the client
 	configPath, err := getClientConfigPath(client)
