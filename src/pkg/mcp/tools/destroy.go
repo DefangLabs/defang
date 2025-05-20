@@ -8,6 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -30,13 +31,12 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 	term.Info("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Info("Compose down tool called - removing services")
+		track.Evt("MCP Destroy Tool")
 
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
-
-		client.Track("MCP Destroy Tool")
 
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {

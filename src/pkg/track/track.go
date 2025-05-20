@@ -15,6 +15,7 @@ var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 
 type Property = cliClient.Property
 
+// P creates a Property with the given name and value.
 func P(name string, value interface{}) Property {
 	return Property{Name: name, Value: value}
 }
@@ -27,6 +28,12 @@ var Tracker interface {
 var trackWG = sync.WaitGroup{}
 
 // Evt sends a tracking event to the server in a separate goroutine.
+// This function can take in optional key-value pairs which is a type called Property.
+//
+// Example:
+//
+//	client := "vscode"
+//	track.Evt("MCP Setup Client:", track.P("client", client))
 func Evt(name string, props ...Property) {
 	if disableAnalytics {
 		return
