@@ -105,8 +105,8 @@ func Execute(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if resp, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName}); err == nil {
-				projectName = resp.Project
+			if resp, err := provider.RemoteProjectName(ctx); err == nil {
+				projectName = resp
 			}
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
