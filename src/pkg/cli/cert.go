@@ -90,8 +90,14 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 		if service, ok := project.Services[serviceInfo.Service.Name]; ok && service.DomainName != "" && serviceInfo.ZoneId == "" {
 			cnt++
 			targets := getDomainTargets(serviceInfo, service)
-			term.Debugf("Found service %v with domain %v and targets %v", service.Name, service.DomainName, targets)
-			generateCert(ctx, service.DomainName, targets, client)
+			domains := []string{service.DomainName}
+			if defaultNetwork, ok := service.Networks["default"]; ok {
+				domains = append(domains, defaultNetwork.Aliases...)
+			}
+			term.Debugf("Found service %v with domains %v and targets %v", service.Name, domains, targets)
+			for _, domain := range domains {
+				generateCert(ctx, domain, targets, client)
+			}
 		}
 	}
 	if cnt == 0 {
