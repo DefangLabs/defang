@@ -74,6 +74,12 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 				term.Warn("Project not found", "error", err)
 				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), nil
 			}
+
+			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
+
 			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), nil
 		}
 
