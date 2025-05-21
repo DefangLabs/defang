@@ -76,6 +76,11 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			err = fmt.Errorf("failed to compose up services: %w", err)
 			term.Error("Failed to compose up services", "error", err)
 
+			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
+
 			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), nil
 		}
 
