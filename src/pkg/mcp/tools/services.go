@@ -79,6 +79,12 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 				term.Warnf("Project %s is not deployed in Playground", projectName)
 				return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), nil
 			}
+
+			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
+
 			term.Error("Failed to get services", "error", err)
 			return mcp.NewToolResultText("Failed to get services"), nil
 		}
