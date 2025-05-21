@@ -9,6 +9,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
 func Token(ctx context.Context, client client.FabricClient, tenant types.TenantName, dur time.Duration, scope scope.Scope) error {
@@ -26,7 +27,18 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		return err
 	}
 
+	// Translate the OpenAuth token to our own Defang Fabric token
+	resp, err := client.Token(ctx, &defangv1.TokenRequest{
+		Tenant:    string(tenant),
+		Scope:     []string{string(scope)},
+		Assertion: at,
+		ExpiresIn: uint32(dur.Seconds()),
+	})
+	if err != nil {
+		return err
+	}
+
 	term.Printc(term.BrightCyan, "Scoped access token: ")
-	term.Println(at)
+	term.Println(resp.AccessToken)
 	return nil
 }
