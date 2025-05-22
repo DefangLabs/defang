@@ -46,6 +46,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
+		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
+		if managedMongo {
+			if err := fixupMongoService(&svccfg, provider); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, project)
 		}
@@ -190,6 +197,31 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 	return nil
 }
 
+func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) error {
+	if _, ok := provider.(*client.PlaygroundProvider); ok {
+		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+		delete(svccfg.Extensions, "x-defang-mongodb")
+	}
+	if len(svccfg.Ports) == 0 {
+		// HACK: we must have at least one host port to get a CNAME for the service
+		var port uint32 = 27017
+		// Check --port
+		args := append(svccfg.Entrypoint, svccfg.Command...)
+		for i, arg := range args {
+			if arg == "--port" && i+1 < len(args) {
+				var err error
+				port, err = parsePortString(args[i+1])
+				if err != nil {
+					return err
+				}
+			}
+		}
+		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
+		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	}
+	return nil
+}
+
 func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
@@ -200,7 +232,7 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) er
 		// Check entrypoint or command for --port argument
 		args := append(svccfg.Entrypoint, svccfg.Command...)
 		for i, arg := range args {
-			if arg == "--port" {
+			if arg == "--port" && i+1 < len(args) {
 				var err error
 				port, err = parsePortString(args[i+1])
 				if err != nil {
