@@ -47,7 +47,6 @@ const (
 
 var (
 	DefaultCDTags = map[string]string{"created-by": "defang"}
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 
 	//TODO: Create cd role with more fine-grained permissions
 	// cdPermissions = []string{
