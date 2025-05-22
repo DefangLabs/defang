@@ -30,7 +30,7 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 			if authPort != 0 {
 				return mcp.NewToolResultText("Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"), nil
 			}
-			err = cli.InteractiveLoginPrompt(ctx, client, cluster)
+			err = cli.InteractiveLoginPrompt(ctx, client, cluster, authPort)
 			if err != nil {
 				return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
 			}
