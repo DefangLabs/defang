@@ -114,11 +114,11 @@ func makeComposeUpCmd() *cobra.Command {
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
-					if resp, err2 := provider.GetServices(cmd.Context(), &defangv1.GetServicesRequest{Project: project.Name}); err2 == nil {
+					if projectName, err2 := provider.RemoteProjectName(cmd.Context()); err2 == nil {
 						term.Error("Error:", prettyError(err))
-						if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, resp.Project); err != nil {
+						if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, projectName); err != nil {
 							term.Debug("ComposeDown failed:", err)
-							printDefangHint("To deactivate a project, do:", "compose down --project-name "+resp.Project)
+							printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 						} else {
 							printDefangHint("To try deployment again, do:", "compose up")
 						}
@@ -553,5 +553,6 @@ services:
 	composeCmd.AddCommand(makeComposeStartCmd())
 	composeCmd.AddCommand(makeComposeRestartCmd())
 	composeCmd.AddCommand(makeComposeStopCmd())
+
 	return composeCmd
 }

@@ -67,7 +67,12 @@ Install the Defang CLI from one of the following sources:
   Expand-Archive defang.zip . -Force
   ```
 
-* Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
+* Using the [official image from Docker Hub](https://hub.docker.com/r/defangio/defang-cli):
+  ```
+  docker run -it defangio/defang-cli help
+  ```
+  
+* or download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
 
 ## Support
 

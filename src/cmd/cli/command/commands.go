@@ -105,8 +105,8 @@ func Execute(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if resp, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName}); err == nil {
-				projectName = resp.Project
+			if resp, err := provider.RemoteProjectName(ctx); err == nil {
+				projectName = resp
 			}
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
@@ -259,6 +259,9 @@ func SetupCommands(ctx context.Context, version string) {
 	restart := makeComposeRestartCmd()
 	restart.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(restart)
+
+	estimateCmd := makeEstimateCmd()
+	RootCmd.AddCommand(estimateCmd)
 
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")

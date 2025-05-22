@@ -38,9 +38,10 @@ type HasStackSupport interface {
 }
 
 type CanIUseConfig struct {
-	CDImage      string
-	AllowScaling bool
-	AllowGPU     bool
+	AllowGPU      bool
+	AllowScaling  bool
+	CDImage       string
+	PulumiVersion string
 }
 
 type ByocBaseClient struct {
@@ -90,6 +91,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
 	b.AllowScaling = quotas.AllowScaling
 	b.AllowGPU = quotas.Gpu
+	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
@@ -100,14 +102,14 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	// Get the list of projects from remote
 	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
 	for i, name := range projectNames {
 		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
 	}
 
 	if len(projectNames) == 0 {
-		return "", errors.New("no projects found")
+		return "", errors.New("no cloud projects found")
 	}
 
 	if len(projectNames) > 1 {

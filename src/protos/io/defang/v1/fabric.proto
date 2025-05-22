@@ -220,6 +220,7 @@ message CanIUseResponse {
   string cd_image = 2;
   bool gpu = 3;
   bool allow_scaling = 4;
+  string pulumi_version = 5;
 }
 
 message DeployRequest {
@@ -699,7 +700,6 @@ message EstimateRequest {
   Provider provider = 1;
   string region = 2;
   bytes pulumi_preview = 3;
-  DeploymentMode mode = 4;
 }
 
 message EstimateLineItem {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 // MCPServerConfig represents the configuration for an MCP server
@@ -249,6 +250,8 @@ func SetupClient(client string) error {
 	if !isValidClient(client) {
 		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
 	}
+
+	track.Evt("MCP Setup Client: ", track.P("client", client))
 
 	// Get the config path for the client
 	configPath, err := getClientConfigPath(client)
