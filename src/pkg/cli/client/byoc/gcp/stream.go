@@ -60,7 +60,8 @@ func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T
 }
 
 func (s *ServerStream[T]) Close() error {
-	s.cancel() // TODO: investigate if we need to close the tailer
+	s.cancel()
+	s.tailer.Close() // Close the grpc connection
 	return nil
 }
 
