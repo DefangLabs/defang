@@ -52,7 +52,7 @@ func (g *PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutCon
 }
 
 func (g *PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.GetController().DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
+	_, err := g.GetController().DeleteSecrets(ctx, connect.NewRequest(req))
 	return err
 }
 
