@@ -13,6 +13,7 @@ import (
 
 func TestGetExistingToken(t *testing.T) {
 	fabric := "test.defang.dev"
+	os.Unsetenv("DEFANG_ACCESS_TOKEN")
 
 	t.Run("Get access token from environmental variable", func(t *testing.T) {
 		expectedToken := "env-token"
