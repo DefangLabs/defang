@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"html/template"
+	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -75,6 +78,28 @@ const (
 	PromptYes Prompt = true
 )
 
+func NewAuthServer(handler http.Handler, port int) *httptest.Server {
+	// create a listener with the desired port.
+	l, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	if err != nil {
+		fmt.Println("Failed to create listener:", err)
+		log.Fatal(err)
+	}
+
+	ts := httptest.NewUnstartedServer(handler)
+
+	if port != 0 {
+		// NewUnstartedServer creates a listener. Close that listener and replace
+		// with the one we created.
+		ts.Listener.Close()
+		ts.Listener = l
+	}
+
+	// Start the server
+	ts.Start()
+	return ts
+}
+
 // ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
 // The server will run on the port that is specified by authPort. The server will continue to run indefinitely.
 // TODO: make the server stop once we have the code
@@ -89,7 +114,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			slog.Info("redirecting to " + ar.url.String())
+			slog.Debug("redirecting to " + ar.url.String())
 			http.Redirect(w, r, ar.url.String(), http.StatusFound)
 			return
 		}
@@ -130,7 +155,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
+func StartAuthCodeFlow(ctx context.Context, prompt Prompt, port int) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -165,7 +190,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 		authTemplate.Execute(w, struct{ StatusMessage string }{msg})
 	})
 
-	server := httptest.NewServer(handler)
+	server := NewAuthServer(handler, port)
 	defer server.Close()
 
 	redirectUri := server.URL + "/auth"
