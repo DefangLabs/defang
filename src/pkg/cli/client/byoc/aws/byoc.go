@@ -414,6 +414,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"PROJECT":                    projectName,                 // may be empty
 		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":             "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}
