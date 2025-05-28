@@ -362,7 +362,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
-				return nil
+				continue
 			}
 
 			if ts.After(options.Since) {
