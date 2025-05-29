@@ -17,7 +17,7 @@ func Token(ctx context.Context, client client.FabricClient, tenant types.TenantN
 		return ErrDryRun
 	}
 
-	code, err := auth.StartAuthCodeFlow(ctx, true)
+	code, err := auth.StartAuthCodeFlow(ctx, auth.PromptYes, 0)
 	if err != nil {
 		return err
 	}
