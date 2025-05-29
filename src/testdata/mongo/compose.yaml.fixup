@@ -1,0 +1,52 @@
+{
+  "mongo": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "MONGO_INITDB_ROOT_PASSWORD": "example!",
+      "MONGO_INITDB_ROOT_USERNAME": "root"
+    },
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27017,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-express": {
+    "command": null,
+    "depends_on": {
+      "mongo": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
+    "entrypoint": null,
+    "environment": {
+      "ME_CONFIG_BASICAUTH": "false",
+      "ME_CONFIG_MONGODB_ADMINPASSWORD": "example!",
+      "ME_CONFIG_MONGODB_ADMINUSERNAME": "root",
+      "ME_CONFIG_MONGODB_URL": "mongodb://root:example!@mongo:27017/"
+    },
+    "image": "mongo-express",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 8081,
+        "published": "8081",
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ],
+    "restart": "always"
+  }
+}
