@@ -181,6 +181,7 @@ message DebugResponse {
   string general = 1;
   repeated Issue issues = 2;
   repeated string requests = 3;
+  string uuid = 4; // unique identifier for the debug request
 }
 
 message Issue {
