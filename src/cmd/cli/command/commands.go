@@ -315,7 +315,7 @@ func SetupCommands(ctx context.Context, version string) {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
-		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
+		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m") // bold
 		RootCmd.SetUsageTemplate(templ)
 	}
 
