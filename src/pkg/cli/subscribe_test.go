@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -151,58 +152,84 @@ func TestWaitServiceState(t *testing.T) {
 		etag        string
 		services    []string
 		targetState defangv1.ServiceState
+		expected    ServiceStates
 	}{
 		{
 			etag:        "etag1",
 			services:    []string{"service1"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			expected: ServiceStates{
+				"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
 		},
 		{
 			etag:        "etag2",
 			services:    []string{"service1", "service2"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			expected: ServiceStates{
+				"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				"service2": defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			},
 		},
+	}
+
+	for _, tt := range noErrTests {
+		t.Run("Expect No Error", func(t *testing.T) {
+			ss, err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(ss, tt.expected) {
+				t.Errorf("Expected service states %v, got: %v", tt.expected, ss)
+			}
+		})
 	}
 
 	errTests := []struct {
 		etag        string
 		services    []string
 		targetState defangv1.ServiceState
+		expected    ServiceStates
 	}{
 		{
 			etag:        "etag3",
 			services:    []string{"service1"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			expected: ServiceStates{
+				"service1": defangv1.ServiceState_BUILD_FAILED,
+			},
 		},
 		{
 			etag:        "etag4",
 			services:    []string{"service1"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			expected: ServiceStates{
+				"service1": defangv1.ServiceState_DEPLOYMENT_FAILED,
+			},
 		},
 		{
 			etag:        "etag5",
 			services:    []string{"service1", "service2", "service3"},
 			targetState: defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+			expected: ServiceStates{
+				"service1": defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				"service2": defangv1.ServiceState_DEPLOYMENT_COMPLETED,
+				"service3": defangv1.ServiceState_DEPLOYMENT_FAILED,
+			},
 		},
-	}
-
-	for _, tt := range noErrTests {
-		t.Run("Expect No Error", func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-		})
 	}
 
 	for _, tt := range errTests {
 		t.Run("Expect Error", func(t *testing.T) {
-			err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
+			ss, err := WaitServiceState(ctx, provider, tt.targetState, "testproject", tt.etag, tt.services)
 			if err == nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Fatalf("Unexpected error: %v", err)
 			}
 			if !errors.As(err, &client.ErrDeploymentFailed{}) {
-				t.Errorf("Expected ErrDeploymentFailed but got %v", err)
+				t.Errorf("Expected ErrDeploymentFailed but got: %v", err)
+			}
+			if !reflect.DeepEqual(ss, tt.expected) {
+				t.Errorf("Expected service states %v, got: %v", tt.expected, ss)
 			}
 		})
 	}
@@ -283,7 +310,7 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			provider := &mockSubscribeProviderForReconnectTest{stream: tt.stream, RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond}}
-			err := WaitServiceState(
+			_, err := WaitServiceState(
 				ctx, provider,
 				defangv1.ServiceState_DEPLOYMENT_COMPLETED,
 				"testproject",
