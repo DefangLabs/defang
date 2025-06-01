@@ -14,9 +14,9 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-const TargetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
+const targetServiceState = defangv1.ServiceState_DEPLOYMENT_COMPLETED
 
-func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) error {
+func TailAndMonitor(ctx context.Context, project *compose.Project, provider client.Provider, waitTimeout time.Duration, tailOptions TailOptions) (ServiceStates, error) {
 	if tailOptions.Deployment == "" {
 		panic("tailOptions.Deployment must be a valid deployment ID")
 	}
@@ -32,15 +32,18 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	svcStatusCtx, cancelSvcStatus := context.WithCancelCause(ctx)
 	defer cancelSvcStatus(nil) // to cancel WaitServiceState and clean-up context
 
-	_, unmanagedServices := splitManagedAndUnmanagedServices(project.Services)
+	_, computeServices := splitManagedAndUnmanagedServices(project.Services)
 
+	var serviceStates ServiceStates
 	var cdErr, svcErr error
+
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
+
 	go func() {
 		defer wg.Done()
 		// block on waiting for services to reach target state
-		svcErr = WaitServiceState(svcStatusCtx, provider, TargetServiceState, project.Name, tailOptions.Deployment, unmanagedServices)
+		serviceStates, svcErr = WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices)
 	}()
 
 	go func() {
@@ -91,7 +94,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 	}
 
-	return errors.Join(cdErr, svcErr, tailErr)
+	return serviceStates, errors.Join(cdErr, svcErr, tailErr)
 }
 
 func CanMonitorService(service compose.ServiceConfig) bool {
