@@ -179,6 +179,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if svccfg.Build.DockerfileInline != "" {
 			return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline", svccfg.Name)
 		}
+		if svccfg.Build.AdditionalContexts != nil {
+			return fmt.Errorf("service %q: unsupported compose directive: build additional_contexts", svccfg.Name)
+		}
+		if svccfg.Build.Ulimits != nil {
+			term.Warnf("service %q: unsupported compose directive: build ulimits", svccfg.Name) // TODO: add support for build ulimits
+		}
 	}
 	for _, secret := range svccfg.Secrets {
 		if !pkg.IsValidSecretName(secret.Source) {

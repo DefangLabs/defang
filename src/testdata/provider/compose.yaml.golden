@@ -4,7 +4,8 @@ services:
     provider:
       type: model
       options:
-        model: ai/smollm2
+        model:
+          - ai/smollm2
     networks:
       default: null
   chat:
