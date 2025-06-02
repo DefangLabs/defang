@@ -233,11 +233,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new temporary directory for this test case
-			tempDir, err := os.MkdirTemp("", "test-dockerignore")
-			if err != nil {
-				t.Fatalf("Failed to create temp directory: %v", err)
-			}
-			t.Cleanup(func() { os.RemoveAll(tempDir) }) // Clean up after the test
+			tempDir := t.TempDir()
 
 			// Create specified ignore file if the name is not empty
 			if tt.ignoreFileName != "" {

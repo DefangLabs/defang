@@ -12,6 +12,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -34,6 +35,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Get compose path
 		term.Info("Compose up tool called - deploying services")
+		track.Evt("MCP Deploy Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
 		if ok && wd != "" {
@@ -79,6 +81,11 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		if err != nil {
 			err = fmt.Errorf("failed to compose up services: %w", err)
 			term.Error("Failed to compose up services", "error", err)
+
+			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
 
 			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), nil
 		}

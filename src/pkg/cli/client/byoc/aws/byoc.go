@@ -42,10 +42,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.148.0")
-)
-
 type StsProviderAPI interface {
 	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
 	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
@@ -148,7 +144,7 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 	containers := []types.Container{
 		{
 			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
-			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + PulumiVersion,
+			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + b.PulumiVersion,
 			Name:      ecs.CdContainerName,
 			Cpus:      2.0,
 			Memory:    2048_000_000, // 2G
@@ -418,6 +414,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"PROJECT":                    projectName,                 // may be empty
 		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":             "false",
 		"PULUMI_SKIP_UPDATE_CHECK":   "true",
 		"STACK":                      b.PulumiStack,
 	}

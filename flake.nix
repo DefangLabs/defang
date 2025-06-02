@@ -33,9 +33,6 @@
                 pulumi-bin
                 google-cloud-sdk
                 vim
-              ]
-              ++ lib.optionals stdenv.isDarwin [
-                darwin.apple_sdk.frameworks.CoreServices
               ];
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };

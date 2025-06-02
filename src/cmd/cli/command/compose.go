@@ -151,7 +151,7 @@ func makeComposeUpCmd() *cobra.Command {
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
 			tailOptions := cli.NewTailOptionsForDeploy(deploy, since, verbose)
-			err = cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
+			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				var errDeploymentFailed cliClient.ErrDeploymentFailed
 				if errors.As(err, &errDeploymentFailed) {
@@ -184,7 +184,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			for _, service := range deploy.Services {
-				service.State = cli.TargetServiceState
+				service.State = serviceStates[service.Service.Name]
 			}
 
 			// Print the current service states of the deployment

@@ -6,6 +6,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -24,8 +25,9 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 		term.Infof("Login tool called")
 		// Test token
 		term.Debug("Function invoked: cli.Connect")
+		track.Evt("MCP Login Tool")
+
 		client, err := cli.Connect(ctx, cluster)
-		client.Track("MCP Login Tool")
 		if err != nil {
 			if authPort != 0 {
 				return mcp.NewToolResultText("Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"), nil

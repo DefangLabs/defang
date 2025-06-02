@@ -12,6 +12,8 @@ import (
 
 var ErrNothingToMonitor = errors.New("no services to monitor")
 
+type ServiceStates = map[string]defangv1.ServiceState
+
 func WaitServiceState(
 	ctx context.Context,
 	provider client.Provider,
@@ -19,18 +21,18 @@ func WaitServiceState(
 	projectName string,
 	etag types.ETag,
 	services []string,
-) error {
+) (ServiceStates, error) {
 	term.Debugf("waiting for services %v to reach state %s\n", services, targetState) // TODO: don't print in Go-routine
 
 	if len(services) == 0 {
-		return ErrNothingToMonitor
+		return nil, ErrNothingToMonitor
 	}
 
 	// Assume "services" are normalized service names
 	subscribeRequest := defangv1.SubscribeRequest{Project: projectName, Etag: etag, Services: services}
 	serverStream, err := provider.Subscribe(ctx, &subscribeRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -41,7 +43,8 @@ func WaitServiceState(
 		serverStream.Close()
 	}()
 
-	serviceStates := make(map[string]defangv1.ServiceState, len(services))
+	serviceStates := make(ServiceStates, len(services))
+	// Make sure all services are in the map or `allInState` might return true too early
 	for _, name := range services {
 		serviceStates[name] = defangv1.ServiceState_NOT_SPECIFIED
 	}
@@ -52,15 +55,15 @@ func WaitServiceState(
 			// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
 			if isTransientError(serverStream.Err()) {
 				if err := provider.DelayBeforeRetry(ctx); err != nil {
-					return err
+					return serviceStates, err
 				}
 				serverStream, err = provider.Subscribe(ctx, &subscribeRequest)
 				if err != nil {
-					return err
+					return serviceStates, err
 				}
 				continue
 			}
-			return serverStream.Err()
+			return serviceStates, serverStream.Err()
 		}
 
 		msg := serverStream.Msg()
@@ -75,34 +78,23 @@ func WaitServiceState(
 			continue
 		}
 
+		serviceStates[msg.Name] = msg.State
+
 		// exit early on detecting a FAILED state
 		switch msg.State {
 		case defangv1.ServiceState_BUILD_FAILED, defangv1.ServiceState_DEPLOYMENT_FAILED:
-			return client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
+			return serviceStates, client.ErrDeploymentFailed{Service: msg.Name, Message: msg.Status}
 		}
-		serviceStates[msg.Name] = msg.State
 
-		if !allServicesUpdated(serviceStates) {
-			continue
-		}
 		if allInState(targetState, serviceStates) {
-			return nil // all services are in the target state
+			return serviceStates, nil // all services are in the target state
 		}
 	}
 }
 
-func allInState(targetState defangv1.ServiceState, serviceStates map[string]defangv1.ServiceState) bool {
+func allInState(targetState defangv1.ServiceState, serviceStates ServiceStates) bool {
 	for _, state := range serviceStates {
 		if state != targetState {
-			return false
-		}
-	}
-	return true
-}
-
-func allServicesUpdated(serviceStates map[string]defangv1.ServiceState) bool {
-	for _, state := range serviceStates {
-		if state == defangv1.ServiceState_NOT_SPECIFIED {
 			return false
 		}
 	}

@@ -702,6 +702,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVar
 			Value: "false",
 		},
 		{
+			Key:   "PULUMI_COPILOT",
+			Value: "false",
+		},
+		{
 			Key:   "PULUMI_SKIP_UPDATE_CHECK",
 			Value: "true",
 		},

@@ -47,7 +47,6 @@ const (
 
 var (
 	DefaultCDTags = map[string]string{"created-by": "defang"}
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 
 	//TODO: Create cd role with more fine-grained permissions
 	// cdPermissions = []string{
@@ -356,8 +355,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"PROJECT":                  cmd.Project,
 		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":           "false",
+		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"REGION":                   b.driver.Region,
-		"STACK":                    "beta",
+		"STACK":                    b.PulumiStack,
 	}
 
 	if !term.StdoutCanColor() {

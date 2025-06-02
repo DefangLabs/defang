@@ -315,7 +315,9 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				if !options.Raw {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
-				pkg.SleepWithContext(ctx, 1*time.Second)
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
@@ -362,7 +364,7 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 					cancel() // TODO: stuck on defer Close() if we don't do this
 					return nil
 				}
-				return nil
+				continue
 			}
 
 			if ts.After(options.Since) {

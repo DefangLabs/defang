@@ -1,8 +1,11 @@
 package tools
 
 import (
+	"strings"
+
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -30,4 +33,14 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 
 	term.Info("Function invoked: compose.NewLoader")
 	return compose.NewLoader()
+}
+
+// HandleTermsOfServiceError checks if the error is related to terms of service not being accepted
+// and returns an appropriate error message if it is.
+// Returns nil if the error is not related to terms of service.
+func HandleTermsOfServiceError(err error) *mcp.CallToolResult {
+	if connect.CodeOf(err) == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "terms of service") {
+		return mcp.NewToolResultErrorFromErr("The operation failed because the terms of service were not accepted. Please accept the terms of service by logging in here: https://portal.defang.io/auth/login. Then try again.", err)
+	}
+	return nil
 }
