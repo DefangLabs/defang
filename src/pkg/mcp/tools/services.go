@@ -20,7 +20,7 @@ import (
 
 // setupServicesTool configures and adds the services tool to the MCP server
 func setupServicesTool(s *server.MCPServer, cluster string) {
-	term.Info("Creating services tool")
+	term.Debug("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang Playground"),
 		mcp.WithString("working_directory",
@@ -30,9 +30,9 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 	term.Debug("Services tool created")
 
 	// Add the services tool handler - make it non-blocking
-	term.Info("Adding services tool handler")
+	term.Debug("Adding services tool handler")
 	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		term.Info("Services tool called - fetching services from Defang")
+		term.Debug("Services tool called - fetching services from Defang")
 		track.Evt("MCP Services Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
@@ -61,7 +61,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 
 		term.Debug("Function invoked: client.LoadProjectNameWithFallback")
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-		term.Info("Project name loaded", "project", projectName)
+		term.Debugf("Project name loaded: %s", projectName)
 		if err != nil {
 			if strings.Contains(err.Error(), "no projects found") {
 				term.Errorf("No projects found on Playground, error: %v", err)
@@ -95,7 +95,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		// Convert to JSON
 		jsonData, jsonErr := json.Marshal(serviceResponse)
 		if jsonErr == nil {
-			term.Info("Successfully loaded services", "count", len(serviceResponse), "data", string(jsonData))
+			term.Debugf("Successfully loaded services", "count", len(serviceResponse), "data", string(jsonData))
 			// Use NewToolResultText with JSON string
 			return mcp.NewToolResultText(string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects"), nil
 		}

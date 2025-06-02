@@ -13,16 +13,16 @@ import (
 
 // setupLoginTool configures and adds the login tool to the MCP server
 func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
-	term.Info("Creating login tool")
+	term.Debug("Creating login tool")
 	loginTool := mcp.NewTool("login",
 		mcp.WithDescription("Login to Defang"),
 	)
 	term.Debug("Login tool created")
 
 	// Add the login tool handler - make it non-blocking
-	term.Info("Adding login tool handler")
+	term.Debug("Adding login tool handler")
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		term.Infof("Login tool called")
+		term.Debug("Login tool called")
 		// Test token
 		term.Debug("Function invoked: cli.Connect")
 		track.Evt("MCP Login Tool")
@@ -41,7 +41,7 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 
 		output := "Successfully logged in to Defang"
 
-		term.Info(output)
+		term.Debug(output)
 		return mcp.NewToolResultText(output), nil
 	})
 }

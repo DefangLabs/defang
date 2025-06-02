@@ -17,7 +17,7 @@ import (
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
 func setupDestroyTool(s *server.MCPServer, cluster string) {
-	term.Info("Creating destroy tool")
+	term.Debug("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
 		mcp.WithDescription("Remove services using defang."),
 
@@ -28,9 +28,9 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 	term.Debug("Destroy tool created")
 
 	// Add the destroy tool handler - make it non-blocking
-	term.Info("Adding destroy tool handler")
+	term.Debug("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		term.Info("Compose down tool called - removing services")
+		term.Debug("Compose down tool called - removing services")
 		track.Evt("MCP Destroy Tool")
 
 		term.Debug("Function invoked: cli.Connect")
