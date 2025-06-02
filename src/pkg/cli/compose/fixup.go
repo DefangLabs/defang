@@ -227,7 +227,12 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 
 	empty := ""
 	// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
-	svccfg.Environment = types.MappingWithEquals{"OPENAI_API_KEY": &empty} // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	if svccfg.Environment == nil {
+		svccfg.Environment = types.MappingWithEquals{}
+	}
+	if _, exists := svccfg.Environment["OPENAI_API_KEY"]; !exists {
+		svccfg.Environment["OPENAI_API_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	}
 	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "defangio/openai-access-gateway"
 	svccfg.Networks[modelProviderNetwork] = nil
