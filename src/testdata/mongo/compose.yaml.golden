@@ -8,7 +8,8 @@ services:
     networks:
       default: null
     restart: always
-    x-defang-mongodb: true
+    x-defang-mongodb:
+      allow-downtime: true
   mongo-express:
     depends_on:
       mongo:
@@ -28,6 +29,86 @@ services:
         published: "8081"
         protocol: tcp
     restart: always
+  mongo-port1234:
+    command:
+      - --port
+      - "1234"
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port1235:
+    command:
+      - --port=1235
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port1236:
+    command:
+      - --port
+      - "1236"
+      - --shardsvr
+    image: mongo
+    networks:
+      default: null
+    restart: always
+  mongo-port1237:
+    command:
+      - --port=1237
+      - --configsvr
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port1238:
+    command:
+      - --shardsvr
+      - --port
+      - "1238"
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port1239:
+    command:
+      - --configsvr
+      - --port=1239
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port27018:
+    command:
+      - --shardsvr
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-port27019:
+    command:
+      - --configsvr
+    image: mongo
+    networks:
+      default: null
+    restart: always
+    x-defang-mongodb: true
+  mongo-unmanaged:
+    image: mongo
+    networks:
+      default: null
+    restart: always
+  mongo-wrong-image:
+    image: example
+    networks:
+      default: null
+    x-defang-mongodb: true
 networks:
   default:
     name: mongo_default

@@ -7,7 +7,8 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example!
-    x-defang-mongodb: true
+    x-defang-mongodb:
+      allow-downtime: true
 
   mongo-express:
     image: mongo-express
@@ -21,3 +22,58 @@ services:
       ME_CONFIG_BASICAUTH: false
     depends_on:
       - mongo
+
+  mongo-port27018:
+    image: mongo
+    restart: always
+    command: --shardsvr
+    x-defang-mongodb: true
+
+  mongo-port27019:
+    image: mongo
+    restart: always
+    command: --configsvr
+    x-defang-mongodb: true
+
+  mongo-port1234:
+    image: mongo
+    restart: always
+    command: --port 1234
+    x-defang-mongodb: true
+
+  mongo-port1235:
+    image: mongo
+    restart: always
+    command: --port=1235
+    x-defang-mongodb: true
+
+  mongo-port1236:
+    image: mongo
+    restart: always
+    command: --port 1236 --shardsvr
+
+  mongo-port1237:
+    image: mongo
+    restart: always
+    command: --port=1237 --configsvr
+    x-defang-mongodb: true
+
+  mongo-port1238:
+    image: mongo
+    restart: always
+    command: --shardsvr --port 1238
+    x-defang-mongodb: true
+
+  mongo-port1239:
+    image: mongo
+    restart: always
+    command: --configsvr --port=1239
+    x-defang-mongodb: true
+
+  mongo-unmanaged:
+    image: mongo
+    restart: always
+
+  mongo-wrong-image:
+    image: example
+    x-defang-mongodb: true
