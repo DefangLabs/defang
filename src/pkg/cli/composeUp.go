@@ -60,6 +60,10 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 	if err != nil {
 		return nil, project, err
 	}
+	if term.DoDebug() {
+		fmt.Println("FixedUp project:")
+		fmt.Println(string(bytes))
+	}
 
 	if upload == compose.UploadModeIgnore {
 		fmt.Println(string(bytes))

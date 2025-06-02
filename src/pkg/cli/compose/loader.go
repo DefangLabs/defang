@@ -103,6 +103,7 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 
 	if term.DoDebug() {
 		b, _ := yaml.Marshal(project)
+		fmt.Println("Loaded project:")
 		fmt.Println(string(b))
 	}
 
