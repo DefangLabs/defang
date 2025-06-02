@@ -20,12 +20,12 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
 	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...))
 	if projectNameOK {
-		term.Debug("Project name provided: %s", projectName)
+		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
 		term.Debug("Function invoked: compose.WithProjectName")
 		return compose.NewLoader(compose.WithProjectName(projectName))
 	} else if composeFilePathOK {
-		term.Debug("Compose file paths provided: %s", composeFilePaths)
+		term.Debugf("Compose file paths provided: %s", composeFilePaths)
 		term.Debug("Function invoked: compose.NewLoader")
 		term.Debug("Function invoked: compose.WithPath")
 		return compose.NewLoader(compose.WithPath(composeFilePaths...))
@@ -41,7 +41,7 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 func HandleTermsOfServiceError(err error) *mcp.CallToolResult {
 	if connect.CodeOf(err) == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "terms of service") {
 		mcpResult := mcp.NewToolResultErrorFromErr("The operation failed because the terms of service were not accepted. Please accept the terms of service by logging in here: https://portal.defang.io/auth/login. Then try again.", err)
-		term.Debug("MCP output error: %v", mcpResult)
+		term.Debugf("MCP output error: %v", mcpResult)
 		return mcpResult
 	}
 	return nil

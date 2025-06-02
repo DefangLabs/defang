@@ -95,7 +95,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		// Convert to JSON
 		jsonData, jsonErr := json.Marshal(serviceResponse)
 		if jsonErr == nil {
-			term.Debugf("Successfully loaded services", "count", len(serviceResponse), "data", string(jsonData))
+			term.Debugf("Successfully loaded services with count: %d", len(serviceResponse))
 			// Use NewToolResultText with JSON string
 			return mcp.NewToolResultText(string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects"), nil
 		}

@@ -73,7 +73,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Deploy the services
-		term.Debug("Deploying services for project %s...", project.Name)
+		term.Debugf("Deploying services for project %s...", project.Name)
 
 		term.Debug("Function invoked: cli.ComposeUp")
 		// Use ComposeUp to deploy the services
@@ -110,7 +110,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Success case
-		term.Debugf("Successfully started deployed services", "etag", deployResp.Etag)
+		term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
 
 		// Log deployment success
 		term.Debug("Deployment Started!")
