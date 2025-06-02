@@ -39,6 +39,7 @@ var mcpServerCmd = &cobra.Command{
 		} else {
 			defer logFile.Close()
 			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
+			term.SetDebug(true)
 		}
 
 		// Setup knowledge base

@@ -44,7 +44,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
-		term.Info("Function invoked: cli.Connect")
+		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
@@ -53,14 +53,14 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		client.Track("MCP Services Tool")
 
 		// Create a Defang client
-		term.Info("Function invoked: cli.NewProvider")
+		term.Debug("Function invoked: cli.NewProvider")
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to create provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to create provider", err), nil
 		}
 
-		term.Info("Function invoked: client.LoadProjectNameWithFallback")
+		term.Debug("Function invoked: client.LoadProjectNameWithFallback")
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		term.Info("Project name loaded", "project", projectName)
 		if err != nil {
