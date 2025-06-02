@@ -180,7 +180,8 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 		delete(svccfg.Extensions, "x-defang-postgres")
-	} else if len(svccfg.Ports) == 0 {
+	}
+	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		var port uint32 = 5432
 		// Check PGPORT environment variable for port number https://www.postgresql.org/docs/current/libpq-envars.html
@@ -205,16 +206,27 @@ func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) er
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		var port uint32 = 27017
-		// Check --port
 		args := append(svccfg.Entrypoint, svccfg.Command...)
 		for i, arg := range args {
-			if arg == "--port" && i+1 < len(args) {
-				var err error
-				port, err = parsePortString(args[i+1])
-				if err != nil {
-					return err
-				}
+			if arg == "--shardsvr" {
+				port = 27018
+				continue // looking for --port
+			} else if arg == "--configsvr" {
+				port = 27019
+				continue // looking for --port
+			} else if num, ok := strings.CutPrefix(arg, "--port="); ok {
+				arg = num
+			} else if arg == "--port" && i+1 < len(args) {
+				arg = args[i+1]
+			} else {
+				continue
 			}
+			var err error
+			port, err = parsePortString(arg)
+			if err != nil {
+				return err
+			}
+			break // done
 		}
 		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
 		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
@@ -226,7 +238,8 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) er
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 		delete(svccfg.Extensions, "x-defang-redis")
-	} else if len(svccfg.Ports) == 0 {
+	}
+	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service https://redis.io/docs/latest/operate/oss_and_stack/management/config/
 		var port uint32 = 6379
 		// Check entrypoint or command for --port argument
@@ -238,6 +251,7 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) er
 				if err != nil {
 					return err
 				}
+				// continue; last one wins
 			}
 		}
 		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
