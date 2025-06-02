@@ -154,11 +154,10 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 	}
 
 	printDebugReport(resp)
-
 	return nil
 }
 
-func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, project *compose.Project, loadErr error) error {
+func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
 	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
 
 	files := findMatchingProjectFiles(project, nil)
@@ -173,7 +172,7 @@ func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, proje
 		Logs:    loadErr.Error(),
 	}
 
-	resp, err := c.Debug(ctx, &req)
+	resp, err := client.Debug(ctx, &req)
 	if err != nil {
 		return err
 	}
@@ -183,29 +182,30 @@ func debugComposeFileLoadError(ctx context.Context, c client.FabricClient, proje
 }
 
 func printDebugReport(resp *defangv1.DebugResponse) {
-	term.Println("")
+	term.Debugf("Got debug response %s", resp.Uuid)
+	term.Println()
 	term.Println("=================")
 	term.Println("Debugging Summary")
 	term.Println("=================")
 	term.Println(resp.General)
-	term.Println("")
-	term.Println("")
+	term.Println()
+	term.Println()
 
 	for counter, service := range resp.Issues {
 		term.Println("-------------------")
 		term.Println(fmt.Sprintf("Issue #%d", counter+1))
 		term.Println("-------------------")
 		term.Println(service.Details)
-		term.Println("")
-		term.Println("")
+		term.Println()
+		term.Println()
 
 		if (len(service.CodeChanges)) > 0 {
 			for _, changes := range service.CodeChanges {
 				term.Println(fmt.Sprintf("Suggested %s:", changes.File))
 				term.Println("-------------------")
 				term.Println(changes.Change)
-				term.Println("")
-				term.Println("")
+				term.Println()
+				term.Println()
 			}
 		}
 	}

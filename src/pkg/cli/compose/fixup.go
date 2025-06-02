@@ -77,7 +77,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 			svccfg.Build.Context = url
 
-			removedArgs := []string{}
+			var removedArgs []string
 			for key, value := range svccfg.Build.Args {
 				if key == "" || value == nil {
 					removedArgs = append(removedArgs, key)
@@ -105,8 +105,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 
 		// Fixup environment variables
 		shownOnce := false
-		useCfg := []string{}
-		overriddenCfg := []string{}
+		var notAdjusted []string
+		var overridden []string
 		for key, value := range svccfg.Environment {
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
@@ -124,9 +124,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
 				if svcNameReplacer.HasServiceName(*value) {
-					useCfg = append(useCfg, key)
+					notAdjusted = append(notAdjusted, key)
 				} else {
-					overriddenCfg = append(overriddenCfg, key)
+					overridden = append(overridden, key)
 				}
 				svccfg.Environment[key] = nil
 				continue
@@ -136,12 +136,12 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Environment[key] = &val
 		}
 
-		if len(useCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, useCfg)
+		if len(notAdjusted) > 0 {
+			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted)
 		}
 
-		if len(overriddenCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overriddenCfg)
+		if len(overridden) > 0 {
+			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden)
 		}
 
 		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
@@ -268,8 +268,8 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	urlEnv := envName + "_URL"
 	urlVal := "http://" + svccfg.Name + "/api/v1/"
-	modelEnv := envName + "_MODEL"
-	modelVal := svccfg.Provider.Options["model"]
+	modelEnvKey := envName + "_MODEL"
+	modelVals := svccfg.Provider.Options["model"]
 
 	empty := ""
 	// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
@@ -292,8 +292,8 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 			if _, ok := dependency.Environment[urlEnv]; !ok {
 				dependency.Environment[urlEnv] = &urlVal
 			}
-			if _, ok := dependency.Environment[modelEnv]; !ok && modelVal != "" {
-				dependency.Environment[modelEnv] = &modelVal
+			if _, ok := dependency.Environment[modelEnvKey]; !ok && len(modelVals) == 1 {
+				dependency.Environment[modelEnvKey] = &modelVals[0]
 			}
 		}
 	}

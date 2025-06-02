@@ -91,7 +91,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, clie
 			cnt++
 			targets := getDomainTargets(serviceInfo, service)
 			domains := []string{service.DomainName}
-			if defaultNetwork, ok := service.Networks["default"]; ok {
+			if defaultNetwork := service.Networks["default"]; defaultNetwork != nil {
 				domains = append(domains, defaultNetwork.Aliases...)
 			}
 			term.Debugf("Found service %v with domains %v and targets %v", service.Name, domains, targets)

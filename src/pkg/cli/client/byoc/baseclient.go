@@ -38,9 +38,10 @@ type HasStackSupport interface {
 }
 
 type CanIUseConfig struct {
-	CDImage      string
-	AllowScaling bool
-	AllowGPU     bool
+	AllowGPU      bool
+	AllowScaling  bool
+	CDImage       string
+	PulumiVersion string
 }
 
 type ByocBaseClient struct {
@@ -90,6 +91,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
 	b.AllowScaling = quotas.AllowScaling
 	b.AllowGPU = quotas.Gpu
+	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
@@ -184,7 +186,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 
 	var visit func(node *Node)
 	visit = func(node *Node) {
-		if node.Visited {
+		if node == nil || node.Visited {
 			return
 		}
 		node.Visited = true
