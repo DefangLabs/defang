@@ -11,7 +11,7 @@ func TestSafeLabelValue(t *testing.T) {
 		expected string
 	}{
 		{"valid-label", "valid-label"},
-		{"with-UpperCase", "with-u\u0307pperc\u0307ase"},
+		{"with-UpperCase", "with-u\u0307pper\u010base"},
 		{"with_special@chars!", "with_special-chars-"},
 		{"long_label_" + strings.Repeat("a", 60), "long_label_" + strings.Repeat("a", 52)},
 		{"", ""},
@@ -32,8 +32,8 @@ func TestEscapeUnescapeUpperCase(t *testing.T) {
 		expected string
 	}{
 		{"all-lower", "all-lower"},
-		{"someUpperCase", "someu\u0307pperc\u0307ase"},
-		{"ALL_CAPS", "a\u0307l\u0307l\u0307_c\u0307a\u0307p\u0307s\u0307"},
+		{"someUpperCase", "someu\u0307pper\u010base"},
+		{"ALL_CAPS", "\u0227l\u0307l\u0307_\u010b\u0227\u1e57\u1e61"},
 		{"", ""},
 	}
 	for _, test := range tests {
