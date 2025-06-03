@@ -3,6 +3,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
+      "DEBUG": "true",
       "OPENAI_API_KEY": ""
     },
     "image": "defangio/openai-access-gateway",
