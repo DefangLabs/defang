@@ -325,7 +325,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
-		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
+		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
@@ -335,13 +335,31 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if !managedRedis && !managedPostgres && isStatefulImage(svccfg.Image) {
+	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
+	if managedMongodb {
+		// Ensure the image is a valid MongoDB image
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "mongo") {
+			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
+		}
+		if _, err = validateManagedStore(mongodbExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+	}
+
+	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
 		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
+		case "x-defang-dns-role",
+			"x-defang-static-files",
+			"x-defang-redis",
+			"x-defang-postgres",
+			"x-defang-mongodb",
+			"x-defang-llm",
+			"x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)

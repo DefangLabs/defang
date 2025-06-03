@@ -104,6 +104,7 @@ func CanMonitorService(service compose.ServiceConfig) bool {
 
 	return service.Extensions["x-defang-static-files"] == nil &&
 		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-mongodb"] == nil &&
 		service.Extensions["x-defang-postgres"] == nil
 }
 
