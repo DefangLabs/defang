@@ -5,6 +5,8 @@ services:
       type: model
       options:
         model: ai/smollm2
+    environment:
+      DEBUG: "true"
     networks:
       default: null
   chat:
