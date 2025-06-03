@@ -40,17 +40,32 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	go func() {
 		defer wg.Done()
 		// block on waiting for services to reach target state
-		svcErr = WaitServiceState(svcStatusCtx, provider, TargetServiceState, project.Name, tailOptions.Deployment, unmanagedServices)
+		for {
+			svcErr = WaitServiceState(svcStatusCtx, provider, TargetServiceState, project.Name, tailOptions.Deployment, unmanagedServices)
+			if svcErr != nil && isTransientError(svcErr) {
+				term.Debug("WaitServiceState failed with transient error, retrying:", svcErr)
+				continue
+			}
+			break
+		}
+		term.Debug("WaitServiceState stopped with", svcErr)
 	}()
 
 	go func() {
 		defer wg.Done()
 		// block on waiting for cdTask to complete
-		if err := client.WaitForCdTaskExit(ctx, provider); err != nil {
+		for {
+			err := client.WaitForCdTaskExit(ctx, provider)
+			if err != nil && isTransientError(err) {
+				term.Debug("WaitForCdTaskExit failed with transient error, retrying:", err)
+				continue
+			}
 			cdErr = err
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
+			break
 		}
+		term.Debug("WaitForCdTaskExit stopped with", cdErr)
 	}()
 
 	errMonitoringDone := errors.New("monitoring done") // pseudo error to signal that monitoring is done
