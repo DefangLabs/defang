@@ -186,7 +186,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 
 	var visit func(node *Node)
 	visit = func(node *Node) {
-		if node.Visited {
+		if node == nil || node.Visited {
 			return
 		}
 		node.Visited = true
