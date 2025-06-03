@@ -1,4 +1,5 @@
  ! service "Mistral": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "Mistral": service names should be lowercase to ensure reliable DNS resolution; consider renaming using only lowercase letters.
  ! service "env-in-config": environment variable(s) ["CONFIG1"] will use the `defang config` value instead of adjusted service name
  ! service "env-in-config": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "fixup-args": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
