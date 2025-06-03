@@ -22,12 +22,10 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 	if projectNameOK {
 		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
-		term.Debug("Function invoked: compose.WithProjectName")
 		return compose.NewLoader(compose.WithProjectName(projectName))
 	} else if composeFilePathOK {
 		term.Debugf("Compose file paths provided: %s", composeFilePaths)
 		term.Debug("Function invoked: compose.NewLoader")
-		term.Debug("Function invoked: compose.WithPath")
 		return compose.NewLoader(compose.WithPath(composeFilePaths...))
 	}
 

@@ -101,7 +101,6 @@ var mcpSetupCmd = &cobra.Command{
 		client = strings.ToLower(client)
 		term.Debug("Client: ", client)
 		if err := mcp.SetupClient(client); err != nil {
-			term.Error("Failed to setup MCP client", "error", err)
 			return err
 		}
 
