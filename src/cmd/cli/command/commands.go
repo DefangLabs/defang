@@ -169,6 +169,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
+	RootCmd.PersistentFlags().Int("auth-server", 0, "auth server port")
 	_ = RootCmd.MarkPersistentFlagDirname("cwd")
 	RootCmd.PersistentFlags().StringArrayP("file", "f", []string{}, `compose file path(s)`)
 	_ = RootCmd.MarkPersistentFlagFilename("file", "yml", "yaml")
@@ -293,7 +294,6 @@ func SetupCommands(ctx context.Context, version string) {
 	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
-	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpSetupCmd.MarkFlagRequired("client")
 	RootCmd.AddCommand(mcpCmd)
 
@@ -360,6 +360,16 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		// Start auth server for docker login flow if port is specified
+		port, _ := cmd.Flags().GetInt("auth-server")
+		if port != 0 {
+			go func() {
+				if err := cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), port); err != nil {
+					term.Error("Failed to start auth server", "error", err)
+				}
+			}()
+		}
+
 		client, err = cli.Connect(cmd.Context(), getCluster())
 		if cli.IsNetworkError(err) {
 			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
@@ -390,7 +400,7 @@ var RootCmd = &cobra.Command{
 				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
+				if err = cli.InteractiveLoginPrompt(cmd.Context(), client, getCluster(), port); err != nil {
 					return err
 				}
 
@@ -425,13 +435,16 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
+		port, _ := cmd.Flags().GetInt("auth-server")
+
+		fmt.Println("port", port)
 
 		if nonInteractive {
 			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, getCluster())
+			err := cli.InteractiveLogin(cmd.Context(), client, getCluster(), port)
 			if err != nil {
 				return err
 			}
