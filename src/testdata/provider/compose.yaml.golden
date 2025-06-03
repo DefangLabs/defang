@@ -1,0 +1,23 @@
+name: provider
+services:
+  ai_runner:
+    provider:
+      type: model
+      options:
+        model:
+          - ai/smollm2
+    environment:
+      DEBUG: "true"
+    networks:
+      default: null
+  chat:
+    depends_on:
+      ai_runner:
+        condition: service_started
+        required: true
+    image: my-chat-app
+    networks:
+      default: null
+networks:
+  default:
+    name: provider_default

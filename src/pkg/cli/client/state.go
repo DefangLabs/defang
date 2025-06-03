@@ -4,21 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/google/uuid"
 )
-
-func userStateDir() (string, error) {
-	if runtime.GOOS == "windows" {
-		return os.UserCacheDir()
-	} else {
-		home, err := os.UserHomeDir()
-		return pkg.Getenv("XDG_STATE_HOME", filepath.Join(home, ".local/state")), err
-	}
-}
 
 var (
 	stateDir, _ = userStateDir()
@@ -48,7 +37,7 @@ func (state State) write(path string) error {
 		return err
 	} else {
 		os.MkdirAll(StateDir, 0700)
-		return os.WriteFile(path, bytes, 0644)
+		return os.WriteFile(path, bytes, 0600)
 	}
 }
 

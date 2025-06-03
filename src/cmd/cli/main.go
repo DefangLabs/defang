@@ -23,6 +23,11 @@ func main() {
 		}
 	}()
 
+	// To avoid creating files as root, we set the UID and GID to the "current" HOME user
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		setUidGidFromFile(homeDir)
+	}
+
 	// Handle Ctrl+C so we can exit gracefully
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 

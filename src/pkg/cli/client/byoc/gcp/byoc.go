@@ -47,7 +47,6 @@ const (
 
 var (
 	DefaultCDTags = map[string]string{"created-by": "defang"}
-	PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", "3.136.1")
 
 	//TODO: Create cd role with more fine-grained permissions
 	// cdPermissions = []string{
@@ -301,7 +300,7 @@ type GcpAccountInfo struct {
 }
 
 func (g GcpAccountInfo) AccountID() string {
-	return g.email
+	return g.projectId
 }
 
 func (g GcpAccountInfo) Region() string {
@@ -309,7 +308,7 @@ func (g GcpAccountInfo) Region() string {
 }
 
 func (g GcpAccountInfo) Details() string {
-	return g.projectId
+	return g.email
 }
 
 func (g GcpAccountInfo) Provider() client.ProviderID {
@@ -356,8 +355,10 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		"PROJECT":                  cmd.Project,
 		pulumiBackendKey:           pulumiBackendValue,          // TODO: make secret
 		"PULUMI_CONFIG_PASSPHRASE": byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":           "false",
+		"PULUMI_SKIP_UPDATE_CHECK": "true",
 		"REGION":                   b.driver.Region,
-		"STACK":                    "beta",
+		"STACK":                    b.PulumiStack,
 	}
 
 	if !term.StdoutCanColor() {
@@ -714,6 +715,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 	term.Debugf("Creating secret %q", secretId)
 
 	if _, err := b.driver.CreateSecret(ctx, secretId); err != nil {
+		if stat, ok := status.FromError(err); ok && stat.Code() == codes.PermissionDenied {
+			if err := b.driver.EnsureAPIsEnabled(ctx, "secretmanager.googleapis.com"); err != nil {
+				return annotateGcpError(err)
+			}
+			_, err = b.driver.CreateSecret(ctx, secretId)
+		}
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
 			term.Debugf("Secret %q already exists", secretId)
 		} else {

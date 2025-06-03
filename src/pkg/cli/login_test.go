@@ -13,6 +13,7 @@ import (
 
 func TestGetExistingToken(t *testing.T) {
 	fabric := "test.defang.dev"
+	os.Unsetenv("DEFANG_ACCESS_TOKEN")
 
 	t.Run("Get access token from environmental variable", func(t *testing.T) {
 		expectedToken := "env-token"
@@ -49,17 +50,21 @@ func (g mockGitHubAuthService) login(ctx context.Context, client client.FabricCl
 	return g.accessToken, g.err
 }
 
+func (g mockGitHubAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
+	return g.err
+}
+
 func TestInteractiveLogin(t *testing.T) {
-	tempGithubAuthService := authService
+	prevGithubAuthService := authService
 	accessToken := "test-token"
 	fabric := "test.defang.dev"
 	// use a temp dir for the token file
-	tempStateDir := client.StateDir
+	prevStateDir := client.StateDir
 	client.StateDir = filepath.Join(t.TempDir(), "defang")
 
 	t.Cleanup(func() {
-		authService = tempGithubAuthService
-		client.StateDir = tempStateDir
+		authService = prevGithubAuthService
+		client.StateDir = prevStateDir
 	})
 
 	tokenFile := getTokenFile(fabric)
@@ -110,11 +115,11 @@ func TestNonInteractiveLogin(t *testing.T) {
 			t.Skip("ACTIONS_ID_TOKEN_REQUEST_URL not set")
 		}
 
-		// use a temp dir for the token file
-		temp := client.StateDir
+		// use a prevStateDir dir for the token file
+		prevStateDir := client.StateDir
 		client.StateDir = filepath.Join(t.TempDir(), "defang")
 
-		t.Cleanup(func() { client.StateDir = temp })
+		t.Cleanup(func() { client.StateDir = prevStateDir })
 
 		err := NonInteractiveLogin(ctx, mockClient, fabric)
 		if err != nil {

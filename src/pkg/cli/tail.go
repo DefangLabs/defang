@@ -195,7 +195,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return ErrDryRun
 	}
 
-	return tail(ctx, provider, projectName, options)
+	return streamLogs(ctx, provider, projectName, options, LogEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -207,7 +207,9 @@ func isTransientError(err error) bool {
 		errors.Is(err, io.ErrUnexpectedEOF)
 }
 
-func tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
+type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
+
+func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)
@@ -313,7 +315,9 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 				if !options.Raw {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
-				pkg.SleepWithContext(ctx, 1*time.Second)
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {
@@ -336,9 +340,21 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 		}
 
 		for _, e := range msg.Entries {
-			service := valueOrDefault(e.Service, msg.Service)
-			host := valueOrDefault(e.Host, msg.Host)
-			etag := valueOrDefault(e.Etag, msg.Etag)
+			// Replace service progress messages with our own spinner
+			if doSpinner && isProgressDot(e.Message) {
+				continue
+			}
+			ts := e.Timestamp.AsTime()
+			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
+			if skipDuplicate && ts.Equal(options.Since) {
+				skipDuplicate = false
+				continue
+			}
+			e.Service = valueOrDefault(e.Service, msg.Service)
+			e.Host = valueOrDefault(e.Host, msg.Host)
+			e.Etag = valueOrDefault(e.Etag, msg.Etag)
+			host := e.Host
+			service := e.Service
 
 			// HACK: skip noisy CI/CD logs (except errors)
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
@@ -351,78 +367,76 @@ func tail(ctx context.Context, provider client.Provider, projectName string, opt
 				continue
 			}
 
-			ts := e.Timestamp.AsTime()
-			// Skip duplicate logs (e.g. after reconnecting we might get the same log once more)
-			if skipDuplicate && ts.Equal(options.Since) {
-				skipDuplicate = false
-				continue
-			}
 			if ts.After(options.Since) {
 				options.Since = ts
 			}
-
-			if options.Raw {
-				if e.Stderr {
-					term.Error(e.Message)
-				} else {
-					term.Println(e.Message)
-				}
-				continue
+			err := handler(e, &options)
+			if err != nil {
+				term.Debug("Ending tail loop", err)
+				cancel() // TODO: stuck on defer Close() if we don't do this
 			}
-
-			// Replace service progress messages with our own spinner
-			if doSpinner && isProgressDot(e.Message) {
-				continue
-			}
-
-			tsString := ts.Local().Format(RFC3339Milli)
-			tsColor := termenv.ANSIBrightBlack
-			if term.HasDarkBackground() {
-				tsColor = termenv.ANSIWhite
-			}
-			if e.Stderr {
-				tsColor = termenv.ANSIBrightRed
-			}
-			var prefixLen int
-			trimmed := strings.TrimRight(e.Message, "\t\r\n ")
-			buf := term.NewMessageBuilder(term.StdoutCanColor())
-			for i, line := range strings.Split(trimmed, "\n") {
-				if i == 0 {
-					prefixLen, _ = buf.Printc(tsColor, tsString, " ")
-					if options.Deployment == "" {
-						l, _ := buf.Printc(termenv.ANSIYellow, etag, " ")
-						prefixLen += l
-					}
-					if len(options.Services) != 1 {
-						l, _ := buf.Printc(termenv.ANSIGreen, service, " ")
-						prefixLen += l
-					}
-					if options.Verbose {
-						l, _ := buf.Printc(termenv.ANSIMagenta, host, " ")
-						prefixLen += l
-					}
-				} else {
-					buf.WriteString(strings.Repeat(" ", prefixLen))
-				}
-				if term.StdoutCanColor() {
-					if !strings.Contains(line, "\033[") {
-						line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
-					}
-				} else {
-					line = term.StripAnsi(line)
-				}
-				buf.WriteString(line)
-				buf.WriteRune('\n')
-
-				// Detect end logging event
-				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, line) {
-					cancel() // TODO: stuck on defer Close() if we don't do this
-					return nil
-				}
-			}
-			term.Print(buf.String())
 		}
 	}
+}
+
+func LogEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
+	if options.Raw {
+		if e.Stderr {
+			term.Error(e.Message)
+		} else {
+			term.Println(e.Message)
+		}
+		return nil
+	}
+
+	ts := e.Timestamp.AsTime()
+	tsString := ts.Local().Format(RFC3339Milli)
+	tsColor := termenv.ANSIBrightBlack
+	if term.HasDarkBackground() {
+		tsColor = termenv.ANSIWhite
+	}
+	if e.Stderr {
+		tsColor = termenv.ANSIBrightRed
+	}
+	var prefixLen int
+	trimmed := strings.TrimRight(e.Message, "\t\r\n ")
+	buf := term.NewMessageBuilder(term.StdoutCanColor())
+	for i, line := range strings.Split(trimmed, "\n") {
+		if i == 0 {
+			prefixLen, _ = buf.Printc(tsColor, tsString, " ")
+			if options.Deployment == "" {
+				l, _ := buf.Printc(termenv.ANSIYellow, e.Etag, " ")
+				prefixLen += l
+			}
+			if len(options.Services) != 1 {
+				l, _ := buf.Printc(termenv.ANSIGreen, e.Service, " ")
+				prefixLen += l
+			}
+			if options.Verbose {
+				l, _ := buf.Printc(termenv.ANSIMagenta, e.Host, " ")
+				prefixLen += l
+			}
+		} else {
+			buf.WriteString(strings.Repeat(" ", prefixLen))
+		}
+		if term.StdoutCanColor() {
+			if !strings.Contains(line, "\033[") {
+				line = colorKeyRegex.ReplaceAllString(line, replaceString) // add some color
+			}
+		} else {
+			line = term.StripAnsi(line)
+		}
+		buf.WriteString(line)
+		buf.WriteRune('\n')
+
+		// Detect end logging event
+		if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{e.Service}, e.Host, line) {
+			return errors.New("end event detected")
+		}
+	}
+	term.Print(buf.String())
+
+	return nil
 }
 
 func valueOrDefault(value, def string) string {

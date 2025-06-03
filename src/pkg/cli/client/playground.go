@@ -52,7 +52,7 @@ func (g *PlaygroundProvider) PutConfig(ctx context.Context, req *defangv1.PutCon
 }
 
 func (g *PlaygroundProvider) DeleteConfig(ctx context.Context, req *defangv1.Secrets) error {
-	_, err := g.GetController().DeleteSecrets(ctx, connect.NewRequest(&defangv1.Secrets{Names: req.Names}))
+	_, err := g.GetController().DeleteSecrets(ctx, connect.NewRequest(req))
 	return err
 }
 
@@ -116,9 +116,9 @@ func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, erro
 		return "", err
 	}
 	if resp.Project == "" {
-		return "", errors.New("no projects found")
+		return "", errors.New("no Playground projects found")
 	}
-	term.Debug("Using default playground project: ", resp.Project)
+	term.Debug("Using default Playground project: ", resp.Project)
 	return resp.Project, nil
 }
 

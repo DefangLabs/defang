@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 // MCPServerConfig represents the configuration for an MCP server
@@ -66,8 +67,8 @@ var ValidClients = append(
 	ValidVSCodeClients...,
 )
 
-// IsValidClient checks if the provided client is in the list of valid clients
-func IsValidClient(client string) bool {
+// isValidClient checks if the provided client is in the list of valid clients
+func isValidClient(client string) bool {
 	return slices.Contains(ValidClients, client)
 }
 
@@ -246,9 +247,11 @@ func handleVSCodeConfig(configPath string) error {
 
 func SetupClient(client string) error {
 	// Validate client
-	if !IsValidClient(client) {
-		return fmt.Errorf("invalid MCP client: %s. Valid MCP clients are: %s", client, strings.Join(ValidClients, ", "))
+	if !isValidClient(client) {
+		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
 	}
+
+	track.Evt("MCP Setup Client: ", track.P("client", client))
 
 	// Get the config path for the client
 	configPath, err := getClientConfigPath(client)

@@ -105,8 +105,8 @@ func Execute(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if resp, err := provider.GetServices(ctx, &defangv1.GetServicesRequest{Project: projectName}); err == nil {
-				projectName = resp.Project
+			if resp, err := provider.RemoteProjectName(ctx); err == nil {
+				projectName = resp
 			}
 			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
 		}
@@ -260,6 +260,9 @@ func SetupCommands(ctx context.Context, version string) {
 	restart.Hidden = true // hidden from top-level menu
 	RootCmd.AddCommand(restart)
 
+	estimateCmd := makeEstimateCmd()
+	RootCmd.AddCommand(estimateCmd)
+
 	// Debug Command
 	debugCmd.Flags().String("etag", "", "deployment ID (ETag) of the service")
 	debugCmd.Flags().MarkHidden("etag")
@@ -283,12 +286,14 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Deployments Command
 	deploymentsCmd.AddCommand(deploymentsListCmd)
+	deploymentsCmd.PersistentFlags().Bool("utc", false, "show logs in UTC timezone (ie. TZ=UTC)")
 	RootCmd.AddCommand(deploymentsCmd)
 
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
+	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpSetupCmd.MarkFlagRequired("client")
 	RootCmd.AddCommand(mcpCmd)
 
@@ -310,7 +315,7 @@ func SetupCommands(ctx context.Context, version string) {
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
 		re := regexp.MustCompile(`(?m)^[A-Za-z ]+?:`)
-		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m")
+		templ := re.ReplaceAllString(RootCmd.UsageTemplate(), "\033[1m$0\033[0m") // bold
 		RootCmd.SetUsageTemplate(templ)
 	}
 
@@ -991,15 +996,16 @@ var deploymentsCmd = &cobra.Command{
 	Aliases:     []string{"deployment", "deploys", "deps", "dep"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
+	Short:       "List active deployments across all projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		loader := configureLoader(cmd)
-		projectName, err := loader.LoadProjectName(cmd.Context())
-		if err != nil {
-			return err
+		var projectName, _ = cmd.Flags().GetString("project-name")
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			cli.EnableUTCMode()
 		}
 
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE, projectName, client, 0)
 	},
 }
 
@@ -1008,16 +1014,21 @@ var deploymentsListCmd = &cobra.Command{
 	Aliases:     []string{"ls"},
 	Annotations: authNeededAnnotation,
 	Args:        cobra.NoArgs,
-	Short:       "List deployments",
-	Deprecated:  "use 'deployments' instead",
+	Short:       "List deployment history for a project",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var utc, _ = cmd.Flags().GetBool("utc")
+
+		if utc {
+			cli.EnableUTCMode()
+		}
+
 		loader := configureLoader(cmd)
 		projectName, err := loader.LoadProjectName(cmd.Context())
 		if err != nil {
 			return err
 		}
 
-		return cli.DeploymentsList(cmd.Context(), projectName, client)
+		return cli.DeploymentsList(cmd.Context(), defangv1.DeploymentType_DEPLOYMENT_TYPE_HISTORY, projectName, client, 10)
 	},
 }
 

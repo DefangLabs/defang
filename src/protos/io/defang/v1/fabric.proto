@@ -7,6 +7,7 @@ package io.defang.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/type/money.proto";
 
 service FabricController {
   rpc GetStatus(google.protobuf.Empty) returns (Status) {
@@ -132,6 +133,8 @@ service FabricController {
   rpc CanIUse(CanIUseRequest) returns (CanIUseResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+
+  rpc Estimate(EstimateRequest) returns (EstimateResponse);
 }
 
 enum Provider {
@@ -178,6 +181,7 @@ message DebugResponse {
   string general = 1;
   repeated Issue issues = 2;
   repeated string requests = 3;
+  string uuid = 4; // unique identifier for the debug request
 }
 
 message Issue {
@@ -217,6 +221,7 @@ message CanIUseResponse {
   string cd_image = 2;
   bool gpu = 3;
   bool allow_scaling = 4;
+  string pulumi_version = 5;
 }
 
 message DeployRequest {
@@ -227,6 +232,7 @@ message DeployRequest {
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;
+  bool preview = 7;
 }
 
 message DeployResponse {
@@ -689,4 +695,24 @@ message WhoAmIResponse {
   string user_id = 4;
   SubscriptionTier tier = 5;
   bool training_opt_out = 6;
+}
+
+message EstimateRequest {
+  Provider provider = 1;
+  string region = 2;
+  bytes pulumi_preview = 3;
+}
+
+message EstimateLineItem {
+  string description = 1;
+  string unit = 2;
+  float quantity = 3;
+  google.type.Money cost = 4;
+}
+
+message EstimateResponse {
+  Provider provider = 1;
+  string region = 2;
+  google.type.Money subtotal = 3;
+  repeated EstimateLineItem line_items = 4;
 }

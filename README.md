@@ -1,4 +1,6 @@
 [![Go package](https://github.com/DefangLabs/defang/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/DefangLabs/defang/actions/workflows/go.yml)
+![Discord](https://img.shields.io/discord/1233224785450897561)
+![GitHub Release](https://img.shields.io/github/v/release/DefangLabs/defang)
 
 # ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
@@ -67,7 +69,12 @@ Install the Defang CLI from one of the following sources:
   Expand-Archive defang.zip . -Force
   ```
 
-* Download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
+* Using the [official image from Docker Hub](https://hub.docker.com/r/defangio/defang-cli):
+  ```
+  docker run -it defangio/defang-cli help
+  ```
+  
+* or download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
 
 ## Support
 

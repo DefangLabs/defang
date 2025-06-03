@@ -23,6 +23,7 @@ func TestTopologicalSort(t *testing.T) {
 			"a": {"b"}, "b": {"c"}, "c": {"d"}, "d": {"e", "j"}, "e": {"f"}, "f": {},
 			"g": {"h"}, "h": {"i"}, "i": {"d"}, "j": {"k"}, "k": {},
 		},
+		{"a": {"b", "c"}, "b": {"c"}}, // Excluded service
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%v", tt), func(t *testing.T) {

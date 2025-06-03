@@ -38,9 +38,10 @@ type HasStackSupport interface {
 }
 
 type CanIUseConfig struct {
-	CDImage      string
-	AllowScaling bool
-	AllowGPU     bool
+	AllowGPU      bool
+	AllowScaling  bool
+	CDImage       string
+	PulumiVersion string
 }
 
 type ByocBaseClient struct {
@@ -90,6 +91,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.CDImage = pkg.Getenv("DEFANG_CD_IMAGE", quotas.CdImage)
 	b.AllowScaling = quotas.AllowScaling
 	b.AllowGPU = quotas.Gpu
+	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
 }
 
 func (b *ByocBaseClient) ServiceDNS(name string) string {
@@ -100,14 +102,14 @@ func (b *ByocBaseClient) RemoteProjectName(ctx context.Context) (string, error) 
 	// Get the list of projects from remote
 	projectNames, err := b.projectBackend.BootstrapList(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("no cloud projects found: %w", err)
 	}
 	for i, name := range projectNames {
 		projectNames[i] = strings.Split(name, "/")[0] // Remove the stack name
 	}
 
 	if len(projectNames) == 0 {
-		return "", errors.New("no projects found")
+		return "", errors.New("no cloud projects found")
 	}
 
 	if len(projectNames) > 1 {
@@ -184,7 +186,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 
 	var visit func(node *Node)
 	visit = func(node *Node) {
-		if node.Visited {
+		if node == nil || node.Visited {
 			return
 		}
 		node.Visited = true
@@ -205,7 +207,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 // This function was based on update function from Fabric controller and slightly modified to work with BYOC
 func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain string, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
 	if err := compose.ValidateService(&service); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("service %q: %w", service.Name, err)
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
@@ -246,12 +248,6 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 		si.PrivateFqdn = b.GetPrivateFqdn(projectName, fqn)
 	}
 
-	if service.DomainName != "" {
-		if !hasIngress && service.Extensions["x-defang-static-files"] == nil {
-			return nil, errors.New("domainname requires at least one ingress port") // retryable CodeFailedPrecondition
-		}
-	}
-
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if service.Build != nil {
@@ -261,7 +257,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	if siUpdater, ok := b.projectBackend.(ServiceInfoUpdater); ok {
 		if err := siUpdater.UpdateServiceInfo(ctx, si, projectName, delegateDomain, service); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("service %q: %w", service.Name, err)
 		}
 	}
 

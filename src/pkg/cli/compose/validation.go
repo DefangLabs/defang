@@ -179,6 +179,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		if svccfg.Build.DockerfileInline != "" {
 			return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline", svccfg.Name)
 		}
+		if svccfg.Build.AdditionalContexts != nil {
+			return fmt.Errorf("service %q: unsupported compose directive: build additional_contexts", svccfg.Name)
+		}
+		if svccfg.Build.Ulimits != nil {
+			term.Warnf("service %q: unsupported compose directive: build ulimits", svccfg.Name) // TODO: add support for build ulimits
+		}
 	}
 	for _, secret := range svccfg.Secrets {
 		if !pkg.IsValidSecretName(secret.Source) {
@@ -285,7 +291,10 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
-		term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
+		// Don't show this warning for managed pseudo-services like CDN
+		if svccfg.Extensions["x-defang-static-files"] == nil {
+			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
+		}
 	}
 
 	if dnsRoleVal := svccfg.Extensions["x-defang-dns-role"]; dnsRoleVal != nil {
@@ -302,31 +311,55 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if redisExtension, ok := svccfg.Extensions["x-defang-redis"]; ok {
+	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
+	if managedRedis {
 		// Ensure the image is a valid Redis image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
-		if err = ValidateManagedStore(redisExtension); err != nil {
-			return err
+		if _, err = validateManagedStore(redisExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
 		}
 	}
 
-	if postgresExtension, ok := svccfg.Extensions["x-defang-postgres"]; ok {
-		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
+	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
+	if managedPostgres {
+		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
-		if err = ValidateManagedStore(postgresExtension); err != nil {
-			return err
+		if _, err = validateManagedStore(postgresExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
 		}
+	}
+
+	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
+	if managedMongodb {
+		// Ensure the image is a valid MongoDB image
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "mongo") {
+			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
+		}
+		if _, err = validateManagedStore(mongodbExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+	}
+
+	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
+		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
+		case "x-defang-dns-role",
+			"x-defang-static-files",
+			"x-defang-redis",
+			"x-defang-postgres",
+			"x-defang-mongodb",
+			"x-defang-llm",
+			"x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
@@ -436,21 +469,22 @@ func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Pro
 	return nil
 }
 
-func ValidateManagedStore(managedStore any) error {
-	if managedStore == nil || managedStore == true || managedStore == false {
-		return nil
-	}
-
-	postgresProps, ok := managedStore.(map[string]any)
-	if !ok {
-		return errors.New("expected parameters in managed storage definition field")
-	}
-
-	if downtime, ok := postgresProps["allow-downtime"]; ok {
-		if _, ok := downtime.(bool); !ok {
-			return errors.New("'allow-downtime' must be a boolean")
+func validateManagedStore(managedStore any) (bool, error) {
+	switch managedStore := managedStore.(type) {
+	case nil:
+		return false, nil
+	case bool:
+		return managedStore, nil
+	case string:
+		return strconv.ParseBool(managedStore)
+	case map[string]any:
+		if downtime, ok := managedStore["allow-downtime"]; ok {
+			if _, ok := downtime.(bool); !ok {
+				return false, errors.New("'allow-downtime' must be a boolean")
+			}
 		}
+		return true, nil
+	default:
+		return false, errors.New("expected parameters in managed storage definition field")
 	}
-
-	return nil
 }

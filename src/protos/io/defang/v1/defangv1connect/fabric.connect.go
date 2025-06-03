@@ -147,6 +147,9 @@ const (
 	// FabricControllerCanIUseProcedure is the fully-qualified name of the FabricController's CanIUse
 	// RPC.
 	FabricControllerCanIUseProcedure = "/io.defang.v1.FabricController/CanIUse"
+	// FabricControllerEstimateProcedure is the fully-qualified name of the FabricController's Estimate
+	// RPC.
+	FabricControllerEstimateProcedure = "/io.defang.v1.FabricController/Estimate"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -201,6 +204,7 @@ type FabricControllerClient interface {
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
+	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -436,6 +440,11 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 			connect_go.WithClientOptions(opts...),
 		),
+		estimate: connect_go.NewClient[v1.EstimateRequest, v1.EstimateResponse](
+			httpClient,
+			baseURL+FabricControllerEstimateProcedure,
+			opts...,
+		),
 	}
 }
 
@@ -481,6 +490,7 @@ type fabricControllerClient struct {
 	getSelectedProvider      *connect_go.Client[v1.GetSelectedProviderRequest, v1.GetSelectedProviderResponse]
 	setSelectedProvider      *connect_go.Client[v1.SetSelectedProviderRequest, emptypb.Empty]
 	canIUse                  *connect_go.Client[v1.CanIUseRequest, v1.CanIUseResponse]
+	estimate                 *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -695,6 +705,11 @@ func (c *fabricControllerClient) CanIUse(ctx context.Context, req *connect_go.Re
 	return c.canIUse.CallUnary(ctx, req)
 }
 
+// Estimate calls io.defang.v1.FabricController.Estimate.
+func (c *fabricControllerClient) Estimate(ctx context.Context, req *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error) {
+	return c.estimate.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -747,6 +762,7 @@ type FabricControllerHandler interface {
 	GetSelectedProvider(context.Context, *connect_go.Request[v1.GetSelectedProviderRequest]) (*connect_go.Response[v1.GetSelectedProviderResponse], error)
 	SetSelectedProvider(context.Context, *connect_go.Request[v1.SetSelectedProviderRequest]) (*connect_go.Response[emptypb.Empty], error)
 	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
+	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -978,6 +994,11 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
 		connect_go.WithHandlerOptions(opts...),
 	)
+	fabricControllerEstimateHandler := connect_go.NewUnaryHandler(
+		FabricControllerEstimateProcedure,
+		svc.Estimate,
+		opts...,
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -1060,6 +1081,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerSetSelectedProviderHandler.ServeHTTP(w, r)
 		case FabricControllerCanIUseProcedure:
 			fabricControllerCanIUseHandler.ServeHTTP(w, r)
+		case FabricControllerEstimateProcedure:
+			fabricControllerEstimateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1227,4 +1250,8 @@ func (UnimplementedFabricControllerHandler) SetSelectedProvider(context.Context,
 
 func (UnimplementedFabricControllerHandler) CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.CanIUse is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Estimate is not implemented"))
 }

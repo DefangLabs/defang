@@ -12,6 +12,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -31,8 +32,8 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 	// Add the services tool handler - make it non-blocking
 	term.Info("Adding services tool handler")
 	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Get services
 		term.Info("Services tool called - fetching services from Defang")
+		track.Evt("MCP Services Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
 		if ok && wd != "" {
@@ -78,6 +79,12 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 				term.Warnf("Project %s is not deployed in Playground", projectName)
 				return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), nil
 			}
+
+			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
+
 			term.Error("Failed to get services", "error", err)
 			return mcp.NewToolResultText("Failed to get services"), nil
 		}
@@ -87,7 +94,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		if jsonErr == nil {
 			term.Info("Successfully loaded services", "count", len(serviceResponse), "data", string(jsonData))
 			// Use NewToolResultText with JSON string
-			return mcp.NewToolResultText(string(jsonData)), nil
+			return mcp.NewToolResultText(string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects"), nil
 		}
 
 		// Return the data in a structured format
