@@ -1,1 +1,2 @@
  ! service "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "aVeryLongServiceNameThatIsDefinitelyTooLongThatWillCauseAnError": service names should be lowercase to ensure reliable DNS resolution; consider renaming using only lowercase letters.
