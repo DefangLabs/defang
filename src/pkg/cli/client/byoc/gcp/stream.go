@@ -275,6 +275,7 @@ func getLogEntryParser(ctx context.Context, gcpClient *gcp.Gcp) func(entry *logg
 
 		var serviceName, etag, host string
 		serviceName = entry.Labels["defang-service"]
+		serviceName = DecodeServiceNameLabel(serviceName)
 		executionName := entry.Labels["run.googleapis.com/execution_name"]
 		buildTags := entry.Labels["build_tags"]
 		// Log from service
@@ -374,6 +375,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 		case "cloud_run_revision": // Service status
 			if request := auditLog.GetRequest(); request != nil { // Activity log: service update requests
 				serviceName := GetValueInStruct(request, "service.template.labels.defang-service")
+				serviceName = DecodeServiceNameLabel(serviceName)
 				return []*defangv1.SubscribeResponse{{
 					Name:   serviceName,
 					State:  defangv1.ServiceState_DEPLOYMENT_PENDING,
@@ -381,6 +383,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 				}}, nil
 			} else if response := auditLog.GetResponse(); response != nil { // System log: service status update
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
+				serviceName = DecodeServiceNameLabel(serviceName)
 				status := auditLog.GetStatus()
 				if status == nil {
 					return nil, errors.New("missing status in audit log for service " + serviceName)
@@ -414,6 +417,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 			// Kaniko job
 			if request := auditLog.GetRequest(); request != nil { // Acitivity log: job creation
 				serviceName := GetValueInStruct(request, "job.template.labels.defang-service")
+				serviceName = DecodeServiceNameLabel(serviceName)
 				if serviceName != "" {
 					return []*defangv1.SubscribeResponse{{
 						Name:   serviceName,
@@ -423,6 +427,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 				}
 			} else if response := auditLog.GetResponse(); response != nil { // System log: job status update
 				serviceName := GetValueInStruct(response, "spec.template.metadata.labels.defang-service")
+				serviceName = DecodeServiceNameLabel(serviceName)
 				status := auditLog.GetStatus()
 				if status == nil {
 					term.Warnf("missing status in audit log for job %v", path.Base(auditLog.GetResourceName()))
@@ -486,6 +491,7 @@ func getActivityParser(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag s
 				fields := label.GetStructValue().GetFields()
 				if fields["key"].GetStringValue() == "defang-service" {
 					serviceName = fields["value"].GetStringValue()
+					serviceName = DecodeServiceNameLabel(serviceName)
 					break
 				}
 			}
@@ -610,4 +616,8 @@ func GetListInStruct(s *structpb.Struct, path string) []*structpb.Value {
 		keys = keys[1:]
 	}
 	return nil
+}
+
+func DecodeServiceNameLabel(name string) string {
+	return gcp.UnescapeUpperCase(name)
 }

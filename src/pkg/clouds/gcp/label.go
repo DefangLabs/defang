@@ -14,11 +14,56 @@ import (
 //
 // Even though the GCP allow "international characters" in labels, we use a subset for simplicity
 func SafeLabelValue(input string) string {
-	input = strings.ToLower(input)
-	re := regexp.MustCompile(`[^a-z0-9_-]+`)
+	re := regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 	safe := re.ReplaceAllString(input, "-")
 	if len(safe) > 63 {
 		safe = safe[:63]
 	}
+	safe = EscapeUpperCase(safe)
 	return safe
+}
+
+const CombiningDotAbove = '\u0307' // U+0307 Combining Dot Above
+
+func EscapeUpperCase(input string) string {
+	// Fast path: if there are no uppercase letters, return the input as is
+	if strings.IndexFunc(input, func(r rune) bool {
+		return r >= 'A' && r <= 'Z'
+	}) == -1 {
+		return input
+	}
+
+	var buf strings.Builder
+	for _, r := range input {
+		if r >= 'A' && r <= 'Z' {
+			buf.WriteRune(r + 32)
+			// Hack: Use unicode combining characters to indicate this was an uppercase letter
+			buf.WriteRune(CombiningDotAbove)
+		} else {
+			buf.WriteRune(r)
+		}
+	}
+
+	return buf.String()
+}
+
+func UnescapeUpperCase(input string) string {
+	// Fast path: if there are no combining characters, return the input as is
+	if strings.IndexRune(input, CombiningDotAbove) == -1 {
+		return input
+	}
+
+	var output []rune
+	runes := []rune(input)
+	for _, r := range runes {
+		if r == CombiningDotAbove {
+			if l := len(output); l > 0 && output[l-1] >= 'a' && output[l-1] <= 'z' {
+				output[l-1] -= 32 // Convert the last character to uppercase
+			}
+			continue
+		}
+		output = append(output, r)
+	}
+
+	return string(output)
 }
