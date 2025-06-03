@@ -214,7 +214,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 func flushWarnings() {
 	if hasTty && term.HadWarnings() {
-		fmt.Println("\nSome warnings were seen during this command:")
+		fmt.Println("\n\u26A0\uFE0F Some warnings were seen during this command:")
 		term.FlushWarnings()
 	}
 }
