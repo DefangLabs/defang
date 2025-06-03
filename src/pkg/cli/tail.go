@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/muesli/termenv"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -202,9 +205,25 @@ func isTransientError(err error) bool {
 	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
 	code := connect.CodeOf(err)
 	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-	return code == connect.CodeUnavailable ||
-		(code == connect.CodeInternal && !connect.IsWireError(err)) ||
-		errors.Is(err, io.ErrUnexpectedEOF)
+	if code == connect.CodeUnavailable {
+		return true
+	}
+	if code == connect.CodeInternal && !connect.IsWireError(err) {
+		return true
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+
+	// GCP grpc transient errors
+	if st, ok := status.FromError(err); ok {
+		transientCodes := []codes.Code{codes.Unavailable, codes.Internal}
+		if slices.Contains(transientCodes, st.Code()) {
+			return true
+		}
+	}
+
+	return false
 }
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error

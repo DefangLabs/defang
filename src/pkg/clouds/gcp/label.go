@@ -3,6 +3,8 @@ package gcp
 import (
 	"regexp"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // SafeValue converts a string to a safe value for use in labels.
@@ -44,14 +46,11 @@ func EscapeUpperCase(input string) string {
 		}
 	}
 
-	return buf.String()
+	return norm.NFC.String(buf.String())
 }
 
 func UnescapeUpperCase(input string) string {
-	// Fast path: if there are no combining characters, return the input as is
-	if strings.IndexRune(input, CombiningDotAbove) == -1 {
-		return input
-	}
+	input = norm.NFD.String(input)
 
 	var output []rune
 	runes := []rune(input)
