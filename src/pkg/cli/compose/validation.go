@@ -43,11 +43,32 @@ func ValidateProject(project *composeTypes.Project) error {
 		return services[i].Name < services[j].Name
 	})
 
-	errs := make([]error, len(services))
+	var errs []error
+	for _, svccfg := range services {
+		errs = append(errs, validateService(&svccfg, project))
+	}
 	for i, svccfg := range services {
-		errs[i] = validateService(&svccfg, project)
+		for j := i + 1; j < len(services); j++ {
+			if svccfg.Name == services[j].Name {
+				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
+			}
+			if safeServiceName(svccfg.Name) == safeServiceName(services[j].Name) {
+				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
+			}
+		}
 	}
 	return errors.Join(errs...)
+}
+
+var safeServiceNameRE = regexp.MustCompile(`[^a-z0-9_-]+`)
+
+func safeServiceName(input string) string {
+	input = strings.ToLower(input)
+	safe := safeServiceNameRE.ReplaceAllString(input, "-")
+	if len(safe) > 63 {
+		safe = safe[:63]
+	}
+	return safe
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
