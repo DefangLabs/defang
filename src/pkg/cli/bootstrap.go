@@ -44,7 +44,7 @@ func TailAndWaitForCD(ctx context.Context, projectName string, provider client.P
 
 	var cdErr error
 	go func() {
-		cdErr = client.WaitForCdTaskExit(ctx, provider)
+		cdErr = WaitForCdTaskExit(ctx, provider)
 		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we got the last logs
 		cancelTail(cdErr)
 	}()
