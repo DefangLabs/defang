@@ -14,7 +14,7 @@ import (
 //
 // Even though the GCP allow "international characters" in labels, we use a subset for simplicity
 
-var safeLabelRE = regexp.MustCompile(`[^a-z0-9_-]+`)
+var safeLabelRE = regexp.MustCompile(`[^\p{Ll}\p{Lo}0-9_-]+`)
 
 func SafeLabelValue(input string) string {
 	input = strings.ToLower(input)
