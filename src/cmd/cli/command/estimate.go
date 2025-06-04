@@ -33,7 +33,7 @@ func makeEstimateCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 			project, err := loader.LoadProject(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to load project: %w", err)
+				return err
 			}
 
 			estimate, err := RunEstimate(ctx, project, providerID, region, mode.Value())
@@ -58,7 +58,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, provider cliClie
 	term.Info("Generating deployment preview")
 	preview, err := GeneratePreview(ctx, project, defangProvider, mode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate preview: %w", err)
+		return nil, err
 	}
 	term.Debugf("Preview output: %s\n", preview)
 
@@ -70,7 +70,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, provider cliClie
 		PulumiPreview: []byte(preview),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to estimate: %w", err)
+		return nil, err
 	}
 	return estimate, nil
 }
