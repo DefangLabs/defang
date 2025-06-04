@@ -135,6 +135,8 @@ service FabricController {
   }
 
   rpc Estimate(EstimateRequest) returns (EstimateResponse);
+
+  rpc Preview(PreviewRequest) returns (PreviewResponse);
 }
 
 enum Provider {
@@ -232,7 +234,7 @@ message DeployRequest {
   bytes compose = 4; // yaml (or json)
   string delegate_domain = 5;
   string delegation_set_id = 6;
-  bool preview = 7;
+  bool preview = 7 [ deprecated = true ];
 }
 
 message DeployResponse {
@@ -715,4 +717,16 @@ message EstimateResponse {
   string region = 2;
   google.type.Money subtotal = 3;
   repeated EstimateLineItem line_items = 4;
+}
+
+message PreviewRequest {
+  Provider provider = 1;
+  string region = 2;
+  DeploymentMode mode = 3;
+  string etag = 4;
+  bytes compose = 5; // yaml (or json)
+}
+
+message PreviewResponse {
+  bytes pulumi_preview = 1;
 }
