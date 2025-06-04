@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -50,6 +51,9 @@ func ValidateProject(project *composeTypes.Project) error {
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
+	if strings.IndexFunc(svccfg.Name, unicode.IsUpper) >= 0 {
+		term.Warnf("service %q: service names should be lowercase to ensure reliable DNS resolution; consider renaming using only lowercase letters.", svccfg.Name)
+	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
@@ -178,6 +182,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 		if svccfg.Build.DockerfileInline != "" {
 			return fmt.Errorf("service %q: unsupported compose directive: build dockerfile_inline", svccfg.Name)
+		}
+		if svccfg.Build.AdditionalContexts != nil {
+			return fmt.Errorf("service %q: unsupported compose directive: build additional_contexts", svccfg.Name)
+		}
+		if svccfg.Build.Ulimits != nil {
+			term.Warnf("service %q: unsupported compose directive: build ulimits", svccfg.Name) // TODO: add support for build ulimits
 		}
 	}
 	for _, secret := range svccfg.Secrets {
@@ -319,7 +329,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
-		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
+		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
@@ -329,13 +339,31 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if !managedRedis && !managedPostgres && isStatefulImage(svccfg.Image) {
+	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
+	if managedMongodb {
+		// Ensure the image is a valid MongoDB image
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "mongo") {
+			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
+		}
+		if _, err = validateManagedStore(mongodbExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+	}
+
+	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
 		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
+		case "x-defang-dns-role",
+			"x-defang-static-files",
+			"x-defang-redis",
+			"x-defang-postgres",
+			"x-defang-mongodb",
+			"x-defang-llm",
+			"x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)

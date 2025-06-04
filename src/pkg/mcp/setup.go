@@ -248,7 +248,7 @@ func handleVSCodeConfig(configPath string) error {
 func SetupClient(client string) error {
 	// Validate client
 	if !isValidClient(client) {
-		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
+		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, strings.Join(ValidClients, ", "))
 	}
 
 	track.Evt("MCP Setup Client: ", track.P("client", client))

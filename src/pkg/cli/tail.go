@@ -334,7 +334,9 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 				if !options.Raw {
 					spaces, _ = term.Warnf("Reconnecting...\r") // overwritten below
 				}
-				pkg.SleepWithContext(ctx, 1*time.Second)
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
 				tailRequest.Since = timestamppb.New(options.Since)
 				serverStream, err = provider.QueryLogs(ctx, tailRequest)
 				if err != nil {

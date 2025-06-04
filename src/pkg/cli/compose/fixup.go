@@ -46,6 +46,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 		}
 
+		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
+		if managedMongo {
+			if err := fixupMongoService(&svccfg, provider); err != nil {
+				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+		}
+
 		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
 			fixupModelProvider(&svccfg, project)
 		}
@@ -70,7 +77,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			}
 			svccfg.Build.Context = url
 
-			removedArgs := []string{}
+			var removedArgs []string
 			for key, value := range svccfg.Build.Args {
 				if key == "" || value == nil {
 					removedArgs = append(removedArgs, key)
@@ -98,8 +105,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 
 		// Fixup environment variables
 		shownOnce := false
-		useCfg := []string{}
-		overriddenCfg := []string{}
+		var notAdjusted []string
+		var overridden []string
 		for key, value := range svccfg.Environment {
 			// A bug in Compose-go env file parsing can cause empty keys
 			if key == "" {
@@ -117,9 +124,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			// Check if the environment variable is an existing config; if so, mark it as such
 			if _, ok := slices.BinarySearch(config.Names, key); ok {
 				if svcNameReplacer.HasServiceName(*value) {
-					useCfg = append(useCfg, key)
+					notAdjusted = append(notAdjusted, key)
 				} else {
-					overriddenCfg = append(overriddenCfg, key)
+					overridden = append(overridden, key)
 				}
 				svccfg.Environment[key] = nil
 				continue
@@ -129,12 +136,12 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 			svccfg.Environment[key] = &val
 		}
 
-		if len(useCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, useCfg)
+		if len(notAdjusted) > 0 {
+			term.Warnf("service %q: environment variable(s) %q will use the `defang config` value instead of adjusted service name", svccfg.Name, notAdjusted)
 		}
 
-		if len(overriddenCfg) > 0 {
-			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overriddenCfg)
+		if len(overridden) > 0 {
+			term.Warnf("service %q: environment variable(s) %q overridden by config", svccfg.Name, overridden)
 		}
 
 		_, scaling := svccfg.Extensions["x-defang-autoscaling"]
@@ -173,7 +180,8 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 		delete(svccfg.Extensions, "x-defang-postgres")
-	} else if len(svccfg.Ports) == 0 {
+	}
+	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		var port uint32 = 5432
 		// Check PGPORT environment variable for port number https://www.postgresql.org/docs/current/libpq-envars.html
@@ -190,22 +198,60 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 	return nil
 }
 
+func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) error {
+	if _, ok := provider.(*client.PlaygroundProvider); ok {
+		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
+		delete(svccfg.Extensions, "x-defang-mongodb")
+	}
+	if len(svccfg.Ports) == 0 {
+		// HACK: we must have at least one host port to get a CNAME for the service
+		var port uint32 = 27017
+		args := append(svccfg.Entrypoint, svccfg.Command...)
+		for i, arg := range args {
+			if arg == "--shardsvr" {
+				port = 27018
+				continue // looking for --port
+			} else if arg == "--configsvr" {
+				port = 27019
+				continue // looking for --port
+			} else if num, ok := strings.CutPrefix(arg, "--port="); ok {
+				arg = num
+			} else if arg == "--port" && i+1 < len(args) {
+				arg = args[i+1]
+			} else {
+				continue
+			}
+			var err error
+			port, err = parsePortString(arg)
+			if err != nil {
+				return err
+			}
+			break // done
+		}
+		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
+		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	}
+	return nil
+}
+
 func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 		delete(svccfg.Extensions, "x-defang-redis")
-	} else if len(svccfg.Ports) == 0 {
+	}
+	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service https://redis.io/docs/latest/operate/oss_and_stack/management/config/
 		var port uint32 = 6379
 		// Check entrypoint or command for --port argument
 		args := append(svccfg.Entrypoint, svccfg.Command...)
 		for i, arg := range args {
-			if arg == "--port" {
+			if arg == "--port" && i+1 < len(args) {
 				var err error
 				port, err = parsePortString(args[i+1])
 				if err != nil {
 					return err
 				}
+				// continue; last one wins
 			}
 		}
 		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
@@ -222,12 +268,17 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
 	urlEnv := envName + "_URL"
 	urlVal := "http://" + svccfg.Name + "/api/v1/"
-	modelEnv := envName + "_MODEL"
-	modelVal := svccfg.Provider.Options["model"]
+	modelEnvKey := envName + "_MODEL"
+	modelVals := svccfg.Provider.Options["model"]
 
 	empty := ""
 	// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
-	svccfg.Environment = types.MappingWithEquals{"OPENAI_API_KEY": &empty} // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	if svccfg.Environment == nil {
+		svccfg.Environment = types.MappingWithEquals{}
+	}
+	if _, exists := svccfg.Environment["OPENAI_API_KEY"]; !exists {
+		svccfg.Environment["OPENAI_API_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
+	}
 	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "defangio/openai-access-gateway"
 	svccfg.Networks[modelProviderNetwork] = nil
@@ -246,8 +297,8 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 			if _, ok := dependency.Environment[urlEnv]; !ok {
 				dependency.Environment[urlEnv] = &urlVal
 			}
-			if _, ok := dependency.Environment[modelEnv]; !ok && modelVal != "" {
-				dependency.Environment[modelEnv] = &modelVal
+			if _, ok := dependency.Environment[modelEnvKey]; !ok && len(modelVals) == 1 {
+				dependency.Environment[modelEnvKey] = &modelVals[0]
 			}
 		}
 	}

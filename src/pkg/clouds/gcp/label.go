@@ -15,9 +15,10 @@ import (
 //   - International characters are allowed.
 //
 // Even though the GCP allow "international characters" in labels, we use a subset for simplicity
+var safeLabelRE = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
+
 func SafeLabelValue(input string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
-	safe := re.ReplaceAllString(input, "-")
+	safe := safeLabelRE.ReplaceAllString(input, "-")
 	if len(safe) > 63 {
 		safe = safe[:63]
 	}

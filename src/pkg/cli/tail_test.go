@@ -80,6 +80,11 @@ type mockTailProvider struct {
 	Reqs          []*defangv1.TailRequest
 }
 
+func (mockTailProvider) DelayBeforeRetry(ctx context.Context) error {
+	// No delay for mock
+	return ctx.Err()
+}
+
 func (m *mockTailProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	dup, _ := proto.Clone(req).(*defangv1.TailRequest)
 	m.Reqs = append(m.Reqs, dup)
@@ -150,20 +155,20 @@ func TestTail(t *testing.T) {
 	}
 
 	expectedLogs := []string{
-		"SOMEETAG service1 SOMEHOST e1msg1",
-		"SOMEOTHERETAG service1 SOMEHOST e1msg2",
-		"SOMEOTHERETAG2 service1 SOMEOTHERHOST e1msg3",
-		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e1msg4",
-		"SOMEETAG service1 SOMEHOST e1err1",
-		"SOMEOTHERETAG service1 SOMEHOST e2err1",
-		"ENTRIES2ETAG service1 SOMEHOST e2msg1",
-		"SOMEETAG service1 SOMEHOST e2msg2",
-		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e2msg3",
-		"SOMEETAG service1 SOMEHOST e2msg4",
+		"SOMEETAG service1 SOMEHOST e1msg1\n",
+		"SOMEOTHERETAG service1 SOMEHOST e1msg2\n",
+		"SOMEOTHERETAG2 service1 SOMEOTHERHOST e1msg3\n",
+		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e1msg4\n",
+		"SOMEETAG service1 SOMEHOST e1err1\n",
+		"SOMEOTHERETAG service1 SOMEHOST e2err1\n",
+		"ENTRIES2ETAG service1 SOMEHOST e2msg1\n",
+		"SOMEETAG service1 SOMEHOST e2msg2\n",
+		"SOMEOTHERETAG2 service2 SOMEOTHERHOST e2msg3\n",
+		"SOMEETAG service1 SOMEHOST e2msg4\n",
 		"! Reconnecting...\r                           \r",
 	}
 
-	got := strings.Split(strings.TrimRight(stdout.String(), "\n"), "\n")
+	got := strings.SplitAfter(stdout.String(), "\n")
 
 	if len(got) != len(expectedLogs) {
 		t.Log(got)

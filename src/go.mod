@@ -32,7 +32,7 @@ require (
 	github.com/aws/smithy-go v1.22.1
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
-	github.com/compose-spec/compose-go/v2 v2.6.2
+	github.com/compose-spec/compose-go/v2 v2.6.4
 	github.com/digitalocean/godo v1.131.1
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.2

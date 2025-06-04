@@ -20,13 +20,16 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
 	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...))
 	if projectNameOK {
-		term.Infof("Project name provided: %s", projectName)
+		term.Debugf("Project name provided: %s", projectName)
+		term.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithProjectName(projectName))
 	} else if composeFilePathOK {
-		term.Infof("Compose file paths provided: %s", composeFilePaths)
+		term.Debugf("Compose file paths provided: %s", composeFilePaths)
+		term.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithPath(composeFilePaths...))
 	}
 
+	term.Debug("Function invoked: compose.NewLoader")
 	return compose.NewLoader()
 }
 
@@ -35,7 +38,9 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 // Returns nil if the error is not related to terms of service.
 func HandleTermsOfServiceError(err error) *mcp.CallToolResult {
 	if connect.CodeOf(err) == connect.CodeFailedPrecondition && strings.Contains(err.Error(), "terms of service") {
-		return mcp.NewToolResultErrorFromErr("The operation failed because the terms of service were not accepted. Please accept the terms of service by logging in here: https://portal.defang.io/auth/login. Then try again.", err)
+		mcpResult := mcp.NewToolResultErrorFromErr("The operation failed because the terms of service were not accepted. Please accept the terms of service by logging in here: https://portal.defang.io/auth/login. Then try again.", err)
+		term.Debugf("MCP output error: %v", mcpResult)
+		return mcpResult
 	}
 	return nil
 }
