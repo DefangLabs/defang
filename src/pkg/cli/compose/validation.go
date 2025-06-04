@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
@@ -62,9 +61,6 @@ func ValidateProject(project *composeTypes.Project) error {
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
-	if strings.IndexFunc(svccfg.Name, unicode.IsUpper) >= 0 {
-		term.Warnf("service %q: service names should be lowercase to ensure reliable DNS resolution; consider renaming using only lowercase letters.", svccfg.Name)
-	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
