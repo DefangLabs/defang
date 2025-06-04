@@ -33,20 +33,18 @@ func makeEstimateCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 			project, err := loader.LoadProject(ctx)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to load project: %w", err)
 			}
 
-			provider, err := getProvider(ctx, loader)
+			estimate, err := RunEstimate(ctx, project, providerID, region, mode.Value())
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to run estimate: %w", err)
 			}
+			term.Debugf("Estimate: %+v", estimate)
 
-			err = canIUseProvider(ctx, provider, project.Name)
-			if err != nil {
-				return err
-			}
+			PrintEstimate(estimate)
 
-			return RunEstimate(ctx, project, provider, region, mode.Value())
+			return nil
 		},
 	}
 
@@ -55,29 +53,26 @@ func makeEstimateCmd() *cobra.Command {
 	return estimateCmd
 }
 
-func RunEstimate(ctx context.Context, project *compose.Project, provider cliClient.Provider, region string, mode defangv1.DeploymentMode) error {
+func RunEstimate(ctx context.Context, project *compose.Project, provider cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+	defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
 	term.Info("Generating deployment preview")
-	preview, err := GeneratePreview(ctx, project, provider, mode)
+	preview, err := GeneratePreview(ctx, project, defangProvider, mode)
 	if err != nil {
-		return fmt.Errorf("failed to generate preview: %w", err)
+		return nil, fmt.Errorf("failed to generate preview: %w", err)
 	}
 	term.Debugf("Preview output: %s\n", preview)
 
 	term.Info("Preparing estimate")
+
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-		Provider:      providerID.EnumValue(),
+		Provider:      provider.EnumValue(),
 		Region:        region,
 		PulumiPreview: []byte(preview),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to estimate: %w", err)
+		return nil, fmt.Errorf("failed to estimate: %w", err)
 	}
-
-	term.Debugf("Estimate: %+v", estimate)
-
-	PrintEstimate(estimate)
-
-	return nil
+	return estimate, nil
 }
 
 func GeneratePreview(ctx context.Context, project *compose.Project, provider cliClient.Provider, mode defangv1.DeploymentMode) (string, error) {
