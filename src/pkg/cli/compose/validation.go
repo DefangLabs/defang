@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -52,23 +53,12 @@ func ValidateProject(project *composeTypes.Project) error {
 			if svccfg.Name == services[j].Name {
 				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
 			}
-			if safeServiceName(svccfg.Name) == safeServiceName(services[j].Name) {
+			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
 				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
 			}
 		}
 	}
 	return errors.Join(errs...)
-}
-
-var safeServiceNameRE = regexp.MustCompile(`[^a-z0-9_-]+`)
-
-func safeServiceName(input string) string {
-	input = strings.ToLower(input)
-	safe := safeServiceNameRE.ReplaceAllString(input, "-")
-	if len(safe) > 63 {
-		safe = safe[:63]
-	}
-	return safe
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
