@@ -195,7 +195,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return ErrDryRun
 	}
 
-	return streamLogs(ctx, provider, projectName, options, LogEntryPrintHandler)
+	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -374,12 +374,13 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			if err != nil {
 				term.Debug("Ending tail loop", err)
 				cancel() // TODO: stuck on defer Close() if we don't do this
+				return err
 			}
 		}
 	}
 }
 
-func LogEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
+func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)

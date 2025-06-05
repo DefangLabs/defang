@@ -101,7 +101,7 @@ func Execute(ctx context.Context) error {
 
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
-			provider, err := getProvider(ctx, nil)
+			provider, err := newProvider(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -457,7 +457,7 @@ var whoamiCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
 		nonInteractive = true // don't show provider prompt
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			term.Debug("unable to get provider:", err)
 		}
@@ -490,7 +490,7 @@ var certGenerateCmd = &cobra.Command{
 			return err
 		}
 
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -754,7 +754,7 @@ var configSetCmd = &cobra.Command{
 
 		// Make sure we have a project to set config for before asking for a value
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -836,7 +836,7 @@ var configDeleteCmd = &cobra.Command{
 	Short:       "Removes one or more config values",
 	RunE: func(cmd *cobra.Command, names []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -869,7 +869,7 @@ var configListCmd = &cobra.Command{
 	Short:       "List configs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -899,7 +899,7 @@ var debugCmd = &cobra.Command{
 		}
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -944,7 +944,7 @@ var deleteCmd = &cobra.Command{
 		var tail, _ = cmd.Flags().GetBool("tail")
 
 		loader := configureLoader(cmd)
-		provider, err := getProvider(cmd.Context(), loader)
+		provider, err := newProvider(cmd.Context(), loader)
 		if err != nil {
 			return err
 		}
@@ -1095,12 +1095,12 @@ var tosCmd = &cobra.Command{
 			return cli.NonInteractiveAgreeToS(cmd.Context(), client)
 		}
 
-		if !nonInteractive {
-			return cli.InteractiveAgreeToS(cmd.Context(), client)
+		if nonInteractive {
+			printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
+			return nil
 		}
 
-		printDefangHint("To agree to the terms of service, do:", cmd.CalledAs()+" --agree-tos")
-		return nil
+		return cli.InteractiveAgreeToS(cmd.Context(), client)
 	},
 }
 
@@ -1131,29 +1131,30 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 	if prov.Set(projectName) == nil && !cmd.Flag("provider").Changed {
 		// using -p with a provider name instead of -P
 		term.Warnf("Project name %q looks like a provider name; did you mean to use -P=%s instead of -p?", projectName, projectName)
-		doubleCheck(projectName)
+		doubleCheckProjectName(projectName)
 	} else if strings.HasPrefix(projectName, "roject-name") {
 		// -project-name= instead of --project-name
 		term.Warn("Did you mean to use --project-name instead of -project-name?")
-		doubleCheck(projectName)
+		doubleCheckProjectName(projectName)
 	} else if strings.HasPrefix(projectName, "rovider") {
 		// -provider= instead of --provider
 		term.Warn("Did you mean to use --provider instead of -provider?")
-		doubleCheck(projectName)
+		doubleCheckProjectName(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
 }
 
-func doubleCheck(projectName string) {
-	if !nonInteractive {
-		var confirm bool
-		err := survey.AskOne(&survey.Confirm{
-			Message: "Continue with project: " + projectName + "?",
-		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-		track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
-		if err == nil && !confirm {
-			os.Exit(1)
-		}
+func doubleCheckProjectName(projectName string) {
+	if nonInteractive {
+		return
+	}
+	var confirm bool
+	err := survey.AskOne(&survey.Confirm{
+		Message: "Continue with project: " + projectName + "?",
+	}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+	track.Evt("ProjectNameConfirm", P("project", projectName), P("confirm", confirm), P("err", err))
+	if err == nil && !confirm {
+		os.Exit(1)
 	}
 }
 
@@ -1189,29 +1190,24 @@ var providerDescription = map[cliClient.ProviderID]string{
 	cliClient.ProviderGCP:    "Deploy to Google Cloud Platform using gcloud Application Default Credentials.",
 }
 
-func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 	extraMsg := ""
-	source := "default project"
+	whence := "default project"
 
 	// Command line flag takes precedence over environment variable
 	if RootCmd.PersistentFlags().Changed("provider") {
-		source = "command line flag"
+		whence = "command line flag"
 	} else if val, ok := os.LookupEnv("DEFANG_PROVIDER"); ok {
 		// Sanitize the provider value from the environment variable
 		if err := providerID.Set(val); err != nil {
-			return nil, fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
+			return fmt.Errorf("invalid provider '%v' in environment variable DEFANG_PROVIDER, supported providers are: %v", val, cliClient.AllProviders())
 		}
-		source = "environment variable"
+		whence = "environment variable"
 	}
 
 	switch providerID {
 	case cliClient.ProviderAuto:
-		if !nonInteractive {
-			var err error
-			if source, err = determineProviderID(ctx, loader); err != nil {
-				return nil, err
-			}
-		} else {
+		if nonInteractive {
 			// Defaults to defang provider in non-interactive mode
 			if awsInEnv() {
 				term.Warn("Using Defang playground, but AWS environment variables were detected; did you forget --provider=aws or DEFANG_PROVIDER=aws?")
@@ -1223,6 +1219,11 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 				term.Warn("Using Defang playground, but GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable was detected; did you forget --provider=gcp or DEFANG_PROVIDER=gcp?")
 			}
 			providerID = cliClient.ProviderDefang
+		} else {
+			var err error
+			if whence, err = determineProviderID(ctx, loader); err != nil {
+				return err
+			}
 		}
 	case cliClient.ProviderAWS:
 		if !awsInConfig(ctx) {
@@ -1241,13 +1242,16 @@ func getProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 		extraMsg = "; consider using BYOC (https://s.defang.io/byoc)"
 	}
 
-	term.Infof("Using %s provider from %s%s", providerID.Name(), source, extraMsg)
-	provider, err := cli.NewProvider(ctx, providerID, client)
-	if err != nil {
+	term.Infof("Using %s provider from %s%s", providerID.Name(), whence, extraMsg)
+	return nil
+}
+
+func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provider, error) {
+	if err := updateProviderID(ctx, loader); err != nil {
 		return nil, err
 	}
 
-	return provider, nil
+	return cli.NewProvider(ctx, providerID, client)
 }
 
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
@@ -1284,9 +1288,27 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		}
 	}
 
+	whence, err := interactiveSelectProvider(cliClient.AllProviders())
+
+	// Save the selected provider to the fabric
+	if projectName != "" {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
+			term.Warnf("Unable to save selected provider to defang server: %v", err)
+		} else {
+			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
+		}
+	}
+
+	return whence, err
+}
+
+func interactiveSelectProvider(providers []cliClient.ProviderID) (string, error) {
+	if len(providers) < 2 {
+		panic("interactiveSelectProvider called with less than 2 providers")
+	}
 	// Prompt the user to choose a provider if in interactive mode
 	options := []string{}
-	for _, p := range cliClient.AllProviders() {
+	for _, p := range providers {
 		options = append(options, p.String())
 	}
 	// Default to the provider in the environment if available
@@ -1308,20 +1330,12 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 			return providerDescription[cliClient.ProviderID(value)]
 		},
 	}, &optionValue, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to select provider: %w", err)
 	}
 	track.Evt("ProviderSelected", P("provider", optionValue))
 	if err := providerID.Set(optionValue); err != nil {
 		panic(err)
 	}
 
-	// Save the selected provider to the fabric
-	if projectName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
-			term.Warnf("Unable to save selected provider to defang server: %v", err)
-		} else {
-			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
-		}
-	}
 	return "interactive prompt", nil
 }
