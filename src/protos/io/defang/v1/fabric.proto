@@ -728,5 +728,5 @@ message PreviewRequest {
 }
 
 message PreviewResponse {
-  bytes pulumi_preview = 1;
+  string etag = 1;
 }
