@@ -27,7 +27,12 @@ func (g *PlaygroundProvider) GetDeploymentStatus(ctx context.Context) error {
 }
 
 func (g *PlaygroundProvider) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return nil, errors.New("the preview command is not valid for the Defang playground; did you forget --provider?")
+	req.Preview = true
+	return g.Deploy(ctx, req)
+}
+
+func (g *PlaygroundProvider) Estimate(ctx context.Context, req *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error) {
+	return getMsg(g.GetController().Estimate(ctx, connect.NewRequest(req)))
 }
 
 func (g *PlaygroundProvider) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {

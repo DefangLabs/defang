@@ -50,6 +50,7 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
+		Aliases:     []string{"deploy"},
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
@@ -88,7 +89,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
-			provider, err := getProvider(ctx, loader)
+			provider, err := newProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -167,7 +168,9 @@ func makeComposeUpCmd() *cobra.Command {
 					if errDeploymentFailed.Service != "" {
 						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 					}
-					if !nonInteractive {
+					if nonInteractive {
+						printDefangHint("To debug the deployment, do:", debugConfig.String())
+					} else {
 						track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
 						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
@@ -176,8 +179,6 @@ func makeComposeUpCmd() *cobra.Command {
 							tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
 							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 						}
-					} else {
-						printDefangHint("To debug the deployment, do:", debugConfig.String())
 					}
 				}
 				return err
@@ -276,7 +277,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -369,7 +370,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
-			provider, err := getProvider(ctx, loader)
+			provider, err := newProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -394,7 +395,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -481,7 +482,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
