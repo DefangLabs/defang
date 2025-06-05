@@ -10,7 +10,7 @@ import (
 
 var cdCmd = &cobra.Command{
 	Use:     "cd",
-	Aliases: []string{"bootstrap"},
+	Aliases: []string{"bootstrap", "pulumi"},
 	Args:    cobra.NoArgs,
 	Short:   "Manually run a command with the CD task (for BYOC only)",
 	Hidden:  true,

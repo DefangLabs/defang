@@ -50,6 +50,7 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
+		Aliases:     []string{"deploy"},
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
