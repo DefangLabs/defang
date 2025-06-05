@@ -5,6 +5,9 @@ on:
     - cron: '0 6 * * *'  # every day at 6 AM UTC
   workflow_dispatch:     # optional: allows manual runs
 
+permissions:
+  contents: read
+
 jobs:
   goreleaser-nightly:
     runs-on: ubuntu-latest
