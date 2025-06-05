@@ -35,7 +35,7 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		LogType:    logs.LogTypeBuild,
 		Verbose:    verbose,
 	}
-	return TailAndWaitForCD(ctx, projectName, p, options, LogEntryPrintHandler)
+	return TailAndWaitForCD(ctx, projectName, p, options, logEntryPrintHandler)
 }
 
 func TailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions, handler LogEntryHandler) error {

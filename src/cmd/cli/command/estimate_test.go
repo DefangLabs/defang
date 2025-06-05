@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -113,7 +114,7 @@ func TestPrintEstimate(t *testing.T) {
 	}
 
 	stdout, _ := term.SetupTestTerm(t)
-	PrintEstimate(estimate)
+	cli.PrintEstimate(estimate)
 
 	expectedOutput := `
 Cost     Quantity          Description

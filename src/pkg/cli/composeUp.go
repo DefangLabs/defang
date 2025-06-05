@@ -39,8 +39,11 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 			return configs.Names, nil
 		}
 
-		if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
-			return nil, project, &ComposeError{err}
+		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
+		if upload != compose.UploadModePreview {
+			if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+				return nil, project, &ComposeError{err}
+			}
 		}
 	}
 
