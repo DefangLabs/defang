@@ -31,7 +31,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 	term.Info("Preparing estimate")
 
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-		Provider:      provider.EnumValue(),
+		Provider:      provider.Value(),
 		Region:        region,
 		PulumiPreview: []byte(preview),
 	})

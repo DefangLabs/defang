@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -98,6 +100,43 @@ func makeComposeUpCmd() *cobra.Command {
 			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
+			}
+
+			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
+			if resp, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+				Project: project.Name,
+				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			}); err != nil {
+				term.Debugf("ListDeployments failed: %v", err)
+			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
+				term.Debugf("AccountInfo failed: %v", err)
+			} else {
+				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
+					// Old deployments may not have a region or account ID, so we check for empty values too
+					return dep.Provider == providerID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+				})
+				if !samePlace && len(resp.Deployments) > 0 {
+					if nonInteractive {
+						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+					} else {
+						help := "Active deployments of this project:"
+						for _, dep := range resp.Deployments {
+							var providerId cliClient.ProviderID
+							providerId.SetValue(dep.Provider)
+							help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+						}
+						var confirm bool
+						if err := survey.AskOne(&survey.Confirm{
+							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+							Help:    help,
+							Default: true,
+						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+							return err
+						} else if !confirm {
+							return fmt.Errorf("deployment of project %q was canceled", project.Name)
+						}
+					}
+				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor

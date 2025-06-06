@@ -94,7 +94,7 @@ func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyR
 		names = append(names, service.Service.Name)
 	}
 
-	// FIXME: use Destroy rpc instead of Delete rpc
+	// FIXME: use Destroy rpc instead of Delete rpc; https://github.com/DefangLabs/defang/issues/1231
 	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: req.Project, Names: names})
 	if err != nil {
 		return "", err
@@ -127,8 +127,12 @@ func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, erro
 	return resp.Project, nil
 }
 
-func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (AccountInfo, error) {
-	return PlaygroundAccountInfo{}, nil
+func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (*AccountInfo, error) {
+	return &AccountInfo{
+		Provider:  ProviderDefang,
+		AccountID: g.GetTenantName().String(),
+		Region:    "us-west-2", // Hardcoded for now for prod1
+	}, nil
 }
 
 func (g *PlaygroundProvider) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest) error {
@@ -139,10 +143,3 @@ func (g *PlaygroundProvider) PrepareDomainDelegation(ctx context.Context, req Pr
 	return nil, nil // Playground does not support delegate domains
 }
 func (g *PlaygroundProvider) SetCanIUseConfig(*defangv1.CanIUseResponse) {}
-
-type PlaygroundAccountInfo struct{}
-
-func (g PlaygroundAccountInfo) AccountID() string    { return "" }
-func (g PlaygroundAccountInfo) Details() string      { return "" }
-func (g PlaygroundAccountInfo) Provider() ProviderID { return ProviderDefang }
-func (g PlaygroundAccountInfo) Region() string       { return "us-west-2" } // Hardcoded for now for prod1

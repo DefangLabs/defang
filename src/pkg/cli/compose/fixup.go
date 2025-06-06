@@ -179,7 +179,6 @@ func fixupLLM(svccfg *types.ServiceConfig) {
 func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-		delete(svccfg.Extensions, "x-defang-postgres")
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
@@ -201,7 +200,6 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-		delete(svccfg.Extensions, "x-defang-mongodb")
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
@@ -237,7 +235,6 @@ func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) er
 func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
-		delete(svccfg.Extensions, "x-defang-redis")
 	}
 	if len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service https://redis.io/docs/latest/operate/oss_and_stack/management/config/
