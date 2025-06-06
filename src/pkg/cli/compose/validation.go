@@ -51,6 +51,7 @@ func ValidateProject(project *composeTypes.Project) error {
 		for j := i + 1; j < len(services); j++ {
 			if svccfg.Name == services[j].Name {
 				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
+				continue
 			}
 			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
 				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
