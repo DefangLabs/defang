@@ -1,0 +1,41 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"io"
+	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+)
+
+var pollDuration = 2 * time.Second
+
+func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
+	ticker := time.NewTicker(pollDuration)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := provider.GetDeploymentStatus(ctx)
+			// End condition: EOF indicates that the task has completed successfully
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			// Retry on transient errors
+			if isTransientError(err) {
+				// If it's a transient error, we can retry
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
+				}
+				continue
+			}
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done(): // Stop the loop when the context is cancelled
+			return ctx.Err()
+		}
+	}
+}
