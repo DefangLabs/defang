@@ -44,7 +44,6 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		defer wg.Done()
 		// block on waiting for services to reach target state
 		serviceStates, svcErr = WaitServiceState(svcStatusCtx, provider, targetServiceState, project.Name, tailOptions.Deployment, computeServices)
-		term.Debug("WaitServiceState stopped with", svcErr)
 	}()
 
 	go func() {
@@ -55,7 +54,6 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
 		}
-		term.Debug("WaitForCdTaskExit stopped with", cdErr)
 	}()
 
 	errMonitoringDone := errors.New("monitoring done") // pseudo error to signal that monitoring is done

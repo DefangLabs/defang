@@ -18,17 +18,20 @@ func WaitForCdTaskExit(ctx context.Context, provider client.Provider) error {
 	for {
 		select {
 		case <-ticker.C:
-			if err := provider.GetDeploymentStatus(ctx); err != nil {
-				if errors.Is(err, io.EOF) {
-					// EOF indicates that the task has completed successfully
-					return nil
-				} else if isTransientError(err) {
-					// If it's a transient error, we can retry
-					if err := provider.DelayBeforeRetry(ctx); err != nil {
-						return err
-					}
-					continue
+			err := provider.GetDeploymentStatus(ctx)
+			// End condition: EOF indicates that the task has completed successfully
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			// Retry on transient errors
+			if isTransientError(err) {
+				// If it's a transient error, we can retry
+				if err := provider.DelayBeforeRetry(ctx); err != nil {
+					return err
 				}
+				continue
+			}
+			if err != nil {
 				return err
 			}
 		case <-ctx.Done(): // Stop the loop when the context is cancelled
