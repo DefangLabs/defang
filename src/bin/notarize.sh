@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+if [ "$SNAPSHOT" == "true" ]; then
+    echo "SNAPSHOT only build."
+    exit 0
+fi
+
 # Bail if we didn't get one (and only one) argument
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <path to app to notarize>"
