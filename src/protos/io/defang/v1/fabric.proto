@@ -725,6 +725,7 @@ message PreviewRequest {
   DeploymentMode mode = 3;
   string etag = 4;
   bytes compose = 5; // yaml (or json)
+  string project_name = 6;
 }
 
 message PreviewResponse {
