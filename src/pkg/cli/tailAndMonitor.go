@@ -49,7 +49,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	go func() {
 		defer wg.Done()
 		// block on waiting for cdTask to complete
-		if err := client.WaitForCdTaskExit(ctx, provider); err != nil {
+		if err := WaitForCdTaskExit(ctx, provider); err != nil {
 			cdErr = err
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)

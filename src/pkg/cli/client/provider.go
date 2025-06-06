@@ -166,12 +166,22 @@ type Loader interface {
 }
 
 type RetryDelayer struct {
-	Delay time.Duration
+	Delay    time.Duration
+	MaxDelay time.Duration
 }
 
 func (r *RetryDelayer) DelayBeforeRetry(ctx context.Context) error {
 	if r.Delay == 0 {
 		r.Delay = 1 * time.Second // Minimum 1 second delay to be consistent with the old behavior
+	}
+	if r.MaxDelay == 0 {
+		r.MaxDelay = 1 * time.Minute // Default maximum delay
+	}
+	if r.Delay < r.MaxDelay {
+		r.Delay *= 2 // Exponential backoff
+	}
+	if r.Delay > r.MaxDelay {
+		r.Delay = r.MaxDelay // Cap the delay to MaxDelay
 	}
 	return pkg.SleepWithContext(ctx, r.Delay)
 }
