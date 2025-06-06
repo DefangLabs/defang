@@ -516,8 +516,13 @@ func (b *ByocGcp) GetStackName() string {
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
-	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, ignoreCdSuccess)
+	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) *defangv1.SubscribeResponse {
+		if entry.Name != defangCD {
+			return entry
+		}
+		return nil
+	}
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
@@ -534,7 +539,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services)
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +571,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		}()
 	}
 
-	logStream, err := NewLogStream(ctx, b.driver)
+	logStream, err := NewLogStream(ctx, b.driver, req.Services)
 	if err != nil {
 		return nil, err
 	}
