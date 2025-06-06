@@ -44,7 +44,7 @@ func TestWhoami(t *testing.T) {
 	}
 
 	// Playground provider is hardcoded to return "us-west-2" as the region
-	want := "WhoAmI - \n\tProvider: Defang Playground\n\tTenant: tenant-1\n\tSubscription Tier: Pro\n\tRegion: us-west-2"
+	want := "WhoAmI - \n\tProvider: Defang Playground\n\tAccountID: tenant-1\n\tTenant: tenant-1\n\tSubscription Tier: Pro\n\tRegion: us-west-2"
 
 	if got != want {
 		t.Errorf("Whoami() = %v, \nwant: %v", got, want)

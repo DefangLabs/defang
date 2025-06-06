@@ -336,7 +336,7 @@ func (b *ByocAws) PrepareDomainDelegation(ctx context.Context, req client.Prepar
 	return &resp, nil
 }
 
-func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+func (b *ByocAws) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	// Use STS to get the account ID
 	cfg, err := b.driver.LoadConfig(ctx)
 	if err != nil {
@@ -349,33 +349,12 @@ func (b *ByocAws) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 		return nil, AnnotateAwsError(err)
 	}
 
-	return AWSAccountInfo{
-		region:    cfg.Region,
-		accountID: *identity.Account,
-		arn:       *identity.Arn,
+	return &client.AccountInfo{
+		Region:    cfg.Region,
+		AccountID: *identity.Account,
+		Details:   *identity.Arn,
+		Provider:  client.ProviderAWS,
 	}, nil
-}
-
-type AWSAccountInfo struct {
-	accountID string
-	region    string
-	arn       string
-}
-
-func (i AWSAccountInfo) AccountID() string {
-	return i.accountID
-}
-
-func (i AWSAccountInfo) Provider() client.ProviderID {
-	return client.ProviderAWS
-}
-
-func (i AWSAccountInfo) Region() string {
-	return i.region
-}
-
-func (i AWSAccountInfo) Details() string {
-	return i.arn
 }
 
 func (b *ByocAws) GetService(ctx context.Context, s *defangv1.GetRequest) (*defangv1.ServiceInfo, error) {

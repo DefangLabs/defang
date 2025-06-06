@@ -68,8 +68,8 @@ func (m mockDeployProvider) GetDeploymentStatus(ctx context.Context) error {
 	}
 }
 
-func (mockDeployProvider) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
-	return client.PlaygroundAccountInfo{}, ctx.Err()
+func (mockDeployProvider) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
+	return &client.AccountInfo{}, ctx.Err()
 }
 
 func (mockDeployProvider) PrepareDomainDelegation(ctx context.Context, req client.PrepareDomainDelegationRequest) (*client.PrepareDomainDelegationResponse, error) {

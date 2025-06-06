@@ -12,7 +12,7 @@ import (
 
 type mockComposeDown struct {
 	client.MockProvider
-	MockAccountInfo func(ctx context.Context) (client.AccountInfo, error)
+	MockAccountInfo func(ctx context.Context) (*client.AccountInfo, error)
 	MockDestroy     func(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error)
 	MockDelete      func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
 	request         map[string]interface{}
@@ -20,7 +20,7 @@ type mockComposeDown struct {
 
 func (m mockComposeDown) AccountInfo(
 	ctx context.Context,
-) (client.AccountInfo, error) {
+) (*client.AccountInfo, error) {
 	return m.MockAccountInfo(ctx)
 }
 
@@ -49,8 +49,8 @@ func TestComposeDown(t *testing.T) {
 	var mockProvider mockComposeDown
 	mockProvider = mockComposeDown{
 		MockProvider: client.MockProvider{},
-		MockAccountInfo: func(ctx context.Context) (client.AccountInfo, error) {
-			return client.PlaygroundAccountInfo{}, nil
+		MockAccountInfo: func(ctx context.Context) (*client.AccountInfo, error) {
+			return &client.AccountInfo{}, nil
 		},
 		MockDestroy: func(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
 			mockProvider.request["DestroyRequest"] = req
