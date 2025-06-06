@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -43,17 +43,25 @@ func ValidateProject(project *composeTypes.Project) error {
 		return services[i].Name < services[j].Name
 	})
 
-	errs := make([]error, len(services))
+	var errs []error
+	for _, svccfg := range services {
+		errs = append(errs, validateService(&svccfg, project))
+	}
 	for i, svccfg := range services {
-		errs[i] = validateService(&svccfg, project)
+		for j := i + 1; j < len(services); j++ {
+			if svccfg.Name == services[j].Name {
+				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
+				continue
+			}
+			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
+				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
+			}
+		}
 	}
 	return errors.Join(errs...)
 }
 
 func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
-	if strings.IndexFunc(svccfg.Name, unicode.IsUpper) >= 0 {
-		term.Warnf("service %q: service names should be lowercase to ensure reliable DNS resolution; consider renaming using only lowercase letters.", svccfg.Name)
-	}
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
