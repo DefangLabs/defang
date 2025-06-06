@@ -26,11 +26,13 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			if providerID == cliClient.ProviderAuto || providerID == cliClient.ProviderDefang {
-				if _, err := interactiveSelectProvider([]cliClient.ProviderID{cliClient.ProviderAWS, cliClient.ProviderDO, cliClient.ProviderGCP}); err != nil {
-					return err
-				}
-			}
+			providerID = cliClient.ProviderAWS // Default to AWS
+			// TODO: bring this back when GCP is supported
+			// if providerID == cliClient.ProviderAuto || providerID == cliClient.ProviderDefang {
+			// 	if _, err := interactiveSelectProvider([]cliClient.ProviderID{cliClient.ProviderAWS, cliClient.ProviderGCP}); err != nil {
+			// 		return err
+			// 	}
+			// }
 
 			estimate, err := cli.RunEstimate(ctx, project, client, providerID, region, mode.Value())
 			if err != nil {
