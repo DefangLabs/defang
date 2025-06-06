@@ -81,7 +81,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("No projects found for account '%s' at region '%s'\n", accountInfo.AccountID(), accountInfo.Region())
+		fmt.Printf("No projects found in %v\n", accountInfo)
 	}
 
 	for _, stack := range stacks {

@@ -10,10 +10,7 @@ import (
 )
 
 type ShowAccountData struct {
-	Provider       string
-	AccountID      string
-	Details        string
-	Region         string
+	client.AccountInfo
 	SubscriberTier defangv1.SubscriptionTier
 	Tenant         string
 }
@@ -22,7 +19,7 @@ func showAccountInfo(showData ShowAccountData) (string, error) {
 	if showData.Provider == "" {
 		showData.Provider = "Defang"
 	}
-	outputText := "WhoAmI - \n\tProvider: " + showData.Provider
+	outputText := "WhoAmI - \n\tProvider: " + showData.Provider.Name()
 
 	if showData.AccountID != "" {
 		outputText += "\n\tAccountID: " + showData.AccountID
@@ -62,17 +59,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		if err != nil {
 			return "", err
 		}
-
-		if account.AccountID() != "" {
-			showData.AccountID = account.AccountID()
-		}
-
-		if account.Region() != "" {
-			showData.Region = account.Region()
-		}
-
-		showData.Details = account.Details()
-		showData.Provider = account.Provider().Name()
+		showData.AccountInfo = *account
 	}
 
 	return showAccountInfo(showData)

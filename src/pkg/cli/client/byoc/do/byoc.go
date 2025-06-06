@@ -477,7 +477,7 @@ func (b *ByocDo) TearDown(ctx context.Context) error {
 	return nil
 }
 
-func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+func (b *ByocDo) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	accessToken := os.Getenv("DIGITALOCEAN_TOKEN")
 	if accessToken == "" {
 		return nil, errors.New("DIGITALOCEAN_TOKEN must be set (https://docs.defang.io/docs/providers/digitalocean#getting-started)")
@@ -486,32 +486,11 @@ func (b *ByocDo) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return DoAccountInfo{
-			accountID: account.Email,
-			region:    b.driver.Region.String(),
-		},
-		nil
-}
-
-type DoAccountInfo struct {
-	accountID string
-	region    string
-}
-
-func (i DoAccountInfo) AccountID() string {
-	return i.accountID
-}
-
-func (i DoAccountInfo) Provider() client.ProviderID {
-	return client.ProviderDO
-}
-
-func (i DoAccountInfo) Region() string {
-	return i.region
-}
-
-func (i DoAccountInfo) Details() string {
-	return ""
+	return &client.AccountInfo{
+		AccountID: account.Email,
+		Region:    b.driver.Region.String(),
+		Provider:  client.ProviderDO,
+	}, nil
 }
 
 func (b *ByocDo) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {

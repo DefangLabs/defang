@@ -1257,7 +1257,7 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
 	canUseReq := defangv1.CanIUseRequest{
 		Project:  projectName,
-		Provider: providerID.EnumValue(),
+		Provider: providerID.Value(),
 	}
 
 	resp, err := client.CanIUse(ctx, &canUseReq)
@@ -1282,7 +1282,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 			if err != nil {
 				term.Warnf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
-				providerID.SetEnumValue(resp.Provider)
+				providerID.SetValue(resp.Provider)
 				return "stored preference", nil
 			}
 		}
@@ -1292,7 +1292,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 
 	// Save the selected provider to the fabric
 	if projectName != "" {
-		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.EnumValue()}); err != nil {
+		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.Value()}); err != nil {
 			term.Warnf("Unable to save selected provider to defang server: %v", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)

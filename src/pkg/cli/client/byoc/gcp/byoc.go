@@ -277,7 +277,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 	return stacks, nil
 }
 
-func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
 		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
@@ -286,33 +286,12 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return GcpAccountInfo{
-		projectId: projectId,
-		region:    b.driver.Region,
-		email:     email,
+	return &client.AccountInfo{
+		AccountID: projectId,
+		Region:    b.driver.Region,
+		Details:   email,
+		Provider:  client.ProviderGCP,
 	}, nil
-}
-
-type GcpAccountInfo struct {
-	projectId string
-	region    string
-	email     string
-}
-
-func (g GcpAccountInfo) AccountID() string {
-	return g.projectId
-}
-
-func (g GcpAccountInfo) Region() string {
-	return g.region
-}
-
-func (g GcpAccountInfo) Details() string {
-	return g.email
-}
-
-func (g GcpAccountInfo) Provider() client.ProviderID {
-	return client.ProviderGCP
 }
 
 func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
