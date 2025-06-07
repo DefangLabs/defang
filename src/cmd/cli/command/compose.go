@@ -3,6 +3,7 @@ package command
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -190,7 +191,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := cli.NewTailOptionsForDeploy(deploy, since, verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				var errDeploymentFailed cliClient.ErrDeploymentFailed
@@ -215,7 +216,7 @@ func makeComposeUpCmd() *cobra.Command {
 						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 						if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 							// don't show this defang hint if debugging was successful
-							tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
+							tailOptions := newTailOptionsForDeploy(deploy.Etag, since, true)
 							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 						}
 					}
@@ -250,6 +251,26 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
+	return cli.TailOptions{
+		Deployment: deployment,
+		LogType:    logs.LogTypeAll,
+		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
+			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
+				if strings.Contains(eventLog.Message, "Update succeeded in ") {
+					return io.EOF
+				} else if strings.Contains(eventLog.Message, "Update failed in ") {
+					return errors.New(eventLog.Message)
+				}
+			}
+			return nil
+		},
+		Raw:     false,
+		Since:   since,
+		Verbose: verbose,
+	}
 }
 
 func flushWarnings() {
@@ -349,20 +370,10 @@ func makeComposeDownCmd() *cobra.Command {
 				return nil
 			}
 
-			endLogConditions := []cli.EndLogConditional{
-				{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
-				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
-			}
-			tailOptions := cli.TailOptions{
-				Deployment:         deployment,
-				Since:              since,
-				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
-				Verbose:            verbose,
-				LogType:            logs.LogTypeAll,
-			}
-			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
+			tailOptions := newTailOptionsForDown(deployment, since)
+			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
 			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
-			if err != nil {
+			if err != nil && !errors.Is(err, io.EOF) {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we show a warning and detach. This is
 					// different than `up`, which will wait for the deployment to finish, but we don't have an
@@ -382,6 +393,25 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	return composeDownCmd
+}
+
+func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
+	return cli.TailOptions{
+		Deployment: deployment,
+		Since:      since,
+		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
+			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
+				if strings.Contains(eventLog.Message, "Destroy succeeded in ") || strings.Contains(eventLog.Message, "Update succeeded in ") {
+					return io.EOF
+				} else if strings.Contains(eventLog.Message, "Destroy failed in ") || strings.Contains(eventLog.Message, "Update failed in ") {
+					return errors.New(eventLog.Message)
+				}
+			}
+			return nil // keep tailing logs
+		},
+		Verbose: verbose,
+		LogType: logs.LogTypeAll,
+	}
 }
 
 func makeComposeConfigCmd() *cobra.Command {

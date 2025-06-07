@@ -38,14 +38,7 @@ var (
 )
 
 // Deprecated: use Subscribe instead #851
-type EndLogConditional struct {
-	Service  string
-	Host     string
-	EventLog string
-}
-
-// Deprecated: use Subscribe instead #851
-type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
+type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
 	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
@@ -57,16 +50,6 @@ type TailOptions struct {
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
-}
-
-func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
-	return TailOptions{
-		Deployment: deploy.Etag,
-		LogType:    logs.LogTypeAll,
-		Raw:        false,
-		Since:      since,
-		Verbose:    verbose,
-	}
 }
 
 func (to TailOptions) String() string {
@@ -104,24 +87,6 @@ var P = track.P
 // EnableUTCMode sets the local time zone to UTC.
 func EnableUTCMode() {
 	time.Local = time.UTC
-}
-
-// Deprecated: use Subscribe instead #851
-func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
-	return func(services []string, host string, eventLog string) bool {
-		for _, conditional := range conditionals {
-			for _, service := range services {
-				if service == "" || service == conditional.Service {
-					if host == "" || host == conditional.Host {
-						if strings.Contains(eventLog, conditional.EventLog) {
-							return true
-						}
-					}
-				}
-			}
-		}
-		return false
-	}
 }
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -379,9 +344,9 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
+				if err := options.EndEventDetectFunc(e); err != nil {
 					cancel() // TODO: stuck on defer Close() if we don't do this
-					return nil
+					return err
 				}
 				continue
 			}
@@ -448,14 +413,15 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		}
 		buf.WriteString(line)
 		buf.WriteRune('\n')
-
-		// Detect end logging event
-		if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{e.Service}, e.Host, line) {
-			return errors.New("end event detected")
-		}
 	}
 	term.Print(buf.String())
 
+	// Detect end logging event
+	if options.EndEventDetectFunc != nil {
+		if err := options.EndEventDetectFunc(e); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
