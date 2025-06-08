@@ -361,9 +361,6 @@ var RootCmd = &cobra.Command{
 		}
 
 		client, err = cli.Connect(cmd.Context(), getCluster())
-		if cli.IsNetworkError(err) {
-			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
-		}
 
 		if v, err := client.GetVersions(cmd.Context()); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -377,6 +374,11 @@ var RootCmd = &cobra.Command{
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
+		}
+
+		// Check whether Connect failed with a networking error
+		if cli.IsNetworkError(err) {
+			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
@@ -1280,7 +1282,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 		if projectName != "" && !RootCmd.PersistentFlags().Changed("provider") { // If user manually selected auto provider, do not load from remote
 			resp, err := client.GetSelectedProvider(ctx, &defangv1.GetSelectedProviderRequest{Project: projectName})
 			if err != nil {
-				term.Warnf("Unable to get selected provider: %v", err)
+				term.Debugf("Unable to get selected provider: %v", err)
 			} else if resp.Provider != defangv1.Provider_PROVIDER_UNSPECIFIED {
 				providerID.SetValue(resp.Provider)
 				return "stored preference", nil
@@ -1293,7 +1295,7 @@ func determineProviderID(ctx context.Context, loader cliClient.Loader) (string, 
 	// Save the selected provider to the fabric
 	if projectName != "" {
 		if err := client.SetSelectedProvider(ctx, &defangv1.SetSelectedProviderRequest{Project: projectName, Provider: providerID.Value()}); err != nil {
-			term.Warnf("Unable to save selected provider to defang server: %v", err)
+			term.Debugf("Unable to save selected provider to defang server: %v", err)
 		} else {
 			term.Printf("%v is now the default provider for project %v and will auto-select next time if no other provider is specified. Use --provider=auto to reselect.", providerID, projectName)
 		}
