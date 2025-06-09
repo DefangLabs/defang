@@ -24,3 +24,8 @@ services:
     image: bogus
     ports:
       - "8085:85/udp"
+  grpc:
+    image: bogus
+    ports:
+      - target: 9000
+        app_protocol: grpc

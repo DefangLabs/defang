@@ -1,4 +1,20 @@
 {
+  "grpc": {
+    "command": null,
+    "entrypoint": null,
+    "image": "bogus",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 9000,
+        "protocol": "tcp",
+        "app_protocol": "grpc"
+      }
+    ]
+  },
   "long": {
     "command": null,
     "entrypoint": null,
