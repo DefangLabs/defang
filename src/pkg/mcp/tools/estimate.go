@@ -26,12 +26,10 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 	)
 	term.Debug("Estimate tool created")
 
-	// Add the Estimate tool handler - make it non-blocking
+	// Add the Estimate tool handler
 	term.Debug("Adding estimate tool handler")
 	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Debug("Estimate tool called")
-		// Test token
-		term.Debug("Function invoked: cli.Connect")
 		track.Evt("MCP Estimate Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
@@ -61,7 +59,8 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 
 		providerID := cliClient.ProviderAWS // Default to AWS
 
-		estimate, err := cli.RunEstimate(ctx, project, client, providerID, region, defangv1.DeploymentMode_PRODUCTION)
+		term.Debug("Function invoked: cli.RunEstimate")
+		estimate, err := cli.RunEstimate(ctx, project, client, providerID, region, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}
