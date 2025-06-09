@@ -235,7 +235,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	err := validatePorts(svccfg.Ports)
 	if err != nil {
-		return err
+		return fmt.Errorf("service %q: %w", svccfg.Name, err)
 	}
 	if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 		// Show a warning when we have ingress ports but no explicit healthcheck
@@ -428,6 +428,14 @@ func validatePort(port composeTypes.ServicePortConfig) error {
 	}
 
 	return nil
+}
+
+func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
+	if r.Reservations == nil {
+		// TODO: we might not want to default to all the limits, maybe only memory?
+		return r.Limits
+	}
+	return r.Reservations
 }
 
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion

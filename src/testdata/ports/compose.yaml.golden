@@ -1,5 +1,14 @@
 name: ports
 services:
+  grpc:
+    image: bogus
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9000
+        protocol: tcp
+        app_protocol: grpc
   long:
     image: bogus
     networks:
