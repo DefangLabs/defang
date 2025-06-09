@@ -20,10 +20,9 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, provider cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
-	defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
+func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProvider cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
 	term.Info("Generating deployment preview")
-	preview, err := GeneratePreview(ctx, project, client, defangProvider, mode)
+	preview, err := GeneratePreview(ctx, project, client, previewProvider, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +30,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 	term.Info("Preparing estimate")
 
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-		Provider:      provider.Value(),
+		Provider:      estimateProvider.Value(),
 		Region:        region,
 		PulumiPreview: []byte(preview),
 	})
