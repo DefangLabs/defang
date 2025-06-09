@@ -58,10 +58,11 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
 
+		defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
 		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, providerID, "us-west-2", defangv1.DeploymentMode_DEVELOPMENT)
+		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}

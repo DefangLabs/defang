@@ -8,5 +8,4 @@
  ! service "ui": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "ui": service name was adjusted: environment variable "API_URL" assigned value "http://mock-mistral:8000"
  ! service "use-ingress-service": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "use-ingress-service": service name in the environment variable "DB_URL" was not adjusted; only references to other services with port mode set to 'host' will be fixed-up
  * Packaging the project files for fixup-args at .
