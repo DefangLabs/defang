@@ -710,7 +710,7 @@ message EstimateLineItem {
   string unit = 2;
   float quantity = 3;
   google.type.Money cost = 4;
-  string service = 5;
+  repeated string service = 5;
 }
 
 message EstimateResponse {
