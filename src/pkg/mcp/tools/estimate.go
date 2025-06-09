@@ -16,7 +16,7 @@ import (
 )
 
 // setupEstimateTool configures and adds the estimate tool to the MCP server
-func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
+func setupEstimateTool(s *server.MCPServer, cluster string) {
 	term.Debug("Creating estimate tool")
 	estimateTool := mcp.NewTool("estimate",
 		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
@@ -61,7 +61,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, providerID, region, defangv1.DeploymentMode_DEVELOPMENT)
+		estimate, err := cli.RunEstimate(ctx, project, client, providerID, "us-west-2", defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}

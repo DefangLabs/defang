@@ -6,7 +6,7 @@ import (
 )
 
 // SetupTools configures and adds all the MCP tools to the server
-func SetupTools(s *server.MCPServer, cluster string, authPort int, region string) {
+func SetupTools(s *server.MCPServer, cluster string, authPort int) {
 	// Create a tool for logging in and getting a new token
 	term.Debug("Setting up login tool")
 	setupLoginTool(s, cluster, authPort)
@@ -25,7 +25,7 @@ func SetupTools(s *server.MCPServer, cluster string, authPort int, region string
 
 	// Create a tool for estimating costs
 	term.Debug("Setting up estimate tool")
-	setupEstimateTool(s, cluster, region)
+	setupEstimateTool(s, cluster)
 
 	term.Debug("All MCP tools have been set up successfully")
 }
