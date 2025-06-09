@@ -23,5 +23,9 @@ func SetupTools(s *server.MCPServer, cluster string, authPort int) {
 	term.Debug("Setting up destroy tool")
 	setupDestroyTool(s, cluster)
 
+	// Create a tool for estimating costs
+	term.Debug("Setting up estimate tool")
+	setupEstimateTool(s, cluster)
+
 	term.Debug("All MCP tools have been set up successfully")
 }
