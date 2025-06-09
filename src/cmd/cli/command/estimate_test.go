@@ -21,7 +21,7 @@ func TestPrintEstimate(t *testing.T) {
 		},
 		LineItems: []*defangv1.EstimateLineItem{
 			{
-				Service:     "shared",
+				Service:     []string{"shared"},
 				Description: "AWSELB USW2-LoadBalancerUsage",
 				Unit:        "Hours",
 				Quantity:    730,
@@ -32,7 +32,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "shared",
+				Service:     []string{"shared"},
 				Description: "AmazonEC2 USW2-NatGateway-Hours",
 				Unit:        "Hours",
 				Quantity:    730,
@@ -43,7 +43,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "app",
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)",
 				Unit:        "GB-Hours",
 				Quantity:    14600,
@@ -54,7 +54,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "app",
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-GB-Hours (2 GB * 730 hours)",
 				Unit:        "GB-Hours",
 				Quantity:    1460,
@@ -65,7 +65,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "app",
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-GB-Hours-SpotDiscount (Estimated @ 70%)",
 				Unit:        "GB-Hours",
 				Quantity:    1460,
@@ -76,7 +76,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "app",
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-vCPU-Hours:perCPU (1.00 vCPU * 730 hours)",
 				Unit:        "vCPU-Hours",
 				Quantity:    730,
@@ -87,7 +87,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "app",
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-vCPU-Hours:perCPU-SpotDiscount (Estimated @ 70%)",
 				Unit:        "GB-Hours",
 				Quantity:    730,
@@ -98,7 +98,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "cache",
+				Service:     []string{"cache"},
 				Description: "AmazonElastiCache USW2-NodeUsage:cache.t3.medium",
 				Unit:        "%Utilized/mo",
 				Quantity:    730,
@@ -109,7 +109,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
-				Service:     "db",
+				Service:     []string{"db"},
 				Description: "AmazonRDS USW2-InstanceUsage:db.t3.medium",
 				Unit:        "%Utilized/mo",
 				Quantity:    100,

@@ -104,7 +104,7 @@ func prepareEstimateLineItemTableItems(lineItems []*defangv1.EstimateLineItem) [
 
 		tableItems[i] = EstimateLineItemTableItem{
 			Cost:        cost.String(),
-			Service:     lineItem.Service,
+			Service:     strings.Join(lineItem.Service, ", "),
 			Quantity:    fmt.Sprintf("%s %s", quantityStr, lineItem.Unit),
 			Description: lineItem.Description,
 		}
