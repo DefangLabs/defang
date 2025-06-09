@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -66,6 +67,20 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 		}
 		term.Debugf("Estimate: %+v", estimate)
 
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully estimated the cost of the project to AWS: %+v", estimate)), nil
+		oldTerm := term.DefaultTerm
+		stdout := new(bytes.Buffer)
+		term.DefaultTerm = term.NewTerm(
+			os.Stdin,
+			stdout,
+			new(bytes.Buffer),
+		)
+
+		cli.PrintEstimate(estimate)
+
+		term.DefaultTerm = oldTerm
+
+		estimateText := stdout.String()
+
+		return mcp.NewToolResultText("Successfully estimated the cost of the project to AWS:\n" + estimateText), nil
 	})
 }
