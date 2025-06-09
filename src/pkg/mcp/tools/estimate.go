@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -18,6 +19,10 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 	term.Debug("Creating estimate tool")
 	loginTool := mcp.NewTool("estimate",
 		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
+
+		mcp.WithString("working_directory",
+			mcp.Description("Path to current working directory"),
+		),
 	)
 	term.Debug("Login tool created")
 
@@ -29,6 +34,14 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 		term.Debug("Function invoked: cli.Connect")
 		track.Evt("MCP Estimate Tool")
 
+		wd, ok := request.Params.Arguments["working_directory"].(string)
+		if ok && wd != "" {
+			err := os.Chdir(wd)
+			if err != nil {
+				term.Error("Failed to change working directory", "error", err)
+			}
+		}
+
 		loader := configureLoader(request)
 
 		term.Debug("Function invoked: loader.LoadProject")
@@ -37,7 +50,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
 			term.Error("Failed to deploy services", "error", err)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
+			return mcp.NewToolResultText(fmt.Sprintf("Estimate failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
 		term.Debug("Function invoked: cli.Connect")
