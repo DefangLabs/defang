@@ -21,6 +21,7 @@ func TestPrintEstimate(t *testing.T) {
 		},
 		LineItems: []*defangv1.EstimateLineItem{
 			{
+				Service:     []string{"shared"},
 				Description: "AWSELB USW2-LoadBalancerUsage",
 				Unit:        "Hours",
 				Quantity:    730,
@@ -31,6 +32,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"shared"},
 				Description: "AmazonEC2 USW2-NatGateway-Hours",
 				Unit:        "Hours",
 				Quantity:    730,
@@ -41,6 +43,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)",
 				Unit:        "GB-Hours",
 				Quantity:    14600,
@@ -51,6 +54,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-GB-Hours (2 GB * 730 hours)",
 				Unit:        "GB-Hours",
 				Quantity:    1460,
@@ -61,6 +65,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-GB-Hours-SpotDiscount (Estimated @ 70%)",
 				Unit:        "GB-Hours",
 				Quantity:    1460,
@@ -71,6 +76,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-vCPU-Hours:perCPU (1.00 vCPU * 730 hours)",
 				Unit:        "vCPU-Hours",
 				Quantity:    730,
@@ -81,6 +87,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"app"},
 				Description: "AmazonECS USW2-Fargate-vCPU-Hours:perCPU-SpotDiscount (Estimated @ 70%)",
 				Unit:        "GB-Hours",
 				Quantity:    730,
@@ -91,6 +98,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"cache"},
 				Description: "AmazonElastiCache USW2-NodeUsage:cache.t3.medium",
 				Unit:        "%Utilized/mo",
 				Quantity:    730,
@@ -101,6 +109,7 @@ func TestPrintEstimate(t *testing.T) {
 				},
 			},
 			{
+				Service:     []string{"db"},
 				Description: "AmazonRDS USW2-InstanceUsage:db.t3.medium",
 				Unit:        "%Utilized/mo",
 				Quantity:    100,
@@ -117,16 +126,16 @@ func TestPrintEstimate(t *testing.T) {
 	cli.PrintEstimate(estimate)
 
 	expectedOutput := `
-Cost     Quantity          Description
-$16.43   730 Hours         AWSELB USW2-LoadBalancerUsage
-$32.85   730 Hours         AmazonEC2 USW2-NatGateway-Hours
-$1.62    14600 GB-Hours    AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)
-$6.49    1460 GB-Hours     AmazonECS USW2-Fargate-GB-Hours (2 GB * 730 hours)
--$4.54   1460 GB-Hours     AmazonECS USW2-Fargate-GB-Hours-SpotDiscount (Estimated @ 70%)
-$29.55   730 vCPU-Hours    AmazonECS USW2-Fargate-vCPU-Hours:perCPU (1.00 vCPU * 730 hours)
--$20.69  730 GB-Hours      AmazonECS USW2-Fargate-vCPU-Hours:perCPU-SpotDiscount (Estimated @ 70%)
-$49.64   730 %Utilized/mo  AmazonElastiCache USW2-NodeUsage:cache.t3.medium
-$7.20    100 %Utilized/mo  AmazonRDS USW2-InstanceUsage:db.t3.medium
+Cost     Service  Quantity          Description
+$16.43   shared   730 Hours         AWSELB USW2-LoadBalancerUsage
+$32.85   shared   730 Hours         AmazonEC2 USW2-NatGateway-Hours
+$1.62    app      14600 GB-Hours    AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)
+$6.49    app      1460 GB-Hours     AmazonECS USW2-Fargate-GB-Hours (2 GB * 730 hours)
+-$4.54   app      1460 GB-Hours     AmazonECS USW2-Fargate-GB-Hours-SpotDiscount (Estimated @ 70%)
+$29.55   app      730 vCPU-Hours    AmazonECS USW2-Fargate-vCPU-Hours:perCPU (1.00 vCPU * 730 hours)
+-$20.69  app      730 GB-Hours      AmazonECS USW2-Fargate-vCPU-Hours:perCPU-SpotDiscount (Estimated @ 70%)
+$49.64   cache    730 %Utilized/mo  AmazonElastiCache USW2-NodeUsage:cache.t3.medium
+$7.20    db       100 %Utilized/mo  AmazonRDS USW2-InstanceUsage:db.t3.medium
 Estimated Monthly Cost: $118.55 (+ usage)
 Estimate does not include taxes or Discount Programs.
 `

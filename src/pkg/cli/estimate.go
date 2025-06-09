@@ -79,13 +79,14 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 func PrintEstimate(estimate *defangv1.EstimateResponse) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
-	term.Table(tableItems, []string{"Cost", "Quantity", "Description"})
+	term.Table(tableItems, []string{"Cost", "Service", "Quantity", "Description"})
 	term.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
 	term.Printf("Estimate does not include taxes or Discount Programs.\n")
 }
 
 type EstimateLineItemTableItem struct {
 	Cost        string
+	Service     string
 	Quantity    string
 	Description string
 }
@@ -103,6 +104,7 @@ func prepareEstimateLineItemTableItems(lineItems []*defangv1.EstimateLineItem) [
 
 		tableItems[i] = EstimateLineItemTableItem{
 			Cost:        cost.String(),
+			Service:     strings.Join(lineItem.Service, ", "),
 			Quantity:    fmt.Sprintf("%s %s", quantityStr, lineItem.Unit),
 			Description: lineItem.Description,
 		}
