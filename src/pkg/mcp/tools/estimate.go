@@ -17,18 +17,18 @@ import (
 // setupEstimateTool configures and adds the estimate tool to the MCP server
 func setupEstimateTool(s *server.MCPServer, cluster string, region string) {
 	term.Debug("Creating estimate tool")
-	loginTool := mcp.NewTool("estimate",
+	estimateTool := mcp.NewTool("estimate",
 		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
 
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
 		),
 	)
-	term.Debug("Login tool created")
+	term.Debug("Estimate tool created")
 
 	// Add the Estimate tool handler - make it non-blocking
 	term.Debug("Adding estimate tool handler")
-	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Debug("Estimate tool called")
 		// Test token
 		term.Debug("Function invoked: cli.Connect")
