@@ -74,39 +74,40 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 	return strings.Join(pulumiPreviewLogLines, "\n"), nil
 }
 
-var developmentEstimateSummary = `
-The development mode is optimized for low cost and rapid iteration. It uses
-spot instances and lightweight, burstable resources. Logging is verbose but
-short-lived (1 day), deployments are replaced entirely on updates, and
-operations that cause downtime are allowed. Ideal for testing and active
-development, this mode emphasizes affordability over reliability.`
+var affordableModeEstimateSummary = `
+This mode is optimized for low cost and rapid iteration. Your application
+will deployed with spot instances. Databases will be provisioned using
+resources optimized for burstable memory. Deployments are replaced entirely on
+updates, so there may be small windows of downtime during redeployment.
+Services will be exposed directly to the public internet for easy debugging.
+This mode emphasizes affordability over availability.`
 
-var stagingEstimateSummary = `
-Staging mode strikes a balance between cost and resiliency. It uses similar
-infrastructure to production—such as rolling deployments, longer log retention
-(7 days), and stable DNS behavior—while still leveraging some cost-saving
-measures like spot instances. Suitable for final validation before release.`
+var balancedModeEstimateSummary = `
+This mode strikes a balance between cost and availability. Your application
+will be deployed with spot instances. Databases will be provisioned using
+resources optimized for production. Services in the "internal" network will
+be deployed to a private subnet with a NAT gateway for outbound internet access.`
 
-var productionEstimateSummary = `
-The production environment prioritizes performance, security, and uptime. It
-uses on-demand instances, production-grade databases, rolling deployments, and
-full networking features like NAT gateways and HTTPS termination protection.
-Logs are retained for 30 days, and storage is encrypted. This mode is designed
-for serving live traffic reliably.`
+var highAvailabilityModeEstimateSummary = `
+This mode prioritizes availability. Your application
+will deployed with on-demand instances in multiple availability zones.
+Databases will be provisioned using resources optimized for production.
+Services in the "internal" network will be deployed to a private subnet with a
+NAT gateway for outbound internet access.`
 
 func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
 	if mode == defangv1.DeploymentMode_DEVELOPMENT || mode == defangv1.DeploymentMode_MODE_UNSPECIFIED {
-		term.Println("Development Mode Estimate")
-		term.Println(developmentEstimateSummary)
+		term.Println("Estimate for Deployment Mode: AFFORDABLE")
+		term.Println(affordableModeEstimateSummary)
 	} else if mode == defangv1.DeploymentMode_STAGING {
-		term.Println("Staging Mode Estimate")
-		term.Println(stagingEstimateSummary)
+		term.Println("Estimate for Deployment Mode: BALANCED")
+		term.Println(balancedModeEstimateSummary)
 	} else if mode == defangv1.DeploymentMode_PRODUCTION {
-		term.Println("Production Mode Estimate")
-		term.Println(productionEstimateSummary)
+		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
+		term.Println(highAvailabilityModeEstimateSummary)
 	} else {
 		term.Printf("Estimate for %s Mode\n", mode.String())
 	}
@@ -115,7 +116,7 @@ func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResp
 	term.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
 	term.Println("")
 	term.Printf("Estimate does not include taxes or Discount Programs.\n")
-	term.Println("")
+	term.Println("To estimate other modes, use defang estimate --mode=affordable|balanced|high_availability")
 }
 
 type EstimateLineItemTableItem struct {

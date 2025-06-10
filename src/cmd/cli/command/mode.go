@@ -18,9 +18,20 @@ func (b Mode) String() string {
 }
 
 func (b *Mode) Set(s string) error {
-	mode, ok := defangv1.DeploymentMode_value[strings.ToUpper(s)]
+	upper := strings.ToUpper(s)
+	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
-		return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+		switch upper {
+		case "AFFORDABLE":
+			mode = int32(defangv1.DeploymentMode_DEVELOPMENT)
+		case "BALANCED":
+			mode = int32(defangv1.DeploymentMode_STAGING)
+		case "HIGH_AVAILABILITY":
+		case "HA":
+			mode = int32(defangv1.DeploymentMode_PRODUCTION)
+		default:
+			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+		}
 	}
 	*b = Mode(mode)
 	return nil
