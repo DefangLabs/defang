@@ -27,9 +27,9 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		),
 
 		mcp.WithString("deployment_mode",
-			mcp.Description("The deployment mode for the estimate. Options are DEVELOPMENT or PRODUCTION."),
-			mcp.DefaultString("DEVELOPMENT"),
-			mcp.Enum("DEVELOPMENT", "PRODUCTION"),
+			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
+			mcp.DefaultString("AFFORDABLE"),
+			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH_AVAILABILITY"),
 		),
 	)
 	term.Debug("Estimate tool created")
@@ -48,15 +48,32 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			}
 		}
 
-		// Set the deployment mode default to DEVELOPMENT
-		deploymentMode := defangv1.DeploymentMode_DEVELOPMENT
-
-		mode, ok := request.Params.Arguments["deployment_mode"].(string)
-		mode = strings.ToLower(mode) // Normalize to lowercase for consistency
-		if ok && mode == "production" {
-			deploymentMode = defangv1.DeploymentMode_PRODUCTION
+		modeString, ok := request.Params.Arguments["deployment_mode"].(string)
+		if !ok {
+			modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
 		}
-		term.Debugf("Deployment mode set to: %s", mode)
+
+		// This logic is replicated from src/cmd/cli/command/mode.go
+		// I couldn't figure out how to import it without circular dependencies
+		modeString = strings.ToUpper(modeString)
+		mode := defangv1.DeploymentMode_DEVELOPMENT // Default to DEVELOPMENT
+		switch modeString {
+		case "AFFORDABLE":
+		case "DEVELOPMENT":
+			mode = defangv1.DeploymentMode_DEVELOPMENT
+		case "BALANCED":
+		case "STAGING":
+			mode = defangv1.DeploymentMode_STAGING
+		case "PRODUCTION":
+		case "HIGH_AVAILABILITY":
+		case "HA":
+			mode = defangv1.DeploymentMode_PRODUCTION
+		default:
+			term.Warn("Unknown deployment mode provided, defaulting to AFFORDABLE")
+			mode = defangv1.DeploymentMode_DEVELOPMENT
+		}
+
+		term.Debugf("Deployment mode set to: %s", mode.String())
 
 		loader := configureLoader(request)
 
@@ -79,7 +96,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", deploymentMode)
+		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", mode)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}
@@ -93,7 +110,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			new(bytes.Buffer),
 		)
 
-		cli.PrintEstimate(deploymentMode, estimate)
+		cli.PrintEstimate(mode, estimate)
 
 		term.DefaultTerm = oldTerm
 

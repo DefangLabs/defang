@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -17,7 +16,7 @@ func (b Mode) String() string {
 	return strings.ToLower(defangv1.DeploymentMode_name[int32(b)])
 }
 
-func (b *Mode) Set(s string) error {
+func NewMode(s string) (Mode, error) {
 	upper := strings.ToUpper(s)
 	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
@@ -30,10 +29,19 @@ func (b *Mode) Set(s string) error {
 		case "HA":
 			mode = int32(defangv1.DeploymentMode_PRODUCTION)
 		default:
-			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+			return 0, fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
 		}
 	}
-	*b = Mode(mode)
+	return Mode(mode), nil
+}
+
+func (b *Mode) Set(s string) error {
+	mode, err := NewMode(s)
+	if err != nil {
+		return fmt.Errorf("failed to set mode: %w", err)
+	}
+	*b = mode
+
 	return nil
 }
 
@@ -46,13 +54,5 @@ func (b Mode) Value() defangv1.DeploymentMode {
 }
 
 func allModes() []string {
-	modes := make([]string, 0, len(defangv1.DeploymentMode_name)-1)
-	for i, mode := range defangv1.DeploymentMode_name {
-		if i == 0 {
-			continue
-		}
-		modes = append(modes, strings.ToLower(mode))
-	}
-	slices.Sort(modes) // TODO: sort by enum value instead of string
-	return modes
+	return []string{"affordable", "balanced", "high_availability"}
 }
