@@ -56,17 +56,13 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		// This logic is replicated from src/cmd/cli/command/mode.go
 		// I couldn't figure out how to import it without circular dependencies
 		modeString = strings.ToUpper(modeString)
-		mode := defangv1.DeploymentMode_DEVELOPMENT // Default to DEVELOPMENT
+		var mode defangv1.DeploymentMode
 		switch modeString {
 		case "AFFORDABLE":
-		case "DEVELOPMENT":
 			mode = defangv1.DeploymentMode_DEVELOPMENT
 		case "BALANCED":
-		case "STAGING":
 			mode = defangv1.DeploymentMode_STAGING
-		case "PRODUCTION":
 		case "HIGH_AVAILABILITY":
-		case "HA":
 			mode = defangv1.DeploymentMode_PRODUCTION
 		default:
 			term.Warn("Unknown deployment mode provided, defaulting to AFFORDABLE")
