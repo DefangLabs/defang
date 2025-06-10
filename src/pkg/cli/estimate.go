@@ -21,7 +21,6 @@ import (
 )
 
 func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProvider cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
-	term.Info("Generating deployment preview")
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, mode)
 	if err != nil {
 		return nil, err
@@ -49,6 +48,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", err
 	}
 
+	term.Info("Generating deployment preview")
 	var pulumiPreviewLogLines []string
 	options := TailOptions{
 		EndEventDetectFunc: func(services []string, host string, eventlog string) bool {
