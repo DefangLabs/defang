@@ -46,7 +46,7 @@ func makeEstimateCmd() *cobra.Command {
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(estimate)
+			cli.PrintEstimate(mode.Value(), estimate)
 
 			return nil
 		},
