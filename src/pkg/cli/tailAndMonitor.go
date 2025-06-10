@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -78,6 +79,9 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 
 		switch {
+		case errors.Is(err, io.EOF):
+			break // an end condition was detected; cdErr and/or svcErr might be nil
+
 		case errors.Is(context.Cause(ctx), context.Canceled):
 			term.Warn("Deployment is not finished. Service(s) might not be running.")
 
@@ -90,7 +94,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			fallthrough
 
 		default:
-			tailErr = err
+			tailErr = err // report the error, in addition to the cdErr and svcErr
 		}
 	}
 
