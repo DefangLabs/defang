@@ -16,7 +16,7 @@ func (b Mode) String() string {
 	return strings.ToLower(defangv1.DeploymentMode_name[int32(b)])
 }
 
-func NewMode(s string) (Mode, error) {
+func (b *Mode) Set(s string) error {
 	upper := strings.ToUpper(s)
 	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
@@ -29,19 +29,10 @@ func NewMode(s string) (Mode, error) {
 		case "HA":
 			mode = int32(defangv1.DeploymentMode_PRODUCTION)
 		default:
-			return 0, fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
 		}
 	}
-	return Mode(mode), nil
-}
-
-func (b *Mode) Set(s string) error {
-	mode, err := NewMode(s)
-	if err != nil {
-		return fmt.Errorf("failed to set mode: %w", err)
-	}
-	*b = mode
-
+	*b = Mode(mode)
 	return nil
 }
 
