@@ -126,13 +126,14 @@ func TestPrintEstimate(t *testing.T) {
 	cli.PrintEstimate(defangv1.DeploymentMode_DEVELOPMENT, estimate)
 
 	expectedOutput := `
-Development Mode Estimate
+Estimate for Deployment Mode: AFFORDABLE
 
-The development mode is optimized for low cost and rapid iteration. It uses
-spot instances and lightweight, burstable resources. Logging is verbose but
-short-lived (1 day), deployments are replaced entirely on updates, and
-operations that cause downtime are allowed. Ideal for testing and active
-development, this mode emphasizes affordability over reliability.
+This mode is optimized for low cost and rapid iteration. Your application
+will deployed with spot instances. Databases will be provisioned using
+resources optimized for burstable memory. Deployments are replaced entirely on
+updates, so there may be small windows of downtime during redeployment.
+Services will be exposed directly to the public internet for easy debugging.
+This mode emphasizes affordability over availability.
 
 Cost     Quantity          Service  Description
 $1.62    14600 GB-Hours    app      AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)
@@ -147,7 +148,7 @@ $32.85   730 Hours         shared   AmazonEC2 USW2-NatGateway-Hours
 Estimated Monthly Cost: $118.55 (+ usage)
 
 Estimate does not include taxes or Discount Programs.
-
+To estimate other modes, use defang estimate --mode=affordable|balanced|high_availability
 `
 
 	outputLines := strings.Split(term.StripAnsi(stdout.String()), "\n")
