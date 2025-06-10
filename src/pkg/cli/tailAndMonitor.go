@@ -78,11 +78,11 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 
 		switch {
-		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
-			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
-
 		case errors.Is(context.Cause(ctx), context.Canceled):
 			term.Warn("Deployment is not finished. Service(s) might not be running.")
+
+		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
+			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
 
 		case errors.Is(context.Cause(ctx), context.DeadlineExceeded):
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
