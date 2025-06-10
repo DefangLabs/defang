@@ -27,9 +27,9 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		),
 
 		mcp.WithString("deployment_mode",
-			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
+			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
 			mcp.DefaultString("AFFORDABLE"),
-			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH_AVAILABILITY"),
+			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH AVAILABILITY"),
 		),
 	)
 	term.Debug("Estimate tool created")
@@ -62,7 +62,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			mode = defangv1.DeploymentMode_DEVELOPMENT
 		case "BALANCED":
 			mode = defangv1.DeploymentMode_STAGING
-		case "HIGH_AVAILABILITY":
+		case "HIGH AVAILABILITY":
 			mode = defangv1.DeploymentMode_PRODUCTION
 		default:
 			term.Warn("Unknown deployment mode provided, defaulting to AFFORDABLE")
