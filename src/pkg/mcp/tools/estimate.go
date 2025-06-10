@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -24,6 +25,12 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
 		),
+
+		mcp.WithString("deployment_mode",
+			mcp.Description("The deployment mode for the estimate. Options are DEVELOPMENT or PRODUCTION."),
+			mcp.DefaultString("DEVELOPMENT"),
+			mcp.Enum("DEVELOPMENT", "PRODUCTION"),
+		),
 	)
 	term.Debug("Estimate tool created")
 
@@ -40,6 +47,16 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 				term.Error("Failed to change working directory", "error", err)
 			}
 		}
+
+		// Set the deployment mode default to DEVELOPMENT
+		deploymentMode := defangv1.DeploymentMode_DEVELOPMENT
+
+		mode, ok := request.Params.Arguments["deployment_mode"].(string)
+		mode = strings.ToLower(mode) // Normalize to lowercase for consistency
+		if ok && mode == "production" {
+			deploymentMode = defangv1.DeploymentMode_PRODUCTION
+		}
+		term.Debugf("Deployment mode set to: %s", mode)
 
 		loader := configureLoader(request)
 
@@ -59,11 +76,10 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		}
 
 		defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
-		providerID := cliClient.ProviderAWS         // Default to AWS
-		mode := defangv1.DeploymentMode_DEVELOPMENT // Default mode
+		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", mode)
+		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", deploymentMode)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}
@@ -77,7 +93,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			new(bytes.Buffer),
 		)
 
-		cli.PrintEstimate(mode, estimate)
+		cli.PrintEstimate(deploymentMode, estimate)
 
 		term.DefaultTerm = oldTerm
 
