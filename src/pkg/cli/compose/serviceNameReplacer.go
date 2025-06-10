@@ -61,7 +61,7 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 	val := s.replaceServiceNameWithDNS(value)
 
 	if val != value {
-		term.Warnf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
+		term.Debugf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
 	} else if s.ingressServiceNameRegex != nil && s.ingressServiceNameRegex.MatchString(value) {
 		term.Debugf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
 	}
