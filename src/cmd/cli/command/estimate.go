@@ -8,6 +8,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,11 @@ func makeEstimateCmd() *cobra.Command {
 			// 		return err
 			// 	}
 			// }
+
+			// default to development mode if not specified
+			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
+				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
+			}
 
 			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
 			if err != nil {
