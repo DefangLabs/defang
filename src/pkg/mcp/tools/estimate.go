@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -24,6 +25,12 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
 		),
+
+		mcp.WithString("deployment_mode",
+			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
+			mcp.DefaultString("AFFORDABLE"),
+			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH AVAILABILITY"),
+		),
 	)
 	term.Debug("Estimate tool created")
 
@@ -40,6 +47,29 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 				term.Error("Failed to change working directory", "error", err)
 			}
 		}
+
+		modeString, ok := request.Params.Arguments["deployment_mode"].(string)
+		if !ok {
+			modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
+		}
+
+		// This logic is replicated from src/cmd/cli/command/mode.go
+		// I couldn't figure out how to import it without circular dependencies
+		modeString = strings.ToUpper(modeString)
+		var mode defangv1.DeploymentMode
+		switch modeString {
+		case "AFFORDABLE":
+			mode = defangv1.DeploymentMode_DEVELOPMENT
+		case "BALANCED":
+			mode = defangv1.DeploymentMode_STAGING
+		case "HIGH AVAILABILITY":
+			mode = defangv1.DeploymentMode_PRODUCTION
+		default:
+			term.Warn("Unknown deployment mode provided, defaulting to AFFORDABLE")
+			mode = defangv1.DeploymentMode_DEVELOPMENT
+		}
+
+		term.Debugf("Deployment mode set to: %s", mode.String())
 
 		loader := configureLoader(request)
 
@@ -59,8 +89,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		}
 
 		defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
-		providerID := cliClient.ProviderAWS         // Default to AWS
-		mode := defangv1.DeploymentMode_DEVELOPMENT // Default mode
+		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
 		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", mode)

@@ -58,7 +58,7 @@ func makeEstimateCmd() *cobra.Command {
 		},
 	}
 
-	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", []string{"affordable", "balanced", "high_availability"}))
+	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
 	estimateCmd.Flags().StringP("region", "r", pkg.Getenv("AWS_REGION", "us-west-2"), "which cloud region to estimate")
 	return estimateCmd
 }

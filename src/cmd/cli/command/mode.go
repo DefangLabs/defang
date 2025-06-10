@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -46,13 +45,5 @@ func (b Mode) Value() defangv1.DeploymentMode {
 }
 
 func allModes() []string {
-	modes := make([]string, 0, len(defangv1.DeploymentMode_name)-1)
-	for i, mode := range defangv1.DeploymentMode_name {
-		if i == 0 {
-			continue
-		}
-		modes = append(modes, strings.ToLower(mode))
-	}
-	slices.Sort(modes) // TODO: sort by enum value instead of string
-	return modes
+	return []string{"affordable", "balanced", "high_availability"}
 }
