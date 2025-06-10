@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
@@ -25,8 +26,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	for _, svccfg := range project.Services {
 		// Fixup ports (which affects service name replacement by ReplaceServiceNameWithDNS)
 		for i, port := range svccfg.Ports {
-			fixupPort(&port)
-			svccfg.Ports[i] = port
+			svccfg.Ports[i] = fixupPort(port)
 		}
 	}
 
@@ -34,21 +34,21 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	for _, svccfg := range project.Services {
 		_, managedRedis := svccfg.Extensions["x-defang-redis"]
 		if managedRedis {
-			if err := fixupRedisService(&svccfg, provider); err != nil {
+			if err := fixupRedisService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 		if managedPostgres {
-			if err := fixupPostgresService(&svccfg, provider); err != nil {
+			if err := fixupPostgresService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
 		if managedMongo {
-			if err := fixupMongoService(&svccfg, provider); err != nil {
+			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
@@ -132,8 +132,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				continue
 			}
 
-			val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
-			svccfg.Environment[key] = &val
+			if upload != UploadModePreview {
+				val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
+				svccfg.Environment[key] = &val
+			}
 		}
 
 		if len(notAdjusted) > 0 {
@@ -176,8 +178,8 @@ func fixupLLM(svccfg *types.ServiceConfig) {
 	}
 }
 
-func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok {
+func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -197,8 +199,8 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider)
 	return nil
 }
 
-func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok {
+func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
 		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -232,8 +234,8 @@ func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider) er
 	return nil
 }
 
-func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok {
+func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -305,4 +307,31 @@ func getImageRepo(imageRepo string) string {
 	image := strings.ToLower(imageRepo)
 	image, _, _ = strings.Cut(image, ":")
 	return image
+}
+
+func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
+	switch port.Mode {
+	case "":
+		term.Warnf("port %d: no 'mode' was specified; defaulting to 'ingress' (add 'mode: ingress' to silence)", port.Target)
+		fallthrough
+	case Mode_INGRESS:
+		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
+		if port.Protocol != Protocol_UDP {
+			if port.Published != "" {
+				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
+			}
+			if port.AppProtocol == "" {
+				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
+				port.AppProtocol = "http"
+			}
+		} else {
+			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+			port.Mode = Mode_HOST
+		}
+	case Mode_HOST:
+		// no-op
+	default:
+		panic(fmt.Sprintf("port %d: 'mode' should have been validated to be one of [host ingress] but got: %v", port.Target, port.Mode))
+	}
+	return port
 }

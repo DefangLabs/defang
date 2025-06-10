@@ -6,6 +6,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/spf13/cobra"
 )
@@ -26,19 +27,32 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
+			var previewProvider cliClient.Provider
+			if awsInEnv() && providerID == cliClient.ProviderAWS {
+				previewProvider = aws.NewByocProvider(ctx, client.GetTenantName())
+			} else {
+				previewProvider = &cliClient.PlaygroundProvider{FabricClient: client}
+			}
 			if providerID == cliClient.ProviderAuto || providerID == cliClient.ProviderDefang {
-				if _, err := interactiveSelectProvider([]cliClient.ProviderID{cliClient.ProviderAWS, cliClient.ProviderDO, cliClient.ProviderGCP}); err != nil {
-					return err
-				}
+				providerID = cliClient.ProviderAWS
+			} else {
+				return fmt.Errorf("unsupported provider %s; must be one of %v", providerID, []cliClient.ProviderID{cliClient.ProviderAWS})
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, client, providerID, region, mode.Value())
+			// TODO: bring this back when GCP is supported
+			// if providerID == cliClient.ProviderAuto || providerID == cliClient.ProviderDefang {
+			// 	if _, err := interactiveSelectProvider([]cliClient.ProviderID{cliClient.ProviderAWS, cliClient.ProviderGCP}); err != nil {
+			// 		return err
+			// 	}
+			// }
+
+			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(estimate)
+			cli.PrintEstimate(mode.Value(), estimate)
 
 			return nil
 		},
