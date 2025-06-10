@@ -2,7 +2,6 @@
  ! service "mongo-express": environment "ME_CONFIG_MONGODB_URL" may contain sensitive information; consider using 'defang config set ME_CONFIG_MONGODB_URL' to securely store this value
  ! service "mongo-express": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "mongo-express": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "mongo-express": service name was adjusted: environment variable "ME_CONFIG_MONGODB_URL" assigned value "mongodb://root:example!@mock-mongo:27017/"
  ! service "mongo-port1234": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "mongo-port1235": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "mongo-port1236": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
