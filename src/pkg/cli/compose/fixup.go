@@ -132,8 +132,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				continue
 			}
 
-			val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
-			svccfg.Environment[key] = &val
+			if upload != UploadModePreview {
+				val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
+				svccfg.Environment[key] = &val
+			}
 		}
 
 		if len(notAdjusted) > 0 {
