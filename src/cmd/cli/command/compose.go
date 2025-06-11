@@ -400,7 +400,7 @@ func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
 		Deployment: deployment,
 		Since:      since,
 		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
-			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
+			if eventLog.Service == "cd" && eventLog.Host == "pulumi" {
 				if strings.Contains(eventLog.Message, "Destroy succeeded in ") || strings.Contains(eventLog.Message, "Update succeeded in ") {
 					return io.EOF
 				} else if strings.Contains(eventLog.Message, "Destroy failed in ") || strings.Contains(eventLog.Message, "Update failed in ") {

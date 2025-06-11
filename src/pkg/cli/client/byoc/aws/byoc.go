@@ -686,6 +686,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		tailStream, err = b.driver.TailTaskID(ctx, etag)
 		if err == nil {
 			b.cdTaskArn, err = b.driver.GetTaskArn(etag)
+			etag = "" // no need to filter by etag
 		}
 	} else {
 		var service string
