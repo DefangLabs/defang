@@ -1220,9 +1220,44 @@ func updateProviderID(ctx context.Context, loader cliClient.Loader) error {
 			}
 			providerID = cliClient.ProviderDefang
 		} else {
-			var err error
-			if whence, err = determineProviderID(ctx, loader); err != nil {
-				return err
+			if awsInEnv() {
+				var confirm bool
+				if err := survey.AskOne(&survey.Confirm{
+					Message: "AWS environment variables detected. Do you want to use AWS as the provider?",
+				}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+					return fmt.Errorf("failed to confirm AWS provider: %w", err)
+				}
+				if confirm {
+					providerID = cliClient.ProviderAWS
+					whence = "AWS environment variables and confirmation"
+				}
+			} else if doInEnv() {
+				var confirm bool
+				if err := survey.AskOne(&survey.Confirm{
+					Message: "DIGITALOCEAN_TOKEN environment variable detected. Do you want to use DigitalOcean as the provider?",
+				}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+					return fmt.Errorf("failed to confirm DigitalOcean provider: %w", err)
+				}
+				if confirm {
+					providerID = cliClient.ProviderDO
+					whence = "Digital Ocean environment variable and confirmation"
+				}
+			} else if gcpInEnv() {
+				var confirm bool
+				if err := survey.AskOne(&survey.Confirm{
+					Message: "GCP_PROJECT_ID/CLOUDSDK_CORE_PROJECT environment variable detected. Do you want to use GCP as the provider?",
+				}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+					return fmt.Errorf("failed to confirm GCP provider: %w", err)
+				}
+				if confirm {
+					providerID = cliClient.ProviderGCP
+					whence = "GCP environment variable and confirmation"
+				}
+			} else {
+				var err error
+				if whence, err = determineProviderID(ctx, loader); err != nil {
+					return err
+				}
 			}
 		}
 	case cliClient.ProviderAWS:
