@@ -344,9 +344,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if err := options.EndEventDetectFunc(e); err != nil {
-					cancel() // TODO: stuck on defer Close() if we don't do this
-					return err
+				if options.EndEventDetectFunc != nil {
+					if err := options.EndEventDetectFunc(e); err != nil {
+						cancel() // TODO: stuck on defer Close() if we don't do this
+						return err
+					}
 				}
 				continue
 			}
