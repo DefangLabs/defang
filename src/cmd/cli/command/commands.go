@@ -986,7 +986,7 @@ var deleteCmd = &cobra.Command{
 			Verbose:    verbose,
 		}
 		tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
-		return cli.Tail(tailCtx, provider, projectName, tailOptions)
+		return cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
 	},
 }
 

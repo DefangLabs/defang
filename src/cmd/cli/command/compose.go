@@ -257,6 +257,7 @@ func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) c
 	return cli.TailOptions{
 		Deployment: deployment,
 		LogType:    logs.LogTypeAll,
+		// TODO: Move this to playground provider GetDeploymentStatus
 		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
 			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
 				if strings.Contains(eventLog.Message, "Update succeeded in ") {
@@ -372,7 +373,7 @@ func makeComposeDownCmd() *cobra.Command {
 
 			tailOptions := newTailOptionsForDown(deployment, since)
 			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
-			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
+			err = cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
 			if err != nil && !errors.Is(err, io.EOF) {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we show a warning and detach. This is
@@ -399,6 +400,7 @@ func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
 	return cli.TailOptions{
 		Deployment: deployment,
 		Since:      since,
+		// TODO: Move this to playground provider GetDeploymentStatus
 		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
 			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
 				if strings.Contains(eventLog.Message, "Destroy succeeded in ") || strings.Contains(eventLog.Message, "Update succeeded in ") {

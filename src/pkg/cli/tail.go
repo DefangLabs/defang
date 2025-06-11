@@ -41,7 +41,7 @@ var (
 type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
-	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
