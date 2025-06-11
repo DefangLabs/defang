@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -246,7 +247,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			defer cancelSpinner()
 		}
 
-		if !options.Verbose {
+		// HACK: On Windows, closing stdout will cause debugger to stop working
+		if !options.Verbose && runtime.GOOS != "windows" {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
