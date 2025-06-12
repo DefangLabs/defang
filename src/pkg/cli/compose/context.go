@@ -27,10 +27,11 @@ import (
 type UploadMode int
 
 const (
-	UploadModeDigest  UploadMode = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
-	UploadModeForce                     // force: always upload the tarball, even if it's the same as a previous one
-	UploadModeIgnore                    // dry-run: don't upload the tarball, just return the path
-	UploadModePreview                   // preview: like dry-run but does start the preview command
+	UploadModeDigest   UploadMode = iota // the default: calculate the digest of the tarball so we can skip building the same image twice
+	UploadModeForce                      // force: always upload the tarball, even if it's the same as a previous one
+	UploadModeIgnore                     // dry-run: don't upload the tarball, just return the path
+	UploadModePreview                    // preview: like dry-run but does start the preview command
+	UploadModeEstimate                   // cost estimation: like preview, but skips the tarball
 )
 
 const (
@@ -88,6 +89,15 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
 	}
 
+	switch upload {
+	case UploadModeIgnore:
+		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
+		return root, nil
+	case UploadModeEstimate:
+		// For estimation, we don't bother packaging the files, we just return a placeholder URL
+		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
+	}
+
 	term.Info("Packaging the project files for", name, "at", root)
 	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
 	if err != nil {
@@ -101,14 +111,11 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		sha := sha256.Sum256(buffer.Bytes())
 		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
 		term.Debug("Digest:", digest)
-	case UploadModeIgnore:
-		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
-		return root, nil
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
 	case UploadModeForce:
-		// Force: always upload the tarball (to a random URL), triggering a new buil
+		// Force: always upload the tarball (to a random URL), triggering a new build
 	default:
 		panic("unexpected UploadMode value")
 	}
