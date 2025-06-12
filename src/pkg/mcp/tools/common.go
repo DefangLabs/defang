@@ -1,6 +1,9 @@
 package tools
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"regexp"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -43,4 +46,23 @@ func HandleTermsOfServiceError(err error) *mcp.CallToolResult {
 		return mcpResult
 	}
 	return nil
+}
+
+func HandleConfigError(err error) *mcp.CallToolResult {
+	if strings.Contains(err.Error(), "missing configs") {
+		mcpResult := mcp.NewToolResultErrorFromErr("The operation failed due to missing configs not being set. Please use the Defang MCP tool called config to set the variable.", err)
+		term.Debugf("MCP output error: %v", mcpResult)
+		return mcpResult
+	}
+	return nil
+}
+
+func CreateRandomConfigValue() string {
+	// Note that no error handling is necessary, as Read always succeeds.
+	key := make([]byte, 32)
+	rand.Read(key)
+	str := base64.StdEncoding.EncodeToString(key)
+	re := regexp.MustCompile("[+/=]")
+	str = re.ReplaceAllString(str, "")
+	return str
 }

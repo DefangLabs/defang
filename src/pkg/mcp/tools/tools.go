@@ -27,5 +27,9 @@ func SetupTools(s *server.MCPServer, cluster string, authPort int) {
 	term.Debug("Setting up estimate tool")
 	setupEstimateTool(s, cluster)
 
+	// Create a tool to set environment variables and secrets
+	term.Debug("Setting up config tool")
+	setupConfigTool(s, cluster)
+
 	term.Debug("All MCP tools have been set up successfully")
 }
