@@ -6,46 +6,36 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// setupConfigTool configures and adds the estimate tool to the MCP server
-func setupConfigTool(s *server.MCPServer, cluster string) {
-	term.Debug("Creating config tool")
-	configTool := mcp.NewTool("config",
-		mcp.WithDescription("Set config variable for the defang project"),
+// setupRemoveConfigTool configures and adds the estimate tool to the MCP server
+func setupRemoveConfigTool(s *server.MCPServer, cluster string) {
+	term.Debug("Creating remove config tool")
+	removeConfigTool := mcp.NewTool("remove_config",
+		mcp.WithDescription("Remove config variable for the defang project"),
 		mcp.WithString("name",
 			mcp.Description("The name of the config variable"),
 			mcp.Required(),
 		),
 
-		mcp.WithString("value",
-			mcp.Description("The value of the config variable"),
-			mcp.Required(),
-		),
-
-		// mcp.WithBoolean("random",
-		// 	mcp.Description("If true, the value will be randomly generated. If false, the value will be set to the provided value."),
-		// 	mcp.DefaultBool(false),
-		// ),
-
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
 		),
 	)
-	term.Debug("config tool created")
+	term.Debug("remove config tool created")
 
 	// Add the Config tool handler
-	term.Debug("Adding config tool handler")
-	s.AddTool(configTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		term.Debug("Config tool called")
-		track.Evt("MCP Config Tool")
+	term.Debug("Adding remove config tool handler")
+	s.AddTool(removeConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		term.Debug("Remove Config tool called")
+		track.Evt("MCP Remove Config Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
 		if ok && wd != "" {
@@ -60,17 +50,6 @@ func setupConfigTool(s *server.MCPServer, cluster string) {
 			term.Debug("No name provided")
 			return mcp.NewToolResultErrorFromErr("No name provided", errors.New("no name provided")), nil
 		}
-
-		value, ok := request.Params.Arguments["name"].(string)
-		if !ok || value == "" {
-			term.Debug("No name provided")
-			return mcp.NewToolResultErrorFromErr("No name provided", errors.New("no name provided")), nil
-		}
-
-		// random, ok := request.Params.Arguments["random"].(bool)
-		// if !ok {
-		// 	random = false // Default to false if not provided
-		// }
 
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
@@ -95,14 +74,16 @@ func setupConfigTool(s *server.MCPServer, cluster string) {
 		}
 		term.Debug("Project name loaded:", projectName)
 
-		if !pkg.IsValidSecretName(name) {
-			return mcp.NewToolResultErrorFromErr("Invalid secret name", fmt.Errorf("secret name '%s' is not valid", name)), nil
+		term.Debug("Function invoked: cli.ConfigDelete")
+		if err := cli.ConfigDelete(ctx, projectName, provider, name); err != nil {
+			// Show a warning (not an error) if the config was not found
+			if connect.CodeOf(err) == connect.CodeNotFound {
+
+				return mcp.NewToolResultText(fmt.Sprintf("Config variable: %s not found in project: %s", name, projectName)), nil
+			}
+			return mcp.NewToolResultErrorFromErr(fmt.Sprintf("Failed to remove config variable: %s from project: %s", name, projectName), err), nil
 		}
 
-		if err := cli.ConfigSet(ctx, projectName, provider, name, value); err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to set config", err), nil
-		}
-
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully set the config variable: %s to defang project: %s", name, projectName)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Successfully remove the config variable: %s to defang project: %s", name, projectName)), nil
 	})
 }

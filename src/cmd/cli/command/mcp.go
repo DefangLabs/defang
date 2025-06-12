@@ -22,7 +22,6 @@ var mcpCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//set global nonInteractive to false
 		nonInteractive = false
-		term.SetDebug(true)
 	},
 }
 
@@ -32,6 +31,7 @@ var mcpServerCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		authPort, _ := cmd.Flags().GetInt("auth-server")
+		term.SetDebug(true)
 
 		term.Debug("Creating log file")
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
@@ -51,12 +51,12 @@ var mcpServerCmd = &cobra.Command{
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
 		s := server.NewMCPServer(
-			"Defang Services",
+			"Defang MCP Server",
 			RootCmd.Version,
 			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
 			server.WithPromptCapabilities(true),         // Enable interactive prompts
 			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
-			server.WithInstructions("You are an MCP server for Defang Services. Your role is to manage and deploy services efficiently using the provided tools and resources."),
+			server.WithInstructions("You are an MCP server for Defang and do not use the Defang CLI. Your role is to manage and deploy services efficiently using the provided tools and resources. When interacting with the LLM make it use the MCP tools to perform actions and do not use the Defang CLI directly. When ask about defang please use the MCP resources to answer."),
 		)
 
 		// Setup resources
