@@ -23,7 +23,8 @@ import (
 
 var natgatewayRegex = regexp.MustCompile(`(?i)natgateway`)
 
-func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProvider cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, mode)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 	term.Info("Preparing estimate")
 
 	estimate, err := client.Estimate(ctx, &defangv1.EstimateRequest{
-		Provider:      estimateProvider.Value(),
+		Provider:      estimateProviderID.Value(),
 		Region:        region,
 		PulumiPreview: []byte(preview),
 	})
@@ -43,10 +44,10 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 }
 
 func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, provider cliClient.Provider, mode defangv1.DeploymentMode) (string, error) {
-	os.Setenv("DEFANG_JSON", "1") // always show JSON output for estimate
+	os.Setenv("DEFANG_JSON", "1") // HACK: always show JSON output for estimate
 	since := time.Now()
 
-	resp, project, err := ComposeUp(ctx, project, client, provider, compose.UploadModePreview, mode)
+	resp, project, err := ComposeUp(ctx, project, client, provider, compose.UploadModeEstimate, mode)
 	if err != nil {
 		return "", err
 	}

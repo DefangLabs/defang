@@ -1,4 +1,2 @@
  ! service "build1": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "build2": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- * Packaging the project files for build1 at .
- * Packaging the project files for build2 at .

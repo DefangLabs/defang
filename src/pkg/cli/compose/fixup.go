@@ -132,7 +132,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				continue
 			}
 
-			if upload != UploadModePreview {
+			if upload != UploadModeEstimate {
 				val := svcNameReplacer.ReplaceServiceNameWithDNS(svccfg.Name, key, *value, EnvironmentVars)
 				svccfg.Environment[key] = &val
 			}
@@ -179,7 +179,7 @@ func fixupLLM(svccfg *types.ServiceConfig) {
 }
 
 func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -200,7 +200,7 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider,
 }
 
 func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -235,7 +235,7 @@ func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider, up
 }
 
 func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModePreview {
+	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {

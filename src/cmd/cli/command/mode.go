@@ -21,11 +21,11 @@ func (b *Mode) Set(s string) error {
 	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
 		switch upper {
-		case "AFFORDABLE":
+		case "AFFORDABLE", "CHEAP":
 			mode = int32(defangv1.DeploymentMode_DEVELOPMENT)
 		case "BALANCED":
 			mode = int32(defangv1.DeploymentMode_STAGING)
-		case "HA", "HIGH_AVAILABILITY":
+		case "HA", "HIGH_AVAILABILITY", "HIGH-AVAILABILITY":
 			mode = int32(defangv1.DeploymentMode_PRODUCTION)
 		default:
 			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
