@@ -100,7 +100,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Get the portal URL for browser preview
-		portalURL := SERVICE_PORTAL_URL
+		portalURL := "https://portal.defang.io/"
 
 		// Open the portal URL in the browser
 		term.Debugf("Opening portal URL in browser: %s", portalURL)
@@ -133,5 +133,3 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		return mcp.NewToolResultText(fmt.Sprintf("Please use the web portal url: %s to follow the deployment of %s, with the deployment ID of %s", portalURL, project.Name, deployResp.Etag)), nil
 	})
 }
-
-const SERVICE_PORTAL_URL = "https://portal.defang.io/"
