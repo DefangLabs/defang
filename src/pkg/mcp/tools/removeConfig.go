@@ -78,7 +78,6 @@ func setupRemoveConfigTool(s *server.MCPServer, cluster string) {
 		if err := cli.ConfigDelete(ctx, projectName, provider, name); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-
 				return mcp.NewToolResultText(fmt.Sprintf("Config variable: %s not found in project: %s", name, projectName)), nil
 			}
 			return mcp.NewToolResultErrorFromErr(fmt.Sprintf("Failed to remove config variable: %s from project: %s", name, projectName), err), nil
