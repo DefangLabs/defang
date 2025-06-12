@@ -19,7 +19,7 @@ import (
 func setupRemoveConfigTool(s *server.MCPServer, cluster string) {
 	term.Debug("Creating remove config tool")
 	removeConfigTool := mcp.NewTool("remove_config",
-		mcp.WithDescription("Remove config variable for the defang project"),
+		mcp.WithDescription("Remove a config variable for the defang project"),
 		mcp.WithString("name",
 			mcp.Description("The name of the config variable"),
 			mcp.Required(),

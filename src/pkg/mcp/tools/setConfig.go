@@ -19,7 +19,7 @@ import (
 func setupSetConfigTool(s *server.MCPServer, cluster string) {
 	term.Debug("Creating set config tool")
 	setConfigTool := mcp.NewTool("set_config",
-		mcp.WithDescription("Set config variable for the defang project"),
+		mcp.WithDescription("Set a config variable for the defang project"),
 		mcp.WithString("name",
 			mcp.Description("The name of the config variable"),
 			mcp.Required(),
