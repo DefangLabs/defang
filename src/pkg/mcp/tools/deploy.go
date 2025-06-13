@@ -86,6 +86,10 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			if result != nil {
 				return result, nil
 			}
+			result = HandleConfigError(err)
+			if result != nil {
+				return result, nil
+			}
 
 			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), nil
 		}
@@ -96,18 +100,16 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Get the portal URL for browser preview
-		portalURL := printPlaygroundPortalServiceURLs(deployResp.Services)
+		portalURL := "https://portal.defang.io/"
 
-		// Open the portal URL in the browser if available
-		if portalURL != "" {
-			term.Debugf("Opening portal URL in browser: %s", portalURL)
-			go func() {
-				err := browser.OpenURL(portalURL)
-				if err != nil {
-					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-				}
-			}()
-		}
+		// Open the portal URL in the browser
+		term.Debugf("Opening portal URL in browser: %s", portalURL)
+		go func() {
+			err := browser.OpenURL(portalURL)
+			if err != nil {
+				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
+			}
+		}()
 
 		// Success case
 		term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
@@ -130,31 +132,4 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		// Return the etag data as text
 		return mcp.NewToolResultText(fmt.Sprintf("Please use the web portal url: %s to follow the deployment of %s, with the deployment ID of %s", portalURL, project.Name, deployResp.Etag)), nil
 	})
-}
-
-const DEFANG_PORTAL_HOST = "portal.defang.io"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
-
-// printPlaygroundPortalServiceURLs logs service URLs for the Defang portal
-// and returns the first URL for browser preview
-func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) string {
-	// Log portal URLs for monitoring services
-	term.Debug("Monitor your services' status in the defang portal")
-
-	// TODO: print all of the urls instead of just the first one.
-	// the user may have many publicly accessible services
-	// Store the first URL to return for browser preview
-	var firstURL string
-
-	for _, serviceInfo := range serviceInfos {
-		serviceURL := SERVICE_PORTAL_URL + "/" + serviceInfo.Service.Name
-		term.Debugf("   - %s", serviceURL)
-
-		// Save the first URL we encounter
-		if firstURL == "" {
-			firstURL = serviceURL
-		}
-	}
-
-	return firstURL
 }
