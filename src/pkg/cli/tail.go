@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ var (
 type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
-	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
@@ -246,7 +247,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			defer cancelSpinner()
 		}
 
-		if !options.Verbose {
+		// HACK: On Windows, closing stdout will cause debugger to stop working
+		if !options.Verbose && runtime.GOOS != "windows" {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
@@ -344,9 +346,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if err := options.EndEventDetectFunc(e); err != nil {
-					cancel() // TODO: stuck on defer Close() if we don't do this
-					return err
+				if options.EndEventDetectFunc != nil {
+					if err := options.EndEventDetectFunc(e); err != nil {
+						cancel() // TODO: stuck on defer Close() if we don't do this
+						return err
+					}
 				}
 				continue
 			}
