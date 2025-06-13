@@ -56,11 +56,11 @@ func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 			Status: "UNKNOWN",
 			Endpoints: []string{
 				"example.com",
-				"service1.internal",
+				"service1.internal:80",
 			},
 		}})
 	const expectedOutput = `Deployment  Name      Status         Endpoints
-            service1  NOT_SPECIFIED  example.com, service1.internal
+            service1  NOT_SPECIFIED  https://example.com, service1.internal:80
 `
 	receivedLines := strings.Split(stdout.String(), "\n")
 	expectedLines := strings.Split(expectedOutput, "\n")
@@ -99,12 +99,12 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 			Domainname: "example.com",
 			Endpoints: []string{
 				"example.com",
-				"service1.internal",
+				"service1.internal:80",
 			},
 		}})
 	expectedLines := []string{
-		"Deployment  Name      Status         Endpoints                       DomainName",
-		"            service1  NOT_SPECIFIED  example.com, service1.internal  https://example.com",
+		"Deployment  Name      Status         Endpoints                                  DomainName",
+		"            service1  NOT_SPECIFIED  https://example.com, service1.internal:80  https://example.com",
 		" * Run `defang cert generate` to get a TLS certificate for your service(s)",
 		"",
 	}
