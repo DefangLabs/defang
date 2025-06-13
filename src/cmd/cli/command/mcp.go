@@ -56,7 +56,7 @@ var mcpServerCmd = &cobra.Command{
 			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
 			server.WithPromptCapabilities(true),         // Enable interactive prompts
 			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
-			server.WithInstructions("You are an MCP server for Defang and do not use the Defang CLI. Your role is to manage and deploy services efficiently using the provided tools and resources. When interacting with the LLM make it use the MCP tools to perform actions and do not use the Defang CLI directly. When ask about defang please use the MCP resources to answer."),
+			server.WithInstructions("Use these tools to deploy projects to the cloud with Defang. These tools also help manage deployed projects, manage config variables, and estimate the monthly cost of deploying a given compose file."),
 		)
 
 		// Setup resources
