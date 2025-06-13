@@ -73,7 +73,7 @@ func setupListConfigTool(s *server.MCPServer, cluster string) {
 
 		numConfigs := len(config.Names)
 		if numConfigs == 0 {
-			return mcp.NewToolResultText("No config variables found for the project: " + projectName), nil
+			return mcp.NewToolResultText(fmt.Sprintf("No config variables found for the project %q.", projectName)), nil
 		}
 
 		configNames := make([]string, numConfigs)
@@ -81,6 +81,6 @@ func setupListConfigTool(s *server.MCPServer, cluster string) {
 			configNames[i] = c
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Here is the list of configs: %v to defang project: %s", strings.Join(configNames, ", "), projectName)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Here is the list of config variables for the project %q: %v", projectName, strings.Join(configNames, ", "))), nil
 	})
 }

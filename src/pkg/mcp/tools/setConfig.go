@@ -86,7 +86,7 @@ func setupSetConfigTool(s *server.MCPServer, cluster string) {
 		term.Debug("Project name loaded:", projectName)
 
 		if !pkg.IsValidSecretName(name) {
-			return mcp.NewToolResultErrorFromErr("Invalid secret name", fmt.Errorf("secret name '%s' is not valid", name)), nil
+			return mcp.NewToolResultErrorFromErr("Invalid secret name", fmt.Errorf("secret name %q is not valid", name)), nil
 		}
 
 		term.Debug("Function invoked: cli.ConfigSet")
@@ -94,6 +94,6 @@ func setupSetConfigTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Failed to set config", err), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully set the config variable: %s to defang project: %s", name, projectName)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Successfully set the config variable %q for project %q", name, projectName)), nil
 	})
 }
