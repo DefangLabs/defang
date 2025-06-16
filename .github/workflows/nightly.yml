@@ -6,7 +6,7 @@ on:
   workflow_dispatch:     # optional: allows manual runs
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   goreleaser-nightly:
@@ -28,7 +28,7 @@ jobs:
         with:
           distribution: goreleaser-pro
           version: latest
-          args: release --clean --nightly
+          args: release --clean --nightly --skip=announce
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
