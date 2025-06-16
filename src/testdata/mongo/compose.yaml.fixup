@@ -1,0 +1,220 @@
+{
+  "mongo": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "MONGO_INITDB_ROOT_PASSWORD": "example!",
+      "MONGO_INITDB_ROOT_USERNAME": "root"
+    },
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27017,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-express": {
+    "command": null,
+    "depends_on": {
+      "mongo": {
+        "condition": "service_started",
+        "required": true
+      }
+    },
+    "entrypoint": null,
+    "environment": {
+      "ME_CONFIG_BASICAUTH": "false",
+      "ME_CONFIG_MONGODB_ADMINPASSWORD": "example!",
+      "ME_CONFIG_MONGODB_ADMINUSERNAME": "root",
+      "ME_CONFIG_MONGODB_URL": "mongodb://root:example!@mongo:27017/"
+    },
+    "image": "mongo-express",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 8081,
+        "published": "8081",
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port1234": {
+    "command": [
+      "--port",
+      "1234"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1234,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port1235": {
+    "command": [
+      "--port=1235"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1235,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port1236": {
+    "command": [
+      "--port",
+      "1236",
+      "--shardsvr"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "restart": "always"
+  },
+  "mongo-port1237": {
+    "command": [
+      "--port=1237",
+      "--configsvr"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1237,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port1238": {
+    "command": [
+      "--shardsvr",
+      "--port",
+      "1238"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1238,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port1239": {
+    "command": [
+      "--configsvr",
+      "--port=1239"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1239,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port27018": {
+    "command": [
+      "--shardsvr"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27018,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-port27019": {
+    "command": [
+      "--configsvr"
+    ],
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27019,
+        "protocol": "tcp"
+      }
+    ],
+    "restart": "always"
+  },
+  "mongo-unmanaged": {
+    "command": null,
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "restart": "always"
+  },
+  "mongo-wrong-image": {
+    "command": null,
+    "entrypoint": null,
+    "image": "example",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27017,
+        "protocol": "tcp"
+      }
+    ]
+  }
+}

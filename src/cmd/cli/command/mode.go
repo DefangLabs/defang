@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -18,9 +17,19 @@ func (b Mode) String() string {
 }
 
 func (b *Mode) Set(s string) error {
-	mode, ok := defangv1.DeploymentMode_value[strings.ToUpper(s)]
+	upper := strings.ToUpper(s)
+	mode, ok := defangv1.DeploymentMode_value[upper]
 	if !ok {
-		return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+		switch upper {
+		case "AFFORDABLE", "CHEAP":
+			mode = int32(defangv1.DeploymentMode_DEVELOPMENT)
+		case "BALANCED":
+			mode = int32(defangv1.DeploymentMode_STAGING)
+		case "HA", "HIGH_AVAILABILITY", "HIGH-AVAILABILITY":
+			mode = int32(defangv1.DeploymentMode_PRODUCTION)
+		default:
+			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+		}
 	}
 	*b = Mode(mode)
 	return nil
@@ -35,13 +44,5 @@ func (b Mode) Value() defangv1.DeploymentMode {
 }
 
 func allModes() []string {
-	modes := make([]string, 0, len(defangv1.DeploymentMode_name)-1)
-	for i, mode := range defangv1.DeploymentMode_name {
-		if i == 0 {
-			continue
-		}
-		modes = append(modes, strings.ToLower(mode))
-	}
-	slices.Sort(modes) // TODO: sort by enum value instead of string
-	return modes
+	return []string{"affordable", "balanced", "high_availability"}
 }

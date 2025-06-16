@@ -3,11 +3,14 @@ package command
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -50,6 +53,7 @@ func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 func makeComposeUpCmd() *cobra.Command {
 	composeUpCmd := &cobra.Command{
 		Use:         "up",
+		Aliases:     []string{"deploy"},
 		Annotations: authNeededAnnotation,
 		Args:        cobra.NoArgs, // TODO: takes optional list of service names
 		Short:       "Reads a Compose file and deploy a new project or update an existing project",
@@ -88,7 +92,7 @@ func makeComposeUpCmd() *cobra.Command {
 				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
-			provider, err := getProvider(ctx, loader)
+			provider, err := newProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -97,6 +101,43 @@ func makeComposeUpCmd() *cobra.Command {
 			err = canIUseProvider(ctx, provider, project.Name)
 			if err != nil {
 				return err
+			}
+
+			// Check if the project is already deployed and warn the user if they're deploying it elsewhere
+			if resp, err := client.ListDeployments(ctx, &defangv1.ListDeploymentsRequest{
+				Project: project.Name,
+				Type:    defangv1.DeploymentType_DEPLOYMENT_TYPE_ACTIVE,
+			}); err != nil {
+				term.Debugf("ListDeployments failed: %v", err)
+			} else if accountInfo, err := provider.AccountInfo(ctx); err != nil {
+				term.Debugf("AccountInfo failed: %v", err)
+			} else {
+				samePlace := slices.ContainsFunc(resp.Deployments, func(dep *defangv1.Deployment) bool {
+					// Old deployments may not have a region or account ID, so we check for empty values too
+					return dep.Provider == providerID.Value() && (dep.ProviderAccountId == accountInfo.AccountID || dep.ProviderAccountId == "") && (dep.Region == accountInfo.Region || dep.Region == "")
+				})
+				if !samePlace && len(resp.Deployments) > 0 {
+					if nonInteractive {
+						term.Warnf("Project appears to be already deployed elsewhere. Use `defang deployments --project-name=%q` to view all deployments.", project.Name)
+					} else {
+						help := "Active deployments of this project:"
+						for _, dep := range resp.Deployments {
+							var providerId cliClient.ProviderID
+							providerId.SetValue(dep.Provider)
+							help += fmt.Sprintf("\n - %v", cliClient.AccountInfo{Provider: providerId, AccountID: dep.ProviderAccountId, Region: dep.Region})
+						}
+						var confirm bool
+						if err := survey.AskOne(&survey.Confirm{
+							Message: "This project appears to be already deployed elsewhere. Are you sure you want to continue?",
+							Help:    help,
+							Default: true,
+						}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+							return err
+						} else if !confirm {
+							return fmt.Errorf("deployment of project %q was canceled", project.Name)
+						}
+					}
+				}
 			}
 
 			// Show a warning for any (managed) services that we cannot monitor
@@ -150,7 +191,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
-			tailOptions := cli.NewTailOptionsForDeploy(deploy, since, verbose)
+			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
 				var errDeploymentFailed cliClient.ErrDeploymentFailed
@@ -167,17 +208,17 @@ func makeComposeUpCmd() *cobra.Command {
 					if errDeploymentFailed.Service != "" {
 						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
 					}
-					if !nonInteractive {
+					if nonInteractive {
+						printDefangHint("To debug the deployment, do:", debugConfig.String())
+					} else {
 						track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
 
 						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
 						if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
 							// don't show this defang hint if debugging was successful
-							tailOptions := cli.NewTailOptionsForDeploy(deploy, since, true)
+							tailOptions := newTailOptionsForDeploy(deploy.Etag, since, true)
 							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
 						}
-					} else {
-						printDefangHint("To debug the deployment, do:", debugConfig.String())
 					}
 				}
 				return err
@@ -210,6 +251,27 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
+	return cli.TailOptions{
+		Deployment: deployment,
+		LogType:    logs.LogTypeAll,
+		// TODO: Move this to playground provider GetDeploymentStatus
+		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
+			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
+				if strings.Contains(eventLog.Message, "Update succeeded in ") {
+					return io.EOF
+				} else if strings.Contains(eventLog.Message, "Update failed in ") {
+					return errors.New(eventLog.Message)
+				}
+			}
+			return nil
+		},
+		Raw:     false,
+		Since:   since,
+		Verbose: verbose,
+	}
 }
 
 func flushWarnings() {
@@ -276,7 +338,7 @@ func makeComposeDownCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -309,20 +371,10 @@ func makeComposeDownCmd() *cobra.Command {
 				return nil
 			}
 
-			endLogConditions := []cli.EndLogConditional{
-				{Service: "cd", Host: "pulumi", EventLog: "Destroy succeeded in "},
-				{Service: "cd", Host: "pulumi", EventLog: "Update succeeded in "},
-			}
-			tailOptions := cli.TailOptions{
-				Deployment:         deployment,
-				Since:              since,
-				EndEventDetectFunc: cli.CreateEndLogEventDetectFunc(endLogConditions),
-				Verbose:            verbose,
-				LogType:            logs.LogTypeAll,
-			}
-			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment is done
-			err = cli.Tail(tailCtx, provider, projectName, tailOptions)
-			if err != nil {
+			tailOptions := newTailOptionsForDown(deployment, since)
+			tailCtx := cmd.Context() // FIXME: stop Tail when the deployment task is done
+			err = cli.TailAndWaitForCD(tailCtx, provider, projectName, tailOptions)
+			if err != nil && !errors.Is(err, io.EOF) {
 				if connect.CodeOf(err) == connect.CodePermissionDenied {
 					// If tail fails because of missing permission, we show a warning and detach. This is
 					// different than `up`, which will wait for the deployment to finish, but we don't have an
@@ -342,6 +394,26 @@ func makeComposeDownCmd() *cobra.Command {
 	composeDownCmd.Flags().Bool("tail", false, "tail the service logs after deleting") // obsolete, but keep for backwards compatibility
 	_ = composeDownCmd.Flags().MarkHidden("tail")
 	return composeDownCmd
+}
+
+func newTailOptionsForDown(deployment string, since time.Time) cli.TailOptions {
+	return cli.TailOptions{
+		Deployment: deployment,
+		Since:      since,
+		// TODO: Move this to playground provider GetDeploymentStatus
+		EndEventDetectFunc: func(eventLog *defangv1.LogEntry) error {
+			if eventLog.Service == "cd" && eventLog.Host == "pulumi" && deployment == eventLog.Etag {
+				if strings.Contains(eventLog.Message, "Destroy succeeded in ") || strings.Contains(eventLog.Message, "Update succeeded in ") {
+					return io.EOF
+				} else if strings.Contains(eventLog.Message, "Destroy failed in ") || strings.Contains(eventLog.Message, "Update failed in ") {
+					return errors.New(eventLog.Message)
+				}
+			}
+			return nil // keep tailing logs
+		},
+		Verbose: verbose,
+		LogType: logs.LogTypeAll,
+	}
 }
 
 func makeComposeConfigCmd() *cobra.Command {
@@ -369,7 +441,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
-			provider, err := getProvider(ctx, loader)
+			provider, err := newProvider(ctx, loader)
 			if err != nil {
 				return err
 			}
@@ -394,7 +466,7 @@ func makeComposePsCmd() *cobra.Command {
 			long, _ := cmd.Flags().GetBool("long")
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}
@@ -481,7 +553,7 @@ func makeComposeLogsCmd() *cobra.Command {
 			}
 
 			loader := configureLoader(cmd)
-			provider, err := getProvider(cmd.Context(), loader)
+			provider, err := newProvider(cmd.Context(), loader)
 			if err != nil {
 				return err
 			}

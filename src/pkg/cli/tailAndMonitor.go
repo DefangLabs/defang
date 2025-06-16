@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"sync"
 	"time"
 
@@ -49,7 +50,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 	go func() {
 		defer wg.Done()
 		// block on waiting for cdTask to complete
-		if err := client.WaitForCdTaskExit(ctx, provider); err != nil {
+		if err := WaitForCdTaskExit(ctx, provider); err != nil {
 			cdErr = err
 			// When CD fails, stop WaitServiceState
 			cancelSvcStatus(cdErr)
@@ -78,11 +79,14 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 		}
 
 		switch {
-		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
-			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
+		case errors.Is(err, io.EOF):
+			break // an end condition was detected; cdErr and/or svcErr might be nil
 
 		case errors.Is(context.Cause(ctx), context.Canceled):
 			term.Warn("Deployment is not finished. Service(s) might not be running.")
+
+		case errors.Is(context.Cause(tailCtx), errMonitoringDone):
+			break // the monitoring stopped the tail; cdErr and/or svcErr will have been set
 
 		case errors.Is(context.Cause(ctx), context.DeadlineExceeded):
 			// Tail was canceled when wait-timeout is reached; show a warning and exit with an error
@@ -90,7 +94,7 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 			fallthrough
 
 		default:
-			tailErr = err
+			tailErr = err // report the error, in addition to the cdErr and svcErr
 		}
 	}
 
@@ -104,6 +108,7 @@ func CanMonitorService(service compose.ServiceConfig) bool {
 
 	return service.Extensions["x-defang-static-files"] == nil &&
 		service.Extensions["x-defang-redis"] == nil &&
+		service.Extensions["x-defang-mongodb"] == nil &&
 		service.Extensions["x-defang-postgres"] == nil
 }
 

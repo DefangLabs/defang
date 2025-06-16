@@ -22,25 +22,25 @@ import (
 	logtype "google.golang.org/genproto/googleapis/logging/type"
 )
 
-type LogParser[T any] func(*loggingpb.LogEntry) ([]T, error)
-type LogFilter[T any] func(entry T) bool
+type LogParser[T any] func(*loggingpb.LogEntry) ([]*T, error)
+type LogFilter[T any] func(entry T) T
 
 type ServerStream[T any] struct {
 	ctx     context.Context
 	gcp     *gcp.Gcp
 	parse   LogParser[T]
-	filters []LogFilter[T]
+	filters []LogFilter[*T]
 	query   *Query
 	tailer  *gcp.Tailer
 
-	lastResp T
+	lastResp *T
 	lastErr  error
-	respCh   chan T
+	respCh   chan *T
 	errCh    chan error
 	cancel   func()
 }
 
-func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[T]) (*ServerStream[T], error) {
+func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T], filters ...LogFilter[*T]) (*ServerStream[T], error) {
 	tailer, err := gcp.NewTailer(ctx)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func NewServerStream[T any](ctx context.Context, gcp *gcp.Gcp, parse LogParser[T
 		filters: filters,
 		tailer:  tailer,
 
-		respCh: make(chan T),
+		respCh: make(chan *T),
 		errCh:  make(chan error),
 		cancel: cancel,
 	}, nil
@@ -145,16 +145,16 @@ func (s *ServerStream[T]) Start(start time.Time) {
 	}()
 }
 
-func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]T, error) {
+func (s *ServerStream[T]) parseAndFilter(entry *loggingpb.LogEntry) ([]*T, error) {
 	resps, err := s.parse(entry)
 	if err != nil {
 		return nil, err
 	}
-	newResps := make([]T, 0, len(resps))
+	newResps := make([]*T, 0, len(resps))
 	for _, resp := range resps {
 		include := true
-		for _, admit := range s.filters {
-			if !admit(resp) {
+		for _, f := range s.filters {
+			if resp = f(resp); resp == nil {
 				include = false
 				break
 			}
@@ -174,16 +174,23 @@ func (s *ServerStream[T]) Err() error {
 	return s.lastErr
 }
 
-func (s *ServerStream[T]) Msg() T {
+func (s *ServerStream[T]) Msg() *T {
 	return s.lastResp
 }
 
 type LogStream struct {
-	*ServerStream[*defangv1.TailResponse]
+	*ServerStream[defangv1.TailResponse]
 }
 
-func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp) (*LogStream, error) {
-	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient))
+func NewLogStream(ctx context.Context, gcpClient *gcp.Gcp, services []string) (*LogStream, error) {
+	restoreServiceName := getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.TailResponse) string { return entry.Service },
+		func(entry *defangv1.TailResponse, name string) *defangv1.TailResponse {
+			entry.Service = name
+			return entry
+		})
+
+	ss, err := NewServerStream(ctx, gcpClient, getLogEntryParser(ctx, gcpClient), restoreServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -222,11 +229,33 @@ func (s *LogStream) AddFilter(filter string) {
 }
 
 type SubscribeStream struct {
-	*ServerStream[*defangv1.SubscribeResponse]
+	*ServerStream[defangv1.SubscribeResponse]
 }
 
-func NewSubscribeStream(ctx context.Context, gcp *gcp.Gcp, waitForCD bool, etag string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
-	ss, err := NewServerStream(ctx, gcp, getActivityParser(ctx, gcp, waitForCD, etag), filters...)
+func getServiceNameRestorer[T any](services []string, encode func(string) string, extract func(T) string, update func(T, string) T) func(T) T {
+	mapping := make(map[string]string, len(services))
+	for _, service := range services {
+		mapping[encode(service)] = service
+	}
+	return func(entry T) T {
+		name := extract(entry)
+		if restored, ok := mapping[name]; ok {
+			name = restored
+		}
+		return update(entry, name)
+	}
+}
+
+func NewSubscribeStream(ctx context.Context, driver *gcp.Gcp, waitForCD bool, etag string, services []string, filters ...LogFilter[*defangv1.SubscribeResponse]) (*SubscribeStream, error) {
+	filters = append(filters, getServiceNameRestorer(services, gcp.SafeLabelValue,
+		func(entry *defangv1.SubscribeResponse) string { return entry.Name },
+		func(entry *defangv1.SubscribeResponse, name string) *defangv1.SubscribeResponse {
+			entry.Name = name
+			return entry
+		}),
+	)
+
+	ss, err := NewServerStream(ctx, driver, getActivityParser(ctx, driver, waitForCD, etag), filters...)
 	if err != nil {
 		return nil, err
 	}

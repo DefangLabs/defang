@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 )
 
 type Query struct {
@@ -75,22 +77,22 @@ func (q *Query) AddJobLogQuery(stack, project, etag string, services []string) {
 
 	if stack != "" {
 		query += fmt.Sprintf(`
-labels."defang-stack" = %q`, stack)
+labels."defang-stack" = %q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
-labels."defang-project" = %q`, project)
+labels."defang-project" = %q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag" = %q`, etag)
+labels."defang-etag" = %q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+labels."defang-service" =~ "^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(query)
@@ -101,22 +103,22 @@ func (q *Query) AddServiceLogQuery(stack, project, etag string, services []strin
 
 	if stack != "" {
 		query += fmt.Sprintf(`
-labels."defang-stack" = %q`, stack)
+labels."defang-stack" = %q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
-labels."defang-project" = %q`, project)
+labels."defang-project" = %q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag" = %q`, etag)
+labels."defang-etag" = %q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+labels."defang-service" =~ "^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(query)
@@ -127,22 +129,22 @@ func (q *Query) AddComputeEngineLogQuery(stack, project, etag string, services [
 
 	if stack != "" {
 		query += fmt.Sprintf(`
-labels."defang-stack" = %q`, stack)
+labels."defang-stack" = %q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
-labels."defang-project" = %q`, project)
+labels."defang-project" = %q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
-labels."defang-etag" = %q`, etag)
+labels."defang-etag" = %q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		query += fmt.Sprintf(`
-labels."defang-service" =~ "^(%v)$"`, strings.Join(services, "|"))
+labels."defang-service" =~ "^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(query)
@@ -154,10 +156,10 @@ func (q *Query) AddCloudBuildLogQuery(stack, project, etag string, services []st
 	// FIXME: Support stack
 	servicesRegex := `[a-zA-Z0-9-]{1,63}`
 	if len(services) > 0 {
-		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|"))
+		servicesRegex = fmt.Sprintf("(%v)", strings.Join(services, "|")) // Cloud build labels allows upper case letters
 	}
 	query += fmt.Sprintf(`
-labels.build_tags =~ "%v_%v_%v"`, project, servicesRegex, etag)
+labels.build_tags =~ "%v_%v_%v_%v"`, stack, project, servicesRegex, etag)
 
 	q.AddQuery(query)
 }
@@ -172,7 +174,7 @@ func (q *Query) AddJobExecutionUpdateQuery(executionName string) {
 	if executionName == "" {
 		return
 	}
-	q.AddQuery(fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, executionName))
+	q.AddQuery(fmt.Sprintf(`labels."run.googleapis.com/execution_name" = %q`, gcp.SafeLabelValue(executionName)))
 }
 
 func (q *Query) AddJobStatusUpdateRequestQuery(stack, project, etag string, services []string) {
@@ -180,22 +182,22 @@ func (q *Query) AddJobStatusUpdateRequestQuery(stack, project, etag string, serv
 
 	if stack != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-stack"=%q`, stack)
+protoPayload.request.job.template.labels."defang-stack"=%q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-project"=%q`, project)
+protoPayload.request.job.template.labels."defang-project"=%q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-etag"=%q`, etag)
+protoPayload.request.job.template.labels."defang-etag"=%q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+protoPayload.request.job.template.labels."defang-service"=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(reqQuery)
@@ -206,22 +208,22 @@ func (q *Query) AddJobStatusUpdateResponseQuery(stack, project, etag string, ser
 
 	if stack != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, stack)
+protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, project)
+protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
+protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(resQuery)
@@ -232,22 +234,22 @@ func (q *Query) AddServiceStatusRequestUpdate(stack, project, etag string, servi
 
 	if stack != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-stack"=%q`, stack)
+protoPayload.request.service.template.labels."defang-stack"=%q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-project"=%q`, project)
+protoPayload.request.service.template.labels."defang-project"=%q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-etag"=%q`, etag)
+protoPayload.request.service.template.labels."defang-etag"=%q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		reqQuery += fmt.Sprintf(`
-protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+protoPayload.request.service.template.labels."defang-service"=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(reqQuery)
@@ -258,22 +260,22 @@ func (q *Query) AddServiceStatusReponseUpdate(stack, project, etag string, servi
 
 	if stack != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, stack)
+protoPayload.response.spec.template.metadata.labels."defang-stack"=%q`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, project)
+protoPayload.response.spec.template.metadata.labels."defang-project"=%q`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, etag)
+protoPayload.response.spec.template.metadata.labels."defang-etag"=%q`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		resQuery += fmt.Sprintf(`
-protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, strings.Join(services, "|"))
+protoPayload.response.spec.template.metadata.labels."defang-service"=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(resQuery)
@@ -285,25 +287,25 @@ func (q *Query) AddComputeEngineInstanceGroupInsertOrPatch(stack, project, etag 
 	if stack != "" {
 		query += fmt.Sprintf(`
 protoPayload.request.allInstancesConfig.properties.labels.key="defang-stack"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, stack)
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(stack))
 	}
 
 	if project != "" {
 		query += fmt.Sprintf(`
 protoPayload.request.allInstancesConfig.properties.labels.key="defang-project"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, project)
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(project))
 	}
 
 	if etag != "" {
 		query += fmt.Sprintf(`
 protoPayload.request.allInstancesConfig.properties.labels.key="defang-etag"
-protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, etag)
+protoPayload.request.allInstancesConfig.properties.labels.value="%v"`, gcp.SafeLabelValue(etag))
 	}
 
 	if len(services) > 0 {
 		query += fmt.Sprintf(`
 protoPayload.request.allInstancesConfig.properties.labels.key="defang-service"
-protoPayload.request.allInstancesConfig.properties.labels.value=~"^(%v)$"`, strings.Join(services, "|"))
+protoPayload.request.allInstancesConfig.properties.labels.value=~"^(%v)$"`, servicesPattern(services))
 	}
 
 	q.AddQuery(query)
@@ -332,4 +334,15 @@ func (q *Query) AddFilter(filter string) {
 		return
 	}
 	q.baseQuery += fmt.Sprintf(` AND (%q)`, filter)
+}
+
+func servicesPattern(services []string) string {
+	if len(services) == 0 {
+		return ""
+	}
+	labelSafeServices := make([]string, len(services))
+	for i, service := range services {
+		labelSafeServices[i] = gcp.SafeLabelValue(service)
+	}
+	return strings.Join(labelSafeServices, "|")
 }

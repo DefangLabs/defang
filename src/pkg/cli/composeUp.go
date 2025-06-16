@@ -39,8 +39,11 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 			return configs.Names, nil
 		}
 
-		if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
-			return nil, project, &ComposeError{err}
+		// Ignore missing configs in preview mode, because we don't want to fail the preview if some configs are missing.
+		if upload != compose.UploadModeEstimate {
+			if err := compose.ValidateProjectConfig(ctx, project, listConfigNamesFunc); err != nil {
+				return nil, project, &ComposeError{err}
+			}
 		}
 	}
 
@@ -81,7 +84,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 
 	delegation, err := p.PrepareDomainDelegation(ctx, client.PrepareDomainDelegationRequest{
 		DelegateDomain: delegateDomain.Zone,
-		Preview:        upload == compose.UploadModePreview,
+		Preview:        upload == compose.UploadModePreview || upload == compose.UploadModeEstimate,
 		Project:        project.Name,
 	})
 	if err != nil {
@@ -91,7 +94,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 	}
 
 	var resp *defangv1.DeployResponse
-	if upload == compose.UploadModePreview {
+	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
 		resp, err = p.Preview(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
@@ -121,10 +124,10 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
 				Id:                resp.Etag,
 				Project:           project.Name,
-				Provider:          accountInfo.Provider().EnumValue(),
-				ProviderAccountId: accountInfo.AccountID(),
-				ProviderString:    string(accountInfo.Provider()),
-				Region:            accountInfo.Region(),
+				Provider:          accountInfo.Provider.Value(),
+				ProviderAccountId: accountInfo.AccountID,
+				ProviderString:    string(accountInfo.Provider),
+				Region:            accountInfo.Region,
 				Timestamp:         timestamppb.New(timestamp),
 			},
 		})

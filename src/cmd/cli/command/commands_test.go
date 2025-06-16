@@ -276,7 +276,7 @@ func TestGetProvider(t *testing.T) {
 		os.Unsetenv("DEFANG_PROVIDER")
 		RootCmd = FakeRootWithProviderParam("")
 
-		p, err := getProvider(ctx, nil)
+		p, err := newProvider(ctx, nil)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -303,7 +303,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -336,7 +336,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -377,7 +377,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := newProvider(ctx, loader)
 		if err != nil && !strings.HasPrefix(err.Error(), "GET https://api.digitalocean.com/v2/account: 401") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -410,7 +410,7 @@ func TestGetProvider(t *testing.T) {
 			term.DefaultTerm = oldTerm
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := newProvider(ctx, loader)
 		if err != nil && err.Error() != "GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects" {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -431,7 +431,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.savedProvider = nil
 		})
 
-		_, err := getProvider(ctx, loader)
+		_, err := newProvider(ctx, loader)
 		if err != nil && !strings.HasPrefix(err.Error(), "DIGITALOCEAN_TOKEN must be set") {
 			t.Fatalf("getProvider() failed: %v", err)
 		}
@@ -450,7 +450,7 @@ func TestGetProvider(t *testing.T) {
 			aws.StsClient = sts
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -469,7 +469,7 @@ func TestGetProvider(t *testing.T) {
 			}, nil
 		}
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -490,7 +490,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}
@@ -523,7 +523,7 @@ func TestGetProvider(t *testing.T) {
 			mockCtrl.canIUseResponse.CdImage = ""
 		})
 
-		p, err := getProvider(ctx, loader)
+		p, err := newProvider(ctx, loader)
 		if err != nil {
 			t.Errorf("getProvider() failed: %v", err)
 		}

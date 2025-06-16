@@ -1,4 +1,2 @@
  ! port 4567: UDP ports default to 'host' mode (add 'mode: host' to silence)
  ! service "dfnx": secrets will be exposed as environment variables, not files (use 'environment' instead)
- ! service "dfnx": service name was adjusted: build argument "DNS" assigned value "mock-dfnx"
- * Packaging the project files for dfnx at .

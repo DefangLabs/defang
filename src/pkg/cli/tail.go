@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +22,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/muesli/termenv"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -35,17 +39,10 @@ var (
 )
 
 // Deprecated: use Subscribe instead #851
-type EndLogConditional struct {
-	Service  string
-	Host     string
-	EventLog string
-}
-
-// Deprecated: use Subscribe instead #851
-type TailDetectStopEventFunc func(services []string, host string, eventlog string) bool
+type TailDetectStopEventFunc func(eventLog *defangv1.LogEntry) error
 
 type TailOptions struct {
-	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe instead #851
+	EndEventDetectFunc TailDetectStopEventFunc // Deprecated: use Subscribe and GetDeploymentStatus instead #851
 	Deployment         types.ETag
 	Filter             string
 	LogType            logs.LogType
@@ -54,16 +51,6 @@ type TailOptions struct {
 	Since              time.Time
 	Until              time.Time
 	Verbose            bool
-}
-
-func NewTailOptionsForDeploy(deploy *defangv1.DeployResponse, since time.Time, verbose bool) TailOptions {
-	return TailOptions{
-		Deployment: deploy.Etag,
-		LogType:    logs.LogTypeAll,
-		Raw:        false,
-		Since:      since,
-		Verbose:    verbose,
-	}
 }
 
 func (to TailOptions) String() string {
@@ -101,24 +88,6 @@ var P = track.P
 // EnableUTCMode sets the local time zone to UTC.
 func EnableUTCMode() {
 	time.Local = time.UTC
-}
-
-// Deprecated: use Subscribe instead #851
-func CreateEndLogEventDetectFunc(conditionals []EndLogConditional) TailDetectStopEventFunc {
-	return func(services []string, host string, eventLog string) bool {
-		for _, conditional := range conditionals {
-			for _, service := range services {
-				if service == "" || service == conditional.Service {
-					if host == "" || host == conditional.Host {
-						if strings.Contains(eventLog, conditional.EventLog) {
-							return true
-						}
-					}
-				}
-			}
-		}
-		return false
-	}
 }
 
 // ParseTimeOrDuration parses a time string or duration string (e.g. 1h30m) and returns a time.Time.
@@ -195,16 +164,32 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return ErrDryRun
 	}
 
-	return streamLogs(ctx, provider, projectName, options, LogEntryPrintHandler)
+	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
 	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
 	code := connect.CodeOf(err)
 	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
-	return code == connect.CodeUnavailable ||
-		(code == connect.CodeInternal && !connect.IsWireError(err)) ||
-		errors.Is(err, io.ErrUnexpectedEOF)
+	if code == connect.CodeUnavailable {
+		return true
+	}
+	if code == connect.CodeInternal && !connect.IsWireError(err) {
+		return true
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+
+	// GCP grpc transient errors
+	if st, ok := status.FromError(err); ok {
+		transientCodes := []codes.Code{codes.Unavailable, codes.Internal}
+		if slices.Contains(transientCodes, st.Code()) {
+			return true
+		}
+	}
+
+	return false
 }
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
@@ -262,7 +247,8 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			defer cancelSpinner()
 		}
 
-		if !options.Verbose {
+		// HACK: On Windows, closing stdout will cause debugger to stop working
+		if !options.Verbose && runtime.GOOS != "windows" {
 			// Allow the user to toggle verbose mode with the V key
 			if oldState, err := term.MakeUnbuf(int(os.Stdin.Fd())); err == nil {
 				defer term.Restore(int(os.Stdin.Fd()), oldState)
@@ -360,9 +346,11 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			isInternal := service == "cd" || service == "kaniko" || service == "fabric" || host == "kaniko" || host == "fabric" || host == "ecs" || host == "cloudbuild" || host == "pulumi"
 			onlyErrors := !options.Verbose && isInternal
 			if onlyErrors && !e.Stderr {
-				if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{service}, host, e.Message) {
-					cancel() // TODO: stuck on defer Close() if we don't do this
-					return nil
+				if options.EndEventDetectFunc != nil {
+					if err := options.EndEventDetectFunc(e); err != nil {
+						cancel() // TODO: stuck on defer Close() if we don't do this
+						return err
+					}
 				}
 				continue
 			}
@@ -374,12 +362,13 @@ func streamLogs(ctx context.Context, provider client.Provider, projectName strin
 			if err != nil {
 				term.Debug("Ending tail loop", err)
 				cancel() // TODO: stuck on defer Close() if we don't do this
+				return err
 			}
 		}
 	}
 }
 
-func LogEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
+func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 	if options.Raw {
 		if e.Stderr {
 			term.Error(e.Message)
@@ -428,14 +417,15 @@ func LogEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		}
 		buf.WriteString(line)
 		buf.WriteRune('\n')
-
-		// Detect end logging event
-		if options.EndEventDetectFunc != nil && options.EndEventDetectFunc([]string{e.Service}, e.Host, line) {
-			return errors.New("end event detected")
-		}
 	}
 	term.Print(buf.String())
 
+	// Detect end logging event
+	if options.EndEventDetectFunc != nil {
+		if err := options.EndEventDetectFunc(e); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

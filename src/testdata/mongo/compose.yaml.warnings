@@ -1,0 +1,17 @@
+ ! service "mongo": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-express": environment "ME_CONFIG_MONGODB_URL" may contain sensitive information; consider using 'defang config set ME_CONFIG_MONGODB_URL' to securely store this value
+ ! service "mongo-express": ingress port without healthcheck defaults to GET / HTTP/1.1
+ ! service "mongo-express": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1234": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1235": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1236": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1236": stateful service will lose data on restart; use a managed service instead
+ ! service "mongo-port1237": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1238": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port1239": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port27018": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-port27019": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-unmanaged": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "mongo-unmanaged": stateful service will lose data on restart; use a managed service instead
+ ! service "mongo-wrong-image": managed MongoDB service should use a mongo image
+ ! service "mongo-wrong-image": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

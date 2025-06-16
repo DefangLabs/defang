@@ -3,6 +3,8 @@
  ! port 84: UDP ports default to 'host' mode (add 'mode: host' to silence)
  ! port 85: 'published' should be equal to 'target'; ignoring 'published: 8085'
  ! port 85: UDP ports default to 'host' mode (add 'mode: host' to silence)
+ ! service "grpc": ingress port without healthcheck defaults to GET / HTTP/1.1
+ ! service "grpc": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "long": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "long": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "long-published": ingress port without healthcheck defaults to GET / HTTP/1.1

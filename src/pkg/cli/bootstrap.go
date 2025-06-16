@@ -13,7 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p client.Provider, cmd string) error {
+func BootstrapCommand(ctx context.Context, projectName string, verbose bool, provider client.Provider, cmd string) error {
 	if projectName == "" { // projectName is empty for "list --remote"
 		term.Infof("Running CD command %q", cmd)
 	} else {
@@ -24,7 +24,7 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 	}
 
 	since := time.Now()
-	etag, err := p.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: projectName, Command: cmd})
+	etag, err := provider.BootstrapCommand(ctx, client.BootstrapCommandRequest{Project: projectName, Command: cmd})
 	if err != nil || etag == "" {
 		return err
 	}
@@ -35,23 +35,23 @@ func BootstrapCommand(ctx context.Context, projectName string, verbose bool, p c
 		LogType:    logs.LogTypeBuild,
 		Verbose:    verbose,
 	}
-	return TailAndWaitForCD(ctx, projectName, p, options, LogEntryPrintHandler)
+	return TailAndWaitForCD(ctx, provider, projectName, options)
 }
 
-func TailAndWaitForCD(ctx context.Context, projectName string, provider client.Provider, tailOptions TailOptions, handler LogEntryHandler) error {
+func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName string, tailOptions TailOptions) error {
 	ctx, cancelTail := context.WithCancelCause(ctx)
 	defer cancelTail(nil) // to cancel tail and clean-up context
 
 	var cdErr error
 	go func() {
-		cdErr = client.WaitForCdTaskExit(ctx, provider)
+		cdErr = WaitForCdTaskExit(ctx, provider)
 		pkg.SleepWithContext(ctx, 2*time.Second) // a delay before cancelling tail to make sure we got the last logs
 		cancelTail(cdErr)
 	}()
 
 	// blocking call to tail
 	var tailErr error
-	if err := streamLogs(ctx, provider, projectName, tailOptions, handler); err != nil {
+	if err := streamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err
@@ -81,7 +81,7 @@ func BootstrapLocalList(ctx context.Context, provider client.Provider) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("No projects found for account '%s' at region '%s'\n", accountInfo.AccountID(), accountInfo.Region())
+		fmt.Printf("No projects found in %v\n", accountInfo)
 	}
 
 	for _, stack := range stacks {

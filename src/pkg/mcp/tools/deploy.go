@@ -20,7 +20,7 @@ import (
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
 func setupDeployTool(s *server.MCPServer, cluster string) {
-	term.Info("Creating deployment tool")
+	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
 
@@ -31,10 +31,10 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 	term.Debug("Deployment tool created")
 
 	// Add the deployment tool handler - make it non-blocking
-	term.Info("Adding deployment tool handler")
+	term.Debug("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Get compose path
-		term.Info("Compose up tool called - deploying services")
+		term.Debug("Compose up tool called - deploying services")
 		track.Evt("MCP Deploy Tool")
 
 		wd, ok := request.Params.Arguments["working_directory"].(string)
@@ -47,6 +47,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 
 		loader := configureLoader(request)
 
+		term.Debug("Function invoked: loader.LoadProject")
 		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
@@ -55,11 +56,15 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
+		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
 		}
 
+		client.Track("MCP Deploy Tool")
+
+		term.Debug("Function invoked: cli.NewProvider")
 		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
@@ -68,8 +73,9 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Deploy the services
-		term.Infof("Deploying services for project %s...", project.Name)
+		term.Debugf("Deploying services for project %s...", project.Name)
 
+		term.Debug("Function invoked: cli.ComposeUp")
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
@@ -77,6 +83,10 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			term.Error("Failed to compose up services", "error", err)
 
 			result := HandleTermsOfServiceError(err)
+			if result != nil {
+				return result, nil
+			}
+			result = HandleConfigError(err)
 			if result != nil {
 				return result, nil
 			}
@@ -90,65 +100,36 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Get the portal URL for browser preview
-		portalURL := printPlaygroundPortalServiceURLs(deployResp.Services)
+		portalURL := "https://portal.defang.io/"
 
-		// Open the portal URL in the browser if available
-		if portalURL != "" {
-			term.Infof("Opening portal URL in browser: %s", portalURL)
-			go func() {
-				err := browser.OpenURL(portalURL)
-				if err != nil {
-					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-				}
-			}()
-		}
+		// Open the portal URL in the browser
+		term.Debugf("Opening portal URL in browser: %s", portalURL)
+		go func() {
+			err := browser.OpenURL(portalURL)
+			if err != nil {
+				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
+			}
+		}()
 
 		// Success case
-		term.Info("Successfully started deployed services", "etag", deployResp.Etag)
+		term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
 
 		// Log deployment success
-		term.Info("Deployment Started!")
-		term.Infof("Deployment ID: %s", deployResp.Etag)
+		term.Debug("Deployment Started!")
+		term.Debugf("Deployment ID: %s", deployResp.Etag)
 
 		// Log browser preview information
-		term.Infof("🌐 %s available", portalURL)
+		term.Debugf("🌐 %s available", portalURL)
 
 		// Log service details
-		term.Info("Services:")
+		term.Debug("Services:")
 		for _, serviceInfo := range deployResp.Services {
-			term.Infof("- %s", serviceInfo.Service.Name)
-			term.Infof("  Public URL: %s", serviceInfo.PublicFqdn)
-			term.Infof("  Status: %s", serviceInfo.Status)
+			term.Debugf("- %s", serviceInfo.Service.Name)
+			term.Debugf("  Public URL: %s", serviceInfo.PublicFqdn)
+			term.Debugf("  Status: %s", serviceInfo.Status)
 		}
 
 		// Return the etag data as text
 		return mcp.NewToolResultText(fmt.Sprintf("Please use the web portal url: %s to follow the deployment of %s, with the deployment ID of %s", portalURL, project.Name, deployResp.Etag)), nil
 	})
-}
-
-const DEFANG_PORTAL_HOST = "portal.defang.io"
-const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
-
-// printPlaygroundPortalServiceURLs logs service URLs for the Defang portal
-// and returns the first URL for browser preview
-func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) string {
-	// Log portal URLs for monitoring services
-	term.Info("Monitor your services' status in the defang portal")
-
-	// TODO: print all of the urls instead of just the first one.
-	// the user may have many publicly accessible services
-	// Store the first URL to return for browser preview
-	var firstURL string
-
-	for _, serviceInfo := range serviceInfos {
-		serviceURL := SERVICE_PORTAL_URL + "/" + serviceInfo.Service.Name
-		term.Infof("   - %s", serviceURL)
-
-		// Save the first URL we encounter
-		if firstURL == "" {
-			firstURL = serviceURL
-		}
-	}
-
-	return firstURL
 }

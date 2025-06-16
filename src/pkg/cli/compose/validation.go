@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/clouds/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -42,9 +43,20 @@ func ValidateProject(project *composeTypes.Project) error {
 		return services[i].Name < services[j].Name
 	})
 
-	errs := make([]error, len(services))
+	var errs []error
+	for _, svccfg := range services {
+		errs = append(errs, validateService(&svccfg, project))
+	}
 	for i, svccfg := range services {
-		errs[i] = validateService(&svccfg, project)
+		for j := i + 1; j < len(services); j++ {
+			if svccfg.Name == services[j].Name {
+				errs = append(errs, fmt.Errorf("service %q defined multiple times", svccfg.Name))
+				continue
+			}
+			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
+				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
+			}
+		}
 	}
 	return errors.Join(errs...)
 }
@@ -223,7 +235,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	err := validatePorts(svccfg.Ports)
 	if err != nil {
-		return err
+		return fmt.Errorf("service %q: %w", svccfg.Name, err)
 	}
 	if svccfg.HealthCheck == nil || svccfg.HealthCheck.Disable {
 		// Show a warning when we have ingress ports but no explicit healthcheck
@@ -325,7 +337,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
-		// Ensure the image is a valid Postgres image; FIXME: there are several valid Postgres images
+		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
 		if !strings.HasSuffix(image, "postgres") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
@@ -335,13 +347,31 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	if !managedRedis && !managedPostgres && isStatefulImage(svccfg.Image) {
+	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
+	if managedMongodb {
+		// Ensure the image is a valid MongoDB image
+		image := getImageRepo(svccfg.Image)
+		if !strings.HasSuffix(image, "mongo") {
+			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
+		}
+		if _, err = validateManagedStore(mongodbExtension); err != nil {
+			return fmt.Errorf("service %q: %w", svccfg.Name, err)
+		}
+	}
+
+	if !managedRedis && !managedPostgres && !managedMongodb && isStatefulImage(svccfg.Image) {
 		term.Warnf("service %q: stateful service will lose data on restart; use a managed service instead", svccfg.Name)
 	}
 
 	for k := range svccfg.Extensions {
 		switch k {
-		case "x-defang-dns-role", "x-defang-static-files", "x-defang-redis", "x-defang-postgres", "x-defang-llm", "x-defang-autoscaling":
+		case "x-defang-dns-role",
+			"x-defang-static-files",
+			"x-defang-redis",
+			"x-defang-postgres",
+			"x-defang-mongodb",
+			"x-defang-llm",
+			"x-defang-autoscaling":
 			continue
 		default:
 			term.Warnf("service %q: unsupported compose extension: %q", svccfg.Name, k)
@@ -398,6 +428,14 @@ func validatePort(port composeTypes.ServicePortConfig) error {
 	}
 
 	return nil
+}
+
+func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
+	if r.Reservations == nil {
+		// TODO: we might not want to default to all the limits, maybe only memory?
+		return r.Limits
+	}
+	return r.Reservations
 }
 
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion

@@ -277,7 +277,7 @@ func (b *ByocGcp) BootstrapList(ctx context.Context) ([]string, error) {
 	return stacks, nil
 }
 
-func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
+func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	projectId := getGcpProjectID()
 	if projectId == "" {
 		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
@@ -286,33 +286,12 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (client.AccountInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return GcpAccountInfo{
-		projectId: projectId,
-		region:    b.driver.Region,
-		email:     email,
+	return &client.AccountInfo{
+		AccountID: projectId,
+		Region:    b.driver.Region,
+		Details:   email,
+		Provider:  client.ProviderGCP,
 	}, nil
-}
-
-type GcpAccountInfo struct {
-	projectId string
-	region    string
-	email     string
-}
-
-func (g GcpAccountInfo) AccountID() string {
-	return g.projectId
-}
-
-func (g GcpAccountInfo) Region() string {
-	return g.region
-}
-
-func (g GcpAccountInfo) Details() string {
-	return g.email
-}
-
-func (g GcpAccountInfo) Provider() client.ProviderID {
-	return client.ProviderGCP
 }
 
 func (b *ByocGcp) BootstrapCommand(ctx context.Context, req client.BootstrapCommandRequest) (types.ETag, error) {
@@ -516,8 +495,13 @@ func (b *ByocGcp) GetStackName() string {
 }
 
 func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
-	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) bool { return entry.Name != defangCD }
-	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, ignoreCdSuccess)
+	ignoreCdSuccess := func(entry *defangv1.SubscribeResponse) *defangv1.SubscribeResponse {
+		if entry.Name != defangCD {
+			return entry
+		}
+		return nil
+	}
+	subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services, ignoreCdSuccess)
 	if err != nil {
 		return nil, err
 	}
@@ -534,7 +518,7 @@ func (b *ByocGcp) Subscribe(ctx context.Context, req *defangv1.SubscribeRequest)
 
 func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
 	if b.cdExecution != "" && req.Etag == b.cdExecution { // Only follow CD log, we need to subscribe to cd activities to detect when the job is done
-		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag)
+		subscribeStream, err := NewSubscribeStream(ctx, b.driver, true, req.Etag, req.Services)
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +550,7 @@ func (b *ByocGcp) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		}()
 	}
 
-	logStream, err := NewLogStream(ctx, b.driver)
+	logStream, err := NewLogStream(ctx, b.driver, req.Services)
 	if err != nil {
 		return nil, err
 	}
