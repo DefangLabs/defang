@@ -84,6 +84,19 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		VersioningConfiguration: &s3.Bucket_VersioningConfiguration{
 			Status: "Enabled",
 		},
+		LifecycleConfiguration: &s3.Bucket_LifecycleConfiguration{
+			Rules: []s3.Bucket_Rule{
+				{
+					Status: "Enabled",
+					NoncurrentVersionExpiration: &s3.Bucket_NoncurrentVersionExpiration{
+						// Deletion only happens when both NoncurrentDays and NewerNoncurrentVersions are exceeded
+						// See: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html
+						NoncurrentDays:          10,          // Keep deployments for at least 10 days
+						NewerNoncurrentVersions: ptr.Int(10), // Keep last 10 deployments
+					},
+				},
+			},
+		},
 	}
 
 	// 2. ECS cluster
