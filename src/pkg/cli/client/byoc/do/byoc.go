@@ -827,6 +827,9 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string, log
 
 			if logType.Has(logs.LogTypeBuild) {
 				mainDeployLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeDeploy, true, 50)
+				if err != nil {
+					return "", err
+				}
 				if resp.StatusCode != 200 {
 					// godo has no concept of returning the "last deployment", only "Active", "Pending", etc
 					// Create our own last deployment and return deployment logs if the deployment failed in the last 2 minutes
@@ -840,19 +843,16 @@ func (b *ByocDo) processServiceLogs(ctx context.Context, projectName string, log
 					// Assume no deploy happened, return without an error
 					return "", nil
 				}
-				if err != nil {
-					return "", err
-				}
 				readHistoricalLogs(ctx, mainDeployLogs.HistoricURLs)
 			}
 			if logType.Has(logs.LogTypeRun) {
 				mainRunLogs, resp, err := b.client.Apps.GetLogs(ctx, app.ID, "", "", godo.AppLogTypeRun, true, 50)
+				if err != nil {
+					return "", err
+				}
 				if resp.StatusCode != 200 {
 					// Assume no deploy happened, return without an error
 					return "", nil
-				}
-				if err != nil {
-					return "", err
 				}
 				readHistoricalLogs(ctx, mainRunLogs.HistoricURLs)
 				appLiveURL = mainRunLogs.LiveURL
