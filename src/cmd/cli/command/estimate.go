@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
@@ -26,15 +27,7 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
-			previewProvider, err := newProvider(cmd.Context(), loader)
-			if err != nil {
-				return err
-			}
-
-			err = canIUseProvider(cmd.Context(), previewProvider, project.Name)
-			if err != nil {
-				return err
-			}
+			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
