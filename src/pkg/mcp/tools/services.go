@@ -35,7 +35,12 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		term.Debug("Services tool called - fetching services from Defang")
 		track.Evt("MCP Services Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			term.Error("Failed to parse arguments as map[string]any")
+			return mcp.NewToolResultErrorFromErr("Invalid arguments format", errors.New("arguments is not a map[string]any")), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {

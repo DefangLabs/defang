@@ -13,9 +13,14 @@ import (
 )
 
 func configureLoader(request mcp.CallToolRequest) *compose.Loader {
-	composeFilePaths, composeFilePathOK := request.Params.Arguments["compose_file_paths"].([]string)
+	arguments, ok := request.Params.Arguments.(map[string]any)
+	if !ok {
+		term.Debug("Failed to assert type for request.Params.Arguments")
+		return compose.NewLoader()
+	}
+	composeFilePaths, composeFilePathOK := arguments["compose_file_paths"].([]string)
 
-	projectName, projectNameOK := request.Params.Arguments["project_name"].(string)
+	projectName, projectNameOK := arguments["project_name"].(string)
 
 	//TODO: Talk about using both project name and compose file paths
 

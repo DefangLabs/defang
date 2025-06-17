@@ -37,7 +37,11 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		term.Debug("Compose up tool called - deploying services")
 		track.Evt("MCP Deploy Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			return mcp.NewToolResultErrorFromErr("Invalid arguments type", errors.New("expected map[string]any for arguments")), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {

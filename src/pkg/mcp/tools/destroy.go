@@ -49,8 +49,12 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
 		}
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if !ok || wd != "" {
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			return mcp.NewToolResultError("Invalid arguments type"), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
+		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {
 				term.Error("Failed to change working directory", "error", err)

@@ -33,7 +33,11 @@ func setupListConfigTool(s *server.MCPServer, cluster string) {
 		term.Debug("List Config tool called")
 		track.Evt("MCP List Config Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			return mcp.NewToolResultError("Invalid arguments type"), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {

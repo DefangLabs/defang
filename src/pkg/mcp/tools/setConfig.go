@@ -42,7 +42,12 @@ func setupSetConfigTool(s *server.MCPServer, cluster string) {
 		term.Debug("Set Config tool called")
 		track.Evt("MCP Set Config Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			term.Debug("Invalid arguments type")
+			return mcp.NewToolResultErrorFromErr("Invalid arguments type", errors.New("arguments is not a map[string]any")), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {
@@ -50,13 +55,13 @@ func setupSetConfigTool(s *server.MCPServer, cluster string) {
 			}
 		}
 
-		name, ok := request.Params.Arguments["name"].(string)
+		name, ok := arguments["name"].(string)
 		if !ok || name == "" {
 			term.Debug("No name provided")
 			return mcp.NewToolResultErrorFromErr("No name provided", errors.New("no name provided")), nil
 		}
 
-		value, ok := request.Params.Arguments["value"].(string)
+		value, ok := arguments["value"].(string)
 		if !ok || value == "" {
 			term.Debug("No value provided")
 			return mcp.NewToolResultErrorFromErr("No value provided", errors.New("no value provided")), nil

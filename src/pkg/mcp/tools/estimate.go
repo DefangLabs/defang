@@ -40,7 +40,11 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		term.Debug("Estimate tool called")
 		track.Evt("MCP Estimate Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		arguments, ok := request.Params.Arguments.(map[string]any)
+		if !ok {
+			return mcp.NewToolResultError("Invalid arguments format"), nil
+		}
+		wd, ok := arguments["working_directory"].(string)
 		if ok && wd != "" {
 			err := os.Chdir(wd)
 			if err != nil {
@@ -48,7 +52,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			}
 		}
 
-		modeString, ok := request.Params.Arguments["deployment_mode"].(string)
+		modeString, ok := arguments["deployment_mode"].(string)
 		if !ok {
 			modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
 		}
