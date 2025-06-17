@@ -7,6 +7,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
@@ -31,11 +32,15 @@ func makeEstimateCmd() *cobra.Command {
 			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
 			switch providerID {
 			case cliClient.ProviderAuto:
-				providerID = cliClient.ProviderAWS // default to AWS for estimates; TODO: show a picker
+				providerID = cliClient.ProviderAWS
 				fallthrough
 			case cliClient.ProviderAWS:
 				if awsInEnv() {
 					previewProvider = aws.NewByocProvider(ctx, client.GetTenantName())
+				}
+			case cliClient.ProviderGCP:
+				if gcpInEnv() {
+					previewProvider = gcp.NewByocProvider(ctx, client.GetTenantName())
 				}
 			default:
 				return fmt.Errorf("unsupported provider %s; must be one of %v", providerID, []cliClient.ProviderID{cliClient.ProviderAWS})
