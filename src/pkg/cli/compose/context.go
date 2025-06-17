@@ -292,7 +292,9 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	}
 
 	if !foundDockerfile {
-		return fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
+		term.Debugf("the specified dockerfile could not be read: %q", dockerfile)
+
+		return nil
 	}
 
 	return nil
