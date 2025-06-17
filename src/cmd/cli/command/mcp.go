@@ -1,7 +1,10 @@
 package command
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,8 +83,10 @@ var mcpServerCmd = &cobra.Command{
 		}
 
 		// Start the server
-		term.Println("Starting Defang MCP server")
-		if err := server.ServeStdio(s); err != nil {
+		term.Println("Starting Defang MCP server on :5533")
+		mux := http.NewServeMux()
+		mux.HandleFunc("/sse", createSSEHandler(s))
+		if err := http.ListenAndServe(":5533", mux); err != nil {
 			return err
 		}
 
@@ -89,6 +94,61 @@ var mcpServerCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// createSSEHandler creates an HTTP handler for SSE transport of MCP messages
+func createSSEHandler(mcpServer *server.MCPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Set SSE headers
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Cache-Control")
+
+		// Handle preflight request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Create a context for this connection
+		ctx := r.Context()
+		// Read the request body (JSON-RPC message)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			term.Error("Failed to read request body", "error", err)
+			http.Error(w, "Failed to read request body", http.StatusBadRequest)
+			return
+		}
+
+		// Process the message through the MCP server
+		response := mcpServer.HandleMessage(ctx, json.RawMessage(body))
+
+		// Marshal the response
+		responseData, err := json.Marshal(response)
+		if err != nil {
+			term.Error("Failed to marshal response", "error", err)
+			http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
+			return
+		}
+
+		// Send the response as SSE event
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", responseData); err != nil {
+			term.Error("Failed to write SSE response", "error", err)
+			return
+		}
+
+		// Flush the response
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
 }
 
 var mcpSetupCmd = &cobra.Command{

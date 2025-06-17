@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/pkg/browser"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -79,6 +83,8 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		// Deploy the services
 		term.Debugf("Deploying services for project %s...", project.Name)
 
+		since := time.Now()
+
 		term.Debug("Function invoked: cli.ComposeUp")
 		// Use ComposeUp to deploy the services
 		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
@@ -99,8 +105,38 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		if len(deployResp.Services) == 0 {
-			term.Error("Failed to deploy services", "error", errors.New("no services deployed"))
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
+		}
+
+		options := cli.TailOptions{
+			Deployment: deployResp.Etag,
+			Since:      since,
+			LogType:    logs.LogTypeBuild,
+			Verbose:    true,
+		}
+
+		err = cli.StreamLogs(ctx, provider, project.Name, options, func(entry *defangv1.LogEntry, options *cli.TailOptions) error {
+			if strings.HasPrefix(entry.Message, "Deploy succeeded") {
+				return io.EOF
+			} else if strings.HasPrefix(entry.Message, "Deploy failed") {
+				return errors.New(entry.Message)
+			}
+
+			// Send log message as SSE notification
+			if err := s.SendNotificationToClient(ctx, "notifications/logs", map[string]any{
+				"message":   entry.Message,
+				"timestamp": entry.Timestamp,
+				"level":     "info",
+				"source":    "deployment",
+				"etag":      deployResp.Etag,
+			}); err != nil {
+				term.Error("Failed to send log notification", "error", err)
+			}
+
+			return nil
+		})
+		if err != nil && !errors.Is(err, io.EOF) {
+			return mcp.NewToolResultErrorFromErr("failed to tail and wait for cd", err), nil
 		}
 
 		// Get the portal URL for browser preview
