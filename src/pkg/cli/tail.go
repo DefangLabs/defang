@@ -164,7 +164,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		return ErrDryRun
 	}
 
-	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
+	return StreamLogs(ctx, provider, projectName, options, logEntryPrintHandler)
 }
 
 func isTransientError(err error) bool {
@@ -194,7 +194,7 @@ func isTransientError(err error) bool {
 
 type LogEntryHandler func(*defangv1.LogEntry, *TailOptions) error
 
-func streamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
+func StreamLogs(ctx context.Context, provider client.Provider, projectName string, options TailOptions, handler LogEntryHandler) error {
 	var sinceTs, untilTs *timestamppb.Timestamp
 	if pkg.IsValidTime(options.Since) {
 		sinceTs = timestamppb.New(options.Since)

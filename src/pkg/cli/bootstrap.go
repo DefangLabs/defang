@@ -51,7 +51,7 @@ func TailAndWaitForCD(ctx context.Context, provider client.Provider, projectName
 
 	// blocking call to tail
 	var tailErr error
-	if err := streamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
+	if err := StreamLogs(ctx, provider, projectName, tailOptions, logEntryPrintHandler); err != nil {
 		term.Debug("Tail stopped with", err, errors.Unwrap(err))
 		if !errors.Is(err, context.Canceled) {
 			tailErr = err

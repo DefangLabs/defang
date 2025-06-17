@@ -61,7 +61,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		Verbose:    true,
 	}
 
-	err = streamLogs(ctx, provider, project.Name, options, func(entry *defangv1.LogEntry, options *TailOptions) error {
+	err = StreamLogs(ctx, provider, project.Name, options, func(entry *defangv1.LogEntry, options *TailOptions) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {
