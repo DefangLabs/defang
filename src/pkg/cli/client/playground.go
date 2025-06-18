@@ -81,21 +81,7 @@ func (g *PlaygroundProvider) BootstrapCommand(ctx context.Context, req Bootstrap
 	return "", errors.New("the CD command is not valid for the Defang playground; did you forget --provider?")
 }
 func (g *PlaygroundProvider) Destroy(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error) {
-	// Get all the services in the project and delete them all at once
-	servicesList, err := g.GetServices(ctx, &defangv1.GetServicesRequest{Project: req.Project})
-	if err != nil {
-		return "", err
-	}
-	if len(servicesList.Services) == 0 {
-		return "", errors.New("no services found")
-	}
-	var names []string
-	for _, service := range servicesList.Services {
-		names = append(names, service.Service.Name)
-	}
-
-	// FIXME: use Destroy rpc instead of Delete rpc; https://github.com/DefangLabs/defang/issues/1231
-	resp, err := g.Delete(ctx, &defangv1.DeleteRequest{Project: req.Project, Names: names})
+	resp, err := getMsg(g.GetController().Destroy(ctx, connect.NewRequest(req)))
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +117,7 @@ func (g *PlaygroundProvider) AccountInfo(ctx context.Context) (*AccountInfo, err
 	return &AccountInfo{
 		Provider:  ProviderDefang,
 		AccountID: g.GetTenantName().String(),
-		Region:    "us-west-2", // Hardcoded for now for prod1
+		Region:    "us-west-2", // Hardcoded for now for prod1 TODO: Probably should be the current tenant shard?
 	}, nil
 }
 
