@@ -23,7 +23,13 @@ func (grpcDestroyMockHandler) WhoAmI(context.Context, *connect.Request[emptypb.E
 
 func (grpcDestroyMockHandler) Delete(context.Context, *connect.Request[defangv1.DeleteRequest]) (*connect.Response[defangv1.DeleteResponse], error) {
 	return connect.NewResponse(&defangv1.DeleteResponse{
-		Etag: "test-etag",
+		Etag: "test-delete-etag",
+	}), nil
+}
+
+func (grpcDestroyMockHandler) Destroy(context.Context, *connect.Request[defangv1.DestroyRequest]) (*connect.Response[defangv1.DestroyResponse], error) {
+	return connect.NewResponse(&defangv1.DestroyResponse{
+		Etag: "test-destroy-etag",
 	}), nil
 }
 
@@ -55,7 +61,7 @@ func TestDestroy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if etag != "test-etag" {
-		t.Fatalf("expected etag %q, got %q", "test-etag", etag)
+	if etag != "test-destroy-etag" {
+		t.Fatalf("expected etag %q, got %q", "test-destroy-etag", etag)
 	}
 }
