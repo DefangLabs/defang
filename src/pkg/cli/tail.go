@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"regexp"
 	"runtime"
@@ -168,6 +169,12 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 }
 
 func isTransientError(err error) bool {
+	// Networking errors are considered transient errors
+	var netOpErr *net.OpError
+	if errors.As(err, &netOpErr) && netOpErr.Temporary() {
+		return true
+	}
+
 	// TODO: detect ALB timeout (504) or Fabric restart and reconnect automatically
 	code := connect.CodeOf(err)
 	// Reconnect on Error: internal: stream error: stream ID 5; INTERNAL_ERROR; received from peer
