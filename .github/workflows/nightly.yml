@@ -21,8 +21,8 @@ jobs:
         # Get go
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
       - uses: goreleaser/goreleaser-action@v5
         with:

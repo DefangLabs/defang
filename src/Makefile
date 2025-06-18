@@ -112,8 +112,8 @@ push-images: images login ## Push all docker images
 login: ## Login to docker
 	@docker login
 
-.PHONY: nightly-local
-nightly-local: ## Used for local testing of goreleaser nightly run
+.PHONY: snapshot
+snapshot: ## Used for local testing of goreleaser
 	GORELEASER_ALLOW_DIRTY=true GORELEASER_LOG=debug \
-	goreleaser release --nightly --clean \
+	goreleaser release --snapshot --clean \
 	--skip=publish,announce,sign,notarize,validate
