@@ -82,7 +82,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	redirectUri := "http://127.0.0.1:" + strconv.Itoa(authPort) + "/auth"
 
 	// Get the authorization URL before setting up the handler
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	defer server.Close()
 
 	redirectUri := server.URL + "/auth"
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce())
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
