@@ -46,6 +46,13 @@ func makeEstimateCmd() *cobra.Command {
 				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
 			}
 
+			// TODO: bring this back when GCP is supported
+			// if providerID == cliClient.ProviderAuto || providerID == cliClient.ProviderDefang {
+			// 	if _, err := interactiveSelectProvider([]cliClient.ProviderID{cliClient.ProviderAWS, cliClient.ProviderGCP}); err != nil {
+			// 		return err
+			// 	}
+			// }
+
 			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
