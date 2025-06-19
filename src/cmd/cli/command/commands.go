@@ -427,7 +427,7 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if nonInteractive {
-			if err := cli.NonInteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
+			if err := cli.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
 		} else {
