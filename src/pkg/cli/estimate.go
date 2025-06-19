@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,8 +19,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
-
-var natgatewayRegex = regexp.MustCompile(`(?i)natgateway`)
 
 func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
 	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
@@ -68,11 +65,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 			return errors.New(entry.Message)
 		}
 		term.Debug(entry.Message)
-
-		if mode != defangv1.DeploymentMode_DEVELOPMENT || !natgatewayRegex.MatchString(entry.Message) {
-			pulumiPreviewLogLines = append(pulumiPreviewLogLines, entry.Message)
-		}
-
+		pulumiPreviewLogLines = append(pulumiPreviewLogLines, entry.Message)
 		return nil
 	})
 	if err != nil && !errors.Is(err, io.EOF) {
