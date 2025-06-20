@@ -68,11 +68,11 @@ type AuthCodeFlow struct {
 	verifier    string
 }
 
-type Prompt bool
+type LoginFlow bool
 
 const (
-	PromptNo  Prompt = false
-	PromptYes Prompt = true
+	CliFlow LoginFlow = false
+	McpFlow LoginFlow = true
 )
 
 // ServeAuthCodeFlowServer serves the auth code flow server and will save the auth token to the file when it has been received.
@@ -130,7 +130,7 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	return nil
 }
 
-func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error) {
+func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -169,7 +169,13 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	defer server.Close()
 
 	redirectUri := server.URL + "/auth"
-	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, WithPkce(), WithProvider("github"))
+	opts := []AuthorizeOption{
+		WithPkce(),
+	}
+	if !mcpFlow {
+		opts = append(opts, WithProvider("github"))
+	}
+	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, opts...)
 	if err != nil {
 		return AuthCodeFlow{}, err
 	}
@@ -182,7 +188,7 @@ func StartAuthCodeFlow(ctx context.Context, prompt Prompt) (AuthCodeFlow, error)
 	defer term.Print(strings.Repeat(" ", n), "\r") // TODO: use termenv to clear line
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
-	if prompt {
+	if mcpFlow {
 		browser.OpenURL(server.URL)
 	}
 
