@@ -114,6 +114,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 		}
 		// We continue even if we can't save the token; we just won't have it saved for next time
 	}
+	// The new login page shows the ToS so a successful login implies the user agreed
 	if err := NonInteractiveAgreeToS(ctx, client); err != nil {
 		term.Debug("unable to agree to terms:", err) // not fatal
 	}
