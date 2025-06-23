@@ -68,6 +68,9 @@ func prettyError(err error) error {
 		term.Debug("Server error:", cerr)
 		err = errors.Unwrap(cerr)
 	}
+	if cli.IsNetworkError(err) {
+		return fmt.Errorf("%w; please check network settings and try again", err)
+	}
 	return err
 }
 
@@ -374,11 +377,6 @@ var RootCmd = &cobra.Command{
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
 			return nil
-		}
-
-		// Check whether Connect failed with a networking error
-		if cli.IsNetworkError(err) {
-			return fmt.Errorf("unable to connect to Defang server %q; please check network settings and try again", cluster)
 		}
 
 		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
