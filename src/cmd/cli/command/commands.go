@@ -1060,7 +1060,7 @@ var tokenCmd = &cobra.Command{
 		var expires, _ = cmd.Flags().GetDuration("expires")
 
 		// TODO: should default to use the current tenant, not the default tenant
-		return cli.Token(cmd.Context(), client, types.DEFAULT_TENANT, expires, scope.Scope(s))
+		return cli.Token(cmd.Context(), client, types.TenantName(org), expires, scope.Scope(s))
 	},
 }
 
