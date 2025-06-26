@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-if [ "$SNAPSHOT" == "true" ]; then
-    echo "SNAPSHOT only build."
-    exit 0
+if [ "$SNAPSHOT" = "true" ] || [ "$NIGHTLY" = "true" ]; then
+  echo "Skipping codesign for snapshot/nightly build"
+  exit 0
 fi
 
 # Bail if we didn't get one (and only one) argument

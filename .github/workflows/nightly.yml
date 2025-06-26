@@ -24,11 +24,13 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
-      - uses: goreleaser/goreleaser-action@v5
+      - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
           version: latest
-          args: release --clean --nightly --skip=announce
+          workdir: src
+          args: release --clean --nightly --skip=announce --config=.goreleaser.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          NIGHTLY: true
