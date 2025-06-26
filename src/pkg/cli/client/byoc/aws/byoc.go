@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"slices"
 	"strconv"
@@ -755,21 +754,18 @@ func (b *ByocAws) UpdateServiceInfo(ctx context.Context, si *defangv1.ServiceInf
 	if service.DomainName == "" {
 		return nil
 	}
-	// Do a DNS lookup for DomainName and confirm it's indeed a CNAME to the service's public FQDN
-	cname, _ := net.LookupCNAME(service.DomainName)
-	if dns.Normalize(cname) != si.PublicFqdn {
-		dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
-		zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
-		if err != nil {
-			return err
-		}
-		if zoneId == "" {
-			si.UseAcmeCert = true
-			// TODO: We should add link to documentation on how the acme cert workflow works
-			// TODO: Should we make this the default behavior or require the user to set a flag?
-		} else {
-			si.ZoneId = zoneId
-		}
+	dnsRole, _ := service.Extensions["x-defang-dns-role"].(string)
+	zoneId, err := b.findZone(ctx, service.DomainName, dnsRole)
+	if err != nil {
+		return err
+	}
+	if zoneId == "" {
+		si.UseAcmeCert = true
+		// TODO: We should add link to documentation on how the acme cert workflow works
+		// TODO: Should we make this the default behavior or require the user to set a flag?
+	} else {
+		// Set the ZoneId so CD can manage any records for us
+		si.ZoneId = zoneId
 	}
 	return nil
 }
