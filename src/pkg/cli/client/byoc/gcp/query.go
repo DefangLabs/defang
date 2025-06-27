@@ -45,9 +45,10 @@ func (q *Query) GetQuery() string {
 func NewLogQuery(projectId string) *Query {
 	return NewQuery(fmt.Sprintf(`(
 logName=~"logs/run.googleapis.com%%2F(stdout|stderr)$" OR
-logName="projects/%s/logs/cloudbuild" OR
-logName="projects/%s/logs/cos_containers"
-)`, projectId, projectId))
+logName="projects/%[1]s/logs/cloudbuild" OR
+logName="projects/%[1]s/logs/cos_containers" OR
+logName="projects/%[1]s/logs/docker-logs"
+)`, projectId))
 }
 
 func NewSubscribeQuery() *Query {
