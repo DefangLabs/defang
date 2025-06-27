@@ -69,11 +69,11 @@ var mcpServerCmd = &cobra.Command{
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
-			term.Debug("Starting Auth Server for Docker login flow")
-			term.Debug("Function invoked: cli.InteractiveLoginWithDocker")
+			term.Debug("Starting Auth Server for MCP-in-Docker login flow")
+			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), authPort); err != nil {
+				if err := cli.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()

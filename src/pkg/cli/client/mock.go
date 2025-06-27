@@ -98,6 +98,10 @@ type MockFabricClient struct {
 	DelegateDomain string
 }
 
+func (m MockFabricClient) AgreeToS(ctx context.Context) error {
+	return nil
+}
+
 func (m MockFabricClient) CanIUse(ctx context.Context, req *defangv1.CanIUseRequest) (*defangv1.CanIUseResponse, error) {
 	return &defangv1.CanIUseResponse{CdImage: "beta", Gpu: true}, nil
 }
