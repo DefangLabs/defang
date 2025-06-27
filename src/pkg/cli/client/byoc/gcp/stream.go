@@ -170,6 +170,10 @@ func (s *ServerStream[T]) AddCustomQuery(query string) {
 	s.query.AddQuery(query)
 }
 
+func (s *ServerStream[T]) GetQuery() string {
+	return s.query.GetQuery()
+}
+
 func (s *ServerStream[T]) Err() error {
 	return s.lastErr
 }
