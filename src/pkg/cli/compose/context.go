@@ -1,9 +1,8 @@
 package compose
 
 import (
-	"archive/tar"
+	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -99,7 +98,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
+	buffer, err := createZipFile(ctx, build.Context, build.Dockerfile)
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +108,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
-		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
+		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) + ".zip" // same as Nix
 		term.Debug("Digest:", digest)
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
@@ -133,7 +132,7 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
+	resp, err := http.Put(ctx, res.Url, "application/zip", body)
 	if err != nil {
 		return "", err
 	}
@@ -147,22 +146,23 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 	if strings.HasPrefix(url, gcpPrefix) {
 		url = "gs://" + url[len(gcpPrefix):]
 	}
+	url = "s3://" + strings.TrimPrefix(url, "https://")
 	return url, nil
 }
 
-type contextAwareWriter struct {
-	ctx context.Context
-	io.WriteCloser
-}
+// type contextAwareWriter struct {
+// 	ctx context.Context
+// 	io.WriteCloser
+// }
 
-func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
-	select {
-	case <-cw.ctx.Done(): // Detect context cancelation
-		return 0, cw.ctx.Err()
-	default:
-		return cw.WriteCloser.Write(p)
-	}
-}
+// func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
+// 	select {
+// 	case <-cw.ctx.Done(): // Detect context cancelation
+// 		return 0, cw.ctx.Err()
+// 	default:
+// 		return cw.WriteCloser.Write(p)
+// 	}
+// }
 
 // tryReadIgnoreFile attempts to read the specified ignore file.
 func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
@@ -300,12 +300,13 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	return nil
 }
 
-func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+func createZipFile(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	buf := &bytes.Buffer{}
-	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
-	tarWriter := tar.NewWriter(gzipWriter)
+
+	// Create a new zip writer
+	zipWriter := zip.NewWriter(buf)
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
@@ -321,23 +322,29 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		header, err := tar.FileInfoHeader(info, info.Name())
-		if err != nil {
-			return err
+		// Create a new zip file header
+		header := &zip.FileHeader{
+			Name:   slashPath,
+			Method: zip.Deflate,
 		}
 
-		// Make reproducible; WalkDir walks files in lexical order.
-		header.ModTime = time.Unix(sourceDateEpoch, 0)
-		header.Gid = 0
-		header.Uid = 0
-		header.Name = slashPath
-		err = tarWriter.WriteHeader(header)
-		if err != nil {
-			return err
-		}
+		// Make reproducible
+		header.Modified = time.Unix(sourceDateEpoch, 0)
 
 		if !info.Mode().IsRegular() {
+			if info.IsDir() {
+				header.Name = slashPath + "/" // Ensure directory paths end with slash
+				header.Method = zip.Store     // Directories are stored without compression
+				_, err = zipWriter.CreateHeader(header)
+				return err
+			}
 			return nil
+		}
+
+		// Create file entry in zip
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return err
 		}
 
 		file, err := os.Open(path)
@@ -352,7 +359,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		}
 
 		bufLen := buf.Len()
-		_, err = io.Copy(tarWriter, file)
+		_, err = io.Copy(writer, file)
 		if int64(buf.Len()) > ContextSizeHardLimit {
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
@@ -366,12 +373,8 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		return nil, err
 	}
 
-	// Close the tar and gzip writers before returning the buffer
-	if err = tarWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	if err = gzipWriter.Close(); err != nil {
+	// Close the zip writer before returning the buffer
+	if err = zipWriter.Close(); err != nil {
 		return nil, err
 	}
 
