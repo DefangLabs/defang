@@ -20,7 +20,7 @@ func (gcp Gcp) EnsureAPIsEnabled(ctx context.Context, apis ...string) error {
 	projectName := "projects/" + gcp.ProjectId
 
 	for i := range 3 {
-		term.Debugf("Enabling services: %v\n", apis)
+		term.Debugf("Enabling services for project %q: %v\n", projectName, apis)
 		req := &serviceusage.BatchEnableServicesRequest{
 			ServiceIds: apis,
 		}
