@@ -56,11 +56,11 @@ func TestPrintServiceStatesAndEndpoints(t *testing.T) {
 			Status: "UNKNOWN",
 			Endpoints: []string{
 				"example.com",
-				"service1.internal",
+				"service1",
 			},
 		}})
 	const expectedOutput = `Deployment  Name      Status         Endpoints
-            service1  NOT_SPECIFIED  example.com, service1.internal
+            service1  NOT_SPECIFIED  https://example.com, https://service1
 `
 	receivedLines := strings.Split(stdout.String(), "\n")
 	expectedLines := strings.Split(expectedOutput, "\n")
@@ -86,38 +86,102 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
-	_ = printServiceStatesAndEndpoints([]*defangv1.ServiceInfo{
+	tests := []struct {
+		name          string
+		serviceinfos  []*defangv1.ServiceInfo
+		expectedLines []string
+	}{
 		{
-			Service: &defangv1.Service{
-				Name: "service1",
-				Ports: []*defangv1.Port{
-					{Mode: defangv1.Mode_INGRESS},
-					{Mode: defangv1.Mode_HOST},
+			name: "empty endpoint list",
+			serviceinfos: []*defangv1.ServiceInfo{
+				{
+					Service: &defangv1.Service{
+						Name: "service1",
+						Ports: []*defangv1.Port{
+							{Mode: defangv1.Mode_INGRESS},
+							{Mode: defangv1.Mode_HOST},
+						},
+					},
+					Status:     "UNKNOWN",
+					Domainname: "example.com",
+					Endpoints:  []string{},
 				},
 			},
-			Status:     "UNKNOWN",
-			Domainname: "example.com",
-			Endpoints: []string{
-				"example.com",
-				"service1.internal",
+			expectedLines: []string{
+				"Deployment  Name      Status         Endpoints  DomainName",
+				"            service1  NOT_SPECIFIED  N/A        https://example.com",
+				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
+				"",
 			},
-		}})
-	expectedLines := []string{
-		"Deployment  Name      Status         Endpoints                       DomainName",
-		"            service1  NOT_SPECIFIED  example.com, service1.internal  https://example.com",
-		" * Run `defang cert generate` to get a TLS certificate for your service(s)",
-		"",
+		},
+		{
+			name: "Service with Domainname",
+			serviceinfos: []*defangv1.ServiceInfo{
+				{
+					Service: &defangv1.Service{
+						Name: "service1",
+						Ports: []*defangv1.Port{
+							{Mode: defangv1.Mode_INGRESS},
+							{Mode: defangv1.Mode_HOST},
+						},
+					},
+					Status:     "UNKNOWN",
+					Domainname: "example.com",
+					Endpoints: []string{
+						"example.com",
+						"service1.internal:80",
+					},
+				},
+			},
+			expectedLines: []string{
+				"Deployment  Name      Status         Endpoints                                  DomainName",
+				"            service1  NOT_SPECIFIED  https://example.com, service1.internal:80  https://example.com",
+				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
+				"",
+			},
+		},
+		{
+			name: "endpoint without port",
+			serviceinfos: []*defangv1.ServiceInfo{
+				{
+					Service: &defangv1.Service{
+						Name: "service1",
+						Ports: []*defangv1.Port{
+							{Mode: defangv1.Mode_INGRESS},
+							{Mode: defangv1.Mode_HOST},
+						},
+					},
+					Status: "UNKNOWN",
+					Endpoints: []string{
+						"service1",
+					},
+				},
+			},
+			expectedLines: []string{
+				"Deployment  Name      Status         Endpoints",
+				"            service1  NOT_SPECIFIED  https://service1",
+				"",
+			},
+		},
 	}
-	receivedLines := strings.Split(stdout.String(), "\n")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset stdout before each test
+			stdout.Reset()
 
-	if len(receivedLines) != len(expectedLines) {
-		t.Errorf("Expected %v lines, received %v", len(expectedLines), len(receivedLines))
-	}
+			_ = printServiceStatesAndEndpoints(tt.serviceinfos)
+			receivedLines := strings.Split(stdout.String(), "\n")
 
-	for i, receivedLine := range receivedLines {
-		receivedLine = strings.TrimRight(receivedLine, " ")
-		if receivedLine != expectedLines[i] {
-			t.Errorf("\n-%v\n+%v", expectedLines[i], receivedLine)
-		}
+			if len(receivedLines) != len(tt.expectedLines) {
+				t.Errorf("Expected %v lines, received %v", len(tt.expectedLines), len(receivedLines))
+			}
+
+			for i, receivedLine := range receivedLines {
+				receivedLine = strings.TrimRight(receivedLine, " ")
+				if receivedLine != tt.expectedLines[i] {
+					t.Errorf("\n-%v\n+%v", tt.expectedLines[i], receivedLine)
+				}
+			}
+		})
 	}
 }
