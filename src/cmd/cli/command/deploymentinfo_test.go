@@ -35,48 +35,6 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	}
 }
 
-func TestPrintServiceStatesAndEndpoints(t *testing.T) {
-	defaultTerm := term.DefaultTerm
-	t.Cleanup(func() {
-		term.DefaultTerm = defaultTerm
-	})
-
-	var stdout, stderr bytes.Buffer
-	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
-
-	_ = printServiceStatesAndEndpoints([]*defangv1.ServiceInfo{
-		{
-			Service: &defangv1.Service{
-				Name: "service1",
-				Ports: []*defangv1.Port{
-					{Mode: defangv1.Mode_INGRESS},
-					{Mode: defangv1.Mode_HOST},
-				},
-			},
-			Status: "UNKNOWN",
-			Endpoints: []string{
-				"example.com",
-				"service1",
-			},
-		}})
-	const expectedOutput = `Deployment  Name      Status         Endpoints
-            service1  NOT_SPECIFIED  https://example.com, https://service1
-`
-	receivedLines := strings.Split(stdout.String(), "\n")
-	expectedLines := strings.Split(expectedOutput, "\n")
-
-	if len(receivedLines) != len(expectedLines) {
-		t.Errorf("Expected %v lines, received %v", len(expectedLines), len(receivedLines))
-	}
-
-	for i, receivedLine := range receivedLines {
-		receivedLine = strings.TrimRight(receivedLine, " ")
-		if receivedLine != expectedLines[i] {
-			t.Errorf("\n-%v\n+%v", expectedLines[i], receivedLine)
-		}
-	}
-}
-
 func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 	defaultTerm := term.DefaultTerm
 	t.Cleanup(func() {
