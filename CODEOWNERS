@@ -3,14 +3,14 @@
 # Owners here correspond to frequent contributors in the git history.
 
 # Default owners for everything
-*       @nullfunc 
+*       @nullfunc
 
 # GitHub actions and repo configuration
-/.github/       @nullfunc @raphaeltm
+/.github/**       @nullfunc @raphaeltm
 
 # Go command line tool
-/src/       @lionello @nullfunc
+/src/**       @lionello @nullfunc
 
 # Packaging with Nix
-/pkgs/defang/   @lionello
+/pkgs/defang/**   @lionello
 
