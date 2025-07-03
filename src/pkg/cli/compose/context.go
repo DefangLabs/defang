@@ -1,13 +1,16 @@
 package compose
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,7 +101,9 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createZipFile(ctx, build.Context, build.Dockerfile)
+
+	buffer, err := createArchive(ctx, build.Context, build.Dockerfile)
+
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +113,9 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeDigest:
 		// Calculate the digest of the tarball and pass it to the fabric controller (to avoid building the same image twice)
 		sha := sha256.Sum256(buffer.Bytes())
-		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) + ".zip" // same as Nix
+
+		digest = "sha256-" + base64.StdEncoding.EncodeToString(sha[:]) // same as Nix
+
 		term.Debug("Digest:", digest)
 	case UploadModePreview:
 		// For preview, we invoke the CD "preview" command, which will want a valid (S3) URL, even though it won't be used
@@ -120,10 +127,17 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Uploading the project files for", name)
-	return uploadTarball(ctx, provider, project, buffer, digest)
+
+	contentType := "application/gzip" // default content type for tarballs
+	if build.Dockerfile == "*" {
+		// If the Dockerfile is "*", we upload a zip file instead of a tarball
+		contentType = "application/zip"
+	}
+
+	return uploadContent(ctx, provider, project, buffer, contentType, digest)
 }
 
-func uploadTarball(ctx context.Context, provider client.Provider, project string, body io.Reader, digest string) (string, error) {
+func uploadContent(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType string, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
 	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
@@ -132,7 +146,7 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, "application/zip", body)
+	resp, err := http.Put(ctx, res.Url, contentType, body)
 	if err != nil {
 		return "", err
 	}
@@ -146,23 +160,22 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 	if strings.HasPrefix(url, gcpPrefix) {
 		url = "gs://" + url[len(gcpPrefix):]
 	}
-	url = "s3://" + strings.TrimPrefix(url, "https://")
 	return url, nil
 }
 
-// type contextAwareWriter struct {
-// 	ctx context.Context
-// 	io.WriteCloser
-// }
+type contextAwareWriter struct {
+	ctx context.Context
+	io.WriteCloser
+}
 
-// func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
-// 	select {
-// 	case <-cw.ctx.Done(): // Detect context cancelation
-// 		return 0, cw.ctx.Err()
-// 	default:
-// 		return cw.WriteCloser.Write(p)
-// 	}
-// }
+func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
+	select {
+	case <-cw.ctx.Done(): // Detect context cancelation
+		return 0, cw.ctx.Err()
+	default:
+		return cw.WriteCloser.Write(p)
+	}
+}
 
 // tryReadIgnoreFile attempts to read the specified ignore file.
 func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
@@ -292,7 +305,7 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	}
 
 	if !foundDockerfile {
-		term.Debugf("the specified dockerfile could not be read: %q", dockerfile)
+		term.Debugf("the specified dockerfile could not be read, switching to railpack: %q", dockerfile)
 
 		return nil
 	}
@@ -300,13 +313,104 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	return nil
 }
 
-func createZipFile(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+type WriterFactory interface {
+	CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error)
+	Close() error
+}
+
+type tarFactory struct {
+	*tar.Writer
+	*contextAwareWriter
+}
+
+func (tw *tarFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error) {
+	// Convert zip header to tar header
+	header, err := tar.FileInfoHeader(info, info.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if !info.Mode().IsRegular() {
+		return nil, nil
+	}
+
+	// Make reproducible; WalkDir walks files in lexical order.
+	header.ModTime = time.Unix(sourceDateEpoch, 0)
+	header.Gid = 0
+	header.Uid = 0
+	header.Name = slashPath
+	err = tw.WriteHeader(header)
+	return tw.Writer, err
+}
+
+func (tw *tarFactory) Close() error {
+	// Close the tar and gzip writers before returning the buffer
+	err := tw.Writer.Close()
+	if err != nil {
+		return err
+	}
+
+	err = tw.contextAwareWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type zipFactory struct {
+	*zip.Writer
+}
+
+func (zw *zipFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error) {
+	// Create a new zip file header
+	header := &zip.FileHeader{
+		Name:   slashPath,
+		Method: zip.Deflate,
+	}
+
+	// Make reproducible
+	header.Modified = time.Unix(sourceDateEpoch, 0)
+
+	if !info.Mode().IsRegular() {
+		if info.IsDir() {
+			header.Name = slashPath + "/" // Ensure directory paths end with slash
+			header.Method = zip.Store     // Directories are stored without compression
+			_, err := zw.Writer.CreateHeader(header)
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	// Create file entry in zip
+	writer, err := zw.Writer.CreateHeader(header)
+	return writer, err
+}
+
+func (zw *zipFactory) Close() error {
+	// Close the zip writer before returning the buffer
+	err := zw.Writer.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createArchive(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	buf := &bytes.Buffer{}
 
-	// Create a new zip writer
-	zipWriter := zip.NewWriter(buf)
+	var factory WriterFactory
+	if dockerfile == "*" {
+		// Create a new zip writer
+		zipWriter := zip.NewWriter(buf)
+		factory = &zipFactory{zipWriter}
+	} else {
+		gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
+		tarWriter := tar.NewWriter(gzipWriter)
+		factory = &tarFactory{tarWriter, gzipWriter}
+	}
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
@@ -322,28 +426,8 @@ func createZipFile(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			return err
 		}
 
-		// Create a new zip file header
-		header := &zip.FileHeader{
-			Name:   slashPath,
-			Method: zip.Deflate,
-		}
-
-		// Make reproducible
-		header.Modified = time.Unix(sourceDateEpoch, 0)
-
-		if !info.Mode().IsRegular() {
-			if info.IsDir() {
-				header.Name = slashPath + "/" // Ensure directory paths end with slash
-				header.Method = zip.Store     // Directories are stored without compression
-				_, err = zipWriter.CreateHeader(header)
-				return err
-			}
-			return nil
-		}
-
-		// Create file entry in zip
-		writer, err := zipWriter.CreateHeader(header)
-		if err != nil {
+		writer, err := factory.CreateHeader(info, slashPath)
+		if err != nil || writer == nil {
 			return err
 		}
 
@@ -373,8 +457,8 @@ func createZipFile(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 		return nil, err
 	}
 
-	// Close the zip writer before returning the buffer
-	if err = zipWriter.Close(); err != nil {
+	err = factory.Close() // Close the tar or zip writer
+	if err != nil {
 		return nil, err
 	}
 

@@ -54,7 +54,7 @@ func TestUploadTarball(t *testing.T) {
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, digest)
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/gzip", digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "")
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/zip", "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
