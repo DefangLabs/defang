@@ -1,0 +1,16 @@
+# Code owners automatically determined from commit history
+# Patterns match files or directories followed by one or more owners.
+# Owners here correspond to frequent contributors in the git history.
+
+# Default owners for everything
+*       @nullfunc
+
+# GitHub actions and repo configuration
+/.github/**       @nullfunc @raphaeltm
+
+# Go command line tool
+/src/**       @lionello @nullfunc
+
+# Packaging with Nix
+/pkgs/defang/**   @lionello
+
