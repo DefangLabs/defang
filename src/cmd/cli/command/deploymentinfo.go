@@ -1,6 +1,7 @@
 package command
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -35,6 +36,8 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 
 	showDomainNameColumn := false
 	showCertGenerateHint := false
+	hasPort := regexp.MustCompile(`:\d{1,5}$`)
+
 	for _, serviceInfo := range serviceInfos {
 		var domainname string
 		if serviceInfo.Domainname != "" {
@@ -44,12 +47,24 @@ func printServiceStatesAndEndpoints(serviceInfos []*defangv1.ServiceInfo) error 
 				showCertGenerateHint = true
 			}
 		}
+		endpoints := make([]string, 0, len(serviceInfo.Endpoints))
+		for _, endpoint := range serviceInfo.Endpoints {
+			if !hasPort.MatchString(endpoint) {
+				endpoint = "https://" + endpoint
+			}
+
+			endpoints = append(endpoints, endpoint)
+		}
+		if len(endpoints) == 0 {
+			endpoints = append(endpoints, "N/A")
+		}
+
 		serviceTableItems = append(serviceTableItems, ServiceTableItem{
 			Deployment: serviceInfo.Etag,
 			Name:       serviceInfo.Service.Name,
 			Status:     serviceInfo.State.String(),
 			DomainName: domainname,
-			Endpoints:  strings.Join(serviceInfo.Endpoints, ", "),
+			Endpoints:  strings.Join(endpoints, ", "),
 		})
 	}
 
