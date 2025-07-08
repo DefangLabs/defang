@@ -22,7 +22,7 @@ import (
 
 func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
 	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
-	preview, err := GeneratePreview(ctx, project, client, previewProvider, mode)
+	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +40,15 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 	return estimate, nil
 }
 
-func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, provider cliClient.Provider, mode defangv1.DeploymentMode) (string, error) {
+func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, mode defangv1.DeploymentMode, region string) (string, error) {
 	os.Setenv("DEFANG_JSON", "1") // HACK: always show JSON output for estimate
 	since := time.Now()
 
-	resp, project, err := ComposeUp(ctx, project, client, provider, compose.UploadModeEstimate, mode)
+	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
+		Provider: estimateProviderID.Value(),
+		Mode:     mode,
+		Region:   region,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -58,7 +62,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		Verbose:    true,
 	}
 
-	err = streamLogs(ctx, provider, project.Name, options, func(entry *defangv1.LogEntry, options *TailOptions) error {
+	err = streamLogs(ctx, previewProvider, project.Name, options, func(entry *defangv1.LogEntry, options *TailOptions) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {
