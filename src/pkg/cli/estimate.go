@@ -44,10 +44,17 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 	os.Setenv("DEFANG_JSON", "1") // HACK: always show JSON output for estimate
 	since := time.Now()
 
+	compose, err := project.MarshalYAML()
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal compose project: %w", err)
+	}
+
 	resp, err := client.Preview(ctx, &defangv1.PreviewRequest{
-		Provider: estimateProviderID.Value(),
-		Mode:     mode,
-		Region:   region,
+		Provider:    estimateProviderID.Value(),
+		Mode:        mode,
+		Region:      region,
+		Compose:     compose,
+		ProjectName: project.Name,
 	})
 	if err != nil {
 		return "", err
