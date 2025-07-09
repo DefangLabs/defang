@@ -130,7 +130,7 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 	term.Debug("Got GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
 		Assertion: idToken,
-		Scope:     []string{"admin", "read", "delete"}, // no "tail" scope
+		Scope:     []string{"admin", "read", "delete", "tail"},
 	})
 	if err != nil {
 		return err
