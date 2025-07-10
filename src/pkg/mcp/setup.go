@@ -141,36 +141,52 @@ func getClientConfigPath(client string) (string, error) {
 }
 
 // getDefangMCPConfig returns the default MCP config for Defang
-func getDefangMCPConfig() MCPServerConfig {
-	return MCPServerConfig{
-		Command: "npx",
-		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
+func getDefangMCPConfig() (*MCPServerConfig, error) {
+	currentPath, err := os.Executable()
+	if err != nil {
+		return nil, err
 	}
+
+	return &MCPServerConfig{
+		Command: currentPath,
+		Args:    []string{"mcp", "serve"},
+	}, nil
 }
 
 // getVSCodeDefangMCPConfig returns the default MCP config for Defang in VSCode format
-func getVSCodeDefangMCPConfig() VSCodeMCPServerConfig {
-	return VSCodeMCPServerConfig{
-		Type:    "stdio",
-		Command: "npx",
-		Args:    []string{"-y", "defang@latest", "mcp", "serve"},
+func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
+	currentPath, err := os.Executable()
+	if err != nil {
+		return nil, err
 	}
+	return &VSCodeMCPServerConfig{
+		Type:    "stdio",
+		Command: currentPath,
+		Args:    []string{"mcp", "serve"},
+	}, nil
 }
 
 // getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() map[string]interface{} {
-	config := getVSCodeDefangMCPConfig()
+func getVSCodeServerConfig() (map[string]interface{}, error) {
+	config, err := getVSCodeDefangMCPConfig()
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
 		"type":    config.Type,
 		"command": config.Command,
 		"args":    config.Args,
-	}
+	}, nil
 }
 
 // handleVSCodeConfig handles the special case for VSCode settings.json
 func handleVSCodeConfig(configPath string) error {
 	// Create or update the config file
 	var existingData map[string]interface{}
+	config, err := getVSCodeServerConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
+	}
 
 	// Check if the file exists
 	if _, err := os.Stat(configPath); err == nil {
@@ -192,7 +208,7 @@ func handleVSCodeConfig(configPath string) error {
 			// Create new mcp section
 			existingData["mcp"] = map[string]interface{}{
 				"servers": map[string]interface{}{
-					"defang": getVSCodeServerConfig(),
+					"defang": config,
 				},
 			}
 		} else {
@@ -205,7 +221,7 @@ func handleVSCodeConfig(configPath string) error {
 			serversData, ok := mcpMap["servers"]
 			if !ok {
 				mcpMap["servers"] = map[string]interface{}{
-					"defang": getVSCodeServerConfig(),
+					"defang": config,
 				}
 			} else {
 				serversMap, ok := serversData.(map[string]interface{})
@@ -214,7 +230,7 @@ func handleVSCodeConfig(configPath string) error {
 				}
 
 				// Add or update the Defang MCP server config
-				serversMap["defang"] = getVSCodeServerConfig()
+				serversMap["defang"] = config
 
 				mcpMap["servers"] = serversMap
 			}
@@ -226,7 +242,7 @@ func handleVSCodeConfig(configPath string) error {
 		existingData = map[string]interface{}{
 			"mcp": map[string]interface{}{
 				"servers": map[string]interface{}{
-					"defang": getVSCodeServerConfig(),
+					"defang": config,
 				},
 			},
 		}
@@ -302,8 +318,12 @@ func SetupClient(client string) error {
 			config.MCPServers = make(map[string]MCPServerConfig)
 		}
 
+		defangConfig, err := getDefangMCPConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get Defang MCP config: %w", err)
+		}
 		// Add or update the Defang MCP server config
-		config.MCPServers["defang"] = getDefangMCPConfig()
+		config.MCPServers["defang"] = *defangConfig
 
 		// Write the config to the file
 		data, err := json.MarshalIndent(config, "", "  ")
