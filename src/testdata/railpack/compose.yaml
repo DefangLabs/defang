@@ -1,0 +1,6 @@
+services:
+  wrailpack-short:
+    build: .
+  wrailpack-long:
+    build:
+      context: .

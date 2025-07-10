@@ -1115,7 +1115,7 @@ var upgradeCmd = &cobra.Command{
 	},
 }
 
-func configureLoader(cmd *cobra.Command) *compose.Loader {
+func configureLoader(cmd *cobra.Command, opt ...compose.LoaderOption) *compose.Loader {
 	configPaths, err := cmd.Flags().GetStringArray("file")
 	if err != nil {
 		panic(err)
@@ -1141,7 +1141,15 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 		term.Warn("Did you mean to use --provider instead of -provider?")
 		doubleCheckProjectName(projectName)
 	}
-	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+
+	// Combine the default options with any additional options passed in
+	allOptions := []compose.LoaderOption{
+		compose.WithProjectName(projectName),
+		compose.WithPath(configPaths...),
+	}
+	allOptions = append(allOptions, opt...)
+
+	return compose.NewLoader(allOptions...)
 }
 
 func doubleCheckProjectName(projectName string) {

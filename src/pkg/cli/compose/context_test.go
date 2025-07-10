@@ -1,8 +1,11 @@
 package compose
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -46,8 +49,9 @@ func TestUploadTarball(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" {
-			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
+		header := r.Header.Get("Content-Type")
+		if header != "application/gzip" && header != "application/zip" {
+			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", header)
 		}
 		w.WriteHeader(200)
 	}))
@@ -129,58 +133,58 @@ func TestWalkContextFolder(t *testing.T) {
 	})
 }
 
-// func TestCreateTarballReader(t *testing.T) {
-// 	t.Run("Default Dockerfile", func(t *testing.T) {
-// 		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
-// 		if err != nil {
-// 			t.Fatalf("createTarballReader() failed: %v", err)
-// 		}
+func TestCreateTarballReader(t *testing.T) {
+	t.Run("Default Dockerfile", func(t *testing.T) {
+		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "")
+		if err != nil {
+			t.Fatalf("createTarballReader() failed: %v", err)
+		}
 
-// 		g, err := gzip.NewReader(buffer)
-// 		if err != nil {
-// 			t.Fatalf("gzip.NewReader() failed: %v", err)
-// 		}
-// 		defer g.Close()
+		g, err := gzip.NewReader(buffer)
+		if err != nil {
+			t.Fatalf("gzip.NewReader() failed: %v", err)
+		}
+		defer g.Close()
 
-// 		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
-// 		var actual []string
-// 		ar := tar.NewReader(g)
-// 		for {
-// 			h, err := ar.Next()
-// 			if err != nil {
-// 				if err == io.EOF {
-// 					break
-// 				}
-// 				t.Fatal(err)
-// 			}
-// 			// Ensure the paths are relative
-// 			if h.Name[0] == '/' {
-// 				t.Errorf("Path is not relative: %v", h.Name)
-// 			}
-// 			if _, err := ar.Read(make([]byte, h.Size)); err != io.EOF {
-// 				t.Log(err)
-// 			}
-// 			actual = append(actual, h.Name)
-// 		}
-// 		if !reflect.DeepEqual(actual, expected) {
-// 			t.Errorf("Expected files: %v, got %v", expected, actual)
-// 		}
-// 	})
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
+		var actual []string
+		ar := tar.NewReader(g)
+		for {
+			h, err := ar.Next()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				t.Fatal(err)
+			}
+			// Ensure the paths are relative
+			if h.Name[0] == '/' {
+				t.Errorf("Path is not relative: %v", h.Name)
+			}
+			if _, err := ar.Read(make([]byte, h.Size)); err != io.EOF {
+				t.Log(err)
+			}
+			actual = append(actual, h.Name)
+		}
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Expected files: %v, got %v", expected, actual)
+		}
+	})
 
-// 	t.Run("Missing Dockerfile", func(t *testing.T) {
-// 		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
-// 		if err == nil {
-// 			t.Fatal("createTarballReader() should have failed")
-// 		}
-// 	})
+	t.Run("Missing Dockerfile", func(t *testing.T) {
+		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing")
+		if err == nil {
+			t.Fatal("createTarballReader() should have failed")
+		}
+	})
 
-// 	t.Run("Missing Context", func(t *testing.T) {
-// 		_, err := createTarball(context.Background(), "asdfqwer", "")
-// 		if err == nil {
-// 			t.Fatal("createTarballReader() should have failed")
-// 		}
-// 	})
-// }
+	t.Run("Missing Context", func(t *testing.T) {
+		_, err := createArchive(context.Background(), "asdfqwer", "")
+		if err == nil {
+			t.Fatal("createTarballReader() should have failed")
+		}
+	})
+}
 
 func TestGetDockerIgnorePatterns(t *testing.T) {
 	tests := []struct {
