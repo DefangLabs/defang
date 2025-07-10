@@ -67,6 +67,43 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
 		}
 
+		loaderNotNormalized := compose.NewLoader(compose.WithNormalization(false))
+		projectNotNormalized, err := loaderNotNormalized.LoadProject(ctx)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("Failed to load project without normalization", err), nil
+		}
+
+		// Create a map of original services by name for comparison
+		originalServiceMap := make(map[string]compose.ServiceConfig)
+		for _, service := range projectNotNormalized.Services {
+			originalServiceMap[service.Name] = service
+		}
+
+		// Compare and restore Build.Dockerfile fields for each normalized service
+		for serviceName, normalizedService := range project.Services {
+			if originalService, exists := originalServiceMap[serviceName]; exists {
+				// Both services exist, restore original Dockerfile path
+				if originalService.Build != nil && normalizedService.Build != nil {
+					// Store original values for logging
+					normalizedDockerfile := normalizedService.Build.Dockerfile
+					originalDockerfile := originalService.Build.Dockerfile
+
+					if originalDockerfile == "" {
+						// Update the service back in the map
+						project.Services[serviceName].Build.Dockerfile = "*"
+					}
+
+					// Log the information
+					if normalizedDockerfile != originalDockerfile {
+						term.Debugf("Service %s: Restored Dockerfile path from '%s' to '%s'",
+							serviceName, normalizedDockerfile, originalDockerfile)
+					}
+				}
+			} else {
+				term.Debugf("Service %s exists in normalized project but not in original", serviceName)
+			}
+		}
+
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
