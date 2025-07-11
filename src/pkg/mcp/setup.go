@@ -49,26 +49,43 @@ type VSCodeMCPServerConfig struct {
 	Headers map[string]string `json:"headers,omitempty"` // For sse
 }
 
+// MCPClient represents the supported MCP clients as an enum
+type MCPClient string
+
+const (
+	MCPClientVSCode         MCPClient = "vscode"
+	MCPClientCode           MCPClient = "code"
+	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
+	MCPClientInsiders       MCPClient = "insiders"
+	MCPClientClaude         MCPClient = "claude"
+	MCPClientWindsurf       MCPClient = "windsurf"
+	MCPClientCascade        MCPClient = "cascade"
+	MCPClientCodeium        MCPClient = "codeium"
+	MCPClientCursor         MCPClient = "cursor"
+)
+
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
-var ValidVSCodeClients = []string{
-	"vscode",
-	"code",
-	"vscode-insiders",
-	"insiders",
+var ValidVSCodeClients = []MCPClient{
+	MCPClientVSCode,
+	MCPClientCode,
+	MCPClientVSCodeInsiders,
+	MCPClientInsiders,
 }
 
 // ValidClients is a list of supported MCP clients
 var ValidClients = append(
-	[]string{
-		"claude",
-		"windsurf",
-		"cursor",
+	[]MCPClient{
+		MCPClientClaude,
+		MCPClientWindsurf,
+		MCPClientCascade,
+		MCPClientCodeium,
+		MCPClientCursor,
 	},
 	ValidVSCodeClients...,
 )
 
 // isValidClient checks if the provided client is in the list of valid clients
-func isValidClient(client string) bool {
+func isValidClient(client MCPClient) bool {
 	return slices.Contains(ValidClients, client)
 }
 
@@ -104,16 +121,16 @@ var cursorConfig = ClientInfo{
 }
 
 // clientRegistry maps client names to their configuration details
-var clientRegistry = map[string]ClientInfo{
-	"cascade":         windsurfConfig,
-	"codeium":         windsurfConfig,
-	"windsurf":        windsurfConfig,
-	"vscode":          vscodeConfig,
-	"code":            vscodeConfig,
-	"vscode-insiders": codeInsidersConfig,
-	"insiders":        codeInsidersConfig,
-	"claude":          claudeConfig,
-	"cursor":          cursorConfig,
+var clientRegistry = map[MCPClient]ClientInfo{
+	MCPClientWindsurf:       windsurfConfig,
+	MCPClientCascade:        windsurfConfig,
+	MCPClientCodeium:        windsurfConfig,
+	MCPClientVSCode:         vscodeConfig,
+	MCPClientCode:           vscodeConfig,
+	MCPClientVSCodeInsiders: codeInsidersConfig,
+	MCPClientInsiders:       codeInsidersConfig,
+	MCPClientClaude:         claudeConfig,
+	MCPClientCursor:         cursorConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS
@@ -141,9 +158,7 @@ func getSystemConfigDir(homeDir, goos string) string {
 }
 
 // getClientConfigPath returns the path to the config file for the given client
-func getClientConfigPath(homeDir, goos, client string) (string, error) {
-	client = strings.ToLower(client)
-
+func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error) {
 	clientInfo, exists := clientRegistry[client]
 	if !exists {
 		return "", fmt.Errorf("unsupported client: %s", client)
@@ -282,10 +297,68 @@ func handleVSCodeConfig(configPath string) error {
 	return nil
 }
 
-func SetupClient(client string) error {
+func handleStandardConfig(configPath string) error {
+	// For all other clients, use the standard format
+	var config MCPConfig
+
+	// Check if the file exists
+	if _, err := os.Stat(configPath); err == nil {
+		// File exists, read it
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to read config file: %w", err)
+		}
+
+		// Parse the JSON
+		if err := json.Unmarshal(data, &config); err != nil {
+			// If we can't parse it, start fresh
+			config = MCPConfig{
+				MCPServers: make(map[string]MCPServerConfig),
+			}
+		}
+	} else {
+		// File doesn't exist, create a new config
+		config = MCPConfig{
+			MCPServers: make(map[string]MCPServerConfig),
+		}
+	}
+
+	if config.MCPServers == nil {
+		config.MCPServers = make(map[string]MCPServerConfig)
+	}
+
+	defangConfig, err := getDefangMCPConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get Defang MCP config: %w", err)
+	}
+	// Add or update the Defang MCP server config
+	config.MCPServers["defang"] = *defangConfig
+
+	// Write the config to the file
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+func SetupClient(clientValue string) error {
+	// cast the client string to MCPClient
+	client := MCPClient(strings.ToLower(clientValue))
+
 	// Validate client
 	if !isValidClient(client) {
-		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, strings.Join(ValidClients, ", "))
+		// Convert ValidClients to []string for strings.Join
+		validClientsStr := make([]string, len(ValidClients))
+		for i, c := range ValidClients {
+			validClientsStr[i] = string(c)
+		}
+		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, strings.Join(validClientsStr, ", "))
 	}
 
 	track.Evt("MCP Setup Client: ", track.P("client", client))
@@ -314,50 +387,8 @@ func SetupClient(client string) error {
 			return err
 		}
 	} else {
-		// For all other clients, use the standard format
-		var config MCPConfig
-
-		// Check if the file exists
-		if _, err := os.Stat(configPath); err == nil {
-			// File exists, read it
-			data, err := os.ReadFile(configPath)
-			if err != nil {
-				return fmt.Errorf("failed to read config file: %w", err)
-			}
-
-			// Parse the JSON
-			if err := json.Unmarshal(data, &config); err != nil {
-				// If we can't parse it, start fresh
-				config = MCPConfig{
-					MCPServers: make(map[string]MCPServerConfig),
-				}
-			}
-		} else {
-			// File doesn't exist, create a new config
-			config = MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
-			}
-		}
-
-		if config.MCPServers == nil {
-			config.MCPServers = make(map[string]MCPServerConfig)
-		}
-
-		defangConfig, err := getDefangMCPConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get Defang MCP config: %w", err)
-		}
-		// Add or update the Defang MCP server config
-		config.MCPServers["defang"] = *defangConfig
-
-		// Write the config to the file
-		data, err := json.MarshalIndent(config, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
-		}
-
-		if err := os.WriteFile(configPath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write config file: %w", err)
+		if err := handleStandardConfig(configPath); err != nil {
+			return err
 		}
 	}
 
