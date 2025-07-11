@@ -145,6 +145,7 @@ enum Provider {
   AWS = 2;
   DIGITALOCEAN = 3;
   GCP = 4;
+  SCALEWAY = 5;
 }
 
 message GetSelectedProviderRequest { string project = 1; }

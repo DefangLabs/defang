@@ -98,6 +98,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.33 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
@@ -112,6 +113,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250422160041-2d3770c4ea7f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (
