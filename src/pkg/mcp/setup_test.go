@@ -86,7 +86,7 @@ func TestGetClientConfigPath(t *testing.T) {
 		{
 			name:         "cursor",
 			client:       "cursor",
-			expectedPath: filepath.Join(homeDir, ".cursor", "mcp.json"),
+			expectedPath: filepath.Join(homeDir, ".cursor", "settings.json"),
 		},
 
 		// VSCode tests - Darwin
@@ -94,13 +94,13 @@ func TestGetClientConfigPath(t *testing.T) {
 			name:         "vscode_darwin",
 			client:       "vscode",
 			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json"),
+			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "mcp.json"),
 		},
 		{
 			name:         "code_darwin",
 			client:       "code",
 			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json"),
+			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "mcp.json"),
 		},
 
 		// VSCode tests - Windows with APPDATA
@@ -109,7 +109,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:       "vscode",
 			goos:         "windows",
 			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
-			expectedPath: filepath.Join("C:\\Users\\TestUser\\AppData\\Roaming", "Code", "User", "settings.json"),
+			expectedPath: filepath.Join("C:\\Users\\TestUser\\AppData\\Roaming", "Code", "User", "mcp.json"),
 		},
 
 		// VSCode tests - Windows without APPDATA
@@ -118,7 +118,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:       "vscode",
 			goos:         "windows",
 			appData:      "",
-			expectedPath: filepath.Join(homeDir, "AppData", "Roaming", "Code", "User", "settings.json"),
+			expectedPath: filepath.Join(homeDir, "AppData", "Roaming", "Code", "User", "mcp.json"),
 		},
 
 		// VSCode tests - Linux with XDG_CONFIG_HOME
@@ -127,7 +127,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:        "vscode",
 			goos:          "linux",
 			xdgConfigHome: "/home/testuser/.config",
-			expectedPath:  filepath.Join("/home/testuser/.config", "Code/User/settings.json"),
+			expectedPath:  filepath.Join("/home/testuser/.config", "Code/User/mcp.json"),
 		},
 
 		// VSCode tests - Linux without XDG_CONFIG_HOME
@@ -136,7 +136,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:        "vscode",
 			goos:          "linux",
 			xdgConfigHome: "",
-			expectedPath:  filepath.Join(homeDir, ".config", "Code/User/settings.json"),
+			expectedPath:  filepath.Join(homeDir, ".config", "Code/User/mcp.json"),
 		},
 
 		// VSCode Insiders tests - Darwin
@@ -144,13 +144,13 @@ func TestGetClientConfigPath(t *testing.T) {
 			name:         "vscode_insiders_darwin",
 			client:       "vscode-insiders",
 			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json"),
+			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "mcp.json"),
 		},
 		{
 			name:         "insiders_darwin",
 			client:       "insiders",
 			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json"),
+			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "mcp.json"),
 		},
 
 		// VSCode Insiders tests - Windows with APPDATA
@@ -159,7 +159,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:       "vscode-insiders",
 			goos:         "windows",
 			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
-			expectedPath: filepath.Join("C:\\Users\\TestUser\\AppData\\Roaming", "Code - Insiders", "User", "settings.json"),
+			expectedPath: filepath.Join("C:\\Users\\TestUser\\AppData\\Roaming", "Code - Insiders", "User", "mcp.json"),
 		},
 
 		// VSCode Insiders tests - Linux with XDG_CONFIG_HOME
@@ -168,7 +168,7 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:        "vscode-insiders",
 			goos:          "linux",
 			xdgConfigHome: "/home/testuser/.config",
-			expectedPath:  filepath.Join("/home/testuser/.config", "Code - Insiders/User/settings.json"),
+			expectedPath:  filepath.Join("/home/testuser/.config", "Code - Insiders/User/mcp.json"),
 		},
 
 		// Error cases

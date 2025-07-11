@@ -29,7 +29,7 @@ type MCPConfig struct {
 	MCPServers map[string]MCPServerConfig `json:"mcpServers"`
 }
 
-// VSCodeConfig represents the VSCode settings.json structure
+// VSCodeConfig represents the VSCode mcp.json structure
 type VSCodeConfig struct {
 	MCP struct {
 		Servers map[string]VSCodeMCPServerConfig `json:"servers"`
@@ -84,12 +84,12 @@ var windsurfConfig = ClientInfo{
 }
 
 var vscodeConfig = ClientInfo{
-	configFile: "Code/User/settings.json",
+	configFile: "Code/User/mcp.json",
 	useHomeDir: false,
 }
 
 var codeInsidersConfig = ClientInfo{
-	configFile: "Code - Insiders/User/settings.json",
+	configFile: "Code - Insiders/User/mcp.json",
 	useHomeDir: false,
 }
 
@@ -99,7 +99,7 @@ var claudeConfig = ClientInfo{
 }
 
 var cursorConfig = ClientInfo{
-	configFile: ".cursor/mcp.json",
+	configFile: ".cursor/settings.json",
 	useHomeDir: true,
 }
 
@@ -200,7 +200,7 @@ func getVSCodeServerConfig() (map[string]interface{}, error) {
 	}, nil
 }
 
-// handleVSCodeConfig handles the special case for VSCode settings.json
+// handleVSCodeConfig handles the special case for VSCode mcp.json
 func handleVSCodeConfig(configPath string) error {
 	// Create or update the config file
 	var existingData map[string]interface{}
@@ -308,7 +308,7 @@ func SetupClient(client string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Handle VSCode settings.json specially
+	// Handle VSCode mcp.json specially
 	if slices.Contains(ValidVSCodeClients, client) {
 		if err := handleVSCodeConfig(configPath); err != nil {
 			return err
