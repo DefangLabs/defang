@@ -72,67 +72,93 @@ func isValidClient(client string) bool {
 	return slices.Contains(ValidClients, client)
 }
 
+// ClientInfo defines where each client stores its MCP configuration
+type ClientInfo struct {
+	configFile string // Configuration file name
+	useHomeDir bool   // True if config goes directly in home dir, false if in system config dir
+}
+
+var windsurfConfig = ClientInfo{
+	configFile: ".codeium/windsurf/mcp_config.json",
+	useHomeDir: true,
+}
+
+var vscodeConfig = ClientInfo{
+	configFile: "Code/User/settings.json",
+	useHomeDir: false,
+}
+
+var codeInsidersConfig = ClientInfo{
+	configFile: "Code - Insiders/User/settings.json",
+	useHomeDir: false,
+}
+
+var claudeConfig = ClientInfo{
+	configFile: "Claude/claude_desktop_config.json",
+	useHomeDir: false,
+}
+
+var cursorConfig = ClientInfo{
+	configFile: ".cursor/mcp.json",
+	useHomeDir: true,
+}
+
+// clientRegistry maps client names to their configuration details
+var clientRegistry = map[string]ClientInfo{
+	"cascade":         windsurfConfig,
+	"codeium":         windsurfConfig,
+	"windsurf":        windsurfConfig,
+	"vscode":          vscodeConfig,
+	"code":            vscodeConfig,
+	"vscode-insiders": codeInsidersConfig,
+	"insiders":        codeInsidersConfig,
+	"claude":          claudeConfig,
+	"cursor":          cursorConfig,
+}
+
+// getSystemConfigDir returns the system configuration directory for the given OS
+func getSystemConfigDir(homeDir, goos string) string {
+	switch goos {
+	case "darwin":
+		return filepath.Join(homeDir, "Library", "Application Support")
+	case "windows":
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return appData
+		}
+		return filepath.Join(homeDir, "AppData", "Roaming")
+	case "linux":
+		if configHome := os.Getenv("XDG_CONFIG_HOME"); configHome != "" {
+			return configHome
+		}
+		return filepath.Join(homeDir, ".config")
+	default:
+		// Default to Linux behavior
+		if configHome := os.Getenv("XDG_CONFIG_HOME"); configHome != "" {
+			return configHome
+		}
+		return filepath.Join(homeDir, ".config")
+	}
+}
+
 // getClientConfigPath returns the path to the config file for the given client
 func getClientConfigPath(homeDir, goos, client string) (string, error) {
-	var configPath string
-	switch strings.ToLower(client) {
-	case "windsurf", "cascade", "codeium":
-		configPath = filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json")
-	case "claude":
-		if goos == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-		} else if goos == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Claude", "claude_desktop_config.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Claude", "claude_desktop_config.json")
-		}
-	case "cursor":
-		configPath = filepath.Join(homeDir, ".cursor", "mcp.json")
-	case "vscode", "code":
-		if goos == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
-		} else if goos == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Code", "User", "settings.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Code/User/settings.json")
-		}
-	case "vscode-insiders", "insiders":
-		if goos == "darwin" {
-			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
-		} else if goos == "windows" {
-			appData := os.Getenv("APPDATA")
-			if appData == "" {
-				appData = filepath.Join(homeDir, "AppData", "Roaming")
-			}
-			configPath = filepath.Join(appData, "Code - Insiders", "User", "settings.json")
-		} else {
-			configHome := os.Getenv("XDG_CONFIG_HOME")
-			if configHome == "" {
-				configHome = filepath.Join(homeDir, ".config")
-			}
-			configPath = filepath.Join(configHome, "Code - Insiders/User/settings.json")
-		}
-	default:
+	client = strings.ToLower(client)
+
+	clientInfo, exists := clientRegistry[client]
+	if !exists {
 		return "", fmt.Errorf("unsupported client: %s", client)
 	}
 
-	return configPath, nil
+	var basePath string
+	if clientInfo.useHomeDir {
+		// Config goes directly in home directory
+		basePath = homeDir
+	} else {
+		// Config goes in system-specific config directory
+		basePath = getSystemConfigDir(homeDir, goos)
+	}
+
+	return filepath.Join(basePath, clientInfo.configFile), nil
 }
 
 // getDefangMCPConfig returns the default MCP config for Defang
