@@ -59,7 +59,7 @@ var mcpServerCmd = &cobra.Command{
 			server.WithInstructions(`
 Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
 
-There are a number of available tools to help with deployment, configuration, and management applications deployed with Defang.
+There are a number of available tools to help with deployment, configuration, and manage applications deployed with Defang.
 
 deploy - This tool deploys a web application to the cloud using the compose.yaml file in the application's working directory.
 destroy - This tool spins down and removes a deployed project from the cloud, cleaning up all associated resources.
