@@ -11,10 +11,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -94,12 +94,22 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 		return c.cached, nil
 	}
 
-	projOpts, err := c.NewProjectOptions()
+	projOpts, funcOpts, err := c.NewProjectOptions()
 	if err != nil {
 		return nil, err
 	}
 
-	project, err := projOpts.LoadProject(ctx)
+	data, err := projOpts.LoadModel(ctx)
+
+	configDetails := composeTypes.ConfigDetails{
+		WorkingDir: projOpts.WorkingDir,
+		// ConfigFiles: projOpts.ConfigFiles,
+		Environment: projOpts.Environment,
+	}
+
+	opts := loader.ToOptions(&configDetails, funcOpts)
+
+	project, err := loader.ModelToProject(data, opts, configDetails)
 	if err != nil {
 		if errors.Is(err, errdefs.ErrNotFound) {
 			return nil, types.ErrComposeFileNotFound
@@ -117,7 +127,7 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	return project, nil
 }
 
-func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
+func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, []func(*loader.Options), error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
@@ -157,7 +167,9 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 		options = append(options, cli.WithNormalization(false))
 	}
 
-	options = append(options, cli.WithLoadOptions(func(o *loader.Options) {
+	var optFuncs []func(*loader.Options)
+
+	optFuncs = append(optFuncs, func(o *loader.Options) {
 		// As suggested by https://github.com/compose-spec/compose-go/issues/710#issuecomment-2462287043, we'll be called again once the project is loaded
 		if o.Interpolate == nil {
 			return
@@ -188,10 +200,18 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 				return "${" + key + "}", true
 			})
 		}
-	}),
-	)
+	})
 
-	return cli.NewProjectOptions(c.options.ConfigPaths, options...)
+	for _, optFunc := range optFuncs {
+		options = append(options, cli.WithLoadOptions(optFunc))
+	}
+
+	project, err := cli.NewProjectOptions(c.options.ConfigPaths, options...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return project, optFuncs, nil
 }
 
 func hasSubstitution(s, key string) bool {

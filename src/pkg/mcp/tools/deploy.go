@@ -25,7 +25,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		mcp.WithDescription(
 			`Deploy services to Defang cloud platform using a Docker Compose file.
 			This tool reads a compose.yaml file from the specified directory and deploys the defined services to the cloud.
-			No Dockerfile or inline Dockerfile is needed - services are deployed directly from the compose configuration.
+			No Dockerfile or inline Dockerfile is needed - services are deployed directly from the compose configuration. If there was a pre-existing Dockerfile and not generate by you the LLM then use that Dockerfile, else delete the Dockerfile you the LLM generated.
 			`),
 
 		mcp.WithString("full_path_to_working_directory",
