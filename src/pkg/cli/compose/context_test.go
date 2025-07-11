@@ -49,15 +49,16 @@ func TestUploadTarball(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" {
-			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
+		header := r.Header.Get("Content-Type")
+		if header != "application/gzip" && header != "application/zip" {
+			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", header)
 		}
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, digest)
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/gzip", digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -68,7 +69,7 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "")
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/zip", "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -134,7 +135,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
+		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -171,14 +172,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
+		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "")
+		_, err := createArchive(context.Background(), "asdfqwer", "")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

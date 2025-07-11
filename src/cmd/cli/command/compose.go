@@ -92,6 +92,43 @@ func makeComposeUpCmd() *cobra.Command {
 				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
 			}
 
+			loaderNotNormalized := configureLoader(cmd, compose.WithNormalization(false))
+			projectNotNormalized, err := loaderNotNormalized.LoadProject(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to load project: %w", err)
+			}
+
+			// Create a map of original services by name for comparison
+			originalServiceMap := make(map[string]compose.ServiceConfig)
+			for _, service := range projectNotNormalized.Services {
+				originalServiceMap[service.Name] = service
+			}
+
+			// Compare and restore Build.Dockerfile fields for each normalized service
+			for serviceName, normalizedService := range project.Services {
+				if originalService, exists := originalServiceMap[serviceName]; exists {
+					// Both services exist, restore original Dockerfile path
+					if originalService.Build != nil && normalizedService.Build != nil {
+						// Store original values for logging
+						normalizedDockerfile := normalizedService.Build.Dockerfile
+						originalDockerfile := originalService.Build.Dockerfile
+
+						if originalDockerfile == "" {
+							// Update the service back in the map
+							project.Services[serviceName].Build.Dockerfile = "*"
+						}
+
+						// Log the information
+						if normalizedDockerfile != originalDockerfile {
+							term.Debugf("Service %s: Restored Dockerfile path from '%s' to '%s'",
+								serviceName, normalizedDockerfile, originalDockerfile)
+						}
+					}
+				} else {
+					term.Debugf("Service %s exists in normalized project but not in original", serviceName)
+				}
+			}
+
 			provider, err := newProvider(ctx, loader)
 			if err != nil {
 				return err

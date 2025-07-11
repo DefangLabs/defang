@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -11,12 +12,20 @@ import (
 
 func TestFixup(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
+		loaderSkipNorm := NewLoader(WithPath(path), WithNormalization(false))
+		projSkipNorm, err := loaderSkipNorm.LoadProject(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fmt.Println("Project without normalization:", projSkipNorm)
+
 		loader := NewLoader(WithPath(path))
 		proj, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeIgnore)
+		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeDigest)
 		if err != nil {
 			t.Fatal(err)
 		}

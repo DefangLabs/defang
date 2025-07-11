@@ -22,10 +22,14 @@ import (
 func setupDeployTool(s *server.MCPServer, cluster string) {
 	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
-		mcp.WithDescription("Deploy services using defang"),
+		mcp.WithDescription(
+			`Deploy services to Defang cloud platform using a Docker Compose file.
+			This tool reads a compose.yaml file from the specified directory and deploys the defined services to the cloud.
+			No Dockerfile or inline Dockerfile is needed - services are deployed directly from the compose configuration. If there was a pre-existing Dockerfile and not generate by you the LLM then use that Dockerfile, else delete the Dockerfile you the LLM generated.
+			`),
 
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
+		mcp.WithString("full_path_to_working_directory",
+			mcp.Description("The absolute file path to the directory containing the compose.yaml file. This must be the complete path (e.g., /Users/username/project/myapp) where the Docker Compose file is located. The compose file must be named exactly 'compose.yaml'. Do not use relative paths like '.' or '../' - always provide the full absolute path."),
 		),
 	)
 	term.Debug("Deployment tool created")
@@ -37,8 +41,15 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		term.Debug("Compose up tool called - deploying services")
 		track.Evt("MCP Deploy Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
+		wd, ok := request.Params.Arguments["full_path_to_working_directory"].(string)
 		if ok && wd != "" {
+			if wd == "." {
+				var err error
+				wd, err = os.Getwd()
+				if err != nil {
+					term.Error("Failed to get current working directory", "error", err)
+				}
+			}
 			err := os.Chdir(wd)
 			if err != nil {
 				term.Error("Failed to change working directory", "error", err)
@@ -54,6 +65,43 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			term.Error("Failed to deploy services", "error", err)
 
 			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
+		}
+
+		loaderNotNormalized := compose.NewLoader(compose.WithNormalization(false))
+		projectNotNormalized, err := loaderNotNormalized.LoadProject(ctx)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("Failed to load project without normalization", err), nil
+		}
+
+		// Create a map of original services by name for comparison
+		originalServiceMap := make(map[string]compose.ServiceConfig)
+		for _, service := range projectNotNormalized.Services {
+			originalServiceMap[service.Name] = service
+		}
+
+		// Compare and restore Build.Dockerfile fields for each normalized service
+		for serviceName, normalizedService := range project.Services {
+			if originalService, exists := originalServiceMap[serviceName]; exists {
+				// Both services exist, restore original Dockerfile path
+				if originalService.Build != nil && normalizedService.Build != nil {
+					// Store original values for logging
+					normalizedDockerfile := normalizedService.Build.Dockerfile
+					originalDockerfile := originalService.Build.Dockerfile
+
+					if originalDockerfile == "" {
+						// Update the service back in the map
+						project.Services[serviceName].Build.Dockerfile = "*"
+					}
+
+					// Log the information
+					if normalizedDockerfile != originalDockerfile {
+						term.Debugf("Service %s: Restored Dockerfile path from '%s' to '%s'",
+							serviceName, normalizedDockerfile, originalDockerfile)
+					}
+				}
+			} else {
+				term.Debugf("Service %s exists in normalized project but not in original", serviceName)
+			}
 		}
 
 		term.Debug("Function invoked: cli.Connect")
