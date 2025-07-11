@@ -73,12 +73,7 @@ func isValidClient(client string) bool {
 }
 
 // getClientConfigPath returns the path to the config file for the given client
-func getClientConfigPath(goos string, client string) (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
+func getClientConfigPath(homeDir, goos, client string) (string, error) {
 	var configPath string
 	switch strings.ToLower(client) {
 	case "windsurf", "cascade", "codeium":
@@ -269,8 +264,12 @@ func SetupClient(client string) error {
 
 	track.Evt("MCP Setup Client: ", track.P("client", client))
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
 	// Get the config path for the client
-	configPath, err := getClientConfigPath(runtime.GOOS, client)
+	configPath, err := getClientConfigPath(homeDir, runtime.GOOS, client)
 	if err != nil {
 		return err
 	}
