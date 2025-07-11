@@ -73,7 +73,7 @@ func isValidClient(client string) bool {
 }
 
 // getClientConfigPath returns the path to the config file for the given client
-func getClientConfigPath(client string) (string, error) {
+func getClientConfigPath(goos string, client string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -84,9 +84,9 @@ func getClientConfigPath(client string) (string, error) {
 	case "windsurf", "cascade", "codeium":
 		configPath = filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json")
 	case "claude":
-		if runtime.GOOS == "darwin" {
+		if goos == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-		} else if runtime.GOOS == "windows" {
+		} else if goos == "windows" {
 			appData := os.Getenv("APPDATA")
 			if appData == "" {
 				appData = filepath.Join(homeDir, "AppData", "Roaming")
@@ -102,9 +102,9 @@ func getClientConfigPath(client string) (string, error) {
 	case "cursor":
 		configPath = filepath.Join(homeDir, ".cursor", "mcp.json")
 	case "vscode", "code":
-		if runtime.GOOS == "darwin" {
+		if goos == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
-		} else if runtime.GOOS == "windows" {
+		} else if goos == "windows" {
 			appData := os.Getenv("APPDATA")
 			if appData == "" {
 				appData = filepath.Join(homeDir, "AppData", "Roaming")
@@ -118,9 +118,9 @@ func getClientConfigPath(client string) (string, error) {
 			configPath = filepath.Join(configHome, "Code/User/settings.json")
 		}
 	case "vscode-insiders", "insiders":
-		if runtime.GOOS == "darwin" {
+		if goos == "darwin" {
 			configPath = filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "settings.json")
-		} else if runtime.GOOS == "windows" {
+		} else if goos == "windows" {
 			appData := os.Getenv("APPDATA")
 			if appData == "" {
 				appData = filepath.Join(homeDir, "AppData", "Roaming")
@@ -270,7 +270,7 @@ func SetupClient(client string) error {
 	track.Evt("MCP Setup Client: ", track.P("client", client))
 
 	// Get the config path for the client
-	configPath, err := getClientConfigPath(client)
+	configPath, err := getClientConfigPath(runtime.GOOS, client)
 	if err != nil {
 		return err
 	}
