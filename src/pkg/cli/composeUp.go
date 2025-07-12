@@ -22,7 +22,7 @@ func (e ComposeError) Unwrap() error {
 }
 
 // ComposeUp validates a compose project and uploads the services using the client
-func ComposeUp(ctx context.Context, project *compose.Project, fabric client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
+func ComposeUp(ctx context.Context, project *compose.Project, servicesWithDockerfile map[string]bool, fabric client.FabricClient, p client.Provider, upload compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
 	if DoDryRun {
 		upload = compose.UploadModeIgnore
 	}
@@ -47,7 +47,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		}
 	}
 
-	if err := compose.ValidateProject(project); err != nil {
+	if err := compose.ValidateProject(project, servicesWithDockerfile); err != nil {
 		return nil, project, &ComposeError{err}
 	}
 
@@ -55,7 +55,7 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
-	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
+	if err := compose.FixupServices(ctx, p, fixedProject, servicesWithDockerfile, upload); err != nil {
 		return nil, project, err
 	}
 

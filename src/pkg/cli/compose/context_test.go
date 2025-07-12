@@ -81,7 +81,8 @@ func TestUploadTarball(t *testing.T) {
 func TestWalkContextFolder(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
 		var files []string
-		err := WalkContextFolder("../../../testdata/testproj", "", func(path string, de os.DirEntry, slashPath string) error {
+		dockerfileString := ""
+		err := WalkContextFolder("../../../testdata/testproj", &dockerfileString, false, func(path string, de os.DirEntry, slashPath string) error {
 			if strings.Contains(slashPath, "testproj") {
 				t.Errorf("Path is not relative: %v", slashPath)
 			}
@@ -99,14 +100,16 @@ func TestWalkContextFolder(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		err := WalkContextFolder("../../testdata", "Dockerfile.missing", func(string, os.DirEntry, string) error { return nil })
+		dockerfileString := "Dockerfile.missing"
+		err := WalkContextFolder("../../testdata", &dockerfileString, true, func(string, os.DirEntry, string) error { return nil })
 		if err == nil {
 			t.Fatal("WalkContextFolder() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		err := WalkContextFolder("asdfqwer", "", func(string, os.DirEntry, string) error { return nil })
+		dockerfileString := ""
+		err := WalkContextFolder("asdfqwer", &dockerfileString, false, func(string, os.DirEntry, string) error { return nil })
 		if err == nil {
 			t.Fatal("WalkContextFolder() should have failed")
 		}
@@ -114,7 +117,8 @@ func TestWalkContextFolder(t *testing.T) {
 
 	t.Run("Default .dockerignore", func(t *testing.T) {
 		var files []string
-		err := WalkContextFolder("../../../testdata/alttestproj", "", func(path string, de os.DirEntry, slashPath string) error {
+		dockerfileString := ""
+		err := WalkContextFolder("../../../testdata/alttestproj", &dockerfileString, false, func(path string, de os.DirEntry, slashPath string) error {
 			if strings.Contains(slashPath, "alttestproj") {
 				t.Errorf("Path is not relative: %v", slashPath)
 			}
@@ -134,7 +138,8 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
+		dockerfileString := ""
+		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", &dockerfileString, true)
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -171,14 +176,16 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
+		dockerfileString := "Dockerfile.missing"
+		_, err := createTarball(context.Background(), "../../testdata", &dockerfileString, false)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "")
+		dockerfileString := ""
+		_, err := createTarball(context.Background(), "asdfqwer", &dockerfileString, true)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

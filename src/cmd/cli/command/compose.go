@@ -76,7 +76,7 @@ func makeComposeUpCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 
 			ctx := cmd.Context()
-			project, loadErr := loader.LoadProject(ctx)
+			project, servicesWithDockerfile, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
 				if nonInteractive {
 					return loadErr
@@ -151,7 +151,7 @@ func makeComposeUpCmd() *cobra.Command {
 				term.Warnf("Defang cannot monitor status of the following managed service(s): %v.\n   To check if the managed service is up, check the status of the service which depends on it.", managedServices)
 			}
 
-			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
+			deploy, project, err := cli.ComposeUp(ctx, project, servicesWithDockerfile, client, provider, upload, mode.Value())
 
 			if err != nil {
 				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
@@ -425,7 +425,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			loader := configureLoader(cmd)
 
 			ctx := cmd.Context()
-			project, loadErr := loader.LoadProject(ctx)
+			project, servicesWithDockerfile, loadErr := loader.LoadProject(ctx)
 			if loadErr != nil {
 				if nonInteractive {
 					return loadErr
@@ -446,7 +446,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				return err
 			}
 
-			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			_, _, err = cli.ComposeUp(ctx, project, servicesWithDockerfile, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 			if !errors.Is(err, cli.ErrDryRun) {
 				return err
 			}

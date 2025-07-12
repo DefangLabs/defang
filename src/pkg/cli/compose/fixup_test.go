@@ -12,11 +12,11 @@ import (
 func TestFixup(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
-		proj, err := loader.LoadProject(context.Background())
+		proj, servicesWithDockerfile, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeIgnore)
+		err = FixupServices(context.Background(), client.MockProvider{}, proj, servicesWithDockerfile, UploadModeIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}

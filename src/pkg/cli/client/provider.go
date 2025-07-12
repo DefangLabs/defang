@@ -61,7 +61,7 @@ type Provider interface {
 }
 
 type Loader interface {
-	LoadProject(context.Context) (*composeTypes.Project, error)
+	LoadProject(context.Context) (*composeTypes.Project, map[string]bool, error)
 	LoadProjectName(context.Context) (string, error)
 }
 

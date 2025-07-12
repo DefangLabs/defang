@@ -1,0 +1,35 @@
+{
+  "railpackwithdockerfile": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "wrailpack-long": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "wrailpack-short": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  }
+}

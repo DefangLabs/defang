@@ -146,7 +146,7 @@ func TestGetServiceInfosWithTestData(t *testing.T) {
 	for name, path := range tests {
 		t.Run(name, func(t *testing.T) {
 			loader := compose.NewLoader(compose.WithPath(path))
-			proj, err := loader.LoadProject(context.Background())
+			proj, _, err := loader.LoadProject(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}

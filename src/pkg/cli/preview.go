@@ -9,8 +9,8 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func Preview(ctx context.Context, project *compose.Project, fabric cliClient.FabricClient, provider cliClient.Provider, mode defangv1.DeploymentMode) error {
-	resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModePreview, mode)
+func Preview(ctx context.Context, project *compose.Project, servicesWithDockerfile map[string]bool, fabric cliClient.FabricClient, provider cliClient.Provider, mode defangv1.DeploymentMode) error {
+	resp, project, err := ComposeUp(ctx, project, servicesWithDockerfile, fabric, provider, compose.UploadModePreview, mode)
 	if err != nil {
 		return err
 	}

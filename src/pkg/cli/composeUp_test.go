@@ -81,7 +81,7 @@ func (mockDeployProvider) PrepareDomainDelegation(ctx context.Context, req clien
 
 func TestComposeUp(t *testing.T) {
 	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
-	proj, err := loader.LoadProject(context.Background())
+	proj, servicesWithDockerfile, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(context.Background(), proj, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(context.Background(), proj, servicesWithDockerfile, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
@@ -236,6 +236,10 @@ func TestComposeUpStops(t *testing.T) {
 		},
 	}
 
+	servicesWithDockerfile := map[string]bool{
+		"service1": false, // No dockerfile specified in build
+	}
+
 	tests := []struct {
 		name                  string
 		cdStatus              error
@@ -265,7 +269,7 @@ func TestComposeUpStops(t *testing.T) {
 				deploymentStatus: tt.cdStatus,
 			}
 
-			resp, project, err := ComposeUp(ctx, project, fabric, provider, compose.UploadModeDigest, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			resp, project, err := ComposeUp(ctx, project, servicesWithDockerfile, fabric, provider, compose.UploadModeDigest, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 			if err != nil {
 				t.Fatalf("ComposeUp() failed: %v", err)
 			}

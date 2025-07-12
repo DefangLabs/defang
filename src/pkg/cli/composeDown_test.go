@@ -40,7 +40,7 @@ func (m mockComposeDown) Delete(
 
 func TestComposeDown(t *testing.T) {
 	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
-	proj, err := loader.LoadProject(context.Background())
+	proj, _, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}

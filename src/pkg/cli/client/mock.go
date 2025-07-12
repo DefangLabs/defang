@@ -143,8 +143,8 @@ type MockLoader struct {
 	Error   error
 }
 
-func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, error) {
-	return &m.Project, m.Error
+func (m MockLoader) LoadProject(ctx context.Context) (*composeTypes.Project, map[string]bool, error) {
+	return &m.Project, nil, m.Error
 }
 
 func (m MockLoader) LoadProjectName(ctx context.Context) (string, error) {

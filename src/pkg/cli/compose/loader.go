@@ -71,7 +71,7 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 		return c.options.ProjectName, nil
 	}
 
-	project, err := c.LoadProject(ctx)
+	project, _, err := c.LoadProject(ctx)
 	if err != nil {
 		if errors.Is(err, types.ErrComposeFileNotFound) {
 			return "", fmt.Errorf("no --project-name specified and %w", err)
@@ -82,23 +82,43 @@ func (c *Loader) LoadProjectName(ctx context.Context) (string, error) {
 	return project.Name, nil
 }
 
-func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
+// LoadProject loads the project from the compose file(s) specified in the LoaderOptions.
+// It returns the project and a map of services that have a Dockerfile defined in the compose file or an error if it fails.
+func (c *Loader) LoadProject(ctx context.Context) (*Project, map[string]bool, error) {
 	if c.cached != nil {
-		return c.cached, nil
+		return c.cached, nil, nil
 	}
 
-	projOpts, err := c.NewProjectOptions()
+	// Made the options to normalize the Model
+	projOpts, err := c.NewProjectOptions(cli.WithNormalization(false))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	project, err := projOpts.LoadProject(ctx)
+	rawCompose, err := projOpts.LoadModel(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	servicesWithDockerfile := hasDockerfile(rawCompose)
+
+	// Normalize the project
+	normalizedCompose, err := loader.Normalize(rawCompose, projOpts.Environment)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	configDetails, err := projOpts.ReadConfigFiles(ctx, projOpts.WorkingDir, projOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Load the project with the normalized data
+	project, err := loader.ModelToProject(normalizedCompose, loader.ToOptions(configDetails, projOpts.GetLoadOptions()), *configDetails)
 	if err != nil {
 		if errors.Is(err, errdefs.ErrNotFound) {
-			return nil, types.ErrComposeFileNotFound
+			return nil, nil, types.ErrComposeFileNotFound
 		}
-
-		return nil, err
 	}
 
 	if term.DoDebug() {
@@ -107,17 +127,19 @@ func (c *Loader) LoadProject(ctx context.Context) (*Project, error) {
 	}
 
 	c.cached = project
-	return project, nil
+	return project, servicesWithDockerfile, nil
 }
 
-func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
+func (c *Loader) NewProjectOptions(opts ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
 	// Set logrus send logs via the term package
 	termLogger := logs.TermLogFormatter{Term: term.DefaultTerm}
 	logrus.SetFormatter(termLogger)
 
 	// Based on how docker compose setup its own project options
 	// https://github.com/docker/compose/blob/1a14fcb1e6645dd92f5a4f2da00071bd59c2e887/cmd/compose/compose.go#L326-L346
-	return cli.NewProjectOptions(c.options.ConfigPaths,
+
+	// Create default options slice
+	defaultOptions := []cli.ProjectOptionsFn{
 		cli.WithEnv([]string{"COMPOSE_PROFILES=defang"}),
 		// First apply os.Environment, always win
 		// -- DISABLED FOR DEFANG -- cli.WithOsEnv,
@@ -172,11 +194,38 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 				})
 			}
 		}),
-	)
+	}
+
+	// Append any additional options passed as parameters
+	allOptions := append(defaultOptions, opts...)
+
+	return cli.NewProjectOptions(c.options.ConfigPaths, allOptions...)
 }
 
 func hasSubstitution(s, key string) bool {
 	// Check in the original `templ` string if the variable uses any substitution patterns like - :- + :+ ? :?
 	pattern := regexp.MustCompile(`(^|[^$])\$\{` + regexp.QuoteMeta(key) + `:?[-+?]`)
 	return pattern.MatchString(s)
+}
+
+// buildHasDockerfile checks if the build section of a service has a dockerfile or dockerfile_inline defined using serialization data of the compose file
+func hasDockerfile(dict map[string]any) map[string]bool {
+	servicesWithDockerfile := make(map[string]bool)
+
+	if d, ok := dict["services"]; ok {
+		services := d.(map[string]any)
+		for name, s := range services {
+			servicesWithDockerfile[name] = false
+			service := s.(map[string]any)
+
+			if b, ok := service["build"]; ok {
+				build := b.(map[string]any)
+				if build["dockerfile"] != nil || build["dockerfile_inline"] != nil {
+					servicesWithDockerfile[name] = true
+				}
+			}
+		}
+	}
+
+	return servicesWithDockerfile
 }

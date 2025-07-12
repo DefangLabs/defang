@@ -14,7 +14,7 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
+func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, servicesWithDockerfile map[string]bool, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
@@ -70,8 +70,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
+
+			serviceName := svccfg.Name
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
+			url, err := getRemoteBuildContext(ctx, provider, project.Name, serviceName, svccfg.Build, servicesWithDockerfile[serviceName], upload)
 			if err != nil {
 				return err
 			}
@@ -280,6 +282,7 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 	}
 	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "defangio/openai-access-gateway"
+	// This is error cause this does not exist in the map therefore panic
 	svccfg.Networks[modelProviderNetwork] = nil
 	svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	svccfg.Provider = nil              // remove "provider:" because current backend will not accept it

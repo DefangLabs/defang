@@ -31,6 +31,10 @@ func TestPreviewStops(t *testing.T) {
 		},
 	}
 
+	servicesWithDockerfile := map[string]bool{
+		"service1": false, // No dockerfile specified in build
+	}
+
 	tests := []struct {
 		name      string
 		err       error
@@ -46,7 +50,7 @@ func TestPreviewStops(t *testing.T) {
 				deploymentStatus: tt.err,
 			}
 
-			err := Preview(context.Background(), project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			err := Preview(context.Background(), project, servicesWithDockerfile, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("got error: %v, want: %v", err, tt.wantError)
@@ -68,7 +72,7 @@ func TestPreviewStops(t *testing.T) {
 
 		provider := &mockDeployProvider{}
 
-		err := Preview(ctx, project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+		err := Preview(ctx, project, servicesWithDockerfile, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 		if err != nil {
 			t.Errorf("got error: %v, want nil", err)
 		}

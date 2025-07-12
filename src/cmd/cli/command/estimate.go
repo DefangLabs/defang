@@ -21,7 +21,7 @@ func makeEstimateCmd() *cobra.Command {
 			region, _ := cmd.Flags().GetString("region")
 
 			loader := configureLoader(cmd)
-			project, err := loader.LoadProject(ctx)
+			project, _, err := loader.LoadProject(ctx)
 			if err != nil {
 				return err
 			}

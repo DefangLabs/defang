@@ -485,7 +485,7 @@ var certGenerateCmd = &cobra.Command{
 	Short:   "Generate a TLS certificate",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
+		project, _, err := loader.LoadProject(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -673,7 +673,7 @@ var generateCmd = &cobra.Command{
 
 		// Load the project and check for empty environment variables
 		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
-		project, err := loader.LoadProject(cmd.Context())
+		project, _, err := loader.LoadProject(cmd.Context())
 		if err != nil {
 			term.Debugf("unable to load new project: %v", err)
 		}
@@ -904,7 +904,7 @@ var debugCmd = &cobra.Command{
 			return err
 		}
 
-		project, err := loader.LoadProject(cmd.Context())
+		project, servicesWithDockerfile, err := loader.LoadProject(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -920,13 +920,14 @@ var debugCmd = &cobra.Command{
 		}
 
 		debugConfig := cli.DebugConfig{
-			Deployment:     deployment,
-			FailedServices: args,
-			ModelId:        modelId,
-			Project:        project,
-			Provider:       provider,
-			Since:          sinceTs.UTC(),
-			Until:          untilTs.UTC(),
+			Deployment:             deployment,
+			FailedServices:         args,
+			ModelId:                modelId,
+			Project:                project,
+			ServicesWithDockerfile: servicesWithDockerfile,
+			Provider:               provider,
+			Since:                  sinceTs.UTC(),
+			Until:                  untilTs.UTC(),
 		}
 		return cli.DebugDeployment(cmd.Context(), client, debugConfig)
 	},

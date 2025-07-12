@@ -48,7 +48,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		loader := configureLoader(request)
 
 		term.Debug("Function invoked: loader.LoadProject")
-		project, err := loader.LoadProject(ctx)
+		project, servicesWithDockerfile, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
 			term.Error("Failed to deploy services", "error", err)
@@ -77,7 +77,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 
 		term.Debug("Function invoked: cli.ComposeUp")
 		// Use ComposeUp to deploy the services
-		deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+		deployResp, project, err := cli.ComposeUp(ctx, project, servicesWithDockerfile, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 		if err != nil {
 			err = fmt.Errorf("failed to compose up services: %w", err)
 			term.Error("Failed to compose up services", "error", err)

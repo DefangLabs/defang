@@ -8,7 +8,7 @@ import (
 func TestRoundTrip(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

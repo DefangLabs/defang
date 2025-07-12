@@ -74,7 +74,7 @@ func TestLoadProject(t *testing.T) {
 
 	t.Run("no project name defaults to parent directory name", func(t *testing.T) {
 		loader := NewLoader(WithPath("../../../testdata/noprojname/compose.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -89,7 +89,7 @@ func TestLoadProject(t *testing.T) {
 
 	t.Run("no project name defaults to fancy parent directory name", func(t *testing.T) {
 		loader := NewLoader(WithPath("../../../testdata/Fancy-Proj_Dir/compose.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -104,7 +104,7 @@ func TestLoadProject(t *testing.T) {
 
 	t.Run("use project name in compose file", func(t *testing.T) {
 		loader := NewLoader(WithPath("../../../testdata/testproj/compose.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -119,7 +119,7 @@ func TestLoadProject(t *testing.T) {
 	t.Run("COMPOSE_PROJECT_NAME env var should override project name", func(t *testing.T) {
 		t.Setenv("COMPOSE_PROJECT_NAME", "overridename")
 		loader := NewLoader(WithPath("../../../testdata/testproj/compose.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -133,7 +133,7 @@ func TestLoadProject(t *testing.T) {
 
 	t.Run("use project name should not be overridden by tenantName", func(t *testing.T) {
 		loader := NewLoader(WithPath("../../../testdata/testproj/compose.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -165,7 +165,7 @@ func TestLoadProject(t *testing.T) {
 
 		// execute test
 		loader := NewLoader()
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -179,7 +179,7 @@ func TestLoadProject(t *testing.T) {
 
 	t.Run("load alternative compose file", func(t *testing.T) {
 		loader := NewLoader(WithPath("../../../testdata/alttestproj/altcomp.yaml"))
-		p, err := loader.LoadProject(context.Background())
+		p, _, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatalf("LoadProject() failed: %v", err)
 		}
@@ -202,7 +202,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 	term.DefaultTerm = term.NewTerm(os.Stdin, &warnings, &warnings)
 
 	loader := NewLoader(WithPath("../../../testdata/compose-go-warn/compose.yaml"))
-	_, err := loader.LoadProject(context.Background())
+	_, _, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestComposeOnlyOneFile(t *testing.T) {
 	os.Chdir("../../../testdata/toomany")
 
 	loader := NewLoader()
-	project, err := loader.LoadProject(context.Background())
+	project, _, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestComposeMultipleFiles(t *testing.T) {
 	os.Chdir("../../../testdata/multiple")
 
 	loader := NewLoader(WithPath("compose1.yaml", "compose2.yaml"))
-	project, err := loader.LoadProject(context.Background())
+	project, _, err := loader.LoadProject(context.Background())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}

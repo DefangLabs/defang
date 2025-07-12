@@ -12,13 +12,13 @@ import (
 )
 
 func TestFindMathingProjectFiles(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, servicesWithDockerfile, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test that the correct files are found for debugging: compose.yaml + only files from the failing service
-	files := findMatchingProjectFiles(project, []string{"failing", "failing-image"})
+	files := findMatchingProjectFiles(project, servicesWithDockerfile, []string{"failing", "failing-image"})
 	expected := []*defangv1.File{
 		{Name: "compose.yaml", Content: "services:\n  failing:\n    build: ./app\n  ok:\n    build: .\n"},
 		{Name: "app/Dockerfile", Content: "FROM scratch"},
@@ -57,7 +57,7 @@ func (m MockDebugFabricClient) Debug(ctx context.Context, req *defangv1.DebugReq
 }
 
 func TestQueryHasProject(t *testing.T) {
-	project, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
+	project, _, err := compose.NewLoader(compose.WithPath("../../testdata/debugproj/compose.yaml")).LoadProject(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,11 +92,13 @@ func TestDebugProject(t *testing.T) {
 		ComposeFiles: []string{"composefile"},
 	}
 
+	servicesWithDockerfile := make(map[string]bool)
+
 	loadErr := errors.New("load error")
 	fabricClient := MockDebugFabricClient{}
 
 	t.Run("with load error", func(t *testing.T) {
-		if err := debugComposeFileLoadError(context.Background(), fabricClient, project, loadErr); err != nil {
+		if err := debugComposeFileLoadError(context.Background(), fabricClient, project, servicesWithDockerfile, loadErr); err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 	})

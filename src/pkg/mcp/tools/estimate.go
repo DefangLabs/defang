@@ -74,7 +74,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		loader := configureLoader(request)
 
 		term.Debug("Function invoked: loader.LoadProject")
-		project, err := loader.LoadProject(ctx)
+		project, _, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
 			term.Error("Failed to deploy services", "error", err)

@@ -58,7 +58,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
-		project, err := loader.LoadProject(context.Background())
+		project, servicesWithDockerfile, err := loader.LoadProject(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,12 +68,12 @@ func TestValidationAndConvert(t *testing.T) {
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := ValidateProject(project); err != nil {
+		if err := ValidateProject(project, servicesWithDockerfile); err != nil {
 			t.Logf("Project validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
+		if err := FixupServices(context.Background(), mockClient, project, servicesWithDockerfile, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}

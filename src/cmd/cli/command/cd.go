@@ -183,7 +183,7 @@ var cdPreviewCmd = &cobra.Command{
 	Short:       "Preview the changes that will be made by the CD task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		loader := configureLoader(cmd)
-		project, err := loader.LoadProject(cmd.Context())
+		project, servicesWithDockerfile, err := loader.LoadProject(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -198,6 +198,6 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		return cli.Preview(cmd.Context(), project, client, provider, mode.Value())
+		return cli.Preview(cmd.Context(), project, servicesWithDockerfile, client, provider, mode.Value())
 	},
 }

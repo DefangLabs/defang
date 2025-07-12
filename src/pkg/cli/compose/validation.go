@@ -30,7 +30,7 @@ func (e ErrMissingConfig) Error() string {
 
 var ErrDockerfileNotFound = errors.New("dockerfile not found")
 
-func ValidateProject(project *composeTypes.Project) error {
+func ValidateProject(project *composeTypes.Project, servicesWithDockerfile map[string]bool) error {
 	if project == nil {
 		return errors.New("no project found")
 	}
@@ -45,7 +45,7 @@ func ValidateProject(project *composeTypes.Project) error {
 
 	var errs []error
 	for _, svccfg := range services {
-		errs = append(errs, validateService(&svccfg, project))
+		errs = append(errs, validateService(&svccfg, project, servicesWithDockerfile[svccfg.Name]))
 	}
 	for i, svccfg := range services {
 		for j := i + 1; j < len(services); j++ {
@@ -61,7 +61,7 @@ func ValidateProject(project *composeTypes.Project) error {
 	return errors.Join(errs...)
 }
 
-func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) error {
+func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, dockerfileSpecified bool) error {
 	if svccfg.ReadOnly {
 		term.Debugf("service %q: unsupported compose directive: read_only", svccfg.Name)
 	}
@@ -149,7 +149,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			// Check if the dockerfile exists
 			dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 			if _, err := os.Stat(dockerfilePath); err != nil {
-				return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
+				if dockerfileSpecified {
+					return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
+				}
+
+				// Our compose file in memory got normailized to have a dockerfile, but orginal compose file did not have one
+				term.Debugf("service %q: dockerfile: %q not found, because the orginal compose dockerfile field was set: %v", svccfg.Name, svccfg.Build.Dockerfile, dockerfileSpecified)
 			}
 		}
 		if svccfg.Build.SSH != nil {

@@ -83,7 +83,7 @@ var (
 	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_BUILD_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
-func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, dockerfileSpecified bool, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -99,7 +99,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
+	buffer, err := createTarball(ctx, build.Context, &build.Dockerfile, dockerfileSpecified)
 	if err != nil {
 		return "", err
 	}
@@ -228,16 +228,16 @@ func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) 
 	return patterns, dockerignore, nil
 }
 
-func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
+func WalkContextFolder(root string, dockerfile *string, dockerfileSpecified bool, fn func(path string, de os.DirEntry, slashPath string) error) error {
 	foundDockerfile := false
-	if dockerfile == "" {
-		dockerfile = "Dockerfile"
+	if *dockerfile == "" {
+		*dockerfile = "Dockerfile"
 	} else {
-		dockerfile = filepath.Clean(dockerfile)
+		*dockerfile = filepath.Clean(*dockerfile)
 	}
 
 	// Get the ignore patterns from the .dockerignore file
-	patterns, dockerignore, err := getDockerIgnorePatterns(root, dockerfile)
+	patterns, dockerignore, err := getDockerIgnorePatterns(root, *dockerfile)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		slashPath := filepath.ToSlash(relPath)
 
 		// we need the Dockerfile, even if it's in the .dockerignore file
-		if relPath == dockerfile {
+		if relPath == *dockerfile {
 			foundDockerfile = true
 		} else if relPath == dockerignore {
 			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile, but is needed by the builder
@@ -291,14 +291,16 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		return err
 	}
 
-	if !foundDockerfile {
-		return fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
+	// This mean that the orginal compose dockerfile field was not set and there was no Dockerfile in the tree
+	if !foundDockerfile && !dockerfileSpecified {
+		*dockerfile = "*" // Build with Railpack, so we don't need a Dockerfile
+		term.Debugf("No Dockerfile found in the tree and no dockerfile field was set in the compose file, using %q", *dockerfile)
 	}
 
 	return nil
 }
 
-func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+func createTarball(ctx context.Context, root string, dockerfile *string, dockerfileSpecified bool) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	buf := &bytes.Buffer{}
@@ -306,7 +308,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 	tarWriter := tar.NewWriter(gzipWriter)
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
-	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
+	err := WalkContextFolder(root, dockerfile, dockerfileSpecified, func(path string, de os.DirEntry, slashPath string) error {
 		if term.DoDebug() {
 			term.Debug("Adding", slashPath)
 		} else if doProgress {

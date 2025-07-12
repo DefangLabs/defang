@@ -32,13 +32,14 @@ var (
 )
 
 type DebugConfig struct {
-	Deployment     types.ETag
-	FailedServices []string
-	ModelId        string
-	Project        *compose.Project
-	Provider       client.Provider
-	Since          time.Time
-	Until          time.Time
+	Deployment             types.ETag
+	FailedServices         []string
+	ModelId                string
+	Project                *compose.Project
+	ServicesWithDockerfile map[string]bool // services that have a Dockerfile specified in their build context
+	Provider               client.Provider
+	Since                  time.Time
+	Until                  time.Time
 }
 
 func (dc DebugConfig) String() string {
@@ -92,7 +93,7 @@ func interactiveDebug(ctx context.Context, client client.FabricClient, debugConf
 	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Deployment), P("loadErr", loadError))
 
 	if loadError != nil {
-		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, loadError); err != nil {
+		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, debugConfig.ServicesWithDockerfile, loadError); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
@@ -120,7 +121,7 @@ func interactiveDebug(ctx context.Context, client client.FabricClient, debugConf
 func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfig DebugConfig) error {
 	term.Debugf("Invoking AI debugger for deployment %q", debugConfig.Deployment)
 
-	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
+	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.ServicesWithDockerfile, debugConfig.FailedServices)
 
 	if DoDryRun {
 		return ErrDryRun
@@ -157,10 +158,10 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 	return nil
 }
 
-func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
+func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, servicesWithDockerfile map[string]bool, loadErr error) error {
 	term.Debugf("Invoking AI debugger for load error: %v", loadErr)
 
-	files := findMatchingProjectFiles(project, nil)
+	files := findMatchingProjectFiles(project, servicesWithDockerfile, nil)
 
 	if DoDryRun {
 		return ErrDryRun
@@ -242,7 +243,7 @@ func getServices(project *compose.Project, names []string) compose.Services {
 	return services
 }
 
-func findMatchingProjectFiles(project *compose.Project, services []string) []*defangv1.File {
+func findMatchingProjectFiles(project *compose.Project, servicesWithDockerfile map[string]bool, services []string) []*defangv1.File {
 	var files []*defangv1.File
 
 	for _, path := range project.ComposeFiles {
@@ -253,7 +254,7 @@ func findMatchingProjectFiles(project *compose.Project, services []string) []*de
 
 	for _, service := range getServices(project, services) {
 		if service.Build != nil {
-			files = append(files, findMatchingFiles(project.WorkingDir, service.Build.Context, service.Build.Dockerfile)...)
+			files = append(files, findMatchingFiles(project.WorkingDir, service.Build.Context, service.Build.Dockerfile, servicesWithDockerfile[service.Name])...)
 		}
 		// TODO: also consider other files, like .dockerignore, .env, etc.
 	}
@@ -279,14 +280,14 @@ func filepathMatchAny(patterns []string, name string) bool {
 	return false
 }
 
-func findMatchingFiles(basepath, context, dockerfile string) []*defangv1.File {
+func findMatchingFiles(basepath, context, dockerfile string, dockerfileSpecified bool) []*defangv1.File {
 	var files []*defangv1.File
 
 	if file := readFile(basepath, filepath.Join(context, dockerfile)); file != nil {
 		files = append(files, file)
 	}
 
-	err := compose.WalkContextFolder(context, dockerfile, func(path string, info os.DirEntry, slashPath string) error {
+	err := compose.WalkContextFolder(context, &dockerfile, dockerfileSpecified, func(path string, info os.DirEntry, slashPath string) error {
 		if info.IsDir() {
 			return nil // continue to next file/directory
 		}
