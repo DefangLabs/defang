@@ -173,3 +173,7 @@ func (g GrpcClient) SetOptions(ctx context.Context, req *defangv1.SetOptionsRequ
 func (g GrpcClient) Estimate(ctx context.Context, req *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error) {
 	return getMsg(g.client.Estimate(ctx, connect.NewRequest(req)))
 }
+
+func (g GrpcClient) Preview(ctx context.Context, req *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error) {
+	return getMsg(g.client.Preview(ctx, connect.NewRequest(req)))
+}

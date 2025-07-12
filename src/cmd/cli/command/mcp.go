@@ -51,12 +51,24 @@ var mcpServerCmd = &cobra.Command{
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
 		s := server.NewMCPServer(
-			"Defang MCP Server",
+			"Deploy with Defang",
 			RootCmd.Version,
 			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
 			server.WithPromptCapabilities(true),         // Enable interactive prompts
 			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
-			server.WithInstructions("Use these tools to deploy projects to the cloud with Defang. These tools also help manage deployed projects, manage config variables, and estimate the monthly cost of deploying a given compose file."),
+			server.WithInstructions(`
+Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
+
+There are a number of available tools to help with deployment, configuration, and manage applications deployed with Defang.
+
+deploy - This tool deploys a web application to the cloud using the compose.yaml file in the application's working directory.
+destroy - This tool spins down and removes a deployed project from the cloud, cleaning up all associated resources.
+estimate - This tool estimates the cost of running a deployed application based on its resource usage and cloud provider pricing.
+services - This tool lists all running services for a deployed application, providing status and resource usage information
+list_configs - This tool lists all configuration variables for a deployed application, allowing you to view current settings.
+remove_config - This tool removes a configuration variable for a deployed application, allowing you to clean up unused settings.
+set_config - This tool sets or updates configuration variables for a deployed application, allowing you to manage environment variables and secrets.
+			`),
 		)
 
 		// Setup resources
@@ -69,11 +81,11 @@ var mcpServerCmd = &cobra.Command{
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
-			term.Debug("Starting Auth Server for Docker login flow")
-			term.Debug("Function invoked: cli.InteractiveLoginWithDocker")
+			term.Debug("Starting Auth Server for MCP-in-Docker login flow")
+			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := cli.InteractiveLoginWithDocker(cmd.Context(), getCluster(), authPort); err != nil {
+				if err := cli.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()
