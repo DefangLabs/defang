@@ -280,10 +280,15 @@ func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
 	}
 	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "defangio/openai-access-gateway"
+	if svccfg.Networks == nil {
+		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
+		svccfg.Networks = make(map[string]*types.ServiceNetworkConfig)
+	} else {
+		delete(svccfg.Networks, "default") // remove the default network
+	}
 	svccfg.Networks[modelProviderNetwork] = nil
 	svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
-	svccfg.Provider = nil              // remove "provider:" because current backend will not accept it
-	delete(svccfg.Networks, "default") // remove the default network
+	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = types.NetworkConfig{Name: modelProviderNetwork}
 
 	// Set environment variables (url and model) for any service that depends on the provider pseudo service

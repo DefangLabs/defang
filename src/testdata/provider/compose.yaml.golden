@@ -8,8 +8,6 @@ services:
           - ai/smollm2
     environment:
       DEBUG: "true"
-    networks:
-      default: null
   chat:
     depends_on:
       ai_runner:
