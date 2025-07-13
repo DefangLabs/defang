@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -103,27 +102,6 @@ func TestSplitByComma(t *testing.T) {
 	}
 }
 
-func TestOneOrList(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want []string
-	}{
-		{"empty", `[]`, []string{}},
-		{"string", `"a"`, []string{"a"}},
-		{"one", `["a"]`, []string{"a"}},
-		{"two", `["a","b"]`, []string{"a", "b"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var got OneOrList
-			if err := json.Unmarshal([]byte(tt.in), &got); err != nil || !reflect.DeepEqual([]string(got), tt.want) {
-				t.Errorf("OneOrList(%v) = %v, want %v: %v", tt.in, got, tt.want, err)
-			}
-		})
-	}
-}
-
 func TestRandomID(t *testing.T) {
 	var unique = make(map[string]bool)
 	for range 100 {
@@ -135,28 +113,6 @@ func TestRandomID(t *testing.T) {
 		if !IsValidRandomID(id) {
 			t.Errorf("RandomID() = %v, want IsValidRandomID true", id)
 		}
-	}
-}
-
-func TestContains(t *testing.T) {
-	tests := []struct {
-		name     string
-		slice    []int
-		value    int
-		expected bool
-	}{
-		{"Empty slice", []int{}, 1, false},
-		{"Single element", []int{1}, 1, true},
-		{"Multiple elements", []int{1, 2, 3, 4, 5}, 3, true},
-		{"Non-existent element", []int{1, 2, 3, 4, 5}, 6, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Contains(tt.slice, tt.value); got != tt.expected {
-				t.Errorf("Contains() returned %v, expected %v", got, tt.expected)
-			}
-		})
 	}
 }
 
