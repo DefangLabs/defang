@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"math/rand"
 	"os"
@@ -62,21 +61,6 @@ func SplitByComma(s string) []string {
 	return strings.Split(s, ",")
 }
 
-type OneOrList []string
-
-func (l *OneOrList) UnmarshalJSON(data []byte) error {
-	ls := []string{}
-	if err := json.Unmarshal(data, &ls); err != nil {
-		var s string
-		if err := json.Unmarshal(data, &s); err != nil {
-			return err
-		}
-		ls = []string{s}
-	}
-	*l = ls
-	return nil
-}
-
 func RandomID() string {
 	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
 	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:]
@@ -116,15 +100,6 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func Contains[T comparable](s []T, v T) bool {
-	for _, val := range s {
-		if val == v {
-			return true
-		}
-	}
-	return false
 }
 
 func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
