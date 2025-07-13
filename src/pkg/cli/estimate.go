@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/money"
@@ -20,7 +19,7 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func RunEstimate(ctx context.Context, project *compose.Project, client cliClient.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
+func RunEstimate(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
 	term.Debugf("Running estimate for project %s in region %s with mode %s", project.Name, region, mode)
 	preview, err := GeneratePreview(ctx, project, client, previewProvider, estimateProviderID, mode, region)
 	if err != nil {
@@ -40,7 +39,7 @@ func RunEstimate(ctx context.Context, project *compose.Project, client cliClient
 	return estimate, nil
 }
 
-func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider cliClient.Provider, estimateProviderID cliClient.ProviderID, mode defangv1.DeploymentMode, region string) (string, error) {
+func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, mode defangv1.DeploymentMode, region string) (string, error) {
 	os.Setenv("DEFANG_JSON", "1") // HACK: always show JSON output for estimate
 	since := time.Now()
 
@@ -111,16 +110,17 @@ func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResp
 	subtotal := (*money.Money)(estimate.Subtotal)
 	tableItems := prepareEstimateLineItemTableItems(estimate.LineItems)
 	term.Println("")
-	if mode == defangv1.DeploymentMode_DEVELOPMENT || mode == defangv1.DeploymentMode_MODE_UNSPECIFIED {
+	switch mode {
+	case defangv1.DeploymentMode_DEVELOPMENT, defangv1.DeploymentMode_MODE_UNSPECIFIED:
 		term.Println("Estimate for Deployment Mode: AFFORDABLE")
 		term.Println(affordableModeEstimateSummary)
-	} else if mode == defangv1.DeploymentMode_STAGING {
+	case defangv1.DeploymentMode_STAGING:
 		term.Println("Estimate for Deployment Mode: BALANCED")
 		term.Println(balancedModeEstimateSummary)
-	} else if mode == defangv1.DeploymentMode_PRODUCTION {
+	case defangv1.DeploymentMode_PRODUCTION:
 		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
 		term.Println(highAvailabilityModeEstimateSummary)
-	} else {
+	default:
 		term.Printf("Estimate for %s Mode\n", mode.String())
 	}
 
