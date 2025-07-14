@@ -71,7 +71,16 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
 			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
+			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload, func(selectPackBuilder string) {
+				// This callback is called when dockerfile changes are detected in WalkContextFolder
+				if selectPackBuilder == "*Railpack" {
+					// When no Dockerfile is found and using pack builder
+					project.Services[svccfg.Name].Build.Dockerfile = "*Railpack"
+				} else if selectPackBuilder == "*Buildpacks" {
+					// When no Dockerfile is found and using buildpack builder
+					project.Services[svccfg.Name].Build.Dockerfile = "*Buildpacks"
+				}
+			})
 			if err != nil {
 				return err
 			}

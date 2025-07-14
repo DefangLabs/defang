@@ -32,6 +32,7 @@ const (
 	UploadModeIgnore                     // dry-run: don't upload the tarball, just return the path
 	UploadModePreview                    // preview: like dry-run but does start the preview command
 	UploadModeEstimate                   // cost estimation: like preview, but skips the tarball
+	UploadPackMode                       // pack: select a pack builder instead of using a Dockerfile, but skip the tarball upload
 )
 
 const (
@@ -83,7 +84,7 @@ var (
 	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_BUILD_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
-func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode, selectPackBuilder func(builder string)) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -96,10 +97,16 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
+	case UploadPackMode:
+		_, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
+		if err != nil {
+			return "", err
+		}
+		return root, nil
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createTarball(ctx, build.Context, build.Dockerfile)
+	buffer, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +235,7 @@ func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) 
 	return patterns, dockerignore, nil
 }
 
-func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
+func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error, selectPackBuilder func(builder string)) error {
 	foundDockerfile := false
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
@@ -291,14 +298,17 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		return err
 	}
 
-	if !foundDockerfile {
+	if !foundDockerfile && dockerfile == "Dockerfile" {
+		// If the Dockerfile is not found and the Dockerfile is possibly set by Normalization, we should not return an error and use a pack builder
+		selectPackBuilder("*Railpack")
+	} else if !foundDockerfile {
 		return fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
 	}
 
 	return nil
 }
 
-func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer, error) {
+func createTarball(ctx context.Context, root, dockerfile string, selectPackBuilder func(builder string)) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 	buf := &bytes.Buffer{}
@@ -358,7 +368,7 @@ func createTarball(ctx context.Context, root, dockerfile string) (*bytes.Buffer,
 			term.Warnf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
 		}
 		return err
-	})
+	}, selectPackBuilder)
 
 	if err != nil {
 		return nil, err

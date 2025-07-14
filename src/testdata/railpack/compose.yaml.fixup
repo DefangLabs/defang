@@ -1,0 +1,46 @@
+{
+  "railpackwithdockerfile": {
+    "build": {
+      "context": ".",
+      "dockerfile": "*Railpack"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "railpackwithnoDockerfile": {
+    "build": {
+      "context": "/Users/defang/codebase/defang/src/testdata",
+      "dockerfile": "dev.Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "wrailpack-long": {
+    "build": {
+      "context": ".",
+      "dockerfile": "*Railpack"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "wrailpack-short": {
+    "build": {
+      "context": ".",
+      "dockerfile": "*Railpack"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  }
+}

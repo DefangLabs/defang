@@ -87,7 +87,7 @@ func TestWalkContextFolder(t *testing.T) {
 			}
 			files = append(files, slashPath)
 			return nil
-		})
+		}, func(builder string) {})
 		if err != nil {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
@@ -99,14 +99,14 @@ func TestWalkContextFolder(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		err := WalkContextFolder("../../testdata", "Dockerfile.missing", func(string, os.DirEntry, string) error { return nil })
+		err := WalkContextFolder("../../testdata", "Dockerfile.missing", func(string, os.DirEntry, string) error { return nil }, func(builder string) {})
 		if err == nil {
 			t.Fatal("WalkContextFolder() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		err := WalkContextFolder("asdfqwer", "", func(string, os.DirEntry, string) error { return nil })
+		err := WalkContextFolder("asdfqwer", "", func(string, os.DirEntry, string) error { return nil }, func(builder string) {})
 		if err == nil {
 			t.Fatal("WalkContextFolder() should have failed")
 		}
@@ -120,7 +120,7 @@ func TestWalkContextFolder(t *testing.T) {
 			}
 			files = append(files, slashPath)
 			return nil
-		})
+		}, func(builder string) {})
 		if err != nil {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
@@ -134,7 +134,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
+		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "", func(builder string) {})
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -171,14 +171,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
+		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing", func(builder string) {})
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "")
+		_, err := createTarball(context.Background(), "asdfqwer", "", func(builder string) {})
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

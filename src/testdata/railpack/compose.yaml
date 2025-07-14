@@ -8,3 +8,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+  railpackwithnoDockerfile:
+    build:
+      context: ../
+      dockerfile: dev.Dockerfile

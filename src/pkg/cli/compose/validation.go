@@ -151,7 +151,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			if _, err := os.Stat(dockerfilePath); err != nil {
 				err := fmt.Errorf("service %q: dockerfile not found: %w", svccfg.Name, ErrDockerfileNotFound)
 
-				// Allow this case to fall though now because of normalization
+				// Allow this case to fall though now because the possiblity of normalization
 				if svccfg.Build.Dockerfile == "Dockerfile" {
 					term.Debug(err)
 				}
