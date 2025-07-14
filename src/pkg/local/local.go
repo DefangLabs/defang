@@ -54,6 +54,8 @@ func (l *Local) Run(ctx context.Context, env map[string]string, args ...string) 
 		return nil, errors.New("already running")
 	}
 	args = append(l.entrypoint, args...)
+	// TODO - use enums to define commands instead of passing strings down from the caller
+	// #nosec G204
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = l.workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

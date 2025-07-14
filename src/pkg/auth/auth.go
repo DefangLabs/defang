@@ -119,7 +119,11 @@ func ServeAuthCodeFlowServer(ctx context.Context, authPort int, tenant types.Ten
 	})
 
 	// set the port and the handler to the server
-	server := &http.Server{Addr: "0.0.0.0:" + strconv.Itoa(authPort), Handler: handler}
+	server := &http.Server{
+		Addr:              "0.0.0.0:" + strconv.Itoa(authPort),
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
 	// Start the server
 	err = server.ListenAndServe()
