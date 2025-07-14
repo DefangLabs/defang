@@ -116,6 +116,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+  settings:
+    gosec:
+      config:
+        G306: "0o644"
 formatters:
   enable:
     - gofmt
