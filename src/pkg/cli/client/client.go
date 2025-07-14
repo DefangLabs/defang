@@ -29,6 +29,7 @@ type FabricClient interface {
 	GetTenantName() types.TenantName
 	GetVersions(context.Context) (*defangv1.Version, error)
 	ListDeployments(context.Context, *defangv1.ListDeploymentsRequest) (*defangv1.ListDeploymentsResponse, error)
+	Preview(context.Context, *defangv1.PreviewRequest) (*defangv1.PreviewResponse, error)
 	Publish(context.Context, *defangv1.PublishRequest) error
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	RevokeToken(context.Context) error

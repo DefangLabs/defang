@@ -339,7 +339,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if managedPostgres {
 		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "postgres") {
+		if !strings.HasSuffix(image, "postgres") && !strings.HasSuffix(image, "pgvector") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(postgresExtension); err != nil {

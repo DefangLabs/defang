@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,7 +61,7 @@ func printDefangHint(hint string, cmds ...string) {
 	for _, arg := range cmds {
 		fmt.Printf("  %s %s\n\n", executable, arg)
 	}
-	if rand.Intn(10) == 0 {
+	if pkg.RandomIndex(10) == 0 {
 		fmt.Println("To silence these hints, do: export DEFANG_HIDE_HINTS=1")
 	}
 }

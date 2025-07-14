@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"math/rand"
 	"os"
@@ -62,23 +61,17 @@ func SplitByComma(s string) []string {
 	return strings.Split(s, ",")
 }
 
-type OneOrList []string
-
-func (l *OneOrList) UnmarshalJSON(data []byte) error {
-	ls := []string{}
-	if err := json.Unmarshal(data, &ls); err != nil {
-		var s string
-		if err := json.Unmarshal(data, &s); err != nil {
-			return err
-		}
-		ls = []string{s}
+func RandomIndex(n int) int {
+	if n <= 0 {
+		panic("n must be greater than 0")
 	}
-	*l = ls
-	return nil
+	// #nosec G404 - crypto is not important here, we just need a random index
+	return rand.Intn(n)
 }
 
 func RandomID() string {
 	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
+	// #nosec G404 - this is not a security-sensitive ID, just a random identifier
 	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:]
 }
 
@@ -116,15 +109,6 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func Contains[T comparable](s []T, v T) bool {
-	for _, val := range s {
-		if val == v {
-			return true
-		}
-	}
-	return false
 }
 
 func SubscriptionTierToString(tier defangv1.SubscriptionTier) string {
