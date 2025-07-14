@@ -175,6 +175,7 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 		"roles/redis.admin",                     // For creating redis instances/clusters
 		"roles/certificatemanager.owner",        // For creating certificates
 		"roles/serviceusage.serviceUsageAdmin",  // For allowing cd to Enable APIs
+		"roles/datastore.owner",                 // For creating firestore database
 	}); err != nil {
 		return err
 	}
