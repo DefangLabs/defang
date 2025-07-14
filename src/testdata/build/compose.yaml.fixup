@@ -30,5 +30,16 @@
     "networks": {
       "default": null
     }
+  },
+  "build3": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
   }
 }

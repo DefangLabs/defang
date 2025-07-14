@@ -10,17 +10,6 @@
       "default": null
     }
   },
-  "railpackwithnoDockerfile": {
-    "build": {
-      "context": "/Users/defang/codebase/defang/src/testdata",
-      "dockerfile": "dev.Dockerfile"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
   "wrailpack-long": {
     "build": {
       "context": ".",

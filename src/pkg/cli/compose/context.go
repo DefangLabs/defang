@@ -32,7 +32,6 @@ const (
 	UploadModeIgnore                     // dry-run: don't upload the tarball, just return the path
 	UploadModePreview                    // preview: like dry-run but does start the preview command
 	UploadModeEstimate                   // cost estimation: like preview, but skips the tarball
-	UploadPackMode                       // pack: select a pack builder instead of using a Dockerfile, but skip the tarball upload
 )
 
 const (
@@ -92,17 +91,15 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	switch upload {
 	case UploadModeIgnore:
+		_, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
+		if err != nil {
+			return "", err
+		}
 		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
 		return root, nil
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
-	case UploadPackMode:
-		_, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
-		if err != nil {
-			return "", err
-		}
-		return root, nil
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)

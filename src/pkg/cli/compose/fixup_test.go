@@ -17,7 +17,7 @@ func TestFixup(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadPackMode)
+		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeIgnore)
 		if err != nil {
 			if strings.Contains(err.Error(), "the specified dockerfile could not be read:") {
 				t.Logf("Skipping test because the dockerfile could not be read: %v", err)
