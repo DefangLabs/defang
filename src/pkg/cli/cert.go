@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"strings"
@@ -60,7 +59,7 @@ var (
 				}
 
 				dialer := &net.Dialer{}
-				rootAddr := net.JoinHostPort(ips[rand.Intn(len(ips))].String(), port)
+				rootAddr := net.JoinHostPort(ips[pkg.RandomIndex(len(ips))].String(), port)
 				return dialer.DialContext(ctx, network, rootAddr)
 			},
 			ForceAttemptHTTP2:     true,

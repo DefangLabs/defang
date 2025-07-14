@@ -61,8 +61,17 @@ func SplitByComma(s string) []string {
 	return strings.Split(s, ",")
 }
 
+func RandomIndex(n int) int {
+	if n <= 0 {
+		panic("n must be greater than 0")
+	}
+	// #nosec G404 - crypto is not important here, we just need a random index
+	return rand.Intn(n)
+}
+
 func RandomID() string {
 	const uint64msb = 1 << 63 // always set the MSB to ensure we get ≥12 digits
+	// #nosec G404 - this is not a security-sensitive ID, just a random identifier
 	return strconv.FormatUint(rand.Uint64()|uint64msb, 36)[1:]
 }
 

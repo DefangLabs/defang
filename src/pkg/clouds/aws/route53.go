@@ -3,9 +3,9 @@ package aws
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
@@ -61,7 +61,7 @@ func GetDelegationSet(ctx context.Context, r53 Route53API) (*types.DelegationSet
 	}
 	// Return a random delegation set, to work around the 100 zones-per-delegation-set limit,
 	// because we can't easily tell how many zones are using each delegation set.
-	return &resp.DelegationSets[rand.Intn(len(resp.DelegationSets))], nil
+	return &resp.DelegationSets[pkg.RandomIndex(len(resp.DelegationSets))], nil
 }
 
 func GetHostedZoneByName(ctx context.Context, domain string, r53 Route53API) (*types.HostedZone, error) {

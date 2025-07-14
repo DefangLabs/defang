@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"slices"
 	"sort"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/miekg/dns"
 )
 
@@ -66,14 +66,15 @@ func (r RootResolver) getResolver(ctx context.Context, domain string) Resolver {
 	if err != nil {
 		return DirectResolver{}
 	}
-	return DirectResolver{NSServer: ns[rand.Intn(len(ns))].Host}
+	return DirectResolver{NSServer: ns[pkg.RandomIndex(len(ns))].Host}
 }
 
 func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 	nsServers := rootServers
 	retries := 3
 	for {
-		nsServer := nsServers[rand.Intn(len(nsServers))].Host
+		index := pkg.RandomIndex(len(nsServers))
+		nsServer := nsServers[index].Host
 		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
 		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
 		if err != nil {
