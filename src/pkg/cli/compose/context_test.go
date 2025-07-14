@@ -38,7 +38,7 @@ func Test_parseContextLimit(t *testing.T) {
 	})
 }
 
-func TestUploadTarball(t *testing.T) {
+func TestUploadContent(t *testing.T) {
 	const path = "/upload/x/"
 	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
@@ -49,17 +49,17 @@ func TestUploadTarball(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" {
-			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
+		if r.Header.Get("Content-Type") != "application/gzip" && r.Header.Get("Content-Type") != "application/zip" {
+			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", r.Header.Get("Content-Type"))
 		}
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, digest)
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/gzip", digest)
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadContent() failed: %v", err)
 		}
 		const expectedPath = path + digest
 		if url != server.URL+expectedPath {
@@ -68,9 +68,19 @@ func TestUploadTarball(t *testing.T) {
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "")
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/gzip", "")
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadContent() failed: %v", err)
+		}
+		if url != server.URL+path {
+			t.Errorf("Expected %v, got %v", server.URL+path, url)
+		}
+	})
+
+	t.Run("upload with zip", func(t *testing.T) {
+		url, err := uploadContent(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "application/zip", "")
+		if err != nil {
+			t.Fatalf("uploadContent() failed: %v", err)
 		}
 		if url != server.URL+path {
 			t.Errorf("Expected %v, got %v", server.URL+path, url)
@@ -134,7 +144,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
+		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "")
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -171,14 +181,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
+		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "")
+		_, err := createArchive(context.Background(), "asdfqwer", "")
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
