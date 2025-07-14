@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,11 +139,11 @@ func Execute(ctx context.Context) error {
 		fmt.Println("For help with warnings, check our FAQ at https://s.defang.io/warnings")
 	}
 
-	if hasTty && !hideUpdate && rand.Intn(10) == 0 {
+	if hasTty && !hideUpdate && pkg.RandomIndex(10) == 0 {
 		if latest, err := GetLatestVersion(ctx); err == nil && isNewer(GetCurrentVersion(), latest) {
 			term.Debug("Latest Version:", latest, "Current Version:", GetCurrentVersion())
 			fmt.Println("A newer version of the CLI is available at https://github.com/DefangLabs/defang/releases/latest")
-			if rand.Intn(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
+			if pkg.RandomIndex(10) == 0 && !pkg.GetenvBool("DEFANG_HIDE_HINTS") {
 				fmt.Println("To silence these notices, do: export DEFANG_HIDE_UPDATE=1")
 			}
 		}

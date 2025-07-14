@@ -45,7 +45,7 @@ linters:
     # - gomoddirectives
     - gomodguard
     - goprintffuncname
-    # - gosec
+    - gosec
     # - gosmopolitan
     # - govet
     - grouper
@@ -116,6 +116,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+  settings:
+    gosec:
+      config:
+        G306: "0o644"
 formatters:
   enable:
     - gofmt
