@@ -151,10 +151,14 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			if _, err := os.Stat(dockerfilePath); err != nil {
 				err := fmt.Errorf("service %q: dockerfile not found: %w", svccfg.Name, ErrDockerfileNotFound)
 
-				// Allow this case to fall though now because the possiblity of normalization
+				// In this case we know that the dockerfile is not in the location the compose file specifies,
+				// so can assume that the dockerfile has been normalized to the default "Dockerfile".
+				// Later we will walk the file tree in WalkContextFolder() to comfirm there no dockerfile in other locations as well.
 				if svccfg.Build.Dockerfile == "Dockerfile" {
-					term.Debug(err)
+					// Undo normalization
+					project.Services[svccfg.Name].Build.Dockerfile = ""
 				}
+
 				return err
 			}
 		}
