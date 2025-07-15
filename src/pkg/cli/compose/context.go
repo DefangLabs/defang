@@ -181,11 +181,10 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	switch upload {
 	case UploadModeIgnore:
-		_, err := createArchive(ctx, build.Context, build.Dockerfile, ArchiveTypeGzip)
-		if err != nil {
-			return "", err
+		if build.Dockerfile == "" {
+			build.Dockerfile = "*Railpack"
 		}
-		// `compose config`, ie. dry-run: don't upload the tarball, just return the path as-is
+		// `compose config`, ie. dry-run: don't upload the archive, just return the path as-is
 		return root, nil
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL

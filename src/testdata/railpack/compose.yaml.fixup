@@ -1,15 +1,4 @@
 {
-  "railpackwithdockerfile": {
-    "build": {
-      "context": ".",
-      "dockerfile": "*Railpack"
-    },
-    "command": null,
-    "entrypoint": null,
-    "networks": {
-      "default": null
-    }
-  },
   "railpack-long": {
     "build": {
       "context": ".",
@@ -22,6 +11,17 @@
     }
   },
   "railpack-short": {
+    "build": {
+      "context": ".",
+      "dockerfile": "*Railpack"
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "railpackwithdockerfile": {
     "build": {
       "context": ".",
       "dockerfile": "*Railpack"
