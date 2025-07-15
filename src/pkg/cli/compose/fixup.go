@@ -3,6 +3,8 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -70,17 +72,25 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 	for _, svccfg := range project.Services {
 		// Upload the build context, if any; TODO: parallelize
 		if svccfg.Build != nil {
-			// Pack the build context into a tarball and upload
-			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload, func(selectPackBuilder string) {
-				// This callback is called when dockerfile changes are detected in WalkContextFolder
-				if selectPackBuilder == "*Railpack" {
-					// When no Dockerfile is found and using pack builder
-					project.Services[svccfg.Name].Build.Dockerfile = "*Railpack"
-				} else if selectPackBuilder == "*Buildpacks" {
-					// When no Dockerfile is found and using buildpack builder
-					project.Services[svccfg.Name].Build.Dockerfile = "*Buildpacks"
+			// Because of normalization, Dockerfile is always set to "Dockerfile" even if it was not specified in the compose file.
+			if svccfg.Build.Dockerfile != "" {
+				// Check if the dockerfile exists
+				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
+				if _, err := os.Stat(dockerfilePath); err != nil {
+					// In this case we know that the dockerfile is not in the location the compose file specifies,
+					// so can assume that the dockerfile has been normalized to the default "Dockerfile".
+					if svccfg.Build.Dockerfile != "Dockerfile" {
+						// An explicit Dockerfile was specified, but it does not exist.
+						return fmt.Errorf("service %q: dockerfile not found: %w", svccfg.Name, ErrDockerfileNotFound)
+					}
+
+					// Undo normalization
+					svccfg.Build.Dockerfile = ""
 				}
-			})
+			}
+
+			// Pack the build context into a tarball and upload
+			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return err
 			}

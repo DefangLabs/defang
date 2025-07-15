@@ -72,6 +72,11 @@ defang.exe
 .defang`
 )
 
+type ArchiveType string
+
+const ArchiveTypeZip ArchiveType = "application/zip"
+const ArchiveTypeGzip ArchiveType = "application/gzip"
+
 func parseContextLimit(limit string, def int64) int64 {
 	if size, err := units.RAMInBytes(limit); err == nil {
 		return size
@@ -83,7 +88,7 @@ var (
 	ContextSizeHardLimit = parseContextLimit(os.Getenv("DEFANG_BUILD_CONTEXT_LIMIT"), DefaultContextSizeHardLimit)
 )
 
-func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode, selectPackBuilder func(builder string)) (string, error) {
+func getRemoteBuildContext(ctx context.Context, provider client.Provider, project, name string, build *types.BuildConfig, upload UploadMode) (string, error) {
 	root, err := filepath.Abs(build.Context)
 	if err != nil {
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
@@ -91,7 +96,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	switch upload {
 	case UploadModeIgnore:
-		_, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
+		_, err := createTarball(ctx, build.Context, build.Dockerfile, ArchiveTypeGzip)
 		if err != nil {
 			return "", err
 		}
@@ -102,8 +107,17 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
 	}
 
+	var archiveType ArchiveType
+	if build.Dockerfile == "" {
+		// No Dockerfile means we'll build with Railpack
+		archiveType = ArchiveTypeZip
+		build.Dockerfile = "*Railpack" // hint to CD that we want to use Railpack
+	} else {
+		archiveType = ArchiveTypeGzip
+	}
+
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createTarball(ctx, build.Context, build.Dockerfile, selectPackBuilder)
+	buffer, err := createTarball(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
 	}
@@ -232,13 +246,8 @@ func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) 
 	return patterns, dockerignore, nil
 }
 
-func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error, selectPackBuilder func(builder string)) error {
-	foundDockerfile := false
-	if dockerfile == "" {
-		dockerfile = "Dockerfile"
-	} else {
-		dockerfile = filepath.Clean(dockerfile)
-	}
+func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
+	dockerfile = filepath.Clean(dockerfile)
 
 	// Get the ignore patterns from the .dockerignore file
 	patterns, dockerignore, err := getDockerIgnorePatterns(root, dockerfile)
@@ -269,9 +278,8 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 
 		slashPath := filepath.ToSlash(relPath)
 
-		// we need the Dockerfile, even if it's in the .dockerignore file
 		if relPath == dockerfile {
-			foundDockerfile = true
+			// we need the Dockerfile, even if it's in the .dockerignore file
 		} else if relPath == dockerignore {
 			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile, but is needed by the builder
 		} else {
@@ -295,19 +303,15 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 		return err
 	}
 
-	if !foundDockerfile && dockerfile == "Dockerfile" {
-		// If the Dockerfile is not found and the Dockerfile is possibly set by Normalization, we should not return an error and use a pack builder
-		selectPackBuilder("*Railpack")
-	} else if !foundDockerfile {
-		return fmt.Errorf("the specified dockerfile could not be read: %q", dockerfile)
-	}
-
 	return nil
 }
 
-func createTarball(ctx context.Context, root, dockerfile string, selectPackBuilder func(builder string)) (*bytes.Buffer, error) {
+func createTarball(ctx context.Context, root string, dockerfile string, contentType ArchiveType) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
+
+	fmt.Println("Will use in the next PR: after rebase, we will use the contentType to determine the archive type", contentType)
+
 	buf := &bytes.Buffer{}
 	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
 	tarWriter := tar.NewWriter(gzipWriter)
@@ -365,7 +369,7 @@ func createTarball(ctx context.Context, root, dockerfile string, selectPackBuild
 			term.Warnf("the build context is larger than %s; use --debug or create .dockerignore to exclude caches and build artifacts", units.BytesSize(float64(buf.Len())))
 		}
 		return err
-	}, selectPackBuilder)
+	})
 
 	if err != nil {
 		return nil, err

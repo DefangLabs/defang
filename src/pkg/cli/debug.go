@@ -302,7 +302,7 @@ func findMatchingFiles(basepath, context, dockerfile string) []*defangv1.File {
 			}
 		}
 		return nil
-	}, func(builder string) {})
+	})
 
 	if err != nil && err != errFileLimitReached {
 		term.Debug("error walking the path:", err)

@@ -31,7 +31,7 @@
       "default": null
     }
   },
-  "build3": {
+  "normalized": {
     "build": {
       "context": ".",
       "dockerfile": "Dockerfile"

@@ -1,7 +1,7 @@
 services:
-  wrailpack-short:
+  railpack-short:
     build: .
-  wrailpack-long:
+  railpack-long:
     build:
       context: .
   railpackwithdockerfile:

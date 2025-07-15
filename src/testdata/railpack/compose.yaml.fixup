@@ -10,7 +10,7 @@
       "default": null
     }
   },
-  "wrailpack-long": {
+  "railpack-long": {
     "build": {
       "context": ".",
       "dockerfile": "*Railpack"
@@ -21,7 +21,7 @@
       "default": null
     }
   },
-  "wrailpack-short": {
+  "railpack-short": {
     "build": {
       "context": ".",
       "dockerfile": "*Railpack"

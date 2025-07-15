@@ -1,18 +1,18 @@
 name: railpack
 services:
+  railpack-long:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
+  railpack-short:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
   railpackwithdockerfile:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    networks:
-      default: null
-  wrailpack-long:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    networks:
-      default: null
-  wrailpack-short:
     build:
       context: .
       dockerfile: Dockerfile
