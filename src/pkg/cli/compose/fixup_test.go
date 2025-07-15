@@ -3,7 +3,6 @@ package compose
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -19,11 +18,7 @@ func TestFixup(t *testing.T) {
 		}
 		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeIgnore)
 		if err != nil {
-			if strings.Contains(err.Error(), "the specified dockerfile could not be read:") {
-				t.Logf("Skipping test because the dockerfile could not be read: %v", err)
-			} else {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
 		}
 
 		services := map[string]composeTypes.ServiceConfig{}
