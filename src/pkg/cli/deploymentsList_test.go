@@ -79,7 +79,7 @@ func TestDeploymentsList(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DeploymentsList() error = %v", err)
 		}
-		expectedOutput := "\x1b[1m\nProjectName  Provider  AccountId   Region     Deployment  DeployedAt\x1b[0m" + `
+		expectedOutput := "\x1b[1m\nPROJECTNAME  PROVIDER  ACCOUNTID   REGION     DEPLOYMENT  DEPLOYEDAT\x1b[0m" + `
 test         defang    1234567890  us-test-2  a1b2c3      ` + time.Time{}.Local().Format(time.RFC3339) + "\n"
 
 		receivedLines := strings.Split(stdout.String(), "\n")
