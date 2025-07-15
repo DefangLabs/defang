@@ -74,6 +74,11 @@ defang.exe
 .defang`
 )
 
+type ArchiveType string
+
+const ArchiveTypeZip ArchiveType = "application/zip"
+const ArchiveTypeGzip ArchiveType = "application/gzip"
+
 type WriterFactory interface {
 	CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error)
 	Close() error
@@ -157,37 +162,6 @@ func (zw *zipFactory) Close() error {
 	return nil
 }
 
-// getMimeTypeFromURL checks the MIME type of a URL using HTTP HEAD request
-func getMimeTypeFromURL(ctx context.Context, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		return "", fmt.Errorf("no Content-Type header found")
-	}
-
-	// Extract just the MIME type (remove charset, etc.)
-	if idx := strings.Index(contentType, ";"); idx != -1 {
-		contentType = contentType[:idx]
-	}
-
-	return strings.TrimSpace(contentType), nil
-}
-
 func parseContextLimit(limit string, def int64) int64 {
 	if size, err := units.RAMInBytes(limit); err == nil {
 		return size
@@ -238,17 +212,17 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	term.Info("Uploading the project files for", name)
 
-	contentType := "application/gzip" // default content type for tarballs
-	// Once this PR get merge this will work: https://github.com/DefangLabs/defang/pull/1301
+	// Once this PR get merge this will work, then continue: https://github.com/DefangLabs/defang/pull/1301
+	// contentType := "application/gzip" // default content type for tarballs
 	// if selectPackBuilder == "*Railpack" ||selectPackBuilder == "*Buildpacks" {
 	// 	// If the Dockerfile is "*", we upload a zip file instead of a tarball
 	// 	contentType = "application/zip"
 	// }
 
-	return uploadContent(ctx, provider, project, buffer, contentType, digest)
+	return uploadContent(ctx, provider, project, buffer, ArchiveTypeZip, digest)
 }
 
-func uploadContent(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType string, digest string) (string, error) {
+func uploadContent(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType ArchiveType, digest string) (string, error) {
 	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
 	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
@@ -257,7 +231,7 @@ func uploadContent(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, contentType, body)
+	resp, err := http.Put(ctx, res.Url, string(contentType), body)
 	if err != nil {
 		return "", err
 	}

@@ -49,7 +49,7 @@ func TestUploadContent(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" && r.Header.Get("Content-Type") != "application/zip" {
+		if r.Header.Get("Content-Type") != "application/gzip" || r.Header.Get("Content-Type") != "application/zip" {
 			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", r.Header.Get("Content-Type"))
 		}
 		w.WriteHeader(200)
