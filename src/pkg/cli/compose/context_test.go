@@ -49,15 +49,15 @@ func TestUploadTarball(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" {
-			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
+		if !(r.Header.Get("Content-Type") == string(ArchiveTypeGzip) || r.Header.Get("Content-Type") == string(ArchiveTypeZip)) {
+			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", r.Header.Get("Content-Type"))
 		}
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
 
 	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, digest)
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -65,10 +65,21 @@ func TestUploadTarball(t *testing.T) {
 		if url != server.URL+expectedPath {
 			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
+
+		t.Run("upload with zip", func(t *testing.T) {
+			url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+			if err != nil {
+				t.Fatalf("uploadContent() failed: %v", err)
+			}
+			if url != server.URL+path {
+				t.Errorf("Expected %v, got %v", server.URL+path, url)
+			}
+		})
+
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "")
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
 			t.Fatalf("uploadTarball() failed: %v", err)
 		}
@@ -92,7 +103,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "fileName.env"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -125,7 +136,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", "Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{".dockerignore", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -134,7 +145,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "", ArchiveTypeGzip)
+		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "", ArchiveTypeGzip)
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -145,7 +156,7 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "fileName.env"}
 		var actual []string
 		ar := tar.NewReader(g)
 		for {
@@ -171,14 +182,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing", ArchiveTypeGzip)
+		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "", ArchiveTypeGzip)
+		_, err := createArchive(context.Background(), "asdfqwer", "", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}

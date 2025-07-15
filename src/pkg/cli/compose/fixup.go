@@ -89,7 +89,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				}
 			}
 
-			// Pack the build context into a tarball and upload
+			// Pack the build context into a Archive and upload
 			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
 			if err != nil {
 				return err

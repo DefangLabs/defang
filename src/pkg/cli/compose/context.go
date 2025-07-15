@@ -2,6 +2,7 @@ package compose
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -9,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +79,89 @@ type ArchiveType string
 const ArchiveTypeZip ArchiveType = "application/zip"
 const ArchiveTypeGzip ArchiveType = "application/gzip"
 
+type WriterFactory interface {
+	CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error)
+	Close() error
+}
+
+type tarFactory struct {
+	*tar.Writer
+	*contextAwareWriter
+}
+
+func (tw *tarFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error) {
+	// Convert zip header to tar header
+	header, err := tar.FileInfoHeader(info, info.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if !info.Mode().IsRegular() {
+		return nil, nil
+	}
+
+	// Make reproducible; WalkDir walks files in lexical order.
+	header.ModTime = time.Unix(sourceDateEpoch, 0)
+	header.Gid = 0
+	header.Uid = 0
+	header.Name = slashPath
+	err = tw.WriteHeader(header)
+	return tw.Writer, err
+}
+
+func (tw *tarFactory) Close() error {
+	// Close the tar and gzip writers before returning the buffer
+	err := tw.Writer.Close()
+	if err != nil {
+		return err
+	}
+
+	err = tw.contextAwareWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type zipFactory struct {
+	*zip.Writer
+}
+
+func (zw *zipFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error) {
+	// Create a new zip file header
+	header := &zip.FileHeader{
+		Name:   slashPath,
+		Method: zip.Deflate,
+	}
+
+	// Make reproducible
+	header.Modified = time.Unix(sourceDateEpoch, 0)
+
+	if !info.Mode().IsRegular() {
+		if info.IsDir() {
+			header.Name = slashPath + "/" // Ensure directory paths end with slash
+			header.Method = zip.Store     // Directories are stored without compression
+			_, err := zw.Writer.CreateHeader(header)
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	// Create file entry in zip
+	writer, err := zw.Writer.CreateHeader(header)
+	return writer, err
+}
+
+func (zw *zipFactory) Close() error {
+	// Close the zip writer before returning the buffer
+	err := zw.Writer.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func parseContextLimit(limit string, def int64) int64 {
 	if size, err := units.RAMInBytes(limit); err == nil {
 		return size
@@ -96,7 +181,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 	switch upload {
 	case UploadModeIgnore:
-		_, err := createTarball(ctx, build.Context, build.Dockerfile, ArchiveTypeGzip)
+		_, err := createArchive(ctx, build.Context, build.Dockerfile, ArchiveTypeGzip)
 		if err != nil {
 			return "", err
 		}
@@ -117,7 +202,7 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)
-	buffer, err := createTarball(ctx, build.Context, build.Dockerfile, archiveType)
+	buffer, err := createArchive(ctx, build.Context, build.Dockerfile, archiveType)
 	if err != nil {
 		return "", err
 	}
@@ -139,11 +224,11 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	term.Info("Uploading the project files for", name)
-	return uploadTarball(ctx, provider, project, buffer, digest)
+	return uploadArchive(ctx, provider, project, buffer, archiveType, digest)
 }
 
-func uploadTarball(ctx context.Context, provider client.Provider, project string, body io.Reader, digest string) (string, error) {
-	// Upload the tarball to the fabric controller storage;; TODO: use a streaming API
+func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType ArchiveType, digest string) (string, error) {
+	// Upload the archive to the fabric controller storage;; TODO: use a streaming API
 	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
@@ -151,7 +236,7 @@ func uploadTarball(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, "application/gzip", body)
+	resp, err := http.Put(ctx, res.Url, string(contentType), body)
 	if err != nil {
 		return "", err
 	}
@@ -306,15 +391,20 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	return nil
 }
 
-func createTarball(ctx context.Context, root string, dockerfile string, contentType ArchiveType) (*bytes.Buffer, error) {
+func createArchive(ctx context.Context, root string, dockerfile string, contentType ArchiveType) (*bytes.Buffer, error) {
 	fileCount := 0
 	// TODO: use io.Pipe and do proper streaming (instead of buffering everything in memory)
 
-	fmt.Println("Will use in the next PR: after rebase, we will use the contentType to determine the archive type", contentType)
-
 	buf := &bytes.Buffer{}
-	gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
-	tarWriter := tar.NewWriter(gzipWriter)
+	var factory WriterFactory
+	if contentType == ArchiveTypeZip {
+		zipWriter := zip.NewWriter(buf)
+		factory = &zipFactory{zipWriter}
+	} else {
+		gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
+		tarWriter := tar.NewWriter(gzipWriter)
+		factory = &tarFactory{tarWriter, gzipWriter}
+	}
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
 	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
@@ -330,23 +420,9 @@ func createTarball(ctx context.Context, root string, dockerfile string, contentT
 			return err
 		}
 
-		header, err := tar.FileInfoHeader(info, info.Name())
-		if err != nil {
+		writer, err := factory.CreateHeader(info, slashPath)
+		if err != nil || writer == nil {
 			return err
-		}
-
-		// Make reproducible; WalkDir walks files in lexical order.
-		header.ModTime = time.Unix(sourceDateEpoch, 0)
-		header.Gid = 0
-		header.Uid = 0
-		header.Name = slashPath
-		err = tarWriter.WriteHeader(header)
-		if err != nil {
-			return err
-		}
-
-		if !info.Mode().IsRegular() {
-			return nil
 		}
 
 		file, err := os.Open(path)
@@ -361,7 +437,7 @@ func createTarball(ctx context.Context, root string, dockerfile string, contentT
 		}
 
 		bufLen := buf.Len()
-		_, err = io.Copy(tarWriter, file)
+		_, err = io.Copy(writer, file)
 		if int64(buf.Len()) > ContextSizeHardLimit {
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}
@@ -375,12 +451,8 @@ func createTarball(ctx context.Context, root string, dockerfile string, contentT
 		return nil, err
 	}
 
-	// Close the tar and gzip writers before returning the buffer
-	if err = tarWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	if err = gzipWriter.Close(); err != nil {
+	err = factory.Close() // Close the tar or zip writer
+	if err != nil {
 		return nil, err
 	}
 
