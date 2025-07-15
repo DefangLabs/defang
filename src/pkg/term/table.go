@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -35,7 +36,7 @@ func (t *Term) Table(slice interface{}, attributes ...string) error {
 		if i > 0 {
 			prefix = "\t"
 		}
-		_, err = fmt.Fprint(w, prefix, attr)
+		_, err = fmt.Fprint(w, prefix, strings.ToUpper(attr))
 		if err != nil {
 			return err
 		}

@@ -66,7 +66,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"Deployment  Name      Status         Endpoints  DomainName",
+				"DEPLOYMENT  NAME      STATUS         ENDPOINTS  DOMAINNAME",
 				"            service1  NOT_SPECIFIED  N/A        https://example.com",
 				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
 				"",
@@ -92,7 +92,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"Deployment  Name      Status         Endpoints                                  DomainName",
+				"DEPLOYMENT  NAME      STATUS         ENDPOINTS                                  DOMAINNAME",
 				"            service1  NOT_SPECIFIED  https://example.com, service1.internal:80  https://example.com",
 				" * Run `defang cert generate` to get a TLS certificate for your service(s)",
 				"",
@@ -116,7 +116,7 @@ func TestPrintServiceStatesAndEndpointsAndDomainname(t *testing.T) {
 				},
 			},
 			expectedLines: []string{
-				"Deployment  Name      Status         Endpoints",
+				"DEPLOYMENT  NAME      STATUS         ENDPOINTS",
 				"            service1  NOT_SPECIFIED  https://service1",
 				"",
 			},
