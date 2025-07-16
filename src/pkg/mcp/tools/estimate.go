@@ -92,7 +92,23 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		providerID := cliClient.ProviderAWS // Default to AWS
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", mode)
+		var region string
+		switch providerID {
+		case cliClient.ProviderAWS:
+			region = os.Getenv("AWS_REGION")
+			if region == "" {
+				region = "us-west-2" // Default AWS region
+			}
+		case cliClient.ProviderGCP:
+			region = os.Getenv("CLOUDSDK_COMPUTE_REGION")
+			if region == "" {
+				region = "us-central1" // Default GCP region
+			}
+		default:
+			return mcp.NewToolResultText("Unsupported provider for estimate"), nil
+		}
+
+		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, region, mode)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
 		}
