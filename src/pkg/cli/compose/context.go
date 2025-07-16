@@ -86,7 +86,7 @@ type WriterFactory interface {
 
 type tarFactory struct {
 	*tar.Writer
-	*contextAwareWriter
+	gzipWriter io.WriteCloser
 }
 
 func (tw *tarFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error) {
@@ -116,7 +116,7 @@ func (tw *tarFactory) Close() error {
 		return err
 	}
 
-	err = tw.contextAwareWriter.Close()
+	err = tw.gzipWriter.Close()
 	if err != nil {
 		return err
 	}
@@ -252,17 +252,17 @@ func uploadArchive(ctx context.Context, provider client.Provider, project string
 	return url, nil
 }
 
-type contextAwareWriter struct {
+type contextAwareReader struct {
 	ctx context.Context
-	io.WriteCloser
+	io.ReadCloser
 }
 
-func (cw contextAwareWriter) Write(p []byte) (n int, err error) {
+func (cr contextAwareReader) Read(p []byte) (n int, err error) {
 	select {
-	case <-cw.ctx.Done(): // Detect context cancelation
-		return 0, cw.ctx.Err()
+	case <-cr.ctx.Done(): // Detect context cancelation
+		return 0, cr.ctx.Err()
 	default:
-		return cw.WriteCloser.Write(p)
+		return cr.ReadCloser.Read(p)
 	}
 }
 
@@ -400,7 +400,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 		zipWriter := zip.NewWriter(buf)
 		factory = &zipFactory{zipWriter}
 	} else {
-		gzipWriter := &contextAwareWriter{ctx, gzip.NewWriter(buf)}
+		gzipWriter := gzip.NewWriter(buf)
 		tarWriter := tar.NewWriter(gzipWriter)
 		factory = &tarFactory{tarWriter, gzipWriter}
 	}
@@ -430,13 +430,16 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 		}
 		defer file.Close()
 
+		// Wrap the file reader with context-aware reader
+		contextReader := &contextAwareReader{ctx, file}
+
 		fileCount++
 		if fileCount == ContextFileLimit+1 {
 			term.Warnf("the build context contains more than %d files; use --debug or create .dockerignore to exclude caches and build artifacts", ContextFileLimit)
 		}
 
 		bufLen := buf.Len()
-		_, err = io.Copy(writer, file)
+		_, err = io.Copy(writer, contextReader)
 		if int64(buf.Len()) > ContextSizeHardLimit {
 			return fmt.Errorf("the build context is limited to %s; consider downloading large files in the Dockerfile or set the DEFANG_BUILD_CONTEXT_LIMIT environment variable", units.BytesSize(float64(ContextSizeHardLimit)))
 		}

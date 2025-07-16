@@ -38,7 +38,7 @@ func Test_parseContextLimit(t *testing.T) {
 	})
 }
 
-func TestUploadTarball(t *testing.T) {
+func TestUploadArchive(t *testing.T) {
 	const path = "/upload/x/"
 	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
@@ -59,7 +59,7 @@ func TestUploadTarball(t *testing.T) {
 	t.Run("upload with digest", func(t *testing.T) {
 		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadArchive() failed: %v", err)
 		}
 		const expectedPath = path + digest
 		if url != server.URL+expectedPath {
@@ -81,7 +81,7 @@ func TestUploadTarball(t *testing.T) {
 	t.Run("force upload without digest", func(t *testing.T) {
 		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadArchive() failed: %v", err)
 		}
 		if url != server.URL+path {
 			t.Errorf("Expected %v, got %v", server.URL+path, url)
