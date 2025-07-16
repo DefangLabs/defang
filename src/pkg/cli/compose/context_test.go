@@ -103,7 +103,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", ".env", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -136,7 +136,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{".dockerignore", "Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -156,7 +156,7 @@ func TestCreateTarballReader(t *testing.T) {
 		}
 		defer g.Close()
 
-		expected := []string{".dockerignore", ".env", "fileName.env"}
+		expected := []string{".dockerignore", ".env", "Dockerfile", "fileName.env"}
 		var actual []string
 		ar := tar.NewReader(g)
 		for {

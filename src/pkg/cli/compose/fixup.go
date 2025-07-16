@@ -86,6 +86,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 
 					// Undo normalization
 					svccfg.Build.Dockerfile = ""
+
+					term.Debug(err)
 				}
 			}
 
