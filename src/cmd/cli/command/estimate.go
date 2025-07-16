@@ -3,7 +3,6 @@ package command
 import (
 	"fmt"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -33,6 +32,14 @@ func makeEstimateCmd() *cobra.Command {
 			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
 				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
 			}
+			if region == "" {
+				switch providerID {
+				case cliClient.ProviderAWS:
+					region = "us-west-2" // default region for AWS
+				case cliClient.ProviderGCP:
+					region = "us-central1" // default region for GCP
+				}
+			}
 
 			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
 			if err != nil {
@@ -47,6 +54,6 @@ func makeEstimateCmd() *cobra.Command {
 	}
 
 	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
-	estimateCmd.Flags().StringP("region", "r", pkg.Getenv("AWS_REGION", "us-west-2"), "which cloud region to estimate")
+	estimateCmd.Flags().StringP("region", "r", "", "which cloud region to estimate")
 	return estimateCmd
 }
