@@ -26,6 +26,12 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 			mcp.Description("Path to current working directory"),
 		),
 
+		mcp.WithString("provider",
+			mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
+			mcp.DefaultString("AWS"),
+			mcp.Enum("AWS", "GCP"),
+		),
+
 		mcp.WithString("deployment_mode",
 			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
 			mcp.DefaultString("AFFORDABLE"),
@@ -51,6 +57,11 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		modeString, ok := request.Params.Arguments["deployment_mode"].(string)
 		if !ok {
 			modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
+		}
+
+		providerString, ok := request.Params.Arguments["provider"].(string)
+		if !ok {
+			providerString = "aws" // Default to AWS if not provided
 		}
 
 		// This logic is replicated from src/cmd/cli/command/mode.go
@@ -89,7 +100,13 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		}
 
 		defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
-		providerID := cliClient.ProviderAWS // Default to AWS
+
+		var providerID cliClient.ProviderID
+		err = providerID.Set(providerString)
+		if err != nil {
+			term.Error("Invalid provider specified", "error", err)
+			return mcp.NewToolResultErrorFromErr("Invalid provider specified", err), nil
+		}
 
 		term.Debug("Function invoked: cli.RunEstimate")
 		var region string
