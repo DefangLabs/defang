@@ -95,15 +95,9 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		var region string
 		switch providerID {
 		case cliClient.ProviderAWS:
-			region = os.Getenv("AWS_REGION")
-			if region == "" {
-				region = "us-west-2" // Default AWS region
-			}
+			region = "us-west-2" // Default AWS region
 		case cliClient.ProviderGCP:
-			region = os.Getenv("CLOUDSDK_COMPUTE_REGION")
-			if region == "" {
-				region = "us-central1" // Default GCP region
-			}
+			region = "us-central1" // Default GCP region
 		default:
 			return mcp.NewToolResultText("Unsupported provider for estimate"), nil
 		}
