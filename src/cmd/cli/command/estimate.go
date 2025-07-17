@@ -3,7 +3,6 @@ package command
 import (
 	"fmt"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -27,11 +26,24 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
+			if providerID == cliClient.ProviderAuto {
+				_, err = interactiveSelectProvider([]cliClient.ProviderID{
+					cliClient.ProviderAWS,
+					cliClient.ProviderGCP,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to select provider: %w", err)
+				}
+			}
+
 			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
 				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
+			}
+			if region == "" {
+				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
 			}
 
 			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
@@ -47,6 +59,6 @@ func makeEstimateCmd() *cobra.Command {
 	}
 
 	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
-	estimateCmd.Flags().StringP("region", "r", pkg.Getenv("AWS_REGION", "us-west-2"), "which cloud region to estimate")
+	estimateCmd.Flags().StringP("region", "r", "", "which cloud region to estimate")
 	return estimateCmd
 }
