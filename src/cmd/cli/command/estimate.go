@@ -26,6 +26,16 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 
+			if providerID == cliClient.ProviderAuto {
+				_, err = interactiveSelectProvider([]cliClient.ProviderID{
+					cliClient.ProviderAWS,
+					cliClient.ProviderGCP,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to select provider: %w", err)
+				}
+			}
+
 			var previewProvider cliClient.Provider = &cliClient.PlaygroundProvider{FabricClient: client}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
