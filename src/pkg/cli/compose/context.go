@@ -180,11 +180,11 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 	}
 
 	var archiveType ArchiveType
-	// If we have a Railpack build, we use a zip archive
 	if build.Dockerfile == RAILPACK {
+		// If we have a Railpack build, we use a zip archive
 		archiveType = ArchiveTypeZip
-		// We use tar for all other builds
 	} else {
+		// We use gzip tar for all other builds
 		archiveType = ArchiveTypeGzip
 	}
 
@@ -363,8 +363,8 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 
 		slashPath := filepath.ToSlash(relPath)
 
-		// we need the Dockerfile, even if it's in the .dockerignore file
 		if relPath == dockerfile {
+			// we need the Dockerfile, even if it's in the .dockerignore file
 		} else if relPath == dockerignore {
 			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile, but is needed by the builder
 		} else {

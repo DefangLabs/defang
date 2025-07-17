@@ -75,7 +75,6 @@ func TestUploadArchive(t *testing.T) {
 				t.Errorf("Expected %v, got %v", server.URL+path, url)
 			}
 		})
-
 	})
 
 	t.Run("force upload without digest", func(t *testing.T) {
