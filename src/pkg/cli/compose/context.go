@@ -179,25 +179,22 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 		return "", fmt.Errorf("invalid build context: %w", err) // already checked in ValidateProject
 	}
 
+	var archiveType ArchiveType
+	// If we have a Railpack build, we use a zip archive
+	if build.Dockerfile == RAILPACK {
+		archiveType = ArchiveTypeZip
+		// We use tar for all other builds
+	} else {
+		archiveType = ArchiveTypeGzip
+	}
+
 	switch upload {
 	case UploadModeIgnore:
-		if build.Dockerfile == "" {
-			build.Dockerfile = "*Railpack"
-		}
 		// `compose config`, ie. dry-run: don't upload the archive, just return the path as-is
 		return root, nil
 	case UploadModeEstimate:
 		// For estimation, we don't bother packaging the files, we just return a placeholder URL
 		return fmt.Sprintf("s3://cd-preview/%v", time.Now().Unix()), nil
-	}
-
-	var archiveType ArchiveType
-	if build.Dockerfile == "" {
-		// No Dockerfile means we'll build with Railpack
-		archiveType = ArchiveTypeZip
-		build.Dockerfile = "*Railpack" // hint to CD that we want to use Railpack
-	} else {
-		archiveType = ArchiveTypeGzip
 	}
 
 	term.Info("Packaging the project files for", name, "at", root)

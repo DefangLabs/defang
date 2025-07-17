@@ -16,6 +16,8 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
+const RAILPACK = "*Railpack"
+
 func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
@@ -77,16 +79,15 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
-					term.Debug("stat %q: %v", dockerfilePath, err)
+					term.Debugf("stat %q: %v", dockerfilePath, err)
 					// In this case we know that the dockerfile is not in the location the compose file specifies,
 					// so can assume that the dockerfile has been normalized to the default "Dockerfile".
 					if svccfg.Build.Dockerfile != "Dockerfile" {
 						// An explicit Dockerfile was specified, but it does not exist.
 						return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 					}
-
-					// Undo normalization
-					svccfg.Build.Dockerfile = ""
+					// hint to CD that we want to use Railpack
+					svccfg.Build.Dockerfile = RAILPACK
 				}
 			}
 
