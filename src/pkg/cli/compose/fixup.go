@@ -77,17 +77,16 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 				// Check if the dockerfile exists
 				dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
 				if _, err := os.Stat(dockerfilePath); err != nil {
+					term.Debug("stat %q: %v", dockerfilePath, err)
 					// In this case we know that the dockerfile is not in the location the compose file specifies,
 					// so can assume that the dockerfile has been normalized to the default "Dockerfile".
 					if svccfg.Build.Dockerfile != "Dockerfile" {
 						// An explicit Dockerfile was specified, but it does not exist.
-						return fmt.Errorf("service %q: dockerfile not found: %w", svccfg.Name, ErrDockerfileNotFound)
+						return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 					}
 
 					// Undo normalization
 					svccfg.Build.Dockerfile = ""
-
-					term.Debug(err)
 				}
 			}
 
