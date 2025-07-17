@@ -43,12 +43,7 @@ func makeEstimateCmd() *cobra.Command {
 				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
 			}
 			if region == "" {
-				switch providerID {
-				case cliClient.ProviderAWS:
-					region = "us-west-2" // default region for AWS
-				case cliClient.ProviderGCP:
-					region = "us-central1" // default region for GCP
-				}
+				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
 			}
 
 			estimate, err := cli.RunEstimate(ctx, project, client, previewProvider, providerID, region, mode.Value())
