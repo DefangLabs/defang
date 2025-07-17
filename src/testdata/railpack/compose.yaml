@@ -1,0 +1,10 @@
+services:
+  railpack-short:
+    build: .
+  railpack-long:
+    build:
+      context: .
+  railpackwithdockerfile:
+    build:
+      context: .
+      dockerfile: Dockerfile

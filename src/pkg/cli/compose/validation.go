@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -145,11 +144,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			}
 			if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
 				return fmt.Errorf("service %q: dockerfile path must be inside the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
-			}
-			// Check if the dockerfile exists
-			dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
-			if _, err := os.Stat(dockerfilePath); err != nil {
-				return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 			}
 		}
 		if svccfg.Build.SSH != nil {
