@@ -66,7 +66,7 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 		return "", err
 	}
 
-	term.Info("Generating deployment preview")
+	term.Info("Generating deployment preview, this may take a few minutes...")
 	var pulumiPreviewLogLines []string
 	options := TailOptions{
 		Deployment: resp.Etag,
