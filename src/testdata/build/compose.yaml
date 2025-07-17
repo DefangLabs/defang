@@ -15,3 +15,6 @@ services:
       target: test
       args:
         BASE_IMAGE: alpine
+  normalized:
+    build:
+      context: .

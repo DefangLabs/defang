@@ -1,13 +1,8 @@
 {
-  "build1": {
+  "railpack-long": {
     "build": {
       "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "BASE_IMAGE": "nginx"
-      },
-      "target": "test",
-      "shm_size": "2147483648"
+      "dockerfile": "*Railpack"
     },
     "command": null,
     "entrypoint": null,
@@ -15,15 +10,10 @@
       "default": null
     }
   },
-  "build2": {
+  "railpack-short": {
     "build": {
       "context": ".",
-      "dockerfile": "Dockerfile",
-      "args": {
-        "BASE_IMAGE": "alpine"
-      },
-      "target": "test",
-      "shm_size": "2147483648"
+      "dockerfile": "*Railpack"
     },
     "command": null,
     "entrypoint": null,
@@ -31,10 +21,10 @@
       "default": null
     }
   },
-  "normalized": {
+  "railpackwithdockerfile": {
     "build": {
       "context": ".",
-      "dockerfile": "Dockerfile"
+      "dockerfile": "*Railpack"
     },
     "command": null,
     "entrypoint": null,

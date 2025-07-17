@@ -1,26 +1,18 @@
-name: build
+name: railpack
 services:
-  build1:
+  railpack-long:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        BASE_IMAGE: nginx
-      target: test
-      shm_size: "2147483648"
     networks:
       default: null
-  build2:
+  railpack-short:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        BASE_IMAGE: alpine
-      target: test
-      shm_size: "2147483648"
     networks:
       default: null
-  normalized:
+  railpackwithdockerfile:
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,4 +20,4 @@ services:
       default: null
 networks:
   default:
-    name: build_default
+    name: railpack_default
