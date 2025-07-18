@@ -97,7 +97,7 @@ func (a *AwsEcs) updateStackAndWait(ctx context.Context, templateBody string) er
 		StackName: uso.StackId,
 	}, stackTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set up %s stack: %w", a.stackName, err)
 	}
 	return a.fillWithOutputs(dso)
 }
