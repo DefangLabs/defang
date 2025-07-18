@@ -1,0 +1,20 @@
+services:
+  app:
+    image: app
+    models: # per docs, should support list as well
+      ai_model: {}
+  withendpoint:
+    image: app
+    models:
+      my_model:
+        endpoint_var: MODEL_URL
+
+models:
+  ai_model:
+    model: ai/model
+  my_model:
+    model: ai/model
+    context_size: 1024
+    runtime_flags:
+      - "--a-flag"
+      - "--another-flag=42"
