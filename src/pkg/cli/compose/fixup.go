@@ -12,13 +12,12 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/compose-spec/compose-go/v2/types"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 const RAILPACK = "*Railpack"
 
-func FixupServices(ctx context.Context, provider client.Provider, project *types.Project, upload UploadMode) error {
+func FixupServices(ctx context.Context, provider client.Provider, project *composeTypes.Project, upload UploadMode) error {
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
 	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
 	if err != nil {
@@ -67,6 +66,12 @@ func FixupServices(ctx context.Context, provider client.Provider, project *types
 
 		// update the concrete service with the fixed up object
 		project.Services[svccfg.Name] = svccfg
+	}
+
+	for name, model := range project.Models {
+		model.Name = name // ensure the model has a name
+		svccfg := fixupModel(model, project)
+		project.Services[svccfg.Name] = *svccfg
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(provider, project)
@@ -189,17 +194,17 @@ func parsePortString(port string) (uint32, error) {
 	}
 }
 
-func fixupLLM(svccfg *types.ServiceConfig) {
+func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 	image := getImageRepo(svccfg.Image)
 	if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		var port uint32 = 80
 		term.Debugf("service %q: adding LLM host port %d", svccfg.Name, port)
-		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 }
 
-func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
@@ -215,12 +220,12 @@ func fixupPostgresService(svccfg *types.ServiceConfig, provider client.Provider,
 			}
 		}
 		term.Debugf("service %q: adding postgres host port %d", svccfg.Name, port)
-		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 	return nil
 }
 
-func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
@@ -250,12 +255,12 @@ func fixupMongoService(svccfg *types.ServiceConfig, provider client.Provider, up
 			break // done
 		}
 		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
-		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 	return nil
 }
 
-func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider, upload UploadMode) error {
+func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
 	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
@@ -275,55 +280,102 @@ func fixupRedisService(svccfg *types.ServiceConfig, provider client.Provider, up
 			}
 		}
 		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
-		svccfg.Ports = []types.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	}
 	return nil
 }
 
-func fixupModelProvider(svccfg *types.ServiceConfig, project *types.Project) {
-	// Declare a private network for the model provider
-	const modelProviderNetwork = "model_provider_private"
+// Declare a private network for the model provider
+const modelProviderNetwork = "model_provider_private"
 
+func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project) *composeTypes.ServiceConfig {
+	svccfg := &composeTypes.ServiceConfig{
+		Name:       model.Name,
+		Extensions: model.Extensions,
+	}
+	makeAccessGatewayService(svccfg, project, model.Model) // TODO: pass other model options too
+	return svccfg
+}
+
+func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) {
+	var model string
+	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
+		model = modelVals[0]
+	}
+	makeAccessGatewayService(svccfg, project, model)
+}
+
+func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string) {
 	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
 	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
-	urlEnv := envName + "_URL"
+	endpointEnvVar := envName + "_URL"
 	urlVal := "http://" + svccfg.Name + "/api/v1/"
-	modelEnvKey := envName + "_MODEL"
-	modelVals := svccfg.Provider.Options["model"]
+	modelEnvVar := envName + "_MODEL"
 
 	empty := ""
-	// svccfg.Deploy.Resources.Reservations.Limits = &types.Resources{} TODO: avoid memory limits warning
+	// svccfg.Deploy.Resources.Reservations.Limits = &composeTypes.Resources{} TODO: avoid memory limits warning
 	if svccfg.Environment == nil {
-		svccfg.Environment = types.MappingWithEquals{}
+		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
 	if _, exists := svccfg.Environment["OPENAI_API_KEY"]; !exists {
 		svccfg.Environment["OPENAI_API_KEY"] = &empty // disable auth; see https://github.com/DefangLabs/openai-access-gateway/pull/5
 	}
-	// svccfg.HealthCheck = &types.ServiceHealthCheckConfig{} TODO: add healthcheck
+	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "defangio/openai-access-gateway"
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
-		svccfg.Networks = make(map[string]*types.ServiceNetworkConfig)
+		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
 	} else {
 		delete(svccfg.Networks, "default") // remove the default network
 	}
 	svccfg.Networks[modelProviderNetwork] = nil
-	svccfg.Ports = []types.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	svccfg.Ports = []composeTypes.ServicePortConfig{{Target: 80, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
-	project.Networks[modelProviderNetwork] = types.NetworkConfig{Name: modelProviderNetwork}
+	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
-	// Set environment variables (url and model) for any service that depends on the provider pseudo service
+	// Set environment variables (url and model) for any service that depends on the model
 	for _, dependency := range project.Services {
 		if _, ok := dependency.DependsOn[svccfg.Name]; ok {
 			if dependency.Environment == nil {
-				dependency.Environment = make(types.MappingWithEquals)
+				dependency.Environment = make(composeTypes.MappingWithEquals)
 			}
 			dependency.Networks[modelProviderNetwork] = nil
-			if _, ok := dependency.Environment[urlEnv]; !ok {
-				dependency.Environment[urlEnv] = &urlVal
+			if _, ok := dependency.Environment[endpointEnvVar]; !ok {
+				dependency.Environment[endpointEnvVar] = &urlVal
 			}
-			if _, ok := dependency.Environment[modelEnvKey]; !ok && len(modelVals) == 1 {
-				dependency.Environment[modelEnvKey] = &modelVals[0]
+			if _, ok := dependency.Environment[modelEnvVar]; !ok && model != "" {
+				dependency.Environment[modelEnvVar] = &model
+			}
+		}
+
+		if modelDep, ok := dependency.Models[svccfg.Name]; ok {
+			endpointVar := endpointEnvVar
+			if modelDep != nil && modelDep.EndpointVariable != "" {
+				endpointVar = modelDep.EndpointVariable
+			}
+			modelVar := modelEnvVar
+			if modelDep != nil && modelDep.ModelVariable != "" {
+				modelVar = modelDep.ModelVariable
+			}
+			if dependency.Environment == nil {
+				dependency.Environment = make(composeTypes.MappingWithEquals)
+			}
+			dependency.Networks[modelProviderNetwork] = nil
+			if _, ok := dependency.Environment[endpointVar]; !ok {
+				dependency.Environment[endpointVar] = &urlVal
+			}
+			if _, ok := dependency.Environment[modelVar]; !ok && model != "" {
+				dependency.Environment[modelVar] = &model
+			}
+			// If the model is not already declared as a dependency, add it
+			if _, ok := dependency.DependsOn[svccfg.Name]; !ok {
+				if dependency.DependsOn == nil {
+					dependency.DependsOn = make(map[string]composeTypes.ServiceDependency)
+				}
+				dependency.DependsOn[svccfg.Name] = composeTypes.ServiceDependency{
+					Condition: composeTypes.ServiceConditionStarted,
+					Required:  true,
+				}
 			}
 		}
 	}
