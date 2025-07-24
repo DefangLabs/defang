@@ -288,6 +288,7 @@ func handleVSCodeConfig(configPath string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
+	// #nosec G306 - config file does not contain sensitive data
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
@@ -338,6 +339,7 @@ func handleStandardConfig(configPath string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
+	// #nosec G306 - config file does not contain sensitive data
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
