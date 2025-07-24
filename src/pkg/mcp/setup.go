@@ -82,9 +82,13 @@ var ValidClients = append(
 	ValidVSCodeClients...,
 )
 
-// isValidClient checks if the provided client is in the list of valid clients
-func isValidClient(client MCPClient) bool {
-	return slices.Contains(ValidClients, client)
+func ParseMCPClient(clientStr string) (MCPClient, error) {
+	clientStr = strings.ToLower(clientStr)
+	client := MCPClient(clientStr)
+	if !slices.Contains(ValidClients, client) {
+		return "", fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
+	}
+	return client, nil
 }
 
 // ClientInfo defines where each client stores its MCP configuration
@@ -348,11 +352,9 @@ func handleStandardConfig(configPath string) error {
 }
 
 func SetupClient(clientValue string) error {
-	// cast the client string to MCPClient
-	client := MCPClient(strings.ToLower(clientValue))
-
-	// Validate client
-	if !isValidClient(client) {
+	client, err := ParseMCPClient(clientValue)
+	if err != nil {
+		// cast the client string to MCPClient
 		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
 	}
 
