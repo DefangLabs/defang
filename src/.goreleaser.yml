@@ -150,7 +150,7 @@ announce:
     enabled: true
 
 nightly:
-  tag_name: devel
+  tag_name: nightly
   publish_release: true
   keep_single_release: true
   version_template: "{{ incpatch .Version }}-{{ .ShortCommit }}-nightly"
