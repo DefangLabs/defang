@@ -135,7 +135,7 @@ updates, so there may be small windows of downtime during redeployment.
 Services will be exposed directly to the public internet for easy debugging.
 This mode emphasizes affordability over availability.
 
-Cost     Quantity          Service  Description
+COST     QUANTITY          SERVICE  DESCRIPTION
 $1.62    14600 GB-Hours    app      AmazonECS USW2-Fargate-EphemeralStorage-GB-Hours (20 GB * 730 hours)
 $6.49    1460 GB-Hours     app      AmazonECS USW2-Fargate-GB-Hours (2 GB * 730 hours)
 -$4.54   1460 GB-Hours     app      AmazonECS USW2-Fargate-GB-Hours-SpotDiscount (Estimated @ 70%)

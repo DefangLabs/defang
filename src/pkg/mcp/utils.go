@@ -32,7 +32,7 @@ func SetupKnowledgeBase() error {
 
 	for _, filename := range filenames {
 		term.Debugf("Downloading knowledge base file: %s", filename)
-		err := downloadFile(KnowledgeBaseDir+"/"+filename, AskDefangBaseURL+"/"+DocumentationEndpoint+"/"+filename)
+		err := downloadKnowledgeBase(KnowledgeBaseDir+"/"+filename, "/"+DocumentationEndpoint+"/"+filename)
 		if err != nil {
 			term.Error("Failed to download knowledge base file", "error", err, "filename", filename)
 			return err
@@ -43,7 +43,7 @@ func SetupKnowledgeBase() error {
 	return nil
 }
 
-func downloadFile(filepath string, url string) (err error) {
+func downloadKnowledgeBase(filepath string, path string) (err error) {
 	// Create the file
 	out, err := os.Create(filepath)
 	term.Debugf("Creating file: %s", filepath)
@@ -54,10 +54,10 @@ func downloadFile(filepath string, url string) (err error) {
 	defer out.Close()
 
 	// Get the data
-	resp, err := http.Get(url)
-	term.Debugf("Downloading file: %s", url)
+	resp, err := http.Get(AskDefangBaseURL + path)
+	term.Debugf("Downloading file: %s", path)
 	if err != nil {
-		term.Error("Failed to download file", "error", err, "url", url)
+		term.Error("Failed to download file", "error", err, "url", path)
 		return err
 	}
 	defer resp.Body.Close()
@@ -65,7 +65,7 @@ func downloadFile(filepath string, url string) (err error) {
 	// Check server response
 	term.Debugf("Checking server response: %s", resp.Status)
 	if resp.StatusCode != http.StatusOK {
-		term.Error("Failed to download file", "error", fmt.Errorf("bad status: %s", resp.Status), "url", url)
+		term.Error("Failed to download file", "error", fmt.Errorf("bad status: %s", resp.Status), "url", path)
 		return fmt.Errorf("bad status: %s", resp.Status)
 	}
 

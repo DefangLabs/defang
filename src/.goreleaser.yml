@@ -54,9 +54,9 @@ archives:
   - id: defang-archive
     format_overrides:
       - goos: darwin
-        format: zip
+        formats: [zip]
       - goos: windows
-        format: zip
+        formats: [zip]
     # replace "darwin" with "macOS" in the filename; replace "all" with ""; NOTE: if you change this, also change go.yml GitHub Actions workflow
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}{{ if ne .Arch "all" }}_{{ .Arch }}{{ end }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     hooks:

@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -118,7 +119,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
-	if len(bs.services) > 0 && !pkg.Contains(bs.services, response.GetService()) {
+	if len(bs.services) > 0 && !slices.Contains(bs.services, response.GetService()) {
 		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
 
@@ -157,7 +158,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		if entry.Etag != "" && bs.etag != "" && entry.Etag != bs.etag {
 			continue
 		}
-		if entry.Service != "" && len(bs.services) > 0 && !pkg.Contains(bs.services, entry.Service) {
+		if entry.Service != "" && len(bs.services) > 0 && !slices.Contains(bs.services, entry.Service) {
 			continue
 		}
 		entries = append(entries, entry)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -54,7 +53,7 @@ func ValidateProject(project *composeTypes.Project) error {
 				continue
 			}
 			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
-				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
+				errs = append(errs, fmt.Errorf("the service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
 			}
 		}
 	}
@@ -145,11 +144,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			}
 			if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
 				return fmt.Errorf("service %q: dockerfile path must be inside the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
-			}
-			// Check if the dockerfile exists
-			dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
-			if _, err := os.Stat(dockerfilePath); err != nil {
-				return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 			}
 		}
 		if svccfg.Build.SSH != nil {
@@ -339,7 +333,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 	if managedPostgres {
 		// Ensure the image is a valid Postgres image
 		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "postgres") {
+		if !strings.HasSuffix(image, "postgres") && !strings.HasSuffix(image, "pgvector") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(postgresExtension); err != nil {

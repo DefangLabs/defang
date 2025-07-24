@@ -45,6 +45,7 @@ func (q ServiceQuotas) ValidateQuotas(service *types.ServiceConfig) error {
 				if device.Count == -1 {
 					deviceCount = 1
 				} else {
+					// #nosec G115 - device.Count is expected to be a small number
 					deviceCount = uint32(device.Count)
 				}
 				if q.Gpus == 0 || deviceCount > q.Gpus {

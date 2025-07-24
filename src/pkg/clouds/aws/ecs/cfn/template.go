@@ -124,6 +124,7 @@ func createTemplate(stack string, containers []types.Container, overrides Templa
 		},
 	}
 
+	// #nosec G101 - not a secret
 	const _privateRepoSecret = "PrivateRepoSecret"
 	// 5. ECR pull-through cache rules
 	// TODO: Creating pull through cache rules isn't supported in the following Regions:

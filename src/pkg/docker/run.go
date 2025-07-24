@@ -18,7 +18,7 @@ func (d Docker) Run(ctx context.Context, env map[string]string, cmd ...string) (
 		AutoRemove:      true, // --rm; FIXME: this causes "No such container" if the container exits early
 		PublishAllPorts: true, // -P
 		Resources: container.Resources{
-			Memory: int64(d.memory),
+			Memory: int64(d.memory), // #nosec G115 - memory is expected to be a small number
 		},
 	}, nil, parsePlatform(d.platform), "")
 	if err != nil {

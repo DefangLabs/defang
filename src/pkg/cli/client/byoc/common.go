@@ -44,6 +44,8 @@ func GetPulumiBackend(stateUrl string) (string, string, error) {
 }
 
 func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
+	// TODO - use enums to define commands instead of passing strings down from the caller
+	// #nosec G204
 	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	command.Dir = dir
 	command.Env = env
