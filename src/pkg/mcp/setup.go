@@ -351,12 +351,7 @@ func SetupClient(clientValue string) error {
 
 	// Validate client
 	if !isValidClient(client) {
-		// Convert ValidClients to []string for strings.Join
-		validClientsStr := make([]string, len(ValidClients))
-		for i, c := range ValidClients {
-			validClientsStr[i] = string(c)
-		}
-		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, strings.Join(validClientsStr, ", "))
+		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
 	}
 
 	track.Evt("MCP Setup Client: ", track.P("client", client))
