@@ -31,9 +31,7 @@ type MCPConfig struct {
 
 // VSCodeConfig represents the VSCode mcp.json structure
 type VSCodeConfig struct {
-	MCP struct {
-		Servers map[string]VSCodeMCPServerConfig `json:"servers"`
-	} `json:"mcp"`
+	Servers map[string]VSCodeMCPServerConfig `json:"servers"`
 	// Other VSCode settings can be preserved with this field
 	Other map[string]interface{} `json:"-"`
 }
