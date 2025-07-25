@@ -249,7 +249,6 @@ func handleVSCodeConfig(configPath string) error {
 			serversSection = existingData["servers"]
 		}
 
-		// get
 		if mcpMap, ok := serversSection.(map[string]interface{}); ok {
 			mcpMap["defang"] = config
 			existingData["servers"] = mcpMap
