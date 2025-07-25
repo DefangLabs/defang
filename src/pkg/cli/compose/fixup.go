@@ -97,11 +97,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			}
 
 			// Pack the build context into a Archive and upload
-			url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
-			if err != nil {
-				return err
+			if !strings.Contains(svccfg.Build.Context, "://") {
+				url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
+				if err != nil {
+					return err
+				}
+				svccfg.Build.Context = url
 			}
-			svccfg.Build.Context = url
 
 			var removedArgs []string
 			for key, value := range svccfg.Build.Args {
@@ -143,8 +145,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				delete(svccfg.Environment, key) // remove the empty key; this is safe
 				continue
 			}
-			if value == nil {
-				continue // will be from config
+			if value == nil || *value == "${"+key+"}" {
+				continue // actual value will be from config
 			}
 
 			// Check if the environment variable is an existing config; if so, mark it as such

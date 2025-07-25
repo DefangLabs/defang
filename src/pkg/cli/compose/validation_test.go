@@ -16,22 +16,6 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-type validationMockProvider struct {
-	client.Provider
-	configs []string
-}
-
-func (m validationMockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
-	return &defangv1.Secrets{
-		Names:   m.configs,
-		Project: "mock-project",
-	}, nil
-}
-
-func (m validationMockProvider) ServiceDNS(name string) string {
-	return "mock-" + name
-}
-
 func TestValidationAndConvert(t *testing.T) {
 	oldTerm := term.DefaultTerm
 	t.Cleanup(func() {
@@ -40,9 +24,7 @@ func TestValidationAndConvert(t *testing.T) {
 
 	t.Setenv("NODE_ENV", "if-you-see-this-env-was-used") // for interpolate/compose.yaml; should be ignored
 
-	mockClient := validationMockProvider{
-		configs: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA"},
-	}
+	mockClient := client.MockProvider{}
 	listConfigNamesFunc := func(ctx context.Context) ([]string, error) {
 		configs, err := mockClient.ListConfig(ctx, &defangv1.ListConfigsRequest{})
 		if err != nil {
