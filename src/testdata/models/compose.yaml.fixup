@@ -22,7 +22,7 @@
     "entrypoint": null,
     "environment": {
       "AI_MODEL_MODEL": "ai/model",
-      "AI_MODEL_URL": "http://ai-model/api/v1/"
+      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
     },
     "image": "app",
     "models": {
@@ -55,7 +55,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
-      "MODEL_URL": "http://my-model/api/v1/",
+      "MODEL_URL": "http://mock-my-model/api/v1/",
       "MY_MODEL_MODEL": "ai/model"
     },
     "image": "app",

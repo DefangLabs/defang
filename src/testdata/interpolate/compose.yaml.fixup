@@ -10,6 +10,7 @@
       "NOP": "abc$def",
       "NOP_BRACED": "abc${def}",
       "PORT": "8080",
+      "VAR1": "${VAR1}",
       "interpolate": "value"
     },
     "image": "alpine",
