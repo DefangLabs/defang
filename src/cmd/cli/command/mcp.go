@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -110,8 +109,7 @@ var mcpSetupCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Debug("Setting up MCP client")
 		client, _ := cmd.Flags().GetString("client")
-		client = strings.ToLower(client)
-		term.Debug("Client: ", client)
+		term.Debugf("MCP Client: %q", client)
 		if err := mcp.SetupClient(client); err != nil {
 			return err
 		}

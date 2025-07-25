@@ -22,6 +22,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -294,7 +295,7 @@ func SetupCommands(ctx context.Context, version string) {
 	// MCP Command
 	mcpCmd.AddCommand(mcpSetupCmd)
 	mcpCmd.AddCommand(mcpServerCmd)
-	mcpSetupCmd.Flags().String("client", "", "MCP setup client (supports: claude, windsurf, cursor, vscode)")
+	mcpSetupCmd.Flags().String("client", "", fmt.Sprintf("MCP setup client %v", mcp.ValidClients))
 	mcpServerCmd.Flags().Int("auth-server", 0, "auth server port")
 	mcpSetupCmd.MarkFlagRequired("client")
 	RootCmd.AddCommand(mcpCmd)
