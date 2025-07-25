@@ -156,14 +156,14 @@ func (c *Loader) NewProjectOptions() (*cli.ProjectOptions, error) {
 					if hasSubstitution(templ, key) {
 						// We don't (yet) support substitution patterns during deployment
 						if inEnv {
-							term.Warnf("Environment variable %q is not used; add it to `.env` if needed", key)
+							term.Warnf("Environment variable %q is ignored; add it to `.env` if needed", key)
 						} else {
 							term.Debugf("Unresolved environment variable %q", key)
 						}
 						return "", false
 					}
 					if inEnv {
-						term.Warnf("Environment variable %q is not used; add it to `.env` or it may be resolved from config during deployment", key)
+						term.Warnf("Environment variable %q is ignored; add it to `.env` or it may be resolved from config during deployment", key)
 					} else {
 						term.Debugf("Environment variable %q was not resolved locally. It may be resolved from config during deployment", key)
 					}

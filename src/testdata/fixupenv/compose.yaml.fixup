@@ -18,7 +18,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
-      "CONFIG1": "http://mistral:8000"
+      "CONFIG1": null
     },
     "image": "service:latest",
     "networks": {
@@ -30,7 +30,7 @@
       "context": ".",
       "dockerfile": "Dockerfile",
       "args": {
-        "API_URL": "http://mistral:8000"
+        "API_URL": "http://mock-mistral:8000"
       }
     },
     "command": null,
@@ -59,7 +59,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
-      "API_URL": "http://mistral:8000",
+      "API_URL": "http://mock-mistral:8000",
       "SENSITIVE_DATA": null
     },
     "image": "ui:latest",
