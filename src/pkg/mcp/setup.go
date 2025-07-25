@@ -87,7 +87,7 @@ func ParseMCPClient(clientStr string) (MCPClient, error) {
 	clientStr = strings.ToLower(clientStr)
 	client := MCPClient(clientStr)
 	if !slices.Contains(ValidClients, client) {
-		return "", fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
+		return "", fmt.Errorf("invalid MCP client: %q. Valid MCP clients are %v", clientStr, ValidClients)
 	}
 	return client, nil
 }
@@ -329,11 +329,10 @@ func handleStandardConfig(configPath string) error {
 	return nil
 }
 
-func SetupClient(clientValue string) error {
-	client, err := ParseMCPClient(clientValue)
+func SetupClient(clientStr string) error {
+	client, err := ParseMCPClient(clientStr)
 	if err != nil {
-		// cast the client string to MCPClient
-		return fmt.Errorf("invalid MCP client: %q. Valid MCP clients are: %v", client, ValidClients)
+		return err
 	}
 
 	track.Evt("MCP Setup Client: ", track.P("client", client))
