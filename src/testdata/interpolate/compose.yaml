@@ -11,3 +11,4 @@ services:
       - NOP_BRACED=abc$${def} # FIXME: this should not get resolved in CD
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT:-8080}
+      - VAR1=${VAR1} # from config
