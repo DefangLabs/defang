@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -240,48 +241,26 @@ func handleVSCodeConfig(configPath string) error {
 			existingData = make(map[string]interface{})
 		}
 
-		// Check if mcp section exists
-		mcpData, ok := existingData["mcp"]
+		// Check if "servers" section exists
+		serversSection, ok := existingData["servers"]
 		if !ok {
-			// Create new mcp section
-			existingData["mcp"] = map[string]interface{}{
-				"servers": map[string]interface{}{
-					"defang": config,
-				},
-			}
+			// Create new "servers" section
+			existingData["servers"] = map[string]interface{}{}
+			serversSection = existingData["servers"]
+		}
+
+		// get
+		if mcpMap, ok := serversSection.(map[string]interface{}); ok {
+			mcpMap["defang"] = config
+			existingData["servers"] = mcpMap
 		} else {
-			// Update existing mcp section
-			mcpMap, ok := mcpData.(map[string]interface{})
-			if !ok {
-				mcpMap = make(map[string]interface{})
-			}
-
-			serversData, ok := mcpMap["servers"]
-			if !ok {
-				mcpMap["servers"] = map[string]interface{}{
-					"defang": config,
-				}
-			} else {
-				serversMap, ok := serversData.(map[string]interface{})
-				if !ok {
-					serversMap = make(map[string]interface{})
-				}
-
-				// Add or update the Defang MCP server config
-				serversMap["defang"] = config
-
-				mcpMap["servers"] = serversMap
-			}
-
-			existingData["mcp"] = mcpMap
+			return errors.New("failed to assert 'servers' section as map[string]interface{}")
 		}
 	} else {
 		// File doesn't exist, create a new config with minimal settings
 		existingData = map[string]interface{}{
-			"mcp": map[string]interface{}{
-				"servers": map[string]interface{}{
-					"defang": config,
-				},
+			"servers": map[string]interface{}{
+				"defang": config,
 			},
 		}
 	}
