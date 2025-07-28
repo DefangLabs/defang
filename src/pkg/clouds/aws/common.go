@@ -20,10 +20,6 @@ type Aws struct {
 	Region    Region
 }
 
-// func (r Region) String() string {
-// 	return string(r)
-// }
-
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {
 	cfg, err := LoadDefaultConfig(ctx, a.Region)
 	if err != nil {

@@ -17,23 +17,25 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              azure-cli
               bashInteractive # full bash with readline/completion so prompts render correctly
               buf
               crane
               git
               gnumake
-              less
               gnused # force Linux `sed` everywhere
               go_1_24 # must match GO_VERSION in Dockerfile
-              gopls
               golangci-lint
+              google-cloud-sdk
+              gopls
               goreleaser
+              less
               nixfmt-rfc-style
               nodejs_24 # for Pulumi, must match values in package.json
               openssh
               pulumi
+              pulumiPackages.pulumi-go
               pulumiPackages.pulumi-nodejs
-              google-cloud-sdk
               vim
             ];
             shellHook = ''

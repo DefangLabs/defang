@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	RegionDefaultAWS = "us-west-2"
-	RegionDefaultDO  = "nyc3"
-	RegionDefaultGCP = "us-central1" // Defaults to us-central1 for lower price
+	RegionDefaultAWS   = "us-west-2"
+	RegionDefaultAzure = "westus" // Default region for Azure
+	RegionDefaultDO    = "nyc3"
+	RegionDefaultGCP   = "us-central1" // Defaults to us-central1 for lower price
 )
 
 func GetRegion(provider ProviderID) string {
@@ -15,6 +16,8 @@ func GetRegion(provider ProviderID) string {
 	switch provider {
 	case ProviderAWS:
 		defaultRegion = RegionDefaultAWS
+	case ProviderAzure:
+		defaultRegion = RegionDefaultAzure
 	case ProviderGCP:
 		defaultRegion = RegionDefaultGCP
 	case ProviderDO:
@@ -33,6 +36,8 @@ func GetRegionVarName(provider ProviderID) string {
 	switch provider {
 	case ProviderAWS:
 		return "AWS_REGION"
+	case ProviderAzure:
+		return "AZURE_LOCATION"
 	case ProviderGCP:
 		// Try standard GCP environment variables in order of precedence
 		GCPRegionEnvVar, _ := pkg.GetFirstEnv(pkg.GCPRegionEnvVars...)
