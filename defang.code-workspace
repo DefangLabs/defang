@@ -1,19 +1,19 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "src"
-		}
-	],
-	"settings": {
-		"go.testEnvVars": {
-			"AWS_PROFILE": "defang-sandbox"
-		},
-		"go.buildTags": "integration",
-		"go.testFlags": ["-short"],
-		"go.testTimeout": "300s",
-		"makefile.configureOnOpen": false
-	}
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "src"
+    }
+  ],
+  "settings": {
+    "go.testEnvVars": {
+      "AWS_PROFILE": "defang-sandbox"
+    },
+    "go.buildTags": "integration",
+    "go.testFlags": ["-short", "-v"],
+    "go.testTimeout": "300s",
+    "makefile.configureOnOpen": false
+  }
 }

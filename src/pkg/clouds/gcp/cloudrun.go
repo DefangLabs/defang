@@ -182,10 +182,10 @@ func (gcp Gcp) GetExecutionEnv(ctx context.Context, executionName string) (map[s
 }
 
 // FIXME: Add tests
-func FixupGcpConfig(vCpu float32, memoryMiB uint64) (cpu float64, memory uint) {
+func FixupGcpConfig(vCpu float64, memoryMiB uint64) (cpu float64, memory uint) {
 	// Fixup CPU value and minimum memory according to
 	// https://cloud.google.com/run/docs/configuring/jobs/cpu
-	cpu = math.Trunc(float64(vCpu)*100) / 100 // Cpu value below 1 should be in increments of 0.01
+	cpu = math.Trunc(vCpu*100) / 100 // Cpu value below 1 should be in increments of 0.01
 	if cpu > 1 {
 		cpu = math.Ceil(float64(vCpu)) // Any value above 1 must be an integer value
 	}

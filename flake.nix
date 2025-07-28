@@ -18,6 +18,7 @@
           mkShell {
             buildInputs =
               [
+                azure-cli
                 buf
                 crane
                 git

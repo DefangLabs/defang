@@ -10,6 +10,8 @@ func GetRegion(provider ProviderID) string {
 		return pkg.Getenv("CLOUDSDK_COMPUTE_REGION", "us-central1") // Default region for GCP
 	case ProviderDO:
 		return pkg.Getenv("DO_REGION", "nyc3") // Default region for DigitalOcean
+	case ProviderAzure:
+		return pkg.Getenv("AZURE_LOCATION", "westus") // Default region for Azure
 	default:
 		return "" // No default region for unsupported providers
 	}

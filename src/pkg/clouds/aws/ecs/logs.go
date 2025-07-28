@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/smithy-go/ptr"
@@ -90,8 +89,8 @@ func TailLogGroup(ctx context.Context, input LogGroupInput) (LiveTailStream, err
 		LogEventFilterPattern: pattern,
 	}
 
-	region := region.FromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
-	cw, err := newCloudWatchLogsClient(ctx, region)       // assume all log groups are in the same region
+	region := aws.RegionFromArn(slti.LogGroupIdentifiers[0]) // must have at least one log group
+	cw, err := newCloudWatchLogsClient(ctx, region)          // assume all log groups are in the same region
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func QueryLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogG
 }
 
 func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Time, cb func([]LogEvent) error) error {
-	region := region.FromArn(input.LogGroupARN)
+	region := aws.RegionFromArn(input.LogGroupARN)
 	cw, err := newCloudWatchLogsClient(ctx, region)
 	if err != nil {
 		return err

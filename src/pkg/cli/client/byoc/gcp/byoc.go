@@ -29,7 +29,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	"google.golang.org/api/googleapi"
 	auditpb "google.golang.org/genproto/googleapis/cloud/audit"
@@ -225,12 +224,11 @@ func (b *ByocGcp) setUpCD(ctx context.Context) error {
 	serviceAccount := path.Base(b.cdServiceAccount)
 	if err := b.driver.SetupJob(ctx, "defang-cd", serviceAccount, []types.Container{
 		{
-			Image:     b.CDImage,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
-			WorkDir:   "/app",
+			Image:   b.CDImage,
+			Name:    ecs.CdContainerName,
+			Cpus:    2.0,
+			Memory:  2048_000_000, // 2G
+			WorkDir: "/app",
 		},
 	}); err != nil {
 		return err
