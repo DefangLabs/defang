@@ -19,7 +19,7 @@ import (
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, cluster string) {
+func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
 	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -65,7 +65,7 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		client.Track("MCP Deploy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
+		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
