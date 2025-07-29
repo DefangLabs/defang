@@ -1,11 +1,9 @@
 package aci
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
@@ -15,6 +13,7 @@ type ContainerInstance struct {
 	azure.Azure
 	containerGroupProps *armcontainerinstance.ContainerGroupPropertiesProperties
 	resourceGroupName   string
+	storageAccount      string
 }
 
 func NewContainerInstance(resourceGroupName string, location azure.Location) *ContainerInstance {
@@ -24,24 +23,11 @@ func NewContainerInstance(resourceGroupName string, location azure.Location) *Co
 	return &ContainerInstance{
 		Azure:             azure.Azure{Location: location},
 		resourceGroupName: resourceGroupName, // TODO: append location?
+		storageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
 	}
 }
-func newCreds() (string, *azidentity.DefaultAzureCredential, error) {
-	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	if len(subscriptionID) == 0 {
-		return "", nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
-	}
-
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create default Azure credentials: %w", err)
-	}
-
-	return subscriptionID, cred, nil
-}
-
 func newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, error) {
-	subscriptionID, cred, err := newCreds()
+	subscriptionID, cred, err := azure.NewCreds()
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +40,7 @@ func newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, err
 }
 
 func newContainerClient() (*armcontainerinstance.ContainersClient, error) {
-	subscriptionID, cred, err := newCreds()
+	subscriptionID, cred, err := azure.NewCreds()
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +53,7 @@ func newContainerClient() (*armcontainerinstance.ContainersClient, error) {
 }
 
 func newResourceGroupClient() (*armresources.ResourceGroupsClient, error) {
-	subscriptionID, cred, err := newCreds()
+	subscriptionID, cred, err := azure.NewCreds()
 	if err != nil {
 		return nil, err
 	}
