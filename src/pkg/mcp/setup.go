@@ -364,7 +364,7 @@ func SetupClient(clientStr string) error {
 	}
 
 	// Handle VSCode mcp.json specially
-	if slices.Contains(ValidClients, client) {
+	if slices.Contains(ValidVSCodeClients, client) {
 		if err := handleVSCodeConfig(configPath); err != nil {
 			return err
 		}
