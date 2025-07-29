@@ -149,6 +149,13 @@ jobs:
         run: go mod download
         working-directory: src
 
+      - name: Install GoReleaser Pro
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          install-only: true
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
       - name: Run GoReleaser (Linux)
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -394,12 +401,12 @@ jobs:
   on-failure:
     runs-on: ubuntu-latest
     if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: [go-release, post-release, nix-shell-test, push-docker]
+    needs: [go-test, nix-shell-test, go-playground-test, build-and-sign, build-and-sign-mac, go-release, push-docker, post-release]
     steps:
-    - name: Slack Notification
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        MSG_MINIMAL: actions url
-        SLACK_COLOR: ${{ job.status }}
-        SLACK_TITLE: Defang CLI workflow failed
-        SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          MSG_MINIMAL: actions url
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: Defang CLI workflow failed
+          SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}
