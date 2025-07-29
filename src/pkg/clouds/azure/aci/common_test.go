@@ -9,7 +9,9 @@ import (
 func TestNewClient(t *testing.T) {
 	t.Setenv("AZURE_SUBSCRIPTION_ID", uuid.NewString())
 
-	client, err := newContainerGroupClient()
+	c := NewContainerInstance(testResourceGroupName, "")
+
+	client, err := c.newContainerGroupClient()
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}

@@ -30,7 +30,11 @@ func NewByocAzure(ctx context.Context, tenantLabel types.TenantLabel, stack stri
 
 // CdCommand implements byoc.ProjectBackend.
 func (b *ByocAzure) CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error) {
-	panic("unimplemented")
+	return &client.AccountInfo{
+		AccountID: b.driver.SubscriptionID,
+		Provider:  client.ProviderAzure,
+		Region:    b.driver.Location.String(),
+	}, nil
 }
 
 // CdList implements byoc.ProjectBackend.

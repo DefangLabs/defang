@@ -42,7 +42,7 @@ func (c *ContainerInstance) Tail(ctx context.Context, groupName ContainerGroupNa
 }
 
 func (c *ContainerInstance) QueryLogs(ctx context.Context, groupName ContainerGroupName, containerName string) (string, error) {
-	client, err := newContainerClient()
+	client, err := c.newContainerClient()
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +65,7 @@ func (c *ContainerInstance) QueryLogs(ctx context.Context, groupName ContainerGr
 }
 
 func (c *ContainerInstance) StreamLogs(ctx context.Context, groupName ContainerGroupName, containerName string) (<-chan logEntry, error) {
-	client, err := newContainerClient()
+	client, err := c.newContainerClient()
 	if err != nil {
 		return nil, err
 	}

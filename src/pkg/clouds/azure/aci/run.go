@@ -18,7 +18,7 @@ func safeAppend[T any](slice []T, elems ...T) []T {
 }
 
 func (c *ContainerInstance) Run(ctx context.Context, env map[string]string, args ...string) (ContainerGroupName, error) {
-	containerGroupClient, err := newContainerGroupClient()
+	containerGroupClient, err := c.newContainerGroupClient()
 	if err != nil {
 		return nil, err
 	}
