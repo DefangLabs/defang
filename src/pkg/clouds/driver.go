@@ -18,13 +18,12 @@ const (
 )
 
 type Container struct {
-	Image    string
-	Name     string
-	Cpus     float64
-	Memory   uint64
-	Platform string
-	IsInit   bool // whether this container is an init container (non-essential)
-
+	Image       string
+	Name        string
+	Cpus        float64
+	Memory      uint64
+	Platform    string
+	IsInit      bool // whether this container is an init container (non-essential)
 	Volumes     []TaskVolume
 	VolumesFrom []string // "container" (default rw), "container:rw", or "container:ro"
 	EntryPoint  []string

@@ -14,7 +14,7 @@ import (
 
 // GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func GetTaskStatus(ctx context.Context, taskArn TaskArn) (bool, error) {
-	region := region.FromArn(*taskArn)
+	region := aws.RegionFromArn(*taskArn)
 	cluster, taskID := SplitClusterTask(taskArn)
 	return getTaskStatus(ctx, region, cluster, taskID)
 }

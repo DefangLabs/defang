@@ -4,12 +4,6 @@ import (
 	"strings"
 )
 
-type Region string
-
-func (r Region) String() string {
-	return string(r)
-}
-
 const (
 	RegionAFSouth1     Region = "af-south-1"
 	RegionAPEast1      Region = "ap-east-1"

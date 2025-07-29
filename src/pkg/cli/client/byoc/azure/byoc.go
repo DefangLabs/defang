@@ -2,9 +2,11 @@ package azure
 
 import (
 	"context"
+	"iter"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/state"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -18,12 +20,22 @@ type ByocAzure struct {
 
 var _ client.Provider = (*ByocAzure)(nil)
 
-func NewByocAzure(ctx context.Context, tenantName types.TenantName) *ByocAzure {
+func NewByocAzure(ctx context.Context, tenantLabel types.TenantLabel, stack string) *ByocAzure {
 	b := &ByocAzure{
 		driver: aci.NewContainerInstance("defang-cd", ""), // default location => from AZURE_LOCATION env var
 	}
-	b.ByocBaseClient = byoc.NewByocBaseClient(ctx, tenantName, b)
+	b.ByocBaseClient = byoc.NewByocBaseClient(tenantLabel, b, stack)
 	return b
+}
+
+// CdCommand implements byoc.ProjectBackend.
+func (b *ByocAzure) CdCommand(context.Context, client.CdCommandRequest) (types.ETag, error) {
+	panic("unimplemented")
+}
+
+// CdList implements byoc.ProjectBackend.
+func (b *ByocAzure) CdList(context.Context, bool) (iter.Seq[state.Info], error) {
+	panic("unimplemented")
 }
 
 // AccountInfo implements client.Provider.
@@ -31,23 +43,8 @@ func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
 	panic("unimplemented")
 }
 
-// BootstrapCommand implements client.Provider.
-func (b *ByocAzure) BootstrapCommand(context.Context, client.BootstrapCommandRequest) (types.ETag, error) {
-	panic("unimplemented")
-}
-
-// BootstrapList implements client.Provider.
-func (b *ByocAzure) BootstrapList(context.Context) ([]string, error) {
-	panic("unimplemented")
-}
-
 // CreateUploadURL implements client.Provider.
 func (b *ByocAzure) CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	panic("unimplemented")
-}
-
-// Delete implements client.Provider.
-func (b *ByocAzure) Delete(context.Context, *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error) {
 	panic("unimplemented")
 }
 
@@ -57,21 +54,21 @@ func (b *ByocAzure) DeleteConfig(context.Context, *defangv1.Secrets) error {
 }
 
 // Deploy implements client.Provider.
-func (b *ByocAzure) Deploy(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	panic("unimplemented")
-}
-
-// Destroy implements client.Provider.
-func (b *ByocAzure) Destroy(context.Context, *defangv1.DestroyRequest) (types.ETag, error) {
+func (b *ByocAzure) Deploy(context.Context, *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	panic("unimplemented")
 }
 
 // GetDeploymentStatus implements client.Provider.
-func (b *ByocAzure) GetDeploymentStatus(context.Context) error {
+func (b *ByocAzure) GetDeploymentStatus(context.Context) (bool, error) {
 	panic("unimplemented")
 }
 
-// GetProjectUpdate implements client.Provider.
+// GetPrivateDomain implements byoc.ProjectBackend.
+func (b *ByocAzure) GetPrivateDomain(projectName string) string {
+	panic("unimplemented")
+}
+
+// GetProjectUpdate implements byoc.ProjectBackend.
 func (b *ByocAzure) GetProjectUpdate(context.Context, string) (*defangv1.ProjectUpdate, error) {
 	panic("unimplemented")
 }
@@ -97,7 +94,7 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 }
 
 // Preview implements client.Provider.
-func (b *ByocAzure) Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+func (b *ByocAzure) Preview(context.Context, *client.DeployRequest) (*defangv1.DeployResponse, error) {
 	panic("unimplemented")
 }
 
@@ -106,13 +103,8 @@ func (b *ByocAzure) PutConfig(context.Context, *defangv1.PutConfigRequest) error
 	panic("unimplemented")
 }
 
-// QueryForDebug implements client.Provider.
-func (b *ByocAzure) QueryForDebug(context.Context, *defangv1.DebugRequest) error {
-	panic("unimplemented")
-}
-
 // QueryLogs implements client.Provider.
-func (b *ByocAzure) QueryLogs(context.Context, *defangv1.TailRequest) (client.ServerStream[defangv1.TailResponse], error) {
+func (b *ByocAzure) QueryLogs(context.Context, *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	panic("unimplemented")
 }
 
@@ -128,18 +120,27 @@ func (b *ByocAzure) ServiceDNS(string) string {
 	panic("unimplemented")
 }
 
-// SetCanIUseConfig implements client.Provider.
-// Subtle: this method shadows the method (*ByocBaseClient).SetCanIUseConfig of ByocAzure.ByocBaseClient.
-func (b *ByocAzure) SetCanIUseConfig(*defangv1.CanIUseResponse) {
+// SetUpCD implements client.Provider.
+func (b *ByocAzure) SetUpCD(context.Context) error {
 	panic("unimplemented")
 }
 
 // Subscribe implements client.Provider.
-func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (client.ServerStream[defangv1.SubscribeResponse], error) {
+func (b *ByocAzure) Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error) {
 	panic("unimplemented")
 }
 
 // TearDown implements client.Provider.
 func (b *ByocAzure) TearDown(ctx context.Context) error {
 	return b.driver.TearDown(ctx)
+}
+
+// TearDownCD implements client.Provider.
+func (b *ByocAzure) TearDownCD(context.Context) error {
+	panic("unimplemented")
+}
+
+// UpdateShardDomain implements client.DNSResolver.
+func (b *ByocAzure) UpdateShardDomain(context.Context) error {
+	panic("unimplemented")
 }

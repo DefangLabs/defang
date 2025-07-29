@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
 func TestRun(t *testing.T) {
@@ -16,7 +16,7 @@ func TestRun(t *testing.T) {
 
 	containerInstance := NewContainerInstance(testResourceGroupName, "westeurope")
 
-	err := containerInstance.SetUp(ctx, []types.Container{
+	err := containerInstance.SetUp(ctx, []clouds.Container{
 		{
 			Name:  "test-container",
 			Image: "library/alpine:latest",

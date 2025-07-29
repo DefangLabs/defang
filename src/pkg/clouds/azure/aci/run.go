@@ -7,10 +7,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/types"
+	"github.com/DefangLabs/defang/src/pkg/clouds"
 )
 
-type ContainerGroupName = types.TaskID
+type ContainerGroupName = clouds.TaskID
 
 // safeAppend is like append but avoids mutating any aliases of the slice.
 func safeAppend[T any](slice []T, elems ...T) []T {
@@ -22,29 +22,28 @@ func (c *ContainerInstance) Run(ctx context.Context, env map[string]string, args
 	if err != nil {
 		return nil, err
 	}
-	var props armcontainerinstance.ContainerProperties
+
+	commandArgs := to.SliceOfPtrs(args...)
+	var envVars []*armcontainerinstance.EnvironmentVariable
 	for key, value := range env {
-		props.EnvironmentVariables = append(props.EnvironmentVariables, &armcontainerinstance.EnvironmentVariable{
+		envVars = append(envVars, &armcontainerinstance.EnvironmentVariable{
 			Name:  to.Ptr(key),
 			Value: to.Ptr(value),
 		})
-	}
-	for _, arg := range args {
-		props.Command = append(props.Command, to.Ptr(arg))
 	}
 
 	clone := *c.containerGroupProps
 	for i, container := range clone.Containers {
 		newProps := *container.Properties
-		newProps.Command = safeAppend(newProps.Command, props.Command...)
-		newProps.EnvironmentVariables = safeAppend(newProps.EnvironmentVariables, props.EnvironmentVariables...)
+		newProps.Command = safeAppend(newProps.Command, commandArgs...) // TODO: probably should only be done for the first container
+		newProps.EnvironmentVariables = safeAppend(newProps.EnvironmentVariables, envVars...)
 		clone.Containers[i] = &armcontainerinstance.Container{
 			Name:       container.Name,
 			Properties: &newProps,
 		}
 	}
 
-	groupName := containerGroupName + "-" + pkg.RandomID()
+	groupName := containerGroupPrefix + pkg.RandomID()
 	group := armcontainerinstance.ContainerGroup{
 		Name:       to.Ptr(groupName),
 		Location:   c.Location.Ptr(),
