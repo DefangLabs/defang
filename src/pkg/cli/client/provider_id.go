@@ -15,7 +15,7 @@ const (
 	ProviderAWS    ProviderID = "aws"
 	ProviderDO     ProviderID = "digitalocean"
 	ProviderGCP    ProviderID = "gcp"
-	// ProviderAzure  ProviderID = "azure"
+	ProviderAzure  ProviderID = "azure"
 )
 
 var allProviders = []ProviderID{
@@ -24,7 +24,7 @@ var allProviders = []ProviderID{
 	ProviderAWS,
 	ProviderDO,
 	ProviderGCP,
-	// ProviderAzure,
+	ProviderAzure,
 }
 
 func AllProviders() []ProviderID {
@@ -89,6 +89,8 @@ func (p *ProviderID) SetValue(val defangv1.Provider) {
 		*p = ProviderDO
 	case defangv1.Provider_GCP:
 		*p = ProviderGCP
+	case defangv1.Provider_AZURE:
+		*p = ProviderAzure
 	default:
 		*p = ProviderAuto
 	}

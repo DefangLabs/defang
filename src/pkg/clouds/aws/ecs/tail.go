@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
@@ -16,7 +16,7 @@ const AwsLogsStreamPrefix = CrunProjectName
 
 func (a *AwsEcs) Tail(ctx context.Context, taskArn TaskArn) error {
 	taskId := GetTaskID(taskArn)
-	a.Region = region.FromArn(*taskArn)
+	a.Region = aws.RegionFromArn(*taskArn)
 	es, err := a.TailTaskID(ctx, taskId)
 	if err != nil {
 		return err
