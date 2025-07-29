@@ -2,7 +2,9 @@ package azure
 
 import (
 	"context"
+	"net/url"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
@@ -28,7 +30,11 @@ func NewByocAzure(ctx context.Context, tenantName types.TenantName) *ByocAzure {
 
 // AccountInfo implements client.Provider.
 func (b *ByocAzure) AccountInfo(context.Context) (*client.AccountInfo, error) {
-	panic("unimplemented")
+	return &client.AccountInfo{
+		AccountID: b.driver.SubscriptionID,
+		Provider:  client.ProviderAzure,
+		Region:    b.driver.Location.String(),
+	}, nil
 }
 
 // BootstrapCommand implements client.Provider.
@@ -43,7 +49,10 @@ func (b *ByocAzure) BootstrapList(context.Context) ([]string, error) {
 
 // CreateUploadURL implements client.Provider.
 func (b *ByocAzure) CreateUploadURL(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
-	panic("unimplemented")
+	sasQueryParameters := sas.NewQueryParameters(url.Values{}, true)
+	return &defangv1.UploadURLResponse{
+		Url: sasQueryParameters.Encode(),
+	}, nil
 }
 
 // Delete implements client.Provider.

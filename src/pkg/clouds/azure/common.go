@@ -3,40 +3,53 @@ package azure
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 )
 
 type Azure struct {
-	Location Location
+	Location       Location
+	SubscriptionID string
 }
 
-func NewCreds() (string, *azidentity.DefaultAzureCredential, error) {
-	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
-	if len(subscriptionID) == 0 {
-		return "", nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
+func (a Azure) NewCreds() (*azidentity.DefaultAzureCredential, error) {
+	if len(a.SubscriptionID) == 0 {
+		return nil, errors.New("environment variable AZURE_SUBSCRIPTION_ID is not set")
 	}
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to create default Azure credentials: %w", err)
+		return nil, fmt.Errorf("failed to create default Azure credentials: %w", err)
 	}
 
-	return subscriptionID, cred, nil
+	return cred, nil
 }
 
-func NewStorageAccountsClient() (*armstorage.AccountsClient, error) {
-	subscriptionID, cred, err := NewCreds()
+func (a Azure) NewStorageAccountsClient() (*armstorage.AccountsClient, error) {
+	cred, err := a.NewCreds()
 	if err != nil {
 		return nil, err
 	}
 
-	storageClient, err := armstorage.NewClientFactory(subscriptionID, cred, nil)
+	clientFactory, err := armstorage.NewClientFactory(a.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client: %w", err)
 	}
 
-	return storageClient.NewAccountsClient(), nil
+	return clientFactory.NewAccountsClient(), nil
+}
+
+func (a Azure) NewStorageClient() (*armstorage.BlobContainersClient, error) {
+	cred, err := a.NewCreds()
+	if err != nil {
+		return nil, err
+	}
+
+	clientFactory, err := armstorage.NewClientFactory(a.SubscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	return clientFactory.NewBlobContainersClient(), nil
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func (c *ContainerInstance) Stop(ctx context.Context, groupName ContainerGroupName) error {
-	containerGroupClient, err := newContainerGroupClient()
+	containerGroupClient, err := c.newContainerGroupClient()
 	if err != nil {
 		return err
 	}

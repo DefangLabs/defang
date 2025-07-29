@@ -12,7 +12,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/DefangLabs/defang/src/pkg"
-	"github.com/DefangLabs/defang/src/pkg/clouds/azure"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
@@ -20,7 +19,7 @@ const containerGroupPrefix = "defang-cd-"
 const storageAccountPrefix = "defangcd"
 
 func (c *ContainerInstance) SetUp(ctx context.Context, containers []types.Container) error {
-	resourceGroupClient, err := newResourceGroupClient()
+	resourceGroupClient, err := c.newResourceGroupClient()
 	if err != nil {
 		return err
 	}
@@ -74,12 +73,12 @@ func (c *ContainerInstance) SetUp(ctx context.Context, containers []types.Contai
 		}
 	}
 
-	bucketName, err := c.getStorageAccount(ctx)
+	storageAccount, err := c.setUpStorageAccount(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get bucket name: %w", err)
 	}
 
-	if bucketName == "" {
+	if storageAccount == "" {
 
 	}
 
@@ -87,7 +86,7 @@ func (c *ContainerInstance) SetUp(ctx context.Context, containers []types.Contai
 }
 
 func (c *ContainerInstance) TearDown(ctx context.Context) error {
-	resourceGroupClient, err := newResourceGroupClient()
+	resourceGroupClient, err := c.newResourceGroupClient()
 	if err != nil {
 		return err
 	}
@@ -104,14 +103,9 @@ func (c *ContainerInstance) TearDown(ctx context.Context) error {
 	return nil
 }
 
-func (c *ContainerInstance) getStorageAccount(ctx context.Context) (string, error) {
+func (c *ContainerInstance) getStorageAccount(ctx context.Context, accountsClient *armstorage.AccountsClient) (string, error) {
 	if c.storageAccount != "" {
 		return c.storageAccount, nil
-	}
-
-	accountsClient, err := azure.NewStorageAccountsClient()
-	if err != nil {
-		return "", err
 	}
 
 	for pager := accountsClient.NewListByResourceGroupPager(c.resourceGroupName, nil); pager.More(); {
@@ -129,9 +123,13 @@ func (c *ContainerInstance) getStorageAccount(ctx context.Context) (string, erro
 }
 
 func (c *ContainerInstance) setUpStorageAccount(ctx context.Context) (string, error) {
-	accountsClient, err := azure.NewStorageAccountsClient()
+	accountsClient, err := c.NewStorageAccountsClient()
 	if err != nil {
 		return "", err
+	}
+
+	if x, err := c.getStorageAccount(ctx, accountsClient); err == nil {
+		return x, nil
 	}
 
 	storageAccount := storageAccountPrefix + pkg.RandomID() // unique storage account name

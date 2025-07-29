@@ -21,44 +21,48 @@ func NewContainerInstance(resourceGroupName string, location azure.Location) *Co
 		location = azure.Location(os.Getenv("AZURE_LOCATION"))
 	}
 	return &ContainerInstance{
-		Azure:             azure.Azure{Location: location},
+		Azure: azure.Azure{
+			Location:       location,
+			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
+		},
 		resourceGroupName: resourceGroupName, // TODO: append location?
 		storageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
 	}
 }
-func newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, error) {
-	subscriptionID, cred, err := azure.NewCreds()
+
+func (c ContainerInstance) newContainerGroupClient() (*armcontainerinstance.ContainerGroupsClient, error) {
+	cred, err := c.NewCreds()
 	if err != nil {
 		return nil, err
 	}
 
-	clientFactory, err := armcontainerinstance.NewClientFactory(subscriptionID, cred, nil)
+	clientFactory, err := armcontainerinstance.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container group client: %w", err)
 	}
 	return clientFactory.NewContainerGroupsClient(), nil
 }
 
-func newContainerClient() (*armcontainerinstance.ContainersClient, error) {
-	subscriptionID, cred, err := azure.NewCreds()
+func (c ContainerInstance) newContainerClient() (*armcontainerinstance.ContainersClient, error) {
+	cred, err := c.NewCreds()
 	if err != nil {
 		return nil, err
 	}
 
-	clientFactory, err := armcontainerinstance.NewClientFactory(subscriptionID, cred, nil)
+	clientFactory, err := armcontainerinstance.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container client: %w", err)
 	}
 	return clientFactory.NewContainersClient(), nil
 }
 
-func newResourceGroupClient() (*armresources.ResourceGroupsClient, error) {
-	subscriptionID, cred, err := azure.NewCreds()
+func (c ContainerInstance) newResourceGroupClient() (*armresources.ResourceGroupsClient, error) {
+	cred, err := c.NewCreds()
 	if err != nil {
 		return nil, err
 	}
 
-	resourcesClientFactory, err := armresources.NewClientFactory(subscriptionID, cred, nil)
+	resourcesClientFactory, err := armresources.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource group client: %w", err)
 	}
