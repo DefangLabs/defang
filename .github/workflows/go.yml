@@ -158,14 +158,14 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Linux)
-        run: goreleaser-pro release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
         working-directory: src
         env:
           GGOOS: linux
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        run: goreleaser-pro release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
         working-directory: src
         env:
           GGOOS: windows
