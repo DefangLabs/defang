@@ -40,3 +40,20 @@ func TestSetup(t *testing.T) {
 		}
 	})
 }
+
+func TestStorage(t *testing.T) {
+	c := NewContainerInstance(testResourceGroupName, "westeurope")
+
+	storageAccountName, err := c.setUpStorageAccount(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to set up storage account: %v", err)
+	}
+
+	foundAccountName, err := c.getStorageAccount(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to get storage account name: %v", err)
+	}
+	if foundAccountName != storageAccountName {
+		t.Fatalf("Expected storage account name %s, got %s", storageAccountName, foundAccountName)
+	}
+}

@@ -12,9 +12,26 @@ type ContainerJob struct {
 // var _ types.Driver = (*ContainerJob)(nil)
 
 // CreateUploadURL implements types.Driver.
-func (c *ContainerJob) CreateUploadURL(ctx context.Context, name string) (string, error) {
-	panic("unimplemented")
-}
+// func (c *ContainerJob) CreateUploadURL(ctx context.Context, name string) (string, error) {
+// 	blobServiceClient, err := azblob.NewClient("", cred, nil)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	containerClient := blobServiceClient.NewContainerClient(c.Location)
+// 	blobClient := containerClient.NewBlobClient(name)
+
+// 	url, err := blobClient.GetSASURL(ctx, azblob.BlobSASOptions{
+// 		Permissions: azblob.BlobSASPermissions{Read: true, Write: true},
+// 		Expiry:      time.Now().Add(1 * time.Hour),
+// 	})
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	return url, nil
+
+// }
 
 // GetInfo implements types.Driver.
 func (c *ContainerJob) GetInfo(ctx context.Context, taskID types.TaskID) (*types.TaskInfo, error) {
