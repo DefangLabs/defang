@@ -61,6 +61,7 @@ const (
 	MCPClientCascade        MCPClient = "cascade"
 	MCPClientCodeium        MCPClient = "codeium"
 	MCPClientCursor         MCPClient = "cursor"
+	MCPClientKiro           MCPClient = "kiro"
 )
 
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
@@ -79,6 +80,7 @@ var ValidClients = append(
 		MCPClientCascade,
 		MCPClientCodeium,
 		MCPClientCursor,
+		MCPClientKiro,
 	},
 	ValidVSCodeClients...,
 )
@@ -123,6 +125,11 @@ var cursorConfig = ClientInfo{
 	useHomeDir: true,
 }
 
+var kiroConfig = ClientInfo{
+	configFile: ".kiro/settings/mcp.json",
+	useHomeDir: true,
+}
+
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientWindsurf:       windsurfConfig,
@@ -134,6 +141,7 @@ var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientInsiders:       codeInsidersConfig,
 	MCPClientClaude:         claudeConfig,
 	MCPClientCursor:         cursorConfig,
+	MCPClientKiro:           kiroConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS
