@@ -89,6 +89,22 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath: filepath.Join(homeDir, ".cursor", "settings.json"),
 		},
 
+		// Kiro tests - Darwin
+		{
+			name:         "kiro_darwin",
+			client:       MCPClientKiro,
+			goos:         "darwin",
+			expectedPath: filepath.Join(homeDir, ".kiro", "settings", "mcp.json"),
+		},
+
+		// Kiro tests - Linux
+		{
+			name:         "kiro_linux",
+			client:       MCPClientKiro,
+			goos:         "linux",
+			expectedPath: filepath.Join(homeDir, ".kiro", "settings", "mcp.json"),
+		},
+
 		// VSCode tests - Darwin
 		{
 			name:         "vscode_darwin",
