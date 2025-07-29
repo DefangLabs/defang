@@ -55,7 +55,7 @@ const (
 	MCPClientVSCode         MCPClient = "vscode"
 	MCPClientCode           MCPClient = "code"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
-	MCPClientInsiders       MCPClient = "insiders"
+	MCPClientInsiders       MCPClient = "code-insiders"
 	MCPClientClaude         MCPClient = "claude"
 	MCPClientWindsurf       MCPClient = "windsurf"
 	MCPClientCascade        MCPClient = "cascade"
