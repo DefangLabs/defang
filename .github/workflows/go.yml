@@ -149,24 +149,24 @@ jobs:
         run: go mod download
         working-directory: src
 
-      - name: Run GoReleaser (Linux)
+      - name: Install GoReleaser Pro
         uses: goreleaser/goreleaser-action@v6
         with:
-          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
-          # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
-          workdir: src
+          distribution: goreleaser-pro
+          install-only: true
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+      - name: Run GoReleaser (Linux)
+        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        working-directory: src
         env:
           GGOOS: linux
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Run GoReleaser (Windows)
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser-pro # either 'goreleaser' (default) or 'goreleaser-pro'
-          # version: latest
-          args: release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
-          workdir: src
+        run: goreleaser release --split ${{ !startsWith(github.ref, 'refs/tags/v') && '--snapshot' || '' }} ${{ github.event_name == 'schedule' && '--nightly' || ''}}
+        working-directory: src
         env:
           GGOOS: windows
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
@@ -396,10 +396,10 @@ jobs:
     if: failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [go-release, post-release, nix-shell-test, push-docker]
     steps:
-    - name: Slack Notification
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        MSG_MINIMAL: actions url
-        SLACK_COLOR: ${{ job.status }}
-        SLACK_TITLE: Defang CLI workflow failed
-        SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          MSG_MINIMAL: actions url
+          SLACK_COLOR: error
+          SLACK_TITLE: Defang CLI workflow failed
+          SLACK_WEBHOOK: ${{ secrets.SLACK_NOTIFIER_WEBHOOK_URL }}
