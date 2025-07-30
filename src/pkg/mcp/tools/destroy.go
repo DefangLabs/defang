@@ -45,7 +45,6 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
-
 			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
 		}
 
@@ -94,16 +93,19 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 }
 
 func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, projectName string, provider cliClient.Provider) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: defangv1.Provider_DEFANG,
+	info, err := provider.AccountInfo(ctx)
+	if err != nil {
+		return err
 	}
 
+	canUseReq := defangv1.CanIUseRequest{
+		Project:  projectName,
+		Provider: info.Provider.Value(),
+	}
 	term.Debug("Function invoked: client.CanIUse")
 	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		term.Error("Failed to use provider", "error", err)
-		return fmt.Errorf("failed to use provider: %w", err)
+		return err
 	}
 
 	term.Debug("Function invoked: provider.SetCanIUseConfig")

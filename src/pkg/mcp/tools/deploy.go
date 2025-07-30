@@ -104,18 +104,6 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
 		}
 
-		// Get the portal URL for browser preview
-		portalURL := "https://portal.defang.io/"
-
-		// Open the portal URL in the browser
-		term.Debugf("Opening portal URL in browser: %s", portalURL)
-		go func() {
-			err := browser.OpenURL(portalURL)
-			if err != nil {
-				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-			}
-		}()
-
 		// Success case
 		term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
 
@@ -123,8 +111,27 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		term.Debug("Deployment Started!")
 		term.Debugf("Deployment ID: %s", deployResp.Etag)
 
-		// Log browser preview information
-		term.Debugf("🌐 %s available", portalURL)
+		var portal string
+		if providerId == cliClient.ProviderDefang {
+			// Get the portal URL for browser preview
+			portalURL := "https://portal.defang.io/"
+
+			// Open the portal URL in the browser
+			term.Debugf("Opening portal URL in browser: %s", portalURL)
+			go func() {
+				err := browser.OpenURL(portalURL)
+				if err != nil {
+					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
+				}
+			}()
+
+			// Log browser preview information
+			term.Debugf("🌐 %s available", portalURL)
+			portal = "Please use the web portal url: %s" + portalURL
+		} else {
+			// portalURL := fmt.Sprintf("https://%s.signin.aws.amazon.com/console")
+			portal = fmt.Sprintf("Please use the %s console", providerId)
+		}
 
 		// Log service details
 		term.Debug("Services:")
@@ -135,6 +142,6 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		}
 
 		// Return the etag data as text
-		return mcp.NewToolResultText(fmt.Sprintf("Please use the web portal url: %s to follow the deployment of %s, with the deployment ID of %s", portalURL, project.Name, deployResp.Etag)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s", portal, project.Name, deployResp.Etag)), nil
 	})
 }
