@@ -33,6 +33,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 	}
 
+	var mongoServiceNames []string
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
 		_, managedRedis := svccfg.Extensions["x-defang-redis"]
@@ -51,6 +52,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
 		if managedMongo {
+			mongoServiceNames = append(mongoServiceNames, svccfg.Name)
 			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
@@ -158,6 +160,20 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				}
 				svccfg.Environment[key] = nil
 				continue
+			} else if len(mongoServiceNames) > 0 {
+				for serviceName := range svccfg.DependsOn {
+					if slices.Contains(mongoServiceNames, serviceName) {
+						connectionStrEnvVarName := strings.ToUpper(serviceName + "_URL")
+						// If the service depends on a MongoDB service, we need to adjust the environment variable
+						if !shownOnce {
+							term.Warnf("service %q: adjusting environment variable %q for MongoDB service dependency", svccfg.Name, connectionStrEnvVarName)
+							shownOnce = true
+						}
+						notAdjusted = append(notAdjusted, connectionStrEnvVarName)
+						svccfg.Environment[serviceName] = nil
+						continue
+					}
+				}
 			}
 
 			if upload != UploadModeEstimate {
