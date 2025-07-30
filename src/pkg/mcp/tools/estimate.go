@@ -17,7 +17,11 @@ import (
 )
 
 // setupEstimateTool configures and adds the estimate tool to the MCP server
-func setupEstimateTool(s *server.MCPServer, cluster string) {
+func setupEstimateTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+	if providerId == cliClient.ProviderDefang {
+		providerId = cliClient.ProviderAWS // Default to AWS
+	}
+
 	term.Debug("Creating estimate tool")
 	estimateTool := mcp.NewTool("estimate",
 		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
@@ -28,7 +32,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 
 		mcp.WithString("provider",
 			mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-			mcp.DefaultString("AWS"),
+			mcp.DefaultString(strings.ToUpper(providerId.String())),
 			mcp.Enum("AWS", "GCP"),
 		),
 
@@ -61,7 +65,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 
 		providerString, ok := request.Params.Arguments["provider"].(string)
 		if !ok {
-			providerString = "aws" // Default to AWS if not provided
+			providerString = providerId.String()
 		}
 
 		// This logic is replicated from src/cmd/cli/command/mode.go
