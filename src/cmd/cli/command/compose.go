@@ -89,7 +89,7 @@ func makeComposeUpCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)
@@ -152,22 +152,27 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
-
 			if err != nil {
-				if !nonInteractive && strings.Contains(err.Error(), "maximum number of projects") {
-					if projectName, err2 := provider.RemoteProjectName(cmd.Context()); err2 == nil {
-						term.Error("Error:", prettyError(err))
-						if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, projectName); err != nil {
-							term.Debug("ComposeDown failed:", err)
-							printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-						} else {
-							printDefangHint("To try deployment again, do:", "compose up")
-						}
-						return nil
-					}
-				}
 				if errors.Is(err, types.ErrComposeFileNotFound) {
 					printDefangHint("To start a new project, do:", "new")
+				}
+				if !nonInteractive {
+					if strings.Contains(err.Error(), "maximum number of projects") {
+						if projectName, err2 := provider.RemoteProjectName(cmd.Context()); err2 == nil {
+							term.Error("Error:", prettyError(err))
+							if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, projectName); err != nil {
+								term.Debug("ComposeDown failed:", err)
+								printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+							} else {
+								printDefangHint("To try deployment again, do:", "compose up")
+							}
+							return nil
+						}
+						return err
+					}
+					term.Error("Error:", prettyError(err))
+					track.Evt("Debug Prompted", P("composeErr", err))
+					return cli.InteractiveDebugForClientError(ctx, client, project, err)
 				}
 				return err
 			}
@@ -438,7 +443,7 @@ func makeComposeConfigCmd() *cobra.Command {
 				}
 
 				track.Evt("Debug Prompted", P("loadErr", loadErr))
-				return cli.InteractiveDebugForLoadError(ctx, client, project, loadErr)
+				return cli.InteractiveDebugForClientError(ctx, client, project, loadErr)
 			}
 
 			provider, err := newProvider(ctx, loader)
