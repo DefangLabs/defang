@@ -52,9 +52,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
 		if managedMongo {
-			mongoServiceNames = append(mongoServiceNames, svccfg.Name)
 			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
+			}
+			// for GCP: Collect the names of MongoDB services so we can check for connection string adjustments
+			// make provider check this way to avoid import cycle with byoc/gcp
+			if providerType := fmt.Sprintf("%T", provider); strings.Contains(providerType, "ByocGcp") {
+				mongoServiceNames = append(mongoServiceNames, svccfg.Name)
 			}
 		}
 
@@ -161,15 +165,13 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				svccfg.Environment[key] = nil
 				continue
 			} else if len(mongoServiceNames) > 0 {
+				// GCP: check whether there is an environment variable that will be overridden by the MongoDB service connection string
 				for serviceName := range svccfg.DependsOn {
 					if slices.Contains(mongoServiceNames, serviceName) {
 						connectionStrEnvVarName := strings.ToUpper(serviceName + "_URL")
 						// If the service depends on a MongoDB service, we need to adjust the environment variable
-						if !shownOnce {
-							term.Warnf("service %q: adjusting environment variable %q for MongoDB service dependency", svccfg.Name, connectionStrEnvVarName)
-							shownOnce = true
-						}
-						notAdjusted = append(notAdjusted, connectionStrEnvVarName)
+						term.Warnf("service %q: environment variable %q for MongoDB service dependency", svccfg.Name, connectionStrEnvVarName)
+						overridden = append(overridden, connectionStrEnvVarName)
 						svccfg.Environment[serviceName] = nil
 						continue
 					}
