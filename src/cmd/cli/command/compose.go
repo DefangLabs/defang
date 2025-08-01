@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -153,28 +154,7 @@ func makeComposeUpCmd() *cobra.Command {
 
 			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
 			if err != nil {
-				if errors.Is(err, types.ErrComposeFileNotFound) {
-					printDefangHint("To start a new project, do:", "new")
-				}
-				if !nonInteractive {
-					if strings.Contains(err.Error(), "maximum number of projects") {
-						if projectName, err2 := provider.RemoteProjectName(cmd.Context()); err2 == nil {
-							term.Error("Error:", prettyError(err))
-							if _, err := cli.InteractiveComposeDown(cmd.Context(), provider, projectName); err != nil {
-								term.Debug("ComposeDown failed:", err)
-								printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-							} else {
-								printDefangHint("To try deployment again, do:", "compose up")
-							}
-							return nil
-						}
-						return err
-					}
-					term.Error("Error:", prettyError(err))
-					track.Evt("Debug Prompted", P("composeErr", err))
-					return cli.InteractiveDebugForClientError(ctx, client, project, err)
-				}
-				return err
+				return handleComposeUpErr(ctx, err, project, provider)
 			}
 
 			if len(deploy.Services) == 0 {
@@ -193,39 +173,18 @@ func makeComposeUpCmd() *cobra.Command {
 			if deploy.Etag != "" {
 				tailSource = "deployment ID " + deploy.Etag
 			}
-
 			term.Info("Tailing logs for", tailSource, "; press Ctrl+C to detach:")
 
 			tailOptions := newTailOptionsForDeploy(deploy.Etag, since, verbose)
 			serviceStates, err := cli.TailAndMonitor(ctx, project, provider, time.Duration(waitTimeout)*time.Second, tailOptions)
 			if err != nil {
-				var errDeploymentFailed cliClient.ErrDeploymentFailed
-				if errors.As(err, &errDeploymentFailed) {
-					// Tail got canceled because of deployment failure: prompt to show the debugger
-					term.Warn(errDeploymentFailed)
-					debugConfig := cli.DebugConfig{
-						Deployment: deploy.Etag,
-						ModelId:    modelId,
-						Project:    project,
-						Provider:   provider,
-						Since:      since,
-					}
-					if errDeploymentFailed.Service != "" {
-						debugConfig.FailedServices = []string{errDeploymentFailed.Service}
-					}
-					if nonInteractive {
-						printDefangHint("To debug the deployment, do:", debugConfig.String())
-					} else {
-						track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", deploy.Etag), P("reason", errDeploymentFailed))
-
-						// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
-						if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
-							// don't show this defang hint if debugging was successful
-							tailOptions := newTailOptionsForDeploy(deploy.Etag, since, true)
-							printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
-						}
-					}
-				}
+				handleTailAndMonitorErr(ctx, err, client, cli.DebugConfig{
+					Deployment: deploy.Etag,
+					ModelId:    modelId,
+					Project:    project,
+					Provider:   provider,
+					Since:      since,
+				})
 				return err
 			}
 
@@ -256,6 +215,59 @@ func makeComposeUpCmd() *cobra.Command {
 	_ = composeUpCmd.Flags().MarkHidden("wait")
 	composeUpCmd.Flags().Int("wait-timeout", -1, "maximum duration to wait for the project to be running|healthy") // docker-compose compatibility
 	return composeUpCmd
+}
+
+func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) error {
+	if errors.Is(err, types.ErrComposeFileNotFound) {
+		// TODO: generate a compose file based on the current project
+		printDefangHint("To start a new project, do:", "new")
+	}
+
+	if nonInteractive {
+		return err
+	}
+
+	if strings.Contains(err.Error(), "maximum number of projects") {
+		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
+			term.Error("Error:", prettyError(err))
+			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
+				term.Debug("ComposeDown failed:", err)
+				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+			} else {
+				// TODO: actually do the "compose up" (because that's what the user intended in the first place)
+				printDefangHint("To try deployment again, do:", "compose up")
+			}
+			return nil
+		}
+		return err
+	}
+
+	term.Error("Error:", prettyError(err))
+	track.Evt("Debug Prompted", P("composeErr", err))
+	return cli.InteractiveDebugForClientError(ctx, client, project, err)
+}
+
+func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
+	var errDeploymentFailed cliClient.ErrDeploymentFailed
+	if errors.As(err, &errDeploymentFailed) {
+		// Tail got canceled because of deployment failure: prompt to show the debugger
+		term.Warn(errDeploymentFailed)
+		if errDeploymentFailed.Service != "" {
+			debugConfig.FailedServices = []string{errDeploymentFailed.Service}
+		}
+		if nonInteractive {
+			printDefangHint("To debug the deployment, do:", debugConfig.String())
+		} else {
+			track.Evt("Debug Prompted", P("failedServices", debugConfig.FailedServices), P("etag", debugConfig.Deployment), P("reason", errDeploymentFailed))
+
+			// Call the AI debug endpoint using the original command context (not the tail ctx which is canceled)
+			if nil != cli.InteractiveDebugDeployment(ctx, client, debugConfig) {
+				// don't show this defang hint if debugging was successful
+				tailOptions := newTailOptionsForDeploy(debugConfig.Deployment, debugConfig.Since, true)
+				printDefangHint("To see the logs of the failed service, do:", tailOptions.String())
+			}
+		}
+	}
 }
 
 func newTailOptionsForDeploy(deployment string, since time.Time, verbose bool) cli.TailOptions {
