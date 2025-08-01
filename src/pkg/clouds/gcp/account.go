@@ -17,7 +17,7 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
-		return "", fmt.Errorf("unable to find default credentials: %w", err)
+		return "", errors.New("unable to find default credentials.\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n")
 	}
 	content := struct {
 		ClientEmail string `json:"client_email"`
