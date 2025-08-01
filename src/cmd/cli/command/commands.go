@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -319,6 +320,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
+
+	// setup command
+	RootCmd.AddCommand(setupCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
@@ -1147,6 +1151,29 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 		doubleCheckProjectName(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
+}
+
+var setupCmd = &cobra.Command{
+	Use:         "setup",
+	Args:        cobra.NoArgs,
+	Aliases:     []string{"init", "configure"},
+	Annotations: authNeededAnnotation, // need subscription
+	Short:       "Setup the Defang CLI",
+	Long:        "Set up your project to be deployed with Defang",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive {
+			return errors.New("cannot run in non-interactive mode")
+		}
+
+		from, _ := cmd.Flags().GetString("from")
+		sourcePlatform, _ := setup.ParseSourcePlatform(from)
+
+		if err := setup.InteractiveSetup(cmd.Context(), client, sourcePlatform); err != nil {
+			return err
+		}
+
+		return nil
+	},
 }
 
 func doubleCheckProjectName(projectName string) {
