@@ -285,10 +285,10 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	}
 	email, err := b.driver.GetCurrentAccountEmail(ctx)
 	if err != nil {
-		if email, err := gcp.GetGcloudAccountEmail(); err == nil {
-			return nil, errors.New("failed to retrieve credentials for " + email + " in GCP project " + projectId + ".\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n")
+		if email, err2 := gcp.GetGcloudAccountEmail(); err2 == nil {
+			return nil, fmt.Errorf("%v. \nFailed to retrieve credentials for %v in GCP project %v.\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n", err, email, projectId)
 		}
-		return nil, errors.New("failed to retrieve credentials for GCP project " + projectId + ".\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n")
+		return nil, fmt.Errorf("%v. \nFailed to retrieve credentials for GCP project %v.\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n", err, projectId)
 	}
 	return &client.AccountInfo{
 		AccountID: projectId,
