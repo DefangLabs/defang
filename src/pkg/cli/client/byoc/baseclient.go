@@ -207,7 +207,7 @@ func topologicalSort(nodes map[string]*Node) []*defangv1.ServiceInfo {
 // This function was based on update function from Fabric controller and slightly modified to work with BYOC
 func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain string, service composeTypes.ServiceConfig) (*defangv1.ServiceInfo, error) {
 	if err := compose.ValidateService(&service); err != nil {
-		return nil, fmt.Errorf("service %q: %w", service.Name, err)
+		return nil, err // caller prepends service name
 	}
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
@@ -257,7 +257,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	if siUpdater, ok := b.projectBackend.(ServiceInfoUpdater); ok {
 		if err := siUpdater.UpdateServiceInfo(ctx, si, projectName, delegateDomain, service); err != nil {
-			return nil, fmt.Errorf("service %q: %w", service.Name, err)
+			return nil, err // caller prepends service name
 		}
 	}
 
