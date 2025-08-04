@@ -277,8 +277,8 @@ func tryReadIgnoreFile(cwd, ignorefile string) io.ReadCloser {
 // writeDefaultIgnoreFile writes a default
 // .dockerignore file to the specified directory.
 // Returns the filename of the written file and an error.
-func writeDefaultIgnoreFile(cwd string) (string, error) {
-	path := filepath.Join(cwd, dotdockerignore)
+func writeDefaultIgnoreFile(cwd string, dockerignore string) (string, error) {
+	path := filepath.Join(cwd, dockerignore)
 	term.Debug("Writing .dockerignore file to", path)
 
 	err := os.WriteFile(path, []byte(defaultDockerIgnore), 0644)
@@ -286,7 +286,7 @@ func writeDefaultIgnoreFile(cwd string) (string, error) {
 		return "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
 	}
 
-	return dotdockerignore, nil
+	return dockerignore, nil
 }
 
 // getDockerIgnorePatterns attempts to read the ignore file
@@ -302,18 +302,9 @@ func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) 
 		dockerignore = dotdockerignore
 		reader = tryReadIgnoreFile(root, dockerignore)
 		if reader == nil {
-			// Generate a default .dockerignore file if none exists
-			term.Warn("No .dockerignore file found; generating default .dockerignore")
-			var err error
-			dockerignore, err = writeDefaultIgnoreFile(root)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to write default .dockerignore file: %w", err)
-			}
-			// Try reading the newly created .dockerignore file
-			reader = tryReadIgnoreFile(root, dockerignore)
-			if reader == nil {
-				return nil, "", fmt.Errorf("failed to read default .dockerignore file: %s at the path: %s", dockerignore, root)
-			}
+			// No .dockerignore file found; read from defaults
+			dockerignore = ""
+			reader = io.NopCloser(strings.NewReader(defaultDockerIgnore))
 		}
 	}
 
@@ -328,6 +319,15 @@ func getDockerIgnorePatterns(root, dockerfile string) ([]string, string, error) 
 }
 
 func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEntry, slashPath string) error) error {
+	return walkContextFolder(root, dockerfile, writeIgnoreFileNo, fn)
+}
+
+type writeIgnoreFile bool
+
+const writeIgnoreFileNo writeIgnoreFile = false
+const writeIgnoreFileYes writeIgnoreFile = true
+
+func walkContextFolder(root, dockerfile string, writeIgnore writeIgnoreFile, fn func(path string, de os.DirEntry, slashPath string) error) error {
 	if dockerfile == "" {
 		dockerfile = "Dockerfile"
 	} else {
@@ -338,6 +338,16 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 	patterns, dockerignore, err := getDockerIgnorePatterns(root, dockerfile)
 	if err != nil {
 		return err
+	}
+
+	if dockerignore == "" && writeIgnore {
+		// Generate a default .dockerignore file if none exists (to be included in the context)
+		term.Warn("No .dockerignore file found; creating default .dockerignore")
+		var err error
+		dockerignore, err = writeDefaultIgnoreFile(root, dotdockerignore)
+		if err != nil {
+			return fmt.Errorf("failed to write default .dockerignore file: %w", err)
+		}
 	}
 
 	pm, err := patternmatcher.New(patterns)
@@ -363,11 +373,12 @@ func WalkContextFolder(root, dockerfile string, fn func(path string, de os.DirEn
 
 		slashPath := filepath.ToSlash(relPath)
 
-		if relPath == dockerfile {
+		switch relPath {
+		case dockerfile:
 			// we need the Dockerfile, even if it's in the .dockerignore file
-		} else if relPath == dockerignore {
+		case dockerignore:
 			// we need the .dockerignore file too: it might ignore itself and/or the Dockerfile, but is needed by the builder
-		} else {
+		default:
 			// Ignore files using the dockerignore patternmatcher
 			ignore, err := pm.MatchesOrParentMatches(slashPath) // always use forward slashes
 			if err != nil {
@@ -407,7 +418,7 @@ func createArchive(ctx context.Context, root string, dockerfile string, contentT
 	}
 
 	doProgress := term.StdoutCanColor() && term.IsTerminal()
-	err := WalkContextFolder(root, dockerfile, func(path string, de os.DirEntry, slashPath string) error {
+	err := walkContextFolder(root, dockerfile, writeIgnoreFileYes, func(path string, de os.DirEntry, slashPath string) error {
 		if term.DoDebug() {
 			term.Debug("Adding", slashPath)
 		} else if doProgress {
