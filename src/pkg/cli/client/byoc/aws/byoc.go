@@ -35,7 +35,6 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/bufbuild/connect-go"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/proto"
@@ -139,26 +138,24 @@ func (b *ByocAws) setUpCD(ctx context.Context) error {
 
 	term.Debugf("Using CD image: %q", b.CDImage)
 
-	cdTaskName := byoc.CdTaskPrefix
+	cdContainerName := byoc.CdTaskPrefix
 	containers := []types.Container{
 		{
 			// FIXME: get the Pulumi image or version from Fabric: https://github.com/DefangLabs/defang/issues/1027
-			Image:     "public.ecr.aws/pulumi/pulumi-nodejs:" + b.PulumiVersion,
-			Name:      ecs.CdContainerName,
-			Cpus:      2.0,
-			Memory:    2048_000_000, // 2G
-			Essential: ptr.Bool(true),
+			Image:  "public.ecr.aws/pulumi/pulumi-nodejs:" + b.PulumiVersion,
+			Name:   ecs.CdContainerName,
+			Cpus:   2.0,
+			Memory: 2048_000_000, // 2G
 			VolumesFrom: []string{
-				cdTaskName,
+				cdContainerName,
 			},
 			WorkDir:    "/app",
-			DependsOn:  map[string]types.ContainerCondition{cdTaskName: "START"},
 			EntryPoint: []string{"node", "lib/index.js"},
 		},
 		{
-			Image:     b.CDImage,
-			Name:      cdTaskName,
-			Essential: ptr.Bool(false),
+			Image:  b.CDImage,
+			Name:   cdContainerName,
+			IsInit: true,
 			Volumes: []types.TaskVolume{
 				{
 					Source:   "pulumi-plugins",

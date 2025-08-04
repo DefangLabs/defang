@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/region"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 // GetTaskStatus returns nil if the task is still running, io.EOF if the task is stopped successfully, or an error if the task failed.
 func GetTaskStatus(ctx context.Context, taskArn TaskArn) error {
-	region := region.FromArn(*taskArn)
+	region := aws.RegionFromArn(*taskArn)
 	cluster, taskID := SplitClusterTask(taskArn)
 	return getTaskStatus(ctx, region, cluster, taskID)
 }

@@ -11,14 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/processcreds"
 )
 
-type Region string
-
 type Aws struct {
 	Region Region
-}
-
-func (r Region) String() string {
-	return string(r)
 }
 
 func (a *Aws) LoadConfig(ctx context.Context) (aws.Config, error) {

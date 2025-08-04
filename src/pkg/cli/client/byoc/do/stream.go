@@ -42,7 +42,7 @@ func newByocServerStream(ctx context.Context, liveUrl string, etag types.ETag) (
 		liveURL.Scheme = "wss"
 	}
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, liveURL.String(), nil)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, liveURL.String(), nil) // TODO: should we close resp.Body?
 	if err != nil {
 		return nil, err
 	}
