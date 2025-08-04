@@ -25,8 +25,6 @@ import (
 const maxFiles = 20
 
 var (
-	ErrDebugSkipped = errors.New("debug skipped")
-
 	errFileLimitReached = errors.New("file limit reached")
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
@@ -86,7 +84,7 @@ func interactiveDebug(ctx context.Context, client client.FabricClient, debugConf
 		return err
 	} else if !aiDebug {
 		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Deployment), P("loadErr", clientErr))
-		return ErrDebugSkipped
+		return err
 	}
 
 	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Deployment), P("loadErr", clientErr))

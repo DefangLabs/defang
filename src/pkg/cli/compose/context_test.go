@@ -135,7 +135,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", "Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -222,7 +222,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 			dockerfile:        "Dockerfile",
 			ignoreFileName:    "",
 			ignoreFileContent: defaultDockerIgnore,
-			expectedFileName:  ".dockerignore",
+			expectedFileName:  "",
 		},
 		{
 			name:              "No dockerfile, but dockerignore exists",
@@ -236,7 +236,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 			dockerfile:        "",
 			ignoreFileName:    "",
 			ignoreFileContent: defaultDockerIgnore,
-			expectedFileName:  ".dockerignore",
+			expectedFileName:  "",
 		},
 	}
 
