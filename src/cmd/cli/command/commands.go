@@ -136,6 +136,11 @@ func Execute(ctx context.Context) error {
 			hint += " Please check if this legacy zone is still needed. If not, remove it from your Google Cloud account and try again."
 			printDefangHint(hint)
 		}
+
+		if credError := new(gcp.CredentialsError); errors.As(err, &credError) {
+			fmt.Print("\nPlease log in by running: \n\n\t gcloud auth application-default login\n\n")
+		}
+
 		return ExitCode(code)
 	}
 
