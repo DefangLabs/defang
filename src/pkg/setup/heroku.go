@@ -13,53 +13,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-const herokuSystemInstructions = `
-# Docker Compose Configuration for Heroku Application
-
-Please create a Docker Compose file that represents the following Heroku application configuration for local development and deployment.
-
-## Strategy
-
-### Databases
-
-If the Heroku application uses a PostgreSQL addon, create a PostgreSQL service using the official postgresql image information in the config vars:
-Specify the following environment variables:
-- POSTGRES_USER
-- POSTGRES_PASSWORD
-- POSTGRES_DB
-- POSTGRES_HOST
-- POSTGRES_PORT
-Configure it to be accessible via the DATABASE_URL which is exposed in the application service's environment variables.
-
-### Redis
-
-If the Heroku application uses a Redis addon, create a Redis service using the official redis image.
-Configure it to be accessible via the REDIS_URL which is exposed in the application service's environment variables.
-
-### Dynos
-
-Create an application service that mirrors each dyno
-Dyno's will have either a web or worker type. Web dynos will be exposed on a specific port. Worker dynos will not be exposed.
-Assume the build context is the root of the repository.
-Use the same command as the Heroku dyno
-Include all necessary environment variables. Remember that Heroku Config Vars are shared as environment variables for all dynos in the application.
-
-#### Environment Variables
-
-Assign Heroku config vars as environment variables for the application services.
-Replace external hosts in database and redis URLs with internal service hostnames
-Maintain the custom variables (FOO, LANG, RACK_ENV)
-
-## Best Practices
-
-Assume the docker compose file is being configured for production deployment.
-Prefer official Docker images for databases and redis
-Do not include volume mounts for any services
-Do not specify restart policies
-Configure standard healthchecks for postgres and redis
-Configure web dyno healthchecks to be a commented out curl invocation to localhost: (ex: '# curl http://localhost:$PORT/health')
-`
-
 type HerokuApplicationInfo struct {
 	Addons     []HerokuAddon    `json:"addons"`
 	Dynos      []HerokuDyno     `json:"dynos"`
