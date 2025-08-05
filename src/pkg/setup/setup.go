@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
-func InteractiveSetup(ctx context.Context, client client.FabricClient, sourcePlatform SourcePlatform) error {
+func InteractiveSetup(ctx context.Context, fabric client.FabricClient, sourcePlatform SourcePlatform) error {
 	term.Warn("Starting interactive setup")
 
 	if sourcePlatform == "" {
@@ -28,7 +26,7 @@ func InteractiveSetup(ctx context.Context, client client.FabricClient, sourcePla
 
 	switch sourcePlatform {
 	case SourcePlatformHeroku:
-		err := setupFromHeroku(ctx)
+		err := setupFromHeroku(ctx, fabric)
 		if err != nil {
 			return fmt.Errorf("failed to setup from Heroku: %w", err)
 		}
@@ -39,17 +37,7 @@ func InteractiveSetup(ctx context.Context, client client.FabricClient, sourcePla
 	return nil
 }
 
-func setupFromHeroku(ctx context.Context) error {
-	// invoke anthropic claude sonnet 4
-	// Get API key from environment variable
-	anthropicAPIKey := os.Getenv("ANTHROPIC_API_KEY")
-	if anthropicAPIKey == "" {
-		fmt.Println("Please set the ANTHROPIC_API_KEY environment variable")
-		os.Exit(1)
-	}
-
-	claude := NewClaudeClient(anthropicAPIKey)
-
+func setupFromHeroku(ctx context.Context, fabric client.FabricClient) error {
 	token, err := getHerokuAuthToken()
 	if err != nil {
 		return fmt.Errorf("failed to get Heroku token: %w", err)
@@ -84,22 +72,9 @@ func setupFromHeroku(ctx context.Context) error {
 		return fmt.Errorf("failed to collect Heroku application info: %w", err)
 	}
 
-	prompt := generateHerokuPrompt(applicationInfo)
-	var composeFile string
-	maxAttempts := 3
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		composeFile, err = generateComposeFile(claude, herokuSystemInstructions, prompt)
-		if err == nil {
-			break
-		}
-		term.Warnf("Failed to generate compose file from Heroku info (attempt %d/%d): %v", attempt, maxAttempts, err)
-		if attempt < maxAttempts {
-			term.Info("Retrying...")
-			time.Sleep(2 * time.Second)
-		}
-	}
+	composeFile, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, applicationInfo)
 	if err != nil {
-		return fmt.Errorf("failed to generate compose file from Heroku info after %d attempts: %w", maxAttempts, err)
+		return errors.New("failed to generate compose file from Heroku info")
 	}
 
 	term.Info(composeFile)
@@ -107,86 +82,19 @@ func setupFromHeroku(ctx context.Context) error {
 	return nil
 }
 
-func generateHerokuPrompt(info HerokuApplicationInfo) string {
-	addonsJSON, err := json.Marshal(info.Addons)
+func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, data interface{}) (string, error) {
+	dataJSON, err := json.Marshal(data)
 	if err != nil {
-		term.Warnf("Failed to marshal addons: %v", err)
-		addonsJSON = []byte("[]")
-	}
-	dynosJSON, err := json.Marshal(info.Dynos)
-	if err != nil {
-		term.Warnf("Failed to marshal dynos: %v", err)
-		dynosJSON = []byte("[]")
-	}
-	configVarsJSON, err := json.Marshal(info.ConfigVars)
-	if err != nil {
-		term.Warnf("Failed to marshal config vars: %v", err)
-		configVarsJSON = []byte("{}")
+		return "", fmt.Errorf("failed to marshal data to json: %w", err)
 	}
 
-	return fmt.Sprintf(`Please provide a complete compose.yml file for the following application which is currently deployed to heroku. Explain any assumptions or recommendations inline using comments. Respond directly with the compose file contents in code fences.
-
-## Application Details
-
-Here are the Heroku Application Details
-
-### Add-ons:
-
-%s
-
-### Dynos:
-
-%s
-
-### Config Vars:
-
-%s
-`, addonsJSON, dynosJSON, configVarsJSON)
-}
-
-func generateComposeFile(claude *ClaudeClient, systemInstructions, prompt string) (string, error) {
-	claudeResponse, err := claude.SendConversation(systemInstructions, []Message{
-		{
-			Role:    "user",
-			Content: prompt,
-		},
+	resp, err := fabric.DeriveCompose(ctx, &defangv1.DeriveComposeRequest{
+		Platform: platform,
+		Data:     dataJSON,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to send message to Claude: %w", err)
+		return "", fmt.Errorf("failed to call DeriveCompose: %w", err)
 	}
 
-	term.Debugf("Claude response: %+v", claudeResponse)
-
-	var responseText string
-
-	for _, content := range claudeResponse.Content {
-		if content.Type == "text" {
-			responseText += content.Text
-		} else {
-			fmt.Printf("Unsupported content type: %s\n", content.Type)
-		}
-	}
-
-	// parse the response text. if there are any code fences (```) in the response, extract the content inside the first code fence
-	// avoid using regular expressions for simplicity
-	if responseText == "" {
-		return "", errors.New("Claude response is empty")
-	}
-
-	codeFenceStart := "```yaml"
-	codeFenceEnd := "```"
-	startIndex := strings.Index(responseText, codeFenceStart)
-	if startIndex == -1 {
-		return "", errors.New("no code fence found in Claude response")
-	}
-	startIndex += len(codeFenceStart)
-	endIndex := strings.Index(responseText[startIndex:], codeFenceEnd)
-	if endIndex == -1 {
-		return "", errors.New("no closing code fence found in Claude response")
-	}
-	endIndex += startIndex
-
-	responseText = responseText[startIndex:endIndex]
-
-	return responseText, nil
+	return string(resp.GetCompose()), nil
 }
