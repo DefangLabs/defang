@@ -77,6 +77,14 @@ var (
 	// }
 )
 
+type CredentialsError struct {
+	error
+}
+
+func (e CredentialsError) Unwrap() error {
+	return e.error
+}
+
 type ByocGcp struct {
 	*byoc.ByocBaseClient
 
@@ -283,12 +291,18 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	if projectId == "" {
 		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
 	}
+
+	// check whether the ADC is logged in by trying to get the current account email
 	email, err := b.driver.GetCurrentAccountEmail(ctx)
 	if err != nil {
-		if email, err2 := gcp.GetGcloudAccountEmail(); err2 == nil {
-			return nil, fmt.Errorf("%v. \nFailed to retrieve credentials for %v in GCP project %v.\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n", err, email, projectId)
+		// not logged in, get email from gcloud
+		email, gcloudErr := GetUserEmail()
+		if gcloudErr != nil {
+			return nil, fmt.Errorf("Failed to get GCP credentials for project: %q. %v", projectId, err)
 		}
-		return nil, fmt.Errorf("%v. \nFailed to retrieve credentials for GCP project %v.\nTo address this issue, log in by running:\n\n\tgcloud auth application-default login\n", err, projectId)
+
+		credErr := fmt.Errorf("Failed to get GCP credentials for user: %q project: %q. %v", email, projectId, err)
+		return nil, &CredentialsError{credErr}
 	}
 	return &client.AccountInfo{
 		AccountID: projectId,

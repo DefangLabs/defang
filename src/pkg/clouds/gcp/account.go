@@ -7,35 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"golang.org/x/oauth2/google"
-	ini "gopkg.in/ini.v1"
 )
 
 var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*google.Credentials, error) = google.FindDefaultCredentials
-
-func GetGcloudAccountEmail() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("could not determine home directory: %w", err)
-	}
-
-	configPath := filepath.Join(homeDir, ".config", "gcloud", "configurations", "config_default")
-	cfg, err := ini.Load(configPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to load gcloud config file: %w", err)
-	}
-
-	email := cfg.Section("core").Key("account").String()
-	if email == "" {
-		return "", errors.New("account not found in gcloud config")
-	}
-
-	return email, nil
-}
 
 func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
