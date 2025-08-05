@@ -298,10 +298,10 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 		// not logged in, get email from gcloud
 		email, gcloudErr := GetUserEmail()
 		if gcloudErr != nil {
-			return nil, fmt.Errorf("Failed to get GCP credentials for project: %q. %v", projectId, err)
+			return nil, fmt.Errorf("failed to get GCP credentials for project: %q. %w", projectId, err)
 		}
 
-		credErr := fmt.Errorf("Failed to get GCP credentials for user: %q project: %q. %v", email, projectId, err)
+		credErr := fmt.Errorf("failed to get GCP credentials for user: %q project: %q. %w", email, projectId, err)
 		return nil, &CredentialsError{credErr}
 	}
 	return &client.AccountInfo{
