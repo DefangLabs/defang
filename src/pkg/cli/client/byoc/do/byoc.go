@@ -677,6 +677,10 @@ func (b *ByocDo) environment(projectName, delegateDomain string) ([]*godo.AppVar
 			Value: b.PulumiStack,
 		},
 		{
+			Key:   "NODE_NO_WARNINGS",
+			Value: "1",
+		},
+		{
 			Key:   "NPM_CONFIG_UPDATE_NOTIFIER",
 			Value: "false",
 		},

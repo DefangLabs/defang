@@ -16,24 +16,23 @@
         devShell =
           with pkgs;
           mkShell {
-            buildInputs =
-              [
-                buf
-                crane
-                git
-                gnumake
-                less
-                gnused # force Linux `sed` everywhere
-                go_1_23
-                golangci-lint
-                goreleaser
-                nixfmt-rfc-style
-                nodejs_20 # for Pulumi, must match values in package.json
-                openssh
-                pulumi-bin
-                google-cloud-sdk
-                vim
-              ];
+            buildInputs = [
+              buf
+              crane
+              git
+              gnumake
+              less
+              gnused # force Linux `sed` everywhere
+              go_1_23
+              golangci-lint
+              goreleaser
+              nixfmt-rfc-style
+              nodejs_24 # for Pulumi, must match values in package.json
+              openssh
+              pulumi-bin
+              google-cloud-sdk
+              vim
+            ];
           };
         packages.defang-cli = pkgs.callPackage ./pkgs/defang/cli.nix { };
         packages.defang-bin = pkgs.callPackage ./pkgs/defang { };
