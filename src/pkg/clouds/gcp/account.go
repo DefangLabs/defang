@@ -17,7 +17,7 @@ var FindGoogleDefaultCredentials func(ctx context.Context, scopes ...string) (*g
 func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	creds, err := FindGoogleDefaultCredentials(ctx)
 	if err != nil {
-		return "", fmt.Errorf("unable to find default credentials: %w", err)
+		return "", err
 	}
 	content := struct {
 		ClientEmail string `json:"client_email"`
