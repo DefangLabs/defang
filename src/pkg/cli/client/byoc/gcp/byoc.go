@@ -77,6 +77,14 @@ var (
 	// }
 )
 
+type CredentialsError struct {
+	error
+}
+
+func (e CredentialsError) Unwrap() error {
+	return e.error
+}
+
 type ByocGcp struct {
 	*byoc.ByocBaseClient
 
@@ -283,9 +291,18 @@ func (b *ByocGcp) AccountInfo(ctx context.Context) (*client.AccountInfo, error) 
 	if projectId == "" {
 		return nil, errors.New("GCP_PROJECT_ID or CLOUDSDK_CORE_PROJECT must be set for GCP projects")
 	}
+
+	// check whether the ADC is logged in by trying to get the current account email
 	email, err := b.driver.GetCurrentAccountEmail(ctx)
 	if err != nil {
-		return nil, err
+		// not logged in, get email from gcloud
+		email, gcloudErr := GetUserEmail()
+		if gcloudErr != nil {
+			return nil, fmt.Errorf("failed to get GCP credentials for project: %q. %w", projectId, err)
+		}
+
+		credErr := fmt.Errorf("failed to get GCP credentials for user: %q project: %q. %w", email, projectId, err)
+		return nil, &CredentialsError{credErr}
 	}
 	return &client.AccountInfo{
 		AccountID: projectId,
