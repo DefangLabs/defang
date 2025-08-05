@@ -137,6 +137,10 @@ service FabricController {
   rpc Estimate(EstimateRequest) returns (EstimateResponse);
 
   rpc Preview(PreviewRequest) returns (PreviewResponse);
+
+  rpc DeriveCompose(DeriveComposeRequest) returns (DeriveComposeResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  };
 }
 
 enum Provider {
@@ -731,4 +735,18 @@ message PreviewRequest {
 
 message PreviewResponse {
   string etag = 1;
+}
+
+enum SourcePlatform {
+  SOURCE_PLATFORM_UNSPECIFIED = 0;
+  HEROKU = 1;
+}
+
+message DeriveComposeRequest {
+  SourcePlatform platform = 1;
+  bytes data = 2; // platform-specific json
+}
+
+message DeriveComposeResponse {
+  bytes compose = 1; // yaml
 }
