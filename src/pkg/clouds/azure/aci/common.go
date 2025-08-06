@@ -13,7 +13,8 @@ type ContainerInstance struct {
 	azure.Azure
 	containerGroupProps *armcontainerinstance.ContainerGroupPropertiesProperties
 	resourceGroupName   string
-	storageAccount      string
+	StorageAccount      string
+	BlobContainerName   string
 }
 
 func NewContainerInstance(resourceGroupName string, location azure.Location) *ContainerInstance {
@@ -26,7 +27,7 @@ func NewContainerInstance(resourceGroupName string, location azure.Location) *Co
 			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
 		},
 		resourceGroupName: resourceGroupName, // TODO: append location?
-		storageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
+		StorageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
 	}
 }
 

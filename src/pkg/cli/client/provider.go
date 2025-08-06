@@ -91,6 +91,7 @@ type Provider interface {
 	SetUpCD(context.Context) error
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (iter.Seq2[*defangv1.SubscribeResponse, error], error)
 	TearDownCD(context.Context) error
+	// Upload(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 }
 
 type Loader interface {
