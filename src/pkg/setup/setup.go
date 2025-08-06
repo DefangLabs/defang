@@ -88,12 +88,12 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		return "", fmt.Errorf("failed to marshal data to json: %w", err)
 	}
 
-	resp, err := fabric.DeriveCompose(ctx, &defangv1.DeriveComposeRequest{
+	resp, err := fabric.GenerateCompose(ctx, &defangv1.GenerateComposeRequest{
 		Platform: platform,
 		Data:     dataJSON,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to call DeriveCompose: %w", err)
+		return "", fmt.Errorf("failed to call GenerateCompose: %w", err)
 	}
 
 	return string(resp.GetCompose()), nil
