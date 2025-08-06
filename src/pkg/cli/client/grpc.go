@@ -178,6 +178,6 @@ func (g GrpcClient) Preview(ctx context.Context, req *defangv1.PreviewRequest) (
 	return getMsg(g.client.Preview(ctx, connect.NewRequest(req)))
 }
 
-func (g GrpcClient) DeriveCompose(ctx context.Context, req *defangv1.DeriveComposeRequest) (*defangv1.DeriveComposeResponse, error) {
-	return getMsg(g.client.DeriveCompose(ctx, connect.NewRequest(req)))
+func (g GrpcClient) GenerateCompose(ctx context.Context, req *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error) {
+	return getMsg(g.client.GenerateCompose(ctx, connect.NewRequest(req)))
 }

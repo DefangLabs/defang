@@ -138,7 +138,7 @@ service FabricController {
 
   rpc Preview(PreviewRequest) returns (PreviewResponse);
 
-  rpc DeriveCompose(DeriveComposeRequest) returns (DeriveComposeResponse) {
+  rpc GenerateCompose(GenerateComposeRequest) returns (GenerateComposeResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   };
 }
@@ -742,11 +742,12 @@ enum SourcePlatform {
   HEROKU = 1;
 }
 
-message DeriveComposeRequest {
+message GenerateComposeRequest {
   SourcePlatform platform = 1;
   bytes data = 2; // platform-specific json
+  string previous_error = 3; // optional; if set, will retry while noting this error
 }
 
-message DeriveComposeResponse {
+message GenerateComposeResponse {
   bytes compose = 1; // yaml
 }
