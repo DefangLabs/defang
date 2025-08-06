@@ -36,11 +36,15 @@ func PostFormWithContext(ctx context.Context, url string, data url.Values) (*htt
 	return PostWithContext(ctx, url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
 
-func PostWithContext(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+func PostWithHeader(ctx context.Context, url string, header http.Header, body io.Reader) (*http.Response, error) {
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return nil, err
 	}
-	hreq.Header.Set("Content-Type", contentType)
+	hreq.Header = header
 	return DefaultClient.Do(hreq)
+}
+
+func PostWithContext(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	return PostWithHeader(ctx, url, http.Header{"Content-Type": []string{contentType}}, body)
 }

@@ -58,6 +58,7 @@ type Provider interface {
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error
+	// Upload(context.Context, *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error)
 }
 
 type Loader interface {

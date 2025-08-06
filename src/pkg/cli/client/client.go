@@ -34,7 +34,6 @@ type FabricClient interface {
 	PutDeployment(context.Context, *defangv1.PutDeploymentRequest) error
 	RevokeToken(context.Context) error
 	SetSelectedProvider(context.Context, *defangv1.SetSelectedProviderRequest) error
-	// Subscribe(context.Context, *v1.SubscribeRequest) (*v1.SubscribeResponse, error)
 	Token(context.Context, *defangv1.TokenRequest) (*defangv1.TokenResponse, error)
 	Track(string, ...Property) error
 	VerifyDNSSetup(context.Context, *defangv1.VerifyDNSSetupRequest) error

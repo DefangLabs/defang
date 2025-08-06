@@ -40,7 +40,7 @@ func (a Azure) NewStorageAccountsClient() (*armstorage.AccountsClient, error) {
 	return clientFactory.NewAccountsClient(), nil
 }
 
-func (a Azure) NewStorageClient() (*armstorage.BlobContainersClient, error) {
+func (a Azure) NewBlobContainersClient() (*armstorage.BlobContainersClient, error) {
 	cred, err := a.NewCreds()
 	if err != nil {
 		return nil, err
@@ -53,3 +53,17 @@ func (a Azure) NewStorageClient() (*armstorage.BlobContainersClient, error) {
 
 	return clientFactory.NewBlobContainersClient(), nil
 }
+
+// func (a Azure) NewRoleAssignmentsClient() (*armauthorization.RoleAssignmentsClient, error) {
+// 	cred, err := a.NewCreds()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	clientFactory, err := armauthorization.NewRoleAssignmentsClient(a.SubscriptionID, cred, nil)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create role assignments client: %w", err)
+// 	}
+
+// 	return clientFactory, nil
+// }

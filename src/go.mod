@@ -16,7 +16,7 @@ require (
 	cloud.google.com/go/secretmanager v1.14.5
 	cloud.google.com/go/storage v1.50.0
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.1
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.2
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerinstance/armcontainerinstance/v2 v2.4.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v2 v2.1.0
@@ -76,7 +76,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	cloud.google.com/go/longrunning v0.6.6 // indirect
 	cloud.google.com/go/monitoring v1.24.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.50.0 // indirect
@@ -106,6 +106,7 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
@@ -145,7 +146,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -159,11 +160,11 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
-	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0 // indirect
-	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
-	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.11.0 // indirect

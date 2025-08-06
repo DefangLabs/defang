@@ -232,16 +232,19 @@ func uploadArchive(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, string(contentType), body)
+	header := http.Header{"Content-Type": []string{string(contentType)}}
+	header.Set("X-Ms-Blob-Type", "BlockBlob") // HACK: move to provider
+	resp, err := http.PutWithHeader(ctx, res.Url, header, body)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
 		return "", fmt.Errorf("HTTP PUT failed with status code %v", resp.Status)
 	}
 
-	url := http.RemoveQueryParam(res.Url)
+	url := http.RemoveQueryParam(res.Url) // remove any access signature
+
 	const gcpPrefix = "https://storage.googleapis.com/"
 	if strings.HasPrefix(url, gcpPrefix) {
 		url = "gs://" + url[len(gcpPrefix):]

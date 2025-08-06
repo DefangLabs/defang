@@ -17,6 +17,7 @@ import (
 
 const containerGroupPrefix = "defang-cd-"
 const storageAccountPrefix = "defangcd"
+const blobContainerName = "uploads"
 
 func (c *ContainerInstance) SetUp(ctx context.Context, containers []types.Container) error {
 	resourceGroupClient, err := c.newResourceGroupClient()
@@ -73,13 +74,9 @@ func (c *ContainerInstance) SetUp(ctx context.Context, containers []types.Contai
 		}
 	}
 
-	storageAccount, err := c.setUpStorageAccount(ctx)
+	_, err = c.SetUpStorageAccount(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get bucket name: %w", err)
-	}
-
-	if storageAccount == "" {
-
+		return fmt.Errorf("failed to get storage account name: %w", err)
 	}
 
 	return nil
@@ -104,8 +101,8 @@ func (c *ContainerInstance) TearDown(ctx context.Context) error {
 }
 
 func (c *ContainerInstance) getStorageAccount(ctx context.Context, accountsClient *armstorage.AccountsClient) (string, error) {
-	if c.storageAccount != "" {
-		return c.storageAccount, nil
+	if c.StorageAccount != "" {
+		return c.StorageAccount, nil
 	}
 
 	for pager := accountsClient.NewListByResourceGroupPager(c.resourceGroupName, nil); pager.More(); {
@@ -122,30 +119,71 @@ func (c *ContainerInstance) getStorageAccount(ctx context.Context, accountsClien
 	return "", nil
 }
 
-func (c *ContainerInstance) setUpStorageAccount(ctx context.Context) (string, error) {
+func (c *ContainerInstance) SetUpStorageAccount(ctx context.Context) (string, error) {
 	accountsClient, err := c.NewStorageAccountsClient()
 	if err != nil {
 		return "", err
 	}
 
-	if x, err := c.getStorageAccount(ctx, accountsClient); err == nil {
-		return x, nil
+	storageAccount, err := c.getStorageAccount(ctx, accountsClient)
+	if err != nil {
+		return "", err
 	}
 
-	storageAccount := storageAccountPrefix + pkg.RandomID() // unique storage account name
-	createResponse, err := accountsClient.BeginCreate(ctx, c.resourceGroupName, storageAccount, armstorage.AccountCreateParameters{
-		Kind:     to.Ptr(armstorage.KindStorageV2),
-		Location: c.Location.Ptr(),
-		SKU:      &armstorage.SKU{Name: to.Ptr(armstorage.SKUNameStandardLRS)},
-	}, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create storage account: %w", err)
-	}
+	if storageAccount == "" {
+		storageAccount = storageAccountPrefix + pkg.RandomID() // unique storage account name
+		createResponse, err := accountsClient.BeginCreate(ctx, c.resourceGroupName, storageAccount, armstorage.AccountCreateParameters{
+			Kind:     to.Ptr(armstorage.KindStorageV2),
+			Location: c.Location.Ptr(),
+			SKU:      &armstorage.SKU{Name: to.Ptr(armstorage.SKUNameStandardLRS)},
+		}, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create storage account: %w", err)
+		}
 
-	_, err = createResponse.PollUntilDone(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to poll storage account creation: %w", err)
+		_, err = createResponse.PollUntilDone(ctx, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to poll storage account creation: %w", err)
+		}
 	}
-	c.storageAccount = storageAccount
+	c.StorageAccount = storageAccount
+
+	// Assign permissions
+	// objectId, err := getCurrentUserObjectID(ctx)
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to get current user object ID: %w", err)
+	// }
+	// println("Current user object ID:", objectId)
+
+	// if err := c.assignBlobDataContributor(ctx, objectId); err != nil {
+	// 	return "", fmt.Errorf("failed to assign blob data contributor role: %w", err)
+	// }
+
+	// client, err := c.NewStorageAccountsClient()
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to create storage accounts client: %w", err)
+	// }
+	// lk, err := client.ListKeys(ctx, c.resourceGroupName, storageAccount, nil)
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to list storage account keys: %w", err)
+	// }
+
+	// ss, err := client.RegenerateKey(ctx, c.resourceGroupName, storageAccount, armstorage.RegenerateKeyParameters{
+	// 	KeyName: to.Ptr("key1"),
+	// }, nil)
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to regenerate storage account key: %w", err)
+	// }
+
+	containerClient, err := c.NewBlobContainersClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to create storage client: %w", err)
+	}
+	container, err := containerClient.Create(ctx, c.resourceGroupName, storageAccount, blobContainerName, armstorage.BlobContainer{}, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create blob container: %w", err)
+	}
+	c.BlobContainerName = *container.Name
+
 	return storageAccount, nil
 }
