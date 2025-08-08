@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -40,23 +41,27 @@ func (c *ContainerInstance) CreateUploadURL(ctx context.Context, blobName string
 	// 	return "", err
 	// }
 
-	accountsClient, err := c.NewStorageAccountsClient()
+	storageKey := os.Getenv("AZURE_STORAGE_KEY")
+	if storageKey == "" {
+		accountsClient, err := c.NewStorageAccountsClient()
+		if err != nil {
+			return "", err
+		}
+
+		keys, err := accountsClient.ListKeys(ctx, c.resourceGroupName, c.StorageAccount, nil)
+		if err != nil {
+			return "", err
+		}
+		storageKey = *keys.Keys[0].Value // or [1]?
+	}
+
+	keyCred, err := azblob.NewSharedKeyCredential(c.StorageAccount, storageKey)
 	if err != nil {
 		return "", err
 	}
 
-	keys, err := accountsClient.ListKeys(ctx, c.resourceGroupName, c.StorageAccount, nil)
-	if err != nil {
-		return "", err
-	}
-
-	keyCred, err := azblob.NewSharedKeyCredential(c.StorageAccount, *keys.Keys[0].Value)
-	if err != nil {
-		return "", err
-	}
-
-	// Create SAS
-	perms := sas.BlobPermissions{Create: true, Write: true}
+	// Create SAS; TODO: how does AZURE_STORAGE_SAS_TOKEN env var work?
+	perms := sas.BlobPermissions{Create: true, Write: true, Read: true} // read is for ACR
 	sasQueryParams, err := sas.BlobSignatureValues{
 		BlobName:      blobName,
 		ContainerName: c.BlobContainerName,

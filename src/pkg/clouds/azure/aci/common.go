@@ -17,7 +17,7 @@ type ContainerInstance struct {
 	BlobContainerName   string
 }
 
-func NewContainerInstance(resourceGroupName string, location azure.Location) *ContainerInstance {
+func NewContainerInstance(resourceGroupPrefix string, location azure.Location) *ContainerInstance {
 	if location == "" {
 		location = azure.Location(os.Getenv("AZURE_LOCATION"))
 	}
@@ -26,7 +26,7 @@ func NewContainerInstance(resourceGroupName string, location azure.Location) *Co
 			Location:       location,
 			SubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
 		},
-		resourceGroupName: resourceGroupName, // TODO: append location?
+		resourceGroupName: resourceGroupPrefix + location.String(),
 		StorageAccount:    os.Getenv("DEFANG_CD_BUCKET"),
 	}
 }
