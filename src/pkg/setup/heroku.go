@@ -19,7 +19,7 @@ type HerokuApplicationInfo struct {
 	ConfigVars HerokuConfigVars `json:"config_vars"`
 }
 
-func collectHerokuApplicationInfo(ctx context.Context, client *HerokuClient, appName string) (HerokuApplicationInfo, error) {
+func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
 	var applicationInfo HerokuApplicationInfo
 	dynos, err := client.ListDynos(ctx, appName)
 	if err != nil {
@@ -46,13 +46,13 @@ func collectHerokuApplicationInfo(ctx context.Context, client *HerokuClient, app
 	return applicationInfo, nil
 }
 
-func selectSourceApplication(appNames []string) (string, error) {
+func selectSourceApplication(surveyor Surveyor, appNames []string) (string, error) {
 	var selectedApp string
 	for {
-		err := survey.AskOne(&survey.Select{
+		err := surveyor.AskOne(&survey.Select{
 			Message: "Select the Heroku application to use as a source:",
 			Options: appNames, // This should be a list of app names, but for simplicity, we use the whole string
-		}, &selectedApp, survey.WithStdio(term.DefaultTerm.Stdio()))
+		}, &selectedApp)
 		if err != nil {
 			return "", fmt.Errorf("failed to select Heroku application: %w", err)
 		}
@@ -66,11 +66,24 @@ func selectSourceApplication(appNames []string) (string, error) {
 	return selectedApp, nil
 }
 
+// HerokuClientInterface defines the interface for Heroku client operations
+type HerokuClientInterface interface {
+	SetToken(token string)
+	ListApps(ctx context.Context) ([]HerokuApplication, error)
+	ListDynos(ctx context.Context, appName string) ([]HerokuDyno, error)
+	ListAddons(ctx context.Context, appName string) ([]HerokuAddon, error)
+	ListConfigVars(ctx context.Context, appName string) (HerokuConfigVars, error)
+}
+
 // HerokuClient represents the Heroku API client
 type HerokuClient struct {
 	Token      string
 	HTTPClient *http.Client
 	BaseURL    string
+}
+
+func (h *HerokuClient) SetToken(token string) {
+	h.Token = token
 }
 
 // APIResponse represents a generic API response
@@ -80,9 +93,8 @@ type APIResponse struct {
 }
 
 // NewHerokuClient creates a new Heroku API client
-func NewHerokuClient(token string) *HerokuClient {
+func NewHerokuClient() *HerokuClient {
 	return &HerokuClient{
-		Token: token,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -209,7 +221,7 @@ func getHerokuAuthToken() (string, error) {
 		err := survey.AskOne(&survey.Password{
 			Message: "Defang needs a Heroku auth token key to collect information about your applications.",
 			Help:    "Run `heroku authorizations:create --expires-in=300` or visit https://dashboard.heroku.com/account/applications/authorizations/new",
-		}, &token, survey.WithStdio(term.DefaultTerm.Stdio()))
+		}, &token)
 		if err != nil {
 			return "", fmt.Errorf("failed to prompt for Heroku token: %w", err)
 		}

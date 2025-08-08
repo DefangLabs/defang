@@ -1168,7 +1168,9 @@ var setupCmd = &cobra.Command{
 		from, _ := cmd.Flags().GetString("from")
 		sourcePlatform, _ := setup.ParseSourcePlatform(from)
 
-		if err := setup.InteractiveSetup(cmd.Context(), client, sourcePlatform); err != nil {
+		heroku := setup.NewHerokuClient()
+		surveyor := setup.NewDefaultSurveyor()
+		if err := setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform); err != nil {
 			return err
 		}
 
