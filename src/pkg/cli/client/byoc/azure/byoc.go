@@ -2,13 +2,20 @@ package azure
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"os"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/azure/aci"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type ByocAzure struct {
@@ -48,6 +55,10 @@ func (b *ByocAzure) BootstrapList(context.Context) ([]string, error) {
 
 // CreateUploadURL implements client.Provider.
 func (b *ByocAzure) CreateUploadURL(ctx context.Context, req *defangv1.UploadURLRequest) (*defangv1.UploadURLResponse, error) {
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
 	url, err := b.driver.CreateUploadURL(ctx, req.Digest)
 	if err != nil {
 		return nil, err
@@ -68,10 +79,74 @@ func (b *ByocAzure) DeleteConfig(context.Context, *defangv1.Secrets) error {
 	return errors.ErrUnsupported
 }
 
+func (b *ByocAzure) setUp(ctx context.Context) error {
+	return b.driver.SetUp(ctx, []types.Container{
+		{
+			Name:  "defang-cd",
+			Image: b.CDImage,
+		},
+	})
+}
+
 // Deploy implements client.Provider.
 func (b *ByocAzure) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	// return nil, errors.ErrUnsupported
-	return &defangv1.DeployResponse{}, byoc.DebugPulumi(ctx, nil, "up", "payload")
+	return b.deploy(ctx, req, "up")
+}
+
+func (b *ByocAzure) deploy(ctx context.Context, req *defangv1.DeployRequest, verb string) (*defangv1.DeployResponse, error) {
+	// If multiple Compose files were provided, req.Compose is the merged representation of all the files
+	project, err := compose.LoadFromContent(ctx, req.Compose, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setUp(ctx); err != nil {
+		return nil, err
+	}
+
+	etag := pkg.RandomID()
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := proto.Marshal(&defangv1.ProjectUpdate{
+		CdVersion: b.CDImage,
+		Compose:   req.Compose,
+		Services:  serviceInfos,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#azure-blob-storage
+	defangStateUrl := fmt.Sprintf(`azblob://%s?storage_account=%s`, b.driver.BlobContainerName, b.driver.StorageAccount)
+	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
+	if err != nil {
+		return nil, err
+	}
+	env := []string{
+		"AZURE_LOCATION=" + b.driver.Location.String(),
+		"AZURE_SUBSCRIPTION_ID=" + b.driver.SubscriptionID,
+		"DEFANG_DEBUG=" + os.Getenv("DEFANG_DEBUG"), // TODO: use the global DoDebug flag
+		"DEFANG_JSON=" + os.Getenv("DEFANG_JSON"),
+		"DEFANG_ORG=" + b.TenantName,
+		"DEFANG_PREFIX=" + byoc.DefangPrefix,
+		"DEFANG_STATE_URL=" + defangStateUrl,
+		"NPM_CONFIG_UPDATE_NOTIFIER=" + "false",
+		// "PRIVATE_DOMAIN=" + byoc.GetPrivateDomain(projectName), TODO: implement
+		"PROJECT=" + project.Name,                                 // may be empty
+		pulumiBackendKey + "=" + pulumiBackendValue,               // TODO: make secret
+		"PULUMI_CONFIG_PASSPHRASE=" + byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT=false",
+		"PULUMI_SKIP_UPDATE_CHECK=true",
+		"STACK=" + b.PulumiStack,
+	}
+	if !term.StdoutCanColor() {
+		env = append(env, "NO_COLOR=1")
+	}
+	err = byoc.DebugPulumi(ctx, env, verb, base64.StdEncoding.EncodeToString(data)) // TODO: handle large projects
+	return &defangv1.DeployResponse{Etag: etag, Services: serviceInfos}, err
 }
 
 // Destroy implements client.Provider.
@@ -111,8 +186,8 @@ func (b *ByocAzure) PrepareDomainDelegation(context.Context, client.PrepareDomai
 }
 
 // Preview implements client.Provider.
-func (b *ByocAzure) Preview(context.Context, *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
-	return nil, errors.ErrUnsupported
+func (b *ByocAzure) Preview(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	return b.deploy(ctx, req, "preview")
 }
 
 // PutConfig implements client.Provider.
@@ -140,12 +215,6 @@ func (b *ByocAzure) RemoteProjectName(context.Context) (string, error) {
 // Subtle: this method shadows the method (*ByocBaseClient).ServiceDNS of ByocAzure.ByocBaseClient.
 func (b *ByocAzure) ServiceDNS(host string) string {
 	return host
-}
-
-// SetCanIUseConfig implements client.Provider.
-// Subtle: this method shadows the method (*ByocBaseClient).SetCanIUseConfig of ByocAzure.ByocBaseClient.
-func (b *ByocAzure) SetCanIUseConfig(*defangv1.CanIUseResponse) {
-	// return nil, errors.ErrUnsupported
 }
 
 // Subscribe implements client.Provider.

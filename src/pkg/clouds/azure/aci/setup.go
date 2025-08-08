@@ -105,6 +105,10 @@ func (c *ContainerInstance) getStorageAccount(ctx context.Context, accountsClien
 		return c.StorageAccount, nil
 	}
 
+	if sa := os.Getenv("AZURE_STORAGE_ACCOUNT"); sa != "" {
+		return sa, nil
+	}
+
 	for pager := accountsClient.NewListByResourceGroupPager(c.resourceGroupName, nil); pager.More(); {
 		page, err := pager.NextPage(ctx)
 		if err != nil {

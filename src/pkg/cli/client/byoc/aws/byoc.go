@@ -372,6 +372,8 @@ func (b *ByocAws) bucketName() string {
 
 func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 	region := b.driver.Region // TODO: this should be the destination region, not the CD region; make customizable
+
+	// From https://www.pulumi.com/docs/iac/concepts/state-and-backends/#aws-s3
 	defangStateUrl := fmt.Sprintf(`s3://%s?region=%s&awssdk=v2`, b.bucketName(), region)
 	pulumiBackendKey, pulumiBackendValue, err := byoc.GetPulumiBackend(defangStateUrl)
 	if err != nil {
