@@ -22,7 +22,7 @@ func ParseSourcePlatform(input string) (SourcePlatform, error) {
 	}
 }
 
-func selectSourcePlatform() (error, SourcePlatform) {
+func selectSourcePlatform(surveyor Surveyor) (error, SourcePlatform) {
 	options := []string{
 		string(SourcePlatformHeroku),
 	}
@@ -30,11 +30,11 @@ func selectSourcePlatform() (error, SourcePlatform) {
 	var selectedOption string
 
 	for {
-		err := survey.AskOne(&survey.Select{
+		err := surveyor.AskOne(&survey.Select{
 			Message: "How is your project currently deployed?",
 			Options: options,
 			Help:    "Select the deployment platform you are currently using.",
-		}, &selectedOption, survey.WithStdio(term.DefaultTerm.Stdio()))
+		}, &selectedOption)
 		if err != nil {
 			return fmt.Errorf("failed to select source platform: %w", err), ""
 		}

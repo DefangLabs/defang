@@ -6,17 +6,36 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"go.yaml.in/yaml/v3"
 )
 
-func InteractiveSetup(ctx context.Context, fabric client.FabricClient, sourcePlatform SourcePlatform) error {
+type Surveyor interface {
+	AskOne(prompt survey.Prompt, response interface{}, opts ...survey.AskOpt) error
+}
+
+type DefaultSurveyor struct {
+	DefaultOpts []survey.AskOpt
+}
+
+func NewDefaultSurveyor() *DefaultSurveyor {
+	return &DefaultSurveyor{
+		DefaultOpts: []survey.AskOpt{survey.WithStdio(term.DefaultTerm.Stdio())},
+	}
+}
+
+func (ds *DefaultSurveyor) AskOne(prompt survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
+	return survey.AskOne(prompt, response, append(ds.DefaultOpts, opts...)...)
+}
+
+func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) error {
 	term.Warn("Starting interactive setup")
 
 	if sourcePlatform == "" {
-		err, selected := selectSourcePlatform()
+		err, selected := selectSourcePlatform(surveyor)
 		if err != nil {
 			return fmt.Errorf("failed to select source platform: %w", err)
 		}
@@ -27,7 +46,7 @@ func InteractiveSetup(ctx context.Context, fabric client.FabricClient, sourcePla
 
 	switch sourcePlatform {
 	case SourcePlatformHeroku:
-		err := setupFromHeroku(ctx, fabric)
+		err := setupFromHeroku(ctx, fabric, surveyor, heroku)
 		if err != nil {
 			return fmt.Errorf("failed to setup from Heroku: %w", err)
 		}
@@ -38,15 +57,12 @@ func InteractiveSetup(ctx context.Context, fabric client.FabricClient, sourcePla
 	return nil
 }
 
-func setupFromHeroku(ctx context.Context, fabric client.FabricClient) error {
+func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, herokuClient HerokuClientInterface) error {
 	token, err := getHerokuAuthToken()
 	if err != nil {
-		return fmt.Errorf("failed to get Heroku token: %w", err)
+		return fmt.Errorf("failed to get Heroku auth token: %w", err)
 	}
-
-	term.Debugf("Using Heroku token: %s", token)
-
-	herokuClient := NewHerokuClient(token)
+	herokuClient.SetToken(token)
 	apps, err := herokuClient.ListApps(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list Heroku apps: %w", err)
@@ -61,7 +77,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient) error {
 		appNames[i] = app.Name
 	}
 
-	sourceApp, err := selectSourceApplication(appNames)
+	sourceApp, err := selectSourceApplication(surveyor, appNames)
 	if err != nil {
 		return fmt.Errorf("failed to select source application: %w", err)
 	}
