@@ -90,6 +90,15 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor S
 		return fmt.Errorf("failed to collect Heroku application info: %w", err)
 	}
 
+	term.Debugf("Application info: %+v\n", applicationInfo)
+
+	sanitizedApplicationInfo, err := sanitizeHerokuApplicationInfo(applicationInfo)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize Heroku application info: %w", err)
+	}
+
+	term.Debugf("Sanitized application info: %+v\n", sanitizedApplicationInfo)
+
 	term.Info("Generating compose file...")
 
 	composeFile, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, sourceApp, sanitizedApplicationInfo)
@@ -102,7 +111,22 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor S
 	return nil
 }
 
-func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, data interface{}) (string, error) {
+func sanitizeHerokuApplicationInfo(info HerokuApplicationInfo) (interface{}, error) {
+	for key, value := range info.ConfigVars {
+		// Redact sensitive information in config vars
+		isSecret, err := compose.IsSecret(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if config var %q is a secret: %w", key, err)
+		}
+		if isSecret {
+			info.ConfigVars[key] = "REDACTED"
+		}
+	}
+
+	return info, nil
+}
+
+func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, projectName string, data interface{}) (string, error) {
 	var err error
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
