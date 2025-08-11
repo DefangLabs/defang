@@ -52,7 +52,6 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
-	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/mod v0.18.0
 	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sys v0.32.0
@@ -110,6 +109,7 @@ require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.34.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250422160041-2d3770c4ea7f // indirect

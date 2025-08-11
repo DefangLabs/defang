@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"go.yaml.in/yaml/v3"
 )
 
 type Surveyor interface {
@@ -91,9 +92,9 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor S
 
 	term.Info("Generating compose file...")
 
-	composeFile, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, applicationInfo)
+	composeFile, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, sourceApp, sanitizedApplicationInfo)
 	if err != nil {
-		return errors.New("failed to generate compose file from Heroku info")
+		return fmt.Errorf("failed to generate compose file from Heroku info: %w", err)
 	}
 
 	term.Info(composeFile)
@@ -109,31 +110,68 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 	}
 
 	var resp *defangv1.GenerateComposeResponse
+	var previousError string
 	for range [3]int{} {
-		previousError := ""
-		if err != nil {
-			previousError = err.Error()
-		}
 		resp, err = fabric.GenerateCompose(ctx, &defangv1.GenerateComposeRequest{
 			Platform:      platform,
 			Data:          dataJSON,
 			PreviousError: previousError,
 		})
 		if err != nil {
-			term.Warnf("Failed to generate compose file: %v. Retrying...", err)
+			return "", err
+		}
+
+		responseStr := string(resp.GetCompose())
+		term.Debugf("Received compose response: %+v", responseStr)
+
+		// assume the response is markdown,
+		// extract the contents of the first code block
+		composeContent := extractFirstCodeBlock(responseStr)
+		if composeContent == "" {
+			// If no code block found, use the entire response
+			composeContent = responseStr
+		}
+
+		// Attempt to load the compose content
+		_, err = compose.LoadFromContent(ctx, []byte(composeContent), projectName)
+		if err != nil {
+			previousError = err.Error()
+			term.Debugf("Invalid compose file received: %v. Retrying...", err)
 			continue
 		}
 
-		// TODO: validate as compose instead of just validating yaml
-		var composeData map[string]interface{}
-		err = yaml.Unmarshal(resp.GetCompose(), &composeData)
-		if err != nil {
-			return "", fmt.Errorf("failed to unmarshal yaml: %w", err)
-		}
+		// If we reach here, the compose content is valid
+		return composeContent, nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to generate compose file after retries: %w", err)
 	}
 
-	return string(resp.GetCompose()), nil
+	// This should not be reached, but just in case
+	return "", errors.New("unexpected error: no valid compose file generated")
+}
+
+// extractFirstCodeBlock extracts the first code block from markdown text
+// It looks for fenced code blocks (```...```) and returns the content inside
+func extractFirstCodeBlock(markdown string) string {
+	lines := strings.Split(markdown, "\n")
+	start := -1
+	end := -1
+
+	for i, line := range lines {
+		if strings.HasPrefix(line, "```") {
+			if start == -1 {
+				start = i
+			} else {
+				end = i
+				break
+			}
+		}
+	}
+
+	if start != -1 && end != -1 && end > start+1 {
+		return strings.TrimSpace(strings.Join(lines[start+1:end], "\n"))
+	}
+
+	return ""
 }

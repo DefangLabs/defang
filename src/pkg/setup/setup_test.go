@@ -152,7 +152,7 @@ func TestInteractiveSetup(t *testing.T) {
 				Compose: []byte("version: '3.8'\nservices:\n  web:\n    image: my-app:latest"),
 			},
 			expectError:   false,
-			expectedCalls: 3, // Bug in generateComposeFile causes 3 calls even for success
+			expectedCalls: 1, // Successful compose generation should only call once
 		},
 		{
 			name:           "successful setup with platform selection",
@@ -193,7 +193,7 @@ func TestInteractiveSetup(t *testing.T) {
 				Compose: []byte("version: '3.8'\nservices:\n  web:\n    image: redis-app:latest"),
 			},
 			expectError:   false,
-			expectedCalls: 3, // Bug in generateComposeFile causes 3 calls even for success
+			expectedCalls: 1, // Successful compose generation should only call once
 		},
 		{
 			name:           "fabric client error during compose generation",
@@ -210,7 +210,7 @@ func TestInteractiveSetup(t *testing.T) {
 			herokuConfigVars: HerokuConfigVars{},
 			composeError:     errors.New("fabric service unavailable"),
 			expectError:      true,
-			expectedCalls:    3, // Should retry 3 times
+			expectedCalls:    1, // Fabric client errors are not retried, only called once
 		},
 		{
 			name:           "invalid yaml response from fabric client",
@@ -229,7 +229,7 @@ func TestInteractiveSetup(t *testing.T) {
 				Compose: []byte("invalid: yaml: content: [unclosed"),
 			},
 			expectError:   true,
-			expectedCalls: 1, // Returns immediately on first attempt due to YAML unmarshal error
+			expectedCalls: 3, // Retries 3 times due to YAML unmarshal error
 		},
 	}
 
@@ -255,19 +255,18 @@ func TestInteractiveSetup(t *testing.T) {
 			mockFabricClient := &MockFabricClient{}
 
 			if tt.composeError != nil {
-				// Set up for retry behavior - return error 3 times
+				// Fabric client errors are returned immediately, no retry
 				mockFabricClient.On("GenerateCompose", mock.Anything, mock.Anything).Return(
-					(*defangv1.GenerateComposeResponse)(nil), tt.composeError).Times(3)
+					(*defangv1.GenerateComposeResponse)(nil), tt.composeError).Once()
 			} else if tt.composeResponse != nil {
 				if tt.name == "invalid yaml response from fabric client" {
-					// For invalid YAML, it will return error immediately and not retry
-					mockFabricClient.On("GenerateCompose", mock.Anything, mock.Anything).Return(
-						tt.composeResponse, nil).Once()
-				} else {
-					// Due to a bug in generateComposeFile, successful cases call 3 times without breaking
-					// TODO: This should be .Once() after fixing the generateComposeFile bug
+					// For invalid YAML, it will retry 3 times because YAML unmarshal fails
 					mockFabricClient.On("GenerateCompose", mock.Anything, mock.Anything).Return(
 						tt.composeResponse, nil).Times(3)
+				} else {
+					// Successful cases call only once since valid YAML is returned
+					mockFabricClient.On("GenerateCompose", mock.Anything, mock.Anything).Return(
+						tt.composeResponse, nil).Once()
 				}
 			}
 
@@ -313,6 +312,47 @@ func TestInteractiveSetup(t *testing.T) {
 				assert.Equal(t, tt.herokuAddons, appInfo.Addons)
 				assert.Equal(t, tt.herokuConfigVars, appInfo.ConfigVars)
 			}
+		})
+	}
+}
+
+func TestExtractFirstCodeBlock(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single code block",
+			input:    "```\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest\n```",
+			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
+		},
+		{
+			name:     "single code block with language tag",
+			input:    "```yaml\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest\n```",
+			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
+		},
+		{
+			name:     "multiple code blocks",
+			input:    "Some text\n```yaml\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest\n```\nMore text\n```json\n{\"key\": \"value\"}\n```",
+			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
+		},
+		{
+			name:     "no code blocks",
+			input:    "Just some text without code blocks.",
+			expected: "",
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractFirstCodeBlock(tt.input)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
