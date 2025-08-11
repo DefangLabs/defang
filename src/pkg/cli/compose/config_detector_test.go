@@ -16,6 +16,8 @@ func TestDetectConfig(t *testing.T) {
 		{"VEfk5vO0Q53VkK_uicor", []string{"High entropy string"}},
 		{"ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890", []string{"Github authentication"}},
 		{"AROA1234567890ABCDEF", []string{"AWS Client ID"}},
+		{"REDIS_URL=rediss://foo:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240", []string{"URL with password"}},
+		{"REDIS_URL=rediss://:p41fce90d44ac1d891bd21fdbc5dfc1bd7f163e33a6934c30093eaf56c1c23937@ec2-98-85-106-43.compute-1.amazonaws.com:8240", []string{"URL with password"}},
 	}
 
 	for _, tt := range tests {
