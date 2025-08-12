@@ -110,7 +110,7 @@ func sanitizeHerokuApplicationInfo(info HerokuApplicationInfo) (interface{}, err
 	return info, nil
 }
 
-func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, projectName string, data interface{}) (string, error) {
+func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, projectName string, data any) (string, error) {
 	var err error
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
