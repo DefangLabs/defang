@@ -183,10 +183,18 @@ func cleanupComposeFile(composeContent string) (string, error) {
 	return string(composeBytes), nil
 }
 
+func newline() string {
+	if runtime.GOOS == "windows" {
+		return "\r\n"
+	}
+	return "\n"
+}
+
 // extractFirstCodeBlock extracts the first code block from markdown text
 // It looks for fenced code blocks (```...```) and returns the content inside
 func extractFirstCodeBlock(markdown string) string {
-	lines := strings.Split(markdown, "\n")
+	newline := newline()
+	lines := strings.Split(markdown, newline)
 	start := -1
 	end := -1
 
@@ -202,7 +210,7 @@ func extractFirstCodeBlock(markdown string) string {
 	}
 
 	if start != -1 && end != -1 && end > start+1 {
-		return strings.TrimSpace(strings.Join(lines[start+1:end], "\n"))
+		return strings.TrimSpace(strings.Join(lines[start+1:end], newline))
 	}
 
 	return ""
