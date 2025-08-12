@@ -1189,27 +1189,28 @@ var setupCmd = &cobra.Command{
 }
 
 func writeComposeFile(content string) (string, error) {
-	// check if compose.yaml already exists
-	exists := false
-	_, err := os.Stat("compose.yaml")
-	if err == nil {
-		exists = true
-	} else if !os.IsNotExist(err) {
-		return "", fmt.Errorf("failed to check if compose.yaml exists: %w", err)
+	paths := []string{"compose.yaml", "compose.defang.yaml"}
+	var f *os.File
+	var err error
+
+	for _, composeFilePath := range paths {
+		f, err = os.OpenFile(composeFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if err != nil {
+			if os.IsExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("failed to create compose file: %w", err)
+		}
+		defer f.Close()
+
+		// #nosec G306 -- compose file is not expected to contain sensitive data
+		if _, err := f.WriteString(content); err != nil {
+			return "", fmt.Errorf("failed to write compose file: %w", err)
+		}
+		return composeFilePath, nil
 	}
 
-	composeFilePath := "compose.yaml"
-	if exists {
-		composeFilePath = "compose.defang.yaml"
-	}
-
-	// #nosec G306 -- compose file is not expected to contain sensitive data
-	err = os.WriteFile(composeFilePath, []byte(content), 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to write compose file: %w", err)
-	}
-
-	return composeFilePath, nil
+	return "", fmt.Errorf("all compose file names already exist: %v", paths)
 }
 
 func doubleCheckProjectName(projectName string) {
