@@ -25,6 +25,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/scope"
 	"github.com/DefangLabs/defang/src/pkg/setup"
+	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -1169,7 +1170,7 @@ var setupCmd = &cobra.Command{
 		sourcePlatform, _ := setup.ParseSourcePlatform(from)
 
 		heroku := setup.NewHerokuClient()
-		surveyor := setup.NewDefaultSurveyor()
+		surveyor := surveyor.NewDefaultSurveyor()
 
 		composeFileContents, err := setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform)
 		if err != nil {

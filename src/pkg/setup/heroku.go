@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -46,7 +47,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	return applicationInfo, nil
 }
 
-func selectSourceApplication(surveyor Surveyor, appNames []string) (string, error) {
+func selectSourceApplication(surveyor surveyor.Surveyor, appNames []string) (string, error) {
 	var selectedApp string
 	for {
 		err := surveyor.AskOne(&survey.Select{

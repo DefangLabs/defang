@@ -7,33 +7,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"gopkg.in/yaml.v3"
 )
 
-type Surveyor interface {
-	AskOne(prompt survey.Prompt, response interface{}, opts ...survey.AskOpt) error
-}
-
-type DefaultSurveyor struct {
-	DefaultOpts []survey.AskOpt
-}
-
-func NewDefaultSurveyor() *DefaultSurveyor {
-	return &DefaultSurveyor{
-		DefaultOpts: []survey.AskOpt{survey.WithStdio(term.DefaultTerm.Stdio())},
-	}
-}
-
-func (ds *DefaultSurveyor) AskOne(prompt survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
-	return survey.AskOne(prompt, response, append(ds.DefaultOpts, opts...)...)
-}
-
-func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
+func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor surveyor.Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
 	term.Warn("Starting interactive setup")
 
 	if sourcePlatform == "" {
@@ -61,7 +43,7 @@ func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor 
 	return composeFileContents, nil
 }
 
-func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, herokuClient HerokuClientInterface) (string, error) {
+func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor surveyor.Surveyor, herokuClient HerokuClientInterface) (string, error) {
 	token, err := getHerokuAuthToken()
 	if err != nil {
 		return "", fmt.Errorf("failed to get Heroku auth token: %w", err)

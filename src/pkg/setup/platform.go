@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
@@ -22,7 +23,7 @@ func ParseSourcePlatform(input string) (SourcePlatform, error) {
 	}
 }
 
-func selectSourcePlatform(surveyor Surveyor) (error, SourcePlatform) {
+func selectSourcePlatform(surveyor surveyor.Surveyor) (error, SourcePlatform) {
 	options := []string{
 		string(SourcePlatformHeroku),
 	}
