@@ -29,7 +29,8 @@
               nixfmt-rfc-style
               nodejs_24 # for Pulumi, must match values in package.json
               openssh
-              pulumi-bin
+              pulumi
+              pulumiPackages.pulumi-nodejs
               google-cloud-sdk
               vim
             ];
