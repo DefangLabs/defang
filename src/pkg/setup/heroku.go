@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	ourHttp "github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
@@ -95,11 +96,12 @@ type APIResponse struct {
 
 // NewHerokuClient creates a new Heroku API client
 func NewHerokuClient() *HerokuClient {
+	httpClient := ourHttp.DefaultClient
+	httpClient.Timeout = 5 * time.Second
+
 	return &HerokuClient{
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		BaseURL: "https://api.heroku.com",
+		HTTPClient: httpClient,
+		BaseURL:    "https://api.heroku.com",
 	}
 }
 
