@@ -100,18 +100,19 @@ func (m *MockHerokuClient) SetToken(token string) {
 
 func TestInteractiveSetup(t *testing.T) {
 	tests := []struct {
-		name             string
-		sourcePlatform   SourcePlatform
-		surveyResponses  []interface{}
-		herokuToken      string
-		herokuApps       []HerokuApplication
-		herokuDynos      []HerokuDyno
-		herokuAddons     []HerokuAddon
-		herokuConfigVars HerokuConfigVars
-		composeResponse  *defangv1.GenerateComposeResponse
-		composeError     error
-		expectError      bool
-		expectedCalls    int
+		name                        string
+		sourcePlatform              SourcePlatform
+		surveyResponses             []interface{}
+		herokuToken                 string
+		herokuApps                  []HerokuApplication
+		herokuDynos                 []HerokuDyno
+		herokuAddons                []HerokuAddon
+		herokuConfigVars            HerokuConfigVars
+		composeResponse             *defangv1.GenerateComposeResponse
+		expectedComposeFileContents string
+		composeError                error
+		expectError                 bool
+		expectedCalls               int
 	}{
 		{
 			name:           "successful setup with heroku platform preselected",
@@ -151,8 +152,9 @@ func TestInteractiveSetup(t *testing.T) {
 			composeResponse: &defangv1.GenerateComposeResponse{
 				Compose: []byte("version: '3.8'\nservices:\n  web:\n    image: my-app:latest"),
 			},
-			expectError:   false,
-			expectedCalls: 1, // Successful compose generation should only call once
+			expectError:                 false,
+			expectedCalls:               1, // Successful compose generation should only call once
+			expectedComposeFileContents: "services:\n    web:\n        image: my-app:latest\n",
 		},
 		{
 			name:           "successful setup with platform selection",
@@ -192,8 +194,9 @@ func TestInteractiveSetup(t *testing.T) {
 			composeResponse: &defangv1.GenerateComposeResponse{
 				Compose: []byte("version: '3.8'\nservices:\n  web:\n    image: redis-app:latest"),
 			},
-			expectError:   false,
-			expectedCalls: 1, // Successful compose generation should only call once
+			expectedComposeFileContents: "services:\n    web:\n        image: redis-app:latest\n",
+			expectError:                 false,
+			expectedCalls:               1, // Successful compose generation should only call once
 		},
 		{
 			name:           "fabric client error during compose generation",
@@ -282,7 +285,7 @@ func TestInteractiveSetup(t *testing.T) {
 
 			// Execute the function under test
 			ctx := context.Background()
-			err := InteractiveSetup(ctx, mockFabricClient, mockSurveyor, mockHerokuClient, tt.sourcePlatform)
+			composeFileContents, err := InteractiveSetup(ctx, mockFabricClient, mockSurveyor, mockHerokuClient, tt.sourcePlatform)
 
 			// Assertions
 			if tt.expectError {
@@ -312,6 +315,8 @@ func TestInteractiveSetup(t *testing.T) {
 				assert.Equal(t, tt.herokuAddons, appInfo.Addons)
 				assert.Equal(t, tt.herokuConfigVars, appInfo.ConfigVars)
 			}
+
+			assert.Equal(t, tt.expectedComposeFileContents, composeFileContents)
 		})
 	}
 }

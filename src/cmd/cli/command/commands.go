@@ -1170,12 +1170,45 @@ var setupCmd = &cobra.Command{
 
 		heroku := setup.NewHerokuClient()
 		surveyor := setup.NewDefaultSurveyor()
-		if err := setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform); err != nil {
+
+		composeFileContents, err := setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform)
+		if err != nil {
 			return err
 		}
 
+		composeFilePath, err := writeComposeFile(composeFileContents)
+		if err != nil {
+			return fmt.Errorf("failed to write compose file: %w", err)
+		}
+
+		term.Info("Compose file written to", composeFilePath)
+
 		return nil
 	},
+}
+
+func writeComposeFile(content string) (string, error) {
+	// check if compose.yaml already exists
+	exists := false
+	_, err := os.Stat("compose.yaml")
+	if err == nil {
+		exists = true
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to check if compose.yaml exists: %w", err)
+	}
+
+	composeFilePath := "compose.yaml"
+	if exists {
+		composeFilePath = "compose.defang.yaml"
+	}
+
+	// #nosec G306 -- compose file is not expected to contain sensitive data
+	err = os.WriteFile(composeFilePath, []byte(content), 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to write compose file: %w", err)
+	}
+
+	return composeFilePath, nil
 }
 
 func doubleCheckProjectName(projectName string) {

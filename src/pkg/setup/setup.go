@@ -33,41 +33,43 @@ func (ds *DefaultSurveyor) AskOne(prompt survey.Prompt, response interface{}, op
 	return survey.AskOne(prompt, response, append(ds.DefaultOpts, opts...)...)
 }
 
-func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) error {
+func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
 	term.Warn("Starting interactive setup")
 
 	if sourcePlatform == "" {
 		err, selected := selectSourcePlatform(surveyor)
 		if err != nil {
-			return fmt.Errorf("failed to select source platform: %w", err)
+			return "", fmt.Errorf("failed to select source platform: %w", err)
 		}
 		sourcePlatform = selected
 	}
 
 	term.Debugf("Selected source platform: %s", sourcePlatform)
 
+	var composeFileContents string
+	var err error
 	switch sourcePlatform {
 	case SourcePlatformHeroku:
-		err := setupFromHeroku(ctx, fabric, surveyor, heroku)
+		composeFileContents, err = setupFromHeroku(ctx, fabric, surveyor, heroku)
 		if err != nil {
-			return fmt.Errorf("failed to setup from Heroku: %w", err)
+			return "", fmt.Errorf("failed to setup from Heroku: %w", err)
 		}
 	default:
-		return fmt.Errorf("unsupported source platform: %s", sourcePlatform)
+		return "", fmt.Errorf("unsupported source platform: %s", sourcePlatform)
 	}
 
-	return nil
+	return composeFileContents, nil
 }
 
-func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, herokuClient HerokuClientInterface) error {
+func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor Surveyor, herokuClient HerokuClientInterface) (string, error) {
 	token, err := getHerokuAuthToken()
 	if err != nil {
-		return fmt.Errorf("failed to get Heroku auth token: %w", err)
+		return "", fmt.Errorf("failed to get Heroku auth token: %w", err)
 	}
 	herokuClient.SetToken(token)
 	apps, err := herokuClient.ListApps(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list Heroku apps: %w", err)
+		return "", fmt.Errorf("failed to list Heroku apps: %w", err)
 	}
 
 	// Here you can add logic to process the retrieved apps and set up the project accordingly
@@ -81,35 +83,33 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor S
 
 	sourceApp, err := selectSourceApplication(surveyor, appNames)
 	if err != nil {
-		return fmt.Errorf("failed to select source application: %w", err)
+		return "", fmt.Errorf("failed to select source application: %w", err)
 	}
 
 	term.Infof("Collecting information about %q...", sourceApp)
 
 	applicationInfo, err := collectHerokuApplicationInfo(ctx, herokuClient, sourceApp)
 	if err != nil {
-		return fmt.Errorf("failed to collect Heroku application info: %w", err)
+		return "", fmt.Errorf("failed to collect Heroku application info: %w", err)
 	}
 
 	term.Debugf("Application info: %+v\n", applicationInfo)
 
 	sanitizedApplicationInfo, err := sanitizeHerokuApplicationInfo(applicationInfo)
 	if err != nil {
-		return fmt.Errorf("failed to sanitize Heroku application info: %w", err)
+		return "", fmt.Errorf("failed to sanitize Heroku application info: %w", err)
 	}
 
 	term.Debugf("Sanitized application info: %+v\n", sanitizedApplicationInfo)
 
 	term.Info("Generating compose file...")
 
-	composeFile, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, sourceApp, sanitizedApplicationInfo)
+	composeFileContents, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_HEROKU, sourceApp, sanitizedApplicationInfo)
 	if err != nil {
-		return fmt.Errorf("failed to generate compose file from Heroku info: %w", err)
+		return "", fmt.Errorf("failed to generate compose file from Heroku info: %w", err)
 	}
 
-	term.Info(composeFile)
-
-	return nil
+	return composeFileContents, nil
 }
 
 func sanitizeHerokuApplicationInfo(info HerokuApplicationInfo) (interface{}, error) {
