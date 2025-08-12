@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -128,7 +129,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 			return "", err
 		}
 
-		responseStr := string(resp.GetCompose())
+		responseStr := string(resp.Compose)
 		term.Debugf("Received compose response: %+v", responseStr)
 
 		// assume the response is markdown,
