@@ -45,6 +45,7 @@ var (
 	client         *cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
+	sourcePlatform = setup.SourcePlatformUnspecified // default to auto-detecting the source platform
 	doDebug        = false
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
@@ -323,6 +324,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(certCmd)
 
 	// setup command
+	setupCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
 	RootCmd.AddCommand(setupCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
@@ -1165,9 +1167,6 @@ var setupCmd = &cobra.Command{
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
 		}
-
-		from, _ := cmd.Flags().GetString("from")
-		sourcePlatform, _ := setup.ParseSourcePlatform(from)
 
 		heroku := setup.NewHerokuClient()
 		surveyor := surveyor.NewDefaultSurveyor()

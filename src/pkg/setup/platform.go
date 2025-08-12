@@ -10,9 +10,34 @@ import (
 
 type SourcePlatform string
 
+// Set implements the pflag.Value interface.
+func (sp *SourcePlatform) Set(val string) error {
+	parsed, err := ParseSourcePlatform(val)
+	if err != nil {
+		return err
+	}
+	*sp = parsed
+	return nil
+}
+
+// String implements the pflag.Value interface.
+func (sp *SourcePlatform) String() string {
+	return string(*sp)
+}
+
+// Type implements the pflag.Value interface (optional, but recommended).
+func (sp *SourcePlatform) Type() string {
+	return "SourcePlatform"
+}
+
 const (
-	SourcePlatformHeroku SourcePlatform = "heroku"
+	SourcePlatformUnspecified SourcePlatform = ""
+	SourcePlatformHeroku      SourcePlatform = "heroku"
 )
+
+var AllSourcePlatforms = []SourcePlatform{
+	SourcePlatformHeroku,
+}
 
 func ParseSourcePlatform(input string) (SourcePlatform, error) {
 	switch input {
