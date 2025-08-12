@@ -133,11 +133,17 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		term.Debugf("Received compose response: %+v", responseStr)
 
 		// assume the response is markdown,
-		// extract the contents of the first code block
-		composeContent := extractFirstCodeBlock(responseStr)
-		if composeContent == "" {
-			// If no code block found, use the entire response
-			composeContent = responseStr
+		// extract the contents of the first code block if there is one
+		composeContent, err := extractFirstCodeBlock(responseStr)
+		if err != nil {
+			if errors.Is(err, errNoCodeBlock) {
+				// If no code block found, use the entire response
+				composeContent = responseStr
+			} else {
+				previousError = err.Error()
+				term.Debugf("Failed to extract code block: %v. Retrying...", err)
+				continue
+			}
 		}
 
 		// Cleanup the compose content
@@ -190,9 +196,11 @@ func newline() string {
 	return "\n"
 }
 
+var errNoCodeBlock = errors.New("no code block found")
+
 // extractFirstCodeBlock extracts the first code block from markdown text
 // It looks for fenced code blocks (```...```) and returns the content inside
-func extractFirstCodeBlock(markdown string) string {
+func extractFirstCodeBlock(markdown string) (string, error) {
 	newline := newline()
 	lines := strings.Split(markdown, newline)
 	start := -1
@@ -209,9 +217,14 @@ func extractFirstCodeBlock(markdown string) string {
 		}
 	}
 
-	if start != -1 && end != -1 && end > start+1 {
-		return strings.TrimSpace(strings.Join(lines[start+1:end], newline))
+	if start == -1 || end == -1 {
+		return "", errNoCodeBlock
 	}
 
-	return ""
+	if end <= start+1 {
+		return "", errors.New("empty code block found")
+	}
+
+	codeBlock := strings.Join(lines[start+1:end], newline)
+	return codeBlock, nil
 }

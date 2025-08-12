@@ -377,9 +377,10 @@ services:
 
 func TestExtractFirstCodeBlock(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name        string
+		input       string
+		expected    string
+		expectError bool
 	}{
 		{
 			name:     "single code block",
@@ -397,20 +398,47 @@ func TestExtractFirstCodeBlock(t *testing.T) {
 			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
 		},
 		{
-			name:     "no code blocks",
-			input:    "Just some text without code blocks.",
-			expected: "",
+			name:     "code block with surrounding text",
+			input:    "Here is some text before the code block.\n```yaml\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest\n```\nAnd some text after.",
+			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
 		},
 		{
-			name:     "empty input",
-			input:    "",
-			expected: "",
+			name:        "empty code block",
+			input:       "Some text before.\n```\n```\nSome text after.",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:     "code block with extra backticks",
+			input:    "Text before.\n````yaml\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest\n````\nText after.",
+			expected: "version: '3.8'\nservices:\n  web:\n    image: my-app:latest",
+		},
+		{
+			name:        "partial code block",
+			input:       "Some text\n```\nversion: '3.8'\nservices:\n  web:\n    image: my-app:latest",
+			expected:    "",
+			expectError: true, // No closing backticks
+		},
+		{
+			name:        "no code blocks",
+			input:       "Just some text without code blocks.",
+			expectError: true, // No code blocks found
+		},
+		{
+			name:        "empty input",
+			input:       "",
+			expectError: true, // No code blocks in empty input
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractFirstCodeBlock(tt.input)
+			result, err := extractFirstCodeBlock(tt.input)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.expected, result)
 		})
 	}
