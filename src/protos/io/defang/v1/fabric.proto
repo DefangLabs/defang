@@ -737,13 +737,13 @@ message PreviewResponse {
   string etag = 1;
 }
 
-enum GenerateComposeSourcePlatform {
+enum SourcePlatform {
   SOURCE_PLATFORM_UNSPECIFIED = 0;
-  HEROKU = 1;
+  SOURCE_PLATFORM_HEROKU = 1;
 }
 
 message GenerateComposeRequest {
-  GenerateComposeSourcePlatform platform = 1;
+  SourcePlatform platform = 1;
   bytes data = 2; // platform-specific json
   string previous_error = 3; // optional; if set, will retry while noting this error
 }

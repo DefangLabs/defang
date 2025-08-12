@@ -305,7 +305,7 @@ func TestInteractiveSetup(t *testing.T) {
 			// Verify fabric client request payload if calls were made
 			if len(mockFabricClient.generateComposeRequests) > 0 {
 				req := mockFabricClient.generateComposeRequests[0]
-				assert.Equal(t, defangv1.GenerateComposeSourcePlatform_HEROKU, req.Platform)
+				assert.Equal(t, defangv1.SourcePlatform_SOURCE_PLATFORM_HEROKU, req.Platform)
 
 				// Verify the data payload contains expected Heroku application info
 				var appInfo HerokuApplicationInfo

@@ -87,7 +87,7 @@ func setupFromHeroku(ctx context.Context, fabric client.FabricClient, surveyor s
 
 	term.Info("Generating compose file...")
 
-	composeFileContents, err := generateComposeFile(ctx, fabric, defangv1.GenerateComposeSourcePlatform_HEROKU, sourceApp, sanitizedApplicationInfo)
+	composeFileContents, err := generateComposeFile(ctx, fabric, defangv1.SourcePlatform_SOURCE_PLATFORM_HEROKU, sourceApp, sanitizedApplicationInfo)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate compose file from Heroku info: %w", err)
 	}
@@ -110,7 +110,7 @@ func sanitizeHerokuApplicationInfo(info HerokuApplicationInfo) (interface{}, err
 	return info, nil
 }
 
-func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.GenerateComposeSourcePlatform, projectName string, data any) (string, error) {
+func generateComposeFile(ctx context.Context, fabric client.FabricClient, platform defangv1.SourcePlatform, projectName string, data any) (string, error) {
 	var err error
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
