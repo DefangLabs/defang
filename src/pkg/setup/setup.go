@@ -12,6 +12,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"gopkg.in/yaml.v3"
 )
 
 type Surveyor interface {
@@ -156,6 +157,13 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 			composeContent = responseStr
 		}
 
+		// Cleanup the compose content
+		composeContent, err = cleanupComposeFile(composeContent)
+		if err != nil {
+			previousError = err.Error()
+			continue
+		}
+
 		// Attempt to load the compose content
 		_, err = compose.LoadFromContent(ctx, []byte(composeContent), projectName)
 		if err != nil {
@@ -167,12 +175,29 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		// If we reach here, the compose content is valid
 		return composeContent, nil
 	}
+
 	if err != nil {
 		return "", fmt.Errorf("failed to generate compose file after retries: %w", err)
 	}
 
 	// This should not be reached, but just in case
 	return "", errors.New("unexpected error: no valid compose file generated")
+}
+
+func cleanupComposeFile(composeContent string) (string, error) {
+	// parse as yaml and remove `version` property if present
+	var composeYAML map[string]interface{}
+	if err := yaml.Unmarshal([]byte(composeContent), &composeYAML); err != nil {
+		return "", fmt.Errorf("failed to unmarshal compose content as yaml: %w", err)
+	}
+	delete(composeYAML, "version")
+
+	composeBytes, err := yaml.Marshal(composeYAML)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal compose content to yaml: %w", err)
+	}
+
+	return string(composeBytes), nil
 }
 
 // extractFirstCodeBlock extracts the first code block from markdown text

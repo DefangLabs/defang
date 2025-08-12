@@ -316,6 +316,60 @@ func TestInteractiveSetup(t *testing.T) {
 	}
 }
 
+func TestCleanupComposeFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expected       string
+		expectingError bool
+	}{
+		{
+			name: "compose with version",
+			input: `version: '3.8'
+services:
+  web:
+    image: my-app:latest`,
+			expected: `services:
+    web:
+        image: my-app:latest
+`,
+			expectingError: false,
+		},
+		{
+			name: "compose without version",
+			input: `services:
+  web:
+    image: my-app:latest`,
+			expected: `services:
+    web:
+        image: my-app:latest
+`,
+			expectingError: false,
+		},
+		{
+			name: "invalid yaml",
+			input: `version: '3.8'
+services:
+  web
+    image: my-app:latest`, // Missing colon after 'web'
+			expected:       "",
+			expectingError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := cleanupComposeFile(tt.input)
+			if tt.expectingError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestExtractFirstCodeBlock(t *testing.T) {
 	tests := []struct {
 		name     string
