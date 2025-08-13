@@ -554,6 +554,8 @@ func promptForSample(ctx context.Context) (string, error) {
 
 var defaultFolder = "project1"
 
+const GenerateStartedEvt = "Generate Started"
+
 func aiGenerate(ctx context.Context, folder string) error {
 	prompt := GeneratePrompt{
 		ModelID: modelId,
@@ -597,7 +599,7 @@ func aiGenerate(ctx context.Context, folder string) error {
 		}
 	}
 
-	track.Evt("Generate Started", P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
+	track.Evt(GenerateStartedEvt, P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
 	beforeGenerate(folder)
 	term.Info("Working on it. This may take 1 or 2 minutes...")
 	args := cli.GenerateArgs{
@@ -663,7 +665,7 @@ type GeneratePrompt struct {
 }
 
 func beforeGenerateFromSample(sample string, folder string) {
-	track.Evt("Generate Started", P("sample", sample), P("folder", folder))
+	track.Evt(GenerateStartedEvt, P("sample", sample), P("folder", folder))
 }
 
 func beforeGenerate(directory string) {
