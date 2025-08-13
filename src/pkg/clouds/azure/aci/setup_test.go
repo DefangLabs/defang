@@ -1,4 +1,4 @@
-//go:integration
+//go:build integration
 
 package aci
 
@@ -6,11 +6,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
-
-var testResourceGroupName = "crun-test-" + pkg.GetCurrentUser() // avoid conflict with other users in the same account
 
 func TestSetup(t *testing.T) {
 	if testing.Short() {
