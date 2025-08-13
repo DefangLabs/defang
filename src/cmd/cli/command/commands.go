@@ -230,6 +230,8 @@ func SetupCommands(ctx context.Context, version string) {
 	// Generate Command
 	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
+	// new command
+	newCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
 	RootCmd.AddCommand(newCmd)
 
 	// Get Services Command
@@ -322,10 +324,6 @@ func SetupCommands(ctx context.Context, version string) {
 	// TODO: Add list, renew etc.
 	certCmd.AddCommand(certGenerateCmd)
 	RootCmd.AddCommand(certCmd)
-
-	// setup command
-	setupCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
-	RootCmd.AddCommand(setupCmd)
 
 	if term.StdoutCanColor() { // TODO: should use DoColor(…) instead
 		// Add some emphasis to the help command
@@ -716,7 +714,93 @@ var newCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"init"},
 	Short:   "Create a new Defang project from a sample",
-	RunE:    generateCmd.RunE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		var sample string
+		if len(args) > 0 {
+			return handleGenerate(ctx, sample)
+		}
+
+		if nonInteractive {
+			return errors.New("cannot run in non-interactive mode")
+		}
+
+		// list files in the current directory
+		files, err := os.ReadDir(".")
+		if err != nil {
+			return fmt.Errorf("failed to read current directory: %w", err)
+		}
+
+		if len(files) == 0 {
+			// If the directory is empty, we can proceed with the generation
+			return handleGenerate(ctx, "")
+		}
+
+		// check if any file is a compose file
+		hasComposeFile := false
+		for _, file := range files {
+			name := file.Name()
+			lowerName := strings.ToLower(name)
+			if lowerName == "compose.yaml" || lowerName == "compose.yml" ||
+				lowerName == "docker-compose.yaml" || lowerName == "docker-compose.yml" {
+				hasComposeFile = true
+				break
+			}
+		}
+
+		if hasComposeFile {
+			loader := configureLoader(cmd)
+
+			project, err := loader.LoadProject(ctx)
+			if err != nil {
+				return fmt.Errorf("This project has a compose file, but it cannot be loaded: %w", err)
+			}
+			if err := compose.ValidateProject(project); err != nil {
+				return fmt.Errorf("This project has a compose file, but it appears to be invalid: %w", err)
+			}
+
+			term.Info("Your compose file is ready to go. You can deploy it by running `defang compose up`")
+
+			return nil
+		}
+
+		surveyor := surveyor.NewDefaultSurveyor()
+		heroku := setup.NewHerokuClient()
+
+		var response string
+		err = surveyor.AskOne(&survey.Select{
+			Message: "Is this application currently deployed?",
+			Options: []string{"Yes", "No"},
+			Help:    "If you select 'Yes', we will try to migrate the existing deployment to Defang.",
+		}, &response)
+		if err != nil {
+			return fmt.Errorf("failed to ask if the application is deployed: %w", err)
+		}
+
+		var composeFileContents string
+		if response == "Yes" {
+			term.Info("Ok, let's create a compose file for your existing deployment.")
+			composeFileContents, err = setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform)
+			if err != nil {
+				return err
+			}
+		} else {
+			term.Info("Ok, let's generate a simple compose file for your project.")
+			composeFileContents, err = setup.GenerateSimpleComposeFile()
+			if err != nil {
+				return err
+			}
+		}
+
+		composeFilePath, err := writeComposeFile(composeFileContents)
+		if err != nil {
+			return fmt.Errorf("failed to write compose file: %w", err)
+		}
+
+		term.Info("Compose file written to", composeFilePath)
+
+		return nil
+	},
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {
@@ -1160,37 +1244,6 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 		doubleCheckProjectName(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
-}
-
-var setupCmd = &cobra.Command{
-	Use:         "setup",
-	Args:        cobra.NoArgs,
-	Aliases:     []string{"init", "configure"},
-	Annotations: authNeededAnnotation, // need subscription
-	Short:       "Setup the Defang CLI",
-	Long:        "Set up your project to be deployed with Defang",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if nonInteractive {
-			return errors.New("cannot run in non-interactive mode")
-		}
-
-		heroku := setup.NewHerokuClient()
-		surveyor := surveyor.NewDefaultSurveyor()
-
-		composeFileContents, err := setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform)
-		if err != nil {
-			return err
-		}
-
-		composeFilePath, err := writeComposeFile(composeFileContents)
-		if err != nil {
-			return fmt.Errorf("failed to write compose file: %w", err)
-		}
-
-		term.Info("Compose file written to", composeFilePath)
-
-		return nil
-	},
 }
 
 func writeComposeFile(content string) (string, error) {

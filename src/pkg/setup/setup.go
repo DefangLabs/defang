@@ -16,9 +16,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor surveyor.Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
-	term.Warn("Starting interactive setup")
+func GenerateSimpleComposeFile() (string, error) {
+	// This function is a placeholder for generating a simple compose file.
+	// In a real implementation, this would generate a valid Docker Compose file.
+	composeContent := `
+services:
+	app:
+		build: .
+`
 
+	return composeContent, nil
+}
+
+func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor surveyor.Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
 	if sourcePlatform == "" {
 		err, selected := selectSourcePlatform(surveyor)
 		if err != nil {
