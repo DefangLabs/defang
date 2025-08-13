@@ -1,4 +1,4 @@
-//go:integration
+//go:build integration
 
 package aci
 
