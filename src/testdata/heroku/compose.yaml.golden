@@ -1,0 +1,29 @@
+name: heroku
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:5739
+    networks:
+      default: null
+  postgres:
+    image: postgres:15-alpine
+    networks:
+      default: null
+  redis:
+    image: redis:7-alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: heroku_default

@@ -1,0 +1,6 @@
+ ! service "app": environment "DATABASE_URL" may contain sensitive information; consider using 'defang config set DATABASE_URL' to securely store this value
+ ! service "app": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "postgres": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "postgres": stateful service will lose data on restart; use a managed service instead
+ ! service "redis": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
+ ! service "redis": stateful service will lose data on restart; use a managed service instead
