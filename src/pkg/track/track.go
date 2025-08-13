@@ -16,7 +16,7 @@ var disableAnalytics = pkg.GetenvBool("DEFANG_DISABLE_ANALYTICS")
 type Property = cliClient.Property
 
 // P creates a Property with the given name and value.
-func P(name string, value interface{}) Property {
+func P(name string, value any) Property {
 	return Property{Name: name, Value: value}
 }
 

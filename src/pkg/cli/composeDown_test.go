@@ -15,7 +15,7 @@ type mockComposeDown struct {
 	MockAccountInfo func(ctx context.Context) (*client.AccountInfo, error)
 	MockDestroy     func(ctx context.Context, req *defangv1.DestroyRequest) (types.ETag, error)
 	MockDelete      func(ctx context.Context, req *defangv1.DeleteRequest) (*defangv1.DeleteResponse, error)
-	request         map[string]interface{}
+	request         map[string]any
 }
 
 func (m mockComposeDown) AccountInfo(
@@ -60,7 +60,7 @@ func TestComposeDown(t *testing.T) {
 			mockProvider.request["DeleteRequest"] = req
 			return &defangv1.DeleteResponse{Etag: "eTagDelete"}, nil
 		},
-		request: make(map[string]interface{}),
+		request: make(map[string]any),
 	}
 
 	t.Run("Expect `Provider.Destroy` to be called when no specific services are specified",
