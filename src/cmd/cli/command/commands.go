@@ -22,8 +22,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
+	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/scope"
-	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -44,7 +44,7 @@ var (
 	client         *cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
-	sourcePlatform = setup.SourcePlatformUnspecified // default to auto-detecting the source platform
+	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	doDebug        = false
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
@@ -230,7 +230,7 @@ func SetupCommands(ctx context.Context, version string) {
 	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	// new command
-	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
+	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
 	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
@@ -772,11 +772,11 @@ var initCmd = &cobra.Command{
 
 func migrateFromHeroku(ctx context.Context) error {
 	surveyor := surveyor.NewDefaultSurveyor()
-	heroku := setup.NewHerokuClient()
+	heroku := migrate.NewHerokuClient()
 	var composeFileContents string
 
 	term.Info("Ok, let's create a compose file for your existing deployment.")
-	composeFileContents, err := setup.InteractiveSetup(ctx, client, surveyor, heroku, sourcePlatform)
+	composeFileContents, err := migrate.InteractiveSetup(ctx, client, surveyor, heroku, sourcePlatform)
 	if err != nil {
 		return err
 	}
