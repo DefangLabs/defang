@@ -512,6 +512,8 @@ var certGenerateCmd = &cobra.Command{
 	},
 }
 
+const generateWithAI = "Generate with AI"
+
 func handleGenerate(ctx context.Context, sample string) error {
 	var language, defaultFolder string
 	if nonInteractive {
@@ -527,8 +529,6 @@ func handleGenerate(ctx context.Context, sample string) error {
 		if fetchSamplesErr != nil {
 			term.Debug("unable to fetch samples:", fetchSamplesErr)
 		} else if len(sampleList) > 0 {
-			const generateWithAI = "Generate with AI"
-
 			sampleNames := []string{generateWithAI}
 			sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
 			sampleIndex := []string{"unused first entry because we always show genAI option"}
