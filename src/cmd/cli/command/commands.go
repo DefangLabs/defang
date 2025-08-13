@@ -633,18 +633,7 @@ func handleGenerate(ctx context.Context, sample string) error {
 
 	track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
 
-	// Check if the current folder is empty
-	if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
-		nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
-
-		var confirm bool
-		err := survey.AskOne(&survey.Confirm{
-			Message: nonEmptyFolder + " Continue creating project?",
-		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err == nil && !confirm {
-			os.Exit(1)
-		}
-	}
+	beforeGenerate(prompt.Folder)
 
 	if sample != "" {
 		term.Info("Fetching sample from the Defang repository...")
@@ -671,6 +660,21 @@ func handleGenerate(ctx context.Context, sample string) error {
 	afterGenerate(ctx, prompt.Folder)
 
 	return nil
+}
+
+func beforeGenerate(directory string) {
+	// Check if the current folder is empty
+	if empty, err := pkg.IsDirEmpty(directory); !os.IsNotExist(err) && !empty {
+		nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", directory)
+
+		var confirm bool
+		err := survey.AskOne(&survey.Confirm{
+			Message: nonEmptyFolder + " Continue creating project?",
+		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err == nil && !confirm {
+			os.Exit(1)
+		}
+	}
 }
 
 func afterGenerate(ctx context.Context, directory string) {
