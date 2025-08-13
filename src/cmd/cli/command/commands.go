@@ -560,7 +560,11 @@ var generateCmd = &cobra.Command{
 			Fabric:   client,
 		}
 
-		result, err := setupClient.CloneSample(ctx, args[0])
+		sample := ""
+		if len(args) > 0 {
+			sample = args[0]
+		}
+		result, err := setupClient.CloneSample(ctx, sample)
 		if err != nil {
 			return err
 		}
