@@ -555,7 +555,7 @@ func promptForSample(ctx context.Context) (string, error) {
 var defaultFolder = "project1"
 
 func aiGenerate(ctx context.Context, folder string) error {
-	aiPrompt := GeneratePrompt{
+	prompt := GeneratePrompt{
 		ModelID: modelId,
 	}
 	var qs = []*survey.Question{
@@ -579,7 +579,7 @@ func aiGenerate(ctx context.Context, folder string) error {
 			Validate: survey.MinLength(5),
 		},
 	}
-	err := survey.Ask(qs, &aiPrompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+	err := survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
 		return fmt.Errorf("failed to prompt for AI generation: %w", err)
 	}
@@ -587,16 +587,24 @@ func aiGenerate(ctx context.Context, folder string) error {
 	if err != nil {
 		return err
 	}
-	if err := beforeGenerateWithAI(ctx, aiPrompt, folder); err != nil {
-		return err
+	if client.CheckLoginAndToS(ctx) != nil {
+		// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
+		if err := cli.InteractiveAgreeToS(ctx, client); err != nil {
+			// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
+			if connect.CodeOf(err) != connect.CodeUnauthenticated {
+				return err
+			}
+		}
 	}
+
+	track.Evt("Generate Started", P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
 	beforeGenerate(folder)
 	term.Info("Working on it. This may take 1 or 2 minutes...")
 	args := cli.GenerateArgs{
-		Description: aiPrompt.Description,
+		Description: prompt.Description,
 		Folder:      folder,
-		Language:    aiPrompt.Language,
-		ModelId:     aiPrompt.ModelID,
+		Language:    prompt.Language,
+		ModelId:     prompt.ModelID,
 	}
 	_, err = cli.GenerateWithAI(ctx, client, args)
 	if err != nil {
@@ -652,21 +660,6 @@ type GeneratePrompt struct {
 	Description string `json:"description"`
 	ModelID     string `json:"model_id"`
 	Language    string `json:"language"`
-}
-
-func beforeGenerateWithAI(ctx context.Context, prompt GeneratePrompt, folder string) error {
-	if client.CheckLoginAndToS(ctx) != nil {
-		// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
-		if err := cli.InteractiveAgreeToS(ctx, client); err != nil {
-			// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
-			if connect.CodeOf(err) != connect.CodeUnauthenticated {
-				return err
-			}
-		}
-	}
-
-	track.Evt("Generate Started", P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
-	return nil
 }
 
 func beforeGenerateFromSample(sample string, folder string) {
