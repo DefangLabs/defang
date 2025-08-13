@@ -21,8 +21,8 @@ func GenerateSimpleComposeFile() (string, error) {
 	// In a real implementation, this would generate a valid Docker Compose file.
 	composeContent := `
 services:
-	app:
-		build: .
+  app:
+    build: .
 `
 
 	return composeContent, nil

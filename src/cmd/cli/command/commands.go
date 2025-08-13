@@ -231,8 +231,8 @@ func SetupCommands(ctx context.Context, version string) {
 	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
 	// new command
-	newCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
-	RootCmd.AddCommand(newCmd)
+	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, setup.AllSourcePlatforms))
+	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
 	lsCommand := makeComposePsCmd()
@@ -709,10 +709,10 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-var newCmd = &cobra.Command{
-	Use:     "new [SAMPLE]",
+var initCmd = &cobra.Command{
+	Use:     "init [SAMPLE]",
 	Args:    cobra.MaximumNArgs(1),
-	Aliases: []string{"init"},
+	Aliases: []string{"new"},
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
