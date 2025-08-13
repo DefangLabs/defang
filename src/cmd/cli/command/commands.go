@@ -561,66 +561,106 @@ func handleGenerate(ctx context.Context, sample string) error {
 	}
 
 	var err error
+	defaultFolder := "project1"
 	if sample == "" {
 		sample, err = promptForSample(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to prompt for sample: %w", err)
 		}
-	}
-
-	var language, defaultFolder string
-	if sample == generateWithAI {
-		if err := survey.AskOne(&survey.Select{
-			Message: "Choose the language you'd like to use:",
-			Options: cli.SupportedLanguages,
-			Help:    "The project code will be in the language you choose here.",
-		}, &language, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-			return err
-		}
-		sample = ""
-		defaultFolder = "project1"
-	} else {
 		defaultFolder = sample
 	}
 
-	var qs = []*survey.Question{
-		{
-			Name: "description",
-			Prompt: &survey.Input{
-				Message: "Please describe the service you'd like to build:",
-				Help: `Here are some example prompts you can use:
+	var folder string
+	if sample == generateWithAI {
+		aiPrompt := GeneratePrompt{
+			ModelID: modelId,
+		}
+		var qs = []*survey.Question{
+			{
+				Name: "language",
+				Prompt: &survey.Select{
+					Message: "Choose the language you'd like to use:",
+					Options: cli.SupportedLanguages,
+					Help:    "The project code will be in the language you choose here.",
+				},
+			},
+			{
+				Name: "description",
+				Prompt: &survey.Input{
+					Message: "Please describe the service you'd like to build:",
+					Help: `Here are some example prompts you can use:
     "A simple 'hello world' function"
     "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
     "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
+				},
+				Validate: survey.MinLength(5),
 			},
-			Validate: survey.MinLength(5),
-		},
-		{
-			Name: "folder",
-			Prompt: &survey.Input{
-				Message: "What folder would you like to create the project in?",
-				Default: defaultFolder, // dynamically set based on chosen sample
-				Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
-			},
-			Validate: survey.Required,
-		},
+		}
+		err = survey.Ask(qs, &aiPrompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+		if err != nil {
+			return fmt.Errorf("failed to prompt for AI generation: %w", err)
+		}
+		folder, err = promptForDirectory(defaultFolder)
+		if err != nil {
+			return err
+		}
+		if err := beforeGenerateWithAI(ctx, aiPrompt, folder); err != nil {
+			return err
+		}
+		beforeGenerate(folder)
+		term.Info("Working on it. This may take 1 or 2 minutes...")
+		args := cli.GenerateArgs{
+			Description: aiPrompt.Description,
+			Folder:      folder,
+			Language:    aiPrompt.Language,
+			ModelId:     aiPrompt.ModelID,
+		}
+		_, err := cli.GenerateWithAI(ctx, client, args)
+		if err != nil {
+			return err
+		}
+	} else {
+		folder, err = promptForDirectory(defaultFolder)
+		if err != nil {
+			return err
+		}
+		beforeGenerateFromSample(sample, folder)
+		beforeGenerate(folder)
+		term.Info("Fetching sample from the Defang repository...")
+		err := cli.InitFromSamples(ctx, folder, []string{sample})
+		if err != nil {
+			return err
+		}
 	}
 
-	if sample != "" {
-		qs = qs[1:] // user picked a sample, so we skip the description question
-	}
+	term.Info("Code generated successfully in folder", folder)
 
-	prompt := struct {
-		Description string // or you can tag fields to match a specific name
-		Folder      string
-	}{}
+	afterGenerate(ctx, folder)
 
-	// ask the remaining questions
-	err = survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+	return nil
+}
+
+func promptForDirectory(defaultDirectory string) (string, error) {
+	var folder string
+	err := survey.AskOne(&survey.Input{
+		Message: "What folder would you like to create the project in?",
+		Default: defaultDirectory,
+		Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
+	}, &folder, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
-		return err
+		return "", err
 	}
 
+	return strings.TrimSpace(folder), nil
+}
+
+type GeneratePrompt struct {
+	Description string `json:"description"`
+	ModelID     string `json:"model_id"`
+	Language    string `json:"language"`
+}
+
+func beforeGenerateWithAI(ctx context.Context, prompt GeneratePrompt, folder string) error {
 	if client.CheckLoginAndToS(ctx) != nil {
 		// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
 		if err := cli.InteractiveAgreeToS(ctx, client); err != nil {
@@ -631,35 +671,12 @@ func handleGenerate(ctx context.Context, sample string) error {
 		}
 	}
 
-	track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
-
-	beforeGenerate(prompt.Folder)
-
-	if sample != "" {
-		term.Info("Fetching sample from the Defang repository...")
-		err := cli.InitFromSamples(ctx, prompt.Folder, []string{sample})
-		if err != nil {
-			return err
-		}
-	} else {
-		term.Info("Working on it. This may take 1 or 2 minutes...")
-		args := cli.GenerateArgs{
-			Description: prompt.Description,
-			Folder:      prompt.Folder,
-			Language:    language,
-			ModelId:     modelId,
-		}
-		_, err := cli.GenerateWithAI(ctx, client, args)
-		if err != nil {
-			return err
-		}
-	}
-
-	term.Info("Code generated successfully in folder", prompt.Folder)
-
-	afterGenerate(ctx, prompt.Folder)
-
+	track.Evt("Generate Started", P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
 	return nil
+}
+
+func beforeGenerateFromSample(sample string, folder string) {
+	track.Evt("Generate Started", P("sample", sample), P("folder", folder))
 }
 
 func beforeGenerate(directory string) {
