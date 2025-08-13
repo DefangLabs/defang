@@ -520,6 +520,7 @@ var generateCmd = &cobra.Command{
 	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		var sample, language, defaultFolder string
 		if len(args) > 0 {
 			sample = args[0]
@@ -529,10 +530,10 @@ var generateCmd = &cobra.Command{
 			if sample == "" {
 				return errors.New("cannot run in non-interactive mode")
 			}
-			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
+			return cli.InitFromSamples(ctx, "", []string{sample})
 		}
 
-		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
+		sampleList, fetchSamplesErr := cli.FetchSamples(ctx)
 		if sample == "" {
 			// Fetch the list of samples from the Defang repository
 			if fetchSamplesErr != nil {
@@ -624,9 +625,9 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 
-		if client.CheckLoginAndToS(cmd.Context()) != nil {
+		if client.CheckLoginAndToS(ctx) != nil {
 			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
-			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
+			if err := cli.InteractiveAgreeToS(ctx, client); err != nil {
 				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
 				if connect.CodeOf(err) != connect.CodeUnauthenticated {
 					return err
@@ -651,7 +652,7 @@ var generateCmd = &cobra.Command{
 
 		if sample != "" {
 			term.Info("Fetching sample from the Defang repository...")
-			err := cli.InitFromSamples(cmd.Context(), prompt.Folder, []string{sample})
+			err := cli.InitFromSamples(ctx, prompt.Folder, []string{sample})
 			if err != nil {
 				return err
 			}
@@ -663,7 +664,7 @@ var generateCmd = &cobra.Command{
 				Language:    language,
 				ModelId:     modelId,
 			}
-			_, err := cli.GenerateWithAI(cmd.Context(), client, args)
+			_, err := cli.GenerateWithAI(ctx, client, args)
 			if err != nil {
 				return err
 			}
@@ -685,7 +686,7 @@ var generateCmd = &cobra.Command{
 
 		// Load the project and check for empty environment variables
 		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
-		project, err := loader.LoadProject(cmd.Context())
+		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			term.Debugf("unable to load new project: %v", err)
 		}
