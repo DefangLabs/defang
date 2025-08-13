@@ -514,7 +514,6 @@ var certGenerateCmd = &cobra.Command{
 const generateWithAI = "Generate with AI"
 
 func handleGenerate(ctx context.Context, sample string) error {
-	var language, defaultFolder string
 	if nonInteractive {
 		if sample == "" {
 			return errors.New("cannot run in non-interactive mode")
@@ -551,20 +550,22 @@ func handleGenerate(ctx context.Context, sample string) error {
 			}, &sample, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
 				return err
 			}
-			if sample == generateWithAI {
-				if err := survey.AskOne(&survey.Select{
-					Message: "Choose the language you'd like to use:",
-					Options: cli.SupportedLanguages,
-					Help:    "The project code will be in the language you choose here.",
-				}, &language, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-					return err
-				}
-				sample = ""
-				defaultFolder = "project1"
-			} else {
-				defaultFolder = sample
-			}
 		}
+	}
+
+	var language, defaultFolder string
+	if sample == generateWithAI {
+		if err := survey.AskOne(&survey.Select{
+			Message: "Choose the language you'd like to use:",
+			Options: cli.SupportedLanguages,
+			Help:    "The project code will be in the language you choose here.",
+		}, &language, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
+			return err
+		}
+		sample = ""
+		defaultFolder = "project1"
+	} else {
+		defaultFolder = sample
 	}
 
 	var qs = []*survey.Question{
