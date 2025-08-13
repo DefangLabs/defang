@@ -552,91 +552,85 @@ func promptForSample(ctx context.Context) (string, error) {
 	return sample, nil
 }
 
-func handleGenerate(ctx context.Context, sample string) error {
-	if nonInteractive {
-		if sample == "" {
-			return errors.New("cannot run in non-interactive mode")
-		}
-		return cli.InitFromSamples(ctx, "", []string{sample})
-	}
+var defaultFolder = "project1"
 
+func aiGenerate(ctx context.Context, folder string) error {
+	aiPrompt := GeneratePrompt{
+		ModelID: modelId,
+	}
+	var qs = []*survey.Question{
+		{
+			Name: "language",
+			Prompt: &survey.Select{
+				Message: "Choose the language you'd like to use:",
+				Options: cli.SupportedLanguages,
+				Help:    "The project code will be in the language you choose here.",
+			},
+		},
+		{
+			Name: "description",
+			Prompt: &survey.Input{
+				Message: "Please describe the service you'd like to build:",
+				Help: `Here are some example prompts you can use:
+    "A simple 'hello world' function"
+    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
+    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
+			},
+			Validate: survey.MinLength(5),
+		},
+	}
+	err := survey.Ask(qs, &aiPrompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+	if err != nil {
+		return fmt.Errorf("failed to prompt for AI generation: %w", err)
+	}
+	folder, err = promptForDirectory(folder)
+	if err != nil {
+		return err
+	}
+	if err := beforeGenerateWithAI(ctx, aiPrompt, folder); err != nil {
+		return err
+	}
+	beforeGenerate(folder)
+	term.Info("Working on it. This may take 1 or 2 minutes...")
+	args := cli.GenerateArgs{
+		Description: aiPrompt.Description,
+		Folder:      folder,
+		Language:    aiPrompt.Language,
+		ModelId:     aiPrompt.ModelID,
+	}
+	_, err = cli.GenerateWithAI(ctx, client, args)
+	if err != nil {
+		return err
+	}
+	afterGenerate(ctx, folder)
+	return nil
+}
+
+func cloneSample(ctx context.Context, sample string) error {
 	var err error
-	defaultFolder := "project1"
 	if sample == "" {
 		sample, err = promptForSample(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to prompt for sample: %w", err)
 		}
-		defaultFolder = sample
 	}
-
-	var folder string
 	if sample == generateWithAI {
-		aiPrompt := GeneratePrompt{
-			ModelID: modelId,
-		}
-		var qs = []*survey.Question{
-			{
-				Name: "language",
-				Prompt: &survey.Select{
-					Message: "Choose the language you'd like to use:",
-					Options: cli.SupportedLanguages,
-					Help:    "The project code will be in the language you choose here.",
-				},
-			},
-			{
-				Name: "description",
-				Prompt: &survey.Input{
-					Message: "Please describe the service you'd like to build:",
-					Help: `Here are some example prompts you can use:
-    "A simple 'hello world' function"
-    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
-				},
-				Validate: survey.MinLength(5),
-			},
-		}
-		err = survey.Ask(qs, &aiPrompt, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err != nil {
-			return fmt.Errorf("failed to prompt for AI generation: %w", err)
-		}
-		folder, err = promptForDirectory(defaultFolder)
-		if err != nil {
-			return err
-		}
-		if err := beforeGenerateWithAI(ctx, aiPrompt, folder); err != nil {
-			return err
-		}
-		beforeGenerate(folder)
-		term.Info("Working on it. This may take 1 or 2 minutes...")
-		args := cli.GenerateArgs{
-			Description: aiPrompt.Description,
-			Folder:      folder,
-			Language:    aiPrompt.Language,
-			ModelId:     aiPrompt.ModelID,
-		}
-		_, err := cli.GenerateWithAI(ctx, client, args)
-		if err != nil {
-			return err
-		}
-	} else {
-		folder, err = promptForDirectory(defaultFolder)
-		if err != nil {
-			return err
-		}
-		beforeGenerateFromSample(sample, folder)
-		beforeGenerate(folder)
-		term.Info("Fetching sample from the Defang repository...")
-		err := cli.InitFromSamples(ctx, folder, []string{sample})
-		if err != nil {
-			return err
-		}
+		return aiGenerate(ctx, defaultFolder)
 	}
 
-	term.Info("Code generated successfully in folder", folder)
+	folder, err := promptForDirectory(sample)
+	if err != nil {
+		return err
+	}
+	beforeGenerateFromSample(sample, folder)
+	beforeGenerate(folder)
+	term.Info("Fetching sample from the Defang repository...")
+	err = cli.InitFromSamples(ctx, folder, []string{sample})
+	if err != nil {
+		return err
+	}
 
 	afterGenerate(ctx, folder)
-
 	return nil
 }
 
@@ -695,6 +689,7 @@ func beforeGenerate(directory string) {
 }
 
 func afterGenerate(ctx context.Context, directory string) {
+	term.Info("Code generated successfully in folder", directory)
 	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
 	cmdd := exec.Command(editor, directory)
 	err := cmdd.Start()
@@ -738,7 +733,7 @@ var generateCmd = &cobra.Command{
 			sample = args[0]
 		}
 
-		return handleGenerate(ctx, sample)
+		return cloneSample(ctx, sample)
 	},
 }
 
