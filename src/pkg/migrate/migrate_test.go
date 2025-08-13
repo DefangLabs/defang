@@ -360,6 +360,32 @@ services:
 			expected:       "",
 			expectingError: true,
 		},
+		{
+			name: "postgres",
+			input: `
+services:
+  db:
+    image: postgres:latest`,
+			expected: `services:
+    db:
+        image: postgres:latest
+        x-defang-postgres: "true"
+`,
+			expectingError: false,
+		},
+		{
+			name: "redis",
+			input: `
+services:
+  db:
+    image: redis:latest`,
+			expected: `services:
+    db:
+        image: redis:latest
+        x-defang-redis: "true"
+`,
+			expectingError: false,
+		},
 	}
 
 	for _, tt := range tests {

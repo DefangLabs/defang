@@ -179,6 +179,23 @@ func cleanupComposeFile(composeContent string) (string, error) {
 	}
 	delete(composeYAML, "version")
 
+	// iterate over the services
+	services, ok := composeYAML["services"].(map[string]interface{})
+	if ok {
+		for _, service := range services {
+			if serviceConfig, ok := service.(map[string]interface{}); ok {
+				if image, ok := serviceConfig["image"].(string); ok {
+					if strings.HasPrefix(image, "postgres:") {
+						serviceConfig["x-defang-postgres"] = "true"
+					}
+					if strings.HasPrefix(image, "redis:") {
+						serviceConfig["x-defang-redis"] = "true"
+					}
+				}
+			}
+		}
+	}
+
 	composeBytes, err := yaml.Marshal(composeYAML)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal compose content to yaml: %w", err)
