@@ -746,89 +746,57 @@ var initCmd = &cobra.Command{
 		ctx := cmd.Context()
 		var sample string
 		if len(args) > 0 {
-			return handleGenerate(ctx, sample)
+			return cloneSample(ctx, sample)
 		}
 
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
 		}
 
-		// list files in the current directory
-		files, err := os.ReadDir(".")
-		if err != nil {
-			return fmt.Errorf("failed to read current directory: %w", err)
-		}
-
-		if len(files) == 0 {
-			// If the directory is empty, we can proceed with the generation
-			return handleGenerate(ctx, "")
-		}
-
-		// check if any file is a compose file
-		hasComposeFile := false
-		for _, file := range files {
-			name := file.Name()
-			lowerName := strings.ToLower(name)
-			if lowerName == "compose.yaml" || lowerName == "compose.yml" ||
-				lowerName == "docker-compose.yaml" || lowerName == "docker-compose.yml" {
-				hasComposeFile = true
-				break
-			}
-		}
-
-		if hasComposeFile {
-			loader := configureLoader(cmd)
-
-			project, err := loader.LoadProject(ctx)
-			if err != nil {
-				return fmt.Errorf("This project has a compose file, but it cannot be loaded: %w", err)
-			}
-			if err := compose.ValidateProject(project); err != nil {
-				return fmt.Errorf("This project has a compose file, but it appears to be invalid: %w", err)
-			}
-
-			term.Info("Your compose file is ready to go. You can deploy it by running `defang compose up`")
-
-			return nil
-		}
-
-		surveyor := surveyor.NewDefaultSurveyor()
-		heroku := setup.NewHerokuClient()
-
 		var response string
-		err = surveyor.AskOne(&survey.Select{
-			Message: "Is this application currently deployed?",
-			Options: []string{"Yes", "No"},
-			Help:    "If you select 'Yes', we will try to migrate the existing deployment to Defang.",
+		err := survey.AskOne(&survey.Select{
+			Message: "How would you like to start?",
+			Options: []string{
+				"Generate with AI",
+				"Clone a sample",
+				"Migrate from heroku",
+			},
 		}, &response)
 		if err != nil {
-			return fmt.Errorf("failed to ask if the application is deployed: %w", err)
+			return fmt.Errorf("failed to ask how to start: %w", err)
 		}
 
-		var composeFileContents string
-		if response == "Yes" {
-			term.Info("Ok, let's create a compose file for your existing deployment.")
-			composeFileContents, err = setup.InteractiveSetup(cmd.Context(), client, surveyor, heroku, sourcePlatform)
-			if err != nil {
-				return err
-			}
-		} else {
-			term.Info("Ok, let's generate a simple compose file for your project.")
-			composeFileContents, err = setup.GenerateSimpleComposeFile()
-			if err != nil {
-				return err
-			}
+		switch response {
+		case "Generate with AI":
+			return aiGenerate(ctx, defaultFolder)
+		case "Clone a sample":
+			return cloneSample(ctx, "")
+		case "Migrate from heroku":
+			return migrateFromHeroku(ctx)
 		}
-
-		composeFilePath, err := writeComposeFile(composeFileContents)
-		if err != nil {
-			return fmt.Errorf("failed to write compose file: %w", err)
-		}
-
-		term.Info("Compose file written to", composeFilePath)
 
 		return nil
 	},
+}
+
+func migrateFromHeroku(ctx context.Context) error {
+	surveyor := surveyor.NewDefaultSurveyor()
+	heroku := setup.NewHerokuClient()
+	var composeFileContents string
+
+	term.Info("Ok, let's create a compose file for your existing deployment.")
+	composeFileContents, err := setup.InteractiveSetup(ctx, client, surveyor, heroku, sourcePlatform)
+	if err != nil {
+		return err
+	}
+
+	composeFilePath, err := writeComposeFile(composeFileContents)
+	if err != nil {
+		return fmt.Errorf("failed to write compose file: %w", err)
+	}
+
+	term.Info("Compose file written to", composeFilePath)
+	return nil
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {
