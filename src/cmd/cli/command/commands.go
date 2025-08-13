@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -523,11 +522,11 @@ func handleGenerate(ctx context.Context, sample string) error {
 		return cli.InitFromSamples(ctx, "", []string{sample})
 	}
 
-	sampleList, fetchSamplesErr := cli.FetchSamples(ctx)
 	if sample == "" {
+		sampleList, err := cli.FetchSamples(ctx)
 		// Fetch the list of samples from the Defang repository
-		if fetchSamplesErr != nil {
-			term.Debug("unable to fetch samples:", fetchSamplesErr)
+		if err != nil {
+			term.Debug("unable to fetch samples:", err)
 		} else if len(sampleList) > 0 {
 			sampleNames := []string{generateWithAI}
 			sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
@@ -593,13 +592,6 @@ func handleGenerate(ctx context.Context, sample string) error {
 
 	if sample != "" {
 		qs = qs[1:] // user picked a sample, so we skip the description question
-		sampleExists := slices.ContainsFunc(sampleList, func(s cli.Sample) bool {
-			return s.Name == sample
-		})
-
-		if !sampleExists {
-			return cli.ErrSampleNotFound
-		}
 	}
 
 	prompt := struct {
