@@ -24,6 +24,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/setup"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -511,190 +512,22 @@ var certGenerateCmd = &cobra.Command{
 	},
 }
 
-const generateWithAI = "Generate with AI"
-
-func promptForSample(ctx context.Context) (string, error) {
-	sampleList, err := cli.FetchSamples(ctx)
-	// Fetch the list of samples from the Defang repository
-	if err != nil {
-		return "", fmt.Errorf("unable to fetch samples: %w", err)
-	}
-	if len(sampleList) == 0 {
-		return "", errors.New("no samples available")
-	}
-
-	sample := ""
-	sampleNames := []string{generateWithAI}
-	sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
-	sampleIndex := []string{"unused first entry because we always show genAI option"}
-	for _, s := range sampleList {
-		sampleNames = append(sampleNames, s.Name)
-		sampleTitles = append(sampleTitles, s.Title)
-		sampleIndex = append(sampleIndex, strings.ToLower(s.Name+" "+s.Title+" "+
-			strings.Join(s.Tags, " ")+" "+strings.Join(s.Languages, " ")))
-	}
-
-	err = survey.AskOne(&survey.Select{
-		Message: "Choose a sample service:",
-		Options: sampleNames,
-		Help:    "The project code will be based on the sample you choose here.",
-		Filter: func(filter string, value string, i int) bool {
-			return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
-		},
-		Description: func(value string, i int) string {
-			return sampleTitles[i]
-		},
-	}, &sample, survey.WithStdio(term.DefaultTerm.Stdio()))
-	if err != nil {
-		return "", fmt.Errorf("failed to select sample: %w", err)
-	}
-
-	return sample, nil
-}
-
-var defaultFolder = "project1"
-
-const GenerateStartedEvt = "Generate Started"
-
-func aiGenerate(ctx context.Context, folder string) error {
-	prompt := GeneratePrompt{
-		ModelID: modelId,
-	}
-	var qs = []*survey.Question{
-		{
-			Name: "language",
-			Prompt: &survey.Select{
-				Message: "Choose the language you'd like to use:",
-				Options: cli.SupportedLanguages,
-				Help:    "The project code will be in the language you choose here.",
-			},
-		},
-		{
-			Name: "description",
-			Prompt: &survey.Input{
-				Message: "Please describe the service you'd like to build:",
-				Help: `Here are some example prompts you can use:
-    "A simple 'hello world' function"
-    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
-			},
-			Validate: survey.MinLength(5),
-		},
-	}
-	err := survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
-	if err != nil {
-		return fmt.Errorf("failed to prompt for AI generation: %w", err)
-	}
-	folder, err = promptForDirectory(folder)
-	if err != nil {
-		return err
-	}
-	if client.CheckLoginAndToS(ctx) != nil {
-		// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
-		if err := cli.InteractiveAgreeToS(ctx, client); err != nil {
-			// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
-			if connect.CodeOf(err) != connect.CodeUnauthenticated {
-				return err
-			}
-		}
-	}
-
-	track.Evt(GenerateStartedEvt, P("language", prompt.Language), P("description", prompt.Description), P("folder", folder), P("model", prompt.ModelID))
-	beforeGenerate(folder)
-	term.Info("Working on it. This may take 1 or 2 minutes...")
-	args := cli.GenerateArgs{
-		Description: prompt.Description,
-		Folder:      folder,
-		Language:    prompt.Language,
-		ModelId:     prompt.ModelID,
-	}
-	_, err = cli.GenerateWithAI(ctx, client, args)
-	if err != nil {
-		return err
-	}
-	afterGenerate(ctx, folder)
-	return nil
-}
-
-func cloneSample(ctx context.Context, sample string) error {
-	var err error
-	if sample == "" {
-		sample, err = promptForSample(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to prompt for sample: %w", err)
-		}
-	}
-	if sample == generateWithAI {
-		return aiGenerate(ctx, defaultFolder)
-	}
-
-	folder, err := promptForDirectory(sample)
-	if err != nil {
-		return err
-	}
-	track.Evt(GenerateStartedEvt, P("sample", sample), P("folder", folder))
-	beforeGenerate(folder)
-	term.Info("Fetching sample from the Defang repository...")
-	err = cli.InitFromSamples(ctx, folder, []string{sample})
-	if err != nil {
-		return err
-	}
-
-	afterGenerate(ctx, folder)
-	return nil
-}
-
-func promptForDirectory(defaultDirectory string) (string, error) {
-	var folder string
-	err := survey.AskOne(&survey.Input{
-		Message: "What folder would you like to create the project in?",
-		Default: defaultDirectory,
-		Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
-	}, &folder, survey.WithStdio(term.DefaultTerm.Stdio()))
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(folder), nil
-}
-
-type GeneratePrompt struct {
-	Description string `json:"description"`
-	ModelID     string `json:"model_id"`
-	Language    string `json:"language"`
-}
-
-func beforeGenerate(directory string) {
-	// Check if the current folder is empty
-	if empty, err := pkg.IsDirEmpty(directory); !os.IsNotExist(err) && !empty {
-		nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", directory)
-
-		var confirm bool
-		err := survey.AskOne(&survey.Confirm{
-			Message: nonEmptyFolder + " Continue creating project?",
-		}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-		if err == nil && !confirm {
-			os.Exit(1)
-		}
-	}
-}
-
-func afterGenerate(ctx context.Context, directory string) {
-	term.Info("Code generated successfully in folder", directory)
-	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
-	cmdd := exec.Command(editor, directory)
+func afterGenerate(ctx context.Context, result setup.SetupResult) {
+	term.Info("Code generated successfully in folder", result.Folder)
+	editor := pkg.Getenv("EDITOR", "code")
+	cmdd := exec.Command(editor, result.Folder)
 	err := cmdd.Start()
 	if err != nil {
 		term.Debugf("unable to launch editor %q: %v", editor, err)
 	}
 
 	cd := ""
-	if directory != "." {
-		cd = "`cd " + directory + "` and "
+	if result.Folder != "." {
+		cd = "`cd " + result.Folder + "` and "
 	}
 
 	// Load the project and check for empty environment variables
-	loader := compose.NewLoader(compose.WithPath(filepath.Join(directory, "compose.yaml")))
+	loader := compose.NewLoader(compose.WithPath(filepath.Join(result.Folder, "compose.yaml")))
 	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		term.Debugf("unable to load new project: %v", err)
@@ -719,12 +552,20 @@ var generateCmd = &cobra.Command{
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		var sample string
-		if len(args) > 0 {
-			sample = args[0]
+
+		setupClient := setup.SetupClient{
+			Surveyor: surveyor.NewDefaultSurveyor(),
+			Heroku:   migrate.NewHerokuClient(),
+			ModelID:  modelId,
+			Fabric:   client,
 		}
 
-		return cloneSample(ctx, sample)
+		result, err := setupClient.CloneSample(ctx, args[0])
+		if err != nil {
+			return err
+		}
+		afterGenerate(ctx, result)
+		return nil
 	},
 }
 
@@ -735,59 +576,29 @@ var initCmd = &cobra.Command{
 	Short:   "Create a new Defang project from a sample",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		var sample string
+		setupClient := setup.SetupClient{
+			Surveyor: surveyor.NewDefaultSurveyor(),
+			Heroku:   migrate.NewHerokuClient(),
+			ModelID:  modelId,
+			Fabric:   client,
+		}
+
 		if len(args) > 0 {
-			return cloneSample(ctx, sample)
+			_, err := setupClient.CloneSample(ctx, args[0])
+			return err
 		}
 
 		if nonInteractive {
 			return errors.New("cannot run in non-interactive mode")
 		}
 
-		var response string
-		err := survey.AskOne(&survey.Select{
-			Message: "How would you like to start?",
-			Options: []string{
-				"Generate with AI",
-				"Clone a sample",
-				"Migrate from heroku",
-			},
-		}, &response)
+		result, err := setupClient.Start(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to ask how to start: %w", err)
+			return err
 		}
-
-		switch response {
-		case "Generate with AI":
-			return aiGenerate(ctx, defaultFolder)
-		case "Clone a sample":
-			return cloneSample(ctx, "")
-		case "Migrate from heroku":
-			return migrateFromHeroku(ctx)
-		}
-
+		afterGenerate(ctx, result)
 		return nil
 	},
-}
-
-func migrateFromHeroku(ctx context.Context) error {
-	surveyor := surveyor.NewDefaultSurveyor()
-	heroku := migrate.NewHerokuClient()
-	var composeFileContents string
-
-	term.Info("Ok, let's create a compose file for your existing deployment.")
-	composeFileContents, err := migrate.InteractiveSetup(ctx, client, surveyor, heroku, sourcePlatform)
-	if err != nil {
-		return err
-	}
-
-	composeFilePath, err := writeComposeFile(composeFileContents)
-	if err != nil {
-		return fmt.Errorf("failed to write compose file: %w", err)
-	}
-
-	term.Info("Compose file written to", composeFilePath)
-	return nil
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {
@@ -1231,31 +1042,6 @@ func configureLoader(cmd *cobra.Command) *compose.Loader {
 		doubleCheckProjectName(projectName)
 	}
 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(configPaths...))
-}
-
-func writeComposeFile(content string) (string, error) {
-	paths := []string{"compose.yaml", "compose.defang.yaml"}
-	var f *os.File
-	var err error
-
-	for _, composeFilePath := range paths {
-		f, err = os.OpenFile(composeFilePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-		if err != nil {
-			if os.IsExist(err) {
-				continue
-			}
-			return "", fmt.Errorf("failed to create compose file: %w", err)
-		}
-		defer f.Close()
-
-		// #nosec G306 -- compose file is not expected to contain sensitive data
-		if _, err := f.WriteString(content); err != nil {
-			return "", fmt.Errorf("failed to write compose file: %w", err)
-		}
-		return composeFilePath, nil
-	}
-
-	return "", fmt.Errorf("all compose file names already exist: %v", paths)
 }
 
 func doubleCheckProjectName(projectName string) {
