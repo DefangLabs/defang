@@ -632,7 +632,7 @@ func cloneSample(ctx context.Context, sample string) error {
 	if err != nil {
 		return err
 	}
-	beforeGenerateFromSample(sample, folder)
+	track.Evt(GenerateStartedEvt, P("sample", sample), P("folder", folder))
 	beforeGenerate(folder)
 	term.Info("Fetching sample from the Defang repository...")
 	err = cli.InitFromSamples(ctx, folder, []string{sample})
@@ -662,10 +662,6 @@ type GeneratePrompt struct {
 	Description string `json:"description"`
 	ModelID     string `json:"model_id"`
 	Language    string `json:"language"`
-}
-
-func beforeGenerateFromSample(sample string, folder string) {
-	track.Evt(GenerateStartedEvt, P("sample", sample), P("folder", folder))
 }
 
 func beforeGenerate(directory string) {
