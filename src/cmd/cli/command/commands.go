@@ -660,20 +660,26 @@ func handleGenerate(ctx context.Context, sample string) error {
 
 	term.Info("Code generated successfully in folder", prompt.Folder)
 
+	afterGenerate(ctx, prompt.Folder)
+
+	return nil
+}
+
+func afterGenerate(ctx context.Context, directory string) {
 	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
-	cmdd := exec.Command(editor, prompt.Folder)
-	err = cmdd.Start()
+	cmdd := exec.Command(editor, directory)
+	err := cmdd.Start()
 	if err != nil {
 		term.Debugf("unable to launch editor %q: %v", editor, err)
 	}
 
 	cd := ""
-	if prompt.Folder != "." {
-		cd = "`cd " + prompt.Folder + "` and "
+	if directory != "." {
+		cd = "`cd " + directory + "` and "
 	}
 
 	// Load the project and check for empty environment variables
-	loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
+	loader := compose.NewLoader(compose.WithPath(filepath.Join(directory, "compose.yaml")))
 	project, err := loader.LoadProject(ctx)
 	if err != nil {
 		term.Debugf("unable to load new project: %v", err)
@@ -689,8 +695,6 @@ func handleGenerate(ctx context.Context, sample string) error {
 	} else {
 		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
 	}
-
-	return nil
 }
 
 var generateCmd = &cobra.Command{
