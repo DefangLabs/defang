@@ -513,6 +513,45 @@ var certGenerateCmd = &cobra.Command{
 
 const generateWithAI = "Generate with AI"
 
+func promptForSample(ctx context.Context) (string, error) {
+	sampleList, err := cli.FetchSamples(ctx)
+	// Fetch the list of samples from the Defang repository
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch samples: %w", err)
+	}
+	if len(sampleList) == 0 {
+		return "", errors.New("no samples available")
+	}
+
+	sample := ""
+	sampleNames := []string{generateWithAI}
+	sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
+	sampleIndex := []string{"unused first entry because we always show genAI option"}
+	for _, s := range sampleList {
+		sampleNames = append(sampleNames, s.Name)
+		sampleTitles = append(sampleTitles, s.Title)
+		sampleIndex = append(sampleIndex, strings.ToLower(s.Name+" "+s.Title+" "+
+			strings.Join(s.Tags, " ")+" "+strings.Join(s.Languages, " ")))
+	}
+
+	err = survey.AskOne(&survey.Select{
+		Message: "Choose a sample service:",
+		Options: sampleNames,
+		Help:    "The project code will be based on the sample you choose here.",
+		Filter: func(filter string, value string, i int) bool {
+			return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
+		},
+		Description: func(value string, i int) string {
+			return sampleTitles[i]
+		},
+	}, &sample, survey.WithStdio(term.DefaultTerm.Stdio()))
+	if err != nil {
+		return "", fmt.Errorf("failed to select sample: %w", err)
+	}
+
+	return sample, nil
+}
+
 func handleGenerate(ctx context.Context, sample string) error {
 	if nonInteractive {
 		if sample == "" {
@@ -521,35 +560,11 @@ func handleGenerate(ctx context.Context, sample string) error {
 		return cli.InitFromSamples(ctx, "", []string{sample})
 	}
 
+	var err error
 	if sample == "" {
-		sampleList, err := cli.FetchSamples(ctx)
-		// Fetch the list of samples from the Defang repository
+		sample, err = promptForSample(ctx)
 		if err != nil {
-			term.Debug("unable to fetch samples:", err)
-		} else if len(sampleList) > 0 {
-			sampleNames := []string{generateWithAI}
-			sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
-			sampleIndex := []string{"unused first entry because we always show genAI option"}
-			for _, sample := range sampleList {
-				sampleNames = append(sampleNames, sample.Name)
-				sampleTitles = append(sampleTitles, sample.Title)
-				sampleIndex = append(sampleIndex, strings.ToLower(sample.Name+" "+sample.Title+" "+
-					strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " ")))
-			}
-
-			if err := survey.AskOne(&survey.Select{
-				Message: "Choose a sample service:",
-				Options: sampleNames,
-				Help:    "The project code will be based on the sample you choose here.",
-				Filter: func(filter string, value string, i int) bool {
-					return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
-				},
-				Description: func(value string, i int) string {
-					return sampleTitles[i]
-				},
-			}, &sample, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-				return err
-			}
+			return fmt.Errorf("failed to prompt for sample: %w", err)
 		}
 	}
 
@@ -601,7 +616,7 @@ func handleGenerate(ctx context.Context, sample string) error {
 	}{}
 
 	// ask the remaining questions
-	err := survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+	err = survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
 	if err != nil {
 		return err
 	}
