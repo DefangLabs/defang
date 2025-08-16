@@ -30,7 +30,14 @@
     "image": "postgres:15-alpine",
     "networks": {
       "default": null
-    }
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
   },
   "redis": {
     "command": null,
@@ -38,6 +45,13 @@
     "image": "redis:7-alpine",
     "networks": {
       "default": null
-    }
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 6379,
+        "protocol": "tcp"
+      }
+    ]
   }
 }

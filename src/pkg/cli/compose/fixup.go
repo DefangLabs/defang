@@ -26,8 +26,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	}
 	slices.Sort(config.Names) // sort for binary search
 
+	// Fixup ports first (which affects service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
-		// Fixup ports (which affects service name replacement by ReplaceServiceNameWithDNS)
 		for i, port := range svccfg.Ports {
 			svccfg.Ports[i] = fixupPort(port)
 		}
@@ -35,22 +35,24 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
+		repo := getImageRepo(svccfg.Image)
+
 		_, managedRedis := svccfg.Extensions["x-defang-redis"]
-		if managedRedis {
+		if managedRedis || strings.HasSuffix(repo, "redis") {
 			if err := fixupRedisService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
-		if managedPostgres {
+		if managedPostgres || strings.HasSuffix(repo, "postgres") || strings.HasSuffix(repo, "pgvector") {
 			if err := fixupPostgresService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
-		if managedMongo {
+		if managedMongo || strings.HasSuffix(repo, "mongo") {
 			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
@@ -207,7 +209,8 @@ func fixupLLM(svccfg *composeTypes.ServiceConfig) {
 }
 
 func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
+	_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
+	if _, ok := provider.(*client.PlaygroundProvider); ok && managedPostgres && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed postgres is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -228,7 +231,8 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 }
 
 func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
+	_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
+	if _, ok := provider.(*client.PlaygroundProvider); ok && managedMongo && upload != UploadModeEstimate {
 		term.Warnf("service %q: managed mongodb is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -263,7 +267,8 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 }
 
 func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provider, upload UploadMode) error {
-	if _, ok := provider.(*client.PlaygroundProvider); ok && upload != UploadModeEstimate {
+	_, managedRedis := svccfg.Extensions["x-defang-redis"]
+	if _, ok := provider.(*client.PlaygroundProvider); ok && managedRedis && upload != UploadModeEstimate {
 		term.Warnf("service %q: Managed redis is not supported in the Playground; consider using BYOC (https://s.defang.io/byoc)", svccfg.Name)
 	}
 	if len(svccfg.Ports) == 0 {
@@ -383,10 +388,9 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	}
 }
 
-func getImageRepo(imageRepo string) string {
-	image := strings.ToLower(imageRepo)
-	image, _, _ = strings.Cut(image, ":")
-	return image
+func getImageRepo(image string) string {
+	repo, _, _ := strings.Cut(image, ":")
+	return strings.ToLower(repo)
 }
 
 func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConfig {
