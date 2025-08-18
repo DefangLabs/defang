@@ -176,9 +176,6 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	opts := []AuthorizeOption{
 		WithPkce(),
 	}
-	if !mcpFlow {
-		opts = append(opts, WithProvider("github"))
-	}
 	ar, err := openAuthClient.Authorize(redirectUri, CodeResponseType, opts...)
 	if err != nil {
 		return AuthCodeFlow{}, err
