@@ -222,7 +222,7 @@ func getHerokuAuthToken() (string, error) {
 
 	for {
 		err := survey.AskOne(&survey.Password{
-			Message: "Defang needs a Heroku auth token key to collect information about your applications.",
+			Message: "Please paste a Heroku auth token, so Defang can collect information about your applications",
 			Help:    "Run `heroku authorizations:create --expires-in=300` or visit https://dashboard.heroku.com/account/applications/authorizations/new",
 		}, &token)
 		if err != nil {
