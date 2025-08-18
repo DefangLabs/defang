@@ -36,7 +36,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 
 	t.Run("Email in refreshed token", func(t *testing.T) {
 		token := &oauth2.Token{}
-		token = token.WithExtra(map[string]interface{}{
+		token = token.WithExtra(map[string]any{
 			"id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ1bml0IHRlc3QiLCJpYXQiOm51bGwsImV4cCI6bnVsbCwiYXVkIjoiIiwic3ViIjoiIiwiZW1haWwiOiJ0ZXN0QGVtYWlsLmNvbSJ9.UP2OF86aOg2BkpbFrkKUQ-osrwhTjh9_2JOnUlGMmHM",
 		})
 		FindGoogleDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {

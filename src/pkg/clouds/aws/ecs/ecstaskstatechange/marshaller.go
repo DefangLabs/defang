@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-func Marshal(inputEvent interface{}) ([]byte, error) {
+func Marshal(inputEvent any) ([]byte, error) {
 	outputStream, err := json.Marshal(inputEvent)
 	if err != nil {
 		return nil, err
@@ -13,8 +13,8 @@ func Marshal(inputEvent interface{}) ([]byte, error) {
 	return outputStream, nil
 }
 
-func Unmarshal(inputStream []byte) (map[string]interface{}, error) {
-	var outputEvent map[string]interface{}
+func Unmarshal(inputStream []byte) (map[string]any, error) {
+	var outputEvent map[string]any
 	err := json.Unmarshal(inputStream, &outputEvent)
 	if err != nil {
 		return nil, err

@@ -22,12 +22,12 @@ func MarshalPretty(root string, data proto.Message) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var raw map[string]interface{} // TODO: this messes with the order of the fields
+	var raw map[string]any // TODO: this messes with the order of the fields
 	if err := json.Unmarshal(bytes, &raw); err != nil {
 		return nil, err
 	}
 	if root != "" {
-		raw = map[string]interface{}{root: raw}
+		raw = map[string]any{root: raw}
 	}
 	return yaml.Marshal(raw)
 }

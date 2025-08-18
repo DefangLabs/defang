@@ -11,7 +11,7 @@ var DefaultClient = newClient().StandardClient()
 
 type slogLogger struct{}
 
-func (slogLogger) Printf(format string, args ...interface{}) {
+func (slogLogger) Printf(format string, args ...any) {
 	slog.Debug(fmt.Sprintf(format, args...))
 }
 

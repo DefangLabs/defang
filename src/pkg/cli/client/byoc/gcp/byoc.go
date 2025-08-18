@@ -877,7 +877,7 @@ func annotateGcpError(err error) error {
 }
 
 // Used to get nested values from the detail of a googleapi.Error
-func GetGoogleAPIErrorDetail(detail interface{}, path string) string {
+func GetGoogleAPIErrorDetail(detail any, path string) string {
 	if path == "" {
 		value, ok := detail.(string)
 		if ok {
@@ -885,7 +885,7 @@ func GetGoogleAPIErrorDetail(detail interface{}, path string) string {
 		}
 		return ""
 	}
-	dm, ok := detail.(map[string]interface{})
+	dm, ok := detail.(map[string]any)
 	if !ok {
 		return ""
 	}
