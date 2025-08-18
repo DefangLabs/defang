@@ -317,11 +317,12 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
+	repo := getImageRepo(svccfg.Image)
+
 	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
 	if managedRedis {
-		// Ensure the image is a valid Redis image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "redis") {
+		// Ensure the repo is a valid Redis repo
+		if !strings.HasSuffix(repo, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(redisExtension); err != nil {
@@ -331,9 +332,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
-		// Ensure the image is a valid Postgres image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "postgres") && !strings.HasSuffix(image, "pgvector") {
+		// Ensure the repo is a valid Postgres repo
+		if !strings.HasSuffix(repo, "postgres") && !strings.HasSuffix(repo, "pgvector") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(postgresExtension); err != nil {
@@ -343,9 +343,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
 	if managedMongodb {
-		// Ensure the image is a valid MongoDB image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "mongo") {
+		// Ensure the repo is a valid MongoDB repo
+		if !strings.HasSuffix(repo, "mongo") {
 			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(mongodbExtension); err != nil {
