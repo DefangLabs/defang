@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/term"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -50,6 +51,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 		return "", err
 	}
 
+	term.Debug("User ID: " + resp.UserId)
 	showData.Region = resp.Region
 	showData.SubscriberTier = resp.Tier
 	showData.Tenant = resp.Tenant
