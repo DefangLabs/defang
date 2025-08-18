@@ -97,6 +97,13 @@
     "networks": {
       "default": null
     },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 1236,
+        "protocol": "tcp"
+      }
+    ],
     "restart": "always"
   },
   "mongo-port1237": {
@@ -200,6 +207,13 @@
     "networks": {
       "default": null
     },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27017,
+        "protocol": "tcp"
+      }
+    ],
     "restart": "always"
   },
   "mongo-wrong-image": {
