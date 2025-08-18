@@ -34,7 +34,7 @@ type MCPConfig struct {
 type VSCodeConfig struct {
 	Servers map[string]VSCodeMCPServerConfig `json:"servers"`
 	// Other VSCode settings can be preserved with this field
-	Other map[string]interface{} `json:"-"`
+	Other map[string]any `json:"-"`
 }
 
 // VSCodeMCPServerConfig represents the configuration for a VSCode MCP server
@@ -214,12 +214,12 @@ func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
 }
 
 // getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() (map[string]interface{}, error) {
+func getVSCodeServerConfig() (map[string]any, error) {
 	config, err := getVSCodeDefangMCPConfig()
 	if err != nil {
 		return nil, err
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"type":    config.Type,
 		"command": config.Command,
 		"args":    config.Args,
@@ -229,7 +229,7 @@ func getVSCodeServerConfig() (map[string]interface{}, error) {
 // handleVSCodeConfig handles the special case for VSCode mcp.json
 func handleVSCodeConfig(configPath string) error {
 	// Create or update the config file
-	var existingData map[string]interface{}
+	var existingData map[string]any
 	config, err := getVSCodeServerConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
@@ -246,27 +246,27 @@ func handleVSCodeConfig(configPath string) error {
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
 			// If we can't parse it, start fresh
-			existingData = make(map[string]interface{})
+			existingData = make(map[string]any)
 		}
 
 		// Check if "servers" section exists
 		serversSection, ok := existingData["servers"]
 		if !ok {
 			// Create new "servers" section
-			existingData["servers"] = map[string]interface{}{}
+			existingData["servers"] = map[string]any{}
 			serversSection = existingData["servers"]
 		}
 
-		if mcpMap, ok := serversSection.(map[string]interface{}); ok {
+		if mcpMap, ok := serversSection.(map[string]any); ok {
 			mcpMap["defang"] = config
 			existingData["servers"] = mcpMap
 		} else {
-			return errors.New("failed to assert 'servers' section as map[string]interface{}")
+			return errors.New("failed to assert 'servers' section as map[string]any")
 		}
 	} else {
 		// File doesn't exist, create a new config with minimal settings
-		existingData = map[string]interface{}{
-			"servers": map[string]interface{}{
+		existingData = map[string]any{
+			"servers": map[string]any{
 				"defang": config,
 			},
 		}

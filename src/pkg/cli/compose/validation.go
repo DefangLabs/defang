@@ -311,7 +311,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
 		_, str := staticFilesVal.(string)
-		_, obj := staticFilesVal.(map[string]interface{})
+		_, obj := staticFilesVal.(map[string]any)
 		if !str && !obj {
 			return fmt.Errorf(`service %q: x-defang-static-files must be a string or object {"folder": string, "redirects": string[]}`, svccfg.Name)
 		}
