@@ -386,6 +386,26 @@ services:
 `,
 			expectingError: false,
 		},
+		{
+			name: "with comments",
+			input: `
+services:
+  # newline comment
+  web:
+    image: my-app:latest
+  db:
+    image: postgres:latest # EOL comment
+`,
+			expected: `services:
+    # newline comment
+    web:
+        image: my-app:latest
+    db:
+        image: postgres:latest # EOL comment
+        x-defang-postgres: "true"
+`,
+			expectingError: false,
+		},
 	}
 
 	for _, tt := range tests {

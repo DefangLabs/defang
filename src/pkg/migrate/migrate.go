@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -13,7 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func InteractiveSetup(ctx context.Context, fabric client.FabricClient, surveyor surveyor.Surveyor, heroku HerokuClientInterface, sourcePlatform SourcePlatform) (string, error) {
@@ -171,37 +172,77 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 	return "", errors.New("unexpected error: no valid compose file generated")
 }
 
-func cleanupComposeFile(composeContent string) (string, error) {
-	// parse as yaml and remove `version` property if present
-	var composeYAML map[string]interface{}
-	if err := yaml.Unmarshal([]byte(composeContent), &composeYAML); err != nil {
+func cleanupComposeFile(in string) (string, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(in), &document); err != nil {
 		return "", fmt.Errorf("failed to unmarshal compose content as yaml: %w", err)
 	}
-	delete(composeYAML, "version")
 
-	// iterate over the services
-	services, ok := composeYAML["services"].(map[string]interface{})
-	if ok {
-		for _, service := range services {
-			if serviceConfig, ok := service.(map[string]interface{}); ok {
-				if image, ok := serviceConfig["image"].(string); ok {
-					if strings.HasPrefix(image, "postgres:") {
-						serviceConfig["x-defang-postgres"] = "true"
-					}
-					if strings.HasPrefix(image, "redis:") {
-						serviceConfig["x-defang-redis"] = "true"
+	root := document.Content[0]
+	node := root
+
+	for i := 0; i < len(node.Content); i += 2 {
+		ki := node.Content[i]
+		vi := node.Content[i+1]
+		if ki.Value == "version" {
+			node.Content = slices.Delete(node.Content, i, i+2)
+			i -= 2 // Adjust index after deletion
+			continue
+		}
+		if ki.Value == "services" && vi.Kind == yaml.MappingNode {
+			for j := 0; j < len(vi.Content); j += 2 {
+				// kj := vi.Content[j]
+				vj := vi.Content[j+1]
+				for k := 0; k < len(vj.Content); k += 2 {
+					kk := vj.Content[k]
+					vk := vj.Content[k+1]
+					if kk.Value == "image" && vk.Kind == yaml.ScalarNode {
+						repo := compose.GetImageRepo(vk.Value)
+						if compose.IsPostgresRepo(repo) {
+							vj.Content = append(vj.Content, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "x-defang-postgres",
+							}, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "true",
+							})
+						}
+						if compose.IsMongoRepo(repo) {
+							vj.Content = append(vj.Content, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "x-defang-mongodb",
+							}, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "true",
+							})
+						}
+						if compose.IsRedisRepo(repo) {
+							vj.Content = append(vj.Content, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "x-defang-redis",
+							}, &yaml.Node{
+								Tag:   "!!str",
+								Kind:  yaml.ScalarNode,
+								Value: "true",
+							})
+						}
 					}
 				}
 			}
 		}
 	}
 
-	composeBytes, err := yaml.Marshal(composeYAML)
+	contentBytes, err := yaml.Marshal(root)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal compose content to yaml: %w", err)
 	}
 
-	return string(composeBytes), nil
+	return string(contentBytes), nil
 }
 
 func newline() string {

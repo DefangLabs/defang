@@ -317,7 +317,7 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		}
 	}
 
-	repo := getImageRepo(svccfg.Image)
+	repo := GetImageRepo(svccfg.Image)
 
 	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
 	if managedRedis {
