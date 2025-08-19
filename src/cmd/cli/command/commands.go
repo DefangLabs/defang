@@ -391,44 +391,51 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
-			if nonInteractive {
-				return err
-			}
-			// Login interactively now; only do this for authorization-related errors
-			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				term.Debug("Server error:", err)
-				term.Warn("Please log in to continue.")
-				term.ResetWarnings() // clear any previous warnings so we don't show them again
-
-				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = login.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
-					return err
-				}
-
-				// Reconnect with the new token
-				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
-					return err
-				}
-
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
-					return nil // success
-				}
-			}
-
-			// Check if the user has agreed to the terms of service and show a prompt if needed
-			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				term.Warn(prettyError(err))
-
-				defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-				if err = login.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-					return err // fatal
-				}
-			}
-		}
+		err = RequireLoginAndToS(cmd.Context())
 
 		return err
 	},
+}
+
+func RequireLoginAndToS(ctx context.Context) error {
+	var err error
+	if err = client.CheckLoginAndToS(ctx); err != nil {
+		if nonInteractive {
+			return err
+		}
+		// Login interactively now; only do this for authorization-related errors
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			term.Debug("Server error:", err)
+			term.Warn("Please log in to continue.")
+			term.ResetWarnings() // clear any previous warnings so we don't show them again
+
+			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
+			if err = login.InteractiveLogin(ctx, client, getCluster()); err != nil {
+				return err
+			}
+
+			// Reconnect with the new token
+			if client, err = cli.Connect(ctx, getCluster()); err != nil {
+				return err
+			}
+
+			if err = client.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
+				return nil // success
+			}
+		}
+
+		// Check if the user has agreed to the terms of service and show a prompt if needed
+		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
+			term.Warn(prettyError(err))
+
+			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
+			if err = login.InteractiveAgreeToS(ctx, client); err != nil {
+				return err // fatal
+			}
+		}
+	}
+
+	return err
 }
 
 var loginCmd = &cobra.Command{
