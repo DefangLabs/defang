@@ -514,7 +514,7 @@ var certGenerateCmd = &cobra.Command{
 
 func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	term.Info("Code generated successfully in folder", result.Folder)
-	editor := pkg.Getenv("EDITOR", "code")
+	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead? But won't handle terminal editors like vim
 	cmdd := exec.Command(editor, result.Folder)
 	err := cmdd.Start()
 	if err != nil {
