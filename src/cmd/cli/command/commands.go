@@ -335,6 +335,7 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		ctx := cmd.Context()
 		term.SetDebug(doDebug)
 
 		// Don't track/connect the completion commands
@@ -362,9 +363,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client, err = cli.Connect(cmd.Context(), getCluster())
+		client, err = cli.Connect(ctx, getCluster())
 
-		if v, err := client.GetVersions(cmd.Context()); err == nil {
+		if v, err := client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
@@ -378,18 +379,19 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		err = RequireLoginAndToS(cmd.Context())
+		if nonInteractive {
+			err = client.CheckLoginAndToS(ctx)
+		} else {
+			err = InteractiveRequireLoginAndToS(ctx)
+		}
 
 		return err
 	},
 }
 
-func RequireLoginAndToS(ctx context.Context) error {
+func InteractiveRequireLoginAndToS(ctx context.Context) error {
 	var err error
 	if err = client.CheckLoginAndToS(ctx); err != nil {
-		if nonInteractive {
-			return err
-		}
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			term.Debug("Server error:", err)
