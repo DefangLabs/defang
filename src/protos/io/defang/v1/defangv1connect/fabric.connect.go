@@ -153,6 +153,9 @@ const (
 	// FabricControllerPreviewProcedure is the fully-qualified name of the FabricController's Preview
 	// RPC.
 	FabricControllerPreviewProcedure = "/io.defang.v1.FabricController/Preview"
+	// FabricControllerGenerateComposeProcedure is the fully-qualified name of the FabricController's
+	// GenerateCompose RPC.
+	FabricControllerGenerateComposeProcedure = "/io.defang.v1.FabricController/GenerateCompose"
 )
 
 // FabricControllerClient is a client for the io.defang.v1.FabricController service.
@@ -209,6 +212,7 @@ type FabricControllerClient interface {
 	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
+	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
 }
 
 // NewFabricControllerClient constructs a client for the io.defang.v1.FabricController service. By
@@ -454,6 +458,12 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 			baseURL+FabricControllerPreviewProcedure,
 			opts...,
 		),
+		generateCompose: connect_go.NewClient[v1.GenerateComposeRequest, v1.GenerateComposeResponse](
+			httpClient,
+			baseURL+FabricControllerGenerateComposeProcedure,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -501,6 +511,7 @@ type fabricControllerClient struct {
 	canIUse                  *connect_go.Client[v1.CanIUseRequest, v1.CanIUseResponse]
 	estimate                 *connect_go.Client[v1.EstimateRequest, v1.EstimateResponse]
 	preview                  *connect_go.Client[v1.PreviewRequest, v1.PreviewResponse]
+	generateCompose          *connect_go.Client[v1.GenerateComposeRequest, v1.GenerateComposeResponse]
 }
 
 // GetStatus calls io.defang.v1.FabricController.GetStatus.
@@ -725,6 +736,11 @@ func (c *fabricControllerClient) Preview(ctx context.Context, req *connect_go.Re
 	return c.preview.CallUnary(ctx, req)
 }
 
+// GenerateCompose calls io.defang.v1.FabricController.GenerateCompose.
+func (c *fabricControllerClient) GenerateCompose(ctx context.Context, req *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error) {
+	return c.generateCompose.CallUnary(ctx, req)
+}
+
 // FabricControllerHandler is an implementation of the io.defang.v1.FabricController service.
 type FabricControllerHandler interface {
 	GetStatus(context.Context, *connect_go.Request[emptypb.Empty]) (*connect_go.Response[v1.Status], error)
@@ -779,6 +795,7 @@ type FabricControllerHandler interface {
 	CanIUse(context.Context, *connect_go.Request[v1.CanIUseRequest]) (*connect_go.Response[v1.CanIUseResponse], error)
 	Estimate(context.Context, *connect_go.Request[v1.EstimateRequest]) (*connect_go.Response[v1.EstimateResponse], error)
 	Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error)
+	GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error)
 }
 
 // NewFabricControllerHandler builds an HTTP handler from the service implementation. It returns the
@@ -1020,6 +1037,12 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 		svc.Preview,
 		opts...,
 	)
+	fabricControllerGenerateComposeHandler := connect_go.NewUnaryHandler(
+		FabricControllerGenerateComposeProcedure,
+		svc.GenerateCompose,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
+	)
 	return "/io.defang.v1.FabricController/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FabricControllerGetStatusProcedure:
@@ -1106,6 +1129,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 			fabricControllerEstimateHandler.ServeHTTP(w, r)
 		case FabricControllerPreviewProcedure:
 			fabricControllerPreviewHandler.ServeHTTP(w, r)
+		case FabricControllerGenerateComposeProcedure:
+			fabricControllerGenerateComposeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1281,4 +1306,8 @@ func (UnimplementedFabricControllerHandler) Estimate(context.Context, *connect_g
 
 func (UnimplementedFabricControllerHandler) Preview(context.Context, *connect_go.Request[v1.PreviewRequest]) (*connect_go.Response[v1.PreviewResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.Preview is not implemented"))
+}
+
+func (UnimplementedFabricControllerHandler) GenerateCompose(context.Context, *connect_go.Request[v1.GenerateComposeRequest]) (*connect_go.Response[v1.GenerateComposeResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("io.defang.v1.FabricController.GenerateCompose is not implemented"))
 }
