@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
 func TearDown(ctx context.Context, provider client.Provider, force bool) error {
-	if DoDryRun {
+	if dryrun.DoDryRun {
 		return errors.New("dry run")
 	}
 	if !force {

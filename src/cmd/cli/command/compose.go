@@ -17,6 +17,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -464,7 +465,7 @@ func makeComposeConfigCmd() *cobra.Command {
 			}
 
 			_, _, err = cli.ComposeUp(ctx, project, client, provider, compose.UploadModeIgnore, defangv1.DeploymentMode_MODE_UNSPECIFIED)
-			if !errors.Is(err, cli.ErrDryRun) {
+			if !errors.Is(err, dryrun.ErrDryRun) {
 				return err
 			}
 			return nil

@@ -6,6 +6,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
@@ -41,8 +42,8 @@ func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 }
 
 func NonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	// Persist the terms agreement in the state file so that we don't ask again

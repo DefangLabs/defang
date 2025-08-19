@@ -15,6 +15,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/spinner"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -161,8 +162,8 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 		}
 	}
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	return streamLogs(ctx, provider, projectName, options, logEntryPrintHandler)

@@ -2,18 +2,11 @@ package cli
 
 import (
 	"encoding/json"
-	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
-)
-
-var (
-	DoDryRun = false
-
-	ErrDryRun = errors.New("dry run")
 )
 
 func MarshalPretty(root string, data proto.Message) ([]byte, error) {
