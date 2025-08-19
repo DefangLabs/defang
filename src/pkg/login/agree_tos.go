@@ -1,4 +1,4 @@
-package cli
+package login
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 )
 
 var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of service to use this tool")
+
+var P = track.P
 
 func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if client.TermsAccepted() {

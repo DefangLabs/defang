@@ -2,41 +2,25 @@ package cli
 
 import (
 	"context"
-	"net"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
-const DefaultCluster = "fabric-prod1.defang.dev"
+const DefaultCluster = login.DefaultCluster
 
-var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
-
-func SplitTenantHost(cluster string) (types.TenantName, string) {
-	tenant := types.DEFAULT_TENANT
-	parts := strings.SplitN(cluster, "@", 2)
-	if len(parts) == 2 {
-		tenant, cluster = types.TenantName(parts[0]), parts[1]
-	}
-	if cluster == "" {
-		cluster = DefangFabric
-	}
-	if _, _, err := net.SplitHostPort(cluster); err != nil {
-		cluster = cluster + ":443" // default to https
-	}
-	return tenant, cluster
-}
+var DefangFabric = login.DefangFabric
 
 func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
-	tenantName, host := SplitTenantHost(cluster)
-	accessToken := GetExistingToken(cluster)
+	tenantName, host := login.SplitTenantHost(cluster)
+	accessToken := login.GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantName, "for cluster", host)
 	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
 	track.Tracker = grpcClient // Update track client

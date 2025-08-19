@@ -21,6 +21,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
@@ -401,7 +402,7 @@ var RootCmd = &cobra.Command{
 				term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
+				if err = login.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
 					return err
 				}
 
@@ -420,7 +421,7 @@ var RootCmd = &cobra.Command{
 				term.Warn(prettyError(err))
 
 				defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
+				if err = login.InteractiveAgreeToS(cmd.Context(), client); err != nil {
 					return err // fatal
 				}
 			}
@@ -438,11 +439,11 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if nonInteractive {
-			if err := cli.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, getCluster())
+			err := login.InteractiveLogin(cmd.Context(), client, getCluster())
 			if err != nil {
 				return err
 			}
@@ -999,7 +1000,7 @@ var tosCmd = &cobra.Command{
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
 		if agree {
-			return cli.NonInteractiveAgreeToS(cmd.Context(), client)
+			return login.NonInteractiveAgreeToS(cmd.Context(), client)
 		}
 
 		if nonInteractive {
@@ -1007,7 +1008,7 @@ var tosCmd = &cobra.Command{
 			return nil
 		}
 
-		return cli.InteractiveAgreeToS(cmd.Context(), client)
+		return login.InteractiveAgreeToS(cmd.Context(), client)
 	},
 }
 

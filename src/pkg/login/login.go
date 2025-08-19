@@ -1,4 +1,4 @@
-package cli
+package login
 
 import (
 	"context"
@@ -7,13 +7,36 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
+
+const DefaultCluster = "fabric-prod1.defang.dev"
+
+var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
+
+func SplitTenantHost(cluster string) (types.TenantName, string) {
+	tenant := types.DEFAULT_TENANT
+	parts := strings.SplitN(cluster, "@", 2)
+	if len(parts) == 2 {
+		tenant, cluster = types.TenantName(parts[0]), parts[1]
+	}
+	if cluster == "" {
+		cluster = DefangFabric
+	}
+	if _, _, err := net.SplitHostPort(cluster); err != nil {
+		cluster = cluster + ":443" // default to https
+	}
+	return tenant, cluster
+}
 
 func getTokenFile(fabric string) string {
 	if host, _, _ := net.SplitHostPort(fabric); host != "" {
@@ -113,6 +136,9 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 			term.Printf("\nTo fix file permissions, run:\n\n  sudo chown -R $(whoami) %q\n", pathError.Path)
 		}
 		// We continue even if we can't save the token; we just won't have it saved for next time
+	}
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 	// The new login page shows the ToS so a successful login implies the user agreed
 	if err := NonInteractiveAgreeToS(ctx, client); err != nil {
