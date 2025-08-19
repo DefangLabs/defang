@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -205,6 +206,35 @@ func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, erro
 	return data, nil
 }
 
+func getHerokuAuthTokenFromCLI() (string, error) {
+	if _, err := exec.LookPath("heroku"); err != nil {
+		return "", fmt.Errorf("Heroku CLI is not installed: %v", err)
+	}
+	term.Debug("Heroku CLI is installed, attempting to create a short-lived authorization token")
+	cmd := exec.Command("heroku", "authorizations:create", "--expires-in=300", "--json")
+	output, err := cmd.Output()
+	if err != nil {
+		term.Debugf("Failed to run Heroku CLI: %v", err)
+		return "", err
+	}
+
+	term.Debugf("received output from heroku cli: %s", output)
+
+	var result struct {
+		AccessToken struct {
+			Token string `json:"token"`
+		} `json:"access_token"`
+	}
+	err = json.Unmarshal(output, &result)
+	if err != nil || result.AccessToken.Token == "" {
+		term.Debugf("Failed to parse Heroku CLI output: %v", err)
+		return "", err
+	}
+
+	term.Debug("Successfully obtained Heroku token via CLI")
+	return result.AccessToken.Token, nil
+}
+
 func getHerokuAuthToken() (string, error) {
 	token := os.Getenv("HEROKU_API_KEY")
 	if token != "" {
@@ -215,6 +245,11 @@ func getHerokuAuthToken() (string, error) {
 	token = os.Getenv("HEROKU_AUTH_TOKEN")
 	if token != "" {
 		term.Debug("Using HEROKU_AUTH_TOKEN environment variable")
+		return token, nil
+	}
+
+	token, err := getHerokuAuthTokenFromCLI()
+	if err == nil && token != "" {
 		return token, nil
 	}
 
