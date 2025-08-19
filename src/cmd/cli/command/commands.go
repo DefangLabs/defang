@@ -415,7 +415,7 @@ func RequireLoginAndToS(ctx context.Context) error {
 
 		// Check if the user has agreed to the terms of service and show a prompt if needed
 		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			term.Warn(prettyError(err))
+			term.Warn(cliClient.PrettyError(err))
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 			if err = login.InteractiveAgreeToS(ctx, client); err != nil {
