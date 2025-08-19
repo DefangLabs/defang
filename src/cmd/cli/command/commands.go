@@ -380,18 +380,19 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		err = RequireLoginAndToS(cmd.Context())
+		if nonInteractive {
+			err = client.CheckLoginAndToS(ctx)
+		} else {
+			err = InteractiveRequireLoginAndToS(ctx)
+		}
 
 		return err
 	},
 }
 
-func RequireLoginAndToS(ctx context.Context) error {
+func InteractiveRequireLoginAndToS(ctx context.Context) error {
 	var err error
 	if err = client.CheckLoginAndToS(ctx); err != nil {
-		if nonInteractive {
-			return err
-		}
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			term.Debug("Server error:", err)
