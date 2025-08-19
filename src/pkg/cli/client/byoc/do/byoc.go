@@ -792,6 +792,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
 	serviceInfo := &defangv1.ServiceInfo{
+		Name:    service.Name,
 		Project: projectName,
 		Etag:    pkg.RandomID(), // TODO: get the real etag from spec somehow
 		Service: &defangv1.Service{

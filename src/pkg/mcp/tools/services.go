@@ -71,7 +71,7 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId cliClient
 			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
 		}
 
-		serviceResponse, err := deployment_info.GetServices(ctx, projectName, provider)
+		serviceResponse, err := deployment_info.GetDeploymentInfo(ctx, projectName, provider)
 		if err != nil {
 			var noServicesErr cli.ErrNoServices
 			if errors.As(err, &noServicesErr) {

@@ -17,7 +17,7 @@ func (e ErrNoServices) Error() string {
 	return fmt.Sprintf("no services found in project %q", e.ProjectName)
 }
 
-type Service struct {
+type serviceInfo struct {
 	Service      string
 	DeploymentId string
 	PublicFqdn   string
@@ -25,7 +25,7 @@ type Service struct {
 	Status       string
 }
 
-func GetServices(ctx context.Context, projectName string, provider client.Provider) ([]Service, error) {
+func GetDeploymentInfo(ctx context.Context, projectName string, provider client.Provider) ([]serviceInfo, error) {
 	term.Debugf("Listing services in project %q", projectName)
 
 	term.Debug("Function invoked: provider.GetServices")
@@ -40,9 +40,9 @@ func GetServices(ctx context.Context, projectName string, provider client.Provid
 		return nil, ErrNoServices{ProjectName: projectName}
 	}
 
-	result := make([]Service, numServices)
+	result := make([]serviceInfo, numServices)
 	for i, si := range getServicesResponse.Services {
-		result[i] = Service{
+		result[i] = serviceInfo{
 			Service:      si.Service.Name,
 			DeploymentId: si.Etag,
 			PublicFqdn:   si.PublicFqdn,

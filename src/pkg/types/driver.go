@@ -12,10 +12,9 @@ type TaskID *string
 type ContainerCondition string
 
 const (
-	ContainerStarted  ContainerCondition = "START"
-	ContainerComplete                    = "COMPLETE"
-	ContainerSuccess                     = "SUCCESS"
-	ContainerHealthy                     = "HEALTHY"
+	ContainerStarted ContainerCondition = "START"
+	ContainerSuccess ContainerCondition = "SUCCESS"
+	ContainerHealthy ContainerCondition = "HEALTHY"
 )
 
 type Container struct {

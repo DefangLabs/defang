@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs/cfn"
 	"github.com/DefangLabs/defang/src/pkg/dns"
@@ -386,16 +387,19 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_JSON":                os.Getenv("DEFANG_JSON"),
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
+		"DEFANG_PREVIEW":             "true", // always preview HACK
 		"DEFANG_STATE_URL":           defangStateUrl,
 		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
-		"PROJECT":                    projectName,                 // may be empty
-		pulumiBackendKey:             pulumiBackendValue,          // TODO: make secret
-		"PULUMI_CONFIG_PASSPHRASE":   byoc.PulumiConfigPassphrase, // TODO: make secret
-		"PULUMI_COPILOT":             "false",
-		"PULUMI_SKIP_UPDATE_CHECK":   "true",
-		"STACK":                      b.PulumiStack,
+		"PROJECT":                    projectName,        // may be empty
+		pulumiBackendKey:             pulumiBackendValue, // TODO: make secret
+		"PULUMI_AUTOMATION_API_SKIP_VERSION_CHECK":      "true",
+		"PULUMI_CONFIG_PASSPHRASE":                      byoc.PulumiConfigPassphrase, // TODO: make secret
+		"PULUMI_COPILOT":                                "false",
+		"PULUMI_DIY_BACKEND_DISABLE_CHECKPOINT_BACKUPS": "true", // versioned bucket is used
+		"PULUMI_SKIP_UPDATE_CHECK":                      "true",
+		"STACK":                                         b.PulumiStack,
 	}
 
 	if !term.StdoutCanColor() {
@@ -537,6 +541,50 @@ func (b *ByocAws) GetServices(ctx context.Context, req *defangv1.GetServicesRequ
 		listServiceResp.Project = projUpdate.Project
 	}
 
+	/*if len(listServiceResp.Services) > 0 {
+		cfg, err := b.driver.LoadConfig(ctx)
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+
+		ecsClient := awsecs.NewFromConfig(cfg) // Ensure the ECS client is initialized
+		lso, err := ecsClient.ListServices(ctx, &awsecs.ListServicesInput{
+			Cluster:    ptr.String(b.driver.ClusterName),
+			MaxResults: ptr.Int32(100), // 100=maximum
+		})
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+
+		var services []string
+		for _, service := range listServiceResp.Services {
+			// Find the physical service name
+			for _, ecsService := range lso.ServiceArns {
+				if strings.HasSuffix(*ecsService, service.Service.Name) {
+					// The physical service name is the one with the Pulumi suffix
+			services = append(services, service.Service.Name) //this is wrong, since the physical name has the Pulumi suffix
+		}
+		dso, err := ecsClient.DescribeServices(ctx, &awsecs.DescribeServicesInput{
+			Cluster:  ptr.String(b.driver.ClusterName),
+			Services: services,
+		})
+		if err != nil {
+			return nil, AnnotateAwsError(err)
+		}
+		bytes, _ := json.Marshal(dso)
+		term.Debug(string(bytes))
+		for _, service := range projUpdate.Services {
+			for _, ecsService := range dso.Services {
+				if *ecsService.ServiceName != service.Service.Name {
+					continue
+				}
+				ecsService.Deployments[0].
+					service.Status = *ecsService.Status
+				break
+			}
+		}
+	}*/
+
 	return &listServiceResp, nil
 }
 
@@ -616,7 +664,7 @@ func (b *ByocAws) QueryForDebug(ctx context.Context, req *defangv1.DebugRequest)
 	}
 
 	// Gather logs from the CD task, kaniko, ECS events, and all services
-	evtsChan, errsChan := ecs.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
+	evtsChan, errsChan := cw.QueryLogGroups(ctx, start, end, b.getLogGroupInputs(req.Etag, req.Project, service, "", logs.LogTypeAll)...)
 	if evtsChan == nil {
 		return <-errsChan
 	}
@@ -680,7 +728,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 	//  * No Etag, service:		tail all tasks/services with that service name
 	//  * Etag, service:		tail that task/service
 	var err error
-	var tailStream ecs.LiveTailStream
+	var tailStream cw.LiveTailStream
 
 	if etag != "" && !pkg.IsValidRandomID(etag) { // Assume invalid "etag" is a task ID
 		tailStream, err = b.driver.TailTaskID(ctx, etag)
@@ -700,7 +748,7 @@ func (b *ByocAws) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (cli
 		if req.Until.IsValid() {
 			end = req.Until.AsTime()
 		}
-		tailStream, err = ecs.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
+		tailStream, err = cw.QueryAndTailLogGroups(ctx, start, end, b.getLogGroupInputs(etag, req.Project, service, req.Pattern, logs.LogType(req.LogType))...)
 	}
 
 	if err != nil {
@@ -714,7 +762,7 @@ func (b *ByocAws) makeLogGroupARN(name string) string {
 	return b.driver.MakeARN("logs", "log-group:"+name)
 }
 
-func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []ecs.LogGroupInput {
+func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filter string, logType logs.LogType) []cw.LogGroupInput {
 	// Escape the filter pattern to avoid problems with the CloudWatch Logs pattern syntax
 	// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
 	var pattern string // TODO: add etag to filter
@@ -722,26 +770,26 @@ func (b *ByocAws) getLogGroupInputs(etag types.ETag, projectName, service, filte
 		pattern = strconv.Quote(filter)
 	}
 
-	var groups []ecs.LogGroupInput
+	var groups []cw.LogGroupInput
 	// Tail CD and kaniko
 	if logType.Has(logs.LogTypeBuild) {
-		cdTail := ecs.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
+		cdTail := cw.LogGroupInput{LogGroupARN: b.driver.LogGroupARN, LogEventFilterPattern: pattern} // TODO: filter by etag
 		// If we know the CD task ARN, only tail the logstream for that CD task
 		if b.cdTaskArn != nil && b.cdEtag == etag {
 			cdTail.LogStreamNames = []string{ecs.GetCDLogStreamForTaskID(ecs.GetTaskID(b.cdTaskArn))}
 		}
 		groups = append(groups, cdTail)
 		term.Debug("Query CD logs", cdTail.LogGroupARN, cdTail.LogStreamNames, filter)
-		kanikoTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
+		kanikoTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "builds")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service
 		term.Debug("Query kaniko logs", kanikoTail.LogGroupARN, filter)
 		groups = append(groups, kanikoTail)
-		ecsTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
+		ecsTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "ecs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts; TODO: filter by etag/service/deploymentId
 		term.Debug("Query ecs events logs", ecsTail.LogGroupARN, filter)
 		groups = append(groups, ecsTail)
 	}
 	// Tail services
 	if logType.Has(logs.LogTypeRun) {
-		servicesTail := ecs.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
+		servicesTail := cw.LogGroupInput{LogGroupARN: b.makeLogGroupARN(b.StackDir(projectName, "logs")), LogEventFilterPattern: pattern} // must match logic in ecs/common.ts
 		if service != "" && etag != "" {
 			servicesTail.LogStreamNamePrefix = service + "/" + service + "_" + etag
 		}

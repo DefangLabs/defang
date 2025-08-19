@@ -26,6 +26,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const DEFANG_PORTAL_HOST = "portal.defang.io"
+const SERVICE_PORTAL_URL = "https://" + DEFANG_PORTAL_HOST + "/service"
+
+func printPlaygroundPortalServiceURLs(serviceInfos []*defangv1.ServiceInfo) {
+	// We can only show services deployed to the prod1 defang SaaS environment.
+	if providerID == cliClient.ProviderDefang && cluster == cli.DefaultCluster {
+		term.Info("Monitor your services' status in the defang portal")
+		for _, serviceInfo := range serviceInfos {
+			term.Println("   -", SERVICE_PORTAL_URL+"/"+serviceInfo.Service.Name)
+		}
+	}
+}
+
 func createProjectForDebug(loader *compose.Loader) (*compose.Project, error) {
 	projOpts, err := loader.NewProjectOptions()
 	if err != nil {
@@ -193,7 +206,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Print the current service states of the deployment
-			err = printServiceStatesAndEndpoints(deploy.Services)
+			err = cli.PrintServiceStatesAndEndpoints(ctx, deploy.Services)
 			if err != nil {
 				return err
 			}

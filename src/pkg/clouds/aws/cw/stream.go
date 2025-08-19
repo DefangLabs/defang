@@ -1,4 +1,4 @@
-package ecs
+package cw
 
 import (
 	"context"

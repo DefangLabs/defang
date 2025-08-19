@@ -10,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -23,12 +24,12 @@ type byocServerStream struct {
 	etag     string
 	response *defangv1.TailResponse
 	services []string
-	stream   ecs.LiveTailStream
+	stream   cw.LiveTailStream
 
 	ecsEventsHandler ECSEventHandler
 }
 
-func newByocServerStream(stream ecs.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
+func newByocServerStream(stream cw.LiveTailStream, etag string, services []string, ecsEventHandler ECSEventHandler) *byocServerStream {
 	return &byocServerStream{
 		etag:     etag,
 		stream:   stream,
@@ -61,7 +62,7 @@ func (bs *byocServerStream) Receive() bool {
 		bs.err = AnnotateAwsError(err)
 		return false
 	}
-	evts, err := ecs.GetLogEvents(e)
+	evts, err := cw.GetLogEvents(e)
 	if err != nil {
 		bs.err = err
 		return false
@@ -70,7 +71,7 @@ func (bs *byocServerStream) Receive() bool {
 	return true
 }
 
-func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailResponse {
+func (bs *byocServerStream) parseEvents(events []cw.LogEvent) *defangv1.TailResponse {
 	var response defangv1.TailResponse
 	if len(events) == 0 {
 		// The original gRPC/connect server stream would never send an empty response.

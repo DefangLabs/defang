@@ -98,8 +98,8 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 				}
 			}
 
-			// Pack the build context into a Archive and upload
 			if !strings.Contains(svccfg.Build.Context, "://") {
+				// Pack the build context into a Archive and upload
 				url, err := getRemoteBuildContext(ctx, provider, project.Name, svccfg.Name, svccfg.Build, upload)
 				if err != nil {
 					return err

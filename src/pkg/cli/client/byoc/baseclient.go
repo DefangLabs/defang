@@ -212,6 +212,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	si := &defangv1.ServiceInfo{
+		Name:         service.Name,
 		AllowScaling: b.AllowScaling,
 		Domainname:   service.DomainName,
 		Etag:         pkg.RandomID(), // TODO: could be hash for dedup/idempotency
@@ -227,14 +228,6 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.GetEndpoint(fqn, projectName, delegateDomain, &port))
-			mode := defangv1.Mode_INGRESS
-			if port.Mode == compose.Mode_HOST {
-				mode = defangv1.Mode_HOST
-			}
-			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-				Target: port.Target,
-				Mode:   mode,
-			})
 		}
 	} else {
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)
@@ -251,7 +244,7 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 	si.Status = "UPDATE_QUEUED"
 	si.State = defangv1.ServiceState_UPDATE_QUEUED
 	if service.Build != nil {
-		si.Status = "BUILD_QUEUED" // in SaaS, this gets overwritten by the ECS events for "kaniko"
+		si.Status = "BUILD_QUEUED" // in Playground, this gets overwritten by the ECS events for "kaniko"
 		si.State = defangv1.ServiceState_BUILD_QUEUED
 	}
 
