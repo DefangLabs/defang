@@ -558,6 +558,7 @@ var generateCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  modelId,
 			Fabric:   client,
+			Cluster:  getCluster(),
 		}
 
 		sample := ""
@@ -585,6 +586,7 @@ var initCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  modelId,
 			Fabric:   client,
+			Cluster:  getCluster(),
 		}
 
 		if len(args) > 0 {

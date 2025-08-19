@@ -25,6 +25,7 @@ type SetupClient struct {
 	Heroku   *migrate.HerokuClient
 	ModelID  string
 	Fabric   *client.GrpcClient
+	Cluster  string
 }
 
 func (s *SetupClient) Start(ctx context.Context) (SetupResult, error) {
@@ -224,6 +225,9 @@ func beforeGenerate(directory string) {
 }
 
 func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error) {
+	if err := cli.InteractiveLogin(ctx, s.Fabric, s.Cluster); err != nil {
+		return SetupResult{}, err
+	}
 	var composeFileContents string
 
 	term.Info("Ok, let's create a compose file for your existing deployment.")
