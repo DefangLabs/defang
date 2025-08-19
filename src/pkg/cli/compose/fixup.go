@@ -35,24 +35,24 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
-		repo := getImageRepo(svccfg.Image)
+		repo := GetImageRepo(svccfg.Image)
 
 		_, managedRedis := svccfg.Extensions["x-defang-redis"]
-		if managedRedis || strings.HasSuffix(repo, "redis") {
+		if managedRedis || IsRedisRepo(repo) {
 			if err := fixupRedisService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedPostgres := svccfg.Extensions["x-defang-postgres"]
-		if managedPostgres || strings.HasSuffix(repo, "postgres") || strings.HasSuffix(repo, "pgvector") {
+		if managedPostgres || IsPostgresRepo(repo) {
 			if err := fixupPostgresService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
 		}
 
 		_, managedMongo := svccfg.Extensions["x-defang-mongodb"]
-		if managedMongo || strings.HasSuffix(repo, "mongo") {
+		if managedMongo || IsMongoRepo(repo) {
 			if err := fixupMongoService(&svccfg, provider, upload); err != nil {
 				return fmt.Errorf("service %q: %w", svccfg.Name, err)
 			}
@@ -199,7 +199,7 @@ func parsePortString(port string) (uint32, error) {
 }
 
 func fixupLLM(svccfg *composeTypes.ServiceConfig) {
-	image := getImageRepo(svccfg.Image)
+	image := GetImageRepo(svccfg.Image)
 	if strings.HasSuffix(image, "/openai-access-gateway") && len(svccfg.Ports) == 0 {
 		// HACK: we must have at least one host port to get a CNAME for the service
 		var port uint32 = 80
@@ -388,7 +388,7 @@ func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *compo
 	}
 }
 
-func getImageRepo(image string) string {
+func GetImageRepo(image string) string {
 	repo, _, _ := strings.Cut(image, ":")
 	return strings.ToLower(repo)
 }
@@ -418,4 +418,17 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 		panic(fmt.Sprintf("port %d: 'mode' should have been validated to be one of [host ingress] but got: %v", port.Target, port.Mode))
 	}
 	return port
+}
+
+func IsPostgresRepo(repo string) bool {
+	// TODO: check if managed postgres supports postgis
+	return strings.HasSuffix(repo, "postgres") || strings.HasSuffix(repo, "pgvector")
+}
+
+func IsRedisRepo(repo string) bool {
+	return strings.HasSuffix(repo, "redis") || strings.HasSuffix(repo, "valkey")
+}
+
+func IsMongoRepo(repo string) bool {
+	return strings.HasSuffix(repo, "mongo")
 }

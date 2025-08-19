@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +22,10 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
+	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/scope"
+	"github.com/DefangLabs/defang/src/pkg/setup"
+	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -43,6 +45,7 @@ var (
 	client         *cliClient.GrpcClient
 	cluster        string
 	colorMode      = ColorAuto
+	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
 	doDebug        = false
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
@@ -227,7 +230,9 @@ func SetupCommands(ctx context.Context, version string) {
 	// Generate Command
 	generateCmd.Flags().StringVar(&modelId, "model", modelId, "LLM model to use for generating the code (Pro users only)")
 	RootCmd.AddCommand(generateCmd)
-	RootCmd.AddCommand(newCmd)
+	// new command
+	initCmd.PersistentFlags().Var(&sourcePlatform, "from", fmt.Sprintf(`the platform from which to migrate the project; one of %v`, migrate.AllSourcePlatforms))
+	RootCmd.AddCommand(initCmd)
 
 	// Get Services Command
 	lsCommand := makeComposePsCmd()
@@ -507,203 +512,99 @@ var certGenerateCmd = &cobra.Command{
 	},
 }
 
+func afterGenerate(ctx context.Context, result setup.SetupResult) {
+	term.Info("Code generated successfully in folder", result.Folder)
+	editor := pkg.Getenv("EDITOR", "code")
+	cmdd := exec.Command(editor, result.Folder)
+	err := cmdd.Start()
+	if err != nil {
+		term.Debugf("unable to launch editor %q: %v", editor, err)
+	}
+
+	cd := ""
+	if result.Folder != "." {
+		cd = "`cd " + result.Folder + "` and "
+	}
+
+	// Load the project and check for empty environment variables
+	loader := compose.NewLoader(compose.WithPath(filepath.Join(result.Folder, "compose.yaml")))
+	project, err := loader.LoadProject(ctx)
+	if err != nil {
+		term.Debugf("unable to load new project: %v", err)
+	}
+
+	var envInstructions []string
+	for _, envVar := range collectUnsetEnvVars(project) {
+		envInstructions = append(envInstructions, "config create "+envVar)
+	}
+
+	if len(envInstructions) > 0 {
+		printDefangHint("Check the files in your favorite editor.\nTo configure the service, do "+cd, envInstructions...)
+	} else {
+		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
+	}
+}
+
 var generateCmd = &cobra.Command{
 	Use:     "generate",
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"gen"},
 	Short:   "Generate a sample Defang project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var sample, language, defaultFolder string
+		ctx := cmd.Context()
+
+		setupClient := setup.SetupClient{
+			Surveyor: surveyor.NewDefaultSurveyor(),
+			Heroku:   migrate.NewHerokuClient(),
+			ModelID:  modelId,
+			Fabric:   client,
+			Cluster:  getCluster(),
+		}
+
+		sample := ""
 		if len(args) > 0 {
 			sample = args[0]
 		}
-
-		if nonInteractive {
-			if sample == "" {
-				return errors.New("cannot run in non-interactive mode")
-			}
-			return cli.InitFromSamples(cmd.Context(), "", []string{sample})
-		}
-
-		sampleList, fetchSamplesErr := cli.FetchSamples(cmd.Context())
-		if sample == "" {
-			// Fetch the list of samples from the Defang repository
-			if fetchSamplesErr != nil {
-				term.Debug("unable to fetch samples:", fetchSamplesErr)
-			} else if len(sampleList) > 0 {
-				const generateWithAI = "Generate with AI"
-
-				sampleNames := []string{generateWithAI}
-				sampleTitles := []string{"Generate a sample from scratch using a language prompt"}
-				sampleIndex := []string{"unused first entry because we always show genAI option"}
-				for _, sample := range sampleList {
-					sampleNames = append(sampleNames, sample.Name)
-					sampleTitles = append(sampleTitles, sample.Title)
-					sampleIndex = append(sampleIndex, strings.ToLower(sample.Name+" "+sample.Title+" "+
-						strings.Join(sample.Tags, " ")+" "+strings.Join(sample.Languages, " ")))
-				}
-
-				if err := survey.AskOne(&survey.Select{
-					Message: "Choose a sample service:",
-					Options: sampleNames,
-					Help:    "The project code will be based on the sample you choose here.",
-					Filter: func(filter string, value string, i int) bool {
-						return i == 0 || strings.Contains(sampleIndex[i], strings.ToLower(filter))
-					},
-					Description: func(value string, i int) string {
-						return sampleTitles[i]
-					},
-				}, &sample, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-					return err
-				}
-				if sample == generateWithAI {
-					if err := survey.AskOne(&survey.Select{
-						Message: "Choose the language you'd like to use:",
-						Options: cli.SupportedLanguages,
-						Help:    "The project code will be in the language you choose here.",
-					}, &language, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-						return err
-					}
-					sample = ""
-					defaultFolder = "project1"
-				} else {
-					defaultFolder = sample
-				}
-			}
-		}
-
-		var qs = []*survey.Question{
-			{
-				Name: "description",
-				Prompt: &survey.Input{
-					Message: "Please describe the service you'd like to build:",
-					Help: `Here are some example prompts you can use:
-    "A simple 'hello world' function"
-    "A service with 2 endpoints, one to upload and the other to download a file from AWS S3"
-    "A service with a default endpoint that returns an HTML page with a form asking for the user's name and then a POST endpoint to handle the form post when the user clicks the 'submit' button"`,
-				},
-				Validate: survey.MinLength(5),
-			},
-			{
-				Name: "folder",
-				Prompt: &survey.Input{
-					Message: "What folder would you like to create the project in?",
-					Default: defaultFolder, // dynamically set based on chosen sample
-					Help:    "The generated code will be in the folder you choose here. If the folder does not exist, it will be created.",
-				},
-				Validate: survey.Required,
-			},
-		}
-
-		if sample != "" {
-			qs = qs[1:] // user picked a sample, so we skip the description question
-			sampleExists := slices.ContainsFunc(sampleList, func(s cli.Sample) bool {
-				return s.Name == sample
-			})
-
-			if !sampleExists {
-				return cli.ErrSampleNotFound
-			}
-		}
-
-		prompt := struct {
-			Description string // or you can tag fields to match a specific name
-			Folder      string
-		}{}
-
-		// ask the remaining questions
-		err := survey.Ask(qs, &prompt, survey.WithStdio(term.DefaultTerm.Stdio()))
+		result, err := setupClient.CloneSample(ctx, sample)
 		if err != nil {
 			return err
 		}
-
-		if client.CheckLoginAndToS(cmd.Context()) != nil {
-			// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
-			if err := cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-				// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
-				if connect.CodeOf(err) != connect.CodeUnauthenticated {
-					return err
-				}
-			}
-		}
-
-		track.Evt("Generate Started", P("language", language), P("sample", sample), P("description", prompt.Description), P("folder", prompt.Folder), P("model", modelId))
-
-		// Check if the current folder is empty
-		if empty, err := pkg.IsDirEmpty(prompt.Folder); !os.IsNotExist(err) && !empty {
-			nonEmptyFolder := fmt.Sprintf("The folder %q is not empty. We recommend running this command in an empty folder.", prompt.Folder)
-
-			var confirm bool
-			err := survey.AskOne(&survey.Confirm{
-				Message: nonEmptyFolder + " Continue creating project?",
-			}, &confirm, survey.WithStdio(term.DefaultTerm.Stdio()))
-			if err == nil && !confirm {
-				os.Exit(1)
-			}
-		}
-
-		if sample != "" {
-			term.Info("Fetching sample from the Defang repository...")
-			err := cli.InitFromSamples(cmd.Context(), prompt.Folder, []string{sample})
-			if err != nil {
-				return err
-			}
-		} else {
-			term.Info("Working on it. This may take 1 or 2 minutes...")
-			args := cli.GenerateArgs{
-				Description: prompt.Description,
-				Folder:      prompt.Folder,
-				Language:    language,
-				ModelId:     modelId,
-			}
-			_, err := cli.GenerateWithAI(cmd.Context(), client, args)
-			if err != nil {
-				return err
-			}
-		}
-
-		term.Info("Code generated successfully in folder", prompt.Folder)
-
-		editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead?
-		cmdd := exec.Command(editor, prompt.Folder)
-		err = cmdd.Start()
-		if err != nil {
-			term.Debugf("unable to launch editor %q: %v", editor, err)
-		}
-
-		cd := ""
-		if prompt.Folder != "." {
-			cd = "`cd " + prompt.Folder + "` and "
-		}
-
-		// Load the project and check for empty environment variables
-		loader := compose.NewLoader(compose.WithPath(filepath.Join(prompt.Folder, "compose.yaml")))
-		project, err := loader.LoadProject(cmd.Context())
-		if err != nil {
-			term.Debugf("unable to load new project: %v", err)
-		}
-
-		var envInstructions []string
-		for _, envVar := range collectUnsetEnvVars(project) {
-			envInstructions = append(envInstructions, "config create "+envVar)
-		}
-
-		if len(envInstructions) > 0 {
-			printDefangHint("Check the files in your favorite editor.\nTo configure the service, do "+cd, envInstructions...)
-		} else {
-			printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
-		}
-
+		afterGenerate(ctx, result)
 		return nil
 	},
 }
 
-var newCmd = &cobra.Command{
-	Use:     "new [SAMPLE]",
+var initCmd = &cobra.Command{
+	Use:     "init [SAMPLE]",
 	Args:    cobra.MaximumNArgs(1),
-	Aliases: []string{"init"},
+	Aliases: []string{"new"},
 	Short:   "Create a new Defang project from a sample",
-	RunE:    generateCmd.RunE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		setupClient := setup.SetupClient{
+			Surveyor: surveyor.NewDefaultSurveyor(),
+			Heroku:   migrate.NewHerokuClient(),
+			ModelID:  modelId,
+			Fabric:   client,
+			Cluster:  getCluster(),
+		}
+
+		if len(args) > 0 {
+			_, err := setupClient.CloneSample(ctx, args[0])
+			return err
+		}
+
+		if nonInteractive {
+			return errors.New("cannot run in non-interactive mode")
+		}
+
+		result, err := setupClient.Start(ctx)
+		if err != nil {
+			return err
+		}
+		afterGenerate(ctx, result)
+		return nil
+	},
 }
 
 func collectUnsetEnvVars(project *composeTypes.Project) []string {

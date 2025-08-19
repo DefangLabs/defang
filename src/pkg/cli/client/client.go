@@ -22,6 +22,7 @@ type FabricClient interface {
 	DelegateSubdomainZone(context.Context, *defangv1.DelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
 	DeleteSubdomainZone(context.Context, *defangv1.DeleteSubdomainZoneRequest) error
 	Estimate(context.Context, *defangv1.EstimateRequest) (*defangv1.EstimateResponse, error)
+	GenerateCompose(context.Context, *defangv1.GenerateComposeRequest) (*defangv1.GenerateComposeResponse, error)
 	GenerateFiles(context.Context, *defangv1.GenerateFilesRequest) (*defangv1.GenerateFilesResponse, error)
 	GetController() defangv1connect.FabricControllerClient
 	GetDelegateSubdomainZone(context.Context, *defangv1.GetDelegateSubdomainZoneRequest) (*defangv1.DelegateSubdomainZoneResponse, error)
