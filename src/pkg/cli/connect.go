@@ -7,15 +7,19 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/do"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
-	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
 )
 
-func Connect(ctx context.Context, addr string) (*client.GrpcClient, error) {
-	tenantName, host := cluster.SplitTenantHost(addr)
-	accessToken := cluster.GetExistingToken(addr)
+const DefaultCluster = login.DefaultCluster
+
+var DefangFabric = login.DefangFabric
+
+func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
+	tenantName, host := login.SplitTenantHost(cluster)
+	accessToken := login.GetExistingToken(cluster)
 	term.Debug("Using tenant", tenantName, "for cluster", host)
 	grpcClient := client.NewGrpcClient(host, accessToken, tenantName)
 	track.Tracker = grpcClient // Update track client

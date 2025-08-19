@@ -226,8 +226,7 @@ func beforeGenerate(directory string) {
 }
 
 func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error) {
-	err := login.InteractiveRequireLoginAndToS(ctx, s.Fabric, s.Cluster)
-	if err != nil {
+	if err := login.InteractiveLogin(ctx, s.Fabric, s.Cluster); err != nil {
 		return SetupResult{}, err
 	}
 
