@@ -66,19 +66,6 @@ func getCluster() string {
 	return org + "@" + cluster
 }
 
-func prettyError(err error) error {
-	// To avoid printing the internal gRPC error code
-	var cerr *connect.Error
-	if errors.As(err, &cerr) {
-		term.Debug("Server error:", cerr)
-		err = errors.Unwrap(cerr)
-	}
-	if cli.IsNetworkError(err) {
-		return fmt.Errorf("%w; please check network settings and try again", err)
-	}
-	return err
-}
-
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
@@ -87,7 +74,7 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-			term.Error("Error:", prettyError(err))
+			term.Error("Error:", cliClient.PrettyError(err))
 		}
 
 		if err == dryrun.ErrDryRun {
@@ -426,7 +413,7 @@ func RequireLoginAndToS(ctx context.Context) error {
 
 		// Check if the user has agreed to the terms of service and show a prompt if needed
 		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			term.Warn(prettyError(err))
+			term.Warn(cliClient.PrettyError(err))
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
 			if err = login.InteractiveAgreeToS(ctx, client); err != nil {
@@ -764,7 +751,7 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(prettyError(err))
+				term.Warn(cliClient.PrettyError(err))
 				return nil
 			}
 			return err
@@ -879,7 +866,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(prettyError(err))
+				term.Warn(cliClient.PrettyError(err))
 				return nil
 			}
 			return err

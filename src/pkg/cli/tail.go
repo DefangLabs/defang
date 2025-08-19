@@ -156,7 +156,7 @@ func Tail(ctx context.Context, provider client.Provider, projectName string, opt
 				case connect.CodeUnknown:
 					// Ignore unknown (nil) errors
 				default:
-					term.Warn(err) // TODO: use prettyError(…)
+					term.Warn(err) // TODO: use cliClient.PrettyError(…)
 				}
 			}
 		}

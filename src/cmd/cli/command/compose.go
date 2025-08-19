@@ -230,7 +230,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 
 	if strings.Contains(err.Error(), "maximum number of projects") {
 		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", prettyError(err))
+			term.Error("Error:", cliClient.PrettyError(err))
 			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
 				term.Debug("ComposeDown failed:", err)
 				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
@@ -243,7 +243,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		return err
 	}
 
-	term.Error("Error:", prettyError(err))
+	term.Error("Error:", cliClient.PrettyError(err))
 	track.Evt("Debug Prompted", P("composeErr", err))
 	return cli.InteractiveDebugForClientError(ctx, client, project, err)
 }
@@ -376,7 +376,7 @@ func makeComposeDownCmd() *cobra.Command {
 			if err != nil {
 				if connect.CodeOf(err) == connect.CodeNotFound {
 					// Show a warning (not an error) if the service was not found
-					term.Warn(prettyError(err))
+					term.Warn(cliClient.PrettyError(err))
 					return nil
 				}
 				return err

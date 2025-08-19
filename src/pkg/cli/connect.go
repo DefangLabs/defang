@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/aws"
@@ -35,24 +34,6 @@ func Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
 		grpcClient.TenantName = types.TenantName(resp.Tenant)
 	}
 	return grpcClient, err
-}
-
-func IsNetworkError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	lastColon := strings.LastIndexByte(errStr, ':')
-	switch errStr[lastColon+1:] { // +1 to skip the colon and handle the case where there is no colon
-	case " connection refused",
-		" i/o timeout",
-		" network is unreachable",
-		" no such host",
-		" unexpected EOF",
-		" device or resource busy":
-		return true
-	}
-	return false
 }
 
 func NewProvider(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient) (client.Provider, error) {
