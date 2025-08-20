@@ -112,6 +112,15 @@ func (m *MockHerokuClient) ListConfigVars(ctx context.Context, appName string) (
 	return configVars, args.Error(1)
 }
 
+func (m *MockHerokuClient) GetReleaseTasks(ctx context.Context, appName string) ([]HerokuReleaseTask, error) {
+	args := m.Called(ctx, appName)
+	releaseTasks, ok := args.Get(0).([]HerokuReleaseTask)
+	if !ok {
+		return nil, errors.New("failed to cast to []HerokuReleaseTask")
+	}
+	return releaseTasks, args.Error(1)
+}
+
 func (m *MockHerokuClient) SetToken(token string) {
 	m.Called(token)
 }
@@ -128,6 +137,7 @@ func TestInteractiveSetup(t *testing.T) {
 		herokuAddons                []HerokuAddon
 		herokuPGInfo                PGInfo
 		herokuConfigVars            HerokuConfigVars
+		herokuReleaseTasks          []HerokuReleaseTask
 		composeResponse             *defangv1.GenerateComposeResponse
 		expectedComposeFileContents string
 		composeError                error
@@ -164,6 +174,13 @@ func TestInteractiveSetup(t *testing.T) {
 						Name      string `json:"name"`
 					}{HumanName: "Mini", ID: "plan-123", Name: "heroku-postgresql:mini"},
 					State: "provisioned",
+				},
+			},
+			herokuReleaseTasks: []HerokuReleaseTask{
+				{
+					Command: "rails db:migrate",
+					Type:    "release",
+					Size:    "Eco",
 				},
 			},
 			herokuPGInfo: PGInfo{
@@ -330,6 +347,7 @@ func TestInteractiveSetup(t *testing.T) {
 			}
 
 			mockHerokuClient.On("ListConfigVars", mock.Anything, mock.Anything).Return(tt.herokuConfigVars, nil)
+			mockHerokuClient.On("GetReleaseTasks", mock.Anything, mock.Anything).Return(tt.herokuReleaseTasks, nil)
 
 			// Execute the function under test
 			ctx := context.Background()

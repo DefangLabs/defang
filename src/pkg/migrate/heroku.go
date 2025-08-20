@@ -17,11 +17,12 @@ import (
 )
 
 type HerokuApplicationInfo struct {
-	Addons     []HerokuAddon             `json:"addons"`
-	Dynos      []HerokuDyno              `json:"dynos"`
-	ConfigVars HerokuConfigVars          `json:"config_vars"`
-	PGInfo     []PGInfo                  `json:"pg_info"`
-	DynoSizes  map[string]HerokuDynoSize `json:"dyno_sizes"`
+	Addons       []HerokuAddon             `json:"addons"`
+	Dynos        []HerokuDyno              `json:"dynos"`
+	ConfigVars   HerokuConfigVars          `json:"config_vars"`
+	PGInfo       []PGInfo                  `json:"pg_info"`
+	DynoSizes    map[string]HerokuDynoSize `json:"dyno_sizes"`
+	ReleaseTasks []HerokuReleaseTask       `json:"release_tasks"`
 }
 
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
@@ -71,6 +72,12 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 	applicationInfo.ConfigVars = configVars
 
+	releaseTasks, err := client.GetReleaseTasks(ctx, appName)
+	if err != nil {
+		return HerokuApplicationInfo{}, fmt.Errorf("failed to get Heroku release tasks: %w", err)
+	}
+	applicationInfo.ReleaseTasks = releaseTasks
+
 	return applicationInfo, nil
 }
 
@@ -103,6 +110,7 @@ type HerokuClientInterface interface {
 	GetDynoSize(ctx context.Context, dynoSizeName string) (HerokuDynoSize, error)
 	GetPGInfo(ctx context.Context, addonID string) (PGInfo, error)
 	ListConfigVars(ctx context.Context, appName string) (HerokuConfigVars, error)
+	GetReleaseTasks(ctx context.Context, appName string) ([]HerokuReleaseTask, error)
 }
 
 // HerokuClient represents the Heroku API client
@@ -183,6 +191,37 @@ func (h *HerokuClient) ListConfigVars(ctx context.Context, appName string) (Hero
 	endpoint := fmt.Sprintf("/apps/%s/config-vars", appName)
 	url := h.BaseURL + endpoint
 	return herokuGet[HerokuConfigVars](ctx, h, url)
+}
+
+type HerokuFormation struct {
+	Command string `json:"command"`
+	Type    string `json:"type"`
+	Size    string `json:"size"`
+}
+
+type HerokuReleaseTask = HerokuFormation
+
+func (h *HerokuClient) GetFormation(ctx context.Context, appName string) ([]HerokuFormation, error) {
+	endpoint := fmt.Sprintf("/apps/%s/formation", appName)
+	url := h.BaseURL + endpoint
+	return herokuGet[[]HerokuFormation](ctx, h, url)
+}
+
+func (h *HerokuClient) GetReleaseTasks(ctx context.Context, appName string) ([]HerokuReleaseTask, error) {
+	formationList, err := h.GetFormation(ctx, appName)
+	if err != nil {
+		return nil, err
+	}
+
+	releaseTasks := []HerokuReleaseTask{}
+
+	for _, formation := range formationList {
+		if formation.Type == "release" {
+			releaseTasks = append(releaseTasks, formation)
+		}
+	}
+
+	return releaseTasks, nil
 }
 
 type HerokuDyno struct {
