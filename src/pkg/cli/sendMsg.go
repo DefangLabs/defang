@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/google/uuid"
@@ -23,8 +24,8 @@ func SendMsg(ctx context.Context, client client.FabricClient, subject, _type, id
 
 	term.Debug("Sending message to", subject, "with type", _type, "and id", id)
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	err := client.Publish(ctx, &defangv1.PublishRequest{Event: &defangv1.Event{

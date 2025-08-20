@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -84,7 +84,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := cli.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
+				if err := login.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()

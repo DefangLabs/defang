@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -120,8 +121,8 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 
 	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -160,8 +161,8 @@ func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, 
 
 	files := findMatchingProjectFiles(project, nil)
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	req := defangv1.DebugRequest{

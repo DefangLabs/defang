@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -301,15 +302,44 @@ func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, erro
 	return data, nil
 }
 
+func authenticateHerokuCLI() error {
+	cmd := exec.Command("heroku", "whoami")
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		return nil
+	}
+
+	term.Info("You need to authenticate with the Heroku CLI.")
+	term.Info("If a browser window does not open, run `heroku login` in a separate shell and try again.")
+	cmd = exec.Command("heroku", "login")
+	// cmd needs to receive any keypress on stdin in order to open a browser
+	cmd.Stdin = bytes.NewBuffer([]byte{'\n'})
+	_, err = cmd.Output()
+	if err != nil {
+		term.Debugf("Failed to run `heroku login`: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 func getHerokuAuthTokenFromCLI() (string, error) {
-	if _, err := exec.LookPath("heroku"); err != nil {
+	_, err := exec.LookPath("heroku")
+	if err != nil {
 		return "", fmt.Errorf("Heroku CLI is not installed: %v", err)
 	}
-	term.Debug("Heroku CLI is installed, attempting to create a short-lived authorization token")
+	term.Info("The Heroku CLI is installed, we'll use it to generate a short-lived authorization token")
+	err = authenticateHerokuCLI()
+	if err != nil {
+		term.Debugf("Failed to authenticate Heroku CLI: %v", err)
+		return "", err
+	}
+	term.Debug("Successfully authenticated with Heroku")
+
 	cmd := exec.Command("heroku", "authorizations:create", "--expires-in=300", "--json")
 	output, err := cmd.Output()
 	if err != nil {
-		term.Debugf("Failed to run Heroku CLI: %v", err)
+		term.Debugf("Failed to run `heroku authorizations:create`: %v", err)
 		return "", err
 	}
 

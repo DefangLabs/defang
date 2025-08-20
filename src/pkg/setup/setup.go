@@ -11,6 +11,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -134,7 +135,7 @@ func (s *SetupClient) AIGenerate(ctx context.Context) (SetupResult, error) {
 	}
 	if s.Fabric.CheckLoginAndToS(ctx) != nil {
 		// The user is either not logged in or has not agreed to the terms of service; ask for agreement to the terms now
-		if err := cli.InteractiveAgreeToS(ctx, s.Fabric); err != nil {
+		if err := login.InteractiveAgreeToS(ctx, s.Fabric); err != nil {
 			// This might fail because the user did not log in. This is fine: server won't save the terms agreement, but can proceed with the generation
 			if connect.CodeOf(err) != connect.CodeUnauthenticated {
 				return SetupResult{}, err
@@ -225,10 +226,10 @@ func beforeGenerate(directory string) {
 }
 
 func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error) {
-	if err := cli.InteractiveLogin(ctx, s.Fabric, s.Cluster); err != nil {
+	err := login.InteractiveRequireLoginAndToS(ctx, s.Fabric, s.Cluster)
+	if err != nil {
 		return SetupResult{}, err
 	}
-	var composeFileContents string
 
 	term.Info("Ok, let's create a compose file for your existing deployment.")
 	composeFileContents, err := migrate.InteractiveSetup(ctx, s.Fabric, s.Surveyor, s.Heroku, "heroku")

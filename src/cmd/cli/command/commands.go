@@ -20,6 +20,9 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc/gcp"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/migrate"
@@ -64,19 +67,6 @@ func getCluster() string {
 	return org + "@" + cluster
 }
 
-func prettyError(err error) error {
-	// To avoid printing the internal gRPC error code
-	var cerr *connect.Error
-	if errors.As(err, &cerr) {
-		term.Debug("Server error:", cerr)
-		err = errors.Unwrap(cerr)
-	}
-	if cli.IsNetworkError(err) {
-		return fmt.Errorf("%w; please check network settings and try again", err)
-	}
-	return err
-}
-
 func Execute(ctx context.Context) error {
 	if term.StdoutCanColor() {
 		restore := term.EnableANSI()
@@ -85,10 +75,10 @@ func Execute(ctx context.Context) error {
 
 	if err := RootCmd.ExecuteContext(ctx); err != nil {
 		if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-			term.Error("Error:", prettyError(err))
+			term.Error("Error:", cliClient.PrettyError(err))
 		}
 
-		if err == cli.ErrDryRun {
+		if err == dryrun.ErrDryRun {
 			return nil
 		}
 
@@ -169,14 +159,14 @@ func SetupCommands(ctx context.Context, version string) {
 
 	RootCmd.Version = version
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
-	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", cli.DefangFabric, "Defang cluster to connect to")
+	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
-	RootCmd.PersistentFlags().BoolVar(&cli.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
+	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
 	RootCmd.PersistentFlags().StringP("cwd", "C", "", "change directory before running the command")
@@ -346,6 +336,7 @@ var RootCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	Short:         "Defang CLI is used to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		ctx := cmd.Context()
 		term.SetDebug(doDebug)
 
 		// Don't track/connect the completion commands
@@ -373,9 +364,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		client, err = cli.Connect(cmd.Context(), getCluster())
+		client, err = cli.Connect(ctx, getCluster())
 
-		if v, err := client.GetVersions(cmd.Context()); err == nil {
+		if v, err := client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
 			term.Debug("Fabric:", v.Fabric, "CLI:", version, "CLI-Min:", v.CliMin)
 			if hasTty && isNewer(version, v.CliMin) && !isUpgradeCommand(cmd) {
@@ -389,40 +380,10 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		if err = client.CheckLoginAndToS(cmd.Context()); err != nil {
-			if nonInteractive {
-				return err
-			}
-			// Login interactively now; only do this for authorization-related errors
-			if connect.CodeOf(err) == connect.CodeUnauthenticated {
-				term.Debug("Server error:", err)
-				term.Warn("Please log in to continue.")
-				term.ResetWarnings() // clear any previous warnings so we don't show them again
-
-				defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-				if err = cli.InteractiveLogin(cmd.Context(), client, getCluster()); err != nil {
-					return err
-				}
-
-				// Reconnect with the new token
-				if client, err = cli.Connect(cmd.Context(), getCluster()); err != nil {
-					return err
-				}
-
-				if err = client.CheckLoginAndToS(cmd.Context()); err == nil { // recheck (new token = new user)
-					return nil // success
-				}
-			}
-
-			// Check if the user has agreed to the terms of service and show a prompt if needed
-			if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-				term.Warn(prettyError(err))
-
-				defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-				if err = cli.InteractiveAgreeToS(cmd.Context(), client); err != nil {
-					return err // fatal
-				}
-			}
+		if nonInteractive {
+			err = client.CheckLoginAndToS(ctx)
+		} else {
+			err = login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		}
 
 		return err
@@ -437,11 +398,11 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if nonInteractive {
-			if err := cli.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := cli.InteractiveLogin(cmd.Context(), client, getCluster())
+			err := login.InteractiveLogin(cmd.Context(), client, getCluster())
 			if err != nil {
 				return err
 			}
@@ -755,7 +716,7 @@ var configDeleteCmd = &cobra.Command{
 		if err := cli.ConfigDelete(cmd.Context(), projectName, provider, names...); err != nil {
 			// Show a warning (not an error) if the config was not found
 			if connect.CodeOf(err) == connect.CodeNotFound {
-				term.Warn(prettyError(err))
+				term.Warn(cliClient.PrettyError(err))
 				return nil
 			}
 			return err
@@ -870,7 +831,7 @@ var deleteCmd = &cobra.Command{
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
-				term.Warn(prettyError(err))
+				term.Warn(cliClient.PrettyError(err))
 				return nil
 			}
 			return err
@@ -998,7 +959,7 @@ var tosCmd = &cobra.Command{
 		agree, _ := cmd.Flags().GetBool("agree-tos")
 
 		if agree {
-			return cli.NonInteractiveAgreeToS(cmd.Context(), client)
+			return login.NonInteractiveAgreeToS(cmd.Context(), client)
 		}
 
 		if nonInteractive {
@@ -1006,7 +967,7 @@ var tosCmd = &cobra.Command{
 			return nil
 		}
 
-		return cli.InteractiveAgreeToS(cmd.Context(), client)
+		return login.InteractiveAgreeToS(cmd.Context(), client)
 	},
 }
 

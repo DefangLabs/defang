@@ -1,4 +1,4 @@
-package cli
+package login
 
 import (
 	"context"
@@ -6,11 +6,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
 var ErrTermsNotAgreed = errors.New("you must agree to the Defang terms of service to use this tool")
+
+var P = track.P
 
 func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 	if client.TermsAccepted() {
@@ -41,8 +44,8 @@ func InteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
 }
 
 func NonInteractiveAgreeToS(ctx context.Context, c client.FabricClient) error {
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	// Persist the terms agreement in the state file so that we don't ask again
