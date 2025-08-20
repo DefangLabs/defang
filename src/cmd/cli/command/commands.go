@@ -383,49 +383,11 @@ var RootCmd = &cobra.Command{
 		if nonInteractive {
 			err = client.CheckLoginAndToS(ctx)
 		} else {
-			err = InteractiveRequireLoginAndToS(ctx, client, getCluster())
+			err = login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		}
 
 		return err
 	},
-}
-
-func InteractiveRequireLoginAndToS(ctx context.Context, fabric cliClient.FabricClient, addr string) error {
-	var err error
-	if err = fabric.CheckLoginAndToS(ctx); err != nil {
-		// Login interactively now; only do this for authorization-related errors
-		if connect.CodeOf(err) == connect.CodeUnauthenticated {
-			term.Debug("Server error:", err)
-			term.Warn("Please log in to continue.")
-			term.ResetWarnings() // clear any previous warnings so we don't show them again
-
-			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-			if err = login.InteractiveLogin(ctx, fabric, addr); err != nil {
-				return err
-			}
-
-			// Reconnect with the new token
-			if fabric, err = cli.Connect(ctx, addr); err != nil {
-				return err
-			}
-
-			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
-				return nil // success
-			}
-		}
-
-		// Check if the user has agreed to the terms of service and show a prompt if needed
-		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			term.Warn(cliClient.PrettyError(err))
-
-			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-			if err = login.InteractiveAgreeToS(ctx, fabric); err != nil {
-				return err // fatal
-			}
-		}
-	}
-
-	return err
 }
 
 var loginCmd = &cobra.Command{
