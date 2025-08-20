@@ -17,10 +17,11 @@ import (
 )
 
 type HerokuApplicationInfo struct {
-	Addons     []HerokuAddon    `json:"addons"`
-	Dynos      []HerokuDyno     `json:"dynos"`
-	ConfigVars HerokuConfigVars `json:"config_vars"`
-	PGInfo     []PGInfo         `json:"pg_info"`
+	Addons     []HerokuAddon             `json:"addons"`
+	Dynos      []HerokuDyno              `json:"dynos"`
+	ConfigVars HerokuConfigVars          `json:"config_vars"`
+	PGInfo     []PGInfo                  `json:"pg_info"`
+	DynoSizes  map[string]HerokuDynoSize `json:"dyno_sizes"`
 }
 
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
@@ -38,6 +39,7 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)
 	}
 	applicationInfo.Addons = addons
+	term.Debugf("Addons for the selected application: %+v\n", addons)
 
 	for _, addon := range addons {
 		if addon.AddonService.Name == "heroku-postgresql" {
@@ -49,7 +51,19 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		}
 	}
 
-	term.Debugf("Addons for the selected application: %+v\n", addons)
+	term.Debugf("Postgres info for the selected application: %+v\n", applicationInfo.PGInfo)
+	dynoSizes := make(map[string]HerokuDynoSize)
+
+	// for each dyno, get the dyno size,
+	for _, dyno := range dynos {
+		dynoSize, err := client.GetDynoSize(ctx, dyno.Size)
+		if err != nil {
+			return HerokuApplicationInfo{}, fmt.Errorf("failed to get dyno size for dyno %s: %w", dyno.Name, err)
+		}
+		dynoSizes[dyno.Name] = dynoSize
+	}
+
+	applicationInfo.DynoSizes = dynoSizes
 
 	configVars, err := client.ListConfigVars(ctx, appName)
 	if err != nil {
@@ -86,6 +100,7 @@ type HerokuClientInterface interface {
 	ListApps(ctx context.Context) ([]HerokuApplication, error)
 	ListDynos(ctx context.Context, appName string) ([]HerokuDyno, error)
 	ListAddons(ctx context.Context, appName string) ([]HerokuAddon, error)
+	GetDynoSize(ctx context.Context, dynoSizeName string) (HerokuDynoSize, error)
 	GetPGInfo(ctx context.Context, addonID string) (PGInfo, error)
 	ListConfigVars(ctx context.Context, appName string) (HerokuConfigVars, error)
 }
@@ -182,6 +197,20 @@ func (h *HerokuClient) ListDynos(ctx context.Context, appName string) ([]HerokuD
 	endpoint := fmt.Sprintf("/apps/%s/dynos", appName)
 	url := h.BaseURL + endpoint
 	return herokuGet[[]HerokuDyno](ctx, h, url)
+}
+
+type HerokuDynoSize struct {
+	Architecture     string  `json:"architecture"`
+	Compute          int     `json:"compute"`
+	PreciseDynoUnits float64 `json:"precise_dyno_units"`
+	Memory           float64 `json:"memory"`
+	Name             string  `json:"name"`
+}
+
+func (h *HerokuClient) GetDynoSize(ctx context.Context, dynoSizeName string) (HerokuDynoSize, error) {
+	endpoint := "/dyno-sizes/" + dynoSizeName
+	url := h.BaseURL + endpoint
+	return herokuGet[HerokuDynoSize](ctx, h, url)
 }
 
 type PGInfo struct {

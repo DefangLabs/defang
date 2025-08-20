@@ -76,6 +76,15 @@ func (m *MockHerokuClient) ListDynos(ctx context.Context, appName string) ([]Her
 	return dynos, args.Error(1)
 }
 
+func (m *MockHerokuClient) GetDynoSize(ctx context.Context, dynoSizeName string) (HerokuDynoSize, error) {
+	args := m.Called(ctx, dynoSizeName)
+	dynoSize, ok := args.Get(0).(HerokuDynoSize)
+	if !ok {
+		return HerokuDynoSize{}, errors.New("failed to cast to HerokuDynoSize")
+	}
+	return dynoSize, args.Error(1)
+}
+
 func (m *MockHerokuClient) ListAddons(ctx context.Context, appName string) ([]HerokuAddon, error) {
 	args := m.Called(ctx, appName)
 	addons, ok := args.Get(0).([]HerokuAddon)
@@ -115,8 +124,9 @@ func TestInteractiveSetup(t *testing.T) {
 		herokuToken                 string
 		herokuApps                  []HerokuApplication
 		herokuDynos                 []HerokuDyno
+		herokuDynoSize              HerokuDynoSize
 		herokuAddons                []HerokuAddon
-		herokuPGInfo                []PGInfo
+		herokuPGInfo                PGInfo
 		herokuConfigVars            HerokuConfigVars
 		composeResponse             *defangv1.GenerateComposeResponse
 		expectedComposeFileContents string
@@ -138,6 +148,7 @@ func TestInteractiveSetup(t *testing.T) {
 			herokuDynos: []HerokuDyno{
 				{Name: "web.1", Command: "npm start", Size: "Standard-1X", Type: "web"},
 			},
+			herokuDynoSize: HerokuDynoSize{Architecture: "amd64", Name: "Eco", Memory: 0.5, Compute: 1, PreciseDynoUnits: 0.28},
 			herokuAddons: []HerokuAddon{
 				{
 					Name: "postgresql-addon-123",
@@ -155,16 +166,14 @@ func TestInteractiveSetup(t *testing.T) {
 					State: "provisioned",
 				},
 			},
-			herokuPGInfo: []PGInfo{
-				{
-					DatabaseName: "mydb",
-					NumBytes:     12345,
-					Info: []struct {
-						Name   string   `json:"name"`
-						Values []string `json:"values"`
-					}{
-						{Name: "PG Version", Values: []string{"17.4"}},
-					},
+			herokuPGInfo: PGInfo{
+				DatabaseName: "mydb",
+				NumBytes:     12345,
+				Info: []struct {
+					Name   string   `json:"name"`
+					Values []string `json:"values"`
+				}{
+					{Name: "PG Version", Values: []string{"17.4"}},
 				},
 			},
 			herokuConfigVars: HerokuConfigVars{
@@ -193,6 +202,7 @@ func TestInteractiveSetup(t *testing.T) {
 				{Name: "web.1", Command: "node server.js", Size: "Standard-2X", Type: "web"},
 				{Name: "web.2", Command: "node server.js", Size: "Standard-2X", Type: "web"},
 			},
+			herokuDynoSize: HerokuDynoSize{Architecture: "amd64", Name: "Eco", Memory: 0.5, Compute: 1, PreciseDynoUnits: 0.28},
 			herokuAddons: []HerokuAddon{
 				{
 					Name: "redis-addon-456",
@@ -231,6 +241,7 @@ func TestInteractiveSetup(t *testing.T) {
 				{Name: "failing-app", ID: "app-789"},
 			},
 			herokuDynos:      []HerokuDyno{{Name: "web.1", Command: "python app.py", Type: "web", Size: "Standard-1X"}},
+			herokuDynoSize:   HerokuDynoSize{Architecture: "amd64", Name: "Eco", Memory: 0.5, Compute: 1, PreciseDynoUnits: 0.28},
 			herokuAddons:     []HerokuAddon{},
 			herokuConfigVars: HerokuConfigVars{},
 			composeError:     errors.New("fabric service unavailable"),
@@ -248,6 +259,7 @@ func TestInteractiveSetup(t *testing.T) {
 				{Name: "yaml-invalid-app", ID: "app-invalid"},
 			},
 			herokuDynos:      []HerokuDyno{{Name: "web.1", Command: "python app.py", Type: "web", Size: "Standard-1X"}},
+			herokuDynoSize:   HerokuDynoSize{Architecture: "amd64", Name: "Eco", Memory: 0.5, Compute: 1, PreciseDynoUnits: 0.28},
 			herokuAddons:     []HerokuAddon{},
 			herokuConfigVars: HerokuConfigVars{},
 			composeResponse: &defangv1.GenerateComposeResponse{
@@ -302,8 +314,21 @@ func TestInteractiveSetup(t *testing.T) {
 			mockHerokuClient.On("SetToken", tt.herokuToken).Once()
 			mockHerokuClient.On("ListApps", mock.Anything).Return(tt.herokuApps, nil)
 			mockHerokuClient.On("ListDynos", mock.Anything, mock.Anything).Return(tt.herokuDynos, nil)
-			mockHerokuClient.On("GetPGInfo", mock.Anything, mock.Anything).Return(tt.herokuPGInfo, nil)
+
+			// GetDynoSize is called once for each dyno
+			for range tt.herokuDynos {
+				mockHerokuClient.On("GetDynoSize", mock.Anything, mock.Anything).Return(tt.herokuDynoSize, nil).Once()
+			}
+
 			mockHerokuClient.On("ListAddons", mock.Anything, mock.Anything).Return(tt.herokuAddons, nil)
+
+			// GetPGInfo is only called for Postgres addons
+			for _, addon := range tt.herokuAddons {
+				if addon.AddonService.Name == "heroku-postgresql" {
+					mockHerokuClient.On("GetPGInfo", mock.Anything, addon.ID).Return(tt.herokuPGInfo, nil).Once()
+				}
+			}
+
 			mockHerokuClient.On("ListConfigVars", mock.Anything, mock.Anything).Return(tt.herokuConfigVars, nil)
 
 			// Execute the function under test
