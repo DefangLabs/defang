@@ -51,8 +51,8 @@ func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId cliCl
 
 		name, err := request.RequireString("name")
 		if err != nil || name == "" {
-			term.Error("Invalid config name", "error", errors.New("name is required"))
-			return mcp.NewToolResultErrorFromErr("Invalid config name", errors.New("name is required")), err
+			term.Error("Invalid config `name`", "error", errors.New("`name` is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid config `name`", errors.New("`name` is required")), err
 		}
 
 		term.Debug("Function invoked: cli.Connect")

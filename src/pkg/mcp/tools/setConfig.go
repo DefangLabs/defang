@@ -56,14 +56,14 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId cliClien
 
 		name, err := request.RequireString("name")
 		if err != nil || name == "" {
-			term.Error("Invalid config name", "error", errors.New("name is required"))
-			return mcp.NewToolResultErrorFromErr("Invalid config name", errors.New("name is required")), err
+			term.Error("Invalid config `name`", "error", errors.New("`name` is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid config `name`", errors.New("`name` is required")), err
 		}
 
 		value, err := request.RequireString("value")
 		if err != nil || value == "" {
-			term.Error("Invalid config value", "error", errors.New("value is required"))
-			return mcp.NewToolResultErrorFromErr("Invalid config value", errors.New("value is required")), err
+			term.Error("Invalid config `value`", "error", errors.New("`value` is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid config `value`", errors.New("`value` is required")), err
 		}
 
 		term.Debug("Function invoked: cli.Connect")
