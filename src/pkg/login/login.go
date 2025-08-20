@@ -4,66 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/auth"
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
-	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 )
-
-const DefaultCluster = "fabric-prod1.defang.dev"
-
-var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
-
-func SplitTenantHost(cluster string) (types.TenantName, string) {
-	tenant := types.DEFAULT_TENANT
-	parts := strings.SplitN(cluster, "@", 2)
-	if len(parts) == 2 {
-		tenant, cluster = types.TenantName(parts[0]), parts[1]
-	}
-	if cluster == "" {
-		cluster = DefangFabric
-	}
-	if _, _, err := net.SplitHostPort(cluster); err != nil {
-		cluster = cluster + ":443" // default to https
-	}
-	return tenant, cluster
-}
-
-func getTokenFile(fabric string) string {
-	if host, _, _ := net.SplitHostPort(fabric); host != "" {
-		fabric = host
-	}
-	return filepath.Join(client.StateDir, fabric)
-}
-
-func GetExistingToken(fabric string) string {
-	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
-
-	if accessToken == "" {
-		tokenFile := getTokenFile(fabric)
-
-		term.Debug("Reading access token from file", tokenFile)
-		all, _ := os.ReadFile(tokenFile)
-		accessToken = string(all)
-	} else {
-		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
-	}
-
-	return accessToken
-}
 
 type LoginFlow = auth.LoginFlow
 
@@ -156,42 +106,4 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 		return err
 	}
 	return cluster.SaveAccessToken(fabric, resp.AccessToken)
-}
-
-func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClient, addr string) error {
-	var err error
-	if err = fabric.CheckLoginAndToS(ctx); err != nil {
-		// Login interactively now; only do this for authorization-related errors
-		if connect.CodeOf(err) == connect.CodeUnauthenticated {
-			term.Debug("Server error:", err)
-			term.Warn("Please log in to continue.")
-			term.ResetWarnings() // clear any previous warnings so we don't show them again
-
-			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-			if err = InteractiveLogin(ctx, fabric, addr); err != nil {
-				return err
-			}
-
-			// Reconnect with the new token
-			if fabric, err = cli.Connect(ctx, addr); err != nil {
-				return err
-			}
-
-			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
-				return nil // success
-			}
-		}
-
-		// Check if the user has agreed to the terms of service and show a prompt if needed
-		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
-			term.Warn(client.PrettyError(err))
-
-			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-			if err = InteractiveAgreeToS(ctx, fabric); err != nil {
-				return err // fatal
-			}
-		}
-	}
-
-	return err
 }
