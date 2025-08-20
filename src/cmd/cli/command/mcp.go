@@ -7,10 +7,11 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
-	"github.com/DefangLabs/defang/src/pkg/mcp"
+	defangMcp "github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Setup knowledge base
 		term.Debug("Setting up knowledge base")
-		if err := mcp.SetupKnowledgeBase(); err != nil {
+		if err := defangMcp.SetupKnowledgeBase(); err != nil {
 			return fmt.Errorf("failed to setup knowledge base: %w", err)
 		}
 
@@ -68,6 +69,15 @@ list_configs - This tool lists all configuration variables for a deployed applic
 remove_config - This tool removes a configuration variable for a deployed application, allowing you to clean up unused settings.
 set_config - This tool sets or updates configuration variables for a deployed application, allowing you to manage environment variables and secrets.
 			`),
+		)
+
+		s.AddPrompts(
+			server.ServerPrompt{
+				Prompt: mcp.NewPrompt("setup",
+					mcp.WithPromptDescription("Select cloud provider"),
+					mcp.WithArgument("provider", mcp.RequiredArgument(), mcp.ArgumentDescription("The cloud provider to use for deployment")),
+				),
+			},
 		)
 
 		// Setup resources
@@ -110,7 +120,7 @@ var mcpSetupCmd = &cobra.Command{
 		term.Debug("Setting up MCP client")
 		client, _ := cmd.Flags().GetString("client")
 		term.Debugf("MCP Client: %q", client)
-		if err := mcp.SetupClient(client); err != nil {
+		if err := defangMcp.SetupClient(client); err != nil {
 			return err
 		}
 
