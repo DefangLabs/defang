@@ -383,16 +383,16 @@ var RootCmd = &cobra.Command{
 		if nonInteractive {
 			err = client.CheckLoginAndToS(ctx)
 		} else {
-			err = InteractiveRequireLoginAndToS(ctx)
+			err = InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		}
 
 		return err
 	},
 }
 
-func InteractiveRequireLoginAndToS(ctx context.Context) error {
+func InteractiveRequireLoginAndToS(ctx context.Context, fabric cliClient.FabricClient, addr string) error {
 	var err error
-	if err = client.CheckLoginAndToS(ctx); err != nil {
+	if err = fabric.CheckLoginAndToS(ctx); err != nil {
 		// Login interactively now; only do this for authorization-related errors
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
 			term.Debug("Server error:", err)
@@ -400,16 +400,16 @@ func InteractiveRequireLoginAndToS(ctx context.Context) error {
 			term.ResetWarnings() // clear any previous warnings so we don't show them again
 
 			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
-			if err = login.InteractiveLogin(ctx, client, getCluster()); err != nil {
+			if err = login.InteractiveLogin(ctx, fabric, addr); err != nil {
 				return err
 			}
 
 			// Reconnect with the new token
-			if client, err = cli.Connect(ctx, getCluster()); err != nil {
+			if fabric, err = cli.Connect(ctx, addr); err != nil {
 				return err
 			}
 
-			if err = client.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
+			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
 				return nil // success
 			}
 		}
@@ -419,7 +419,7 @@ func InteractiveRequireLoginAndToS(ctx context.Context) error {
 			term.Warn(cliClient.PrettyError(err))
 
 			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
-			if err = login.InteractiveAgreeToS(ctx, client); err != nil {
+			if err = login.InteractiveAgreeToS(ctx, fabric); err != nil {
 				return err // fatal
 			}
 		}
