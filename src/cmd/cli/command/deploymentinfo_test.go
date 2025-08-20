@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	pcluster "github.com/DefangLabs/defang/src/pkg/cluster"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
@@ -22,7 +22,7 @@ func TestPrintPlaygroundPortalServiceURLs(t *testing.T) {
 	term.DefaultTerm = term.NewTerm(os.Stdin, &stdout, &stderr)
 
 	providerID = cliClient.ProviderDefang
-	cluster = cli.DefaultCluster
+	cluster = pcluster.DefaultCluster
 	printPlaygroundPortalServiceURLs([]*defangv1.ServiceInfo{
 		{
 			Service: &defangv1.Service{Name: "service1"},

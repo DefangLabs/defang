@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
 	"github.com/bufbuild/connect-go"
@@ -25,7 +26,7 @@ func TestConnect(t *testing.T) {
 		if expected, actual := "unavailable: dial tcp 1.2.3.4:443: connect: network is unreachable", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
-		if !IsNetworkError(err) {
+		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
 		}
 	})
@@ -40,7 +41,7 @@ func TestConnect(t *testing.T) {
 		if expected, actual := `deadline_exceeded: Post "https://240.0.0.1:443/io.defang.v1.FabricController/WhoAmI": dial tcp 240.0.0.1:443: i/o timeout`, err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
-		if !IsNetworkError(err) {
+		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
 		}
 	})
@@ -51,7 +52,7 @@ func TestConnect(t *testing.T) {
 		if expected, actual := "unavailable: dial tcp 127.0.0.1:1234: connect: connection refused", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
-		if !IsNetworkError(err) {
+		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
 		}
 	})
@@ -63,7 +64,7 @@ func TestConnect(t *testing.T) {
 		if actual := err.Error(); !slices.ContainsFunc(suffixes, func(suffix string) bool { return strings.HasSuffix(actual, suffix) }) {
 			t.Errorf("expected error to end with %q, got: %v", suffixes, actual)
 		}
-		if !IsNetworkError(err) {
+		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
 		}
 	})
@@ -77,7 +78,7 @@ func TestConnect(t *testing.T) {
 		if expected, actual := "internal: protocol error: no Grpc-Status trailer: unexpected EOF", err.Error(); expected != actual {
 			t.Errorf("expected %v, got: %v", expected, actual)
 		}
-		if !IsNetworkError(err) {
+		if !client.IsNetworkError(err) {
 			t.Errorf("expected network error, got: %v", err)
 		}
 	})

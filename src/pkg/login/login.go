@@ -1,42 +1,22 @@
-package cli
+package login
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
-	"path/filepath"
 
 	"github.com/DefangLabs/defang/src/pkg/auth"
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/cluster"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/bufbuild/connect-go"
 )
-
-func getTokenFile(fabric string) string {
-	if host, _, _ := net.SplitHostPort(fabric); host != "" {
-		fabric = host
-	}
-	return filepath.Join(client.StateDir, fabric)
-}
-
-func GetExistingToken(fabric string) string {
-	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
-
-	if accessToken == "" {
-		tokenFile := getTokenFile(fabric)
-
-		term.Debug("Reading access token from file", tokenFile)
-		all, _ := os.ReadFile(tokenFile)
-		accessToken = string(all)
-	} else {
-		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
-	}
-
-	return accessToken
-}
 
 type LoginFlow = auth.LoginFlow
 
@@ -55,17 +35,17 @@ func (g OpenAuthService) login(ctx context.Context, client client.FabricClient, 
 		return "", err
 	}
 
-	tenant, _ := SplitTenantHost(fabric)
+	tenant, _ := cluster.SplitTenantHost(fabric)
 	return auth.ExchangeCodeForToken(ctx, code, tenant, 0) // no scopes = unrestricted
 }
 
 func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, authPort int) error {
 	term.Debug("Logging in to", fabric)
 
-	tenant, _ := SplitTenantHost(fabric)
+	tenant, _ := cluster.SplitTenantHost(fabric)
 
 	err := auth.ServeAuthCodeFlowServer(ctx, authPort, tenant, func(token string) {
-		saveAccessToken(fabric, token)
+		cluster.SaveAccessToken(fabric, token)
 	})
 	if err != nil {
 		term.Error("failed to start auth server", "error", err)
@@ -74,16 +54,6 @@ func (g OpenAuthService) serveAuthServer(ctx context.Context, fabric string, aut
 }
 
 var authService AuthService = OpenAuthService{}
-
-func saveAccessToken(fabric, token string) error {
-	tokenFile := getTokenFile(fabric)
-	term.Debug("Saving access token to", tokenFile)
-	os.MkdirAll(client.StateDir, 0700)
-	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
-		return fmt.Errorf("failed to save access token: %w", err)
-	}
-	return nil
-}
 
 func InteractiveLogin(ctx context.Context, client client.FabricClient, fabric string) error {
 	return interactiveLogin(ctx, client, fabric, auth.CliFlow)
@@ -103,16 +73,19 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 		return err
 	}
 
-	tenant, host := SplitTenantHost(fabric)
+	tenant, host := cluster.SplitTenantHost(fabric)
 	term.Info("Successfully logged in to", host, "("+tenant.String()+" tenant)")
 
-	if err := saveAccessToken(fabric, token); err != nil {
+	if err := cluster.SaveAccessToken(fabric, token); err != nil {
 		term.Warn(err)
 		var pathError *os.PathError
 		if errors.As(err, &pathError) {
 			term.Printf("\nTo fix file permissions, run:\n\n  sudo chown -R $(whoami) %q\n", pathError.Path)
 		}
 		// We continue even if we can't save the token; we just won't have it saved for next time
+	}
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 	// The new login page shows the ToS so a successful login implies the user agreed
 	if err := NonInteractiveAgreeToS(ctx, client); err != nil {
@@ -135,5 +108,43 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 	if err != nil {
 		return err
 	}
-	return saveAccessToken(fabric, resp.AccessToken)
+	return cluster.SaveAccessToken(fabric, resp.AccessToken)
+}
+
+func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClient, addr string) error {
+	var err error
+	if err = fabric.CheckLoginAndToS(ctx); err != nil {
+		// Login interactively now; only do this for authorization-related errors
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			term.Debug("Server error:", err)
+			term.Warn("Please log in to continue.")
+			term.ResetWarnings() // clear any previous warnings so we don't show them again
+
+			defer func() { track.Cmd(nil, "Login", P("reason", err)) }()
+			if err = InteractiveLogin(ctx, fabric, addr); err != nil {
+				return err
+			}
+
+			// Reconnect with the new token
+			if fabric, err = cli.Connect(ctx, addr); err != nil {
+				return err
+			}
+
+			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
+				return nil // success
+			}
+		}
+
+		// Check if the user has agreed to the terms of service and show a prompt if needed
+		if connect.CodeOf(err) == connect.CodeFailedPrecondition {
+			term.Warn(client.PrettyError(err))
+
+			defer func() { track.Cmd(nil, "Terms", P("reason", err)) }()
+			if err = InteractiveAgreeToS(ctx, fabric); err != nil {
+				return err // fatal
+			}
+		}
+	}
+
+	return err
 }
