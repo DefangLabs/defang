@@ -73,7 +73,7 @@ Install the Defang CLI from one of the following sources:
   ```
   docker run -it defangio/defang-cli help
   ```
-  
+
 * or download the [latest binary](https://github.com/DefangLabs/defang/releases/latest/) of the Defang CLI.
 
 ## Support
@@ -125,7 +125,6 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_CD_IMAGE` - The image to use for the Continuous Deployment (CD) pipeline; defaults to `public.ecr.aws/defang-io/cd:public-beta`
 - `DEFANG_DEBUG` - set this to `1` or `true` to enable debug logging
 - `DEFANG_DISABLE_ANALYTICS` - If set to `true`, disables sending analytics to Defang; defaults to `false`
-- `DEFANG_EDITOR` - The editor to launch after new project generation; defaults to `code` (VS Code)
 - `DEFANG_FABRIC` - The address of the Defang Fabric to use; defaults to `fabric-prod1.defang.dev`
 - `DEFANG_JSON` - If set to `true`, outputs JSON instead of human-readable output; defaults to `false`
 - `DEFANG_HIDE_HINTS` - If set to `true`, hides hints in the CLI output; defaults to `false`

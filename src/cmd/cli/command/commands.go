@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -512,13 +513,34 @@ var certGenerateCmd = &cobra.Command{
 	},
 }
 
+func openWithEditor(path string) error {
+	editor := pkg.Getenv("EDITOR", "code --wait")
+
+	// Split editor command in case it has arguments (like "code --wait")
+	parts := strings.Fields(editor)
+
+	// Find the full path to the editor
+	editorPath, err := exec.LookPath(parts[0])
+	if err != nil {
+		return err
+	}
+
+	// Prepare arguments: program name + editor args + our args
+	args := append(parts, path)
+
+	// Replace current process with editor
+	err = syscall.Exec(editorPath, args, os.Environ())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	term.Info("Code generated successfully in folder", result.Folder)
-	editor := pkg.Getenv("DEFANG_EDITOR", "code") // TODO: should we use EDITOR env var instead? But won't handle terminal editors like vim
-	cmdd := exec.Command(editor, result.Folder)
-	err := cmdd.Start()
-	if err != nil {
-		term.Debugf("unable to launch editor %q: %v", editor, err)
+
+	if err := openWithEditor(result.Folder); err != nil {
+		term.Debugf("unable to launch editor: %v", err)
 	}
 
 	cd := ""
