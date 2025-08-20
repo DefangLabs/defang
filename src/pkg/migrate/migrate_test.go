@@ -85,6 +85,15 @@ func (m *MockHerokuClient) ListAddons(ctx context.Context, appName string) ([]He
 	return addons, args.Error(1)
 }
 
+func (m *MockHerokuClient) GetPGInfo(ctx context.Context, addonID string) (PGInfo, error) {
+	args := m.Called(ctx, addonID)
+	pgInfo, ok := args.Get(0).(PGInfo)
+	if !ok {
+		return PGInfo{}, errors.New("failed to cast to *PGInfo")
+	}
+	return pgInfo, args.Error(1)
+}
+
 func (m *MockHerokuClient) ListConfigVars(ctx context.Context, appName string) (HerokuConfigVars, error) {
 	args := m.Called(ctx, appName)
 	configVars, ok := args.Get(0).(HerokuConfigVars)
@@ -107,6 +116,7 @@ func TestInteractiveSetup(t *testing.T) {
 		herokuApps                  []HerokuApplication
 		herokuDynos                 []HerokuDyno
 		herokuAddons                []HerokuAddon
+		herokuPGInfo                []PGInfo
 		herokuConfigVars            HerokuConfigVars
 		composeResponse             *defangv1.GenerateComposeResponse
 		expectedComposeFileContents string
@@ -143,6 +153,18 @@ func TestInteractiveSetup(t *testing.T) {
 						Name      string `json:"name"`
 					}{HumanName: "Mini", ID: "plan-123", Name: "heroku-postgresql:mini"},
 					State: "provisioned",
+				},
+			},
+			herokuPGInfo: []PGInfo{
+				{
+					DatabaseName: "mydb",
+					NumBytes:     12345,
+					Info: []struct {
+						Name   string   `json:"name"`
+						Values []string `json:"values"`
+					}{
+						{Name: "PG Version", Values: []string{"17.4"}},
+					},
 				},
 			},
 			herokuConfigVars: HerokuConfigVars{
@@ -280,6 +302,7 @@ func TestInteractiveSetup(t *testing.T) {
 			mockHerokuClient.On("SetToken", tt.herokuToken).Once()
 			mockHerokuClient.On("ListApps", mock.Anything).Return(tt.herokuApps, nil)
 			mockHerokuClient.On("ListDynos", mock.Anything, mock.Anything).Return(tt.herokuDynos, nil)
+			mockHerokuClient.On("GetPGInfo", mock.Anything, mock.Anything).Return(tt.herokuPGInfo, nil)
 			mockHerokuClient.On("ListAddons", mock.Anything, mock.Anything).Return(tt.herokuAddons, nil)
 			mockHerokuClient.On("ListConfigVars", mock.Anything, mock.Anything).Return(tt.herokuConfigVars, nil)
 

@@ -20,6 +20,7 @@ type HerokuApplicationInfo struct {
 	Addons     []HerokuAddon    `json:"addons"`
 	Dynos      []HerokuDyno     `json:"dynos"`
 	ConfigVars HerokuConfigVars `json:"config_vars"`
+	PGInfo     []PGInfo         `json:"pg_info"`
 }
 
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
@@ -37,6 +38,16 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)
 	}
 	applicationInfo.Addons = addons
+
+	for _, addon := range addons {
+		if addon.AddonService.Name == "heroku-postgresql" {
+			pgInfo, err := client.GetPGInfo(ctx, addon.ID)
+			if err != nil {
+				return HerokuApplicationInfo{}, fmt.Errorf("failed to get Postgres info for addon %s: %w", addon.Name, err)
+			}
+			applicationInfo.PGInfo = append(applicationInfo.PGInfo, pgInfo)
+		}
+	}
 
 	term.Debugf("Addons for the selected application: %+v\n", addons)
 
@@ -75,6 +86,7 @@ type HerokuClientInterface interface {
 	ListApps(ctx context.Context) ([]HerokuApplication, error)
 	ListDynos(ctx context.Context, appName string) ([]HerokuDyno, error)
 	ListAddons(ctx context.Context, appName string) ([]HerokuAddon, error)
+	GetPGInfo(ctx context.Context, addonID string) (PGInfo, error)
 	ListConfigVars(ctx context.Context, appName string) (HerokuConfigVars, error)
 }
 
@@ -170,6 +182,21 @@ func (h *HerokuClient) ListDynos(ctx context.Context, appName string) ([]HerokuD
 	endpoint := fmt.Sprintf("/apps/%s/dynos", appName)
 	url := h.BaseURL + endpoint
 	return herokuGet[[]HerokuDyno](ctx, h, url)
+}
+
+type PGInfo struct {
+	DatabaseName string `json:"database_name"`
+	NumBytes     int64  `json:"num_bytes"`
+	Info         []struct {
+		Name   string   `json:"name"`
+		Values []string `json:"values"`
+	} `json:"info"`
+}
+
+func (h *HerokuClient) GetPGInfo(ctx context.Context, addonID string) (PGInfo, error) {
+	endpoint := "/client/v11/databases/" + addonID
+	url := "https://postgres-api.heroku.com" + endpoint
+	return herokuGet[PGInfo](ctx, h, url)
 }
 
 func herokuGet[T any](ctx context.Context, h *HerokuClient, url string) (T, error) {
