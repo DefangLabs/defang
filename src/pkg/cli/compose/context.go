@@ -134,6 +134,7 @@ func (zw *zipFactory) CreateHeader(info fs.FileInfo, slashPath string) (io.Write
 		Name:   slashPath,
 		Method: zip.Deflate,
 	}
+	header.SetMode(info.Mode()) // sets CreatorVersion and ExternalAttrs
 
 	// Make reproducible
 	header.Modified = time.Unix(sourceDateEpoch, 0)
