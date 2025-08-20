@@ -13,24 +13,28 @@ import (
 )
 
 func configureLoader(request mcp.CallToolRequest) *compose.Loader {
-	composeFilePaths, composeFilePathOK := request.Params.Arguments["compose_file_paths"].([]string)
-
-	projectName, projectNameOK := request.Params.Arguments["project_name"].(string)
-
-	//TODO: Talk about using both project name and compose file paths
-
-	// if projectNameOK && composeFilePathOK {
-	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
-	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...))
-	if projectNameOK {
+	projectName, err := request.RequireString("project_name")
+	if err == nil {
 		term.Debugf("Project name provided: %s", projectName)
 		term.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithProjectName(projectName))
-	} else if composeFilePathOK {
-		term.Debugf("Compose file paths provided: %s", composeFilePaths)
-		term.Debug("Function invoked: compose.NewLoader")
-		return compose.NewLoader(compose.WithPath(composeFilePaths...))
 	}
+	arguments := request.GetArguments()
+	composeFilePathsArgs, ok := arguments["compose_file_paths"]
+	if ok {
+		composeFilePaths, ok := composeFilePathsArgs.([]string)
+		if ok {
+			term.Debugf("Compose file paths provided: %s", composeFilePaths)
+			term.Debug("Function invoked: compose.NewLoader")
+			return compose.NewLoader(compose.WithPath(composeFilePaths...))
+		}
+	}
+
+	//TODO: Talk about using both project name and compose file paths
+	// if projectNameOK && composeFilePathOK {
+	// 	term.Infof("Compose file paths and project name provided: %s, %s", composeFilePaths, projectName)
+	// 	return compose.NewLoader(compose.WithProjectName(projectName), compose.WithPath(composeFilePaths...))
+	// }
 
 	term.Debug("Function invoked: compose.NewLoader")
 	return compose.NewLoader()
