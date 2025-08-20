@@ -94,7 +94,6 @@ func Execute(ctx context.Context) error {
 		if strings.Contains(err.Error(), "config") {
 			printDefangHint("To manage sensitive service config, use:", "config")
 		}
-
 		if strings.Contains(err.Error(), "maximum number of projects") {
 			projectName := "<name>"
 			provider, err := newProvider(ctx, nil)
@@ -208,7 +207,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Login Command
 	loginCmd.Flags().Bool("training-opt-out", false, "opt out of ML training (Pro users only)")
-	loginCmd.Flags().StringP("token", "t", "", "access token to use for authentication")
+	loginCmd.Flags().StringVar(&pcluster.DefaultAccessToken, "token", "", "access token to use for authentication")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
@@ -397,8 +396,6 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
-		token, _ := cmd.Flags().GetString("token")
-		pcluster.SetTemporaryAccessToken(token)
 
 		if nonInteractive {
 			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {

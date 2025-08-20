@@ -19,10 +19,6 @@ var DefaultAccessToken = ""
 
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
-func SetTemporaryAccessToken(accessToken string) {
-	DefaultAccessToken = accessToken
-}
-
 func SplitTenantHost(cluster string) (types.TenantName, string) {
 	tenant := types.DEFAULT_TENANT
 	parts := strings.SplitN(cluster, "@", 2)
@@ -46,7 +42,11 @@ func GetTokenFile(fabric string) string {
 }
 
 func GetExistingToken(fabric string) string {
-	var accessToken = pkg.Getenv("DEFANG_ACCESS_TOKEN", DefaultAccessToken)
+	if DefaultAccessToken != "" {
+		return DefaultAccessToken
+	}
+
+	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken == "" {
 		tokenFile := GetTokenFile(fabric)
@@ -55,7 +55,7 @@ func GetExistingToken(fabric string) string {
 		all, _ := os.ReadFile(tokenFile)
 		accessToken = string(all)
 	} else {
-		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN", DefaultAccessToken)
+		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN", accessToken)
 	}
 
 	return accessToken
