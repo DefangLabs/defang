@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -33,18 +34,22 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClie
 		term.Debug("List Config tool called")
 		track.Evt("MCP List Config Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if ok && wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		}
+
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 		}
 
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		term.Debug("Function invoked: cli.NewProvider")
@@ -52,7 +57,7 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClie
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
-			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 		}
 
 		loader := configureLoader(request)
@@ -60,7 +65,7 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClie
 		term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 		}
 		term.Debug("Project name loaded:", projectName)
 
@@ -68,7 +73,7 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClie
 
 		config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to list config variables", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to list config variables", err), err
 		}
 
 		numConfigs := len(config.Names)

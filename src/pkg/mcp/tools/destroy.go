@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -36,7 +37,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		client.Track("MCP Destroy Tool")
@@ -45,15 +46,19 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 		}
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if !ok || wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		}
+
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 		}
 
 		loader := configureLoader(request)
@@ -62,13 +67,13 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			term.Error("Failed to load project name", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 		}
 
 		err = canIUseProvider(ctx, client, projectName, provider)
 		if err != nil {
 			term.Error("Failed to use provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
 		}
 
 		term.Debug("Function invoked: cli.ComposeDown")
@@ -77,15 +82,15 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
 				term.Warn("Project not found", "error", err)
-				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), nil
+				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), err
 			}
 
 			result := HandleTermsOfServiceError(err)
 			if result != nil {
-				return result, nil
+				return result, err
 			}
 
-			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), err
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf("Successfully destroyed project: %s, etag: %s", projectName, deployment)), nil
