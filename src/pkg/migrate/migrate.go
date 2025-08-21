@@ -153,7 +153,7 @@ func generateComposeFile(ctx context.Context, fabric client.FabricClient, platfo
 		}
 
 		// Attempt to load the compose content
-		_, err = compose.LoadFromContent(ctx, []byte(composeContent), projectName)
+		_, err = compose.LoadFromContentWithInterpolation(ctx, []byte(composeContent), projectName)
 		if err != nil {
 			previousError = err.Error()
 			term.Debugf("Invalid compose file received: %v. Retrying...", err)
