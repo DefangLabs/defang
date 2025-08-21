@@ -15,8 +15,6 @@ import (
 
 const DefaultCluster = "fabric-prod1.defang.dev"
 
-var DefaultAccessToken = ""
-
 var DefangFabric = pkg.Getenv("DEFANG_FABRIC", DefaultCluster)
 
 func SplitTenantHost(cluster string) (types.TenantName, string) {
@@ -42,10 +40,6 @@ func GetTokenFile(fabric string) string {
 }
 
 func GetExistingToken(fabric string) string {
-	if DefaultAccessToken != "" {
-		return DefaultAccessToken
-	}
-
 	var accessToken = os.Getenv("DEFANG_ACCESS_TOKEN")
 
 	if accessToken == "" {

@@ -207,7 +207,7 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Login Command
 	loginCmd.Flags().Bool("training-opt-out", false, "opt out of ML training (Pro users only)")
-	loginCmd.Flags().StringVar(&pcluster.DefaultAccessToken, "token", "", "access token to use for authentication")
+	loginCmd.Flags().String("token", "", "access token to use for authentication")
 	// loginCmd.Flags().Bool("skip-prompt", false, "skip the login prompt if already logged in"); TODO: Implement this
 	RootCmd.AddCommand(loginCmd)
 
@@ -396,9 +396,10 @@ var loginCmd = &cobra.Command{
 	Short: "Authenticate to Defang",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
+		token, _ := cmd.Flags().GetString("token")
 
 		if nonInteractive {
-			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
+			if err := login.NonInteractiveLogin(cmd.Context(), client, getCluster(), token); err != nil {
 				return err
 			}
 		} else {

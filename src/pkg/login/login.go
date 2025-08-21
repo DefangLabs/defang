@@ -94,15 +94,18 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	return nil
 }
 
-func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, fabric string) error {
-	term.Debug("Non-interactive login using GitHub Actions id-token")
-	idToken, err := github.GetIdToken(ctx)
-	if err != nil {
-		return fmt.Errorf("non-interactive login failed: %w", err)
+func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric, token string) error {
+	if token == "" {
+		term.Debug("Non-interactive login using GitHub Actions id-token")
+		var err error
+		token, err = github.GetIdToken(ctx)
+		if err != nil {
+			return fmt.Errorf("non-interactive login failed: %w", err)
+		}
+		term.Debug("Got GitHub Actions id-token")
 	}
-	term.Debug("Got GitHub Actions id-token")
 	resp, err := client.Token(ctx, &defangv1.TokenRequest{
-		Assertion: idToken,
+		Assertion: token,
 		Scope:     []string{"admin", "read", "delete", "tail"},
 	})
 	if err != nil {
