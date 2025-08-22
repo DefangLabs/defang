@@ -243,6 +243,9 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 	}
 
 	term.Info("Compose file written to", composeFilePath)
+	term.Info("Your application is now ready to deploy with Defang.")
+	term.Info("For next steps, visit https://docs.defang.io/docs/tutorials/migrate-from-heroku")
+
 	return SetupResult{Folder: "."}, nil
 }
 
