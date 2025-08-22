@@ -28,14 +28,37 @@ type HerokuApplicationInfo struct {
 
 func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterface, appName string) (HerokuApplicationInfo, error) {
 	var applicationInfo HerokuApplicationInfo
+
+	term.Info("Identifying deployed dynos")
 	dynos, err := client.ListDynos(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list dynos: %w", err)
 	}
-	applicationInfo.Dynos = dynos
 
+	applicationInfo.Dynos = dynos
 	term.Debugf("Dynos for the selected application: %+v\n", dynos)
 
+	dynoSizes := make(map[string]HerokuDynoSize)
+	for _, dyno := range dynos {
+		dynoSize, err := client.GetDynoSize(ctx, dyno.Size)
+		if err != nil {
+			return HerokuApplicationInfo{}, fmt.Errorf("failed to get dyno size for dyno %s: %w", dyno.Name, err)
+		}
+		dynoSizes[dyno.Name] = dynoSize
+	}
+
+	applicationInfo.DynoSizes = dynoSizes
+	term.Debugf("Dyno sizes for the selected application: %+v\n", dynoSizes)
+
+	releaseTasks, err := client.GetReleaseTasks(ctx, appName)
+	if err != nil {
+		return HerokuApplicationInfo{}, fmt.Errorf("failed to get Heroku release tasks: %w", err)
+	}
+
+	applicationInfo.ReleaseTasks = releaseTasks
+	term.Debugf("Release tasks for the selected application: %+v\n", releaseTasks)
+
+	term.Info("Identifying configured addons")
 	addons, err := client.ListAddons(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku addons: %w", err)
@@ -54,30 +77,12 @@ func collectHerokuApplicationInfo(ctx context.Context, client HerokuClientInterf
 	}
 
 	term.Debugf("Postgres info for the selected application: %+v\n", applicationInfo.PGInfo)
-	dynoSizes := make(map[string]HerokuDynoSize)
-
-	// for each dyno, get the dyno size,
-	for _, dyno := range dynos {
-		dynoSize, err := client.GetDynoSize(ctx, dyno.Size)
-		if err != nil {
-			return HerokuApplicationInfo{}, fmt.Errorf("failed to get dyno size for dyno %s: %w", dyno.Name, err)
-		}
-		dynoSizes[dyno.Name] = dynoSize
-	}
-
-	applicationInfo.DynoSizes = dynoSizes
 
 	configVars, err := client.ListConfigVars(ctx, appName)
 	if err != nil {
 		return HerokuApplicationInfo{}, fmt.Errorf("failed to list Heroku config vars: %w", err)
 	}
 	applicationInfo.ConfigVars = configVars
-
-	releaseTasks, err := client.GetReleaseTasks(ctx, appName)
-	if err != nil {
-		return HerokuApplicationInfo{}, fmt.Errorf("failed to get Heroku release tasks: %w", err)
-	}
-	applicationInfo.ReleaseTasks = releaseTasks
 
 	return applicationInfo, nil
 }
@@ -86,7 +91,7 @@ func selectSourceApplication(surveyor surveyor.Surveyor, appNames []string) (str
 	var selectedApp string
 	for {
 		err := surveyor.AskOne(&survey.Select{
-			Message: "Select the Heroku application to use as a source:",
+			Message: "Select the Heroku application you would like to migrate:",
 			Options: appNames, // This should be a list of app names, but for simplicity, we use the whole string
 		}, &selectedApp)
 		if err != nil {
