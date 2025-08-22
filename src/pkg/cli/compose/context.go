@@ -226,6 +226,9 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType ArchiveType, digest string) (string, error) {
 	// Upload the archive to the fabric controller storage;; TODO: use a streaming API
+	if contentType == ArchiveTypeZip {
+		digest = digest + ".zip" // We need to add the .zip extension for GCP cloudbuild to be valid
+	}
 	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
