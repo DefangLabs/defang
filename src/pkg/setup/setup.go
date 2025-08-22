@@ -36,7 +36,7 @@ func (s *SetupClient) Start(ctx context.Context) (SetupResult, error) {
 		Options: []string{
 			"Generate with AI",
 			"Clone a sample",
-			"Migrate from heroku",
+			"Migrate from Heroku",
 		},
 	}, &response)
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *SetupClient) Start(ctx context.Context) (SetupResult, error) {
 		return s.AIGenerate(ctx)
 	case "Clone a sample":
 		return s.CloneSample(ctx, "")
-	case "Migrate from heroku":
+	case "Migrate from Heroku":
 		return s.MigrateFromHeroku(ctx)
 	}
 
@@ -243,6 +243,9 @@ func (s *SetupClient) MigrateFromHeroku(ctx context.Context) (SetupResult, error
 	}
 
 	term.Info("Compose file written to", composeFilePath)
+	term.Info("Your application is now ready to deploy with Defang.")
+	term.Info("For next steps, visit https://docs.defang.io/docs/tutorials/migrate-from-heroku")
+
 	return SetupResult{Folder: "."}, nil
 }
 
