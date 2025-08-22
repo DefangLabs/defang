@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -86,6 +87,73 @@ func setupSamplesResource(s *server.MCPServer) {
 	})
 }
 
+var BYOCPrompt = mcp.NewPrompt("BYOC Setup",
+	mcp.WithPromptDescription("Bring Your Own Cloud setup for AWS, GCP, or DO"),
+	mcp.WithArgument("cloud",
+		mcp.ArgumentDescription("Supported Cloud providers: AWS, GCP, or DO"),
+		mcp.RequiredArgument(),
+	),
+	mcp.WithArgument("AWS_ACCESS_KEY_ID",
+		mcp.ArgumentDescription("Your AWS Access Key ID"),
+		mcp.RequiredArgument(),
+	),
+
+	mcp.WithArgument("AWS_SECRET_ACCESS_KEY",
+		mcp.ArgumentDescription("Your AWS Secret Access Key"),
+		mcp.RequiredArgument(),
+	),
+)
+
+func handleBYOCPrompt(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	cloud := getStringArg(req.Params.Arguments, "cloud", "aws")
+	awsID := getStringArg(req.Params.Arguments, "AWS_ACCESS_KEY_ID", "")
+	awsSecret := getStringArg(req.Params.Arguments, "AWS_SECRET_ACCESS_KEY", "")
+	var prompt strings.Builder
+
+	// Adjust complexity based on user level
+	switch cloud {
+	case "aws", "AWS":
+		prompt.WriteString(fmt.Sprintf("Please explain %s in simple terms suitable for someone new to the topic. ", awsID))
+		prompt.WriteString("Use clear language and avoid jargon. ")
+	case "gcp", "GCP":
+		prompt.WriteString(fmt.Sprintf("Please provide a detailed explanation of %s. ", awsID))
+		prompt.WriteString("Include technical details but ensure clarity. ")
+	case "do", "DO":
+		prompt.WriteString(fmt.Sprintf("Please provide an in-depth analysis of %s. ", awsID))
+		prompt.WriteString("Include advanced concepts, edge cases, and technical nuances. ")
+	}
+
+	return &mcp.GetPromptResult{
+		Description: fmt.Sprintf("awsid: %s, awsSecret: %s, cloud: %s", awsID, awsSecret, cloud),
+		Messages: []mcp.PromptMessage{
+			{
+				Role:    "user",
+				Content: mcp.NewTextContent(prompt.String()),
+			},
+		},
+	}, nil
+}
+
+func getStringArg(args map[string]string, key, defaultValue string) string {
+	if val, exists := args[key]; exists {
+		return val
+	}
+	return defaultValue
+}
+
+// func getBoolArg(args map[string]string, key string, defaultValue bool) bool {
+// 	if val, exists := args[key]; exists {
+// 		// Accept "true"/"false" strings
+// 		if val == "true" {
+// 			return true
+// 		}
+// 		if val == "false" {
+// 			return false
+// 		}
+// 	}
+// 	return defaultValue
+// }
+
 // setupSamplePrompt configures and adds the sample prompt to the MCP server
 func setupSamplePrompt(s *server.MCPServer) {
 	samplePrompt := mcp.NewPrompt("Make Dockerfile and compose file",
@@ -95,6 +163,8 @@ func setupSamplePrompt(s *server.MCPServer) {
 			mcp.RequiredArgument(),
 		),
 	)
+
+	s.AddPrompt(BYOCPrompt, handleBYOCPrompt)
 
 	s.AddPrompt(samplePrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		projectPath, ok := request.Params.Arguments["project_path"]
