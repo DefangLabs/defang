@@ -500,9 +500,9 @@ func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	}
 
 	if len(envInstructions) > 0 {
-		printDefangHint("Check the files in your favorite editor.\nTo configure the service, do "+cd, envInstructions...)
+		printDefangHint("Check the files in your favorite editor.\nTo configure this project, run "+cd, envInstructions...)
 	} else {
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
+		printDefangHint("Check the files in your favorite editor.\nTo deploy this project, run "+cd, "compose up")
 	}
 }
 
