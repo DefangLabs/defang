@@ -388,7 +388,7 @@ func getHerokuAuthToken() (string, error) {
 	for {
 		err := survey.AskOne(&survey.Password{
 			Message: "Please paste a Heroku auth token, so Defang can collect information about your applications",
-			Help:    "Run `Visit https://dashboard.heroku.com/account/applications/authorizations/new",
+			Help:    "Visit https://dashboard.heroku.com/account/applications/authorizations/new",
 		}, &token)
 		if err != nil {
 			return "", fmt.Errorf("failed to prompt for Heroku token: %w", err)
