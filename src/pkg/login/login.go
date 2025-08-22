@@ -94,7 +94,7 @@ func interactiveLogin(ctx context.Context, client client.FabricClient, fabric st
 	return nil
 }
 
-func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric, token string) error {
+func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric string, token string) error {
 	if token == "" {
 		term.Debug("Non-interactive login using GitHub Actions id-token")
 		var err error
