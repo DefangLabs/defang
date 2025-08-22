@@ -50,6 +50,10 @@ universal_binaries:
       post:
         - ./bin/codesign.sh "{{ .Path }}"
 
+before:
+  hooks:
+    - cp ../README.md README.md
+
 archives:
   - id: defang-archive
     format_overrides:
