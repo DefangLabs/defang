@@ -434,7 +434,7 @@ func getResourceReservations(r composeTypes.Resources) *composeTypes.Resource {
 // Copied from shared/utils.ts but slightly modified to remove the negative-lookahead assertion
 var interpolationRegex = regexp.MustCompile(`(?i)\$(\$)|\$(?:{([^}]+)}|([_a-z][_a-z0-9]*))|([^$]+)`) // [1] escaped dollar, [2] curly braces, [3] variable name, [4] literal
 
-func GetMissingConfigVars(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) ([]string, error) {
+func ValidateProjectConfig(ctx context.Context, composeProject *composeTypes.Project, listConfigNamesFunc ListConfigNamesFunc) error {
 	var names []string
 	// make list of secrets
 	for _, service := range composeProject.Services {
@@ -456,26 +456,30 @@ func GetMissingConfigVars(ctx context.Context, composeProject *composeTypes.Proj
 	}
 
 	if len(names) == 0 {
-		return []string{}, nil // no secrets to check
+		return nil // no secrets to check
 	}
 
 	configs, err := listConfigNamesFunc(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Deduplicate (sort + uniq)
 	slices.Sort(names)
 	names = slices.Compact(names)
 
-	missingNames := []string{}
+	errMissingConfig := ErrMissingConfig{}
 	for _, name := range names {
 		if !slices.Contains(configs, name) {
-			missingNames = append(missingNames, name)
+			errMissingConfig = append(errMissingConfig, name)
 		}
 	}
 
-	return missingNames, nil
+	if len(errMissingConfig) > 0 {
+		return errMissingConfig
+	}
+
+	return nil
 }
 
 func validateManagedStore(managedStore any) (bool, error) {

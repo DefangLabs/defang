@@ -572,10 +572,14 @@ func collectUnsetEnvVars(project *composeTypes.Project) []string {
 	if project == nil {
 		return nil // in case loading failed
 	}
-	missingVars, _ := compose.GetMissingConfigVars(context.TODO(), project, func(ctx context.Context) ([]string, error) {
+	err := compose.ValidateProjectConfig(context.TODO(), project, func(ctx context.Context) ([]string, error) {
 		return nil, nil // assume no config
 	})
-	return missingVars
+	var missingConfig compose.ErrMissingConfig
+	if errors.As(err, &missingConfig) {
+		return missingConfig
+	}
+	return nil
 }
 
 var getVersionCmd = &cobra.Command{

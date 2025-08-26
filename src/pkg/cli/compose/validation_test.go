@@ -3,6 +3,7 @@ package compose
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"slices"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/aws/smithy-go/ptr"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestValidationAndConvert(t *testing.T) {
@@ -45,12 +45,9 @@ func TestValidationAndConvert(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		missingVars, err := GetMissingConfigVars(context.Background(), project, listConfigNamesFunc)
-		assert.NoError(t, err)
-
-		if len(missingVars) > 0 {
-			t.Logf("missing configs: %v", missingVars)
-			logs.WriteString("missing configs [\"" + strings.Join(missingVars, "\" \"") + "\"] (https://docs.defang.io/docs/concepts/configuration)\n")
+		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
+			t.Logf("Project config validation failed: %v", err)
+			logs.WriteString(err.Error() + "\n")
 		}
 
 		if err := ValidateProject(project); err != nil {
@@ -94,9 +91,9 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		missingNames, err := GetMissingConfigVars(ctx, &testProject, makeListConfigNamesFunc())
-		assert.NoError(t, err)
-		assert.Empty(t, missingNames)
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	t.Run("Missing Config", func(t *testing.T) {
@@ -108,11 +105,19 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		missingNames, err := GetMissingConfigVars(ctx, &testProject, makeListConfigNamesFunc())
-		assert.NoError(t, err)
-		assert.Len(t, missingNames, 3)
-		for _, name := range []string{"ASD", "BSD", "CSD"} {
-			assert.Contains(t, missingNames, name)
+		var missing ErrMissingConfig
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingConfig, got: %v", err)
+		} else {
+			if len(missing) != 3 {
+				t.Fatalf("unexpected error: number of missing, got: %d expected 3", len(missing))
+			}
+
+			for index, name := range []string{"ASD", "BSD", "CSD"} {
+				if missing[index] != name {
+					t.Fatalf("unexpected error: missing, got: %s expected ASD", missing[index])
+				}
+			}
 		}
 	})
 
@@ -124,9 +129,9 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		missingNames, err := GetMissingConfigVars(ctx, &testProject, makeListConfigNamesFunc(CONFIG_VAR))
-		assert.NoError(t, err)
-		assert.Empty(t, missingNames)
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc(CONFIG_VAR)); err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	t.Run("Missing interpolated variable", func(t *testing.T) {
@@ -135,22 +140,18 @@ func TestValidateConfig(t *testing.T) {
 		}
 		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
 
-		missingNames, err := GetMissingConfigVars(ctx, &testProject, makeListConfigNamesFunc())
-		assert.NoError(t, err)
-		assert.Len(t, missingNames, 1)
-		assert.Contains(t, missingNames, "CONFIG_VAR")
-	})
+		var missing ErrMissingConfig
+		if err := ValidateProjectConfig(ctx, &testProject, makeListConfigNamesFunc()); !errors.As(err, &missing) {
+			t.Fatalf("expected ErrMissingConfig, got: %v", err)
+		} else {
+			if len(missing) != 1 {
+				t.Fatalf("unexpected error: number of missing, got: %d expected 1", len(missing))
+			}
 
-	t.Run("Missing interpolated variable", func(t *testing.T) {
-		env := map[string]*string{
-			"interpolated": ptr.String(`${CONFIG_VAR}`),
+			if missing[0] != "CONFIG_VAR" {
+				t.Fatalf("unexpected error: missing, got: %s expected CONFIG_VAR", missing[0])
+			}
 		}
-		testProject.Services["service1"] = composeTypes.ServiceConfig{Environment: env}
-
-		missingNames, err := GetMissingConfigVars(ctx, &testProject, makeListConfigNamesFunc())
-		assert.NoError(t, err)
-		assert.Len(t, missingNames, 1)
-		assert.Contains(t, missingNames, "CONFIG_VAR")
 	})
 }
 
