@@ -2,15 +2,15 @@
 ![Discord](https://img.shields.io/discord/1233224785450897561)
 ![GitHub Release](https://img.shields.io/github/v/release/DefangLabs/defang)
 
-# ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
+### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-### Develop Anything. Deploy Anywhere.
+## Develop Anything. Deploy Anywhere.
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
-### Defang CLI
+## Defang CLI
 The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
 
-### Defang MCP Server
+## Defang MCP Server
 The Defang Model Context Protocol [(MCP)](https://docs.defang.io/docs/concepts/mcp) Server is tailored for developers who work primarily within integrated development environments (IDEs). It enables seamless cloud deployment from supported editors such as Cursor, Windsurf, VS Code, VS Code Insiders and Claude delivering a fully integrated experience without leaving your development environment.
 
 ## This repo includes:
@@ -78,7 +78,7 @@ Install the Defang CLI from one of the following sources:
 
 ## Support
 
-- File any issues [right here on GitHub](https://github.com/DefangLabs/defang/issues)
+- File any issues [here](https://github.com/DefangLabs/defang/issues)
 
 ## Command completion
 
