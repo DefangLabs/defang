@@ -495,7 +495,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -528,7 +528,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}

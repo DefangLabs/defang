@@ -821,7 +821,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -1121,10 +1121,11 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return cli.NewProvider(ctx, providerID, client)
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
 	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: providerID.Value(),
+		Project:      projectName,
+		Provider:     providerID.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
 	}
 
 	resp, err := client.CanIUse(ctx, &canUseReq)
