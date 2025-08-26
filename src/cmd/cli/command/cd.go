@@ -46,7 +46,7 @@ var cdDestroyCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ var cdDownCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ var cdRefreshCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ var cdCancelCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -164,7 +164,7 @@ var cdListCmd = &cobra.Command{
 		}
 
 		if remote {
-			err = canIUseProvider(cmd.Context(), provider, "")
+			err = canIUseProvider(cmd.Context(), provider, "", 0)
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ var cdPreviewCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, project.Name)
+		err = canIUseProvider(cmd.Context(), provider, project.Name, 1) // 1 SDU for BYOC preview
 		if err != nil {
 			return err
 		}
