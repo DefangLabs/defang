@@ -21,7 +21,7 @@ var _ Provider = (*PlaygroundProvider)(nil)
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
-		term.Warn("DEFANG_PULUMI_DIR is set, but ignored when using the Playground provider")
+		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
 	}
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
 }
