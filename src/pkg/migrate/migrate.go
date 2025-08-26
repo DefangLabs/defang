@@ -232,6 +232,52 @@ func cleanupComposeFile(in string) (string, error) {
 							})
 						}
 					}
+
+					// railpack generates images with `Entrypoint: "bash -c"`, and
+					// compose-go normalizes string commands into arrays, for example:
+					// `command: npm start` -> `command: [ "npm", "start" ]`. As a
+					// result, the command which ultimately gets run is
+					// `bash -c npm start`. When this gets run, `bash` will ignore
+					// `start` and `npm` will get run in a subprocess--only printing
+					// the helptext. As it is common for users to type their service
+					// command as a string, this cleanup step will help ensure the
+					// command is run as intended by replacing `command: npm start`
+					// with `command: [ "npm start" ]`.
+					if kk.Value == "command" {
+						if vk.Kind == yaml.ScalarNode {
+							cmd := vk.Value
+							vk.Value = ""
+							vk.Kind = yaml.SequenceNode
+							vk.Tag = "!!seq"
+							vk.Content = []*yaml.Node{
+								{
+									Tag:   "!!str",
+									Kind:  yaml.ScalarNode,
+									Value: cmd,
+								},
+							}
+						}
+						// We will do the same for
+						// `command: ["npm", "start"]`, which will also get transformed
+						// to `command: [ "npm start" ]`.
+						if vk.Kind == yaml.SequenceNode && len(vk.Content) > 1 {
+							var cmd string
+							for i, c := range vk.Content {
+								if i > 0 {
+									cmd += " "
+								}
+								cmd += c.Value
+							}
+							// combine content nodes into one
+							vk.Content = []*yaml.Node{
+								{
+									Tag:   "!!str",
+									Kind:  yaml.ScalarNode,
+									Value: cmd,
+								},
+							}
+						}
+					}
 				}
 			}
 		}

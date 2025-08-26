@@ -472,6 +472,40 @@ services:
 `,
 			expectingError: false,
 		},
+		{
+			name: "string command",
+			input: `
+services:
+  web:
+    build: .
+    command: npm start
+`,
+			expected: `services:
+    web:
+        build: .
+        command:
+            - npm start
+`,
+			expectingError: false,
+		},
+		{
+			name: "array command",
+			input: `
+services:
+  web:
+    build: .
+    command:
+      - npm
+      - start
+`,
+			expected: `services:
+    web:
+        build: .
+        command:
+            - npm start
+`,
+			expectingError: false,
+		},
 	}
 
 	for _, tt := range tests {
