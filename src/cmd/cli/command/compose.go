@@ -155,7 +155,17 @@ func makeComposeUpCmd() *cobra.Command {
 
 			deploy, project, err := cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
 			if err != nil {
-				return handleComposeUpErr(ctx, err, project, provider)
+				retry, err2 := handleComposeUpErr(ctx, err, project, provider)
+				if err2 != nil {
+					return err2
+				}
+
+				if retry {
+					deploy, project, err = cli.ComposeUp(ctx, project, client, provider, upload, mode.Value())
+					if err != nil {
+						return err
+					}
+				}
 			}
 
 			if len(deploy.Services) == 0 {
@@ -218,34 +228,67 @@ func makeComposeUpCmd() *cobra.Command {
 	return composeUpCmd
 }
 
-func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) error {
+func handleComposeUpErr(ctx context.Context, err error, project *compose.Project, provider cliClient.Provider) (bool, error) {
 	if errors.Is(err, types.ErrComposeFileNotFound) {
 		// TODO: generate a compose file based on the current project
 		printDefangHint("To start a new project, do:", "new")
-	}
-
-	if nonInteractive {
-		return err
-	}
-
-	if strings.Contains(err.Error(), "maximum number of projects") {
-		if projectName, err2 := provider.RemoteProjectName(ctx); err2 == nil {
-			term.Error("Error:", cliClient.PrettyError(err))
-			if _, err := cli.InteractiveComposeDown(ctx, provider, projectName); err != nil {
-				term.Debug("ComposeDown failed:", err)
-				printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
-			} else {
-				// TODO: actually do the "compose up" (because that's what the user intended in the first place)
-				printDefangHint("To try deployment again, do:", "compose up")
-			}
-			return nil
-		}
-		return err
+		return false, err
 	}
 
 	term.Error("Error:", cliClient.PrettyError(err))
+	if nonInteractive {
+		return false, err
+	}
+
+	if strings.Contains(err.Error(), "maximum number of projects") {
+		projectName, err2 := provider.RemoteProjectName(ctx)
+		if err2 != nil {
+			term.Warn("Failed to fetch remote project name for interactive down", err2)
+			return false, err2
+		}
+		if _, err2 := cli.InteractiveComposeDown(ctx, provider, projectName); err2 != nil {
+			term.Debug("ComposeDown failed:", err2)
+			printDefangHint("To deactivate a project, do:", "compose down --project-name "+projectName)
+			return false, err2
+		}
+		return true, nil
+	}
+
+	var missingConfigErr *compose.ErrMissingConfig
+	if errors.As(err, &missingConfigErr) {
+		// printDefangHint("To fix the missing config, do:", "defang config set <name> <value>")
+		missingNames := missingConfigErr.Names()
+		term.Warn("missing config names: ", missingNames)
+		err2 := InteractiveConfigSet(ctx, project, provider, missingNames)
+		if err2 != nil {
+			term.Warn("Failed to interactively set missing config", err2)
+			return true, err2
+		}
+	}
+
 	track.Evt("Debug Prompted", P("composeErr", err))
-	return cli.InteractiveDebugForClientError(ctx, client, project, err)
+	return false, cli.InteractiveDebugForClientError(ctx, client, project, err)
+}
+
+func InteractiveConfigSet(ctx context.Context, project *compose.Project, provider cliClient.Provider, missingNames []string) error {
+	for _, name := range missingNames {
+		var value string
+		message := fmt.Sprintf("Enter value for %q: ", name)
+		prompt := &survey.Input{
+			Message: message,
+			Default: os.Getenv(name),
+		}
+		err := survey.AskOne(prompt, &value)
+		if err != nil {
+			return err
+		}
+		err = cli.ConfigSet(ctx, project.Name, provider, name, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func handleTailAndMonitorErr(ctx context.Context, err error, client *cliClient.GrpcClient, debugConfig cli.DebugConfig) {
