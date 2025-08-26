@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/surveyor"
@@ -261,13 +262,11 @@ func cleanupComposeFile(in string) (string, error) {
 						// `command: ["npm", "start"]`, which will also get transformed
 						// to `command: [ "npm start" ]`.
 						if vk.Kind == yaml.SequenceNode && len(vk.Content) > 1 {
-							var cmd string
-							for i, c := range vk.Content {
-								if i > 0 {
-									cmd += " "
-								}
-								cmd += c.Value
+							var parts []string
+							for _, c := range vk.Content {
+								parts = append(parts, shellescape.Quote(c.Value))
 							}
+							cmd := strings.Join(parts, " ")
 							// combine content nodes into one
 							vk.Content = []*yaml.Node{
 								{

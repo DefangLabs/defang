@@ -506,6 +506,24 @@ services:
 `,
 			expectingError: false,
 		},
+		{
+			name: "array command with multiple words",
+			input: `
+services:
+  web:
+    build: .
+    command:
+      - echo
+      - hello world
+`,
+			expected: `services:
+    web:
+        build: .
+        command:
+            - echo 'hello world'
+`,
+			expectingError: false,
+		},
 	}
 
 	for _, tt := range tests {
