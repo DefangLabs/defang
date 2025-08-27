@@ -25,6 +25,4 @@ sync-readme:
 	  awk '/^## Support/{p=1} (/^## /||/^### /){if(p&&!/^## Support/){exit}} p' README.md >> src/README.md; \
 	  awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' README.md >> src/README.md; \
 	  echo 'src/README.md updated.'; \
-	else \
-	  echo 'README.md unchanged, skipping sync.'; \
 	fi
