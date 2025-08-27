@@ -56,7 +56,8 @@ const (
 	MCPClientCode           MCPClient = "code"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
 	MCPClientInsiders       MCPClient = "code-insiders"
-	MCPClientClaude         MCPClient = "claude"
+	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
+	MCPClientClaudeCode     MCPClient = "claude-code"
 	MCPClientWindsurf       MCPClient = "windsurf"
 	MCPClientCascade        MCPClient = "cascade"
 	MCPClientCodeium        MCPClient = "codeium"
@@ -75,7 +76,8 @@ var ValidVSCodeClients = []MCPClient{
 // ValidClients is a list of supported MCP clients
 var ValidClients = append(
 	[]MCPClient{
-		MCPClientClaude,
+		MCPClientClaudeDesktop,
+		MCPClientClaudeCode,
 		MCPClientWindsurf,
 		MCPClientCascade,
 		MCPClientCodeium,
@@ -115,9 +117,14 @@ var codeInsidersConfig = ClientInfo{
 	useHomeDir: false,
 }
 
-var claudeConfig = ClientInfo{
+var claudeDesktopConfig = ClientInfo{
 	configFile: "Claude/claude_desktop_config.json",
 	useHomeDir: false,
+}
+
+var claudeCodeConfig = ClientInfo{
+	configFile: ".claude.json",
+	useHomeDir: true,
 }
 
 var cursorConfig = ClientInfo{
@@ -139,7 +146,8 @@ var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientCode:           vscodeConfig,
 	MCPClientVSCodeInsiders: codeInsidersConfig,
 	MCPClientInsiders:       codeInsidersConfig,
-	MCPClientClaude:         claudeConfig,
+	MCPClientClaudeDesktop:  claudeDesktopConfig,
+	MCPClientClaudeCode:     claudeCodeConfig,
 	MCPClientCursor:         cursorConfig,
 	MCPClientKiro:           kiroConfig,
 }
