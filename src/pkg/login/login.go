@@ -111,7 +111,7 @@ func NonInteractiveGitHubLogin(ctx context.Context, client client.FabricClient, 
 	return cluster.SaveAccessToken(fabric, resp.AccessToken)
 }
 
-func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClient, addr string) error {
+func InteractiveRequireLoginAndToS(ctx context.Context, fabric *client.GrpcClient, addr string) error {
 	var err error
 	if err = fabric.CheckLoginAndToS(ctx); err != nil {
 		// Login interactively now; only do this for authorization-related errors
@@ -126,8 +126,10 @@ func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClie
 			}
 
 			// Reconnect with the new token
-			if fabric, err = cli.Connect(ctx, addr); err != nil {
+			if newFabric, err := cli.Connect(ctx, addr); err != nil {
 				return err
+			} else {
+				*fabric = *newFabric
 			}
 
 			if err = fabric.CheckLoginAndToS(ctx); err == nil { // recheck (new token = new user)
