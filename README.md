@@ -4,7 +4,7 @@
 
 ### ![Defang](https://raw.githubusercontent.com/DefangLabs/defang-assets/main/Logos/Element_Wordmark_Slogan/JPG/Dark_Colour_Glow.jpg)
 
-## Develop Anything. Deploy Anywhere.
+## Develop Once. Deploy Anywhere.
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 ## Defang CLI

@@ -1,4 +1,4 @@
-## Develop Anything. Deploy Anywhere.
+## Develop Once. Deploy Anywhere.
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 ## Defang CLI
