@@ -240,7 +240,7 @@ func cleanupComposeFile(in string) (string, error) {
 					// result, the command which ultimately gets run is
 					// `bash -c npm start`. When this gets run, `bash` will ignore
 					// `start` and `npm` will get run in a subprocess--only printing
-					// the helptext. As it is common for users to type their service
+					// the help text. As it is common for users to type their service
 					// command as a string, this cleanup step will help ensure the
 					// command is run as intended by replacing `command: npm start`
 					// with `command: [ "npm start" ]`.
