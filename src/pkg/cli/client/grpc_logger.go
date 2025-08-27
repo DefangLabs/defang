@@ -40,8 +40,20 @@ func (g grpcLogger) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	}
 }
 
-func (grpcLogger) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return next
+func (g grpcLogger) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
+		conn := next(ctx, spec)
+
+		// Add a request ID to the context
+		requestId := pkg.RandomID()
+		conn.RequestHeader().Add("X-Request-Id", requestId)
+
+		// Get the request type name
+		reqType := spec.Procedure
+
+		term.Debug(g.prefix, requestId, reqType, "streaming connection established")
+		return conn
+	}
 }
 
 func (grpcLogger) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
