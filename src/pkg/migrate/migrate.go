@@ -264,9 +264,9 @@ func cleanupComposeFile(in string) (string, error) {
 						if vk.Kind == yaml.SequenceNode && len(vk.Content) > 1 {
 							var parts []string
 							for _, c := range vk.Content {
-								parts = append(parts, shellescape.Quote(c.Value))
+								parts = append(parts, c.Value)
 							}
-							cmd := strings.Join(parts, " ")
+							cmd := shellescape.QuoteCommand(parts)
 							// combine content nodes into one
 							vk.Content = []*yaml.Node{
 								{
