@@ -296,6 +296,7 @@ func handleVSCodeConfig(configPath string) error {
 
 func handleStandardConfig(configPath string) error {
 	// For all other clients, use the standard format
+	var existingData map[string]any
 	var config MCPConfig
 
 	// Check if the file exists
@@ -306,18 +307,24 @@ func handleStandardConfig(configPath string) error {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
 
-		// Parse the JSON
-		if err := json.Unmarshal(data, &config); err != nil {
+		// Parse the JSON into a generic map to preserve all settings
+		if err := json.Unmarshal(data, &existingData); err != nil {
 			// If we can't parse it, start fresh
-			config = MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
+			existingData = make(map[string]any)
+		}
+
+		// Try to extract MCPServers from existing data
+		if mcpServersData, ok := existingData["mcpServers"]; ok {
+			// Convert back to MCPConfig structure
+			mcpServersJSON, err := json.Marshal(map[string]any{"mcpServers": mcpServersData})
+			if err != nil {
+				return fmt.Errorf("failed to marshal mcpServers: %w", err)
 			}
+			json.Unmarshal(mcpServersJSON, &config)
 		}
 	} else {
 		// File doesn't exist, create a new config
-		config = MCPConfig{
-			MCPServers: make(map[string]MCPServerConfig),
-		}
+		existingData = make(map[string]any)
 	}
 
 	if config.MCPServers == nil {
@@ -331,8 +338,11 @@ func handleStandardConfig(configPath string) error {
 	// Add or update the Defang MCP server config
 	config.MCPServers["defang"] = *defangConfig
 
+	// Update the existingData with the new MCPServers
+	existingData["mcpServers"] = config.MCPServers
+
 	// Write the config to the file
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := json.MarshalIndent(existingData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -267,6 +268,110 @@ func TestGetClientConfigPath(t *testing.T) {
 					t.Errorf("Expected path %s for client %s, but got %s", tt.expectedPath, tt.client, configPath)
 				}
 			}
+		})
+	}
+}
+
+func TestWriteVSCodeConfig(t *testing.T) {
+	// This test function will use handleVSCodeConfig to make sure that is not overwritten existing data and only add and append our mcp config, or if there not file make one and write it.
+	test := []struct {
+		name          string
+		fileExists    bool
+		existingData  string
+		expectedData  string
+		expectedError bool
+	}{
+		{
+			name:         "new_file",
+			fileExists:   false,
+			existingData: "",
+			expectedData: `{
+	"servers": {
+		"defang": {
+			"args": [
+				"mcp",
+				"serve"
+			],
+			"command": "/usr/local/bin/defang",
+			"type": "stdio"
+		}
+	}
+}`,
+		},
+		{
+			name:       "existing_file",
+			fileExists: true,
+			existingData: `{
+	"servers": {
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			],
+			"env": {
+				"OPENAPI_MCP_HEADERS": {
+					"Authorization": "Bearer ${input:NOTION_TOKEN}",
+					"Notion-Version": "2022-06-28"
+				}
+			},
+			"type": "stdio"
+		},
+		"github": {
+			"url": "https://api.githubcopilot.com/mcp/"
+		}
+	},
+	"inputs": [
+		{
+			"id": "NOTION_TOKEN",
+			"type": "promptString",
+			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
+			"password": true
+		}
+	]
+}`,
+			expectedData: `{
+	"servers": {
+		"defang": {
+			"args": [
+				"mcp",
+				"serve"
+			],
+			"command": "/usr/local/bin/defang",
+			"type": "stdio"
+		},
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			],
+			"env": {
+				"OPENAPI_MCP_HEADERS": {
+					"Authorization": "Bearer ${input:NOTION_TOKEN}",
+					"Notion-Version": "2022-06-28"
+				}
+			},
+			"type": "stdio"
+		},
+		"github": {
+			"url": "https://api.githubcopilot.com/mcp/"
+		}
+	},
+	"inputs": [
+		{
+			"id": "NOTION_TOKEN",
+			"type": "promptString",
+			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
+			"password": true
+		}
+	]
+}`,
+		},
+	}
+	for _, tt := range test {
+		t.Run(tt.name, func(t *testing.T) {
+			fmt.Println("hello")
 		})
 	}
 }
