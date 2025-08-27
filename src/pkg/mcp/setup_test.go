@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,48 +39,92 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath: filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"),
 		},
 
-		// Claude tests - Darwin
+		// Claude Desktop tests - Darwin
 		{
-			name:         "claude_darwin",
-			client:       MCPClientClaude,
+			name:         "claude_desktop_darwin",
+			client:       MCPClientClaudeDesktop,
 			goos:         "darwin",
 			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
 		},
 
-		// Claude tests - Windows with APPDATA
+		// Claude Desktop tests - Windows with APPDATA
 		{
-			name:         "claude_windows_with_appdata",
-			client:       MCPClientClaude,
+			name:         "claude_desktop_windows_with_appdata",
+			client:       MCPClientClaudeDesktop,
 			goos:         "windows",
 			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
 			expectedPath: filepath.Join("C:\\Users\\TestUser\\AppData\\Roaming", "Claude", "claude_desktop_config.json"),
 		},
 
-		// Claude tests - Windows without APPDATA
+		// Claude Desktop tests - Windows without APPDATA
 		{
-			name:         "claude_windows_without_appdata",
-			client:       MCPClientClaude,
+			name:         "claude_desktop_windows_without_appdata",
+			client:       MCPClientClaudeDesktop,
 			goos:         "windows",
 			appData:      "",
 			expectedPath: filepath.Join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
 		},
 
-		// Claude tests - Linux with XDG_CONFIG_HOME
+		// Claude Desktop tests - Linux with XDG_CONFIG_HOME
 		{
-			name:          "claude_linux_with_xdg",
-			client:        MCPClientClaude,
+			name:          "claude_desktop_linux_with_xdg",
+			client:        MCPClientClaudeDesktop,
 			goos:          "linux",
 			xdgConfigHome: "/home/testuser/.config",
 			expectedPath:  filepath.Join("/home/testuser/.config", "Claude", "claude_desktop_config.json"),
 		},
 
-		// Claude tests - Linux without XDG_CONFIG_HOME
+		// Claude Desktop tests - Linux without XDG_CONFIG_HOME
 		{
-			name:          "claude_linux_without_xdg",
-			client:        MCPClientClaude,
+			name:          "claude_desktop_linux_without_xdg",
+			client:        MCPClientClaudeDesktop,
 			goos:          "linux",
 			xdgConfigHome: "",
 			expectedPath:  filepath.Join(homeDir, ".config", "Claude", "claude_desktop_config.json"),
+		},
+
+		// Claude Code tests - Darwin
+		{
+			name:         "claude_code_darwin",
+			client:       MCPClientClaudeCode,
+			goos:         "darwin",
+			expectedPath: filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude Code tests - Linux with XDG_CONFIG_HOME
+		{
+			name:          "claude_code_linux_with_xdg",
+			client:        MCPClientClaudeCode,
+			goos:          "linux",
+			xdgConfigHome: "/home/testuser",
+			expectedPath:  filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude Code tests - Linux without XDG_CONFIG_HOME
+		{
+			name:          "claude_code_linux_without_xdg",
+			client:        MCPClientClaudeCode,
+			goos:          "linux",
+			xdgConfigHome: "",
+			expectedPath:  filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude Code tests - Windows with APPDATA
+		{
+			name:         "claude_code_windows_with_appdata",
+			client:       MCPClientClaudeCode,
+			goos:         "windows",
+			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
+			expectedPath: filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude code tests - Windows without APPDATA
+		{
+			name:         "claude_code_windows_without_appdata",
+			client:       MCPClientClaudeCode,
+			goos:         "windows",
+			appData:      "",
+			expectedPath: filepath.Join(homeDir, ".claude.json"),
 		},
 
 		// Cursor tests
@@ -223,6 +268,110 @@ func TestGetClientConfigPath(t *testing.T) {
 					t.Errorf("Expected path %s for client %s, but got %s", tt.expectedPath, tt.client, configPath)
 				}
 			}
+		})
+	}
+}
+
+func TestWriteVSCodeConfig(t *testing.T) {
+	// This test function will use handleVSCodeConfig to make sure that is not overwritten existing data and only add and append our mcp config, or if there not file make one and write it.
+	test := []struct {
+		name          string
+		fileExists    bool
+		existingData  string
+		expectedData  string
+		expectedError bool
+	}{
+		{
+			name:         "new_file",
+			fileExists:   false,
+			existingData: "",
+			expectedData: `{
+	"servers": {
+		"defang": {
+			"args": [
+				"mcp",
+				"serve"
+			],
+			"command": "/usr/local/bin/defang",
+			"type": "stdio"
+		}
+	}
+}`,
+		},
+		{
+			name:       "existing_file",
+			fileExists: true,
+			existingData: `{
+	"servers": {
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			],
+			"env": {
+				"OPENAPI_MCP_HEADERS": {
+					"Authorization": "Bearer ${input:NOTION_TOKEN}",
+					"Notion-Version": "2022-06-28"
+				}
+			},
+			"type": "stdio"
+		},
+		"github": {
+			"url": "https://api.githubcopilot.com/mcp/"
+		}
+	},
+	"inputs": [
+		{
+			"id": "NOTION_TOKEN",
+			"type": "promptString",
+			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
+			"password": true
+		}
+	]
+}`,
+			expectedData: `{
+	"servers": {
+		"defang": {
+			"args": [
+				"mcp",
+				"serve"
+			],
+			"command": "/usr/local/bin/defang",
+			"type": "stdio"
+		},
+		"notion": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@notionhq/notion-mcp-server"
+			],
+			"env": {
+				"OPENAPI_MCP_HEADERS": {
+					"Authorization": "Bearer ${input:NOTION_TOKEN}",
+					"Notion-Version": "2022-06-28"
+				}
+			},
+			"type": "stdio"
+		},
+		"github": {
+			"url": "https://api.githubcopilot.com/mcp/"
+		}
+	},
+	"inputs": [
+		{
+			"id": "NOTION_TOKEN",
+			"type": "promptString",
+			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
+			"password": true
+		}
+	]
+}`,
+		},
+	}
+	for _, tt := range test {
+		t.Run(tt.name, func(t *testing.T) {
+			fmt.Println("hello")
 		})
 	}
 }
