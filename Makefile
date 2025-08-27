@@ -18,8 +18,13 @@ setup:
 
 .PHONY: sync-readme
 sync-readme:
-	awk '/^## Develop Anything\. Deploy Anywhere\./{p=1} (/^## /||/^### /){if(p&&!/^## Develop Anything\. Deploy Anywhere\./){exit}} p' README.md > src/README.md; \
-	awk '/^## Defang CLI/{p=1} (/^## /||/^### /){if(p&&!/^## Defang CLI/){exit}} p' README.md >> src/README.md; \
-	awk '/^## Getting started/{p=1} (/^## /||/^### /){if(p&&!/^## Getting started/){exit}} p' README.md >> src/README.md; \
-	awk '/^## Support/{p=1} (/^## /||/^### /){if(p&&!/^## Support/){exit}} p' README.md >> src/README.md; \
-	awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' README.md >> src/README.md
+	@if git diff --name-only HEAD | grep -q '^README.md$$'; then \
+	  awk '/^## Develop Once\. Deploy Anywhere\./{p=1} (/^## /||/^### /){if(p&&!/^## Develop Once\. Deploy Anywhere\./){exit}} p' README.md > src/README.md; \
+	  awk '/^## Defang CLI/{p=1} (/^## /||/^### /){if(p&&!/^## Defang CLI/){exit}} p' README.md >> src/README.md; \
+	  awk '/^## Getting started/{p=1} (/^## /||/^### /){if(p&&!/^## Getting started/){exit}} p' README.md >> src/README.md; \
+	  awk '/^## Support/{p=1} (/^## /||/^### /){if(p&&!/^## Support/){exit}} p' README.md >> src/README.md; \
+	  awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' README.md >> src/README.md; \
+	  echo 'src/README.md updated.'; \
+	else \
+	  echo 'README.md unchanged, skipping sync.'; \
+	fi
