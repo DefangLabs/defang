@@ -40,7 +40,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 		// Claude Desktop tests - Darwin
 		{
-			name:         "claude_darwin",
+			name:         "claude_desktop_darwin",
 			client:       MCPClientClaudeDesktop,
 			goos:         "darwin",
 			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
@@ -48,7 +48,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 		// Claude Desktop tests - Windows with APPDATA
 		{
-			name:         "claude_windows_with_appdata",
+			name:         "claude_desktop_windows_with_appdata",
 			client:       MCPClientClaudeDesktop,
 			goos:         "windows",
 			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
@@ -57,7 +57,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 		// Claude Desktop tests - Windows without APPDATA
 		{
-			name:         "claude_windows_without_appdata",
+			name:         "claude_desktop_windows_without_appdata",
 			client:       MCPClientClaudeDesktop,
 			goos:         "windows",
 			appData:      "",
@@ -66,7 +66,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 		// Claude Desktop tests - Linux with XDG_CONFIG_HOME
 		{
-			name:          "claude_linux_with_xdg",
+			name:          "claude_desktop_linux_with_xdg",
 			client:        MCPClientClaudeDesktop,
 			goos:          "linux",
 			xdgConfigHome: "/home/testuser/.config",
@@ -75,7 +75,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 		// Claude Desktop tests - Linux without XDG_CONFIG_HOME
 		{
-			name:          "claude_linux_without_xdg",
+			name:          "claude_desktop_linux_without_xdg",
 			client:        MCPClientClaudeDesktop,
 			goos:          "linux",
 			xdgConfigHome: "",
