@@ -90,30 +90,12 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath: filepath.Join(homeDir, ".claude.json"),
 		},
 
-		// Claude Code tests - Windows with APPDATA
-		{
-			name:         "claude_code_windows_with_appdata",
-			client:       MCPClientClaudeCode,
-			goos:         "windows",
-			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
-			expectedPath: filepath.Join(homeDir, ".claude.json"),
-		},
-
-		// Claude Code tests - Windows without APPDATA
-		{
-			name:         "claude_code_windows_without_appdata",
-			client:       MCPClientClaudeCode,
-			goos:         "windows",
-			appData:      "",
-			expectedPath: filepath.Join(homeDir, ".claude.json"),
-		},
-
 		// Claude Code tests - Linux with XDG_CONFIG_HOME
 		{
 			name:          "claude_code_linux_with_xdg",
 			client:        MCPClientClaudeCode,
 			goos:          "linux",
-			xdgConfigHome: "/home/testuser/.config",
+			xdgConfigHome: "/home/testuser",
 			expectedPath:  filepath.Join(homeDir, ".claude.json"),
 		},
 
@@ -124,6 +106,24 @@ func TestGetClientConfigPath(t *testing.T) {
 			goos:          "linux",
 			xdgConfigHome: "",
 			expectedPath:  filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude Code tests - Windows with APPDATA
+		{
+			name:         "claude_code_windows_with_appdata",
+			client:       MCPClientClaudeCode,
+			goos:         "windows",
+			appData:      "C:\\Users\\TestUser\\AppData\\Roaming",
+			expectedPath: filepath.Join(homeDir, ".claude.json"),
+		},
+
+		// Claude code tests - Windows without APPDATA
+		{
+			name:         "claude_code_windows_without_appdata",
+			client:       MCPClientClaudeCode,
+			goos:         "windows",
+			appData:      "",
+			expectedPath: filepath.Join(homeDir, ".claude.json"),
 		},
 
 		// Cursor tests
