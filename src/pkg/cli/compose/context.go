@@ -74,10 +74,17 @@ defang.exe
 .defang`
 )
 
-type ArchiveType string
+type ArchiveType struct {
+	MimeType  MimeType
+	Extension string
+}
 
-const ArchiveTypeZip ArchiveType = "application/zip"
-const ArchiveTypeGzip ArchiveType = "application/gzip"
+type MimeType string
+
+var (
+	ArchiveTypeZip  = ArchiveType{MimeType: "application/zip", Extension: ".zip"}
+	ArchiveTypeGzip = ArchiveType{MimeType: "application/gzip", Extension: ".tar.gz"}
+)
 
 type WriterFactory interface {
 	CreateHeader(info fs.FileInfo, slashPath string) (io.Writer, error)
@@ -226,6 +233,11 @@ func getRemoteBuildContext(ctx context.Context, provider client.Provider, projec
 
 func uploadArchive(ctx context.Context, provider client.Provider, project string, body io.Reader, contentType ArchiveType, digest string) (string, error) {
 	// Upload the archive to the fabric controller storage;; TODO: use a streaming API
+	if contentType.MimeType == ArchiveTypeZip.MimeType {
+		digest = digest + ArchiveTypeZip.Extension
+	} else {
+		digest = digest + ArchiveTypeGzip.Extension
+	}
 	ureq := &defangv1.UploadURLRequest{Digest: digest, Project: project}
 	res, err := provider.CreateUploadURL(ctx, ureq)
 	if err != nil {
@@ -233,7 +245,7 @@ func uploadArchive(ctx context.Context, provider client.Provider, project string
 	}
 
 	// Do an HTTP PUT to the generated URL
-	resp, err := http.Put(ctx, res.Url, string(contentType), body)
+	resp, err := http.Put(ctx, res.Url, string(contentType.MimeType), body)
 	if err != nil {
 		return "", err
 	}
