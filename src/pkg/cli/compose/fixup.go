@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -95,6 +96,20 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 					}
 					// hint to CD that we want to use Railpack
 					svccfg.Build.Dockerfile = RAILPACK
+
+					// railpack generates images with `Entrypoint: "bash -c"`, and
+					// compose-go normalizes string commands into arrays, for example:
+					// `command: npm start` -> `command: [ "npm", "start" ]`. As a
+					// result, the command which ultimately gets run is
+					// `bash -c npm start`. When this gets run, `bash` will ignore
+					// `start` and `npm` will get run in a subprocess--only printing
+					// the help text. As it is common for users to type their service
+					// command as a string, this cleanup step will help ensure the
+					// command is run as intended by replacing `command: [ "npm", "start" ]`
+					// with `command: [ "npm start" ]`.
+					if len(svccfg.Command) > 1 {
+						svccfg.Command = []string{shellescape.QuoteCommand(svccfg.Command)}
+					}
 				}
 			}
 

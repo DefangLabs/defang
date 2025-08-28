@@ -4,7 +4,9 @@
       "context": ".",
       "dockerfile": "*Railpack"
     },
-    "command": null,
+    "command": [
+      "exec node index.js"
+    ],
     "entrypoint": null,
     "networks": {
       "default": null
@@ -15,7 +17,9 @@
       "context": ".",
       "dockerfile": "*Railpack"
     },
-    "command": null,
+    "command": [
+      "npm start"
+    ],
     "entrypoint": null,
     "networks": {
       "default": null
@@ -26,7 +30,9 @@
       "context": ".",
       "dockerfile": "*Railpack"
     },
-    "command": null,
+    "command": [
+      "something 'with space'"
+    ],
     "entrypoint": null,
     "networks": {
       "default": null
