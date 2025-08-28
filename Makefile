@@ -22,5 +22,5 @@ src/README.md: README.md
 	awk '/^## Getting started/{p=1} (/^## /||/^### /){if(p&&!/^## Getting started/){exit}} p' README.md >> src/README.md; \
 	awk '/^## Support/{p=1} (/^## /||/^### /){if(p&&!/^## Support/){exit}} p' README.md >> src/README.md; \
 	awk '/^## Environment Variables/{p=1} (/^## /||/^### /){if(p&&!/^## Environment Variables/){exit}} p' README.md >> src/README.md; \
-	echo 'src/README.md updated.';
-	false
+	echo 'src/README.md was updated because root README.md changed. Please add src/README.md to your commit.';
+	@false
