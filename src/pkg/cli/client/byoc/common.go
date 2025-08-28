@@ -51,7 +51,8 @@ func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...strin
 	command.Env = env
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	return command.Run()
+	// Start the process and do not wait for it to finish
+	return command.Start()
 }
 
 func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
