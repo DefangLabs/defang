@@ -274,18 +274,21 @@ func TestGetClientConfigPath(t *testing.T) {
 	}
 }
 
-func TestWriteVSCodeConfig(t *testing.T) {
-	// This test function will use handleVSCodeConfig to make sure that is not overwritten existing data and only add and append our mcp config, or if there not file make one and write it.
+func TestWriteConfig(t *testing.T) {
+	// This test function will use handleVSCodeConfig and handleStandardConfig to make sure that is not overwritten existing data
+	// and only add or append our defangmcp config, or if there not file make one and write it.
 	test := []struct {
 		name          string
 		fileExists    bool
+		vscodeConfig  bool
 		existingData  string
 		expectedData  string
 		expectedError bool
 	}{
 		{
-			name:         "new_file",
+			name:         "vscode_new_file",
 			fileExists:   false,
+			vscodeConfig: true,
 			existingData: "",
 			expectedData: `{
   "servers": {
@@ -301,8 +304,9 @@ func TestWriteVSCodeConfig(t *testing.T) {
 }`,
 		},
 		{
-			name:       "other_mcp_server_without_defang",
-			fileExists: true,
+			name:         "vscode_other_mcp_server_without_defang",
+			fileExists:   true,
+			vscodeConfig: true,
 			existingData: `{
 	"servers": {
 		"notion": {
@@ -371,8 +375,9 @@ func TestWriteVSCodeConfig(t *testing.T) {
 }`,
 		},
 		{
-			name:       "other_mcp_server_with_defang",
-			fileExists: true,
+			name:         "vscode_other_mcp_server_with_defang",
+			fileExists:   true,
+			vscodeConfig: true,
 			existingData: `{
   "inputs": [
     {
@@ -448,6 +453,168 @@ func TestWriteVSCodeConfig(t *testing.T) {
   }
 }`,
 		},
+		{
+			name:          "vscode_invalid_json_file",
+			fileExists:    true,
+			existingData:  `{invalid json}`,
+			expectedError: true,
+		},
+		{
+			name:          "vscode_servers_not_object",
+			fileExists:    true,
+			vscodeConfig:  true,
+			existingData:  `{"servers": "not an object}`,
+			expectedError: true,
+		},
+		{
+			name:         "standard_config_new_file",
+			fileExists:   false,
+			existingData: "",
+			expectedData: `{
+  "mcpServers": {
+    "defang": {
+      "command": %s,
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    }
+  }
+}`,
+		},
+		{
+			name:       "standard_config_other_mcp_server_without_defang",
+			fileExists: true,
+			existingData: `{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all",
+        "--api-key="
+      ]
+    }
+  }
+}`,
+			expectedData: `{
+  "mcpServers": {
+    "defang": {
+      "command": %s,
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all",
+        "--api-key="
+      ]
+    }
+  }
+}`,
+		},
+		{
+			name:       "standard_config_other_mcp_server_with_defang",
+			fileExists: true,
+			existingData: `{
+  "mcpServers": {
+    "defang": {
+      "command": "OLD_OUTDATED_DEFANG_LOCATION",
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all",
+        "--api-key="
+      ]
+    }
+  }
+}`,
+			expectedData: `{
+  "mcpServers": {
+    "defang": {
+      "command": %s,
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all",
+        "--api-key="
+      ]
+    }
+  }
+}`,
+		},
+		{
+			name:          "standard_config_json_file",
+			fileExists:    true,
+			existingData:  `{invalid json}`,
+			expectedError: true,
+		},
+		{
+			name:          "standard_config_not_object",
+			fileExists:    true,
+			existingData:  `{"mcpServers": "not an object}`,
+			expectedError: true,
+		},
 	}
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
@@ -455,7 +622,7 @@ func TestWriteVSCodeConfig(t *testing.T) {
 
 			tempFilePath := filepath.Join(tempDir, "mcp.json")
 
-			// Get the actual executable path that handleVSCodeConfig will use in getVSCodeDefangMCPConfig()
+			// Get the actual executable path that handleVSCodeConfig and handleStandardConfig will use
 			executablePath, err := os.Executable()
 			if err != nil {
 				t.Fatal(err)
@@ -467,21 +634,38 @@ func TestWriteVSCodeConfig(t *testing.T) {
 				}
 			}
 
-			err = handleVSCodeConfig(tempFilePath)
-			if err != nil {
-				t.Error(err)
+			var typeOfConfig string
+
+			if tt.vscodeConfig {
+				typeOfConfig = "vscode"
+				err = handleVSCodeConfig(tempFilePath)
+			} else {
+				typeOfConfig = "standard"
+				err = handleStandardConfig(tempFilePath)
 			}
 
-			// Format the expected data with the actual executable path (quoted for JSON)
+			if tt.expectedError {
+				if err == nil {
+					t.Errorf("Expected error for %s but got none", typeOfConfig)
+				}
+				return // Don't continue with file comparison if we expected an error
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error for %s: %v", typeOfConfig, err)
+				}
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error for %s: %v", typeOfConfig, err)
+			}
+
 			expectedData := fmt.Sprintf(tt.expectedData, fmt.Sprintf(`"%s"`, executablePath))
 
-			// Create a golden file with the expected data
 			goldenFile := filepath.Join(tempDir, "expected.json")
 			if err := os.WriteFile(goldenFile, []byte(expectedData), 0644); err != nil {
 				t.Fatal(err)
 			}
 
-			// Read the actual file content
 			actualContent, err := os.ReadFile(tempFilePath)
 			if err != nil {
 				t.Fatal(err)
@@ -489,10 +673,6 @@ func TestWriteVSCodeConfig(t *testing.T) {
 
 			if err := compose.Compare(actualContent, goldenFile); err != nil {
 				t.Error(err)
-			}
-
-			if tt.expectedError {
-				t.Error("Expected error but got none")
 			}
 		})
 	}
