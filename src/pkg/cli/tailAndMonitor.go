@@ -102,6 +102,12 @@ func TailAndMonitor(ctx context.Context, project *compose.Project, provider clie
 }
 
 func CanMonitorService(service compose.ServiceConfig) bool {
+	// Services with "restart: no" are assumed to be one-off
+	// tasks, so they are not monitored.
+	if service.Restart == "no" {
+		return false
+	}
+
 	if service.Extensions == nil {
 		return true
 	}

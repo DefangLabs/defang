@@ -217,6 +217,23 @@ func TestSplitManagedAndUnmanagedServices(t *testing.T) {
 			t.Errorf("Expected 1 unmanaged resource, got %d (%s)", len(unmanaged), unmanaged)
 		}
 	})
+
+	t.Run("release task with restart: 'no'", func(t *testing.T) {
+		project := compose.Services{
+			"service1": compose.ServiceConfig{
+				Restart: "no",
+			},
+		}
+
+		managed, unmanaged := splitManagedAndUnmanagedServices(project)
+		if len(managed) != 1 {
+			t.Errorf("Expected 1 managed resource, got %d (%v)", len(managed), managed)
+		}
+
+		if len(unmanaged) != 0 {
+			t.Errorf("Expected 0 unmanaged resource, got %d (%v)", len(unmanaged), unmanaged)
+		}
+	})
 }
 
 func TestComposeUpStops(t *testing.T) {
