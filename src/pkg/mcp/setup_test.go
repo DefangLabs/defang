@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 )
 
 func TestGetClientConfigPath(t *testing.T) {
@@ -286,20 +288,20 @@ func TestWriteVSCodeConfig(t *testing.T) {
 			fileExists:   false,
 			existingData: "",
 			expectedData: `{
-	"servers": {
-		"defang": {
-			"args": [
-				"mcp",
-				"serve"
-			],
-			"command": "/usr/local/bin/defang",
-			"type": "stdio"
-		}
-	}
+  "servers": {
+    "defang": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": %s,
+      "type": "stdio"
+    }
+  }
 }`,
 		},
 		{
-			name:       "existing_file",
+			name:       "other_mcp_server_without_defang",
 			fileExists: true,
 			existingData: `{
 	"servers": {
@@ -331,47 +333,167 @@ func TestWriteVSCodeConfig(t *testing.T) {
 	]
 }`,
 			expectedData: `{
-	"servers": {
-		"defang": {
-			"args": [
-				"mcp",
-				"serve"
-			],
-			"command": "/usr/local/bin/defang",
-			"type": "stdio"
+  "inputs": [
+    {
+      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+      "id": "NOTION_TOKEN",
+      "password": true,
+      "type": "promptString"
+    }
+  ],
+  "servers": {
+    "defang": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": %s,
+      "type": "stdio"
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "notion": {
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "command": "npx",
+      "env": {
+        "OPENAPI_MCP_HEADERS": {
+          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+          "Notion-Version": "2022-06-28"
+        }
+      },
+      "type": "stdio"
+    }
+  }
+}`,
 		},
-		"notion": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@notionhq/notion-mcp-server"
-			],
-			"env": {
-				"OPENAPI_MCP_HEADERS": {
-					"Authorization": "Bearer ${input:NOTION_TOKEN}",
-					"Notion-Version": "2022-06-28"
-				}
-			},
-			"type": "stdio"
-		},
-		"github": {
-			"url": "https://api.githubcopilot.com/mcp/"
-		}
-	},
-	"inputs": [
 		{
-			"id": "NOTION_TOKEN",
-			"type": "promptString",
-			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
-			"password": true
-		}
-	]
+			name:       "other_mcp_server_with_defang",
+			fileExists: true,
+			existingData: `{
+  "inputs": [
+    {
+      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+      "id": "NOTION_TOKEN",
+      "password": true,
+      "type": "promptString"
+    }
+  ],
+  "servers": {
+    "defang": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "OLD_OUTDATED_DEFANG_LOCATION",
+      "type": "stdio"
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "notion": {
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "command": "npx",
+      "env": {
+        "OPENAPI_MCP_HEADERS": {
+          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+          "Notion-Version": "2022-06-28"
+        }
+      },
+      "type": "stdio"
+    }
+  }
+}`,
+			expectedData: `{
+  "inputs": [
+    {
+      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+      "id": "NOTION_TOKEN",
+      "password": true,
+      "type": "promptString"
+    }
+  ],
+  "servers": {
+    "defang": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": %s,
+      "type": "stdio"
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "notion": {
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "command": "npx",
+      "env": {
+        "OPENAPI_MCP_HEADERS": {
+          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+          "Notion-Version": "2022-06-28"
+        }
+      },
+      "type": "stdio"
+    }
+  }
 }`,
 		},
 	}
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Println("hello")
+			tempDir := t.TempDir()
+
+			tempFilePath := filepath.Join(tempDir, "mcp.json")
+
+			// Get the actual executable path that handleVSCodeConfig will use in getVSCodeDefangMCPConfig()
+			executablePath, err := os.Executable()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tt.fileExists {
+				if err := os.WriteFile(tempFilePath, []byte(tt.existingData), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			err = handleVSCodeConfig(tempFilePath)
+			if err != nil {
+				t.Error(err)
+			}
+
+			// Format the expected data with the actual executable path (quoted for JSON)
+			expectedData := fmt.Sprintf(tt.expectedData, fmt.Sprintf(`"%s"`, executablePath))
+
+			// Create a golden file with the expected data
+			goldenFile := filepath.Join(tempDir, "expected.json")
+			if err := os.WriteFile(goldenFile, []byte(expectedData), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			// Read the actual file content
+			actualContent, err := os.ReadFile(tempFilePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := compose.Compare(actualContent, goldenFile); err != nil {
+				t.Error(err)
+			}
+
+			if tt.expectedError {
+				t.Error("Expected error but got none")
+			}
 		})
 	}
 }
