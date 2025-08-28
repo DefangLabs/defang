@@ -253,8 +253,7 @@ func handleVSCodeConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			// If we can't parse it, start fresh
-			existingData = make(map[string]any)
+			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
 		}
 
 		// Check if "servers" section exists
@@ -309,8 +308,7 @@ func handleStandardConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			// If we can't parse it, start fresh
-			existingData = make(map[string]any)
+			return fmt.Errorf("failed to unmarshal existing config: %w", err)
 		}
 
 		// Try to extract MCPServers from existing data

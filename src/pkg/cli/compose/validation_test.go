@@ -66,7 +66,7 @@ func TestValidationAndConvert(t *testing.T) {
 		logs = bytes.NewBufferString(strings.Join(logLines, ""))
 
 		// Compare the logs with the warnings file
-		if err := compare(logs.Bytes(), path+".warnings"); err != nil {
+		if err := Compare(logs.Bytes(), path+".warnings"); err != nil {
 			t.Error(err)
 		}
 	})
