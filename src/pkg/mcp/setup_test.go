@@ -637,10 +637,10 @@ func TestWriteConfig(t *testing.T) {
 			var typeOfConfig string
 
 			if tt.vscodeConfig {
-				typeOfConfig = "vscode"
+				typeOfConfig = "vscode mcp config"
 				err = handleVSCodeConfig(tempFilePath)
 			} else {
-				typeOfConfig = "standard"
+				typeOfConfig = "standard mcp config"
 				err = handleStandardConfig(tempFilePath)
 			}
 
