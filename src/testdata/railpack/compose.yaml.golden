@@ -5,7 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile
     command:
-      - exec node index.js
+      - exec
+      - node
+      - index.js
     networks:
       default: null
   railpack-short:
@@ -13,7 +15,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command:
-      - npm start
+      - npm
+      - start
     networks:
       default: null
   railpackwithdockerfile:
@@ -21,7 +24,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command:
-      - something 'with space'
+      - something
+      - with space
     networks:
       default: null
 networks:
