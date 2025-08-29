@@ -51,7 +51,8 @@ func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...strin
 	command.Env = env
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
-	return command.Run()
+	// Start the process and do not wait for it to finish
+	return command.Start()
 }
 
 func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
@@ -72,8 +73,7 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
 		return err
 	}
-	// We always return an error to stop the CLI from "tailing" the cloud logs
-	return errors.New("local pulumi command succeeded; stopping")
+	return nil
 }
 
 func GetPrivateDomain(projectName string) string {
