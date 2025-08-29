@@ -32,7 +32,7 @@ func TestFixup(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := compare(actual, path+".fixup"); err != nil {
+		if err := Compare(actual, path+".fixup"); err != nil {
 			t.Error(err)
 		}
 	})
