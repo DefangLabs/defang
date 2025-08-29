@@ -1,7 +1,9 @@
-## Develop Once. Deploy Anywhere.
+## Develop Once, Deploy Anywhere.
+
 Take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes.
 
 ## Defang CLI
+
 The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-started) is designed for developers who prefer to manage their workflows directly from the terminal. It offers full access to Defang’s capabilities, allowing you to build, test, and deploy applications efficiently to the cloud.
 
 ## Getting started
@@ -46,4 +48,7 @@ The Defang CLI recognizes the following environment variables:
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values
 - `TZ` - The timezone to use for log timestamps: an IANA TZ name like `UTC` or `Europe/Amsterdam`; defaults to `Local`
 - `XDG_STATE_HOME` - The directory to use for storing state; defaults to `~/.local/state`
+
+Environment variables will be loaded from a `.defangrc` file in the current directory, if it exists. This file follows
+the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
 
