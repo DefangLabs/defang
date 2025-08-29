@@ -41,6 +41,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
+	github.com/joho/godotenv v1.5.1
 	github.com/mark3labs/mcp-go v0.29.0
 	github.com/miekg/dns v1.1.59
 	github.com/moby/patternmatcher v0.6.0
