@@ -8,11 +8,11 @@ import (
 	"text/tabwriter"
 )
 
-func Table(slice interface{}, attributes []string) error {
+func Table(slice any, attributes []string) error {
 	return DefaultTerm.Table(slice, attributes...)
 }
 
-func (t *Term) Table(slice interface{}, attributes ...string) error {
+func (t *Term) Table(slice any, attributes ...string) error {
 	// Ensure slice is a slice
 	val := reflect.ValueOf(slice)
 	if val.Kind() != reflect.Slice {

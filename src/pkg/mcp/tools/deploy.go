@@ -19,7 +19,7 @@ import (
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, cluster string) {
+func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
 	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -37,12 +37,16 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		term.Debug("Compose up tool called - deploying services")
 		track.Evt("MCP Deploy Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if ok && wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		}
+
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 		}
 
 		loader := configureLoader(request)
@@ -53,23 +57,28 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
 			term.Error("Failed to deploy services", "error", err)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), nil
+			return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), err
 		}
 
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		client.Track("MCP Deploy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
+		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
+		}
 
-			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
+		err = canIUseProvider(ctx, client, project.Name, provider, len(project.Services))
+		if err != nil {
+			term.Error("Failed to use provider", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
 		}
 
 		// Deploy the services
@@ -84,32 +93,20 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 
 			result := HandleTermsOfServiceError(err)
 			if result != nil {
-				return result, nil
+				return result, err
 			}
 			result = HandleConfigError(err)
 			if result != nil {
-				return result, nil
+				return result, err
 			}
 
-			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), err
 		}
 
 		if len(deployResp.Services) == 0 {
 			term.Error("Failed to deploy services", "error", errors.New("no services deployed"))
 			return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
 		}
-
-		// Get the portal URL for browser preview
-		portalURL := "https://portal.defang.io/"
-
-		// Open the portal URL in the browser
-		term.Debugf("Opening portal URL in browser: %s", portalURL)
-		go func() {
-			err := browser.OpenURL(portalURL)
-			if err != nil {
-				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-			}
-		}()
 
 		// Success case
 		term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
@@ -118,8 +115,27 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		term.Debug("Deployment Started!")
 		term.Debugf("Deployment ID: %s", deployResp.Etag)
 
-		// Log browser preview information
-		term.Debugf("🌐 %s available", portalURL)
+		var portal string
+		if providerId == cliClient.ProviderDefang {
+			// Get the portal URL for browser preview
+			portalURL := "https://portal.defang.io/"
+
+			// Open the portal URL in the browser
+			term.Debugf("Opening portal URL in browser: %s", portalURL)
+			go func() {
+				err := browser.OpenURL(portalURL)
+				if err != nil {
+					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
+				}
+			}()
+
+			// Log browser preview information
+			term.Debugf("🌐 %s available", portalURL)
+			portal = "Please use the web portal url: %s" + portalURL
+		} else {
+			// portalURL := fmt.Sprintf("https://%s.signin.aws.amazon.com/console")
+			portal = fmt.Sprintf("Please use the %s console", providerId)
+		}
 
 		// Log service details
 		term.Debug("Services:")
@@ -130,6 +146,6 @@ func setupDeployTool(s *server.MCPServer, cluster string) {
 		}
 
 		// Return the etag data as text
-		return mcp.NewToolResultText(fmt.Sprintf("Please use the web portal url: %s to follow the deployment of %s, with the deployment ID of %s", portalURL, project.Name, deployResp.Etag)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s", portal, project.Name, deployResp.Etag)), nil
 	})
 }

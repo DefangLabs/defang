@@ -13,6 +13,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -25,8 +26,6 @@ import (
 const maxFiles = 20
 
 var (
-	ErrDebugSkipped = errors.New("debug skipped")
-
 	errFileLimitReached = errors.New("file limit reached")
 	patterns            = []string{"*.js", "*.ts", "*.py", "*.go", "requirements.txt", "package.json", "go.mod"} // TODO: add patterns for other languages
 )
@@ -72,27 +71,27 @@ func InteractiveDebugDeployment(ctx context.Context, client client.FabricClient,
 	return interactiveDebug(ctx, client, debugConfig, nil)
 }
 
-func InteractiveDebugForLoadError(ctx context.Context, client client.FabricClient, project *compose.Project, loadErr error) error {
-	return interactiveDebug(ctx, client, DebugConfig{Project: project}, loadErr)
+func InteractiveDebugForClientError(ctx context.Context, client client.FabricClient, project *compose.Project, clientErr error) error {
+	return interactiveDebug(ctx, client, DebugConfig{Project: project}, clientErr)
 }
 
-func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, loadError error) error {
+func interactiveDebug(ctx context.Context, client client.FabricClient, debugConfig DebugConfig, clientErr error) error {
 	var aiDebug bool
 	if err := survey.AskOne(&survey.Confirm{
 		Message: "Would you like to debug the deployment with AI?",
 		Help:    "This will send logs and artifacts to our backend and attempt to diagnose the issue and provide a solution.",
 	}, &aiDebug, survey.WithStdio(term.DefaultTerm.Stdio())); err != nil {
-		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Deployment), P("reason", err), P("loadErr", loadError))
+		track.Evt("Debug Prompt Failed", P("etag", debugConfig.Deployment), P("reason", err), P("loadErr", clientErr))
 		return err
 	} else if !aiDebug {
-		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Deployment), P("loadErr", loadError))
-		return ErrDebugSkipped
+		track.Evt("Debug Prompt Skipped", P("etag", debugConfig.Deployment), P("loadErr", clientErr))
+		return err
 	}
 
-	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Deployment), P("loadErr", loadError))
+	track.Evt("Debug Prompt Accepted", P("etag", debugConfig.Deployment), P("loadErr", clientErr))
 
-	if loadError != nil {
-		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, loadError); err != nil {
+	if clientErr != nil {
+		if err := debugComposeFileLoadError(ctx, client, debugConfig.Project, clientErr); err != nil {
 			term.Warnf("Failed to debug compose file load: %v", err)
 			return err
 		}
@@ -110,9 +109,9 @@ func interactiveDebug(ctx context.Context, client client.FabricClient, debugConf
 		Message: "Was the debugging helpful?",
 		Help:    "Please provide feedback to help us improve the debugging experience.",
 	}, &goodBad); err != nil {
-		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Deployment), P("reason", err), P("loadErr", loadError))
+		track.Evt("Debug Feedback Prompt Failed", P("etag", debugConfig.Deployment), P("reason", err), P("loadErr", clientErr))
 	} else {
-		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Deployment), P("feedback", goodBad), P("loadErr", loadError))
+		track.Evt("Debug Feedback Prompt Answered", P("etag", debugConfig.Deployment), P("feedback", goodBad), P("loadErr", clientErr))
 	}
 	return nil
 }
@@ -122,8 +121,8 @@ func DebugDeployment(ctx context.Context, client client.FabricClient, debugConfi
 
 	files := findMatchingProjectFiles(debugConfig.Project, debugConfig.FailedServices)
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	var sinceTs, untilTs *timestamppb.Timestamp
@@ -162,8 +161,8 @@ func debugComposeFileLoadError(ctx context.Context, client client.FabricClient, 
 
 	files := findMatchingProjectFiles(project, nil)
 
-	if DoDryRun {
-		return ErrDryRun
+	if dryrun.DoDryRun {
+		return dryrun.ErrDryRun
 	}
 
 	req := defangv1.DebugRequest{

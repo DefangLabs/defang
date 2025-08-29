@@ -18,36 +18,36 @@ const (
 )
 
 type ServiceNameReplacer struct {
-	provider                client.Provider
-	hostServiceNames        *regexp.Regexp
-	ingressServiceNameRegex *regexp.Regexp
+	provider            client.Provider
+	privateServiceNames *regexp.Regexp
+	publicServiceNames  *regexp.Regexp
 }
 
 func NewServiceNameReplacer(provider client.Provider, project *composeTypes.Project) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
-	var hostServiceNames []string    // services with private "host" ports
-	var ingressServiceNames []string // services with "ingress" ports
+	var privateServiceNames []string // services with private "host" ports
+	var publicServiceNames []string  // services with "ingress" ports
 	for _, svccfg := range project.Services {
-		// HACK: we only check the ports for "host" mode and don't care about the networks
-		if slices.ContainsFunc(svccfg.Ports, isHostPort) {
-			hostServiceNames = append(hostServiceNames, regexp.QuoteMeta(svccfg.Name))
+		// HACK: we only check the ports for "host" mode and don't care about the networks; TODO: consider dependsOn / networks
+		if hasHostPort(svccfg) {
+			privateServiceNames = append(privateServiceNames, regexp.QuoteMeta(svccfg.Name))
 		} else if len(svccfg.Ports) > 0 {
-			ingressServiceNames = append(ingressServiceNames, regexp.QuoteMeta(svccfg.Name))
+			publicServiceNames = append(publicServiceNames, regexp.QuoteMeta(svccfg.Name))
 		}
 	}
 
 	return ServiceNameReplacer{
-		provider:                provider,
-		hostServiceNames:        makeServiceNameRegex(hostServiceNames),
-		ingressServiceNameRegex: makeServiceNameRegex(ingressServiceNames),
+		provider:            provider,
+		privateServiceNames: makeServiceNameRegex(privateServiceNames),
+		publicServiceNames:  makeServiceNameRegex(publicServiceNames),
 	}
 }
 
 func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
-	if s.hostServiceNames == nil {
+	if s.privateServiceNames == nil {
 		return value
 	}
-	match := s.hostServiceNames.FindStringSubmatchIndex(value)
+	match := s.privateServiceNames.FindStringSubmatchIndex(value)
 	if match == nil {
 		return value
 	}
@@ -62,7 +62,7 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 
 	if val != value {
 		term.Debugf("service %q: service name was adjusted: %s %q assigned value %q", serviceName, fixupTarget, key, val)
-	} else if s.ingressServiceNameRegex != nil && s.ingressServiceNameRegex.MatchString(value) {
+	} else if s.publicServiceNames != nil && s.publicServiceNames.MatchString(value) {
 		term.Debugf("service %q: service name in the %s %q was not adjusted; only references to other services with port mode set to 'host' will be fixed-up", serviceName, fixupTarget, key)
 	}
 
@@ -70,11 +70,15 @@ func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key,
 }
 
 func (s *ServiceNameReplacer) HasServiceName(name string) bool {
-	return s.hostServiceNames != nil && s.hostServiceNames.MatchString(name)
+	return s.privateServiceNames != nil && s.privateServiceNames.MatchString(name)
 }
 
 func isHostPort(port composeTypes.ServicePortConfig) bool {
 	return port.Mode == Mode_HOST
+}
+
+func hasHostPort(service composeTypes.ServiceConfig) bool {
+	return slices.ContainsFunc(service.Ports, isHostPort)
 }
 
 func makeServiceNameRegex(quotedServiceNames []string) *regexp.Regexp {

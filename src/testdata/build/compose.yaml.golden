@@ -20,6 +20,12 @@ services:
       shm_size: "2147483648"
     networks:
       default: null
+  normalized:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      default: null
 networks:
   default:
     name: build_default

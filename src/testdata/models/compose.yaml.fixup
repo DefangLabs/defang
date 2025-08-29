@@ -1,0 +1,72 @@
+{
+  "ai_model": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "OPENAI_API_KEY": ""
+    },
+    "image": "defangio/openai-access-gateway",
+    "networks": {
+      "model_provider_private": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 80,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "app": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "AI_MODEL_MODEL": "ai/model",
+      "AI_MODEL_URL": "http://mock-ai-model/api/v1/"
+    },
+    "image": "app",
+    "models": {
+      "ai_model": {}
+    },
+    "networks": {
+      "default": null,
+      "model_provider_private": null
+    }
+  },
+  "my_model": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "OPENAI_API_KEY": ""
+    },
+    "image": "defangio/openai-access-gateway",
+    "networks": {
+      "model_provider_private": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 80,
+        "protocol": "tcp"
+      }
+    ]
+  },
+  "withendpoint": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "MODEL_URL": "http://mock-my-model/api/v1/",
+      "MY_MODEL_MODEL": "ai/model"
+    },
+    "image": "app",
+    "models": {
+      "my_model": {
+        "endpoint_var": "MODEL_URL"
+      }
+    },
+    "networks": {
+      "default": null,
+      "model_provider_private": null
+    }
+  }
+}

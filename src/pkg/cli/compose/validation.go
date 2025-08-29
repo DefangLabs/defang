@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -54,7 +53,7 @@ func ValidateProject(project *composeTypes.Project) error {
 				continue
 			}
 			if gcp.SafeLabelValue(svccfg.Name) == gcp.SafeLabelValue(services[j].Name) { // TODO: Shouldn't be just gcp specific
-				errs = append(errs, fmt.Errorf("The service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
+				errs = append(errs, fmt.Errorf("the service names %q and %q normalize to the same value, which causes a conflict. Please use distinct names that differ after normalization", svccfg.Name, services[j].Name))
 			}
 		}
 	}
@@ -145,11 +144,6 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 			}
 			if strings.HasPrefix(svccfg.Build.Dockerfile, "../") {
 				return fmt.Errorf("service %q: dockerfile path must be inside the build context: %q", svccfg.Name, svccfg.Build.Dockerfile)
-			}
-			// Check if the dockerfile exists
-			dockerfilePath := filepath.Join(svccfg.Build.Context, svccfg.Build.Dockerfile)
-			if _, err := os.Stat(dockerfilePath); err != nil {
-				return fmt.Errorf("service %q: %w: %q", svccfg.Name, ErrDockerfileNotFound, dockerfilePath)
 			}
 		}
 		if svccfg.Build.SSH != nil {
@@ -317,17 +311,18 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	if staticFilesVal := svccfg.Extensions["x-defang-static-files"]; staticFilesVal != nil {
 		_, str := staticFilesVal.(string)
-		_, obj := staticFilesVal.(map[string]interface{})
+		_, obj := staticFilesVal.(map[string]any)
 		if !str && !obj {
 			return fmt.Errorf(`service %q: x-defang-static-files must be a string or object {"folder": string, "redirects": string[]}`, svccfg.Name)
 		}
 	}
 
+	repo := GetImageRepo(svccfg.Image)
+
 	redisExtension, managedRedis := svccfg.Extensions["x-defang-redis"]
 	if managedRedis {
-		// Ensure the image is a valid Redis image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "redis") {
+		// Ensure the repo is a valid Redis repo
+		if !strings.HasSuffix(repo, "redis") {
 			term.Warnf("service %q: managed Redis service should use a redis image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(redisExtension); err != nil {
@@ -337,9 +332,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	postgresExtension, managedPostgres := svccfg.Extensions["x-defang-postgres"]
 	if managedPostgres {
-		// Ensure the image is a valid Postgres image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "postgres") && !strings.HasSuffix(image, "pgvector") {
+		// Ensure the repo is a valid Postgres repo
+		if !strings.HasSuffix(repo, "postgres") && !strings.HasSuffix(repo, "pgvector") {
 			term.Warnf("service %q: managed Postgres service should use a postgres image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(postgresExtension); err != nil {
@@ -349,9 +343,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 
 	mongodbExtension, managedMongodb := svccfg.Extensions["x-defang-mongodb"]
 	if managedMongodb {
-		// Ensure the image is a valid MongoDB image
-		image := getImageRepo(svccfg.Image)
-		if !strings.HasSuffix(image, "mongo") {
+		// Ensure the repo is a valid MongoDB repo
+		if !strings.HasSuffix(repo, "mongo") {
 			term.Warnf("service %q: managed MongoDB service should use a mongo image", svccfg.Name)
 		}
 		if _, err = validateManagedStore(mongodbExtension); err != nil {

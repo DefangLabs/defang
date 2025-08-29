@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/dryrun"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 )
 
@@ -21,11 +22,11 @@ func TestConfigSet(t *testing.T) {
 	})
 
 	t.Run("expect error on DryRun", func(t *testing.T) {
-		DoDryRun = true
-		t.Cleanup(func() { DoDryRun = false })
+		dryrun.DoDryRun = true
+		t.Cleanup(func() { dryrun.DoDryRun = false })
 		err := ConfigSet(ctx, "test", provider, "test_name", "test_value")
-		if err != ErrDryRun {
-			t.Fatalf("Expected ErrDryRun, got %v", err)
+		if err != dryrun.ErrDryRun {
+			t.Fatalf("Expected dryrun.ErrDryRun, got %v", err)
 		}
 	})
 }

@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+  redis:
+    image: redis:7-alpine
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:5739
+    depends_on:
+      - postgres
+      - redis

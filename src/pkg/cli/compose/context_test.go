@@ -38,7 +38,7 @@ func Test_parseContextLimit(t *testing.T) {
 	})
 }
 
-func TestUploadTarball(t *testing.T) {
+func TestUploadArchive(t *testing.T) {
 	const path = "/upload/x/"
 	const digest = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
 
@@ -49,31 +49,72 @@ func TestUploadTarball(t *testing.T) {
 		if !strings.HasPrefix(r.URL.Path, path) {
 			t.Errorf("Expected prefix %v, got %v", path, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "application/gzip" {
-			t.Errorf("Expected Content-Type: application/gzip, got %v", r.Header.Get("Content-Type"))
+		if !(r.Header.Get("Content-Type") == string(ArchiveTypeGzip.MimeType) || r.Header.Get("Content-Type") == string(ArchiveTypeZip.MimeType)) {
+			t.Errorf("Expected Content-Type: application/gzip or application/zip, got %v", r.Header.Get("Content-Type"))
 		}
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
 
-	t.Run("upload with digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, digest)
+	t.Run("upload tar with digest", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, digest)
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		const expectedPath = path + digest
+		var expectedPath = path + digest + ArchiveTypeGzip.Extension
 		if url != server.URL+expectedPath {
 			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
 		}
 	})
 
-	t.Run("force upload without digest", func(t *testing.T) {
-		url, err := uploadTarball(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, "")
+	t.Run("upload zip with digest", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, digest)
 		if err != nil {
-			t.Fatalf("uploadTarball() failed: %v", err)
+			t.Fatalf("uploadArchive() failed: %v", err)
 		}
-		if url != server.URL+path {
-			t.Errorf("Expected %v, got %v", server.URL+path, url)
+		var expectedPath = path + digest + ArchiveTypeZip.Extension
+		if url != server.URL+expectedPath {
+			t.Errorf("Expected %v, got %v", server.URL+expectedPath, url)
+		}
+	})
+
+	t.Run("upload with zip", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		if err != nil {
+			t.Fatalf("uploadContent() failed: %v", err)
+		}
+		if url != server.URL+path+ArchiveTypeZip.Extension {
+			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeZip.Extension, url)
+		}
+	})
+
+	t.Run("upload with tar", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		if err != nil {
+			t.Fatalf("uploadContent() failed: %v", err)
+		}
+		if url != server.URL+path+ArchiveTypeGzip.Extension {
+			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeGzip.Extension, url)
+		}
+	})
+
+	t.Run("force upload tar without digest", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeGzip, "")
+		if err != nil {
+			t.Fatalf("uploadArchive() failed: %v", err)
+		}
+		if url != server.URL+path+ArchiveTypeGzip.Extension {
+			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeGzip.Extension, url)
+		}
+	})
+
+	t.Run("force upload zip without digest", func(t *testing.T) {
+		url, err := uploadArchive(context.Background(), client.MockProvider{UploadUrl: server.URL + path}, "testproj", &bytes.Buffer{}, ArchiveTypeZip, "")
+		if err != nil {
+			t.Fatalf("uploadArchive() failed: %v", err)
+		}
+		if url != server.URL+path+ArchiveTypeZip.Extension {
+			t.Errorf("Expected %v, got %v", server.URL+path+ArchiveTypeZip.Extension, url)
 		}
 	})
 }
@@ -125,7 +166,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{".dockerignore", "Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}
@@ -134,7 +175,7 @@ func TestWalkContextFolder(t *testing.T) {
 
 func TestCreateTarballReader(t *testing.T) {
 	t.Run("Default Dockerfile", func(t *testing.T) {
-		buffer, err := createTarball(context.Background(), "../../../testdata/testproj", "")
+		buffer, err := createArchive(context.Background(), "../../../testdata/testproj", "", ArchiveTypeGzip)
 		if err != nil {
 			t.Fatalf("createTarballReader() failed: %v", err)
 		}
@@ -171,14 +212,14 @@ func TestCreateTarballReader(t *testing.T) {
 	})
 
 	t.Run("Missing Dockerfile", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "../../testdata", "Dockerfile.missing")
+		_, err := createArchive(context.Background(), "../../testdata", "Dockerfile.missing", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
 	})
 
 	t.Run("Missing Context", func(t *testing.T) {
-		_, err := createTarball(context.Background(), "asdfqwer", "")
+		_, err := createArchive(context.Background(), "asdfqwer", "", ArchiveTypeGzip)
 		if err == nil {
 			t.Fatal("createTarballReader() should have failed")
 		}
@@ -212,7 +253,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 			dockerfile:        "Dockerfile",
 			ignoreFileName:    "",
 			ignoreFileContent: defaultDockerIgnore,
-			expectedFileName:  ".dockerignore",
+			expectedFileName:  "",
 		},
 		{
 			name:              "No dockerfile, but dockerignore exists",
@@ -226,7 +267,7 @@ func TestGetDockerIgnorePatterns(t *testing.T) {
 			dockerfile:        "",
 			ignoreFileName:    "",
 			ignoreFileContent: defaultDockerIgnore,
-			expectedFileName:  ".dockerignore",
+			expectedFileName:  "",
 		},
 	}
 

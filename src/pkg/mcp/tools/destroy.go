@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -16,7 +17,7 @@ import (
 )
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
-func setupDestroyTool(s *server.MCPServer, cluster string) {
+func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
 	term.Debug("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
 		mcp.WithDescription("Remove services using defang."),
@@ -36,25 +37,28 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		client.Track("MCP Destroy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
+		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
-
-			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 		}
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if !ok || wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		}
+
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 		}
 
 		loader := configureLoader(request)
@@ -63,13 +67,13 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 		projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 		if err != nil {
 			term.Error("Failed to load project name", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 		}
 
-		err = canIUseProvider(ctx, client, projectName, provider)
+		err = canIUseProvider(ctx, client, projectName, provider, 0)
 		if err != nil {
 			term.Error("Failed to use provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
 		}
 
 		term.Debug("Function invoked: cli.ComposeDown")
@@ -78,32 +82,36 @@ func setupDestroyTool(s *server.MCPServer, cluster string) {
 			if connect.CodeOf(err) == connect.CodeNotFound {
 				// Show a warning (not an error) if the service was not found
 				term.Warn("Project not found", "error", err)
-				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), nil
+				return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), err
 			}
 
 			result := HandleTermsOfServiceError(err)
 			if result != nil {
-				return result, nil
+				return result, err
 			}
 
-			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), err
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf("Successfully destroyed project: %s, etag: %s", projectName, deployment)), nil
 	})
 }
 
-func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, projectName string, provider cliClient.Provider) error {
-	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: defangv1.Provider_DEFANG,
+func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, projectName string, provider cliClient.Provider, serviceCount int) error {
+	info, err := provider.AccountInfo(ctx)
+	if err != nil {
+		return err
 	}
 
+	canUseReq := defangv1.CanIUseRequest{
+		Project:      projectName,
+		Provider:     info.Provider.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
+	}
 	term.Debug("Function invoked: client.CanIUse")
 	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
 	if err != nil {
-		term.Error("Failed to use provider", "error", err)
-		return fmt.Errorf("failed to use provider: %w", err)
+		return err
 	}
 
 	term.Debug("Function invoked: provider.SetCanIUseConfig")

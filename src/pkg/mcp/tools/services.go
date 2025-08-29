@@ -19,7 +19,7 @@ import (
 )
 
 // setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer, cluster string) {
+func setupServicesTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
 	term.Debug("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang Playground"),
@@ -35,12 +35,16 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		term.Debug("Services tool called - fetching services from Defang")
 		track.Evt("MCP Services Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if ok && wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		}
+
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 		}
 
 		loader := configureLoader(request)
@@ -48,15 +52,15 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		// Create a Defang client
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, cliClient.ProviderDefang, client)
+		provider, err := cli.NewProvider(ctx, providerId, client)
 		if err != nil {
 			term.Error("Failed to create provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to create provider", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to create provider", err), err
 		}
 
 		term.Debug("Function invoked: client.LoadProjectNameWithFallback")
@@ -68,7 +72,7 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 				return mcp.NewToolResultText("No projects found on Playground"), nil
 			}
 			term.Errorf("Failed to load project name, error: %v", err)
-			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 		}
 
 		serviceResponse, err := deployment_info.GetServices(ctx, projectName, provider)
@@ -76,16 +80,16 @@ func setupServicesTool(s *server.MCPServer, cluster string) {
 			var noServicesErr cli.ErrNoServices
 			if errors.As(err, &noServicesErr) {
 				term.Warnf("No services found for the specified project %s", projectName)
-				return mcp.NewToolResultText("No services found for the specified project " + projectName), nil
+				return mcp.NewToolResultText("No services found for the specified project " + projectName), err
 			}
 			if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
 				term.Warnf("Project %s is not deployed in Playground", projectName)
-				return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), nil
+				return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), err
 			}
 
 			result := HandleTermsOfServiceError(err)
 			if result != nil {
-				return result, nil
+				return result, err
 			}
 
 			term.Error("Failed to get services", "error", err)

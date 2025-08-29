@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -17,13 +18,23 @@ import (
 )
 
 // setupEstimateTool configures and adds the estimate tool to the MCP server
-func setupEstimateTool(s *server.MCPServer, cluster string) {
+func setupEstimateTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+	if providerId == cliClient.ProviderDefang {
+		providerId = cliClient.ProviderAWS // Default to AWS
+	}
+
 	term.Debug("Creating estimate tool")
 	estimateTool := mcp.NewTool("estimate",
 		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
 
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
+		),
+
+		mcp.WithString("provider",
+			mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
+			mcp.DefaultString(strings.ToUpper(providerId.String())),
+			mcp.Enum("AWS", "GCP"),
 		),
 
 		mcp.WithString("deployment_mode",
@@ -40,17 +51,26 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		term.Debug("Estimate tool called")
 		track.Evt("MCP Estimate Tool")
 
-		wd, ok := request.Params.Arguments["working_directory"].(string)
-		if ok && wd != "" {
-			err := os.Chdir(wd)
-			if err != nil {
-				term.Error("Failed to change working directory", "error", err)
-			}
+		wd, err := request.RequireString("working_directory")
+		if err != nil || wd == "" {
+			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+			return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
 		}
 
-		modeString, ok := request.Params.Arguments["deployment_mode"].(string)
-		if !ok {
+		err = os.Chdir(wd)
+		if err != nil {
+			term.Error("Failed to change working directory", "error", err)
+			return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		}
+
+		modeString, err := request.RequireString("deployment_mode")
+		if err != nil {
 			modeString = "AFFORDABLE" // Default to AFFORDABLE if not provided
+		}
+
+		providerString, err := request.RequireString("provider")
+		if err != nil {
+			providerString = providerId.String()
 		}
 
 		// This logic is replicated from src/cmd/cli/command/mode.go
@@ -77,24 +97,35 @@ func setupEstimateTool(s *server.MCPServer, cluster string) {
 		project, err := loader.LoadProject(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to parse compose file: %w", err)
-			term.Error("Failed to deploy services", "error", err)
+			term.Error("failed to parse compose file", "error", err)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Estimate failed: %v. Please provide a valid compose file path.", err)), nil
+			return mcp.NewToolResultErrorFromErr("failed to parse compose file", err), err
 		}
 
 		term.Debug("Function invoked: cli.Connect")
 		client, err := cli.Connect(ctx, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Could not connect", err), nil
+			return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 		}
 
 		defangProvider := &cliClient.PlaygroundProvider{FabricClient: client}
-		providerID := cliClient.ProviderAWS // Default to AWS
+
+		var providerID cliClient.ProviderID
+		err = providerID.Set(providerString)
+		if err != nil {
+			term.Error("Invalid provider specified", "error", err)
+			return mcp.NewToolResultErrorFromErr("Invalid provider specified", err), err
+		}
 
 		term.Debug("Function invoked: cli.RunEstimate")
-		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, "us-west-2", mode)
+		var region string
+		if region == "" {
+			region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
+		}
+
+		estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, region, mode)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), nil
+			return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), err
 		}
 		term.Debugf("Estimate: %+v", estimate)
 

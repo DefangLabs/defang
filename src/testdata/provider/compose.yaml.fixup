@@ -29,7 +29,7 @@
     "entrypoint": null,
     "environment": {
       "AI_RUNNER_MODEL": "ai/smollm2",
-      "AI_RUNNER_URL": "http://ai-runner/api/v1/"
+      "AI_RUNNER_URL": "http://mock-ai-runner/api/v1/"
     },
     "image": "my-chat-app",
     "networks": {

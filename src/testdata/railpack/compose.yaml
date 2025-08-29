@@ -1,0 +1,13 @@
+services:
+  railpack-short:
+    build: .
+    command: npm start
+  railpack-long:
+    build:
+      context: .
+    command: exec node index.js
+  railpackwithdockerfile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: something "with space"

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -77,7 +76,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 
 		// Setup tools
 		term.Debug("Setting up tools")
-		tools.SetupTools(s, getCluster(), authPort)
+		tools.SetupTools(s, getCluster(), authPort, providerID)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
@@ -85,7 +84,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := cli.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
+				if err := login.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()
@@ -110,8 +109,7 @@ var mcpSetupCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Debug("Setting up MCP client")
 		client, _ := cmd.Flags().GetString("client")
-		client = strings.ToLower(client)
-		term.Debug("Client: ", client)
+		term.Debugf("MCP Client: %q", client)
 		if err := mcp.SetupClient(client); err != nil {
 			return err
 		}

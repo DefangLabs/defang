@@ -387,6 +387,7 @@ func (b *ByocAws) environment(projectName string) (map[string]string, error) {
 		"DEFANG_ORG":                 b.TenantName,
 		"DEFANG_PREFIX":              byoc.DefangPrefix,
 		"DEFANG_STATE_URL":           defangStateUrl,
+		"NODE_NO_WARNINGS":           "1",
 		"NPM_CONFIG_UPDATE_NOTIFIER": "false",
 		"PRIVATE_DOMAIN":             byoc.GetPrivateDomain(projectName),
 		"PROJECT":                    projectName,                 // may be empty

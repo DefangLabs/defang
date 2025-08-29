@@ -16,7 +16,7 @@ require (
 	cloud.google.com/go/secretmanager v1.14.5
 	cloud.google.com/go/storage v1.50.0
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f
+	github.com/DefangLabs/secret-detector v0.0.0-20250811234530-d4b4214cd679
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/aws/aws-sdk-go-v2 v1.32.6
 	github.com/aws/aws-sdk-go-v2/config v1.26.6
@@ -32,7 +32,7 @@ require (
 	github.com/aws/smithy-go v1.22.1
 	github.com/awslabs/goformation/v7 v7.13.1
 	github.com/bufbuild/connect-go v1.10.0
-	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250703132301-891fce532a51
+	github.com/compose-spec/compose-go/v2 v2.7.2-0.20250715094302-8da9902241f9
 	github.com/digitalocean/godo v1.131.1
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.2
@@ -41,7 +41,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/mark3labs/mcp-go v0.21.0
+	github.com/mark3labs/mcp-go v0.29.0
 	github.com/miekg/dns v1.1.59
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.15.2
@@ -51,6 +51,8 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.6
+	github.com/stretchr/testify v1.10.0
+	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/mod v0.18.0
 	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sys v0.32.0
@@ -82,8 +84,7 @@ require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
-	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
@@ -100,7 +101,9 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
@@ -116,6 +119,7 @@ require (
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.6.0
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16
