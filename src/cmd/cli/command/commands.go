@@ -462,11 +462,18 @@ var tenantsCmd = &cobra.Command{
 			if selected {
 				marker = "*" // highlight selected
 			}
-			line := fmt.Sprintf("%s %-*s (%s)\n", marker, maxNameLen, t.Name, t.ID)
-			if selected {
-				term.Printc(term.BrightCyan, " * ", line)
+
+			var line string
+			if verbose {
+				line = fmt.Sprintf("%s %-*s (%s)\n", marker, maxNameLen, t.Name, t.ID)
 			} else {
-				term.Printc(term.InfoColor, " * ", line)
+				line = fmt.Sprintf("%s %s\n", marker, t.Name)
+			}
+
+			if selected {
+				term.Printc(term.BrightCyan, line)
+			} else {
+				term.Printc(term.InfoColor, line)
 			}
 		}
 		return nil
