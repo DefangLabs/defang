@@ -23,6 +23,10 @@ type ListConfigNamesFunc func(context.Context) ([]string, error)
 
 type ErrMissingConfig []string
 
+func (e ErrMissingConfig) Names() []string {
+	return ([]string)(e)
+}
+
 func (e ErrMissingConfig) Error() string {
 	return fmt.Sprintf("missing configs %q (https://docs.defang.io/docs/concepts/configuration)", ([]string)(e))
 }
