@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -66,7 +67,7 @@ func TestValidationAndConvert(t *testing.T) {
 		logs = bytes.NewBufferString(strings.Join(logLines, ""))
 
 		// Compare the logs with the warnings file
-		if err := Compare(logs.Bytes(), path+".warnings"); err != nil {
+		if err := pkg.Compare(logs.Bytes(), path+".warnings"); err != nil {
 			t.Error(err)
 		}
 	})

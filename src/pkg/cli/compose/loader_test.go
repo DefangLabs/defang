@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func TestLoader(t *testing.T) {
@@ -22,7 +24,7 @@ func TestLoader(t *testing.T) {
 		}
 
 		// Compare the output with the golden file
-		if err := Compare(yaml, path+".golden"); err != nil {
+		if err := pkg.Compare(yaml, path+".golden"); err != nil {
 			t.Error(err)
 		}
 	})

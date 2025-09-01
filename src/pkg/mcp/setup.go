@@ -318,7 +318,10 @@ func handleStandardConfig(configPath string) error {
 			if err != nil {
 				return fmt.Errorf("failed to marshal mcpServers: %w", err)
 			}
-			json.Unmarshal(mcpServersJSON, &config)
+			err = json.Unmarshal(mcpServersJSON, &config)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal mcpServers: %w", err)
+			}
 		}
 	} else {
 		// File doesn't exist, create a new config

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func TestGetClientConfigPath(t *testing.T) {
@@ -276,7 +276,7 @@ func TestGetClientConfigPath(t *testing.T) {
 
 func TestWriteConfig(t *testing.T) {
 	// This test function will use handleVSCodeConfig and handleStandardConfig to make sure that is not overwritten existing data
-	// and only add or append our defangmcp config, or if there not file make one and write it.
+	// and only add or append our defangmcp config, or if there not an existing file; make one and write it.
 	test := []struct {
 		name          string
 		fileExists    bool
@@ -604,7 +604,7 @@ func TestWriteConfig(t *testing.T) {
 }`,
 		},
 		{
-			name:          "standard_config_json_file",
+			name:          "standard_config_invalid_json_file",
 			fileExists:    true,
 			existingData:  `{invalid json}`,
 			expectedError: true,
@@ -621,6 +621,9 @@ func TestWriteConfig(t *testing.T) {
 			tempDir := t.TempDir()
 
 			tempFilePath := filepath.Join(tempDir, "mcp.json")
+			t.Cleanup(func() {
+				_ = os.Remove(tempFilePath)
+			})
 
 			// Get the actual executable path that handleVSCodeConfig and handleStandardConfig will use
 			executablePath, err := os.Executable()
@@ -661,17 +664,12 @@ func TestWriteConfig(t *testing.T) {
 
 			expectedData := fmt.Sprintf(tt.expectedData, fmt.Sprintf(`"%s"`, executablePath))
 
-			goldenFile := filepath.Join(tempDir, "expected.json")
-			if err := os.WriteFile(goldenFile, []byte(expectedData), 0644); err != nil {
-				t.Fatal(err)
-			}
-
 			actualContent, err := os.ReadFile(tempFilePath)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := compose.Compare(actualContent, goldenFile); err != nil {
+			if err := pkg.Diff(string(actualContent), expectedData); err != nil {
 				t.Error(err)
 			}
 		})

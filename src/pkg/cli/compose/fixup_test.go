@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -32,7 +33,7 @@ func TestFixup(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := Compare(actual, path+".fixup"); err != nil {
+		if err := pkg.Compare(actual, path+".fixup"); err != nil {
 			t.Error(err)
 		}
 	})
