@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -70,6 +71,28 @@ func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
 	}, env...)
 	if err := runLocalCommand(ctx, dir, env, localCmd...); err != nil {
+		return err
+	}
+	// We always return an error to stop the CLI from "tailing" the cloud logs
+	return errors.New("local pulumi command succeeded; stopping")
+}
+
+func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
+	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
+	localCmd := append([]string{"go", "run", "./..."}, cmd...)
+	term.Debug(strings.Join(append(env, localCmd...), " "))
+
+	dir := os.Getenv("DEFANG_PULUMI_DIR")
+	if dir == "" {
+		return nil // show the shell command, but use regular Pulumi command in cloud task
+	}
+
+	// Run the Pulumi command locally
+	env = append([]string{
+		"PATH=" + os.Getenv("PATH"),
+		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
+	}, env...)
+	if err := runLocalCommand(ctx, path.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
 		return err
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
