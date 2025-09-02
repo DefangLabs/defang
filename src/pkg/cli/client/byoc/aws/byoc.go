@@ -438,7 +438,7 @@ func (b *ByocAws) runCdCommand(ctx context.Context, cmd cdCmd) (ecs.TaskArn, err
 		for k, v := range env {
 			debugEnv = append(debugEnv, k+"="+v)
 		}
-		if err := byoc.DebugPulumi(ctx, debugEnv, cmd.cmd...); err != nil {
+		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd.cmd...); err != nil {
 			return nil, err
 		}
 	}

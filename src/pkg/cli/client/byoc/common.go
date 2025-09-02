@@ -54,7 +54,7 @@ func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...strin
 	return command.Run()
 }
 
-func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
+func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
 	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
 	term.Debug(strings.Join(append(env, localCmd...), " "))
