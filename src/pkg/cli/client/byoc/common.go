@@ -45,6 +45,7 @@ func GetPulumiBackend(stateUrl string) (string, string, error) {
 }
 
 func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
+	term.Debug("Running local command `", cmd, "` in dir ", dir)
 	// TODO - use enums to define commands instead of passing strings down from the caller
 	// #nosec G204
 	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
@@ -78,7 +79,6 @@ func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 }
 
 func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
-	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
 	localCmd := append([]string{"go", "run", "./..."}, cmd...)
 	term.Debug(strings.Join(append(env, localCmd...), " "))
 
@@ -87,10 +87,17 @@ func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 		return nil // show the shell command, but use regular Pulumi command in cloud task
 	}
 
+	if gopath, err := exec.Command("go", "env", "GOPATH").Output(); err != nil {
+		return err
+	} else {
+		env = append(env, "GOPATH="+strings.TrimSpace(string(gopath)))
+	}
+
 	// Run the Pulumi command locally
 	env = append([]string{
 		"PATH=" + os.Getenv("PATH"),
 		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
+		"HOME=" + os.Getenv("HOME"),
 	}, env...)
 	if err := runLocalCommand(ctx, path.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
 		return err
