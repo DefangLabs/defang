@@ -372,6 +372,19 @@ func (b *ByocGcp) runCdCommand(ctx context.Context, cmd cdCommand) (string, erro
 		env[k] = v
 	}
 
+	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+		debugEnv := []string{"REGION=" + b.driver.Region}
+		if gcpProject := os.Getenv("GCP_PROJECT_ID"); gcpProject != "" {
+			debugEnv = append(debugEnv, "GCP_PROJECT_ID="+gcpProject)
+		}
+		for k, v := range env {
+			debugEnv = append(debugEnv, k+"="+v)
+		}
+		if err := byoc.DebugPulumiGolang(ctx, debugEnv, cmd.Command...); err != nil {
+			return "", err
+		}
+	}
+
 	execution, err := b.driver.Run(ctx, gcp.JobNameCD, env, cmd.Command...)
 	if err != nil {
 		return "", err
