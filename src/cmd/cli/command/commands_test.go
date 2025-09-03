@@ -137,19 +137,9 @@ func TestVersion(t *testing.T) {
 func TestCommandGates(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current directory: %v", err)
-	}
-	composeDir := "../../../../src/testdata/sanity"
-	if err = os.Chdir(composeDir); err != nil {
-		t.Fatalf("Failed to change directory: %v", err)
-	}
+	t.Chdir("../../../../src/testdata/sanity")
 
 	t.Setenv("AWS_REGION", "us-west-2")
-	t.Cleanup(func() {
-		os.Chdir(origDir)
-	})
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

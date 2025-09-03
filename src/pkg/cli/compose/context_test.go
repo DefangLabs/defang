@@ -166,7 +166,7 @@ func TestWalkContextFolder(t *testing.T) {
 			t.Fatalf("WalkContextFolder() failed: %v", err)
 		}
 
-		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings"}
+		expected := []string{"Dockerfile", "altcomp.yaml", "compose.yaml.fixup", "compose.yaml.golden", "compose.yaml.warnings", "subdir", "subdir/subdir2", "subdir/subdir2/.gitkeep"}
 		if !reflect.DeepEqual(files, expected) {
 			t.Errorf("Expected files: %v, got %v", expected, files)
 		}

@@ -146,22 +146,7 @@ func TestLoadProject(t *testing.T) {
 	})
 
 	t.Run("load starting from a sub directory", func(t *testing.T) {
-		cwd, _ := os.Getwd()
-
-		// setup
-		setup := func() {
-			os.MkdirAll("../../../testdata/alttestproj/subdir/subdir2", 0755)
-			os.Chdir("../../../testdata/alttestproj/subdir/subdir2")
-		}
-
-		//teardown
-		teardown := func() {
-			os.Chdir(cwd)
-			os.RemoveAll("../../../testdata/alttestproj/subdir")
-		}
-
-		setup()
-		t.Cleanup(teardown)
+		t.Chdir("../../../testdata/alttestproj/subdir/subdir2")
 
 		// execute test
 		loader := NewLoader()
@@ -213,11 +198,7 @@ func TestComposeGoNoDoubleWarningLog(t *testing.T) {
 }
 
 func TestComposeOnlyOneFile(t *testing.T) {
-	cwd, _ := os.Getwd()
-	t.Cleanup(func() {
-		os.Chdir(cwd)
-	})
-	os.Chdir("../../../testdata/toomany")
+	t.Chdir("../../../testdata/toomany")
 
 	loader := NewLoader()
 	project, err := loader.LoadProject(context.Background())
@@ -231,11 +212,7 @@ func TestComposeOnlyOneFile(t *testing.T) {
 }
 
 func TestComposeMultipleFiles(t *testing.T) {
-	cwd, _ := os.Getwd()
-	t.Cleanup(func() {
-		os.Chdir(cwd)
-	})
-	os.Chdir("../../../testdata/multiple")
+	t.Chdir("../../../testdata/multiple")
 
 	loader := NewLoader(WithPath("compose1.yaml", "compose2.yaml"))
 	project, err := loader.LoadProject(context.Background())

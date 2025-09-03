@@ -23,7 +23,7 @@
               gnumake
               less
               gnused # force Linux `sed` everywhere
-              go_1_23
+              go_1_24
               golangci-lint
               goreleaser
               nixfmt-rfc-style
