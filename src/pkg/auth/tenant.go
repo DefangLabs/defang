@@ -110,6 +110,12 @@ func ResolveAndSetTenantFromToken(ctx context.Context, accessToken string) error
 		return err
 	}
 
+	// If the token is from GitHub Actions, then we do not
+	// use the userinfo endpoint to resolve the tenant ID.
+	if iss == "https://token.actions.githubusercontent.com" {
+		return nil
+	}
+
 	url := strings.TrimRight(iss, "/") + "/userinfo"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
