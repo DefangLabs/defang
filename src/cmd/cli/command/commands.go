@@ -373,7 +373,11 @@ var RootCmd = &cobra.Command{
 
 		// Configure tenant selection based on --tenant flag
 		if f := cmd.Root().Flag("tenant"); f != nil && f.Changed {
+			// Highest precedence: explicit --tenant flag
 			auth.SetSelectedTenantName(tenantFlag)
+		} else if envTenant := os.Getenv("DEFANG_TENANT"); strings.TrimSpace(envTenant) != "" {
+			// Next precedence: DEFANG_TENANT environment variable
+			auth.SetSelectedTenantName(envTenant)
 		} else {
 			// Default behavior: auto-select tenant by JWT subject if no explicit name is provided
 			auth.SetAutoSelectBySub(true)
