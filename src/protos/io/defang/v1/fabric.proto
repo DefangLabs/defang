@@ -387,6 +387,7 @@ enum DeploymentAction {
   DEPLOYMENT_ACTION_UNSPECIFIED = 0;
   DEPLOYMENT_ACTION_UP = 1;
   DEPLOYMENT_ACTION_DOWN = 2;
+  DEPLOYMENT_ACTION_PREVIEW = 3;
 }
 
 message Deployment {
@@ -398,6 +399,7 @@ message Deployment {
   DeploymentAction action = 6;
   string region = 7;
   Provider provider = 8;
+  int32 service_count = 9;
 }
 
 message PutDeploymentRequest { Deployment deployment = 1; }
