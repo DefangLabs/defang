@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
@@ -94,12 +93,19 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		deployRequest.DelegationSetId = delegation.DelegationSetId
 	}
 
+	accountInfo, err := p.AccountInfo(ctx)
+	if err != nil {
+		return nil, project, err
+	}
+
+	var action defangv1.DeploymentAction
 	var resp *defangv1.DeployResponse
 	if upload == compose.UploadModePreview || upload == compose.UploadModeEstimate {
 		resp, err = p.Preview(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
 		}
+		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_PREVIEW
 	} else {
 		if delegation != nil && len(delegation.NameServers) > 0 {
 			req := &defangv1.DelegateSubdomainZoneRequest{NameServerRecords: delegation.NameServers, Project: project.Name}
@@ -109,34 +115,29 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 			}
 		}
 
-		accountInfo, err := p.AccountInfo(ctx)
-		if err != nil {
-			return nil, project, err
-		}
-
-		timestamp := time.Now()
 		resp, err = p.Deploy(ctx, deployRequest)
 		if err != nil {
 			return nil, project, err
 		}
+		action = defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP
+	}
 
-		err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
-			Deployment: &defangv1.Deployment{
-				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_UP,
-				Id:                resp.Etag,
-				Project:           project.Name,
-				Provider:          accountInfo.Provider.Value(),
-				ProviderAccountId: accountInfo.AccountID,
-				ProviderString:    string(accountInfo.Provider),
-				Region:            accountInfo.Region,
-				ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
-				Timestamp:         timestamppb.New(timestamp),
-			},
-		})
-		if err != nil {
-			term.Debugf("PutDeployment failed: %v", err)
-			term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
-		}
+	err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		Deployment: &defangv1.Deployment{
+			Action:            action,
+			Id:                resp.Etag,
+			Project:           project.Name,
+			Provider:          accountInfo.Provider.Value(),
+			ProviderAccountId: accountInfo.AccountID,
+			ProviderString:    string(accountInfo.Provider),
+			Region:            accountInfo.Region,
+			ServiceCount:      int32(len(fixedProject.Services)), // #nosec G115 - service count will not overflow int32
+			Timestamp:         timestamppb.Now(),
+		},
+	})
+	if err != nil {
+		term.Debugf("PutDeployment failed: %v", err)
+		term.Warn("Unable to update deployment history, but deployment will proceed anyway.")
 	}
 
 	if term.DoDebug() {
