@@ -112,7 +112,7 @@ func ResolveAndSetTenantFromToken(ctx context.Context, accessToken string) error
 
 	// If the token is from GitHub Actions, then we do not
 	// use the userinfo endpoint to resolve the tenant ID.
-	if iss == "https://token.actions.githubusercontent.com" {
+	if iss == "https://fabric-prod1.defang.dev" {
 		return nil
 	}
 
