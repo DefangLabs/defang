@@ -17,7 +17,7 @@ import (
 )
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
-func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating destroy tool")
 	composeDownTool := mcp.NewTool("destroy",
 		mcp.WithDescription("Remove services using defang."),
@@ -43,7 +43,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId cliClient.
 		client.Track("MCP Destroy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
+		provider, err := cli.NewProvider(ctx, *providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err

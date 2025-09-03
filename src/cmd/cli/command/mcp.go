@@ -72,11 +72,11 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 
 		// Setup resources
 		term.Debug("Setting up resources")
-		resources.SetupResources(s)
+		resources.SetupResources(s, &providerID)
 
 		// Setup tools
 		term.Debug("Setting up tools")
-		tools.SetupTools(s, getCluster(), authPort, providerID)
+		tools.SetupTools(s, getCluster(), authPort, &providerID)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {

@@ -17,7 +17,7 @@ import (
 )
 
 // setupSetConfigTool configures and adds the estimate tool to the MCP server
-func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupListConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating list config tool")
 	listConfigTool := mcp.NewTool("list_configs",
 		mcp.WithDescription("List all config variables for the defang project"),
@@ -53,7 +53,7 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId cliClie
 		}
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
+		provider, err := cli.NewProvider(ctx, *providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 
