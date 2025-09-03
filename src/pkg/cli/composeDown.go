@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ComposeDown(ctx context.Context, projectName string, c client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
+func ComposeDown(ctx context.Context, projectName string, fabric client.FabricClient, provider client.Provider, names ...string) (types.ETag, error) {
 	term.Debugf("Destroying project %q %q", projectName, names)
 
 	if dryrun.DoDryRun {
@@ -34,7 +34,7 @@ func ComposeDown(ctx context.Context, projectName string, c client.FabricClient,
 			return "", err
 		}
 
-		err = c.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
+		err = fabric.PutDeployment(ctx, &defangv1.PutDeploymentRequest{
 			Deployment: &defangv1.Deployment{
 				Action:            defangv1.DeploymentAction_DEPLOYMENT_ACTION_DOWN,
 				Id:                etag,
@@ -54,7 +54,7 @@ func ComposeDown(ctx context.Context, projectName string, c client.FabricClient,
 		return etag, nil
 	}
 
-	delegateDomain, err := c.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
+	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{}) // TODO: pass projectName
 	if err != nil {
 		term.Debug("GetDelegateSubdomainZone failed:", err)
 		return "", errors.New("failed to get delegate domain")
