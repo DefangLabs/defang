@@ -18,7 +18,7 @@ func TestCreateRandomConfigValue(t *testing.T) {
 	// create the scanner based on scanner config
 	scannerClient, err := scanner.NewScannerFromConfig(cfg)
 	if err != nil {
-		t.Fatalf("Failed to make a config detector: " + err.Error())
+		t.Fatalf("Failed to make a config detector: %v", err)
 	}
 
 	// a map for storing generated results to check if they are unique
@@ -35,7 +35,7 @@ func TestCreateRandomConfigValue(t *testing.T) {
 		// scan the config
 		ds, err := scannerClient.Scan(randomConfig)
 		if err != nil {
-			t.Fatalf("Failed to scan input: " + err.Error())
+			t.Fatalf("Failed to scan input: %v", err)
 		}
 
 		// the length of ds (detected secrets) should be one
