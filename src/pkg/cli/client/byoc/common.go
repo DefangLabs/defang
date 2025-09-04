@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
@@ -19,6 +20,7 @@ const (
 var (
 	DefangPrefix           = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 	DefangPulumiBackend    = os.Getenv("DEFANG_PULUMI_BACKEND")
+	ErrLocalPulumiStopped  = errors.New("local pulumi command succeeded; stopping")
 	PulumiConfigPassphrase = pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf")
 )
 
@@ -44,6 +46,7 @@ func GetPulumiBackend(stateUrl string) (string, string, error) {
 }
 
 func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...string) error {
+	term.Debug("Running local command `", cmd, "` in dir ", dir)
 	// TODO - use enums to define commands instead of passing strings down from the caller
 	// #nosec G204
 	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
@@ -54,7 +57,7 @@ func runLocalCommand(ctx context.Context, dir string, env []string, cmd ...strin
 	return command.Run()
 }
 
-func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
+func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 	// Locally we use the "dev" script from package.json to run Pulumi commands, which uses ts-node
 	localCmd := append([]string{"npm", "run", "dev"}, cmd...)
 	term.Debug(strings.Join(append(env, localCmd...), " "))
@@ -73,7 +76,35 @@ func DebugPulumi(ctx context.Context, env []string, cmd ...string) error {
 		return err
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
-	return errors.New("local pulumi command succeeded; stopping")
+	return ErrLocalPulumiStopped
+}
+
+func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
+	localCmd := append([]string{"go", "run", "./..."}, cmd...)
+	term.Debug(strings.Join(append(env, localCmd...), " "))
+
+	dir := os.Getenv("DEFANG_PULUMI_DIR")
+	if dir == "" {
+		return nil // show the shell command, but use regular Pulumi command in cloud task
+	}
+
+	if gopath, err := exec.Command("go", "env", "GOPATH").Output(); err != nil {
+		return err
+	} else {
+		env = append(env, "GOPATH="+strings.TrimSpace(string(gopath)))
+	}
+
+	// Run the Pulumi command locally
+	env = append([]string{
+		"PATH=" + os.Getenv("PATH"),
+		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
+		"HOME=" + os.Getenv("HOME"),    // needed for go
+	}, env...)
+	if err := runLocalCommand(ctx, path.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
+		return err
+	}
+	// We always return an error to stop the CLI from "tailing" the cloud logs
+	return ErrLocalPulumiStopped
 }
 
 func GetPrivateDomain(projectName string) string {
