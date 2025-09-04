@@ -13,9 +13,9 @@ type ContainerCondition string
 
 const (
 	ContainerStarted  ContainerCondition = "START"
-	ContainerComplete                    = "COMPLETE"
-	ContainerSuccess                     = "SUCCESS"
-	ContainerHealthy                     = "HEALTHY"
+	ContainerComplete ContainerCondition = "COMPLETE"
+	ContainerSuccess  ContainerCondition = "SUCCESS"
+	ContainerHealthy  ContainerCondition = "HEALTHY"
 )
 
 type Container struct {
