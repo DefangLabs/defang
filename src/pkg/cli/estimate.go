@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -165,8 +165,8 @@ func prepareEstimateLineItemTableItems(lineItems []*defangv1.EstimateLineItem) [
 	}
 
 	// sort line items by service + description
-	sort.Slice(tableItems, func(i, j int) bool {
-		return tableItems[i].Service+tableItems[i].Description < tableItems[j].Service+tableItems[j].Description
+	slices.SortFunc(tableItems, func(a, b EstimateLineItemTableItem) int {
+		return strings.Compare(a.Service+a.Description, b.Service+b.Description)
 	})
 
 	return tableItems

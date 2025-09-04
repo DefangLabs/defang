@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
-	"sort"
+	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/miekg/dns"
@@ -76,7 +76,9 @@ func FindNSServers(ctx context.Context, domain string) ([]*net.NS, error) {
 		index := pkg.RandomIndex(len(nsServers))
 		nsServer := nsServers[index].Host
 		ns, err := ResolverAt(nsServer).LookupNS(ctx, domain)
-		sort.Slice(ns, func(i, j int) bool { return ns[i].Host < ns[j].Host })
+		slices.SortFunc(ns, func(a, b *net.NS) int {
+			return strings.Compare(a.Host, b.Host)
+		})
 		if err != nil {
 			if retries--; retries > 0 {
 				continue

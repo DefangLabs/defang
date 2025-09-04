@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -443,7 +443,9 @@ var tenantsCmd = &cobra.Command{
 		}
 
 		// Sort by name for stable output
-		sort.Slice(tenants, func(i, j int) bool { return strings.ToLower(tenants[i].Name) < strings.ToLower(tenants[j].Name) })
+		slices.SortFunc(tenants, func(a, b auth.Tenant) int {
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		})
 
 		if len(tenants) == 0 {
 			term.Info("No tenants found")
