@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -252,7 +253,7 @@ func handleVSCodeConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove the file at %q and recreate it: mv %q %q", configPath, err, configPath, configPath, configPath+".backup")
+			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
 		}
 
 		// Check if "servers" section exists
@@ -267,7 +268,7 @@ func handleVSCodeConfig(configPath string) error {
 			mcpMap["defang"] = config
 			existingData["servers"] = mcpMap
 		} else {
-			return fmt.Errorf("failed to assert 'servers' section as map[string]any in %q.\nThe 'servers' section should be a JSON object like {}, not an array or other type. Try fixing the config file manually for invalid json format.", configPath)
+			return errors.New("failed to assert 'servers' section as map[string]any")
 		}
 	} else {
 		// File doesn't exist, create a new config with minimal settings
@@ -302,12 +303,12 @@ func handleStandardConfig(configPath string) error {
 		// File exists, read it
 		data, err := os.ReadFile(configPath)
 		if err != nil {
-			return fmt.Errorf("failed to read config file %q: %w\nTry: chmod 644 %q", configPath, err, configPath)
+			return fmt.Errorf("failed to read config file: %w", err)
 		}
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove it to recreate: mv %q %q", configPath, err, configPath, configPath+".backup")
+			return fmt.Errorf("failed to unmarshal existing config: %w", err)
 		}
 
 		// Try to extract MCPServers from existing data
@@ -349,7 +350,7 @@ func handleStandardConfig(configPath string) error {
 
 	// #nosec G306 - config file does not contain sensitive data
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file %q: %w.\nTry: chmod 644 %q or check directory permissions: chmod 755 %q", configPath, err, configPath, filepath.Dir(configPath))
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil
@@ -378,7 +379,7 @@ func SetupClient(clientStr string) error {
 	// Create the directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory %q: %w.\nTry: chmod 755 %q or check parent directory permissions", configDir, err, filepath.Dir(configDir))
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Handle VSCode mcp.json specially
