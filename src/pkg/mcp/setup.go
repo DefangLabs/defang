@@ -244,14 +244,8 @@ func handleVSCodeConfig(configPath string) error {
 	}
 
 	// Check if the file exists
-	if _, err := os.Stat(configPath); err == nil {
-		// File exists, read it
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
-
-		// Parse the JSON into a generic map to preserve all settings
+	if data, err := os.ReadFile(configPath); err == nil {
+		// File exists, parse it
 		if err := json.Unmarshal(data, &existingData); err != nil {
 			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
 		}
@@ -270,6 +264,8 @@ func handleVSCodeConfig(configPath string) error {
 		} else {
 			return errors.New("failed to assert 'servers' section as map[string]any")
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
 	} else {
 		// File doesn't exist, create a new config with minimal settings
 		existingData = map[string]any{
@@ -299,13 +295,7 @@ func handleStandardConfig(configPath string) error {
 	var config MCPConfig
 
 	// Check if the file exists
-	if _, err := os.Stat(configPath); err == nil {
-		// File exists, read it
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
-
+	if data, err := os.ReadFile(configPath); err == nil {
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
 			return fmt.Errorf("failed to unmarshal existing config: %w", err)
@@ -323,6 +313,8 @@ func handleStandardConfig(configPath string) error {
 				return fmt.Errorf("failed to unmarshal mcpServers: %w", err)
 			}
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
 	} else {
 		// File doesn't exist, create a new config
 		existingData = make(map[string]any)

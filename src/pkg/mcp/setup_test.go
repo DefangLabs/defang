@@ -622,9 +622,6 @@ func TestWriteConfig(t *testing.T) {
 
 			tempFilePath := filepath.Join(tempDir, "mcp.json")
 			t.Cleanup(func() {
-						_ = os.Remove(tempFilePath)
-			})
-			t.Cleanup(func() {
 				_ = os.Remove(tempFilePath)
 			})
 
