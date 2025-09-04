@@ -16,7 +16,8 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 
 ## Support
 
-- File any issues [here](https://github.com/DefangLabs/defang/issues)
+- File any issues [right here on GitHub](https://github.com/DefangLabs/defang/issues)
+- Join our [Discord community](https://s.defang.io/discord) for real-time help and discussions
 
 ## Environment Variables
 

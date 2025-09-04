@@ -88,6 +88,7 @@ Install the Defang CLI from one of the following sources:
 ## Support
 
 - File any issues [here](https://github.com/DefangLabs/defang/issues)
+- Join our [Discord community](https://s.defang.io/discord) for real-time help and discussions
 
 ## Command completion
 

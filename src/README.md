@@ -17,6 +17,7 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 ## Support
 
 - File any issues [here](https://github.com/DefangLabs/defang/issues)
+- Join our [Discord community](https://s.defang.io/discord) for real-time help and discussions
 
 ## Environment Variables
 
@@ -52,4 +53,3 @@ The Defang CLI recognizes the following environment variables:
 
 Environment variables will be loaded from a `.defangrc` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
-
