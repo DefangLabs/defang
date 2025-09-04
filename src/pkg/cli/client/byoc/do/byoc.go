@@ -154,9 +154,9 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.CDImage,
 		Compose:   req.Compose,
+		Mode:      req.Mode,
 		Services:  serviceInfos,
 	})
-
 	if err != nil {
 		return nil, err
 	}
