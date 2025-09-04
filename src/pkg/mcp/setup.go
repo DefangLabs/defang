@@ -252,7 +252,7 @@ func handleVSCodeConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove the file at %q and recreate it: mv %q %q.backup", configPath, err, configPath, configPath, configPath)
+			return fmt.Errorf("failed to unmarshal existing vscode config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove the file at %q and recreate it: mv %q %q", configPath, err, configPath, configPath, configPath+".backup")
 		}
 
 		// Check if "servers" section exists
@@ -307,7 +307,7 @@ func handleStandardConfig(configPath string) error {
 
 		// Parse the JSON into a generic map to preserve all settings
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove it to recreate: mv %q %q.backup", configPath, err, configPath, configPath)
+			return fmt.Errorf("failed to unmarshal existing config %q: %w.\nThe config file may be corrupted. Try backing it up and fixing the JSON syntax, or remove it to recreate: mv %q %q", configPath, err, configPath, configPath+".backup")
 		}
 
 		// Try to extract MCPServers from existing data
