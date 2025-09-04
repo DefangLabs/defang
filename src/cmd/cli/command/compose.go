@@ -224,7 +224,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if nonInteractive {
+	if nonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
 		return err
 	}
 
