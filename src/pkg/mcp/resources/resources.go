@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -20,12 +19,6 @@ func SetupResources(s *server.MCPServer, providerId *client.ProviderID) {
 
 	// Create and add samples examples resource
 	setupSamplesResource(s)
-
-	// // Create and add sample prompt
-	// setupSamplePrompt(s)
-
-	//AWS BYOC
-	setupAWSBYOPrompt(s, providerId)
 }
 
 var knowledgeBasePath = filepath.Join(client.StateDir, "knowledge_base.json")
@@ -85,159 +78,6 @@ func setupSamplesResource(s *server.MCPServer) {
 				Text:     string(file),
 				MIMEType: "application/json",
 				URI:      "doc:///knowledge_base/samples_examples.json",
-			},
-		}, nil
-	})
-}
-
-// func handleAwsBYOCPrompt(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-// 	awsID := getStringArg(req.Params.Arguments, "AWS_ACCESS_KEY_ID", "")
-// 	awsSecret := getStringArg(req.Params.Arguments, "AWS_SECRET_ACCESS_KEY", "")
-
-// 	err := os.Setenv("DEFANG_PROVIDER", "aws")
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// providerId.Set(cliClient.ProviderAWS.String())
-
-// 	// Set environment variables
-// 	if awsID != "" {
-// 		err := os.Setenv("AWS_ACCESS_KEY_ID", awsID)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-// 	if awsSecret != "" {
-// 		err := os.Setenv("AWS_SECRET_ACCESS_KEY", awsSecret)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-
-// 	return &mcp.GetPromptResult{
-// 		Description: fmt.Sprintf("AWS credentials set - Access Key ID: %s, Secret Access Key: %s", awsID, maskSecret(awsSecret)),
-// 		Messages: []mcp.PromptMessage{
-// 			{
-// 				Role:    "user",
-// 				Content: mcp.NewTextContent("I have my aws credentials set for BYOC Defang. Now use the defang MCP tool \"deploy\" to deploy my application to set my provider to aws."),
-// 			},
-// 		},
-// 	}, nil
-// }
-
-func getStringArg(args map[string]string, key, defaultValue string) string {
-	if val, exists := args[key]; exists {
-		return val
-	}
-	return defaultValue
-}
-
-// maskSecret masks all but the last 4 characters of a secret for safe logging
-func maskSecret(secret string) string {
-	if len(secret) <= 4 {
-		return strings.Repeat("*", len(secret))
-	}
-	return strings.Repeat("*", len(secret)-4) + secret[len(secret)-4:]
-}
-
-// func getBoolArg(args map[string]string, key string, defaultValue bool) bool {
-// 	if val, exists := args[key]; exists {
-// 		// Accept "true"/"false" strings
-// 		if val == "true" {
-// 			return true
-// 		}
-// 		if val == "false" {
-// 			return false
-// 		}
-// 	}
-// 	return defaultValue
-// }
-
-// // setupSamplePrompt configures and adds the sample prompt to the MCP server
-// func setupSamplePrompt(s *server.MCPServer) {
-// 	samplePrompt := mcp.NewPrompt("Make Dockerfile and compose file",
-// 		mcp.WithPromptDescription("The user should give you a path to a project directory, and you should create a Dockerfile and compose file for that project. If there is an app folder, make the Dockerfile for that folder. Then make a compose file for original project directory or root of that project directory."),
-// 		mcp.WithArgument("project_path",
-// 			mcp.ArgumentDescription("Path to the project directory"),
-// 			mcp.RequiredArgument(),
-// 		),
-// 	)
-
-// 	s.AddPrompt(samplePrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-// 		projectPath, ok := request.Params.Arguments["project_path"]
-// 		if !ok || projectPath == "" {
-// 			projectPath = "."
-// 			term.Warn("Project path not provided, using current directory", "dir", projectPath)
-// 		}
-
-// 		return mcp.NewGetPromptResult(
-// 			"Code assistance to make Dockerfile and compose file",
-// 			[]mcp.PromptMessage{
-// 				mcp.NewPromptMessage(
-// 					mcp.RoleUser,
-// 					mcp.NewTextContent(fmt.Sprintf("You are a helpful code writer. I will give you a path which is %s to a project directory, and you should create a Dockerfile and compose file for that project. If there is an app folder, make the Dockerfile for that folder. Then make a compose file for original project directory or root of that project directory. When creating these files, make sure to use the samples and examples resource for reference of defang. If you need more information, please use the defang documentation resource. When you are creating these files please make sure to scan carefully to expose any ports, start commands, and any other information needed for the project.", projectPath)),
-// 				),
-// 				mcp.NewPromptMessage(
-// 					mcp.RoleAssistant,
-// 					mcp.NewEmbeddedResource(mcp.TextResourceContents{
-// 						MIMEType: "application/json",
-// 						URI:      "doc:///knowledge_base/knowledge_base.json",
-// 					}),
-// 				),
-// 			},
-// 		), nil
-// 	})
-// }
-
-// setupAWSBYOPrompt configures and adds the AWS BYOCPrompt to the MCP server
-func setupAWSBYOPrompt(s *server.MCPServer, providerId *client.ProviderID) {
-	awsBYOCPrompt := mcp.NewPrompt("AWS BYOC Setup",
-		mcp.WithPromptDescription("Bring Your Own Cloud setup for AWS"),
-
-		mcp.WithArgument("AWS_ACCESS_KEY_ID",
-			mcp.ArgumentDescription("Your AWS Access Key ID"),
-			mcp.RequiredArgument(),
-		),
-
-		mcp.WithArgument("AWS_SECRET_ACCESS_KEY",
-			mcp.ArgumentDescription("Your AWS Secret Access Key"),
-			mcp.RequiredArgument(),
-		),
-	)
-
-	s.AddPrompt(awsBYOCPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		awsID := getStringArg(req.Params.Arguments, "AWS_ACCESS_KEY_ID", "")
-		awsSecret := getStringArg(req.Params.Arguments, "AWS_SECRET_ACCESS_KEY", "")
-
-		err := os.Setenv("DEFANG_PROVIDER", "aws")
-		if err != nil {
-			return nil, err
-		}
-
-		providerId.Set(client.ProviderAWS.String())
-
-		// Set environment variables
-		if awsID != "" {
-			err := os.Setenv("AWS_ACCESS_KEY_ID", awsID)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if awsSecret != "" {
-			err := os.Setenv("AWS_SECRET_ACCESS_KEY", awsSecret)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return &mcp.GetPromptResult{
-			Description: fmt.Sprintf("AWS credentials set - Access Key ID: %s, Secret Access Key: %s", awsID, maskSecret(awsSecret)),
-			Messages: []mcp.PromptMessage{
-				{
-					Role:    "user",
-					Content: mcp.NewTextContent("I have my aws credentials set for BYOC Defang. Now use the defang MCP tool \"deploy\" to deploy my application to set my provider to aws."),
-				},
 			},
 		}, nil
 	})
