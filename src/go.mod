@@ -4,7 +4,7 @@ go 1.24
 
 toolchain go1.24.5
 
-replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
+replace github.com/spf13/cobra v1.10.1 => github.com/DefangLabs/cobra v1.10.1-defang
 
 require (
 	cloud.google.com/go/artifactregistry v1.16.1
@@ -50,8 +50,8 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/ross96D/cancelreader v0.2.6
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.8.0
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/cobra v1.10.1
+	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.10.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/mod v0.18.0

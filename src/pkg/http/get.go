@@ -7,6 +7,8 @@ import (
 
 type Header = http.Header
 
+const StatusOK = http.StatusOK
+
 func GetWithContext(ctx context.Context, url string) (*http.Response, error) {
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

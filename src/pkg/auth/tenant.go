@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/http"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -27,7 +28,7 @@ var (
 // SetSelectedTenantName stores the desired tenant name for selection.
 func SetSelectedTenantName(name string) {
 	selectedTenantName = strings.TrimSpace(name)
-	autoSelectBySub = false
+	autoSelectBySub = name == ""
 }
 
 // SetAutoSelectBySub enables or disables auto-select by JWT sub.
@@ -37,20 +38,15 @@ func SetAutoSelectBySub(enabled bool) {
 
 // subFromJWT extracts the "sub" claim from the given JWT without verification.
 func subFromJWT(token string) (string, error) {
-	var claims jwt.MapClaims
+	var claims jwt.RegisteredClaims
 	_, _, err := new(jwt.Parser).ParseUnverified(token, &claims)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse access token: %w", err)
 	}
-	subVal, ok := claims["sub"]
-	if !ok {
-		return "", errors.New("token is missing subject (sub) claim")
-	}
-	sub, ok := subVal.(string)
-	if !ok || sub == "" {
+	if claims.Subject == "" {
 		return "", errors.New("invalid subject (sub) claim in token")
 	}
-	return sub, nil
+	return claims.Subject, nil
 }
 
 // GetSelectedTenantName returns the currently selected tenant name.
@@ -64,20 +60,15 @@ func GetSelectedTenantID() string { return selectedTenantID }
 
 // issuerFromJWT extracts the "iss" claim from the given JWT without verification.
 func issuerFromJWT(token string) (string, error) {
-	var claims jwt.MapClaims
+	var claims jwt.RegisteredClaims
 	_, _, err := new(jwt.Parser).ParseUnverified(token, &claims)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse access token: %w", err)
 	}
-	issVal, ok := claims["iss"]
-	if !ok {
-		return "", errors.New("token is missing issuer (iss) claim")
-	}
-	iss, ok := issVal.(string)
-	if !ok || iss == "" {
+	if claims.Issuer == "" {
 		return "", errors.New("invalid issuer (iss) claim in token")
 	}
-	return iss, nil
+	return claims.Issuer, nil
 }
 
 // userinfoTenant represents a tenant entry in the /userinfo payload.
@@ -89,6 +80,32 @@ type userinfoTenant struct {
 // userinfoResponse represents the relevant portion of the /userinfo response.
 type userinfoResponse struct {
 	AllTenants []userinfoTenant `json:"allTenants"`
+}
+
+func invokeUserinfoEndpoint(ctx context.Context, accessToken string) (*userinfoResponse, error) {
+	iss, err := issuerFromJWT(accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	url, _ := url.JoinPath(iss, "userinfo")
+	header := http.Header{}
+	header.Set("Accept", "application/json")
+	header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := http.GetWithHeader(ctx, url, header)
+	if err != nil {
+		return nil, fmt.Errorf("userinfo request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("userinfo request failed: %s", resp.Status)
+	}
+
+	var ui userinfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ui); err != nil {
+		return nil, fmt.Errorf("failed to decode userinfo: %w", err)
+	}
+	return &ui, nil
 }
 
 // ResolveAndSetTenantFromToken resolves the tenant ID for the previously set tenant name
@@ -116,26 +133,9 @@ func ResolveAndSetTenantFromToken(ctx context.Context, accessToken string) error
 		return nil
 	}
 
-	url := strings.TrimRight(iss, "/") + "/userinfo"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	ui, err := invokeUserinfoEndpoint(ctx, token)
 	if err != nil {
 		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("userinfo request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("userinfo request failed: %s", resp.Status)
-	}
-
-	var ui userinfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ui); err != nil {
-		return fmt.Errorf("failed to decode userinfo: %w", err)
 	}
 
 	if autoSelectBySub {
@@ -197,31 +197,9 @@ func ListTenantsFromToken(ctx context.Context, accessToken string) ([]Tenant, er
 		return nil, ErrNoAccessToken
 	}
 
-	iss, err := issuerFromJWT(token)
+	ui, err := invokeUserinfoEndpoint(ctx, token)
 	if err != nil {
 		return nil, err
-	}
-
-	url := strings.TrimRight(iss, "/") + "/userinfo"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("userinfo request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("userinfo request failed: %s", resp.Status)
-	}
-
-	var ui userinfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ui); err != nil {
-		return nil, fmt.Errorf("failed to decode userinfo: %w", err)
 	}
 
 	tenants := make([]Tenant, 0, len(ui.AllTenants))

@@ -52,19 +52,18 @@ var (
 	cluster        string
 	colorMode      = ColorAuto
 	sourcePlatform = migrate.SourcePlatformUnspecified // default to auto-detecting the source platform
-	doDebug        = false
+	doDebug        = pkg.GetenvBool("DEFANG_DEBUG")
 	hasTty         = term.IsTerminal() && !pkg.GetenvBool("CI")
 	hideUpdate     = pkg.GetenvBool("DEFANG_HIDE_UPDATE")
 	mode           = Mode(defangv1.DeploymentMode_MODE_UNSPECIFIED)
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
-	org            string
-	tenantFlag     string
+	org            = os.Getenv("DEFANG_ORG")
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
-	verbose        = false
+	verbose        = pkg.GetenvBool("DEFANG_VERBOSE")
 )
 
-func getCluster() string {
+func getOrgCluster() string {
 	if org == "" {
 		return cluster
 	}
@@ -165,12 +164,11 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().Var(&colorMode, "color", fmt.Sprintf(`colorize output; one of %v`, allColorModes))
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
-	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
-	RootCmd.PersistentFlags().StringVar(&tenantFlag, "tenant", "", "select tenant by name")
+	RootCmd.PersistentFlags().StringVar(&org, "org", "", "override organization name (tenant)")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
-	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", pkg.GetenvBool("DEFANG_DEBUG"), "debug logging for troubleshooting the CLI")
+	RootCmd.PersistentFlags().BoolVar(&doDebug, "debug", false, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
 	RootCmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "T", !hasTty, "disable interactive prompts / no TTY")
 	RootCmd.PersistentFlags().StringP("project-name", "p", "", "project name")
@@ -372,19 +370,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		// Configure tenant selection based on --tenant flag
-		if f := cmd.Root().Flag("tenant"); f != nil && f.Changed {
-			// Highest precedence: explicit --tenant flag
-			auth.SetSelectedTenantName(tenantFlag)
-		} else if envTenant := os.Getenv("DEFANG_TENANT"); strings.TrimSpace(envTenant) != "" {
-			// Next precedence: DEFANG_TENANT environment variable
-			auth.SetSelectedTenantName(envTenant)
-		} else {
-			// Default behavior: auto-select tenant by JWT subject if no explicit name is provided
-			auth.SetAutoSelectBySub(true)
-		}
+		// Configure tenant selection based on --org flag
+		auth.SetSelectedTenantName(org)
 
-		client, err = cli.Connect(ctx, getCluster())
+		client, err = cli.Connect(ctx, getOrgCluster())
 
 		if v, err := client.GetVersions(ctx); err == nil {
 			version := cmd.Root().Version // HACK to avoid circular dependency with RootCmd
@@ -405,7 +394,7 @@ var RootCmd = &cobra.Command{
 		if nonInteractive {
 			err = client.CheckLoginAndToS(ctx)
 		} else {
-			err = login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
+			err = login.InteractiveRequireLoginAndToS(ctx, client, getOrgCluster())
 		}
 
 		if err != nil {
@@ -413,12 +402,12 @@ var RootCmd = &cobra.Command{
 		}
 
 		// Ensure tenant is resolved post-login as we now have a token
-		if tok := pcluster.GetExistingToken(getCluster()); tok != "" {
+		if tok := pcluster.GetExistingToken(getOrgCluster()); tok != "" {
 			if err2 := auth.ResolveAndSetTenantFromToken(ctx, tok); err2 != nil {
 				return err2
 			}
 			// log the tenant name and id
-			term.Debug("Selected tenant:", auth.GetSelectedTenantName(), "(", auth.GetSelectedTenantID(), ")")
+			term.Debugf("Selected tenant: %q (%s)", auth.GetSelectedTenantName(), auth.GetSelectedTenantID())
 		}
 
 		return nil
@@ -427,63 +416,49 @@ var RootCmd = &cobra.Command{
 
 var tenantsCmd = &cobra.Command{
 	Use:         "tenants",
+	Aliases:     []string{"tenant", "orgs", "org"},
 	Args:        cobra.NoArgs,
 	Annotations: authNeededAnnotation,
 	Short:       "List tenants available to the logged-in user",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tok := pcluster.GetExistingToken(getCluster())
-		if strings.TrimSpace(tok) == "" {
-			return errors.New("not logged in; run 'defang login'")
-		}
 
+		tok := pcluster.GetExistingToken(getOrgCluster())
 		tenants, err := auth.ListTenantsFromToken(ctx, tok)
 		if err != nil {
 			return err
 		}
 
-		// Sort by name for stable output
-		slices.SortFunc(tenants, func(a, b auth.Tenant) int {
-			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-		})
-
 		if len(tenants) == 0 {
-			term.Info("No tenants found")
+			term.Warn("No tenants found")
 			return nil
 		}
 
+		// Sort by name for stable output
+		slices.SortStableFunc(tenants, func(a, b auth.Tenant) int {
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		})
+
+		printTenants := make([]struct {
+			Active string
+			auth.Tenant
+		}, len(tenants))
+
 		currentID := auth.GetSelectedTenantID()
 		currentName := auth.GetSelectedTenantName()
-
-		// Compute longest name for aligned output
-		maxNameLen := 0
-		for _, t := range tenants {
-			if l := len(t.Name); l > maxNameLen {
-				maxNameLen = l
-			}
-		}
-
-		for _, t := range tenants {
+		for i, t := range tenants {
+			printTenants[i].Tenant = t
 			selected := t.ID == currentID || (currentID == "" && t.Name == currentName && strings.TrimSpace(currentName) != "")
-			marker := "-"
 			if selected {
-				marker = "*" // highlight selected
-			}
-
-			var line string
-			if verbose {
-				line = fmt.Sprintf("%s %-*s (%s)\n", marker, maxNameLen, t.Name, t.ID)
-			} else {
-				line = fmt.Sprintf("%s %s\n", marker, t.Name)
-			}
-
-			if selected {
-				term.Printc(term.BrightCyan, line)
-			} else {
-				term.Printc(term.InfoColor, line)
+				printTenants[i].Active = "*" // highlight selected
 			}
 		}
-		return nil
+
+		attrs := []string{"Active", "Name"}
+		if verbose {
+			attrs = append(attrs, "ID")
+		}
+		return term.Table(printTenants, attrs)
 	},
 }
 
@@ -495,11 +470,11 @@ var loginCmd = &cobra.Command{
 		trainingOptOut, _ := cmd.Flags().GetBool("training-opt-out")
 
 		if nonInteractive {
-			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getCluster()); err != nil {
+			if err := login.NonInteractiveGitHubLogin(cmd.Context(), client, getOrgCluster()); err != nil {
 				return err
 			}
 		} else {
-			err := login.InteractiveLogin(cmd.Context(), client, getCluster())
+			err := login.InteractiveLogin(cmd.Context(), client, getOrgCluster())
 			if err != nil {
 				return err
 			}
@@ -616,7 +591,7 @@ var generateCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  modelId,
 			Fabric:   client,
-			Cluster:  getCluster(),
+			Cluster:  getOrgCluster(),
 		}
 
 		sample := ""
@@ -644,7 +619,7 @@ var initCmd = &cobra.Command{
 			Heroku:   migrate.NewHerokuClient(),
 			ModelID:  modelId,
 			Fabric:   client,
-			Cluster:  getCluster(),
+			Cluster:  getOrgCluster(),
 		}
 
 		if len(args) > 0 {
