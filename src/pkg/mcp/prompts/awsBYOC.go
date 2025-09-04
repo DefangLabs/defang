@@ -11,8 +11,8 @@ import (
 )
 
 func setupAWSBYOPrompt(s *server.MCPServer, providerId *client.ProviderID) {
-	awsBYOCPrompt := mcp.NewPrompt("AWS BYOC Setup",
-		mcp.WithPromptDescription("Bring Your Own Cloud setup for AWS"),
+	awsBYOCPrompt := mcp.NewPrompt("AWS Setup",
+		mcp.WithPromptDescription("Setup for AWS"),
 
 		mcp.WithArgument("AWS_ACCESS_KEY_ID",
 			mcp.ArgumentDescription("Your AWS Access Key ID"),
@@ -23,15 +23,30 @@ func setupAWSBYOPrompt(s *server.MCPServer, providerId *client.ProviderID) {
 			mcp.ArgumentDescription("Your AWS Secret Access Key"),
 			mcp.RequiredArgument(),
 		),
+
+		mcp.WithArgument("AWS_REGION",
+			mcp.ArgumentDescription("Your AWS Region"),
+			mcp.RequiredArgument(),
+		),
 	)
 
 	s.AddPrompt(awsBYOCPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		awsID := getStringArg(req.Params.Arguments, "AWS_ACCESS_KEY_ID", "")
 		awsSecret := getStringArg(req.Params.Arguments, "AWS_SECRET_ACCESS_KEY", "")
+		region := getStringArg(req.Params.Arguments, "AWS_REGION", "")
+
+		if region == "" {
+			return nil, errors.New("AWS_REGION is required")
+		}
+
+		err := os.Setenv("AWS_REGION", region)
+		if err != nil {
+			return nil, err
+		}
 
 		providerId.Set(client.ProviderAWS.String())
 
-		err := os.Setenv("DEFANG_PROVIDER", "aws")
+		err = os.Setenv("DEFANG_PROVIDER", "aws")
 		if err != nil {
 			return nil, err
 		}

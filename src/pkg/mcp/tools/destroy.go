@@ -90,10 +90,10 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 				return result, err
 			}
 
-			return mcp.NewToolResultErrorFromErr("Failed to destroy project", err), err
+			return mcp.NewToolResultErrorFromErr("Failed to send destroy request", err), err
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully destroyed project: %s, etag: %s", projectName, deployment)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("The project is in the process of being destroyed: %s, please tail this deployment ID: %s for status updates.", projectName, deployment)), nil
 	})
 }
 
