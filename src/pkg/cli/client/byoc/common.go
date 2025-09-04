@@ -20,6 +20,7 @@ const (
 var (
 	DefangPrefix           = pkg.Getenv("DEFANG_PREFIX", "Defang") // prefix for all resources created by Defang
 	DefangPulumiBackend    = os.Getenv("DEFANG_PULUMI_BACKEND")
+	ErrLocalPulumiStopped  = errors.New("local pulumi command succeeded; stopping")
 	PulumiConfigPassphrase = pkg.Getenv("PULUMI_CONFIG_PASSPHRASE", "asdf")
 )
 
@@ -75,7 +76,7 @@ func DebugPulumiNodeJS(ctx context.Context, env []string, cmd ...string) error {
 		return err
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
-	return errors.New("local pulumi command succeeded; stopping")
+	return ErrLocalPulumiStopped
 }
 
 func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
@@ -97,13 +98,13 @@ func DebugPulumiGolang(ctx context.Context, env []string, cmd ...string) error {
 	env = append([]string{
 		"PATH=" + os.Getenv("PATH"),
 		"USER=" + pkg.GetCurrentUser(), // needed for Pulumi
-		"HOME=" + os.Getenv("HOME"),
+		"HOME=" + os.Getenv("HOME"),    // needed for go
 	}, env...)
 	if err := runLocalCommand(ctx, path.Join(dir, "cd", "gcp"), env, localCmd...); err != nil {
 		return err
 	}
 	// We always return an error to stop the CLI from "tailing" the cloud logs
-	return errors.New("local pulumi command succeeded; stopping")
+	return ErrLocalPulumiStopped
 }
 
 func GetPrivateDomain(projectName string) string {
