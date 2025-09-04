@@ -3,6 +3,7 @@ package tools
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -53,7 +54,8 @@ func HandleTermsOfServiceError(err error) *mcp.CallToolResult {
 }
 
 func HandleConfigError(err error) *mcp.CallToolResult {
-	if strings.Contains(err.Error(), "missing configs") {
+	var missingConfigErr *compose.ErrMissingConfig
+	if errors.As(err, &missingConfigErr) {
 		mcpResult := mcp.NewToolResultErrorFromErr("The operation failed due to missing configs not being set. Please use the Defang tool called set_config to set the variable.", err)
 		term.Debugf("MCP output error: %v", mcpResult)
 		return mcpResult
