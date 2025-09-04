@@ -76,7 +76,7 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 		}
 
-		err = canIUseProvider(ctx, client, project.Name, provider)
+		err = canIUseProvider(ctx, client, project.Name, provider, len(project.Services))
 		if err != nil {
 			term.Error("Failed to use provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err

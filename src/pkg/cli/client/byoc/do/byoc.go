@@ -154,9 +154,9 @@ func (b *ByocDo) deploy(ctx context.Context, req *defangv1.DeployRequest, cmd st
 	data, err := proto.Marshal(&defangv1.ProjectUpdate{
 		CdVersion: b.CDImage,
 		Compose:   req.Compose,
+		Mode:      req.Mode,
 		Services:  serviceInfos,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +608,7 @@ func (b *ByocDo) runCdCommand(ctx context.Context, projectName, delegateDomain s
 		for i, v := range env {
 			debugEnv[i] = v.Key + "=" + v.Value
 		}
-		if err := byoc.DebugPulumi(ctx, debugEnv, cmd...); err != nil {
+		if err := byoc.DebugPulumiNodeJS(ctx, debugEnv, cmd...); err != nil {
 			return nil, err
 		}
 	}

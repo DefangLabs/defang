@@ -1,8 +1,8 @@
 module github.com/DefangLabs/defang/src
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.9
+toolchain go1.24.5
 
 replace github.com/spf13/cobra v1.8.0 => github.com/DefangLabs/cobra v1.8.0-defang
 
@@ -41,6 +41,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hexops/gotextdiff v1.0.3
+	github.com/joho/godotenv v1.5.1
 	github.com/mark3labs/mcp-go v0.38.0
 	github.com/miekg/dns v1.1.59
 	github.com/moby/patternmatcher v0.6.0
@@ -124,6 +125,7 @@ require (
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.6.0
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16

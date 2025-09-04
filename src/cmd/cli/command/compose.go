@@ -100,7 +100,7 @@ func makeComposeUpCmd() *cobra.Command {
 			}
 
 			// Check if the user has permission to use the provider
-			err = canIUseProvider(ctx, provider, project.Name)
+			err = canIUseProvider(ctx, provider, project.Name, len(project.Services))
 			if err != nil {
 				return err
 			}
@@ -224,7 +224,7 @@ func handleComposeUpErr(ctx context.Context, err error, project *compose.Project
 		printDefangHint("To start a new project, do:", "new")
 	}
 
-	if nonInteractive {
+	if nonInteractive || errors.Is(err, byoc.ErrLocalPulumiStopped) {
 		return err
 	}
 
@@ -366,7 +366,7 @@ func makeComposeDownCmd() *cobra.Command {
 				return err
 			}
 
-			err = canIUseProvider(cmd.Context(), provider, projectName)
+			err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 			if err != nil {
 				return err
 			}

@@ -70,7 +70,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 			return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 		}
 
-		err = canIUseProvider(ctx, client, projectName, provider)
+		err = canIUseProvider(ctx, client, projectName, provider, 0)
 		if err != nil {
 			term.Error("Failed to use provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
@@ -97,15 +97,16 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 	})
 }
 
-func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, projectName string, provider cliClient.Provider) error {
+func canIUseProvider(ctx context.Context, grpcClient cliClient.FabricClient, projectName string, provider cliClient.Provider, serviceCount int) error {
 	info, err := provider.AccountInfo(ctx)
 	if err != nil {
 		return err
 	}
 
 	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: info.Provider.Value(),
+		Project:      projectName,
+		Provider:     info.Provider.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
 	}
 	term.Debug("Function invoked: client.CanIUse")
 	resp, err := grpcClient.CanIUse(ctx, &canUseReq)

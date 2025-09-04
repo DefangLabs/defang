@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -19,6 +20,9 @@ type PlaygroundProvider struct {
 var _ Provider = (*PlaygroundProvider)(nil)
 
 func (g *PlaygroundProvider) Deploy(ctx context.Context, req *defangv1.DeployRequest) (*defangv1.DeployResponse, error) {
+	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
+		return nil, errors.New("DEFANG_PULUMI_DIR is set, but not supported by the Playground provider")
+	}
 	return getMsg(g.GetController().Deploy(ctx, connect.NewRequest(req)))
 }
 

@@ -9,11 +9,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	_ "github.com/DefangLabs/defang/src/cmd/cli/autoload"
 	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/auth"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/client/byoc"
@@ -56,6 +59,7 @@ var (
 	modelId        = os.Getenv("DEFANG_MODEL_ID") // for Pro users only
 	nonInteractive = !hasTty
 	org            string
+	tenantFlag     string
 	providerID     = cliClient.ProviderID(pkg.Getenv("DEFANG_PROVIDER", "auto"))
 	verbose        = false
 )
@@ -162,6 +166,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.PersistentFlags().StringVarP(&cluster, "cluster", "s", pcluster.DefangFabric, "Defang cluster to connect to")
 	RootCmd.PersistentFlags().MarkHidden("cluster")
 	RootCmd.PersistentFlags().StringVar(&org, "org", os.Getenv("DEFANG_ORG"), "override GitHub organization name (tenant)")
+	RootCmd.PersistentFlags().StringVar(&tenantFlag, "tenant", "", "select tenant by name")
 	RootCmd.PersistentFlags().VarP(&providerID, "provider", "P", fmt.Sprintf(`bring-your-own-cloud provider; one of %v`, cliClient.AllProviders()))
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging") // backwards compat: only used by tail
@@ -213,6 +218,9 @@ func SetupCommands(ctx context.Context, version string) {
 
 	// Whoami Command
 	RootCmd.AddCommand(whoamiCmd)
+
+	// Tenants Command
+	RootCmd.AddCommand(tenantsCmd)
 
 	// Logout Command
 	RootCmd.AddCommand(logoutCmd)
@@ -364,6 +372,18 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		// Configure tenant selection based on --tenant flag
+		if f := cmd.Root().Flag("tenant"); f != nil && f.Changed {
+			// Highest precedence: explicit --tenant flag
+			auth.SetSelectedTenantName(tenantFlag)
+		} else if envTenant := os.Getenv("DEFANG_TENANT"); strings.TrimSpace(envTenant) != "" {
+			// Next precedence: DEFANG_TENANT environment variable
+			auth.SetSelectedTenantName(envTenant)
+		} else {
+			// Default behavior: auto-select tenant by JWT subject if no explicit name is provided
+			auth.SetAutoSelectBySub(true)
+		}
+
 		client, err = cli.Connect(ctx, getCluster())
 
 		if v, err := client.GetVersions(ctx); err == nil {
@@ -374,6 +394,8 @@ var RootCmd = &cobra.Command{
 				hideUpdate = true // hide the upgrade hint at the end
 			}
 		}
+
+		// (deliberately skip tenant resolution here to avoid blocking non-auth commands)
 
 		// Check if we are correctly logged in, but only if the command needs authorization
 		if _, ok := cmd.Annotations[authNeeded]; !ok {
@@ -386,7 +408,80 @@ var RootCmd = &cobra.Command{
 			err = login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
 		}
 
-		return err
+		if err != nil {
+			return err
+		}
+
+		// Ensure tenant is resolved post-login as we now have a token
+		if tok := pcluster.GetExistingToken(getCluster()); tok != "" {
+			if err2 := auth.ResolveAndSetTenantFromToken(ctx, tok); err2 != nil {
+				return err2
+			}
+			// log the tenant name and id
+			term.Debug("Selected tenant:", auth.GetSelectedTenantName(), "(", auth.GetSelectedTenantID(), ")")
+		}
+
+		return nil
+	},
+}
+
+var tenantsCmd = &cobra.Command{
+	Use:         "tenants",
+	Args:        cobra.NoArgs,
+	Annotations: authNeededAnnotation,
+	Short:       "List tenants available to the logged-in user",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		tok := pcluster.GetExistingToken(getCluster())
+		if strings.TrimSpace(tok) == "" {
+			return errors.New("not logged in; run 'defang login'")
+		}
+
+		tenants, err := auth.ListTenantsFromToken(ctx, tok)
+		if err != nil {
+			return err
+		}
+
+		// Sort by name for stable output
+		sort.Slice(tenants, func(i, j int) bool { return strings.ToLower(tenants[i].Name) < strings.ToLower(tenants[j].Name) })
+
+		if len(tenants) == 0 {
+			term.Info("No tenants found")
+			return nil
+		}
+
+		currentID := auth.GetSelectedTenantID()
+		currentName := auth.GetSelectedTenantName()
+
+		// Compute longest name for aligned output
+		maxNameLen := 0
+		for _, t := range tenants {
+			if l := len(t.Name); l > maxNameLen {
+				maxNameLen = l
+			}
+		}
+
+		for _, t := range tenants {
+			selected := t.ID == currentID || (currentID == "" && t.Name == currentName && strings.TrimSpace(currentName) != "")
+			marker := "-"
+			if selected {
+				marker = "*" // highlight selected
+			}
+
+			var line string
+			if verbose {
+				line = fmt.Sprintf("%s %-*s (%s)\n", marker, maxNameLen, t.Name, t.ID)
+			} else {
+				line = fmt.Sprintf("%s %s\n", marker, t.Name)
+			}
+
+			if selected {
+				term.Printc(term.BrightCyan, line)
+			} else {
+				term.Printc(term.InfoColor, line)
+			}
+		}
+		return nil
 	},
 }
 
@@ -500,9 +595,9 @@ func afterGenerate(ctx context.Context, result setup.SetupResult) {
 	}
 
 	if len(envInstructions) > 0 {
-		printDefangHint("Check the files in your favorite editor.\nTo configure the service, do "+cd, envInstructions...)
+		printDefangHint("Check the files in your favorite editor.\nTo configure this project, run "+cd, envInstructions...)
 	} else {
-		printDefangHint("Check the files in your favorite editor.\nTo deploy the service, do "+cd, "compose up")
+		printDefangHint("Check the files in your favorite editor.\nTo deploy this project, run "+cd, "compose up")
 	}
 }
 
@@ -821,7 +916,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		err = canIUseProvider(cmd.Context(), provider, projectName)
+		err = canIUseProvider(cmd.Context(), provider, projectName, 0)
 		if err != nil {
 			return err
 		}
@@ -1121,10 +1216,11 @@ func newProvider(ctx context.Context, loader cliClient.Loader) (cliClient.Provid
 	return cli.NewProvider(ctx, providerID, client)
 }
 
-func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string) error {
+func canIUseProvider(ctx context.Context, provider cliClient.Provider, projectName string, serviceCount int) error {
 	canUseReq := defangv1.CanIUseRequest{
-		Project:  projectName,
-		Provider: providerID.Value(),
+		Project:      projectName,
+		Provider:     providerID.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
 	}
 
 	resp, err := client.CanIUse(ctx, &canUseReq)

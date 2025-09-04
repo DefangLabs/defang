@@ -137,19 +137,9 @@ func TestVersion(t *testing.T) {
 func TestCommandGates(t *testing.T) {
 	mockService := &mockFabricService{}
 	_, handler := defangv1connect.NewFabricControllerHandler(mockService)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current directory: %v", err)
-	}
-	composeDir := "../../../../src/testdata/sanity"
-	if err = os.Chdir(composeDir); err != nil {
-		t.Fatalf("Failed to change directory: %v", err)
-	}
+	t.Chdir("../../../../src/testdata/sanity")
 
 	t.Setenv("AWS_REGION", "us-west-2")
-	t.Cleanup(func() {
-		os.Chdir(origDir)
-	})
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
@@ -495,7 +485,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
@@ -528,7 +518,7 @@ func TestGetProvider(t *testing.T) {
 			t.Errorf("getProvider() failed: %v", err)
 		}
 
-		err = canIUseProvider(ctx, p, "project")
+		err = canIUseProvider(ctx, p, "project", 0)
 		if err != nil {
 			t.Errorf("CanIUseProvider() failed: %v", err)
 		}
