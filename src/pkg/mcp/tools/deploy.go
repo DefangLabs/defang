@@ -19,7 +19,7 @@ import (
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -69,7 +69,8 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		client.Track("MCP Deploy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
+
+		provider, err := cli.NewProvider(ctx, *providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
@@ -116,7 +117,7 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		term.Debugf("Deployment ID: %s", deployResp.Etag)
 
 		var portal string
-		if providerId == cliClient.ProviderDefang {
+		if *providerId == cliClient.ProviderDefang {
 			// Get the portal URL for browser preview
 			portalURL := "https://portal.defang.io/"
 

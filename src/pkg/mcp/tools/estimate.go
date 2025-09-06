@@ -18,9 +18,9 @@ import (
 )
 
 // setupEstimateTool configures and adds the estimate tool to the MCP server
-func setupEstimateTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
-	if providerId == cliClient.ProviderDefang {
-		providerId = cliClient.ProviderAWS // Default to AWS
+func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
+	if *providerId == cliClient.ProviderDefang {
+		*providerId = cliClient.ProviderAWS // Default to AWS
 	}
 
 	term.Debug("Creating estimate tool")

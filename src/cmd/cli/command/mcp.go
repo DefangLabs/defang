@@ -8,6 +8,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
+	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -72,11 +73,15 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 
 		// Setup resources
 		term.Debug("Setting up resources")
-		resources.SetupResources(s)
+		resources.SetupResources(s, &providerID)
+
+		//setup prompts
+		term.Debug("Setting up prompts")
+		prompts.SetupPrompts(s, &providerID)
 
 		// Setup tools
 		term.Debug("Setting up tools")
-		tools.SetupTools(s, getCluster(), authPort, providerID)
+		tools.SetupTools(s, getCluster(), authPort, &providerID)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {

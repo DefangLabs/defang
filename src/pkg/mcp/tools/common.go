@@ -3,6 +3,7 @@ package tools
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"os"
 	"regexp"
 	"strings"
 
@@ -69,4 +70,11 @@ func CreateRandomConfigValue() string {
 	re := regexp.MustCompile("[+/=]")
 	str = re.ReplaceAllString(str, "")
 	return str
+}
+
+func Getenv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
