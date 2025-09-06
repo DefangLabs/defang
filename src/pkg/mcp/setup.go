@@ -244,17 +244,10 @@ func handleVSCodeConfig(configPath string) error {
 	}
 
 	// Check if the file exists
-	if _, err := os.Stat(configPath); err == nil {
-		// File exists, read it
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
-
-		// Parse the JSON into a generic map to preserve all settings
+	if data, err := os.ReadFile(configPath); err == nil {
+		// File exists, parse it
 		if err := json.Unmarshal(data, &existingData); err != nil {
-			// If we can't parse it, start fresh
-			existingData = make(map[string]any)
+			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
 		}
 
 		// Check if "servers" section exists
@@ -271,6 +264,8 @@ func handleVSCodeConfig(configPath string) error {
 		} else {
 			return errors.New("failed to assert 'servers' section as map[string]any")
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
 	} else {
 		// File doesn't exist, create a new config with minimal settings
 		existingData = map[string]any{
@@ -296,28 +291,33 @@ func handleVSCodeConfig(configPath string) error {
 
 func handleStandardConfig(configPath string) error {
 	// For all other clients, use the standard format
+	var existingData map[string]any
 	var config MCPConfig
 
 	// Check if the file exists
-	if _, err := os.Stat(configPath); err == nil {
-		// File exists, read it
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %w", err)
+	if data, err := os.ReadFile(configPath); err == nil {
+		// Parse the JSON into a generic map to preserve all settings
+		if err := json.Unmarshal(data, &existingData); err != nil {
+			return fmt.Errorf("failed to unmarshal existing config: %w", err)
 		}
 
-		// Parse the JSON
-		if err := json.Unmarshal(data, &config); err != nil {
-			// If we can't parse it, start fresh
-			config = MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
+		// Try to extract MCPServers from existing data
+		if mcpServersData, ok := existingData["mcpServers"]; ok {
+			// Convert back to MCPConfig structure
+			mcpServersJSON, err := json.Marshal(map[string]any{"mcpServers": mcpServersData})
+			if err != nil {
+				return fmt.Errorf("failed to marshal mcpServers: %w", err)
+			}
+			err = json.Unmarshal(mcpServersJSON, &config)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal mcpServers: %w", err)
 			}
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
 	} else {
 		// File doesn't exist, create a new config
-		config = MCPConfig{
-			MCPServers: make(map[string]MCPServerConfig),
-		}
+		existingData = make(map[string]any)
 	}
 
 	if config.MCPServers == nil {
@@ -331,8 +331,11 @@ func handleStandardConfig(configPath string) error {
 	// Add or update the Defang MCP server config
 	config.MCPServers["defang"] = *defangConfig
 
+	// Update the existingData with the new MCPServers
+	existingData["mcpServers"] = config.MCPServers
+
 	// Write the config to the file
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := json.MarshalIndent(existingData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
