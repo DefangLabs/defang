@@ -76,7 +76,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 
 		// Setup tools
 		term.Debug("Setting up tools")
-		tools.SetupTools(s, getCluster(), authPort, providerID)
+		tools.SetupTools(s, getOrgCluster(), authPort, providerID)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
@@ -84,7 +84,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := login.InteractiveLoginInsideDocker(cmd.Context(), getCluster(), authPort); err != nil {
+				if err := login.InteractiveLoginInsideDocker(cmd.Context(), getOrgCluster(), authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()
