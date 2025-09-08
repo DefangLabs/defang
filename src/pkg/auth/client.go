@@ -25,6 +25,7 @@ const (
 var (
 	ErrInvalidAccessToken       = errors.New("invalid access token")
 	ErrInvalidAuthorizationCode = errors.New("invalid authorization code")
+	ErrInvalidJWT               = errors.New("invalid JWT")
 	ErrInvalidRefreshToken      = errors.New("invalid refresh token")
 )
 
@@ -125,6 +126,10 @@ type Client interface {
 	 */
 	Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error)
 	/**
+	 * Exchange jwt for access and refresh tokens.
+	 */
+	ExchangeJWT(jwt string) (*ExchangeSuccess, error)
+	/**
 	 * Refreshes the tokens if they have expired. This is used in an SPA app to maintain the
 	 * session, without logging the user out.
 	 */
@@ -207,6 +212,24 @@ func (c client) callToken(body url.Values) (*Tokens, error) {
 }
 
 /**
+ * Helper function to exchange tokens with common error handling.
+ */
+func (c client) exchangeForTokens(body url.Values, oauthErrorType error) (*ExchangeSuccess, error) {
+	tokens, err := c.callToken(body)
+	if err != nil {
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", oauthErrorType, err)
+		}
+		return nil, fmt.Errorf("token exchange failed: %w", err)
+	}
+
+	return &ExchangeSuccess{
+		Tokens: *tokens,
+	}, nil
+}
+
+/**
  * Exchange the code for access and refresh tokens.
  */
 func (c client) Exchange(code string, redirectURI string, verifier string) (*ExchangeSuccess, error) {
@@ -217,18 +240,18 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (*Exc
 		"grant_type":    {"authorization_code"},
 		"redirect_uri":  {redirectURI},
 	}
-	tokens, err := c.callToken(body)
-	if err != nil {
-		var oauthError *OAuthError
-		if errors.As(err, &oauthError) {
-			return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
-		}
-		return nil, fmt.Errorf("token exchange failed: %w", err)
-	}
+	return c.exchangeForTokens(body, ErrInvalidAuthorizationCode)
+}
 
-	return &ExchangeSuccess{
-		Tokens: *tokens,
-	}, nil
+/**
+ * Exchange the jwt for access and refresh tokens.
+ */
+func (c client) ExchangeJWT(jwt string) (*ExchangeSuccess, error) {
+	body := url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {jwt},
+	}
+	return c.exchangeForTokens(body, ErrInvalidJWT)
 }
 
 /**
