@@ -1,6 +1,6 @@
 package prompts
 
-const postPrompt = "Can you deploy my application now."
+const postPrompt = "Please deploy my application with Defang now."
 
 func getStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {

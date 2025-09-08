@@ -64,6 +64,12 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			if err != nil {
 				return nil, err
 			}
+
+			region := getStringArg(req.Params.Arguments, "AWS_REGION", "")
+			err = os.Setenv("AWS_REGION", region)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		fabric, err := cli.Connect(ctx, cluster)

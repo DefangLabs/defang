@@ -93,7 +93,6 @@ func CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, 
 	provider, err := cli.NewProvider(ctx, providerId, client)
 	if err != nil {
 		term.Error("Failed to get new provider", "error", err)
-		// return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 		return nil, err
 	}
 
@@ -105,7 +104,6 @@ func CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, 
 	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
 	if err != nil {
 		term.Error("Failed to use provider", "error", err)
-		// return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
 		return nil, err
 	}
 
