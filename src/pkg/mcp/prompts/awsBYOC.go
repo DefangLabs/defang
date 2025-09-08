@@ -97,6 +97,7 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 }
 
 // Check if the provided AWS access key ID is valid
+// https://medium.com/@TalBeerySec/a-short-note-on-aws-key-id-f88cc4317489
 func isValidAWSKey(key string) bool {
 	// Define accepted AWS access key prefixes
 	acceptedPrefixes := map[string]bool{
