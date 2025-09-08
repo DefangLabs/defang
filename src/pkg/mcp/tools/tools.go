@@ -8,10 +8,6 @@ import (
 
 // SetupTools configures and adds all the MCP tools to the server
 func SetupTools(s *server.MCPServer, cluster string, authPort int, providerId *client.ProviderID) {
-	if providerId == nil || *providerId == client.ProviderAuto {
-		*providerId = client.ProviderDefang // Default to Defang Playground if not specified
-	}
-
 	// Create a tool for logging in and getting a new token
 	term.Debug("Setting up login tool")
 	setupLoginTool(s, cluster, authPort)

@@ -13,7 +13,7 @@ import (
 )
 
 // SetupResources configures and adds all resources to the MCP server
-func SetupResources(s *server.MCPServer, providerId *client.ProviderID) {
+func SetupResources(s *server.MCPServer) {
 	// Create and add documentation resource
 	setupDocumentationResource(s)
 
