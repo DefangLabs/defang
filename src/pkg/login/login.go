@@ -14,7 +14,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/github"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 )
 
@@ -104,14 +103,12 @@ func NonInteractiveLogin(ctx context.Context, client client.FabricClient, fabric
 		}
 		term.Debug("Got GitHub Actions id-token")
 	}
-	resp, err := client.Token(ctx, &defangv1.TokenRequest{
-		Assertion: token,
-		Scope:     []string{"admin", "read", "delete", "tail"},
-	})
+
+	accessToken, err := auth.ExchangeJWTForToken(ctx, token)
 	if err != nil {
-		return err
+		return fmt.Errorf("non-interactive login failed: %w", err)
 	}
-	return cluster.SaveAccessToken(fabric, resp.AccessToken)
+	return cluster.SaveAccessToken(fabric, accessToken)
 }
 
 func InteractiveRequireLoginAndToS(ctx context.Context, fabric client.FabricClient, addr string) error {
