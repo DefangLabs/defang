@@ -33,7 +33,6 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 	// Add the deployment tool handler - make it non-blocking
 	term.Debug("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-
 		err := providerNotConfiguredError(*providerId)
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("No provider configured", err), err

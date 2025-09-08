@@ -6,7 +6,13 @@ import (
 )
 
 // SetupPrompts configures and adds all prompts to the MCP server
-func SetupPrompts(s *server.MCPServer, providerId *client.ProviderID) {
+func SetupPrompts(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
 	//AWS BYOC
-	setupAWSBYOPrompt(s, providerId)
+	setupAWSBYOPrompt(s, cluster, providerId)
+
+	//GCP BYOC
+	setupGCPBYOPrompt(s, cluster, providerId)
+
+	//Playground
+	setupPlaygroundPrompt(s, providerId)
 }

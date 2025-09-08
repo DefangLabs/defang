@@ -65,7 +65,6 @@ func HandleConfigError(err error) *mcp.CallToolResult {
 }
 
 func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
-
 	canUseReq := defangv1.CanIUseRequest{
 		Project:      projectName,
 		Provider:     providerId.Value(),
