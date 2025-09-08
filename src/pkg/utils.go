@@ -1,16 +1,22 @@
 package pkg
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	"github.com/hexops/gotextdiff"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 )
 
 var (
@@ -139,4 +145,33 @@ func IsValidTime(t time.Time) bool {
 	// and because of timezones this can either be sometime on 1969-12-31 or on 1970-01-01 in local time.
 	// We could be even more conservative and check for > 2000 or so, but this is more predictable.
 	return t.Year() > 1970
+}
+
+func Compare(actual []byte, goldenFile string) error {
+	// Replace the absolute path in context to make the golden file portable
+	absPath, _ := filepath.Abs(goldenFile)
+	actual = bytes.ReplaceAll(actual, []byte(filepath.Dir(absPath)), []byte{'.'})
+
+	golden, err := os.ReadFile(goldenFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("Failed to read golden file: %w", err)
+		}
+		return os.WriteFile(goldenFile, actual, 0644)
+	} else {
+		if err := Diff(string(actual), string(golden)); err != nil {
+			return fmt.Errorf("%s %w", goldenFile, err)
+		}
+	}
+	return nil
+}
+
+func Diff(actualRaw, goldenRaw string) error {
+	if actualRaw == goldenRaw {
+		return nil
+	}
+
+	edits := myers.ComputeEdits(span.URIFromPath("expected"), goldenRaw, actualRaw)
+	diff := fmt.Sprint(gotextdiff.ToUnified("expected", "actual", goldenRaw, edits))
+	return fmt.Errorf("mismatch:\n%s", diff)
 }
