@@ -52,7 +52,7 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			Description: "GCP BYOC Setup Complete",
 			Messages: []mcp.PromptMessage{
 				{
-					Role:    mcp.RoleAssistant,
+					Role:    mcp.RoleUser,
 					Content: mcp.NewTextContent(postPrompt),
 				},
 			},

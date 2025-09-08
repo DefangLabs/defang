@@ -27,7 +27,7 @@ func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
 			Description: "Defang playground Setup Complete",
 			Messages: []mcp.PromptMessage{
 				{
-					Role:    mcp.RoleAssistant,
+					Role:    mcp.RoleUser,
 					Content: mcp.NewTextContent(postPrompt),
 				},
 			},
