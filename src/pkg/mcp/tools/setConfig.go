@@ -42,6 +42,11 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClie
 		term.Debug("Set Config tool called")
 		track.Evt("MCP Set Config Tool")
 
+		err := providerNotConfiguredError(*providerId)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		}
+
 		wd, err := request.RequireString("working_directory")
 		if err != nil || wd == "" {
 			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))

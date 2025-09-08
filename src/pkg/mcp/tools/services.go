@@ -35,6 +35,11 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClien
 		term.Debug("Services tool called - fetching services from Defang")
 		track.Evt("MCP Services Tool")
 
+		err := providerNotConfiguredError(*providerId)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		}
+
 		wd, err := request.RequireString("working_directory")
 		if err != nil || wd == "" {
 			term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
