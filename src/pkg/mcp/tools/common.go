@@ -109,9 +109,5 @@ func CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, 
 		return nil, err
 	}
 
-	// if resp == nil {
-	// 	term.Error("No provider configured")
-	// 	return errors.New("No provider configured, please use the appropriate prompts and type /mcp.defang.AWS_Setup for AWS, /mcp.defang.GCP_Setup for GCP, or /mcp.defang.Playground_Setup for Playground in the chat.")
-	// }
 	return provider, nil
 }

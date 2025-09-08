@@ -2,7 +2,6 @@ package prompts
 
 import (
 	"context"
-	"errors"
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -23,11 +22,8 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 	)
 
 	s.AddPrompt(gcpBYOPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		projectID := getStringArg(req.Params.Arguments, "GCP_PROJECT_ID", "")
-
-		if projectID == "" {
-			return nil, errors.New("GCP_PROJECT_ID is required")
-		}
+		// Can never be nil or empty due to RequiredArgument
+		projectID := req.Params.Arguments["GCP_PROJECT_ID"]
 
 		err := os.Setenv("GCP_PROJECT_ID", projectID)
 		if err != nil {
@@ -57,7 +53,7 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleAssistant,
-					Content: mcp.NewTextContent("Can you deploy my application now."),
+					Content: mcp.NewTextContent(postPrompt),
 				},
 			},
 		}, nil

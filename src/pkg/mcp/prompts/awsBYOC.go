@@ -89,7 +89,7 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleUser,
-					Content: mcp.NewTextContent("Can you deploy my application now."),
+					Content: mcp.NewTextContent(postPrompt),
 				},
 			},
 		}, nil

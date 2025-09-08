@@ -28,7 +28,7 @@ func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleAssistant,
-					Content: mcp.NewTextContent("Can you deploy my application now."),
+					Content: mcp.NewTextContent(postPrompt),
 				},
 			},
 		}, nil
