@@ -6,6 +6,7 @@ PROTOS := protos/io/defang/v1/fabric.pb.go protos/io/defang/v1/defangv1connect/f
 BINARY_NAME:=defang
 GOFLAGS:=-ldflags "-X main.version=$(VERSION)"
 GOSRC := $(shell find . -name '*.go')
+GO_VERSION := $(shell grep '^go ' go.mod | cut -d ' ' -f 2)
 
 $(BINARY_NAME): $(PROTOS) $(GOSRC) go.mod go.sum
 	go build -o $@ $(GOFLAGS) ./cmd/cli
@@ -90,11 +91,11 @@ DOCKER_IMAGE_AMD64:=$(DOCKER_IMAGE_NAME):amd64-$(VERSION)
 
 .PHONY: image-amd64
 image-amd64:
-	docker build --platform linux/amd64 -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_AMD64) --build-arg VERSION=$(VERSION) .
+	docker build --platform linux/amd64 -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_AMD64) --build-arg VERSION=$(VERSION) --build-arg GO_VERSION=$(GO_VERSION) .
 
 .PHONY: image-arm64
 image-arm64:
-	docker build --platform linux/arm64 -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_ARM64) --build-arg VERSION=$(VERSION) .
+	docker build --platform linux/arm64 -t ${PROJECT_NAME} -t $(DOCKER_IMAGE_ARM64) --build-arg VERSION=$(VERSION) --build-arg GO_VERSION=$(GO_VERSION) .
 
 .PHONY: images
 images: image-amd64 image-arm64 ## Build all docker images and manifest
