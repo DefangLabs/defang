@@ -49,7 +49,7 @@ func GetExistingToken(fabric string) string {
 		all, _ := os.ReadFile(tokenFile)
 		accessToken = string(all)
 	} else {
-		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN", accessToken)
+		term.Debug("Using access token from env DEFANG_ACCESS_TOKEN")
 	}
 
 	return accessToken

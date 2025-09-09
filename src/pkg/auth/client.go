@@ -214,14 +214,10 @@ func (c client) callToken(body url.Values) (*Tokens, error) {
 /**
  * Helper function to exchange tokens with common error handling.
  */
-func (c client) exchangeForTokens(body url.Values, oauthErrorType error) (*ExchangeSuccess, error) {
+func (c client) exchangeForTokens(body url.Values) (*ExchangeSuccess, error) {
 	tokens, err := c.callToken(body)
 	if err != nil {
-		var oauthError *OAuthError
-		if errors.As(err, &oauthError) {
-			return nil, fmt.Errorf("%w: %w", oauthErrorType, err)
-		}
-		return nil, fmt.Errorf("token exchange failed: %w", err)
+		return nil, err
 	}
 
 	return &ExchangeSuccess{
@@ -240,18 +236,40 @@ func (c client) Exchange(code string, redirectURI string, verifier string) (*Exc
 		"grant_type":    {"authorization_code"},
 		"redirect_uri":  {redirectURI},
 	}
-	return c.exchangeForTokens(body, ErrInvalidAuthorizationCode)
+
+	result, err := c.exchangeForTokens(body)
+	if err != nil {
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidAuthorizationCode, err)
+		}
+
+		return nil, fmt.Errorf("token exchange failed: %w", err)
+	}
+
+	return result, nil
 }
 
 /**
- * Exchange the jwt for access and refresh tokens.
+ * Exchange the JWT for access and refresh tokens.
  */
 func (c client) ExchangeJWT(jwt string) (*ExchangeSuccess, error) {
 	body := url.Values{
 		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
 		"assertion":  {jwt},
 	}
-	return c.exchangeForTokens(body, ErrInvalidJWT)
+	result, err := c.exchangeForTokens(body)
+
+	if err != nil {
+		var oauthError *OAuthError
+		if errors.As(err, &oauthError) {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidJWT, err)
+		}
+
+		return nil, fmt.Errorf("token exchange failed: %w", err)
+	}
+
+	return result, nil
 }
 
 /**
