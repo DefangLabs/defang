@@ -19,7 +19,7 @@ import (
 )
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating deployment tool")
 	composeUpTool := mcp.NewTool("deploy",
 		mcp.WithDescription("Deploy services using defang"),
@@ -33,6 +33,11 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 	// Add the deployment tool handler - make it non-blocking
 	term.Debug("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		err := providerNotConfiguredError(*providerId)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		}
+
 		// Get compose path
 		term.Debug("Compose up tool called - deploying services")
 		track.Evt("MCP Deploy Tool")
@@ -69,16 +74,10 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		client.Track("MCP Deploy Tool")
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
-		if err != nil {
-			term.Error("Failed to get new provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
-		}
 
-		err = canIUseProvider(ctx, client, project.Name, provider, len(project.Services))
+		provider, err := CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
 		if err != nil {
-			term.Error("Failed to use provider", "error", err)
-			return mcp.NewToolResultErrorFromErr("Failed to use provider", err), err
+			return mcp.NewToolResultErrorFromErr("Provider not configured correctly", err), err
 		}
 
 		// Deploy the services
@@ -116,7 +115,7 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId cliClient.P
 		term.Debugf("Deployment ID: %s", deployResp.Etag)
 
 		var portal string
-		if providerId == cliClient.ProviderDefang {
+		if *providerId == cliClient.ProviderDefang {
 			// Get the portal URL for browser preview
 			portalURL := "https://portal.defang.io/"
 

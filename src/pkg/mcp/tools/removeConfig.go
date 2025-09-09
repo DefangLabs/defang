@@ -16,7 +16,7 @@ import (
 )
 
 // setupRemoveConfigTool configures and adds the estimate tool to the MCP server
-func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating remove config tool")
 	removeConfigTool := mcp.NewTool("remove_config",
 		mcp.WithDescription("Remove a config variable for the defang project"),
@@ -36,6 +36,11 @@ func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId cliCl
 	s.AddTool(removeConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Debug("Remove Config tool called")
 		track.Evt("MCP Remove Config Tool")
+
+		err := providerNotConfiguredError(*providerId)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		}
 
 		wd, err := request.RequireString("working_directory")
 		if err != nil || wd == "" {
@@ -62,7 +67,7 @@ func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId cliCl
 		}
 
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
+		provider, err := cli.NewProvider(ctx, *providerId, client)
 		if err != nil {
 			term.Error("Failed to get new provider", "error", err)
 

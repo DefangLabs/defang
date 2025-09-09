@@ -19,7 +19,7 @@ import (
 )
 
 // setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer, cluster string, providerId cliClient.ProviderID) {
+func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating services tool")
 	servicesTool := mcp.NewTool("services",
 		mcp.WithDescription("List information about services in Defang Playground"),
@@ -34,6 +34,11 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId cliClient
 	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		term.Debug("Services tool called - fetching services from Defang")
 		track.Evt("MCP Services Tool")
+
+		err := providerNotConfiguredError(*providerId)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		}
 
 		wd, err := request.RequireString("working_directory")
 		if err != nil || wd == "" {
@@ -57,7 +62,7 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId cliClient
 
 		// Create a Defang client
 		term.Debug("Function invoked: cli.NewProvider")
-		provider, err := cli.NewProvider(ctx, providerId, client)
+		provider, err := cli.NewProvider(ctx, *providerId, client)
 		if err != nil {
 			term.Error("Failed to create provider", "error", err)
 			return mcp.NewToolResultErrorFromErr("Failed to create provider", err), err
