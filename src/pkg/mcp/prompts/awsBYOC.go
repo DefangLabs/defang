@@ -16,7 +16,7 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 	awsBYOCPrompt := mcp.NewPrompt("AWS Setup",
 		mcp.WithPromptDescription("Setup for AWS"),
 
-		mcp.WithArgument("AWS_Credential",
+		mcp.WithArgument("AWS Credential",
 			mcp.ArgumentDescription("Your AWS Access Key ID or AWS Profile Name"),
 			mcp.RequiredArgument(),
 		),
@@ -32,7 +32,7 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 
 	s.AddPrompt(awsBYOCPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		// Can never be nil or empty due to RequiredArgument
-		awsID := req.Params.Arguments["AWS_Credential"]
+		awsID := req.Params.Arguments["AWS Credential"]
 		if isValidAWSKey(awsID) {
 			err := os.Setenv("AWS_ACCESS_KEY_ID", awsID)
 			if err != nil {
