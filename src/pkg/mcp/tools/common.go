@@ -1,13 +1,16 @@
 package tools
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"regexp"
+	"context"
+	"errors"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -61,12 +64,48 @@ func HandleConfigError(err error) *mcp.CallToolResult {
 	return nil
 }
 
-func CreateRandomConfigValue() string {
-	// Note that no error handling is necessary, as Read always succeeds.
-	key := make([]byte, 32)
-	rand.Read(key)
-	str := base64.StdEncoding.EncodeToString(key)
-	re := regexp.MustCompile("[+/=]")
-	str = re.ReplaceAllString(str, "")
-	return str
+func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {
+	canUseReq := defangv1.CanIUseRequest{
+		Project:      projectName,
+		Provider:     providerId.Value(),
+		ServiceCount: int32(serviceCount), // #nosec G115 - service count will not overflow int32
+	}
+	term.Debug("Function invoked: client.CanIUse")
+	resp, err := grpcClient.CanIUse(ctx, &canUseReq)
+	if err != nil {
+		return err
+	}
+
+	term.Debug("Function invoked: provider.SetCanIUseConfig")
+	provider.SetCanIUseConfig(resp)
+	return nil
+}
+
+func providerNotConfiguredError(providerId client.ProviderID) error {
+	if providerId == client.ProviderAuto {
+		term.Error("No provider configured")
+		return errors.New("No provider configured, please use the appropriate prompts and type /mcp.defang.AWS_Setup for AWS, /mcp.defang.GCP_Setup for GCP, or /mcp.defang.Playground_Setup for Playground in the chat.")
+	}
+	return nil
+}
+
+func CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+	provider, err := cli.NewProvider(ctx, providerId, client)
+	if err != nil {
+		term.Error("Failed to get new provider", "error", err)
+		return nil, err
+	}
+
+	_, err = provider.AccountInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
+	if err != nil {
+		term.Error("Failed to use provider", "error", err)
+		return nil, err
+	}
+
+	return provider, nil
 }

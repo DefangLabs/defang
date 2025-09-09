@@ -8,6 +8,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
+	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -70,13 +71,19 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			`),
 		)
 
+		cluster := getOrgCluster()
+
 		// Setup resources
 		term.Debug("Setting up resources")
 		resources.SetupResources(s)
 
+		//setup prompts
+		term.Debug("Setting up prompts")
+		prompts.SetupPrompts(s, cluster, &providerID)
+
 		// Setup tools
 		term.Debug("Setting up tools")
-		tools.SetupTools(s, getOrgCluster(), authPort, providerID)
+		tools.SetupTools(s, cluster, authPort, &providerID)
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
@@ -84,7 +91,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			term.Debug("Function invoked: cli.InteractiveLoginInsideDocker")
 
 			go func() {
-				if err := login.InteractiveLoginInsideDocker(cmd.Context(), getOrgCluster(), authPort); err != nil {
+				if err := login.InteractiveLoginInsideDocker(cmd.Context(), cluster, authPort); err != nil {
 					term.Error("Failed to start auth server", "error", err)
 				}
 			}()

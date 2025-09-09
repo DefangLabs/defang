@@ -19,9 +19,6 @@ func SetupResources(s *server.MCPServer) {
 
 	// Create and add samples examples resource
 	setupSamplesResource(s)
-
-	// Create and add sample prompt
-	setupSamplePrompt(s)
 }
 
 var knowledgeBasePath = filepath.Join(client.StateDir, "knowledge_base.json")
@@ -83,41 +80,5 @@ func setupSamplesResource(s *server.MCPServer) {
 				URI:      "doc:///knowledge_base/samples_examples.json",
 			},
 		}, nil
-	})
-}
-
-// setupSamplePrompt configures and adds the sample prompt to the MCP server
-func setupSamplePrompt(s *server.MCPServer) {
-	samplePrompt := mcp.NewPrompt("Make Dockerfile and compose file",
-		mcp.WithPromptDescription("The user should give you a path to a project directory, and you should create a Dockerfile and compose file for that project. If there is an app folder, make the Dockerfile for that folder. Then make a compose file for original project directory or root of that project directory."),
-		mcp.WithArgument("project_path",
-			mcp.ArgumentDescription("Path to the project directory"),
-			mcp.RequiredArgument(),
-		),
-	)
-
-	s.AddPrompt(samplePrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		projectPath, ok := request.Params.Arguments["project_path"]
-		if !ok || projectPath == "" {
-			projectPath = "."
-			term.Warn("Project path not provided, using current directory", "dir", projectPath)
-		}
-
-		return mcp.NewGetPromptResult(
-			"Code assistance to make Dockerfile and compose file",
-			[]mcp.PromptMessage{
-				mcp.NewPromptMessage(
-					mcp.RoleUser,
-					mcp.NewTextContent(fmt.Sprintf("You are a helpful code writer. I will give you a path which is %s to a project directory, and you should create a Dockerfile and compose file for that project. If there is an app folder, make the Dockerfile for that folder. Then make a compose file for original project directory or root of that project directory. When creating these files, make sure to use the samples and examples resource for reference of defang. If you need more information, please use the defang documentation resource. When you are creating these files please make sure to scan carefully to expose any ports, start commands, and any other information needed for the project.", projectPath)),
-				),
-				mcp.NewPromptMessage(
-					mcp.RoleAssistant,
-					mcp.NewEmbeddedResource(mcp.TextResourceContents{
-						MIMEType: "application/json",
-						URI:      "doc:///knowledge_base/knowledge_base.json",
-					}),
-				),
-			},
-		), nil
 	})
 }
