@@ -16,7 +16,8 @@ The Defang Command-Line Interface [(CLI)](https://docs.defang.io/docs/getting-st
 
 ## Support
 
-- File any issues [here](https://github.com/DefangLabs/defang/issues)
+- File any issues [right here on GitHub](https://github.com/DefangLabs/defang/issues)
+- Join our [Discord community](https://s.defang.io/discord) for real-time help and discussions
 
 ## Environment Variables
 
@@ -43,7 +44,6 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DIR` - Run Pulumi from this folder, instead of spawning a cloud task; requires `--debug` (BYOC only)
 - `DEFANG_PULUMI_VERSION` - Override the version of the Pulumi image to use (`aws` provider only)
-- `DEFANG_TENANT` - The name of the tenant to use.
 - `NO_COLOR` - If set to any value, disables color output; by default, color output is enabled depending on the terminal
 - `PULUMI_ACCESS_TOKEN` - The Pulumi access token to use for authentication to Pulumi Cloud; see `DEFANG_PULUMI_BACKEND`
 - `PULUMI_CONFIG_PASSPHRASE` - Passphrase used to generate a unique key for your stack, and configuration and encrypted state values
@@ -52,4 +52,3 @@ The Defang CLI recognizes the following environment variables:
 
 Environment variables will be loaded from a `.defangrc` file in the current directory, if it exists. This file follows
 the same format as a `.env` file: `KEY=VALUE` pairs on each line, lines starting with `#` are treated as comments and ignored.
-

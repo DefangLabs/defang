@@ -2,7 +2,7 @@ package cli
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -60,8 +60,8 @@ func DeploymentsList(ctx context.Context, listType defangv1.DeploymentType, proj
 		// TODO: allow user to specify sort order
 		sortKeys[i] = strings.Join([]string{d.ProjectName, d.Provider, d.AccountId, d.Region}, "|")
 	}
-	sort.SliceStable(sortKeys, func(i, j int) bool {
-		return sortKeys[i] < sortKeys[j]
+	slices.SortStableFunc(sortKeys, func(a, b string) int {
+		return strings.Compare(a, b)
 	})
 
 	return term.Table(deployments, []string{"ProjectName", "Provider", "AccountId", "Region", "Deployment", "DeployedAt"})

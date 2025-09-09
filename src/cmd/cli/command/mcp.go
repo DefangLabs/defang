@@ -71,7 +71,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 			`),
 		)
 
-		cluster := getCluster()
+		cluster := getOrgCluster()
 
 		// Setup resources
 		term.Debug("Setting up resources")
