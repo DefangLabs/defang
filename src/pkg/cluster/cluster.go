@@ -57,7 +57,9 @@ func GetExistingToken(fabric string) string {
 
 func SaveAccessToken(fabric, token string) error {
 	tokenFile := GetTokenFile(fabric)
+	term.Debug("Saving access token to location", client.StateDir)
 	term.Debug("Saving access token to", tokenFile)
+	term.Debug("Saving access token", token)
 	os.MkdirAll(client.StateDir, 0700)
 	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
 		return fmt.Errorf("failed to save access token: %w", err)
