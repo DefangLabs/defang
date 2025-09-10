@@ -190,6 +190,7 @@ func (c client) Authorize(redirectURI string, response ResponseType, opts ...Aut
 }
 
 func (c client) callToken(body url.Values) (*Tokens, error) {
+	fmt.Printf("Exchanging token - URL: %s, Body: %s\n", c.issuer+"/token", body.Encode())
 	resp, err := http.PostForm(c.issuer+"/token", body)
 	if err != nil {
 		return nil, err
