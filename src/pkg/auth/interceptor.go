@@ -7,10 +7,7 @@ import (
 	"github.com/bufbuild/connect-go"
 )
 
-const (
-	XDefangOrgID    = "X-Defang-Orgid"
-	XDefangTenantID = "X-Defang-Tenant-Id"
-)
+const XDefangOrgID = "X-Defang-Orgid"
 
 type authInterceptor struct {
 	authorization string
@@ -26,9 +23,6 @@ func (a *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		req.Header().Set("Authorization", a.authorization)
 		req.Header().Set("Content-Type", "application/grpc") // same as the gRPC client
 		req.Header().Set(XDefangOrgID, a.orgID)
-		if tid := GetSelectedTenantID(); tid != "" {
-			req.Header().Set(XDefangTenantID, tid)
-		}
 		return next(ctx, req)
 	}
 }
@@ -39,9 +33,6 @@ func (a *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 		conn.RequestHeader().Set("Authorization", a.authorization)
 		conn.RequestHeader().Set("Content-Type", "application/grpc") // same as the gRPC client
 		conn.RequestHeader().Set(XDefangOrgID, a.orgID)
-		if tid := GetSelectedTenantID(); tid != "" {
-			conn.RequestHeader().Set(XDefangTenantID, tid)
-		}
 		return conn
 	}
 }
