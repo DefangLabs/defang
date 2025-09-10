@@ -23,7 +23,7 @@
               gnumake
               less
               gnused # force Linux `sed` everywhere
-              go_1_24
+              go_1_24 # must match GO_VERSION in Dockerfile
               golangci-lint
               goreleaser
               nixfmt-rfc-style
