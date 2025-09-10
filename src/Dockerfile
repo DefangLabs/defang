@@ -1,6 +1,6 @@
 # Build stage
-ARG GOVERSION=1.23
-FROM --platform=${BUILDPLATFORM} golang:${GOVERSION} AS builder
+ARG GO_VERSION=1.24
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 
 # These two are automatically set by docker buildx
 ARG TARGETARCH
