@@ -15,6 +15,33 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// SetConfigCLIInterface defines the CLI functions needed for setConfig tool
+type SetConfigCLIInterface interface {
+	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
+	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
+	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
+}
+
+// DefaultSetConfigCLI implements SetConfigCLIInterface using the actual CLI functions
+type DefaultSetConfigCLI struct{}
+
+func (c *DefaultSetConfigCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
+	return cli.Connect(ctx, cluster)
+}
+
+func (c *DefaultSetConfigCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
+	return cli.NewProvider(ctx, providerId, client)
+}
+
+func (c *DefaultSetConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
+	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+}
+
+func (c *DefaultSetConfigCLI) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {
+	return cli.ConfigSet(ctx, projectName, provider, name, value)
+}
+
 // setupSetConfigTool configures and adds the estimate tool to the MCP server
 func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating set config tool")
@@ -39,12 +66,13 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClie
 	// Add the Config tool handler
 	term.Debug("Adding set config tool handler")
 	s.AddTool(setConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleSetConfig(ctx, request, cluster, *providerId)
+		cli := &DefaultSetConfigCLI{}
+		return handleSetConfig(ctx, request, cluster, *providerId, cli)
 	})
 }
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId cliClient.ProviderID) (*mcp.CallToolResult, error) {
+func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Set Config tool called")
 	track.Evt("MCP Set Config Tool")
 
@@ -83,14 +111,6 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster s
 		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 	}
 
-	return handleSetConfigWithClient(ctx, request, client, providerId)
-}
-
-// handleSetConfigWithClient handles the set config logic after connection is established
-func handleSetConfigWithClient(ctx context.Context, request mcp.CallToolRequest, client *cliClient.GrpcClient, providerId cliClient.ProviderID) (*mcp.CallToolResult, error) {
-	name, _ := request.RequireString("name")
-	value, _ := request.RequireString("value")
-
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, providerId, client)
 	if err != nil {
@@ -100,8 +120,8 @@ func handleSetConfigWithClient(ctx context.Context, request mcp.CallToolRequest,
 
 	loader := configureLoader(request)
 
-	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
-	projectName, err := cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
+	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
+	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 	}
