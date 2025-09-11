@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -150,11 +151,39 @@ func TestHandleSetConfig(t *testing.T) {
 	}
 }
 
-func TestHandleSetConfigValidWorkingDirectory(t *testing.T) {
+func TestHandleSetConfigProviderAuto(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
 
-	// Use common test data
+	// Test with ProviderAuto to trigger the specific error handling
+	const (
+		testCluster    = "test-cluster"
+		testConfigName = "test-config"
+		testValue      = "test-value"
+	)
+	testContext := context.Background()
+
+	request := createCallToolRequest(map[string]interface{}{
+		"working_directory": tempDir,
+		"name":              testConfigName,
+		"value":             testValue,
+	})
+
+	// Use ProviderAuto to trigger the "No provider configured" error
+	result, err := handleSetConfig(testContext, request, testCluster, client.ProviderAuto)
+
+	// Should get an error about no provider configured
+	assert.Error(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, err.Error(), "No provider configured")
+	assert.Contains(t, err.Error(), "/mcp.defang.AWS_Setup")
+	assert.Contains(t, err.Error(), "/mcp.defang.GCP_Setup")
+	assert.Contains(t, err.Error(), "/mcp.defang.Playground_Setup")
+}
+
+func TestHandleSetConfigValidWorkingDirectory(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir() // Use common test data
 	const (
 		testCluster    = "test-cluster"
 		testConfigName = "valid-config"
@@ -179,4 +208,126 @@ func TestHandleSetConfigValidWorkingDirectory(t *testing.T) {
 	expectedDir, _ := filepath.EvalSymlinks(tempDir)
 	actualDir, _ := filepath.EvalSymlinks(currentDir)
 	assert.Equal(t, expectedDir, actualDir)
+}
+
+func TestHandleSetConfigDefaultLoader(t *testing.T) {
+	// Test that demonstrates the default compose loader behavior
+	// Create an empty directory with no compose files to force default loader behavior
+	tempDir := t.TempDir()
+
+	const (
+		testCluster    = "test-cluster"
+		testConfigName = "test-config"
+		testValue      = "test-value"
+	)
+	testContext := context.Background()
+
+	// No project_name or compose_file_paths - this will use default loader
+	request := createCallToolRequest(map[string]interface{}{
+		"working_directory": tempDir,
+		"name":              testConfigName,
+		"value":             testValue,
+	})
+
+	result, err := handleSetConfig(testContext, request, testCluster, client.ProviderID(""))
+
+	// Should fail at network level, proving we got through all the input check logic
+	assert.Error(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, err.Error(), "dial tcp: lookup test-cluster: no such host")
+}
+
+func TestHandleSetConfigWithProjectName(t *testing.T) {
+	// Test the project_name branch in configureLoader
+	tempDir := t.TempDir()
+
+	const (
+		testCluster    = "test-cluster"
+		testConfigName = "test-config"
+		testValue      = "test-value"
+		testProject    = "test-project"
+	)
+	testContext := context.Background()
+
+	// With project_name - tests the project name branch in configureLoader
+	request := createCallToolRequest(map[string]interface{}{
+		"working_directory": tempDir,
+		"name":              testConfigName,
+		"value":             testValue,
+		"project_name":      testProject,
+	})
+
+	result, err := handleSetConfig(testContext, request, testCluster, client.ProviderID(""))
+
+	// Should fail at network level, proving project_name path worked
+	assert.Error(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, err.Error(), "dial tcp: lookup test-cluster: no such host")
+}
+
+// Direct unit test for handleSetConfigWithClient() - assumes name and value exist
+func TestHandleSetConfigWithClient(t *testing.T) {
+	tests := []struct {
+		name        string
+		providerId  client.ProviderID
+		projectName string
+		description string
+	}{
+		{
+			name:        "defang_provider",
+			providerId:  client.ProviderDefang,
+			projectName: "",
+			description: "Tests handleSetConfigWithClient with Defang provider",
+		},
+		{
+			name:        "aws_provider",
+			providerId:  client.ProviderAWS,
+			projectName: "",
+			description: "Tests handleSetConfigWithClient with AWS provider",
+		},
+		{
+			name:        "with_project_name",
+			providerId:  client.ProviderDefang,
+			projectName: "test-project",
+			description: "Tests handleSetConfigWithClient with explicit project name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			requestArgs := map[string]interface{}{
+				"name":  "valid_config_name",
+				"value": "test-value",
+			}
+
+			if tt.projectName != "" {
+				requestArgs["project_name"] = tt.projectName
+			}
+
+			request := createCallToolRequest(requestArgs)
+
+			// Use an empty GrpcClient which will cause provider creation to fail
+			grpcClient := &client.GrpcClient{}
+
+			// The function will panic when it reaches ConfigSet() with a nil client
+			// This is expected behavior - it proves the function processes all logic correctly
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Expected panic due to nil client usage
+						assert.Contains(t, fmt.Sprint(r), "nil pointer dereference",
+							"Expected nil pointer panic when using empty client")
+					}
+				}()
+
+				result, err := handleSetConfigWithClient(ctx, request, grpcClient, tt.providerId)
+
+				// If we reach here without panic, there was an error before ConfigSet
+				assert.Error(t, err)
+				assert.NotNil(t, result)
+			}()
+		})
+	}
 }

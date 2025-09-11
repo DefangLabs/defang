@@ -83,11 +83,18 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster s
 		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
 	}
 
+	return handleSetConfigWithClient(ctx, request, client, providerId)
+}
+
+// handleSetConfigWithClient handles the set config logic after connection is established
+func handleSetConfigWithClient(ctx context.Context, request mcp.CallToolRequest, client *cliClient.GrpcClient, providerId cliClient.ProviderID) (*mcp.CallToolResult, error) {
+	name, _ := request.RequireString("name")
+	value, _ := request.RequireString("value")
+
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, providerId, client)
 	if err != nil {
 		term.Error("Failed to get new provider", "error", err)
-
 		return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 	}
 
