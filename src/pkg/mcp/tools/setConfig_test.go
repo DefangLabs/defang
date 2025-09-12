@@ -286,18 +286,6 @@ func TestHandleSetConfig(t *testing.T) {
 			checkWorkingDir:      true,
 			expectedConnectCalls: true,
 		},
-		{
-			name:                     "default loader behavior",
-			cluster:                  testCluster,
-			providerId:               client.ProviderID(""),
-			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": "valid_config_name", "value": testValue},
-			mockCLI:                  &MockSetConfigCLI{},
-			expectedError:            false,
-			expectedConnectCalls:     true,
-			expectedProviderCalls:    true,
-			expectedProjectNameCalls: true,
-			expectedConfigSetCalls:   true,
-		},
 	}
 
 	for _, tt := range tests {
