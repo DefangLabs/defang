@@ -63,6 +63,54 @@ func TestExchange(t *testing.T) {
 	})
 }
 
+func TestExchangeJWT(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			if r.Method != http.MethodPost {
+				t.Errorf("Expected POST method, got %s", r.Method)
+			}
+			if expected, got := "urn:ietf:params:oauth:grant-type:jwt-bearer", r.PostFormValue("grant_type"); expected != got {
+				t.Errorf("Expected grant_type %s, got: %s", expected, got)
+			}
+
+			jwt := r.PostFormValue("assertion")
+			if jwt == "valid-jwt" {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"access_token":"jwt-access-token","refresh_token":"jwt-refresh-token"}`))
+			} else {
+				w.Write([]byte(`{"error":"invalid_request","error_description":"Invalid request"}`))
+			}
+		default:
+			http.Error(w, "Not Found", http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.CloseClientConnections)
+
+	client := NewClient("defang-cli", server.URL)
+
+	t.Run("success", func(t *testing.T) {
+		result, err := client.ExchangeJWT("valid-jwt")
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+		if result.AccessToken != "jwt-access-token" {
+			t.Errorf("Expected access token 'jwt-access-token', got: %s", result.AccessToken)
+		}
+		if result.RefreshToken != "jwt-refresh-token" {
+			t.Errorf("Expected refresh token 'jwt-refresh-token', got: %s", result.RefreshToken)
+		}
+	})
+
+	t.Run("invalid jwt", func(t *testing.T) {
+		_, err := client.ExchangeJWT("invalid-jwt")
+		const expected = "invalid JWT: Invalid request"
+		if err.Error() != expected {
+			t.Fatalf("Expected error %q, got: %v", expected, err)
+		}
+	})
+}
+
 func TestAuthorizeExchange(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping browser test in short mode.")
