@@ -141,7 +141,7 @@ func (cerr CancelError) Unwrap() error {
 
 func Tail(ctx context.Context, provider client.Provider, projectName string, options TailOptions) error {
 	if options.LogType == logs.LogTypeUnspecified {
-		options.LogType = logs.LogTypeRun
+		options.LogType = logs.LogTypeAll
 	}
 
 	term.Debugf("Tailing %s logs in project %q", options.LogType, projectName)

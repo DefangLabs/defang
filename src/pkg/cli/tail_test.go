@@ -12,6 +12,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	cwTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -190,8 +191,8 @@ func TestTail(t *testing.T) {
 	if p.Reqs[0].Project != projectName {
 		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
 	}
-	if p.Reqs[0].LogType != 2 {
-		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	if p.Reqs[0].LogType != uint32(logs.LogTypeAll) {
+		t.Errorf("Tail() sent request with log type %v, want %v", p.Reqs[0].LogType, logs.LogTypeAll)
 	}
 	if p.Reqs[0].Since != nil {
 		t.Errorf("Tail() sent request with since %v, want nil", p.Reqs[0].Since)
@@ -205,8 +206,8 @@ func TestTail(t *testing.T) {
 	if p.Reqs[1].Project != projectName {
 		t.Errorf("Tail() sent request with project %v, want %v", p.Reqs[0].Project, projectName)
 	}
-	if p.Reqs[1].LogType != 2 {
-		t.Errorf("Tail() sent request with log type %v, want 2", p.Reqs[0].LogType)
+	if p.Reqs[1].LogType != uint32(logs.LogTypeAll) {
+		t.Errorf("Tail() sent request with log type %v, want %v", p.Reqs[1].LogType, logs.LogTypeAll)
 	}
 	if p.Reqs[1].Since == nil {
 		t.Errorf("Tail() sent request with since nil, want not nil")
@@ -307,7 +308,7 @@ func (m mockQueryErrorProvider) QueryLogs(ctx context.Context, req *defangv1.Tai
 }
 
 func TestTailError(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=ALL --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -342,7 +343,7 @@ func TestTailError(t *testing.T) {
 }
 
 func TestTailContext(t *testing.T) {
-	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=RUN --project-name=project"
+	const cancelError = "tail --since=2024-01-02T03:04:05Z --verbose=0 --type=ALL --project-name=project"
 	tailOptions := TailOptions{
 		Since: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
