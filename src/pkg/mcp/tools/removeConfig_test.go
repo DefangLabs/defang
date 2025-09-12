@@ -74,6 +74,16 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 		expectedErrorContains string
 	}{
 		{
+			name:                  "provider_auto_not_configured",
+			workingDirectory:      ".",
+			configName:            "DATABASE_URL",
+			providerID:            client.ProviderAuto,
+			setupMock:             func(m *MockRemoveConfigCLI) {},
+			expectError:           true,
+			expectErrorResult:     true,
+			expectedErrorContains: "No provider configured",
+		},
+		{
 			name:                  "missing_working_directory",
 			workingDirectory:      "",
 			configName:            "DATABASE_URL",
@@ -102,16 +112,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			expectError:           true,
 			expectErrorResult:     false,
 			expectedErrorContains: "required argument \"name\" not found",
-		},
-		{
-			name:                  "provider_auto_not_configured",
-			workingDirectory:      ".",
-			configName:            "DATABASE_URL",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "No provider configured",
 		},
 		{
 			name:             "connect_error",

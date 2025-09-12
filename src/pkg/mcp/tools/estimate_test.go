@@ -113,6 +113,24 @@ func TestHandleEstimateTool(t *testing.T) {
 		expectedErrorContains string
 	}{
 		{
+			name:                  "provider_auto_not_supported",
+			workingDirectory:      ".",
+			providerID:            client.ProviderAuto,
+			setupMock:             func(m *MockEstimateCLI) {},
+			expectError:           true,
+			expectErrorResult:     true,
+			expectedErrorContains: "estimates are only supported for AWS and GCP",
+		},
+		{
+			name:                  "provider_defang_not_supported",
+			workingDirectory:      ".",
+			providerID:            client.ProviderDefang,
+			setupMock:             func(m *MockEstimateCLI) {},
+			expectError:           true,
+			expectErrorResult:     true,
+			expectedErrorContains: "estimates are only supported for AWS and GCP",
+		},
+		{
 			name:                  "missing_working_directory",
 			workingDirectory:      "",
 			providerID:            client.ProviderAWS,
@@ -131,22 +149,26 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedErrorContains: "no such file or directory",
 		},
 		{
-			name:                  "provider_defang_not_supported",
-			workingDirectory:      ".",
-			providerID:            client.ProviderDefang,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "estimates are only supported for AWS and GCP",
-		},
-		{
-			name:                  "provider_auto_not_supported",
-			workingDirectory:      ".",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "estimates are only supported for AWS and GCP",
+			name:             "unknown_deployment_mode_defaults",
+			workingDirectory: ".",
+			deploymentMode:   "unknown-mode",
+			providerID:       client.ProviderAWS,
+			setupMock: func(m *MockEstimateCLI) {
+				m.Project = &compose.Project{Name: "test-project"}
+				m.Region = "us-west-2"
+				m.ProviderIDAfterSet = client.ProviderAWS
+				m.EstimateResponse = &defangv1.EstimateResponse{
+					Subtotal: &_type.Money{
+						CurrencyCode: "USD",
+						Units:        15,
+						Nanos:        0,
+					},
+				}
+				m.CapturedOutput = "Estimated cost: $15.00/month"
+			},
+			expectError:          false,
+			expectTextResult:     true,
+			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
 			name:             "load_project_error",
