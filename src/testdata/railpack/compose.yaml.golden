@@ -26,6 +26,7 @@ services:
     command:
       - something
       - with space
+      - ${PORT}
     networks:
       default: null
 networks:

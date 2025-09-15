@@ -31,7 +31,7 @@
       "dockerfile": "*Railpack"
     },
     "command": [
-      "something 'with space'"
+      "something \"with space\" \"${PORT}\""
     ],
     "entrypoint": null,
     "networks": {
