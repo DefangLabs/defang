@@ -13,13 +13,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// LoginCLIInterface defines the methods needed for login operations
-type LoginCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error
-	GenerateAuthURL(authPort int) string
-}
-
 // DefaultLoginCLI provides the default implementation
 type DefaultLoginCLI struct{}
 
@@ -71,8 +64,8 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 
 	// Add the login tool handler - make it non-blocking
 	term.Debug("Adding login tool handler")
-	cli := &DefaultLoginCLI{}
+	cli := &DefaultToolCLI{}
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleLoginTool(ctx, request, cluster, authPort, cli)
+		return handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
 	})
 }

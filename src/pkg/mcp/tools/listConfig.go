@@ -7,46 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
-	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
-
-// ListConfigCLIInterface defines the methods needed for listing config variables
-type ListConfigCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error)
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
-	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
-	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
-}
-
-// DefaultListConfigCLI provides the default implementation
-type DefaultListConfigCLI struct{}
-
-func (c *DefaultListConfigCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultListConfigCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error) {
-	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultListConfigCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
-
-func (c *DefaultListConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-func (c *DefaultListConfigCLI) ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error) {
-	return provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: projectName})
-}
 
 // handleListConfigTool handles the list config tool logic
 func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (*mcp.CallToolResult, error) {
@@ -125,8 +92,8 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId *cliCli
 
 	// Add the Config tool handler
 	term.Debug("Adding List config tool handler")
-	cli := &DefaultListConfigCLI{}
+	cli := &DefaultToolCLI{}
 	s.AddTool(listConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleListConfigTool(ctx, request, providerId, cluster, cli)
+		return handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 	})
 }

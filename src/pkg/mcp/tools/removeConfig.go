@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -14,38 +13,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
-
-// RemoveConfigCLIInterface defines the methods needed for removing config variables
-type RemoveConfigCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error)
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
-	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
-	ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error
-}
-
-// DefaultRemoveConfigCLI provides the default implementation
-type DefaultRemoveConfigCLI struct{}
-
-func (c *DefaultRemoveConfigCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultRemoveConfigCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error) {
-	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultRemoveConfigCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
-
-func (c *DefaultRemoveConfigCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-func (c *DefaultRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName string, provider cliClient.Provider, name string) error {
-	return cli.ConfigDelete(ctx, projectName, provider, name)
-}
 
 // handleRemoveConfigTool handles the remove config tool logic
 func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (*mcp.CallToolResult, error) {
@@ -127,8 +94,8 @@ func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId *cliC
 
 	// Add the Config tool handler
 	term.Debug("Adding remove config tool handler")
-	cli := &DefaultRemoveConfigCLI{}
+	cli := &DefaultToolCLI{}
 	s.AddTool(removeConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleRemoveConfigTool(ctx, request, providerId, cluster, cli)
+		return handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 	})
 }

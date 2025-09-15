@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -14,43 +13,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
-
-// DestroyCLIInterface defines the CLI functions needed for destroy tool
-type DestroyCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error)
-	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
-	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
-	CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
-}
-
-// DefaultDestroyCLI implements DestroyCLIInterface using actual CLI functions
-type DefaultDestroyCLI struct{}
-
-func (c *DefaultDestroyCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultDestroyCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error) {
-	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultDestroyCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
-	return cli.ComposeDown(ctx, projectName, client, provider)
-}
-
-func (c *DefaultDestroyCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-func (c *DefaultDestroyCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
-	return CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
-}
-
-func (c *DefaultDestroyCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
 
 // setupDestroyTool configures and adds the destroy tool to the MCP server
 func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
@@ -67,8 +29,8 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 	// Add the destroy tool handler - make it non-blocking
 	term.Debug("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultDestroyCLI{}
-		return handleDestroyTool(ctx, request, providerId, cluster, cli)
+		cli := &DefaultToolCLI{}
+		return handleDestroyTool(ctx, request, providerId, cluster, &DestroyCLIAdapter{DefaultToolCLI: cli})
 	})
 }
 

@@ -85,6 +85,11 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 	return m.ConfigSetError
 }
 
+func (m *MockSetConfigCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
+	// Return nil or a simple mock loader as needed for your tests
+	return nil
+}
+
 func createCallToolRequest(args map[string]interface{}) mcp.CallToolRequest {
 	return mcp.CallToolRequest{
 		Params: mcp.CallToolParams{

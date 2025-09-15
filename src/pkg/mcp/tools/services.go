@@ -18,23 +18,11 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// DeploymentInfoInterface defines the deployment info functions needed for services tool
-type DeploymentInfoInterface interface {
-	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
-}
-
 // DefaultDeploymentInfo implements DeploymentInfoInterface using the actual deployment_info functions
 type DefaultDeploymentInfo struct{}
 
 func (d *DefaultDeploymentInfo) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
 	return deployment_info.GetServices(ctx, projectName, provider)
-}
-
-// CLIInterface defines the CLI functions needed for services tool
-type CLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
-	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 }
 
 // DefaultCLI implements CLIInterface using the actual CLI functions

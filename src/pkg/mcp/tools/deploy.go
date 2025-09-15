@@ -18,17 +18,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// DeployCLIInterface defines the CLI functions needed for deploy tool
-type DeployCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error)
-	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error)
-	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
-	OpenBrowser(url string) error
-}
-
 // DefaultDeployCLI implements DeployCLIInterface using actual CLI functions
 type DefaultDeployCLI struct{}
 
@@ -75,7 +64,7 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 	// Add the deployment tool handler - make it non-blocking
 	term.Debug("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultDeployCLI{}
+		cli := &DefaultToolCLI{}
 		return handleDeployTool(ctx, request, providerId, cluster, cli)
 	})
 }

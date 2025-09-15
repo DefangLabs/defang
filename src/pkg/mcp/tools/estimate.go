@@ -18,19 +18,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// EstimateCLIInterface defines the CLI functions needed for estimate tool
-type EstimateCLIInterface interface {
-	Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error)
-	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
-	RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error)
-	PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse)
-	ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader
-	GetRegion(providerId cliClient.ProviderID) string
-	CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider
-	SetProviderID(providerId *cliClient.ProviderID, providerString string) error
-	CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string
-}
-
 // DefaultEstimateCLI implements EstimateCLIInterface using actual CLI functions
 type DefaultEstimateCLI struct{}
 
@@ -108,7 +95,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 	// Add the Estimate tool handler
 	term.Debug("Adding estimate tool handler")
 	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultEstimateCLI{}
+		cli := &DefaultToolCLI{}
 		return handleEstimateTool(ctx, request, providerId, cluster, cli)
 	})
 }
