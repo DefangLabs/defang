@@ -2,10 +2,7 @@ package command
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
@@ -30,17 +27,9 @@ var mcpServerCmd = &cobra.Command{
 	Short: "Start defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		authPort, _ := cmd.Flags().GetInt("auth-server")
 		term.SetDebug(true)
-
-		term.Debug("Creating log file")
-		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-		if err != nil {
-			term.Warnf("Failed to open log file: %v", err)
-		} else {
-			defer logFile.Close()
-			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
-		}
+		term.SetJSONMode(true)
+		authPort, _ := cmd.Flags().GetInt("auth-server")
 
 		// Setup knowledge base
 		term.Debug("Setting up knowledge base")
@@ -56,6 +45,7 @@ var mcpServerCmd = &cobra.Command{
 			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
 			server.WithPromptCapabilities(true),         // Enable interactive prompts
 			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
+			server.WithLogging(),                        // Enable server logging
 			server.WithInstructions(`
 Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
 
@@ -98,12 +88,12 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 		}
 
 		// Start the server
-		term.Println("Starting Defang MCP server")
+		term.Info("Starting Defang MCP server")
 		if err := server.ServeStdio(s); err != nil {
 			return err
 		}
 
-		term.Println("Server shutdown")
+		term.Info("Server shutdown")
 
 		return nil
 	},

@@ -1,6 +1,7 @@
 package term
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ type Term struct {
 	stdout, stderr io.Writer
 	out, err       *termenv.Output
 	debug          bool
+	jsonMode       bool
 
 	isTerminal bool
 	hasDarkBg  bool
@@ -82,6 +84,10 @@ func (t *Term) ForceColor(color bool) {
 
 func (t *Term) SetDebug(debug bool) {
 	t.debug = debug
+}
+
+func (t *Term) SetJSONMode(jsonMode bool) {
+	t.jsonMode = jsonMode
 }
 
 func (t *Term) DoDebug() bool {
@@ -198,6 +204,9 @@ func (t *Term) Debug(v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
+	if t.jsonMode {
+		return t.outputJSON("debug", t.out, v...)
+	}
 	return output(t.out, DebugColor, ensurePrefix(fmt.Sprintln(v...), " - "))
 }
 
@@ -205,34 +214,59 @@ func (t *Term) Debugf(format string, v ...any) (int, error) {
 	if !t.debug {
 		return 0, nil
 	}
+	if t.jsonMode {
+		return t.outputJSON("debug", t.out, fmt.Sprintf(format, v...))
+	}
 	return output(t.out, DebugColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " - ")))
 }
 
 func (t *Term) Info(v ...any) (int, error) {
+	if t.jsonMode {
+		return t.outputJSON("info", t.out, v...)
+	}
 	return output(t.out, InfoColor, ensurePrefix(fmt.Sprintln(v...), " * "))
 }
 
 func (t *Term) Infof(format string, v ...any) (int, error) {
+	if t.jsonMode {
+		return t.outputJSON("info", t.out, fmt.Sprintf(format, v...))
+	}
 	return output(t.out, InfoColor, ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " * ")))
 }
 
 func (t *Term) Warn(v ...any) (int, error) {
+	if t.jsonMode {
+		msg := strings.TrimSpace(fmt.Sprintln(v...))
+		t.warnings = append(t.warnings, msg)
+		return t.outputJSON("warn", t.out, msg)
+	}
 	msg := ensurePrefix(fmt.Sprintln(v...), " ! ")
 	t.warnings = append(t.warnings, msg)
 	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Warnf(format string, v ...any) (int, error) {
+	if t.jsonMode {
+		msg := strings.TrimSpace(fmt.Sprintf(format, v...))
+		t.warnings = append(t.warnings, msg)
+		return t.outputJSON("warn", t.out, msg)
+	}
 	msg := ensureNewline(ensurePrefix(fmt.Sprintf(format, v...), " ! "))
 	t.warnings = append(t.warnings, msg)
 	return output(t.out, WarnColor, msg)
 }
 
 func (t *Term) Error(v ...any) (int, error) {
+	if t.jsonMode {
+		return t.outputJSON("error", t.err, v...)
+	}
 	return output(t.err, ErrorColor, fmt.Sprintln(v...))
 }
 
 func (t *Term) Errorf(format string, v ...any) (int, error) {
+	if t.jsonMode {
+		return t.outputJSON("error", t.err, fmt.Sprintf(format, v...))
+	}
 	line := ensureNewline(fmt.Sprintf(format, v...))
 	return output(t.err, ErrorColor, line)
 }
@@ -349,6 +383,10 @@ func SetDebug(debug bool) {
 	DefaultTerm.SetDebug(debug)
 }
 
+func SetJSONMode(jsonMode bool) {
+	DefaultTerm.SetJSONMode(jsonMode)
+}
+
 func DoDebug() bool {
 	return DefaultTerm.DoDebug()
 }
@@ -395,6 +433,23 @@ func Reset() {
  * OSC:      ESC ('X' | ']' | '^' | '_') .*? (BEL | ESC '\' | $)	(commands that set window title, etc.)
  */
 var ansiRegex = regexp.MustCompile("\x1b(?:[@-WYZ\\\\`-~]|\\[[0-?]*[ -/]*[@-~]|[X\\]^_].*?(?:\x1b\\\\|\x07|$))")
+
+type LogEntry struct {
+	Level   string `json:"level"`
+	Message string `json:"message"`
+}
+
+func (t *Term) outputJSON(level string, w *termenv.Output, v ...any) (int, error) {
+	entry := LogEntry{
+		Level:   level,
+		Message: strings.TrimSpace(fmt.Sprint(v...)),
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return 0, err
+	}
+	return fmt.Fprint(w, string(data)+"\n")
+}
 
 func StripAnsi(s string) string {
 	return ansiRegex.ReplaceAllLiteralString(s, "")
