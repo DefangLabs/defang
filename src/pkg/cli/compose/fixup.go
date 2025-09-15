@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"al.essio.dev/pkg/shellescape"
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -108,7 +108,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 					// command is run as intended by replacing `command: [ "npm", "start" ]`
 					// with `command: [ "npm start" ]`.
 					if len(svccfg.Command) > 1 {
-						svccfg.Command = []string{shellescape.QuoteCommand(svccfg.Command)}
+						svccfg.Command = []string{pkg.ShellQuote(svccfg.Command...)}
 					}
 				}
 			}

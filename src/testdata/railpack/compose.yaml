@@ -10,4 +10,4 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: something "with space"
+    command: something "with space" $PORT
