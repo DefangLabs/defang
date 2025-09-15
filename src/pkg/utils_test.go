@@ -158,3 +158,38 @@ func TestGetCurrentUser(t *testing.T) {
 		t.Errorf("GetCurrentUser() returned an empty string")
 	}
 }
+
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected string
+	}{
+		{
+			input:    []string{"true"},
+			expected: `true`,
+		},
+		{
+			input:    []string{"echo", "hello world"},
+			expected: `echo "hello world"`,
+		},
+		{
+			input:    []string{"echo", "hello", "world"},
+			expected: `echo hello world`,
+		},
+		{
+			input:    []string{"echo", `hello"world`},
+			expected: `echo "hello\"world"`,
+		},
+		{
+			input:    []string{"bash", "-c", "start.sh $PORT"},
+			expected: `bash -c "start.sh $PORT"`,
+		},
+	}
+
+	for _, test := range tests {
+		actual := ShellQuote(test.input...)
+		if actual != test.expected {
+			t.Errorf("Expected `%s` but got: `%s`", test.expected, actual)
+		}
+	}
+}

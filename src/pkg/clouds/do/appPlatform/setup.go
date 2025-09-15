@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -89,14 +88,6 @@ func (d *DoApp) SetUpBucket(ctx context.Context) error {
 	return err
 }
 
-func shellQuote(args ...string) string {
-	quoted := make([]string, len(args))
-	for i, arg := range args {
-		quoted[i] = strconv.Quote(arg)
-	}
-	return strings.Join(quoted, " ")
-}
-
 func getImageSourceSpec(cdImagePath string) (*godo.ImageSourceSpec, error) {
 	term.Debugf("Using CD image: %q", cdImagePath)
 	image, err := ParseImage(cdImagePath)
@@ -143,7 +134,7 @@ func (d DoApp) Run(ctx context.Context, env []*godo.AppVariableDefinition, cdIma
 			Image:            image,
 			InstanceCount:    1,
 			InstanceSizeSlug: "basic-xs", // TODO: this is legacy and we should use new slugs
-			RunCommand:       shellQuote(cmd...),
+			RunCommand:       pkg.ShellQuote(cmd...),
 			Termination: &godo.AppJobSpecTermination{
 				GracePeriodSeconds: 600, // max 10mins to avoid killing the job while it's still running
 			},
