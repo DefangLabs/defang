@@ -19,10 +19,22 @@ type MCPClient struct {
 	cancel     context.CancelFunc
 }
 
+var expectedToolsList = []string{
+	"login",
+	"services",
+	"deploy",
+	"destroy",
+	"estimate",
+	"set_config",
+	"remove_config",
+	"list_configs",
+}
+
 // startInProcessMCPServer sets up an in-process MCP server and returns a connected client and a stop function.
 func startInProcessMCPServer(ctx context.Context) (*MCPClient, error) {
 	providerId := cliClient.ProviderDefang
-	srv, err := mcp.NewDefangMCPServer("0.0.1-test", "test-cluster", 0, &providerId)
+	//TODO: look at mocking out fabric
+	srv, err := mcp.NewDefangMCPServer("0.0.1-test", "fabric-prod1.defang.dev", 0, &providerId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %v", err)
 	}
@@ -61,7 +73,7 @@ func startInProcessMCPServer(ctx context.Context) (*MCPClient, error) {
 	}, nil
 }
 
-func TestInProcessMCPServer_Smoke(t *testing.T) {
+func TestInProcessMCPServer_Setup(t *testing.T) {
 	ctx := context.Background()
 	clientInfo, err := startInProcessMCPServer(ctx)
 	if err != nil {
@@ -72,7 +84,7 @@ func TestInProcessMCPServer_Smoke(t *testing.T) {
 
 	client := clientInfo.client
 
-	// List resources
+	// validate List resources
 	listResourcesReq := m3mcp.ListResourcesRequest{}
 	resList, err := client.ListResources(ctx, listResourcesReq)
 	if err != nil {
@@ -80,11 +92,88 @@ func TestInProcessMCPServer_Smoke(t *testing.T) {
 	}
 	t.Logf("Resources: %+v", resList)
 
-	// tools
+	if len(resList.Resources) != 2 {
+		t.Fatalf("expected two resources initially, got %d", len(resList.Resources))
+	}
+
+	if resList.Resources[0].Name != "defang_dockerfile_and_compose_examples" || resList.Resources[1].Name != "knowledge_base" {
+		t.Fatalf("unexpected resource names: %+v", resList.Resources)
+	}
+
+	// validate tools list
 	listToolsReq := m3mcp.ListToolsRequest{}
-	toolList, err := client.ListTools(ctx, listToolsReq)
+	toolListResp, err := client.ListTools(ctx, listToolsReq)
 	if err != nil {
 		t.Fatalf("ListTools failed: %v", err)
 	}
-	t.Logf("Tools: %+v", toolList)
+	t.Logf("Tools: %+v", toolListResp)
+
+	if len(toolListResp.Tools) != len(expectedToolsList) {
+		t.Fatalf("expected number of tools: got %d, want %d", len(toolListResp.Tools), len(expectedToolsList))
+	}
+	missingTools := []string{}
+	for _, expected := range expectedToolsList {
+		found := false
+		for _, tool := range toolListResp.Tools {
+			if tool.Name == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missingTools = append(missingTools, expected)
+		}
+	}
+
+	if len(missingTools) > 0 {
+		t.Fatalf("missing expected tools: %v", missingTools)
+	}
+}
+
+func TestInProcessMCPServer_Login(t *testing.T) {
+	ctx := context.Background()
+	clientInfo, err := startInProcessMCPServer(ctx)
+	if err != nil {
+		t.Fatalf("failed to start in-process MCP server: %v", err)
+	}
+
+	defer clientInfo.cancel()
+
+	client := clientInfo.client
+	_, err = client.CallTool(ctx, m3mcp.CallToolRequest{
+		Params: m3mcp.CallToolParams{
+			Name: "login",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Login tool failed!!!: %v", err)
+	}
+
+	_, err = client.CallTool(ctx, m3mcp.CallToolRequest{
+		Params: m3mcp.CallToolParams{
+			Name: "set_config",
+			Arguments: map[string]interface{}{
+				"working_directory": ".",
+				"name":              "TEST_VAR",
+				"value":             "test_value",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Set Config tool failed: %v", err)
+	}
+
+	result, err := client.CallTool(ctx, m3mcp.CallToolRequest{
+		Params: m3mcp.CallToolParams{
+			Name: "list_configs",
+			Arguments: map[string]interface{}{
+				"working_directory": ".",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("List Configs tool failed: %v", err)
+	}
+
+	t.Logf("List Configs Result: %+v", result)
 }
