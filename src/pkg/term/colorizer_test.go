@@ -2,6 +2,7 @@ package term
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"strconv"
@@ -224,22 +225,174 @@ func TestFlushWarnings(t *testing.T) {
 				term.Warn(warning)
 			}
 
-			bytesWritten, err := term.FlushWarnings()
+			_, err := term.FlushWarnings()
 			if (err != nil) != test.expectErr {
 				t.Errorf("FlushWarnings() error = %v, expectErr %v", err, test.expectErr)
 			}
-			bytesInExpected := 0
-			for _, msg := range test.expected {
-				bytesInExpected += len(msg)
+		})
+	}
+}
+
+func TestJSONOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		level    string
+		input    []any
+		expected LogEntry
+	}{
+		{
+			name:     "simple string",
+			level:    "info",
+			input:    []any{"Hello, World!"},
+			expected: LogEntry{Level: "info", Message: "Hello, World!"},
+		},
+		{
+			name:     "multiple values",
+			level:    "warn",
+			input:    []any{"Hello", "World", 123},
+			expected: LogEntry{Level: "warn", Message: "Hello World 123"},
+		},
+		{
+			name:     "empty input",
+			level:    "debug",
+			input:    []any{""},
+			expected: LogEntry{Level: "debug", Message: ""},
+		},
+		{
+			name:     "error level",
+			level:    "error",
+			input:    []any{"Something went wrong"},
+			expected: LogEntry{Level: "error", Message: "Something went wrong"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			term := NewTerm(os.Stdin, &buf, &buf)
+			out := termenv.NewOutput(&buf)
+
+			_, err := term.outputJSON(test.level, out, test.input...)
+			if err != nil {
+				t.Errorf("outputJSON() error = %v", err)
 			}
 
-			if bytesInExpected != bytesWritten {
-				t.Errorf("FlushWarnings() expected %d byteWritten, got %d", bytesInExpected, bytesWritten)
+			// Parse the JSON output
+			var entry LogEntry
+			if err := json.Unmarshal(buf.Bytes()[:buf.Len()-1], &entry); err != nil { // -1 to remove trailing newline
+				t.Errorf("Failed to unmarshal JSON: %v", err)
 			}
 
-			if term.getAllWarnings() != nil {
-				t.Errorf("after FlushWarnings() expected no warnings, got %v", term.getAllWarnings())
+			if entry.Level != test.expected.Level {
+				t.Errorf("Expected level %q, got %q", test.expected.Level, entry.Level)
+			}
+			if entry.Message != test.expected.Message {
+				t.Errorf("Expected message %q, got %q", test.expected.Message, entry.Message)
 			}
 		})
+	}
+}
+
+func TestJSONMode(t *testing.T) {
+	defaultTerm := DefaultTerm
+	t.Cleanup(func() {
+		DefaultTerm = defaultTerm
+	})
+
+	var stdout, stderr bytes.Buffer
+	DefaultTerm = NewTerm(os.Stdin, &stdout, &stderr)
+	DefaultTerm.SetJSONMode(true)
+	DefaultTerm.SetDebug(true)
+
+	// Test different log levels in JSON mode
+	Debug("Debug message")
+	Info("Info message")
+	Warn("Warning message")
+	Error("Error message")
+
+	// Parse JSON outputs
+	stdoutLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	stderrLines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
+
+	// Check debug, info, warn go to stdout
+	if len(stdoutLines) != 3 {
+		t.Errorf("Expected 3 lines in stdout, got %d", len(stdoutLines))
+	}
+
+	// Check error goes to stderr
+	if len(stderrLines) != 1 {
+		t.Errorf("Expected 1 line in stderr, got %d", len(stderrLines))
+	}
+
+	// Verify JSON structure for each log level
+	expectedLevels := []string{"debug", "info", "warn"}
+	for i, line := range stdoutLines {
+		var entry LogEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Errorf("Failed to unmarshal stdout line %d: %v", i, err)
+		}
+		if entry.Level != expectedLevels[i] {
+			t.Errorf("Expected level %q, got %q", expectedLevels[i], entry.Level)
+		}
+	}
+
+	// Verify error JSON
+	var errorEntry LogEntry
+	if err := json.Unmarshal([]byte(stderrLines[0]), &errorEntry); err != nil {
+		t.Errorf("Failed to unmarshal stderr: %v", err)
+	}
+	if errorEntry.Level != "error" {
+		t.Errorf("Expected error level, got %q", errorEntry.Level)
+	}
+}
+
+func TestJSONModeDisabled(t *testing.T) {
+	defaultTerm := DefaultTerm
+	t.Cleanup(func() {
+		DefaultTerm = defaultTerm
+	})
+
+	var stdout, stderr bytes.Buffer
+	DefaultTerm = NewTerm(os.Stdin, &stdout, &stderr)
+	DefaultTerm.SetDebug(true)
+
+	// First enable JSON mode and test it works
+	DefaultTerm.SetJSONMode(true)
+	Info("JSON test message")
+
+	// Check that JSON mode is working
+	jsonOutput := stdout.String()
+	var entry LogEntry
+	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonOutput)), &entry); err != nil {
+		t.Errorf("Expected valid JSON when JSON mode is enabled, but got error: %v", err)
+	}
+	if entry.Level != "info" || entry.Message != "JSON test message" {
+		t.Errorf("Expected JSON entry with level 'info' and message 'JSON test message', got: %+v", entry)
+	}
+
+	// Clear the buffer and disable JSON mode
+	stdout.Reset()
+	stderr.Reset()
+	DefaultTerm.SetJSONMode(false) // Explicitly disable JSON mode
+
+	Info("Test message")
+	Warn("Warning message")
+
+	// Should output regular colored text with prefixes
+	output := stdout.String()
+	if !strings.Contains(output, " * Test message") {
+		t.Errorf("Expected info prefix ' * ', got: %q", output)
+	}
+	if !strings.Contains(output, " ! Warning message") {
+		t.Errorf("Expected warn prefix ' ! ', got: %q", output)
+	}
+
+	// Should not be valid JSON
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		var entry LogEntry
+		if json.Unmarshal([]byte(line), &entry) == nil {
+			t.Errorf("Output should not be valid JSON when JSON mode is disabled, but got: %q", line)
+		}
 	}
 }

@@ -442,7 +442,7 @@ type LogEntry struct {
 func (t *Term) outputJSON(level string, w *termenv.Output, v ...any) (int, error) {
 	entry := LogEntry{
 		Level:   level,
-		Message: strings.TrimSpace(fmt.Sprint(v...)),
+		Message: strings.TrimSpace(fmt.Sprintln(v...)),
 	}
 	data, err := json.Marshal(entry)
 	if err != nil {
