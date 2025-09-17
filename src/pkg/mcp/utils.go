@@ -10,18 +10,18 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-const (
-	AskDefangBaseURL      = "https://ask.defang.io"
-	DocumentationEndpoint = "data"
-)
+const DocumentationEndpoint = "data"
+// AskDefangBaseURL is a var so tests can override it
 
+var AskDefangBaseURL = "https://ask.defang.io"
 var KnowledgeBaseDir = client.StateDir
+
+// knowledgeBaseFilenames is the ordered list of knowledge base files to download as a fixed-size array.
+var knowledgeBaseFilenames = [...]string{"knowledge_base.json", "samples_examples.json"}
 
 func SetupKnowledgeBase() error {
 	term.Debug("Setting up knowledge base")
-	filenames := []string{"knowledge_base.json", "samples_examples.json"}
-
-	term.Debugf("Attempting to download knowledge base files: %v", filenames)
+	term.Debugf("Attempting to download knowledge base files: %v", knowledgeBaseFilenames)
 
 	// Create knowledge base directory if it doesn't exist
 	term.Debugf("Creating knowledge base directory: %s", KnowledgeBaseDir)
@@ -30,7 +30,7 @@ func SetupKnowledgeBase() error {
 		return err
 	}
 
-	for _, filename := range filenames {
+	for _, filename := range knowledgeBaseFilenames {
 		term.Debugf("Downloading knowledge base file: %s", filename)
 		err := downloadKnowledgeBase(KnowledgeBaseDir+"/"+filename, "/"+DocumentationEndpoint+"/"+filename)
 		if err != nil {
