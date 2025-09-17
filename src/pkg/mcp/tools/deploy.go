@@ -18,6 +18,9 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// OpenURLFunc allows browser.OpenURL to be overridden in tests
+var OpenURLFunc = browser.OpenURL
+
 // setupDeployTool configures and adds the deployment tool to the MCP server
 func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
 	term.Debug("Creating deployment tool")
@@ -122,7 +125,7 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 			// Open the portal URL in the browser
 			term.Debugf("Opening portal URL in browser: %s", portalURL)
 			go func() {
-				err := browser.OpenURL(portalURL)
+				err := OpenURLFunc(portalURL)
 				if err != nil {
 					term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
 				}
