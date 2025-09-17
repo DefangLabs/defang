@@ -14,6 +14,7 @@ type ShowAccountData struct {
 	client.AccountInfo
 	SubscriberTier defangv1.SubscriptionTier
 	Tenant         string
+	TenantId       string
 }
 
 func showAccountInfo(showData ShowAccountData) (string, error) {
@@ -28,6 +29,10 @@ func showAccountInfo(showData ShowAccountData) (string, error) {
 
 	if showData.Tenant != "" {
 		outputText += "\n\tTenant: " + showData.Tenant
+	}
+
+	if showData.TenantId != "" {
+		outputText += "\n\tTenant ID: " + showData.TenantId
 	}
 
 	outputText += "\n\tSubscription Tier: " + pkg.SubscriptionTierToString(showData.SubscriberTier)
@@ -55,6 +60,7 @@ func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Pro
 	showData.Region = resp.Region
 	showData.SubscriberTier = resp.Tier
 	showData.Tenant = resp.Tenant
+	showData.TenantId = resp.TenantId
 
 	if provider != nil {
 		account, err := provider.AccountInfo(ctx)
