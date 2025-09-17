@@ -536,7 +536,6 @@ func TestInProcessMCPServer(t *testing.T) {
 		}
 		defer func() { defangtools.OpenURLFunc = originalOpenURL }()
 
-		t.Setenv("DEFANG_TOKEN", "")
 		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
 				Name: "deploy",
