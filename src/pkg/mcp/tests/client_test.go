@@ -524,7 +524,6 @@ func TestInProcessMCPServer(t *testing.T) {
 	}
 
 	TestInProcessMCPServer_DeployAndDestroy := func(t *testing.T) {
-		t.Skip("broken")
 		const dummyToken = "Testing.Token.1234"
 		t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
 
