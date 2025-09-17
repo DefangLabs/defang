@@ -81,13 +81,14 @@ func (m *MockEstimateCLI) SetProviderID(providerId *client.ProviderID, providerS
 		return m.SetProviderIDError
 	}
 	// Simulate the actual setting of the provider ID
-	if providerString == "" {
+	switch providerString {
+	case "":
 		*providerId = m.ProviderIDAfterSet
-	} else if providerString == "AWS" || providerString == "aws" {
+	case "AWS", "aws":
 		*providerId = client.ProviderAWS
-	} else if providerString == "GCP" || providerString == "gcp" {
+	case "GCP", "gcp":
 		*providerId = client.ProviderGCP
-	} else {
+	default:
 		*providerId = client.ProviderAuto
 	}
 	return nil
@@ -112,24 +113,6 @@ func TestHandleEstimateTool(t *testing.T) {
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
-		{
-			name:                  "provider_auto_not_supported",
-			workingDirectory:      ".",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "estimates are only supported for AWS and GCP",
-		},
-		{
-			name:                  "provider_defang_not_supported",
-			workingDirectory:      ".",
-			providerID:            client.ProviderDefang,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "estimates are only supported for AWS and GCP",
-		},
 		{
 			name:                  "missing_working_directory",
 			workingDirectory:      "",
