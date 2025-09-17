@@ -8,9 +8,6 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
-	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -42,48 +39,14 @@ var mcpServerCmd = &cobra.Command{
 			term.DefaultTerm = term.NewTerm(os.Stdin, logFile, logFile)
 		}
 
-		// Setup knowledge base
-		term.Debug("Setting up knowledge base")
-		if err := mcp.SetupKnowledgeBase(); err != nil {
-			return fmt.Errorf("failed to setup knowledge base: %w", err)
-		}
+		cluster := getCluster()
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s := server.NewMCPServer(
-			"Deploy with Defang",
-			RootCmd.Version,
-			server.WithResourceCapabilities(true, true), // Enable resource management and notifications
-			server.WithPromptCapabilities(true),         // Enable interactive prompts
-			server.WithToolCapabilities(true),           // Enable dynamic tool list updates
-			server.WithInstructions(`
-Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
-
-There are a number of available tools to help with deployment, configuration, and manage applications deployed with Defang.
-
-deploy - This tool deploys a web application to the cloud using the compose.yaml file in the application's working directory.
-destroy - This tool spins down and removes a deployed project from the cloud, cleaning up all associated resources.
-estimate - This tool estimates the cost of running a deployed application based on its resource usage and cloud provider pricing.
-services - This tool lists all running services for a deployed application, providing status and resource usage information
-list_configs - This tool lists all configuration variables for a deployed application, allowing you to view current settings.
-remove_config - This tool removes a configuration variable for a deployed application, allowing you to clean up unused settings.
-set_config - This tool sets or updates configuration variables for a deployed application, allowing you to manage environment variables and secrets.
-			`),
-		)
-
-		cluster := getCluster()
-
-		// Setup resources
-		term.Debug("Setting up resources")
-		resources.SetupResources(s)
-
-		//setup prompts
-		term.Debug("Setting up prompts")
-		prompts.SetupPrompts(s, cluster, &providerID)
-
-		// Setup tools
-		term.Debug("Setting up tools")
-		tools.SetupTools(s, cluster, authPort, &providerID)
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, authPort, &providerID)
+		if err != nil {
+			return fmt.Errorf("failed to create MCP server: %w", err)
+		}
 
 		// Start auth server for docker login flow
 		if authPort != 0 {
