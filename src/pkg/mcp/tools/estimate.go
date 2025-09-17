@@ -95,7 +95,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 	// Add the Estimate tool handler
 	term.Debug("Adding estimate tool handler")
 	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultToolCLI{}
+		cli := &DefaultEstimateCLI{}
 		return handleEstimateTool(ctx, request, providerId, cluster, cli)
 	})
 }
@@ -103,12 +103,6 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Estimate tool called")
 	track.Evt("MCP Estimate Tool")
-
-	if *providerId == cliClient.ProviderDefang || *providerId == cliClient.ProviderAuto {
-		// We only support estimates for AWS and GCP, not playground; suggest use setup prompt for another provider
-		err := errors.New("estimates are only supported for AWS and GCP; please configure another provider using the appropriate prompts and type /mcp.defang.AWS_Setup for AWS or /mcp.defang.GCP_Setup for GCP")
-		return mcp.NewToolResultErrorFromErr("No compatible provider configured", err), err
-	}
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {

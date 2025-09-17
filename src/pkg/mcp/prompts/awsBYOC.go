@@ -66,9 +66,11 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			}
 
 			region := getStringArg(req.Params.Arguments, "AWS_REGION", "")
-			err = os.Setenv("AWS_REGION", region)
-			if err != nil {
-				return nil, err
+			if region != "" {
+				err = os.Setenv("AWS_REGION", region)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 

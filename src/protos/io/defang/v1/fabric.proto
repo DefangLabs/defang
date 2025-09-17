@@ -60,9 +60,11 @@ service FabricController {
   // deprecate - change to use *Config functions
   rpc PutSecret(PutConfigRequest) returns (google.protobuf.Empty) {
     option deprecated = true;
+    option idempotency_level = IDEMPOTENT;
   };
   rpc DeleteSecrets(Secrets) returns (google.protobuf.Empty) {
     option deprecated = true;
+    option idempotency_level = IDEMPOTENT;
   };
   rpc ListSecrets(ListConfigsRequest) returns (Secrets) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -717,6 +719,7 @@ message WhoAmIResponse {
   string user_id = 4;
   SubscriptionTier tier = 5;
   bool training_opt_out = 6;
+  string tenant_id = 7;
 }
 
 message EstimateRequest {

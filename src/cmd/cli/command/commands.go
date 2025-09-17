@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -213,6 +214,7 @@ func SetupCommands(ctx context.Context, version string) {
 	RootCmd.AddCommand(loginCmd)
 
 	// Whoami Command
+	whoamiCmd.PersistentFlags().Bool("json", pkg.GetenvBool("DEFANG_JSON"), "print output in JSON format")
 	RootCmd.AddCommand(whoamiCmd)
 
 	// Logout Command
@@ -434,13 +436,30 @@ var whoamiCmd = &cobra.Command{
 			term.Debug("unable to get provider:", err)
 		}
 
-		str, err := cli.Whoami(cmd.Context(), client, provider)
+		jsonMode, _ := cmd.Flags().GetBool("json")
+
+		data, err := cli.Whoami(cmd.Context(), client, provider)
 		if err != nil {
 			return err
 		}
 
-		term.Info(str)
-		return nil
+		if jsonMode {
+			bytes, err := json.Marshal(data)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Println(string(bytes))
+			return err
+		} else {
+			return term.Table([]cli.ShowAccountData{data}, []string{
+				"Provider",
+				"AccountID",
+				"Tenant",
+				"TenantID",
+				"Subscription Tier",
+				"Region",
+			})
+		}
 	},
 }
 
