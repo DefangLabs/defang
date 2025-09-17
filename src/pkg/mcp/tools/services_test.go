@@ -145,7 +145,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			mockDeploymentInfo:  &MockDeploymentInfo{},
 			expectedError:       true,
 			expectedResultError: true,
-			errorMessage:        "No provider configured",
+			errorMessage:        "no provider is configured",
 			expectedGetServices: false,
 		},
 		{

@@ -180,7 +180,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID:            client.ProviderAuto,
 			setupMock:             func(m *MockDestroyCLI) {},
 			expectError:           true,
-			expectedErrorContains: "No provider configured",
+			expectedErrorContains: "no provider is configured",
 		},
 	}
 

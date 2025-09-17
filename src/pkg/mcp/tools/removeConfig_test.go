@@ -81,7 +81,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock:             func(m *MockRemoveConfigCLI) {},
 			expectError:           true,
 			expectErrorResult:     true,
-			expectedErrorContains: "No provider configured",
+			expectedErrorContains: "no provider is configured",
 		},
 		{
 			name:                  "missing_working_directory",

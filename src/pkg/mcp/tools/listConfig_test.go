@@ -97,7 +97,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock:             func(m *MockListConfigCLI) {},
 			expectError:           true,
 			expectErrorResult:     true,
-			expectedErrorContains: "No provider configured",
+			expectedErrorContains: "no provider is configured",
 		},
 		{
 			name:             "connect_error",
