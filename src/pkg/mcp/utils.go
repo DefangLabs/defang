@@ -10,8 +10,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 )
 
-// AskDefangBaseURL is a var so tests can override it
 const DocumentationEndpoint = "data"
+// AskDefangBaseURL is a var so tests can override it
 
 var AskDefangBaseURL = "https://ask.defang.io"
 var KnowledgeBaseDir = client.StateDir
