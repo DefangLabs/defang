@@ -330,12 +330,14 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		putSecret: connect_go.NewClient[v1.PutConfigRequest, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerPutSecretProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		deleteSecrets: connect_go.NewClient[v1.Secrets, emptypb.Empty](
 			httpClient,
 			baseURL+FabricControllerDeleteSecretsProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+			connect_go.WithClientOptions(opts...),
 		),
 		listSecrets: connect_go.NewClient[v1.ListConfigsRequest, v1.Secrets](
 			httpClient,
@@ -909,12 +911,14 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerPutSecretHandler := connect_go.NewUnaryHandler(
 		FabricControllerPutSecretProcedure,
 		svc.PutSecret,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerDeleteSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerDeleteSecretsProcedure,
 		svc.DeleteSecrets,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyIdempotent),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerListSecretsHandler := connect_go.NewUnaryHandler(
 		FabricControllerListSecretsProcedure,
