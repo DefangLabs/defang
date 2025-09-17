@@ -719,6 +719,7 @@ message WhoAmIResponse {
   string user_id = 4;
   SubscriptionTier tier = 5;
   bool training_opt_out = 6;
+  string tenant_id = 7;
 }
 
 message EstimateRequest {
