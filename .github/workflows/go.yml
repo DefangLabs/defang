@@ -23,7 +23,7 @@ jobs:
           cache-dependency-path: src/go.sum
 
       - name: Run Go unit tests
-        run: go test -test.short -v ./...
+        run: go test -v ./...
         working-directory: src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # to avoid GH rate limits
