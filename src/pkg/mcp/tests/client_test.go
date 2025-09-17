@@ -200,11 +200,11 @@ func (m *mockFabricService) Destroy(ctx context.Context, req *connect.Request[de
 // Test helpers
 func setupTest(t *testing.T, workingDir string) *client.Client {
 	t.Helper()
-	ctx := context.Background()
-	if err := beforeTestSuite(ctx, workingDir); err != nil {
+	ctx := t.Context()
+	if err := SetupTestSuite(ctx, workingDir); err != nil {
 		t.Fatalf("failed to start in-process MCP server: %v", err)
 	}
-	t.Cleanup(afterTestSuite)
+	t.Cleanup(TeardownTestSuite)
 	return MCPClientInstance.client
 }
 
@@ -237,6 +237,13 @@ type MCPClient struct {
 }
 
 var MCPClientInstance *MCPClient
+
+// test suite variables
+var (
+	projectDir string
+	mcpClient  *client.Client
+)
+
 var expectedToolsList = []string{
 	"login",
 	"services",
@@ -299,7 +306,7 @@ func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCP
 
 var MockFabric *mockFabricService
 
-func beforeTestSuite(ctx context.Context, workingDir string) error {
+func SetupTestSuite(ctx context.Context, workingDir string) error {
 	// Create a minimal mock knowledge_base resource in the test's working directory
 	resourceDir := workingDir + "/knowledge_base"
 	if _, err := os.Stat(resourceDir); os.IsNotExist(err) {
@@ -313,16 +320,15 @@ func beforeTestSuite(ctx context.Context, workingDir string) error {
 		configValues: make(map[string]string),
 	}
 	var err error
-	MCPClientInstance, err = startInProcessMCPServer(ctx, startMockFabricServer(MockFabric))
+	var fabricServer = startMockFabricServer(MockFabric)
+	MCPClientInstance, err = startInProcessMCPServer(ctx, fabricServer)
 	if err != nil {
 		return err
 	}
-
-	MockFabric.resetFlags()
 	return nil
 }
 
-func afterTestSuite() {
+func TeardownTestSuite() {
 	// Clean up the mock knowledge_base resource if it exists
 	os.RemoveAll("knowledge_base")
 	if MCPClientInstance != nil {
@@ -331,275 +337,253 @@ func afterTestSuite() {
 	}
 }
 
-// Test functions
-func TestInProcessMCPServer_Setup(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
+func TestInProcessMCPServer(t *testing.T) {
+	TestInProcessMCPServer_Setup := func(t *testing.T) {
+		listResourcesReq := m3mcp.ListResourcesRequest{}
+		resList, _ := mcpClient.ListResources(t.Context(), listResourcesReq)
+		if len(resList.Resources) != 2 {
+			t.Fatalf("expected two resources initially, got %d", len(resList.Resources))
+		}
+		if resList.Resources[0].Name != "defang_dockerfile_and_compose_examples" || resList.Resources[1].Name != "knowledge_base" {
+			t.Fatalf("unexpected resource names: %+v", resList.Resources)
+		}
+
+		listToolsReq := m3mcp.ListToolsRequest{}
+		toolListResp, _ := mcpClient.ListTools(t.Context(), listToolsReq)
+		if len(toolListResp.Tools) != len(expectedToolsList) {
+			t.Fatalf("expected number of tools: got %d, want %d", len(toolListResp.Tools), len(expectedToolsList))
+		}
+		missingTools := []string{}
+		for _, expected := range expectedToolsList {
+			found := false
+			for _, tool := range toolListResp.Tools {
+				if tool.Name == expected {
+					found = true
+					break
+				}
+			}
+			if !found {
+				missingTools = append(missingTools, expected)
+			}
+		}
+		if len(missingTools) > 0 {
+			t.Fatalf("missing expected tools: %v", missingTools)
+		}
 	}
 
-	tempDir := t.TempDir()
-	client := setupTest(t, tempDir)
-
-	listResourcesReq := m3mcp.ListResourcesRequest{}
-	resList, _ := client.ListResources(context.Background(), listResourcesReq)
-	if len(resList.Resources) != 2 {
-		t.Fatalf("expected two resources initially, got %d", len(resList.Resources))
-	}
-	if resList.Resources[0].Name != "defang_dockerfile_and_compose_examples" || resList.Resources[1].Name != "knowledge_base" {
-		t.Fatalf("unexpected resource names: %+v", resList.Resources)
-	}
-
-	listToolsReq := m3mcp.ListToolsRequest{}
-	toolListResp, _ := client.ListTools(context.Background(), listToolsReq)
-	if len(toolListResp.Tools) != len(expectedToolsList) {
-		t.Fatalf("expected number of tools: got %d, want %d", len(toolListResp.Tools), len(expectedToolsList))
-	}
-	missingTools := []string{}
-	for _, expected := range expectedToolsList {
+	// Test functions
+	TestInProcessMCPServer_Services := func(t *testing.T) {
+		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "services",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+				},
+			},
+		})
+		assertCalled(t, err == nil, "Services tool error")
+		assertCalled(t, !result.IsError, "Services tool IsError")
+		assertCalled(t, MockFabric.getServicesCalled, "services (GetServices)")
 		found := false
-		for _, tool := range toolListResp.Tools {
-			if tool.Name == expected {
-				found = true
-				break
+		for _, content := range result.Content {
+			if text, ok := content.(m3mcp.TextContent); ok {
+				if strings.Contains(text.Text, "hello") {
+					found = true
+					break
+				}
 			}
 		}
-		if !found {
-			missingTools = append(missingTools, expected)
-		}
-	}
-	if len(missingTools) > 0 {
-		t.Fatalf("missing expected tools: %v", missingTools)
-	}
-}
-
-// Test functions
-func TestInProcessMCPServer_Services(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
+		assertCalled(t, found, "Expected service name 'hello' in services tool output")
 	}
 
-	projectDir, cleanup := createTestProjectDir(t)
-	defer cleanup()
-	client := setupTest(t, projectDir)
-
-	result, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "services",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
+	TestInProcessMCPServer_Estimate := func(t *testing.T) {
+		MockFabric.estimateCalled = false
+		start := time.Now()
+		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "estimate",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+					"provider":          "AWS",
+					"deployment_mode":   "AFFORDABLE",
+				},
 			},
-		},
-	})
-	assertCalled(t, err == nil, "Services tool error")
-	assertCalled(t, !result.IsError, "Services tool IsError")
-	assertCalled(t, MockFabric.getServicesCalled, "services (GetServices)")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "hello") {
-				found = true
-				break
+		})
+		t.Logf("Estimate tool call took: %v", time.Since(start))
+		t.Logf("Estimate tool error: %v", err)
+		t.Logf("MockFabric.estimateCalled: %v", MockFabric.estimateCalled)
+		assertCalled(t, err == nil, "Estimate tool error")
+		assertCalled(t, !result.IsError, "Estimate tool IsError")
+		assertCalled(t, MockFabric.estimateCalled, "estimate (Estimate)")
+		found := false
+		for _, content := range result.Content {
+			if text, ok := content.(m3mcp.TextContent); ok {
+				if strings.Contains(text.Text, "42.42") {
+					found = true
+					break
+				}
 			}
 		}
-	}
-	assertCalled(t, found, "Expected service name 'hello' in services tool output")
-}
-
-func TestInProcessMCPServer_Estimate(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
+		assertCalled(t, found, "Expected cost '42.42' in estimate tool output")
 	}
 
-	projectDir, cleanup := createTestProjectDir(t)
-	defer cleanup()
-	client := setupTest(t, projectDir)
+	TestInProcessMCPServer_Login := func(t *testing.T) {
+		const dummyToken = "Testing.Token.1234"
+		// set as if logged in
+		t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
 
-	MockFabric.estimateCalled = false
-	start := time.Now()
-	result, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "estimate",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"provider":          "AWS",
-				"deployment_mode":   "AFFORDABLE",
+		// Call the login tool
+		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "login",
+				Arguments: map[string]interface{}{
+					"working_directory": ".",
+				},
 			},
-		},
-	})
-	t.Logf("Estimate tool call took: %v", time.Since(start))
-	t.Logf("Estimate tool error: %v", err)
-	t.Logf("MockFabric.estimateCalled: %v", MockFabric.estimateCalled)
-	assertCalled(t, err == nil, "Estimate tool error")
-	assertCalled(t, !result.IsError, "Estimate tool IsError")
-	assertCalled(t, MockFabric.estimateCalled, "estimate (Estimate)")
-	found := false
-	for _, content := range result.Content {
-		if text, ok := content.(m3mcp.TextContent); ok {
-			if strings.Contains(text.Text, "42.42") {
-				found = true
-				break
-			}
+		})
+		assertCalled(t, err == nil, "Login tool error")
+		assertCalled(t, !result.IsError, "Login tool IsError")
+	}
+
+	TestInProcessMCPServer_Config := func(t *testing.T) {
+		var configName = "TEST_VAR"
+		_, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "set_config",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+					"name":              configName,
+					"value":             "test_value",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("set_config tool failed: %v", err)
+		}
+		assertCalled(t, MockFabric.putSecretCalled, "set_config (PutSecret)")
+
+		MockFabric.listSecretsCalled = false
+		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "list_configs",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("list_configs tool failed: %v", err)
+		}
+		assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets)")
+		if len(result.Content) == 0 {
+			t.Fatalf("List Configs tool returned empty content")
+		}
+		textContent, ok := result.Content[0].(m3mcp.TextContent)
+		if !ok {
+			t.Fatalf("Expected TextContent type in result.Content[0], got %T", result.Content[0])
+		}
+		contentStr := textContent.Text
+		if !strings.Contains(contentStr, configName) {
+			t.Fatalf("Expected config name %q not found in list_configs output: %s", configName, contentStr)
+		}
+
+		_, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "remove_config",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+					"name":              configName,
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("remove_config tool failed: %v", err)
+		}
+		assertCalled(t, MockFabric.deleteSecretsCalled, "remove_config (DeleteSecrets)")
+
+		result, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "list_configs",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("list_configs tool failed: %v", err)
+		}
+		assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets after delete)")
+		textContent, ok = result.Content[0].(m3mcp.TextContent)
+		if !ok {
+			t.Fatalf("Expected TextContent type in result.Content[0], got %T", result.Content[0])
+		}
+		contentStr = textContent.Text
+		if strings.Contains(contentStr, configName) {
+			t.Fatalf("Not expected config name %q not found in list_configs output: %s", configName, contentStr)
 		}
 	}
-	assertCalled(t, found, "Expected cost '42.42' in estimate tool output")
-}
 
-func TestInProcessMCPServer_LoginTool(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
+	TestInProcessMCPServer_DeployAndDestroy := func(t *testing.T) {
+		const dummyToken = "Testing.Token.1234"
+		t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
+
+		// Mock openURLFunc
+		originalOpenURL := defangtools.OpenURLFunc
+		called := false
+		defangtools.OpenURLFunc = func(url string) error {
+			called = true
+			return nil
+		}
+		defer func() { defangtools.OpenURLFunc = originalOpenURL }()
+
+		t.Setenv("DEFANG_TOKEN", "")
+		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "deploy",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+				},
+			},
+		})
+		t.Logf("Deploy tool error: %v", err)
+		t.Logf("MockFabric.deployCalled: %v", MockFabric.deployCalled)
+		assertCalled(t, err == nil, "Deploy tool error")
+		assertCalled(t, !result.IsError, "Deploy tool IsError")
+		assertCalled(t, MockFabric.deployCalled, "deploy (Deploy)")
+		assertCalled(t, called, "openURLFunc should be called during deploy")
+
+		_, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
+			Params: m3mcp.CallToolParams{
+				Name: "destroy",
+				Arguments: map[string]interface{}{
+					"working_directory": projectDir,
+				},
+			},
+		})
+		assertCalled(t, err == nil, "Destroy tool error")
+		assertCalled(t, MockFabric.destroyCalled, "destroy (Destroy)")
 	}
 
-	projectDir, cleanup := createTestProjectDir(t)
+	// Suite-level setup
+	var cleanup func()
+	projectDir, cleanup = createTestProjectDir(t)
+	mcpClient = setupTest(t, projectDir)
 	defer cleanup()
-	client := setupTest(t, projectDir)
 
-	const dummyToken = "Testing.Token.1234"
-	// set as if logged in
-	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
-
-	// Call the login tool
-	result, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "login",
-			Arguments: map[string]interface{}{
-				"working_directory": ".",
-			},
-		},
-	})
-	assertCalled(t, err == nil, "Login tool error")
-	assertCalled(t, !result.IsError, "Login tool IsError")
-}
-
-func TestInProcessMCPServer_Config(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
+	// Test functions
+	tests := []struct {
+		name string
+		fn   func(t *testing.T)
+	}{
+		{"TestInProcessMCPServer_DeployAndDestroy", TestInProcessMCPServer_DeployAndDestroy},
+		{"TestInProcessMCPServer_Setup", TestInProcessMCPServer_Setup},
+		{"TestInProcessMCPServer_Login", TestInProcessMCPServer_Login},
+		{"TestInProcessMCPServer_Config", TestInProcessMCPServer_Config},
+		{"TestInProcessMCPServer_Estimate", TestInProcessMCPServer_Estimate},
+		{"TestInProcessMCPServer_Services", TestInProcessMCPServer_Services},
 	}
-
-	projectDir, cleanup := createTestProjectDir(t)
-	defer cleanup()
-	client := setupTest(t, projectDir)
-
-	var configName = "TEST_VAR"
-	_, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "set_config",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"name":              configName,
-				"value":             "test_value",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("set_config tool failed: %v", err)
+	for _, tc := range tests {
+		MockFabric.resetFlags()
+		t.Run(tc.name, tc.fn)
 	}
-	assertCalled(t, MockFabric.putSecretCalled, "set_config (PutSecret)")
-
-	MockFabric.listSecretsCalled = false
-	result, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "list_configs",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("list_configs tool failed: %v", err)
-	}
-	assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets)")
-	if len(result.Content) == 0 {
-		t.Fatalf("List Configs tool returned empty content")
-	}
-	textContent, ok := result.Content[0].(m3mcp.TextContent)
-	if !ok {
-		t.Fatalf("Expected TextContent type in result.Content[0], got %T", result.Content[0])
-	}
-	contentStr := textContent.Text
-	if !strings.Contains(contentStr, configName) {
-		t.Fatalf("Expected config name %q not found in list_configs output: %s", configName, contentStr)
-	}
-
-	_, err = client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "remove_config",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-				"name":              configName,
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("remove_config tool failed: %v", err)
-	}
-	assertCalled(t, MockFabric.deleteSecretsCalled, "remove_config (DeleteSecrets)")
-
-	result, err = client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "list_configs",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("list_configs tool failed: %v", err)
-	}
-	assertCalled(t, MockFabric.listSecretsCalled, "list_configs (ListSecrets after delete)")
-	textContent, ok = result.Content[0].(m3mcp.TextContent)
-	if !ok {
-		t.Fatalf("Expected TextContent type in result.Content[0], got %T", result.Content[0])
-	}
-	contentStr = textContent.Text
-	if strings.Contains(contentStr, configName) {
-		t.Fatalf("Not expected config name %q not found in list_configs output: %s", configName, contentStr)
-	}
-}
-
-func TestInProcessMCPServer_DeployAndDestroy(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
-	projectDir, cleanup := createTestProjectDir(t)
-	defer cleanup()
-	client := setupTest(t, projectDir)
-
-	MockFabric.deployCalled = false
-	start := time.Now()
-	// Mock openURLFunc
-	originalOpenURL := defangtools.OpenURLFunc
-	called := false
-	defangtools.OpenURLFunc = func(url string) error {
-		called = true
-		return nil
-	}
-	defer func() { defangtools.OpenURLFunc = originalOpenURL }()
-
-	result, err := client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "deploy",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-			},
-		},
-	})
-	t.Logf("Deploy tool call took: %v", time.Since(start))
-	t.Logf("Deploy tool error: %v", err)
-	t.Logf("MockFabric.deployCalled: %v", MockFabric.deployCalled)
-	assertCalled(t, err == nil, "Deploy tool error")
-	assertCalled(t, !result.IsError, "Deploy tool IsError")
-	assertCalled(t, MockFabric.deployCalled, "deploy (Deploy)")
-	assertCalled(t, called, "openURLFunc should be called during deploy")
-
-	_, err = client.CallTool(context.Background(), m3mcp.CallToolRequest{
-		Params: m3mcp.CallToolParams{
-			Name: "destroy",
-			Arguments: map[string]interface{}{
-				"working_directory": projectDir,
-			},
-		},
-	})
-	assertCalled(t, err == nil, "Destroy tool error")
-	assertCalled(t, MockFabric.destroyCalled, "destroy (Destroy)")
 }
