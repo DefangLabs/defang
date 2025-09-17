@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/browser"
 
@@ -182,6 +183,13 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		term.Debugf("  Status: %s", serviceInfo.Status)
 	}
 
+	urls := strings.Builder{}
+	for _, serviceInfo := range deployResp.Services {
+		if serviceInfo.PublicFqdn != "" {
+			urls.WriteString(fmt.Sprintf("- %s: %s %s\n", serviceInfo.Service.Name, serviceInfo.PublicFqdn, serviceInfo.Domainname))
+		}
+	}
+
 	// Return the etag data as text
-	return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s", portal, project.Name, deployResp.Etag)), nil
+	return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String())), nil
 }
