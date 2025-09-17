@@ -175,3 +175,18 @@ func Diff(actualRaw, goldenRaw string) error {
 	diff := fmt.Sprint(gotextdiff.ToUnified("expected", "actual", goldenRaw, edits))
 	return fmt.Errorf("mismatch:\n%s", diff)
 }
+
+var shellSpecialChars = regexp.MustCompile(`[^\w@%+=:,./-]`) // copied from al.essio.dev/pkg/shellescape
+
+// ShellQuote returns a shell-quoted string of the given arguments.
+// When needed, arguments are quoted with double quotes, so that spaces and env vars are preserved.
+func ShellQuote(args ...string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		if shellSpecialChars.MatchString(arg) {
+			arg = strconv.Quote(arg)
+		}
+		quoted[i] = arg
+	}
+	return strings.Join(quoted, " ")
+}
