@@ -219,6 +219,13 @@ func TestHandleDeployTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var originalOpenURLFunc = OpenURLFunc
+			OpenURLFunc = func(url string) error {
+				// Mock implementation that doesn't actually open a browser
+				return nil
+			}
+			defer func() { OpenURLFunc = originalOpenURLFunc }()
+
 			// Create mock and configure it
 			mockCLI := &MockDeployCLI{
 				CallLog: []string{},
