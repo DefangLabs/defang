@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 
@@ -14,61 +13,30 @@ type ShowAccountData struct {
 	client.AccountInfo
 	SubscriberTier defangv1.SubscriptionTier
 	Tenant         string
-	TenantId       string
+	TenantID       string
 }
 
-func showAccountInfo(showData ShowAccountData) (string, error) {
-	if showData.Provider == "" {
-		showData.Provider = "Defang"
-	}
-	outputText := "WhoAmI - \n\tProvider: " + showData.Provider.Name()
-
-	if showData.AccountID != "" {
-		outputText += "\n\tAccountID: " + showData.AccountID
-	}
-
-	if showData.Tenant != "" {
-		outputText += "\n\tTenant: " + showData.Tenant
-	}
-
-	if showData.TenantId != "" {
-		outputText += "\n\tTenant ID: " + showData.TenantId
-	}
-
-	outputText += "\n\tSubscription Tier: " + pkg.SubscriptionTierToString(showData.SubscriberTier)
-
-	if showData.Region != "" {
-		outputText += "\n\tRegion: " + showData.Region
-	}
-
-	if showData.Details != "" {
-		outputText += "\n\tDetails: " + showData.Details
-	}
-
-	return outputText, nil
-}
-
-func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider) (string, error) {
+func Whoami(ctx context.Context, fabric client.FabricClient, provider client.Provider) (ShowAccountData, error) {
 	showData := ShowAccountData{}
 
 	resp, err := fabric.WhoAmI(ctx)
 	if err != nil {
-		return "", err
+		return ShowAccountData{}, err
 	}
 
 	term.Debug("User ID: " + resp.UserId)
 	showData.Region = resp.Region
 	showData.SubscriberTier = resp.Tier
 	showData.Tenant = resp.Tenant
-	showData.TenantId = resp.TenantId
+	showData.TenantID = resp.TenantId
 
 	if provider != nil {
 		account, err := provider.AccountInfo(ctx)
 		if err != nil {
-			return "", err
+			return ShowAccountData{}, err
 		}
 		showData.AccountInfo = *account
 	}
 
-	return showAccountInfo(showData)
+	return showData, err
 }
