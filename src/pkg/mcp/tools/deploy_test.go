@@ -213,7 +213,7 @@ func TestHandleDeployTool(t *testing.T) {
 			providerID:            client.ProviderAuto,
 			setupMock:             func(m *MockDeployCLI) {},
 			expectError:           true,
-			expectedErrorContains: "No provider configured",
+			expectedErrorContains: "no provider is configured",
 		},
 	}
 

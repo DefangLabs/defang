@@ -84,7 +84,7 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 func providerNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
 		term.Error("No provider configured")
-		return errors.New("No provider configured, please use the appropriate prompts and type /mcp.defang.AWS_Setup for AWS, /mcp.defang.GCP_Setup for GCP, or /mcp.defang.Playground_Setup for Playground in the chat.")
+		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")
 	}
 	return nil
 }

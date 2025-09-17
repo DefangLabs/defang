@@ -11,8 +11,8 @@ import (
 )
 
 const DocumentationEndpoint = "data"
-// AskDefangBaseURL is a var so tests can override it
 
+// AskDefangBaseURL is a var so tests can override it
 var AskDefangBaseURL = "https://ask.defang.io"
 var KnowledgeBaseDir = client.StateDir
 
