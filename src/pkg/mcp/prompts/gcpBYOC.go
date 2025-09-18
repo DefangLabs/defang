@@ -21,7 +21,7 @@ var (
 )
 
 func setupGCPBYOCPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
-	gcpBYOPrompt := mcp.NewPrompt("GCP Setup",
+	gcpBYOCPrompt := mcp.NewPrompt("GCP Setup",
 		mcp.WithPromptDescription("Setup for GCP"),
 		mcp.WithArgument("GCP_PROJECT_ID",
 			mcp.ArgumentDescription("Your GCP Project ID"),
@@ -29,7 +29,7 @@ func setupGCPBYOCPrompt(s *server.MCPServer, cluster string, providerId *client.
 		),
 	)
 
-	s.AddPrompt(gcpBYOPrompt, GCPBYOCPromptHandler(cluster, providerId))
+	s.AddPrompt(gcpBYOCPrompt, GCPBYOCPromptHandler(cluster, providerId))
 }
 
 // GCPBYOCPromptHandler is extracted for testability

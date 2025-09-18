@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGCPBYOPromptHandler_Success(t *testing.T) {
+func TestGCPBYOCPromptHandler_Success(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -45,7 +45,7 @@ func TestGCPBYOPromptHandler_Success(t *testing.T) {
 	require.Equal(t, "gcp", os.Getenv("DEFANG_PROVIDER"))
 }
 
-func TestGCPBYOPromptHandler_ConnectError(t *testing.T) {
+func TestGCPBYOCPromptHandler_ConnectError(t *testing.T) {
 	origConnect := Connect
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, os.ErrNotExist }
 	defer func() { Connect = origConnect }()
@@ -66,7 +66,7 @@ func TestGCPBYOPromptHandler_ConnectError(t *testing.T) {
 	require.Nil(t, res)
 }
 
-func TestGCPBYOPromptHandler_CheckProviderConfiguredError(t *testing.T) {
+func TestGCPBYOCPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
