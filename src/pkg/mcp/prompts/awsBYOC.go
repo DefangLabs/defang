@@ -5,9 +5,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -30,7 +28,12 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 		),
 	)
 
-	s.AddPrompt(awsBYOCPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	s.AddPrompt(awsBYOCPrompt, AWSBYOPromptHandler(cluster, providerId))
+}
+
+// AWSBYOPromptHandler is extracted for testability
+func AWSBYOPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		// Can never be nil or empty due to RequiredArgument
 		awsID := req.Params.Arguments["AWS Credential"]
 		if isValidAWSKey(awsID) {
@@ -74,12 +77,12 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			}
 		}
 
-		fabric, err := cli.Connect(ctx, cluster)
+		fabric, err := Connect(ctx, cluster)
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = tools.CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", 0)
+		_, err = CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", 0)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +104,7 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 				},
 			},
 		}, nil
-	})
+	}
 }
 
 // Check if the provided AWS access key ID is valid

@@ -146,7 +146,6 @@ func TestCheckProviderConfigured(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc // capture range variable for closure
 		t.Run(tc.name, func(t *testing.T) {
 			withMockedNewProvider(t, tc.providerErr, func() {
 				grpc := &mockGrpcClient{GrpcClient: &cliClient.GrpcClient{}, err: tc.grpcErr}
