@@ -10,9 +10,16 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
+
+var clientQs = &survey.MultiSelect{
+	Message: "Choose a client:",
+	Options: ValidClientStrings(),
+}
 
 // MCPServerConfig represents the configuration for an MCP server
 type MCPServerConfig struct {
@@ -53,14 +60,10 @@ type MCPClient string
 
 const (
 	MCPClientVSCode         MCPClient = "vscode"
-	MCPClientCode           MCPClient = "code"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
-	MCPClientInsiders       MCPClient = "code-insiders"
 	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
 	MCPClientClaudeCode     MCPClient = "claude-code"
 	MCPClientWindsurf       MCPClient = "windsurf"
-	MCPClientCascade        MCPClient = "cascade"
-	MCPClientCodeium        MCPClient = "codeium"
 	MCPClientCursor         MCPClient = "cursor"
 	MCPClientKiro           MCPClient = "kiro"
 )
@@ -68,9 +71,7 @@ const (
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
 var ValidVSCodeClients = []MCPClient{
 	MCPClientVSCode,
-	MCPClientCode,
 	MCPClientVSCodeInsiders,
-	MCPClientInsiders,
 }
 
 // ValidClients is a list of supported MCP clients
@@ -79,8 +80,6 @@ var ValidClients = append(
 		MCPClientClaudeDesktop,
 		MCPClientClaudeCode,
 		MCPClientWindsurf,
-		MCPClientCascade,
-		MCPClientCodeium,
 		MCPClientCursor,
 		MCPClientKiro,
 	},
@@ -93,6 +92,25 @@ func ParseMCPClient(clientStr string) (MCPClient, error) {
 	if !slices.Contains(ValidClients, client) {
 		return "", fmt.Errorf("invalid MCP client: %q. Valid MCP clients are %v", clientStr, ValidClients)
 	}
+	return client, nil
+}
+
+// ValidClientStrings converts ValidClients to []string for survey options
+func ValidClientStrings() []string {
+	strings := make([]string, len(ValidClients))
+	for i, client := range ValidClients {
+		strings[i] = string(client)
+	}
+	return strings
+}
+
+func SelectMCPclients() ([]string, error) {
+	var client []string
+	err := survey.AskOne(clientQs, &client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select MCP client: %w", err)
+	}
+
 	return client, nil
 }
 
@@ -140,12 +158,8 @@ var kiroConfig = ClientInfo{
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientWindsurf:       windsurfConfig,
-	MCPClientCascade:        windsurfConfig,
-	MCPClientCodeium:        windsurfConfig,
 	MCPClientVSCode:         vscodeConfig,
-	MCPClientCode:           vscodeConfig,
 	MCPClientVSCodeInsiders: codeInsidersConfig,
-	MCPClientInsiders:       codeInsidersConfig,
 	MCPClientClaudeDesktop:  claudeDesktopConfig,
 	MCPClientClaudeCode:     claudeCodeConfig,
 	MCPClientCursor:         cursorConfig,
