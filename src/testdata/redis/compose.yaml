@@ -13,6 +13,12 @@ services:
       - target: 6379
         mode: host
 
+  short-ports:
+    image: redis
+    x-defang-redis:
+    ports:
+      - 6379:6379
+
   no-ext:
     image: redis
     ports:
