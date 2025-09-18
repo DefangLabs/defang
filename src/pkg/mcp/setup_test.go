@@ -133,7 +133,7 @@ func TestGetClientConfigPath(t *testing.T) {
 		{
 			name:         "cursor",
 			client:       MCPClientCursor,
-			expectedPath: filepath.Join(homeDir, ".cursor", "settings.json"),
+			expectedPath: filepath.Join(homeDir, ".cursor", "mcp.json"),
 		},
 
 		// Kiro tests - Darwin
