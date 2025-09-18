@@ -456,7 +456,7 @@ var whoamiCmd = &cobra.Command{
 				"AccountID",
 				"Tenant",
 				"TenantID",
-				"Subscription Tier",
+				"SubscriberTier",
 				"Region",
 			})
 		}

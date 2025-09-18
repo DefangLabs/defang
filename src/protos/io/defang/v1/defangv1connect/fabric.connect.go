@@ -314,7 +314,8 @@ func NewFabricControllerClient(httpClient connect_go.HTTPClient, baseURL string,
 		debug: connect_go.NewClient[v1.DebugRequest, v1.DebugResponse](
 			httpClient,
 			baseURL+FabricControllerDebugProcedure,
-			opts...,
+			connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+			connect_go.WithClientOptions(opts...),
 		),
 		signEULA: connect_go.NewClient[emptypb.Empty, emptypb.Empty](
 			httpClient,
@@ -895,7 +896,8 @@ func NewFabricControllerHandler(svc FabricControllerHandler, opts ...connect_go.
 	fabricControllerDebugHandler := connect_go.NewUnaryHandler(
 		FabricControllerDebugProcedure,
 		svc.Debug,
-		opts...,
+		connect_go.WithIdempotency(connect_go.IdempotencyNoSideEffects),
+		connect_go.WithHandlerOptions(opts...),
 	)
 	fabricControllerSignEULAHandler := connect_go.NewUnaryHandler(
 		FabricControllerSignEULAProcedure,
