@@ -49,7 +49,9 @@ service FabricController {
   rpc GenerateStatus(GenerateStatusRequest) returns (GenerateFilesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc Debug(DebugRequest) returns (DebugResponse);
+  rpc Debug(DebugRequest) returns (DebugResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc SignEULA(google.protobuf.Empty)
       returns (google.protobuf.Empty); // AgreeToS
