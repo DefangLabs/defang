@@ -6,22 +6,35 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
-	gcpBYOPrompt := mcp.NewPrompt("GCP Setup",
-		mcp.WithPromptDescription("Setup for GCP"),
+// Patch points for testability
+var (
+	Connect                 = cli.Connect
+	CheckProviderConfigured = func(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+		return tools.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
+	}
+)
 
+func setupGcpByocPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
+	gcpBYOCPrompt := mcp.NewPrompt("GCP Setup",
+		mcp.WithPromptDescription("Setup for GCP"),
 		mcp.WithArgument("GCP_PROJECT_ID",
 			mcp.ArgumentDescription("Your GCP Project ID"),
 			mcp.RequiredArgument(),
 		),
 	)
 
-	s.AddPrompt(gcpBYOPrompt, func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	s.AddPrompt(gcpBYOCPrompt, gcpByocPromptHandler(cluster, providerId))
+}
+
+// gcpByocPromptHandler is extracted for testability
+func gcpByocPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		// Can never be nil or empty due to RequiredArgument
 		projectID := req.Params.Arguments["GCP_PROJECT_ID"]
 
@@ -30,12 +43,12 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 			return nil, err
 		}
 
-		fabric, err := cli.Connect(ctx, cluster)
+		fabric, err := Connect(ctx, cluster)
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = tools.CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", 0)
+		_, err = CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", 0)
 		if err != nil {
 			return nil, err
 		}
@@ -57,5 +70,5 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 				},
 			},
 		}, nil
-	})
+	}
 }
