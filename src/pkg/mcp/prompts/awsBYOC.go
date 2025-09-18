@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
+func setupAWSBYOCPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
 	awsBYOCPrompt := mcp.NewPrompt("AWS Setup",
 		mcp.WithPromptDescription("Setup for AWS"),
 
@@ -28,11 +28,11 @@ func setupAWSBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 		),
 	)
 
-	s.AddPrompt(awsBYOCPrompt, AWSBYOPromptHandler(cluster, providerId))
+	s.AddPrompt(awsBYOCPrompt, AWSBYOCPromptHandler(cluster, providerId))
 }
 
-// AWSBYOPromptHandler is extracted for testability
-func AWSBYOPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+// AWSBYOCPromptHandler is extracted for testability
+func AWSBYOCPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		// Can never be nil or empty due to RequiredArgument
 		awsID := req.Params.Arguments["AWS Credential"]

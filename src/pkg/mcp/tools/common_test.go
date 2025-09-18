@@ -92,7 +92,7 @@ func TestCanIUseProvider(t *testing.T) {
 		assert.NoError(t, err)
 		// No way to check grpc.canIUseCalled since mockGrpcClient does not track it
 		// But we can check provider
-		assert.True(t, !prov.setCanIUseConfigCalled || prov.setCanIUseConfigCalled)
+		assert.True(t, prov.setCanIUseConfigCalled)
 	})
 
 	t.Run("grpc error", func(t *testing.T) {

@@ -23,7 +23,7 @@ func TestAWSBYOPromptHandler_Success_AccessKey(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -35,12 +35,13 @@ func TestAWSBYOPromptHandler_Success_AccessKey(t *testing.T) {
 		},
 	}
 
-	os.Unsetenv("AWS_ACCESS_KEY_ID")
-	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
-	os.Unsetenv("AWS_REGION")
-	os.Unsetenv("DEFANG_PROVIDER")
+	// make sure these env do not exist before the test
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("DEFANG_PROVIDER", "")
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, client.ProviderAWS, providerId)
@@ -63,7 +64,7 @@ func TestAWSBYOPromptHandler_Success_Profile(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -74,11 +75,12 @@ func TestAWSBYOPromptHandler_Success_Profile(t *testing.T) {
 		},
 	}
 
-	os.Unsetenv("AWS_PROFILE")
-	os.Unsetenv("AWS_REGION")
-	os.Unsetenv("DEFANG_PROVIDER")
+	// make sure these env do not exist before the test
+	t.Setenv("AWS_PROFILE", "")
+	t.Setenv("AWS_REGION", "")
+	t.Setenv("DEFANG_PROVIDER", "")
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, client.ProviderAWS, providerId)
@@ -89,7 +91,7 @@ func TestAWSBYOPromptHandler_Success_Profile(t *testing.T) {
 
 func TestAWSBYOPromptHandler_MissingSecret(t *testing.T) {
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -100,14 +102,14 @@ func TestAWSBYOPromptHandler_MissingSecret(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.ErrorContains(t, err, "AWS_SECRET_ACCESS_KEY is required")
 	require.Nil(t, res)
 }
 
 func TestAWSBYOPromptHandler_MissingRegion_AccessKey(t *testing.T) {
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -118,7 +120,7 @@ func TestAWSBYOPromptHandler_MissingRegion_AccessKey(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.ErrorContains(t, err, "AWS_REGION is required")
 	require.Nil(t, res)
 }
@@ -129,7 +131,7 @@ func TestAWSBYOPromptHandler_ConnectError(t *testing.T) {
 	defer func() { Connect = origConnect }()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -141,7 +143,7 @@ func TestAWSBYOPromptHandler_ConnectError(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.Error(t, err)
 	require.Nil(t, res)
 }
@@ -159,7 +161,7 @@ func TestAWSBYOPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOPromptHandler("test-cluster", &providerId)
+	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -171,7 +173,7 @@ func TestAWSBYOPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.Error(t, err)
 	require.Nil(t, res)
 }

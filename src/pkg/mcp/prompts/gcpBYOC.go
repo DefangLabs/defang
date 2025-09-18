@@ -20,7 +20,7 @@ var (
 	}
 )
 
-func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
+func setupGCPBYOCPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
 	gcpBYOPrompt := mcp.NewPrompt("GCP Setup",
 		mcp.WithPromptDescription("Setup for GCP"),
 		mcp.WithArgument("GCP_PROJECT_ID",
@@ -29,11 +29,11 @@ func setupGCPBYOPrompt(s *server.MCPServer, cluster string, providerId *client.P
 		),
 	)
 
-	s.AddPrompt(gcpBYOPrompt, GCPBYOPromptHandler(cluster, providerId))
+	s.AddPrompt(gcpBYOPrompt, GCPBYOCPromptHandler(cluster, providerId))
 }
 
-// GCPBYOPromptHandler is extracted for testability
-func GCPBYOPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+// GCPBYOCPromptHandler is extracted for testability
+func GCPBYOCPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		// Can never be nil or empty due to RequiredArgument
 		projectID := req.Params.Arguments["GCP_PROJECT_ID"]

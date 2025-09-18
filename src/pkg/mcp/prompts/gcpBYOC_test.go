@@ -23,7 +23,7 @@ func TestGCPBYOPromptHandler_Success(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOPromptHandler("test-cluster", &providerId)
+	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -33,8 +33,9 @@ func TestGCPBYOPromptHandler_Success(t *testing.T) {
 		},
 	}
 
-	os.Unsetenv("GCP_PROJECT_ID")
-	os.Unsetenv("DEFANG_PROVIDER")
+	// make sure these env do not exist before the test
+	t.Setenv("GCP_PROJECT_ID", "")
+	t.Setenv("DEFANG_PROVIDER", "")
 
 	res, err := handler(context.Background(), req)
 	require.NoError(t, err)
@@ -50,7 +51,7 @@ func TestGCPBYOPromptHandler_ConnectError(t *testing.T) {
 	defer func() { Connect = origConnect }()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOPromptHandler("test-cluster", &providerId)
+	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -78,7 +79,7 @@ func TestGCPBYOPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOPromptHandler("test-cluster", &providerId)
+	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
