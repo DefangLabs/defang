@@ -250,6 +250,7 @@ rm -r "$EXTRACT_DIR"
 rm "$FILENAME"
 
 echo "Installation completed. You can now use defang by typing '$BINARY_NAME' in the terminal."
+echo "Run '$BINARY_NAME mcp setup' to install the Defang MCP server."
 
 # Unset the variables and functions to avoid polluting the user's environment
 unset EXTRACT_DIR DOWNLOAD_URL RELEASE_JSON RELEASE_PATH ARCH_SUFFIX ARCH OS FILENAME INSTALL_DIR BINARY_NAME REPLY EXPORT_PATH CURRENT_SHELL FOUND_PROFILE_FILE AUTH_HEADER
