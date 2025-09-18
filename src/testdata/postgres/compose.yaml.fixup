@@ -47,6 +47,21 @@
       }
     ]
   },
+  "short-ports": {
+    "command": null,
+    "entrypoint": null,
+    "image": "postgres",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 5432,
+        "protocol": "tcp"
+      }
+    ]
+  },
   "with-ext": {
     "command": null,
     "entrypoint": null,

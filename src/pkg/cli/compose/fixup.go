@@ -241,6 +241,14 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		}
 		term.Debugf("service %q: adding postgres host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		for i, port := range svccfg.Ports {
+			if port.Mode == Mode_INGRESS || port.Mode == "" {
+				svccfg.Ports[i].Mode = Mode_HOST
+				svccfg.Ports[i].Published = ""   // ignore published port in host mode
+				svccfg.Ports[i].AppProtocol = "" // ignore app_protocol in host mode
+			}
+		}
 	}
 	return nil
 }
