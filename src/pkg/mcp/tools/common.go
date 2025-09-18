@@ -15,6 +15,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+var newProvider = cli.NewProvider
+
 func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 	projectName, err := request.RequireString("project_name")
 	if err == nil {
@@ -89,8 +91,8 @@ func providerNotConfiguredError(providerId client.ProviderID) error {
 	return nil
 }
 
-func CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	provider, err := cli.NewProvider(ctx, providerId, client)
+func CheckProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
+	provider, err := newProvider(ctx, providerId, client)
 	if err != nil {
 		term.Error("Failed to get new provider", "error", err)
 		return nil, err
