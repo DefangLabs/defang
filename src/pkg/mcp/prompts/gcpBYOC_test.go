@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGCPBYOCPromptHandler_Success(t *testing.T) {
+func TestGcpByocPromptHandler_Success(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -23,7 +23,7 @@ func TestGCPBYOCPromptHandler_Success(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
+	handler := gcpByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -45,13 +45,13 @@ func TestGCPBYOCPromptHandler_Success(t *testing.T) {
 	require.Equal(t, "gcp", os.Getenv("DEFANG_PROVIDER"))
 }
 
-func TestGCPBYOCPromptHandler_ConnectError(t *testing.T) {
+func TestGcpByocPromptHandler_ConnectError(t *testing.T) {
 	origConnect := Connect
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, os.ErrNotExist }
 	defer func() { Connect = origConnect }()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
+	handler := gcpByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -66,7 +66,7 @@ func TestGCPBYOCPromptHandler_ConnectError(t *testing.T) {
 	require.Nil(t, res)
 }
 
-func TestGCPBYOCPromptHandler_CheckProviderConfiguredError(t *testing.T) {
+func TestGcpByocPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -79,7 +79,7 @@ func TestGCPBYOCPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := GCPBYOCPromptHandler("test-cluster", &providerId)
+	handler := gcpByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAWSBYOCPromptHandler_Success_AccessKey(t *testing.T) {
+func TestAwsByocPromptHandler_Success_AccessKey(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -23,7 +23,7 @@ func TestAWSBYOCPromptHandler_Success_AccessKey(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -51,7 +51,7 @@ func TestAWSBYOCPromptHandler_Success_AccessKey(t *testing.T) {
 	require.Equal(t, "aws", os.Getenv("DEFANG_PROVIDER"))
 }
 
-func TestAWSBYOCPromptHandler_Success_Profile(t *testing.T) {
+func TestAwsByocPromptHandler_Success_Profile(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -64,7 +64,7 @@ func TestAWSBYOCPromptHandler_Success_Profile(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -89,9 +89,9 @@ func TestAWSBYOCPromptHandler_Success_Profile(t *testing.T) {
 	require.Equal(t, "aws", os.Getenv("DEFANG_PROVIDER"))
 }
 
-func TestAWSBYOCPromptHandler_MissingSecret(t *testing.T) {
+func TestAwsByocPromptHandler_MissingSecret(t *testing.T) {
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -107,9 +107,9 @@ func TestAWSBYOCPromptHandler_MissingSecret(t *testing.T) {
 	require.Nil(t, res)
 }
 
-func TestAWSBYOCPromptHandler_MissingRegion_AccessKey(t *testing.T) {
+func TestAwsByocPromptHandler_MissingRegion_AccessKey(t *testing.T) {
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -125,13 +125,13 @@ func TestAWSBYOCPromptHandler_MissingRegion_AccessKey(t *testing.T) {
 	require.Nil(t, res)
 }
 
-func TestAWSBYOCPromptHandler_ConnectError(t *testing.T) {
+func TestAwsByocPromptHandler_ConnectError(t *testing.T) {
 	origConnect := Connect
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, os.ErrNotExist }
 	defer func() { Connect = origConnect }()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{
@@ -148,7 +148,7 @@ func TestAWSBYOCPromptHandler_ConnectError(t *testing.T) {
 	require.Nil(t, res)
 }
 
-func TestAWSBYOCPromptHandler_CheckProviderConfiguredError(t *testing.T) {
+func TestAwsByocPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	origConnect := Connect
 	origCheck := CheckProviderConfigured
 	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
@@ -161,7 +161,7 @@ func TestAWSBYOCPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 	}()
 
 	providerId := client.ProviderID("")
-	handler := AWSBYOCPromptHandler("test-cluster", &providerId)
+	handler := awsByocPromptHandler("test-cluster", &providerId)
 
 	req := mcp.GetPromptRequest{
 		Params: mcp.GetPromptParams{

@@ -529,9 +529,7 @@ func TestInProcessMCPServer(t *testing.T) {
 
 		// Mock openURLFunc
 		originalOpenURL := defangtools.OpenURLFunc
-		// called := false
 		defangtools.OpenURLFunc = func(url string) error {
-			// called = true
 			return nil
 		}
 		defer func() { defangtools.OpenURLFunc = originalOpenURL }()
@@ -550,7 +548,7 @@ func TestInProcessMCPServer(t *testing.T) {
 		assertCalled(t, !result.IsError, "Deploy tool IsError")
 		assertCalled(t, MockFabric.deployCalled, "deploy (Deploy)")
 		// openURLFunc is call within another thread which we do not wait for, so we cannot reliably check if it was called
-		//assertCalled(t, called, "openURLFunc should be called during deploy")
+		//assertCalled(t, openURLFuncCalled, "openURLFunc should be called during deploy")
 
 		_, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
