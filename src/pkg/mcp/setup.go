@@ -128,7 +128,7 @@ var claudeCodeConfig = ClientInfo{
 }
 
 var cursorConfig = ClientInfo{
-	configFile: ".cursor/settings.json",
+	configFile: ".cursor/mcp.json",
 	useHomeDir: true,
 }
 
