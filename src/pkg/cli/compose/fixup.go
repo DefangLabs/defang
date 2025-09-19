@@ -246,6 +246,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 			if port.Mode == Mode_INGRESS || port.Mode == "" {
 				svccfg.Ports[i].Mode = Mode_HOST
 				svccfg.Ports[i].Published = ""   // ignore published port in host mode
+				svccfg.Ports[i].AppProtocol = "" // ignore app protocol in host mode
 			}
 		}
 	}
@@ -315,6 +316,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 			if port.Mode == Mode_INGRESS || port.Mode == "" {
 				svccfg.Ports[i].Mode = Mode_HOST
 				svccfg.Ports[i].Published = ""   // ignore published port in host mode
+				svccfg.Ports[i].AppProtocol = "" // ignore app protocol in host mode
 			}
 		}
 	}
