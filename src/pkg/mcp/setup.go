@@ -16,11 +16,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
 
-var clientQs = &survey.MultiSelect{
-	Message: "Choose a client(s):",
-	Options: ValidClientStrings(),
-}
-
 // MCPServerConfig represents the configuration for an MCP server
 type MCPServerConfig struct {
 	Command string            `json:"command"`
@@ -108,9 +103,12 @@ func ValidClientStrings() []string {
 // SelectMCPclients prompts the user to select one or more MCP clients
 func SelectMCPclients() ([]string, error) {
 	var clients []string
-	err := survey.AskOne(clientQs, &clients)
+	err := survey.AskOne(&survey.MultiSelect{
+		Message: "Choose a client(s):",
+		Options: ValidClientStrings(),
+	}, &clients)
 	if err != nil {
-		return nil, fmt.Errorf("failed to select MCP client: %w", err)
+		return nil, fmt.Errorf("failed to select MCP client(s): %w", err)
 	}
 
 	return clients, nil
