@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 )
@@ -53,14 +55,10 @@ type MCPClient string
 
 const (
 	MCPClientVSCode         MCPClient = "vscode"
-	MCPClientCode           MCPClient = "code"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
-	MCPClientInsiders       MCPClient = "code-insiders"
 	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
 	MCPClientClaudeCode     MCPClient = "claude-code"
 	MCPClientWindsurf       MCPClient = "windsurf"
-	MCPClientCascade        MCPClient = "cascade"
-	MCPClientCodeium        MCPClient = "codeium"
 	MCPClientCursor         MCPClient = "cursor"
 	MCPClientKiro           MCPClient = "kiro"
 )
@@ -68,9 +66,7 @@ const (
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
 var ValidVSCodeClients = []MCPClient{
 	MCPClientVSCode,
-	MCPClientCode,
 	MCPClientVSCodeInsiders,
-	MCPClientInsiders,
 }
 
 // ValidClients is a list of supported MCP clients
@@ -79,14 +75,13 @@ var ValidClients = append(
 		MCPClientClaudeDesktop,
 		MCPClientClaudeCode,
 		MCPClientWindsurf,
-		MCPClientCascade,
-		MCPClientCodeium,
 		MCPClientCursor,
 		MCPClientKiro,
 	},
 	ValidVSCodeClients...,
 )
 
+// ParseMCPClient parses and validates the MCP client string
 func ParseMCPClient(clientStr string) (MCPClient, error) {
 	clientStr = strings.ToLower(clientStr)
 	client := MCPClient(clientStr)
@@ -94,6 +89,29 @@ func ParseMCPClient(clientStr string) (MCPClient, error) {
 		return "", fmt.Errorf("invalid MCP client: %q. Valid MCP clients are %v", clientStr, ValidClients)
 	}
 	return client, nil
+}
+
+// ValidClientStrings converts ValidClients to []string for survey options
+func ValidClientStrings() []string {
+	strings := make([]string, len(ValidClients))
+	for i, client := range ValidClients {
+		strings[i] = string(client)
+	}
+	return strings
+}
+
+// SelectMCPclients prompts the user to select one or more MCP clients
+func SelectMCPclients() ([]string, error) {
+	var clients []string
+	err := survey.AskOne(&survey.MultiSelect{
+		Message: "Choose a client(s):",
+		Options: ValidClientStrings(),
+	}, &clients)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select MCP client(s): %w", err)
+	}
+
+	return clients, nil
 }
 
 // ClientInfo defines where each client stores its MCP configuration
@@ -140,12 +158,8 @@ var kiroConfig = ClientInfo{
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientWindsurf:       windsurfConfig,
-	MCPClientCascade:        windsurfConfig,
-	MCPClientCodeium:        windsurfConfig,
 	MCPClientVSCode:         vscodeConfig,
-	MCPClientCode:           vscodeConfig,
 	MCPClientVSCodeInsiders: codeInsidersConfig,
-	MCPClientInsiders:       codeInsidersConfig,
 	MCPClientClaudeDesktop:  claudeDesktopConfig,
 	MCPClientClaudeCode:     claudeCodeConfig,
 	MCPClientCursor:         cursorConfig,
