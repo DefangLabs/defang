@@ -13,7 +13,5 @@
  ! service "short": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
  ! service "short-published": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "short-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "short-udp": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "short-udp": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors
- ! service "short-udp-published": ingress port without healthcheck defaults to GET / HTTP/1.1
  ! service "short-udp-published": missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors

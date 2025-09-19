@@ -20,6 +20,16 @@ services:
     networks:
       default: null
     x-defang-postgres: null
+  short-ports:
+    image: postgres
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    x-defang-postgres: null
   with-ext:
     image: postgres
     networks:

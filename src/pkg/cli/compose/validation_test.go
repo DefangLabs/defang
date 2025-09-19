@@ -46,6 +46,11 @@ func TestValidationAndConvert(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
+			t.Logf("Service conversion failed: %v", err)
+			logs.WriteString(err.Error() + "\n")
+		}
+
 		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
 			t.Logf("Project config validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
@@ -53,11 +58,6 @@ func TestValidationAndConvert(t *testing.T) {
 
 		if err := ValidateProject(project); err != nil {
 			t.Logf("Project validation failed: %v", err)
-			logs.WriteString(err.Error() + "\n")
-		}
-
-		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
-			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
 

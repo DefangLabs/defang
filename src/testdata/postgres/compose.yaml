@@ -14,6 +14,12 @@ services:
       - target: 5432
         mode: host
 
+  short-ports:
+    image: postgres
+    x-defang-postgres:
+    ports:
+      - 5432:5432
+
   no-ext:
     image: postgres
     ports:
@@ -29,3 +35,4 @@ services:
     x-defang-postgres:
     environment:
       - PGPORT=5433
+

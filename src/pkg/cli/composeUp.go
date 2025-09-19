@@ -47,16 +47,16 @@ func ComposeUp(ctx context.Context, project *compose.Project, fabric client.Fabr
 		}
 	}
 
-	if err := compose.ValidateProject(project); err != nil {
-		return nil, project, &ComposeError{err}
-	}
-
 	// Create a new project with only the necessary resources.
 	// Do not modify the original project, because the caller needs it for debugging.
 	fixedProject := project.WithoutUnnecessaryResources()
 
 	if err := compose.FixupServices(ctx, p, fixedProject, upload); err != nil {
 		return nil, project, err
+	}
+
+	if err := compose.ValidateProject(project); err != nil {
+		return nil, project, &ComposeError{err}
 	}
 
 	bytes, err := fixedProject.MarshalYAML()
