@@ -17,7 +17,7 @@ import (
 )
 
 var clientQs = &survey.MultiSelect{
-	Message: "Choose a client:",
+	Message: "Choose a client(s):",
 	Options: ValidClientStrings(),
 }
 
@@ -86,6 +86,7 @@ var ValidClients = append(
 	ValidVSCodeClients...,
 )
 
+// ParseMCPClient parses and validates the MCP client string
 func ParseMCPClient(clientStr string) (MCPClient, error) {
 	clientStr = strings.ToLower(clientStr)
 	client := MCPClient(clientStr)
@@ -104,14 +105,15 @@ func ValidClientStrings() []string {
 	return strings
 }
 
+// SelectMCPclients prompts the user to select one or more MCP clients
 func SelectMCPclients() ([]string, error) {
-	var client []string
-	err := survey.AskOne(clientQs, &client)
+	var clients []string
+	err := survey.AskOne(clientQs, &clients)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select MCP client: %w", err)
 	}
 
-	return client, nil
+	return clients, nil
 }
 
 // ClientInfo defines where each client stores its MCP configuration
