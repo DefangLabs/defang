@@ -236,3 +236,13 @@ func ExchangeCodeForToken(ctx context.Context, code AuthCodeFlow, tenant types.T
 	}
 	return token.AccessToken, nil
 }
+
+func ExchangeJWTForToken(ctx context.Context, jwt string) (string, error) {
+	term.Debugf("Generating token for jwt %q", jwt)
+
+	token, err := openAuthClient.ExchangeJWT(jwt) // TODO: scopes, TTL
+	if err != nil {
+		return "", err
+	}
+	return token.AccessToken, nil
+}
