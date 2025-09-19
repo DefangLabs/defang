@@ -79,9 +79,36 @@ var mcpSetupCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		term.Debug("Setting up MCP client")
 		client, _ := cmd.Flags().GetString("client")
-		term.Debugf("MCP Client: %q", client)
-		if err := mcp.SetupClient(client); err != nil {
-			return err
+
+		if client != "" {
+
+			// Aliases mapping
+			switch client {
+			case "code":
+				client = string(mcp.MCPClientVSCode)
+			case "code-insiders":
+				client = string(mcp.MCPClientVSCodeInsiders)
+			case "cascade", "codeium":
+				client = string(mcp.MCPClientWindsurf)
+			}
+
+			term.Debugf("Using MCP client flag: %q", client)
+			if err := mcp.SetupClient(client); err != nil {
+				return err
+			}
+		} else {
+			term.Debugf("Using MCP client picker: %q", client)
+			clients, err := mcp.SelectMCPclients()
+			if err != nil {
+				return err
+			}
+			for _, client := range clients {
+				term.Debugf("Selected MCP client using picker: %q", client)
+
+				if err := mcp.SetupClient(client); err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
