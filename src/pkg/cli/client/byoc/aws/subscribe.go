@@ -60,5 +60,10 @@ func (s *byocSubscribeServerStream) send(resp *defangv1.SubscribeResponse) {
 	if s.closed.Load() {
 		return
 	}
-	s.ch <- resp
+
+	select {
+	case s.ch <- resp:
+	default:
+		// Message dropped: channel is closed or full
+	}
 }
