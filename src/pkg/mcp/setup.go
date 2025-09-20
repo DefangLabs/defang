@@ -259,9 +259,15 @@ func handleVSCodeConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// File exists, parse it
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
+		// Check if file is empty or only contains whitespace
+		if len(strings.TrimSpace(string(data))) == 0 {
+			// File is empty, treat as new config
+			existingData = make(map[string]any)
+		} else {
+			// File exists, parse it
+			if err := json.Unmarshal(data, &existingData); err != nil {
+				return fmt.Errorf("failed to unmarshal existing vscode config: %w", err)
+			}
 		}
 
 		// Check if "servers" section exists
@@ -310,9 +316,15 @@ func handleStandardConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// Parse the JSON into a generic map to preserve all settings
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config: %w", err)
+		// Check if file is empty or only contains whitespace
+		if len(strings.TrimSpace(string(data))) == 0 {
+			// File is empty, treat as new config
+			existingData = make(map[string]any)
+		} else {
+			// Parse the JSON into a generic map to preserve all settings
+			if err := json.Unmarshal(data, &existingData); err != nil {
+				return fmt.Errorf("failed to unmarshal existing config: %w", err)
+			}
 		}
 
 		// Try to extract MCPServers from existing data
