@@ -463,7 +463,7 @@ func TestWriteConfig(t *testing.T) {
 }`,
 		},
 		{
-			name:         "standard_config_new_file_non_empty",
+			name:         "standard_config_new_file",
 			fileExists:   false,
 			existingData: "",
 			expectedData: `{
