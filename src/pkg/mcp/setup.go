@@ -264,7 +264,7 @@ func handleVSCodeConfig(configPath string) error {
 			// File is empty, treat as new config
 			existingData = make(map[string]any)
 		} else {
-			// File exists, parse it
+			// File is not empty, attempt to parse it
 			if err := json.Unmarshal(data, &existingData); err != nil {
 				return fmt.Errorf("failed to unmarshal existing vscode config: %w", err)
 			}
