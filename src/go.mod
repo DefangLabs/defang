@@ -47,6 +47,7 @@ require (
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.15.2
 	github.com/opencontainers/image-spec v1.1.0-rc3
+	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/ross96D/cancelreader v0.2.6
 	github.com/sirupsen/logrus v1.9.3

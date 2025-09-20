@@ -40,6 +40,12 @@ npx -y defang@latest mcp setup --client=cursor
 npx -y defang@latest mcp setup --client=windsurf
 ```
 
+### Codex
+
+```bash
+npx -y defang@latest mcp setup --client=codex
+```
+
 ### VS Code
 
 ```bash
