@@ -445,6 +445,24 @@ func TestWriteConfig(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			name:         "vscode_config_new_file_empty",
+			fileExists:   true,
+			vscodeConfig: true,
+			existingData: "",
+			expectedData: `{
+  "servers": {
+    "defang": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": %s,
+      "type": "stdio"
+    }
+  }
+}`,
+		},
+		{
 			name:         "standard_config_new_file",
 			fileExists:   false,
 			existingData: "",
@@ -592,6 +610,22 @@ func TestWriteConfig(t *testing.T) {
 			fileExists:    true,
 			existingData:  `{"mcpServers": "not an object}`,
 			expectedError: true,
+		},
+		{
+			name:         "standard_config_new_file_empty",
+			fileExists:   true,
+			existingData: "",
+			expectedData: `{
+  "mcpServers": {
+    "defang": {
+      "command": %s,
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    }
+  }
+}`,
 		},
 	}
 	for _, tt := range test {
