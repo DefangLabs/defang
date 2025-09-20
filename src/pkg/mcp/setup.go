@@ -411,7 +411,7 @@ func SetupClient(clientStr string) error {
 		}
 	}
 
-	term.Infof("Restart %s for the changes to take effect.\n", client)
+	term.Infof("Ensure that %s is upgraded to the latest version and restarted so the changes can take effect.\n", client)
 
 	return nil
 }
