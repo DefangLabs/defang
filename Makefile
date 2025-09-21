@@ -29,4 +29,5 @@ pkgs/npm/README.md src/README.md: README.md
 
 .PHONY: test-nix
 test-nix:
-	nix-shell --pure -E 'with import <nixpkgs> {}; mkShell { buildInputs = [ (import ./default.nix {}) ]; }' --run defang
+	nix run .#defang-cli
+
