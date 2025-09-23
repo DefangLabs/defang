@@ -77,3 +77,8 @@ services:
   mongo-wrong-image:
     image: example
     x-defang-mongodb: true
+
+  short-ports:
+    image: mongo
+    ports:
+      - 27017:27017
