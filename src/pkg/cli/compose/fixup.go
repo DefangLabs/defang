@@ -28,11 +28,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	slices.Sort(config.Names) // sort for binary search
 
 	// Fixup ports first (which affects service name replacement by ReplaceServiceNameWithDNS)
-	for _, svccfg := range project.Services {
-		for i, port := range svccfg.Ports {
-			svccfg.Ports[i] = fixupPort(port)
-		}
-	}
 
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
@@ -65,6 +60,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
 			fixupLLM(&svccfg)
+		}
+
+		for i, port := range svccfg.Ports {
+			svccfg.Ports[i] = fixupPort(port)
 		}
 
 		// update the concrete service with the fixed up object
@@ -245,8 +244,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		for i, port := range svccfg.Ports {
 			if port.Mode == Mode_INGRESS || port.Mode == "" {
 				svccfg.Ports[i].Mode = Mode_HOST
-				svccfg.Ports[i].Published = ""   // ignore published port in host mode
-				svccfg.Ports[i].AppProtocol = "" // ignore app protocol in host mode
+				svccfg.Ports[i].Published = "" // ignore published port in host mode
 			}
 		}
 	}
@@ -315,8 +313,7 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 		for i, port := range svccfg.Ports {
 			if port.Mode == Mode_INGRESS || port.Mode == "" {
 				svccfg.Ports[i].Mode = Mode_HOST
-				svccfg.Ports[i].Published = ""   // ignore published port in host mode
-				svccfg.Ports[i].AppProtocol = "" // ignore app protocol in host mode
+				svccfg.Ports[i].Published = "" // ignore published port in host mode
 			}
 		}
 	}
