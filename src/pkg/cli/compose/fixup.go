@@ -27,8 +27,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	}
 	slices.Sort(config.Names) // sort for binary search
 
-	// Fixup ports first (which affects service name replacement by ReplaceServiceNameWithDNS)
-
 	// Fixup any pseudo services (this might create port configs, which will affect service name replacement by ReplaceServiceNameWithDNS)
 	for _, svccfg := range project.Services {
 		repo := GetImageRepo(svccfg.Image)
@@ -62,6 +60,7 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			fixupLLM(&svccfg)
 		}
 
+		// Fixup ports, which affects service name replacement by ReplaceServiceNameWithDNS below
 		for i, port := range svccfg.Ports {
 			svccfg.Ports[i] = fixupPort(port)
 		}
@@ -241,12 +240,7 @@ func fixupPostgresService(svccfg *composeTypes.ServiceConfig, provider client.Pr
 		term.Debugf("service %q: adding postgres host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
-		for i, port := range svccfg.Ports {
-			if port.Mode == Mode_INGRESS || port.Mode == "" {
-				svccfg.Ports[i].Mode = Mode_HOST
-				svccfg.Ports[i].Published = "" // ignore published port in host mode
-			}
-		}
+		fixupIngressPorts(svccfg)
 	}
 	return nil
 }
@@ -283,6 +277,8 @@ func fixupMongoService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 		}
 		term.Debugf("service %q: adding mongodb host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
+	} else {
+		fixupIngressPorts(svccfg)
 	}
 	return nil
 }
@@ -310,14 +306,18 @@ func fixupRedisService(svccfg *composeTypes.ServiceConfig, provider client.Provi
 		term.Debugf("service %q: adding redis host port %d", svccfg.Name, port)
 		svccfg.Ports = []composeTypes.ServicePortConfig{{Target: port, Mode: Mode_HOST, Protocol: Protocol_TCP}}
 	} else {
-		for i, port := range svccfg.Ports {
-			if port.Mode == Mode_INGRESS || port.Mode == "" {
-				svccfg.Ports[i].Mode = Mode_HOST
-				svccfg.Ports[i].Published = "" // ignore published port in host mode
-			}
-		}
+		fixupIngressPorts(svccfg)
 	}
 	return nil
+}
+
+func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
+	for i, port := range svccfg.Ports {
+		if port.Mode == Mode_INGRESS || port.Mode == "" {
+			term.Debugf("service %q: changing port %d to host mode", svccfg.Name, port.Target)
+			svccfg.Ports[i].Mode = Mode_HOST
+		}
+	}
 }
 
 // Declare a private network for the model provider
@@ -428,7 +428,10 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 		fallthrough
 	case Mode_INGRESS:
 		// This code is unnecessarily complex because compose-go silently converts short `ports:` syntax to ingress+tcp
-		if port.Protocol != Protocol_UDP {
+		if port.Protocol == Protocol_UDP {
+			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
+			port.Mode = Mode_HOST
+		} else {
 			if port.Published != "" {
 				term.Debugf("port %d: ignoring 'published: %s' in 'ingress' mode", port.Target, port.Published)
 			}
@@ -436,9 +439,6 @@ func fixupPort(port composeTypes.ServicePortConfig) composeTypes.ServicePortConf
 				// TCP ingress is not supported; assuming HTTP (add 'app_protocol: http' to silence)"
 				port.AppProtocol = "http"
 			}
-		} else {
-			term.Warnf("port %d: UDP ports default to 'host' mode (add 'mode: host' to silence)", port.Target)
-			port.Mode = Mode_HOST
 		}
 	case Mode_HOST:
 		// no-op

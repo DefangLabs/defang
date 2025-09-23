@@ -58,6 +58,7 @@
       {
         "mode": "host",
         "target": 5432,
+        "published": "5432",
         "protocol": "tcp"
       }
     ]
