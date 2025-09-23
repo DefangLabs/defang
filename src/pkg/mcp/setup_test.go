@@ -30,16 +30,6 @@ func TestGetClientConfigPath(t *testing.T) {
 			client:       MCPClientWindsurf,
 			expectedPath: filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"),
 		},
-		{
-			name:         "cascade",
-			client:       MCPClientCascade,
-			expectedPath: filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"),
-		},
-		{
-			name:         "codeium",
-			client:       MCPClientCodeium,
-			expectedPath: filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"),
-		},
 
 		// Claude Desktop tests - Darwin
 		{
@@ -133,7 +123,7 @@ func TestGetClientConfigPath(t *testing.T) {
 		{
 			name:         "cursor",
 			client:       MCPClientCursor,
-			expectedPath: filepath.Join(homeDir, ".cursor", "settings.json"),
+			expectedPath: filepath.Join(homeDir, ".cursor", "mcp.json"),
 		},
 
 		// Kiro tests - Darwin
@@ -156,12 +146,6 @@ func TestGetClientConfigPath(t *testing.T) {
 		{
 			name:         "vscode_darwin",
 			client:       MCPClientVSCode,
-			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "mcp.json"),
-		},
-		{
-			name:         "code_darwin",
-			client:       MCPClientCode,
 			goos:         "darwin",
 			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "mcp.json"),
 		},
@@ -206,12 +190,6 @@ func TestGetClientConfigPath(t *testing.T) {
 		{
 			name:         "vscode_insiders_darwin",
 			client:       MCPClientVSCodeInsiders,
-			goos:         "darwin",
-			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "mcp.json"),
-		},
-		{
-			name:         "insiders_darwin",
-			client:       MCPClientInsiders,
 			goos:         "darwin",
 			expectedPath: filepath.Join(homeDir, "Library", "Application Support", "Code - Insiders", "User", "mcp.json"),
 		},
