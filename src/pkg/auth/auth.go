@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -190,7 +191,10 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 
 	// TODO:This is used to open the browser for GitHub Auth before blocking
 	if mcpFlow {
-		browser.OpenURL(server.URL)
+		err := browser.OpenURL(server.URL)
+		if err != nil {
+			return AuthCodeFlow{}, fmt.Errorf("Failed to open browser: %w", err)
+		}
 	}
 
 	input := term.NewNonBlockingStdin()
@@ -205,7 +209,12 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 			case 3: // Ctrl-C
 				cancel()
 			case 10, 13: // Enter or Return
-				browser.OpenURL(server.URL)
+				err := browser.OpenURL(server.URL)
+				if err != nil {
+					term.Error("Failed to open browser:", "error", err)
+					cancel()
+				}
+			default:
 			}
 		}
 	}()
