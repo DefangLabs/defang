@@ -253,6 +253,8 @@ var expectedToolsList = []string{
 	"set_config",
 	"remove_config",
 	"list_configs",
+	"create_project",
+	"process_data",
 }
 
 func startMockFabricServer(mockService *mockFabricService) *httptest.Server {

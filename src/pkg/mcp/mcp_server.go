@@ -38,6 +38,8 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
+		server.WithLogging(),
+		server.WithElicitation(),
 		server.WithInstructions(instructions),
 	)
 
