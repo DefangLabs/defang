@@ -3,7 +3,6 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -267,10 +266,7 @@ func parseExistingConfig(data []byte, existingData *map[string]any) error {
 func handleVSCodeConfig(configPath string) error {
 	// Create or update the config file
 	var existingData map[string]any
-	config, err := getVSCodeServerConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
-	}
+	var config VSCodeConfig
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
@@ -278,30 +274,39 @@ func handleVSCodeConfig(configPath string) error {
 			return err
 		}
 
-		// Check if "servers" section exists
-		serversSection, ok := existingData["servers"]
-		if !ok {
-			// Create new "servers" section
-			existingData["servers"] = map[string]any{}
-			serversSection = existingData["servers"]
-		}
-
-		if mcpMap, ok := serversSection.(map[string]any); ok {
-			mcpMap["defang"] = config
-			existingData["servers"] = mcpMap
-		} else {
-			return errors.New("failed to assert 'servers' section as map[string]any")
+		// Try to extract VSCodeConfig from existing data
+		if mcpVSCodeServerData, ok := existingData["servers"]; ok {
+			// Convert back to MCPConfig structure
+			mcpVSCodeServersJSON, err := json.Marshal(map[string]any{"servers": mcpVSCodeServerData})
+			if err != nil {
+				return fmt.Errorf("failed to marshal mcpVSCodeServers: %w", err)
+			}
+			err = json.Unmarshal(mcpVSCodeServersJSON, &config)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal mcpVSCodeServers: %w", err)
+			}
 		}
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read config file: %w", err)
 	} else {
-		// File doesn't exist, create a new config with minimal settings
-		existingData = map[string]any{
-			"servers": map[string]any{
-				"defang": config,
-			},
-		}
+		// File doesn't exist, create a new config
+		existingData = make(map[string]any)
 	}
+
+	if config.Servers == nil {
+		config.Servers = make(map[string]VSCodeMCPServerConfig)
+	}
+
+	defangConfig, err := getVSCodeServerConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
+	}
+
+	// Add or update the Defang MCP server config
+	config.Servers["defang"] = *defangConfig
+
+	// Update the existingData with the new MCPServers
+	existingData["servers"] = config.Servers
 
 	// Write the config to the file
 	data, err := json.MarshalIndent(existingData, "", "  ")
