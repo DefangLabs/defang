@@ -62,8 +62,8 @@ var mcpServerCmd = &cobra.Command{
 
 		// Start the server
 		term.Println("Starting Defang MCP server")
-		if err := server.ServeStdio(s); err != nil {
-			return err
+		if err := server.NewStreamableHTTPServer(s).Start(":63546"); err != nil {
+			term.Error(err)
 		}
 
 		term.Println("Server shutdown")

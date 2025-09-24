@@ -41,7 +41,7 @@ type VSCodeConfig struct {
 
 // VSCodeMCPServerConfig represents the configuration for a VSCode MCP server
 type VSCodeMCPServerConfig struct {
-	Type    string            `json:"type"`          // Required: "stdio" or "sse"
+	Type    string            `json:"type"`          // Required: "stdio" or "http"
 	Command string            `json:"command"`       // Required for stdio
 	Args    []string          `json:"args"`          // Required for stdio
 	URL     string            `json:"url,omitempty"` // Required for sse
@@ -229,7 +229,8 @@ func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
 		return nil, err
 	}
 	return &VSCodeMCPServerConfig{
-		Type:    "stdio",
+		Type:    "http",
+		URL:     "http://localhost:63546",
 		Command: currentPath,
 		Args:    []string{"mcp", "serve"},
 	}, nil
@@ -243,6 +244,7 @@ func getVSCodeServerConfig() (map[string]any, error) {
 	}
 	return map[string]any{
 		"type":    config.Type,
+		"url":     config.URL,
 		"command": config.Command,
 		"args":    config.Args,
 	}, nil

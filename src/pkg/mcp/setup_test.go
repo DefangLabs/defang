@@ -276,7 +276,8 @@ func TestWriteConfig(t *testing.T) {
         "serve"
       ],
       "command": %s,
-      "type": "stdio"
+      "type": "http",
+      "url": "http://localhost:63546"
     }
   }
 }`,
@@ -299,7 +300,7 @@ func TestWriteConfig(t *testing.T) {
 					"Notion-Version": "2022-06-28"
 				}
 			},
-			"type": "stdio"
+			"type": "http"
 		},
 		"github": {
 			"url": "https://api.githubcopilot.com/mcp/"
@@ -330,7 +331,8 @@ func TestWriteConfig(t *testing.T) {
         "serve"
       ],
       "command": %s,
-      "type": "stdio"
+      "type": "http",
+      "url": "http://localhost:63546"
     },
     "github": {
       "url": "https://api.githubcopilot.com/mcp/"
@@ -347,7 +349,7 @@ func TestWriteConfig(t *testing.T) {
           "Notion-Version": "2022-06-28"
         }
       },
-      "type": "stdio"
+      "type": "http"
     }
   }
 }`,
@@ -409,7 +411,8 @@ func TestWriteConfig(t *testing.T) {
         "serve"
       ],
       "command": %s,
-      "type": "stdio"
+      "type": "http",
+      "url": "http://localhost:63546"
     },
     "github": {
       "url": "https://api.githubcopilot.com/mcp/"
