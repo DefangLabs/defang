@@ -40,8 +40,8 @@ func RunEstimate(ctx context.Context, project *compose.Project, client client.Fa
 }
 
 func GeneratePreview(ctx context.Context, project *compose.Project, client client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, mode defangv1.DeploymentMode, region string) (string, error) {
-	os.Setenv("DEFANG_JSON", "1") // HACK: always show JSON output for estimate
-	since := time.Now()
+	os.Setenv("DEFANG_JSON", "1")             // HACK: always show JSON output for estimate
+	since := time.Now().Add(-1 * time.Minute) // fetch logs since one minute ago to account for clock drift
 
 	fixedProject := project.WithoutUnnecessaryResources()
 	if err := compose.FixupServices(ctx, previewProvider, fixedProject, compose.UploadModeEstimate); err != nil {
@@ -68,14 +68,14 @@ func GeneratePreview(ctx context.Context, project *compose.Project, client clien
 
 	term.Info("Generating deployment preview, this may take a few minutes...")
 	var pulumiPreviewLogLines []string
-	options := TailOptions{
+	tailOptions := TailOptions{
 		Deployment: resp.Etag,
-		Since:      since,
 		LogType:    logs.LogTypeBuild,
+		Since:      since,
 		Verbose:    true,
 	}
 
-	err = streamLogs(ctx, previewProvider, project.Name, options, func(entry *defangv1.LogEntry, options *TailOptions) error {
+	err = streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {
