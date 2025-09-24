@@ -59,7 +59,7 @@ func (mockGetServicesHandler) GetServices(ctx context.Context, req *connect.Requ
 }
 
 func TestGetServices(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	fabricServer := &mockGetServicesHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)

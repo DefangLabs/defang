@@ -37,7 +37,7 @@ func TestGcpByocPromptHandler_Success(t *testing.T) {
 	t.Setenv("GCP_PROJECT_ID", "")
 	t.Setenv("DEFANG_PROVIDER", "")
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, client.ProviderGCP, providerId)
@@ -61,7 +61,7 @@ func TestGcpByocPromptHandler_ConnectError(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.Error(t, err)
 	require.Nil(t, res)
 }
@@ -89,7 +89,7 @@ func TestGcpByocPromptHandler_CheckProviderConfiguredError(t *testing.T) {
 		},
 	}
 
-	res, err := handler(context.Background(), req)
+	res, err := handler(t.Context(), req)
 	require.Error(t, err)
 	require.Nil(t, res)
 }

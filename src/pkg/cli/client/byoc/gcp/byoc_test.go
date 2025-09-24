@@ -1,14 +1,13 @@
 package gcp
 
 import (
-	"context"
 	"encoding/base64"
 	"testing"
 )
 
 func TestSetUpCD(t *testing.T) {
 	t.Skip("skipping test")
-	ctx := context.Background()
+	ctx := t.Context()
 	b := NewByocProvider(ctx, "testTenantID")
 	account, err := b.AccountInfo(ctx)
 	if err != nil {

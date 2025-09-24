@@ -3,7 +3,6 @@ package cli
 import (
 	"archive/tar"
 	"compress/gzip"
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +31,7 @@ func TestInitFromSamples(t *testing.T) {
 		t.Cleanup(func() { ourHttp.DefaultClient = oldClient })
 		ourHttp.DefaultClient = &http.Client{Transport: mockRoundTripper{}}
 
-		err := InitFromSamples(context.Background(), t.TempDir(), []string{"nonexisting"})
+		err := InitFromSamples(t.Context(), t.TempDir(), []string{"nonexisting"})
 		if err == nil {
 			t.Fatal("Expected test to fail")
 		}
@@ -46,7 +45,7 @@ func TestInitFromSamples(t *testing.T) {
 			t.Skip("skipped; add -short to enable")
 		}
 
-		err := InitFromSamples(context.Background(), t.TempDir(), []string{"nonexisting"})
+		err := InitFromSamples(t.Context(), t.TempDir(), []string{"nonexisting"})
 		if err == nil {
 			t.Fatal("Expected test to fail")
 		}

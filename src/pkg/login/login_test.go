@@ -73,7 +73,7 @@ func TestInteractiveLogin(t *testing.T) {
 	t.Run("Expect accessToken to be stored when InteractiveLogin() succeeds", func(t *testing.T) {
 		authService = mockGitHubAuthService{accessToken: accessToken}
 
-		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
+		err := InteractiveLogin(t.Context(), client.MockFabricClient{}, fabric)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -89,7 +89,7 @@ func TestInteractiveLogin(t *testing.T) {
 	t.Run("Expect error when InteractiveLogin fails", func(t *testing.T) {
 		authService = mockGitHubAuthService{err: errors.New("test-error")}
 
-		err := InteractiveLogin(context.Background(), client.MockFabricClient{}, fabric)
+		err := InteractiveLogin(t.Context(), client.MockFabricClient{}, fabric)
 		if err == nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -105,7 +105,7 @@ func (m MockForNonInteractiveLogin) Token(ctx context.Context, req *defangv1.Tok
 }
 
 func TestNonInteractiveLogin(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	mockClient := &MockForNonInteractiveLogin{}
 	fabric := "test.defang.dev"
 

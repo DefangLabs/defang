@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoadProjectNameWithFallback(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("with project", func(t *testing.T) {
 		loader := MockLoader{Project: composeTypes.Project{Name: "test-project"}}

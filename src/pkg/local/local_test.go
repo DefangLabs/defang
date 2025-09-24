@@ -13,7 +13,7 @@ import (
 
 func TestLocal(t *testing.T) {
 	l := New()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("SetUp", func(t *testing.T) {
 		if err := l.SetUp(ctx, []types.Container{{EntryPoint: []string{"/bin/sh"}}}); err != nil {

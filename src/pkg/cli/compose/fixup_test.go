@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -13,11 +12,11 @@ import (
 func TestFixup(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
-		proj, err := loader.LoadProject(context.Background())
+		proj, err := loader.LoadProject(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = FixupServices(context.Background(), client.MockProvider{}, proj, UploadModeIgnore)
+		err = FixupServices(t.Context(), client.MockProvider{}, proj, UploadModeIgnore)
 		if err != nil {
 			t.Fatal(err)
 		}

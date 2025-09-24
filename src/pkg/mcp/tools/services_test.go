@@ -81,7 +81,7 @@ func createConnectError(code connect.Code, message string) error {
 }
 
 func TestHandleServicesToolWithMockCLI(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Common test data
 	const (

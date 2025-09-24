@@ -145,7 +145,7 @@ func (m *mockSubscribeProvider) Subscribe(
 }
 
 func TestWaitServiceState(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	provider := &mockSubscribeProvider{}
 
 	noErrTests := []struct {
@@ -308,7 +308,7 @@ func TestWaitServiceStateStreamReceive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			provider := &mockSubscribeProviderForReconnectTest{stream: tt.stream, RetryDelayer: client.RetryDelayer{Delay: 1 * time.Millisecond}}
 			_, err := WaitServiceState(
 				ctx, provider,

@@ -46,7 +46,7 @@ func TestPreviewStops(t *testing.T) {
 				deploymentStatus: tt.err,
 			}
 
-			err := Preview(context.Background(), project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
+			err := Preview(t.Context(), project, fabric, provider, defangv1.DeploymentMode_MODE_UNSPECIFIED)
 			if err != nil {
 				if err.Error() != tt.wantError {
 					t.Errorf("got error: %v, want: %v", err, tt.wantError)
@@ -58,7 +58,7 @@ func TestPreviewStops(t *testing.T) {
 	}
 
 	t.Run("Context cancellation", func(t *testing.T) {
-		ctx, cancel := context.WithCancelCause(context.Background())
+		ctx, cancel := context.WithCancelCause(t.Context())
 		defer cancel(nil) // to cancel tail and clean-up context
 
 		cancelErr := errors.New("custom error")

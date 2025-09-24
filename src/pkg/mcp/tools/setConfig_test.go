@@ -109,7 +109,7 @@ func TestHandleSetConfig(t *testing.T) {
 		testConfigName = "test-config"
 		testValue      = "test-value"
 	)
-	testContext := context.Background()
+	testContext := t.Context()
 
 	tests := []struct {
 		name                     string

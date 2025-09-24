@@ -1,7 +1,6 @@
 package command
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -74,7 +73,7 @@ func TestGetLatestVersion(t *testing.T) {
 		t.Skip("skipping GitHub HTTP test in short mode to avoid rate limits.")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const version = "v1.2.3"
 	rec := httptest.NewRecorder()

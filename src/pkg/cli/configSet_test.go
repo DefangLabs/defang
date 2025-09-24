@@ -11,7 +11,7 @@ import (
 )
 
 func TestConfigSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	provider := MustHaveProjectNamePutConfigProvider{}
 
 	t.Run("expect no error", func(t *testing.T) {
