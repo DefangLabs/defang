@@ -81,7 +81,6 @@ var mcpSetupCmd = &cobra.Command{
 		client, _ := cmd.Flags().GetString("client")
 
 		if client != "" {
-
 			// Aliases mapping
 			switch client {
 			case "code":
