@@ -230,5 +230,21 @@
         "protocol": "tcp"
       }
     ]
+  },
+  "short-ports": {
+    "command": null,
+    "entrypoint": null,
+    "image": "mongo",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "host",
+        "target": 27017,
+        "published": "27017",
+        "protocol": "tcp"
+      }
+    ]
   }
 }

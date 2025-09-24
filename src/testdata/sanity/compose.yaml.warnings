@@ -1,1 +1,1 @@
- ! service "nginx": ingress port without healthcheck defaults to GET / HTTP/1.1
+ ! service "nginx": ingress port 80 without healthcheck; defaults to GET / HTTP/1.1

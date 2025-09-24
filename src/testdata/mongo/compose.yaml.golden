@@ -109,6 +109,15 @@ services:
     networks:
       default: null
     x-defang-mongodb: true
+  short-ports:
+    image: mongo
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 27017
+        published: "27017"
+        protocol: tcp
 networks:
   default:
     name: mongo_default
