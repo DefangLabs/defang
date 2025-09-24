@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,13 +42,13 @@ type VSCodeConfig struct {
 
 // VSCodeMCPServerConfig represents the configuration for a VSCode MCP server
 type VSCodeMCPServerConfig struct {
-	Type    string            `json:"type"`          // Required: "stdio" or "sse"
-	Command string            `json:"command"`       // Required for stdio
-	Args    []string          `json:"args"`          // Required for stdio
-	URL     string            `json:"url,omitempty"` // Required for sse
-	Env     map[string]string `json:"env,omitempty"`
+	Args    []string          `json:"args,omitempty"`    // Required for stdio
+	Command string            `json:"command,omitempty"` // Required for stdio
+	Env     map[string]any    `json:"env,omitempty"`
 	EnvFile string            `json:"envFile,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"` // For sse
+	Type    string            `json:"type,omitempty"`    // Required: "stdio" or "sse"
+	URL     string            `json:"url,omitempty"`     // Required for sse
 }
 
 // MCPClient represents the supported MCP clients as an enum
@@ -236,16 +237,30 @@ func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
 }
 
 // getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() (map[string]any, error) {
+func getVSCodeServerConfig() (*VSCodeMCPServerConfig, error) {
 	config, err := getVSCodeDefangMCPConfig()
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{
-		"type":    config.Type,
-		"command": config.Command,
-		"args":    config.Args,
+	return &VSCodeMCPServerConfig{
+		Args:    config.Args,
+		Command: config.Command,
+		Type:    config.Type,
 	}, nil
+}
+
+func parseExistingConfig(data []byte, existingData *map[string]any) error {
+	// Check if file is empty or only contains whitespace
+	if len(bytes.TrimSpace(data)) == 0 {
+		// File is empty, treat as new config
+		*existingData = make(map[string]any)
+	} else {
+		// Parse the JSON into a generic map to preserve all settings
+		if err := json.Unmarshal(data, &existingData); err != nil {
+			return fmt.Errorf("failed to unmarshal existing config: %w", err)
+		}
+	}
+	return nil
 }
 
 // handleVSCodeConfig handles the special case for VSCode mcp.json
@@ -259,9 +274,8 @@ func handleVSCodeConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// File exists, parse it
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
+		if err := parseExistingConfig(data, &existingData); err != nil {
+			return err
 		}
 
 		// Check if "servers" section exists
@@ -310,9 +324,8 @@ func handleStandardConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// Parse the JSON into a generic map to preserve all settings
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config: %w", err)
+		if err := parseExistingConfig(data, &existingData); err != nil {
+			return err
 		}
 
 		// Try to extract MCPServers from existing data
@@ -399,7 +412,7 @@ func SetupClient(clientStr string) error {
 		}
 	}
 
-	term.Infof("Restart %s for the changes to take effect.\n", client)
+	term.Infof("Ensure %s is upgraded to the latest version and restarted for mcp settings to take effect.\n", client)
 
 	return nil
 }
