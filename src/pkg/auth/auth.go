@@ -193,7 +193,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 	if mcpFlow {
 		err := browser.OpenURL(server.URL)
 		if err != nil {
-			return AuthCodeFlow{}, fmt.Errorf("Failed to open browser: %w", err)
+			return AuthCodeFlow{}, fmt.Errorf("failed to open browser: %w", err)
 		}
 	}
 
@@ -211,8 +211,7 @@ func StartAuthCodeFlow(ctx context.Context, mcpFlow LoginFlow) (AuthCodeFlow, er
 			case 10, 13: // Enter or Return
 				err := browser.OpenURL(server.URL)
 				if err != nil {
-					term.Error("Failed to open browser:", "error", err)
-					cancel()
+					term.Errorf("failed to open browser: %v", err)
 				}
 			default:
 			}
