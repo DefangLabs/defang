@@ -43,11 +43,11 @@ func (s *byocSubscribeServerStream) Close() error {
 
 func (s *byocSubscribeServerStream) Receive() bool {
 	select {
-	case <-s.done:
-		return false
 	case resp := <-s.ch:
 		s.resp = resp
 		return true
+	case <-s.done:
+		return false
 	}
 }
 
