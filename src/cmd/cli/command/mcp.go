@@ -1,9 +1,13 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/login"
@@ -60,9 +64,31 @@ var mcpServerCmd = &cobra.Command{
 			}()
 		}
 
+		httpServer := server.NewStreamableHTTPServer(s)
+
+		// Create a channel to listen for OS signals
+		sigChan := make(chan os.Signal, 1)
+
+		// Register the channel to receive SIGINT (Ctrl+C) and SIGTERM
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		term.Println("Application started. Press Ctrl+C to trigger graceful shutdown.")
+
+		// Goroutine to handle signals
+		go func() {
+			sig := <-sigChan // Blocks until a signal is received
+			term.Printf("\nReceived signal: %v. Initiating graceful shutdown...\n", sig)
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			httpServer.Shutdown(shutdownCtx)
+
+			os.Exit(0) // Exit the application after cleanup
+		}()
+
 		// Start the server
-		term.Println("Starting Defang MCP server")
-		if err := server.NewStreamableHTTPServer(s).Start(":63546"); err != nil {
+		term.Println("Starting Defang MCP server on :63546")
+		if err := httpServer.Start(":63546"); err != nil {
 			term.Error(err)
 		}
 
