@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/DefangLabs/defang/src/pkg"
 )
 
@@ -21,6 +23,7 @@ func TestGetClientConfigPath(t *testing.T) {
 		goos          string
 		appData       string
 		xdgConfigHome string
+		codexHome     string
 		expectedPath  string
 		expectedError bool
 	}{
@@ -142,6 +145,21 @@ func TestGetClientConfigPath(t *testing.T) {
 			expectedPath: filepath.Join(homeDir, ".kiro", "settings", "mcp.json"),
 		},
 
+		// Codex tests - default path
+		{
+			name:         "codex_default",
+			client:       MCPClientCodex,
+			expectedPath: filepath.Join(homeDir, ".codex", "config.toml"),
+		},
+
+		// Codex tests - CODEX_HOME override
+		{
+			name:         "codex_with_env",
+			client:       MCPClientCodex,
+			codexHome:    filepath.Join(homeDir, "custom-codex-home"),
+			expectedPath: filepath.Join(homeDir, "custom-codex-home", "config.toml"),
+		},
+
 		// VSCode tests - Darwin
 		{
 			name:         "vscode_darwin",
@@ -234,6 +252,8 @@ func TestGetClientConfigPath(t *testing.T) {
 			if tt.xdgConfigHome != "" {
 				t.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome)
 			}
+
+			t.Setenv("CODEX_HOME", tt.codexHome)
 
 			configPath, err := getClientConfigPath(homeDir, tt.goos, tt.client)
 
@@ -720,4 +740,227 @@ func TestWriteConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleCodexConfig(t *testing.T) {
+	type expectedServer struct {
+		command string
+		args    []string
+	}
+
+	executablePath, err := os.Executable()
+	if err != nil {
+		t.Fatalf("failed to get executable: %v", err)
+	}
+
+	tests := []struct {
+		name                string
+		fileExists          bool
+		existingData        string
+		otherServers        map[string]expectedServer
+		expectProfileActive string
+		expectedError       bool
+	}{
+		{
+			name: "codex_new_file",
+		},
+		{
+			name:       "codex_existing_without_defang",
+			fileExists: true,
+			existingData: `
+[profile]
+active = "default"
+
+[mcp_servers.docs]
+command = "npx"
+args = ["-y", "docs-server"]
+`,
+			otherServers: map[string]expectedServer{
+				"docs": {
+					command: "npx",
+					args:    []string{"-y", "docs-server"},
+				},
+			},
+			expectProfileActive: "default",
+		},
+		{
+			name:       "codex_existing_with_defang",
+			fileExists: true,
+			existingData: `
+[mcp_servers.defang]
+command = "OLD_PATH"
+args = ["mcp", "serve"]
+
+[mcp_servers.aux]
+command = "npx"
+args = ["-y", "aux-server"]
+`,
+			otherServers: map[string]expectedServer{
+				"aux": {
+					command: "npx",
+					args:    []string{"-y", "aux-server"},
+				},
+			},
+		},
+		{
+			name:          "codex_invalid_toml",
+			fileExists:    true,
+			existingData:  `invalid = "toml"\nunterminated`,
+			expectedError: true,
+		},
+		{
+			name:          "codex_mcp_servers_not_table",
+			fileExists:    true,
+			existingData:  `mcp_servers = ["bad"]`,
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			configPath := filepath.Join(tempDir, "config.toml")
+
+			if tt.fileExists {
+				if err := os.WriteFile(configPath, []byte(tt.existingData), 0644); err != nil {
+					t.Fatalf("failed to write existing config: %v", err)
+				}
+			}
+
+			err := handleCodexConfig(configPath)
+			if tt.expectedError {
+				if err == nil {
+					t.Fatalf("expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			content, err := os.ReadFile(configPath)
+			if err != nil {
+				t.Fatalf("failed to read config: %v", err)
+			}
+
+			var data map[string]any
+			if err := toml.Unmarshal(content, &data); err != nil {
+				t.Fatalf("failed to unmarshal resulting config: %v", err)
+			}
+
+			mcpServersValue, ok := data["mcp_servers"]
+			if !ok {
+				t.Fatalf("expected mcp_servers section to be present")
+			}
+
+			mcpServers, ok := mcpServersValue.(map[string]any)
+			if !ok {
+				t.Fatalf("expected mcp_servers to be a map, got %T", mcpServersValue)
+			}
+
+			defangRaw, ok := mcpServers["defang"]
+			if !ok {
+				t.Fatalf("expected defang server to be present")
+			}
+
+			defang, ok := defangRaw.(map[string]any)
+			if !ok {
+				t.Fatalf("expected defang server to be a map, got %T", defangRaw)
+			}
+
+			commandValue, ok := defang["command"].(string)
+			if !ok {
+				t.Fatalf("expected defang command to be string, got %T", defang["command"])
+			}
+
+			if commandValue != executablePath {
+				t.Fatalf("expected defang command to be %q, got %q", executablePath, commandValue)
+			}
+
+			argsValue, ok := defang["args"]
+			if !ok {
+				t.Fatal("expected defang args to be present")
+			}
+
+			args := toStringSlice(t, argsValue)
+			expectedArgs := []string{"mcp", "serve"}
+			if len(args) != len(expectedArgs) {
+				t.Fatalf("expected defang args %v, got %v", expectedArgs, args)
+			}
+			for i, arg := range expectedArgs {
+				if args[i] != arg {
+					t.Fatalf("expected defang args %v, got %v", expectedArgs, args)
+				}
+			}
+
+			for serverName, expected := range tt.otherServers {
+				serverValue, ok := mcpServers[serverName]
+				if !ok {
+					t.Fatalf("expected server %q to be present", serverName)
+				}
+
+				serverMap, ok := serverValue.(map[string]any)
+				if !ok {
+					t.Fatalf("expected server %q to be a map, got %T", serverName, serverValue)
+				}
+
+				cmd, ok := serverMap["command"].(string)
+				if !ok {
+					t.Fatalf("expected command for server %q to be string, got %T", serverName, serverMap["command"])
+				}
+
+				if cmd != expected.command {
+					t.Fatalf("expected command for server %q to be %q, got %q", serverName, expected.command, cmd)
+				}
+
+				actualArgs := toStringSlice(t, serverMap["args"])
+				if len(actualArgs) != len(expected.args) {
+					t.Fatalf("expected args %v for server %q, got %v", expected.args, serverName, actualArgs)
+				}
+				for i, arg := range expected.args {
+					if actualArgs[i] != arg {
+						t.Fatalf("expected args %v for server %q, got %v", expected.args, serverName, actualArgs)
+					}
+				}
+			}
+
+			if tt.expectProfileActive != "" {
+				profileValue, ok := data["profile"].(map[string]any)
+				if !ok {
+					t.Fatalf("expected profile section to be a map, got %T", data["profile"])
+				}
+
+				active, ok := profileValue["active"].(string)
+				if !ok {
+					t.Fatalf("expected profile.active to be string, got %T", profileValue["active"])
+				}
+
+				if active != tt.expectProfileActive {
+					t.Fatalf("expected profile.active %q, got %q", tt.expectProfileActive, active)
+				}
+			}
+		})
+	}
+}
+
+func toStringSlice(t *testing.T, value any) []string {
+	t.Helper()
+	switch v := value.(type) {
+	case []string:
+		return append([]string(nil), v...)
+	case []any:
+		result := make([]string, len(v))
+		for i, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				t.Fatalf("expected string elements, got %T", item)
+			}
+			result[i] = str
+		}
+		return result
+	default:
+		t.Fatalf("expected slice for args, got %T", value)
+	}
+	return nil
 }
