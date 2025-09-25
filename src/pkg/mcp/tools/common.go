@@ -17,7 +17,7 @@ import (
 )
 
 // the name of the environment variable should match MCPClientDevelopmentKey in mcp package
-var MCPDevelopmentClients = pkg.Getenv("development-client", "unknown")
+var MCPDevelopmentClients = pkg.Getenv("DEVELOPMENT_CLIENT", "unknown")
 
 var newProvider = cli.NewProvider
 

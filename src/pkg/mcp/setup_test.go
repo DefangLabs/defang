@@ -299,7 +299,7 @@ func TestWriteConfig(t *testing.T) {
 				      "command": %s,
 				      "type": "stdio",
 				      "env": {
-				        "development-client": "vscode"
+				        "DEVELOPMENT_CLIENT": "vscode"
 						}
 				    }
 				  }
@@ -356,7 +356,7 @@ func TestWriteConfig(t *testing.T) {
 				      "command": %s,
 				      "type": "stdio",
 					  "env": {
-				        "development-client": "vscode"
+				        "DEVELOPMENT_CLIENT": "vscode"
 				      }
 				    },
 				    "github": {
@@ -402,7 +402,7 @@ func TestWriteConfig(t *testing.T) {
 							"type": "stdio",
 							"env": {
 								"fake": "fake-data",
-								"development-client": "vscode"
+								"DEVELOPMENT_CLIENT": "vscode"
 							}
 						},
 				    "github": {
@@ -443,7 +443,7 @@ func TestWriteConfig(t *testing.T) {
 							"type": "stdio",
 							"env": {
 								"fake": "fake-data",
-								"development-client": "vscode"
+								"DEVELOPMENT_CLIENT": "vscode"
 							}
 				    },
 				    "github": {
@@ -491,7 +491,7 @@ func TestWriteConfig(t *testing.T) {
 		      "command": %s,
 		      "type": "stdio",
 		      "env": {
-		        "development-client": "vscode"
+		        "DEVELOPMENT_CLIENT": "vscode"
 		      }
 		    }
 		  }
@@ -512,11 +512,62 @@ func TestWriteConfig(t *testing.T) {
 				      "command": %s,
 				      "type": "stdio",
 					  "env": {
-						"development-client": "vscode"
+						"DEVELOPMENT_CLIENT": "vscode"
 					  }
 				    }
 				  }
 				}`,
+		},
+		{
+			name:          "vscode_config_bad_env",
+			fileExists:    true,
+			expectedError: true,
+			existingData: `{
+		  "servers": {
+		    "defang": {
+		      "command": "some command",
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+			    "bad-end: "abc"
+		      }
+		    }
+		  }
+		}`,
+		},
+		{
+			name:          "vscode_config_no_existing_env",
+			fileExists:    true,
+			vscodeConfig:  true,
+			expectedError: false,
+			existingData: `{
+		  "servers": {
+		    "defang": {
+		      "command": "some command",
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ]
+		    }
+		  }
+		}`,
+			expectedData: `{
+		  "servers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "type": "stdio",
+			  "env": {
+		        "DEVELOPMENT_CLIENT": "vscode"
+		      }
+		    }
+		  }
+		}`,
 		},
 		{
 			name:         "standard_config_new_file",
@@ -531,7 +582,7 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 		      "env": {
-		        "development-client": "windsurf"
+		        "DEVELOPMENT_CLIENT": "windsurf"
 		      }
 		    }
 		  }
@@ -572,7 +623,7 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 			  "env": {
-		        "development-client": "windsurf"
+		        "DEVELOPMENT_CLIENT": "windsurf"
 		      }
 		    },
 		    "github": {
@@ -642,7 +693,7 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 			  "env": {
-		        "development-client": "windsurf",
+		        "DEVELOPMENT_CLIENT": "windsurf",
 				"fake": "fake-data"
 		      }
 		    },
@@ -693,7 +744,56 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 			  "env": {
-		        "development-client": "windsurf"
+		        "DEVELOPMENT_CLIENT": "windsurf"
+		      }
+		    }
+		  }
+		}`,
+		},
+		{
+			name:          "standard_config_bad_env",
+			fileExists:    true,
+			expectedError: true,
+			existingData: `{
+		  "mcpServers": {
+		    "defang": {
+		      "command": "some command",
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+			    "bad-end: "abc"
+		      }
+		    }
+		  }
+		}`,
+		},
+		{
+			name:          "standard_config_no_env",
+			fileExists:    true,
+			expectedError: false,
+			existingData: `{
+		  "mcpServers": {
+		    "defang": {
+		      "command": "some command",
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ]
+		    }
+		  }
+		}`,
+			expectedData: `{
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+			    "DEVELOPMENT_CLIENT": "windsurf"
 		      }
 		    }
 		  }
@@ -712,7 +812,7 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 		      "env": {
-		        "development-client": "windsurf"
+		        "DEVELOPMENT_CLIENT": "windsurf"
 		      }
 		    }
 		  }

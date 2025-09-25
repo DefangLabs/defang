@@ -85,9 +85,9 @@ var ValidClients = append(
 	ValidVSCodeClients...,
 )
 
-const MCPClientDevelopmentKey = "development-client"
+const MCPClientDevelopmentKey = "DEVELOPMENT_CLIENT"
 
-func MergeMaps(maps ...map[string]any) map[string]any {
+func mergeMaps(maps ...map[string]any) map[string]any {
 	result := make(map[string]any)
 	for _, m := range maps {
 		for k, v := range m {
@@ -308,7 +308,7 @@ func handleVSCodeConfig(configPath string, client MCPClient) error {
 				if defangBytes, err := json.Marshal(defangRaw); err == nil {
 					var defangConfig VSCodeMCPServerConfig
 					if err := json.Unmarshal(defangBytes, &defangConfig); err == nil {
-						config.Env = MergeMaps(defangConfig.Env, config.Env)
+						config.Env = mergeMaps(defangConfig.Env, config.Env)
 					}
 				}
 			}
@@ -385,7 +385,7 @@ func handleStandardConfig(configPath string, client MCPClient) error {
 	}
 
 	// copy the existing env
-	defangConfig.Env = MergeMaps(defangConfig.Env, config.MCPServers["defang"].Env)
+	defangConfig.Env = mergeMaps(defangConfig.Env, config.MCPServers["defang"].Env)
 
 	// Add or update the Defang MCP server config
 	config.MCPServers["defang"] = *defangConfig
