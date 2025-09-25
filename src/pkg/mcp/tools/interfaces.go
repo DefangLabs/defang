@@ -4,6 +4,7 @@ package tools
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
@@ -38,6 +39,7 @@ type DeployCLIInterface interface {
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
 	LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error)
 	OpenBrowser(url string) error
+	Tail(ctx context.Context, provider cliClient.Provider, projectName string, options cli.TailOptions) error
 }
 
 type DestroyCLIInterface interface {

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"time"
 
 	"github.com/pkg/browser"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
@@ -37,6 +38,10 @@ func (c *DefaultDeployCLI) ComposeUp(ctx context.Context, project *compose.Proje
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
+func (c *DefaultDeployCLI) Tail(ctx context.Context, projectName string, provider cliClient.Provider, options cli.TailOptions) error {
+	return cli.Tail(ctx, provider, projectName, options)
+}
+
 func (c *DefaultDeployCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
 	return CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
 }
@@ -51,6 +56,97 @@ func (c *DefaultDeployCLI) ConfigureLoader(request mcp.CallToolRequest) cliClien
 
 func (c *DefaultDeployCLI) OpenBrowser(url string) error {
 	return browser.OpenURL(url)
+}
+
+func setupTailTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
+	term.Debug("Creating tail tool")
+	tailTool := mcp.NewTool("tail",
+		mcp.WithDescription("Tail logs for a deployment."),
+
+		mcp.WithString("working_directory",
+			mcp.Description("Path to current working directory"),
+		),
+		mcp.WithString("deployment_id",
+			mcp.Description("The deployment ID to tail logs for"),
+		),
+	)
+	term.Debug("Tail tool created")
+
+	s.AddTool(tailTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		cli := &DefaultToolCLI{}
+		return handleTailTool(ctx, request, cluster, providerId, cli)
+	})
+}
+
+func handleTailTool(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli DeployCLIInterface) (*mcp.CallToolResult, error) {
+	term.Debug("Tail tool called - opening logs in browser")
+	track.Evt("MCP Tail Tool")
+	wd, err := request.RequireString("working_directory")
+	if err != nil || wd == "" {
+		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+	}
+	deploymentId, err := request.RequireString("deployment_id")
+	if err != nil || deploymentId == "" {
+		term.Error("Invalid deployment ID", "error", errors.New("deployment_id is required"))
+		return mcp.NewToolResultErrorFromErr("Invalid deployment ID", errors.New("deployment_id is required")), err
+	}
+	since := request.GetString("since", "")
+	until := request.GetString("until", "")
+	sinceTime, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		term.Error("Invalid parameter 'since', must be in RFC3339 format", "error", err)
+		return mcp.NewToolResultErrorFromErr("Invalid parameter 'since', must be in RFC3339 format", err), err
+	}
+	untilTime, err := time.Parse(time.RFC3339, until)
+	if err != nil {
+		term.Error("Invalid parameter 'until', must be in RFC3339 format", "error", err)
+		return mcp.NewToolResultErrorFromErr("Invalid parameter 'until', must be in RFC3339 format", err), err
+	}
+
+	err = os.Chdir(wd)
+	if err != nil {
+		term.Error("Failed to change working directory", "error", err)
+		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+	}
+
+	loader := cli.ConfigureLoader(request)
+
+	term.Debug("Function invoked: loader.LoadProject")
+	project, err := cli.LoadProject(ctx, loader)
+	if err != nil {
+		err = fmt.Errorf("failed to parse compose file: %w", err)
+		term.Error("Failed to deploy services", "error", err)
+
+		return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), err
+	}
+
+	term.Debug("Function invoked: cli.Connect")
+	client, err := cli.Connect(ctx, cluster)
+	if err != nil {
+		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+	}
+
+	term.Debug("Function invoked: cli.NewProvider")
+
+	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
+	if err != nil {
+		return mcp.NewToolResultErrorFromErr("Provider not configured correctly", err), err
+	}
+
+	err = cli.Tail(ctx, provider, project.Name, cliTypes.TailOptions{
+		Deployment: deploymentId,
+		Since:      sinceTime,
+		Until:      untilTime,
+	})
+
+	if err != nil {
+		err = fmt.Errorf("failed to tail logs: %w", err)
+		term.Error("Failed to tail logs", "error", err)
+		return mcp.NewToolResultErrorFromErr("Failed to tail logs", err), err
+	}
+
+	return mcp.NewToolResultText("Done"), nil
 }
 
 // setupDeployTool configures and adds the deployment tool to the MCP server
@@ -146,50 +242,28 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
 	}
 
+	// Get server from context for notifications
+	mcpServer := server.ServerFromContext(ctx)
+	go func() {
+		count := 10
+		for i := 0; i < 3; i++ {
+			time.Sleep(1 * time.Second)
+			if mcpServer == nil {
+				return
+			}
+
+			mcpServer.SendNotificationToClient(ctx, "deployment_progress", map[string]any{
+				"audience": "user",
+				"progress": i,
+				"total":    count,
+				"message":  fmt.Sprintf("Processed %d/%d items", i, count),
+			})
+		}
+	}()
+
 	// Success case
 	term.Debugf("Successfully started deployed services with etag: %s", deployResp.Etag)
 
-	// Log deployment success
-	term.Debug("Deployment Started!")
-	term.Debugf("Deployment ID: %s", deployResp.Etag)
-
-	var portal string
-	if *providerId == cliClient.ProviderDefang {
-		// Get the portal URL for browser preview
-		portalURL := "https://portal.defang.io/"
-
-		// Open the portal URL in the browser
-		term.Debugf("Opening portal URL in browser: %s", portalURL)
-		go func() {
-			err := OpenURLFunc(portalURL)
-			if err != nil {
-				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
-			}
-		}()
-
-		// Log browser preview information
-		term.Debugf("🌐 %s available", portalURL)
-		portal = "Please use the web portal url: %s" + portalURL
-	} else {
-		// portalURL := fmt.Sprintf("https://%s.signin.aws.amazon.com/console")
-		portal = fmt.Sprintf("Please use the %s console", providerId)
-	}
-
-	// Log service details
-	term.Debug("Services:")
-	for _, serviceInfo := range deployResp.Services {
-		term.Debugf("- %s", serviceInfo.Service.Name)
-		term.Debugf("  Public URL: %s", serviceInfo.PublicFqdn)
-		term.Debugf("  Status: %s", serviceInfo.Status)
-	}
-
-	urls := strings.Builder{}
-	for _, serviceInfo := range deployResp.Services {
-		if serviceInfo.PublicFqdn != "" {
-			urls.WriteString(fmt.Sprintf("- %s: %s %s\n", serviceInfo.Service.Name, serviceInfo.PublicFqdn, serviceInfo.Domainname))
-		}
-	}
-
 	// Return the etag data as text
-	return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String())), nil
+	return mcp.NewToolResultText(fmt.Sprintf("Deployment started. In order to follow the progress, tail the logs for deployment ID: %s", deployResp.Etag)), nil
 }
