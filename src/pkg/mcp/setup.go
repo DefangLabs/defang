@@ -23,7 +23,7 @@ type MCPServerConfig struct {
 	Args    []string          `json:"args"`
 	Type    string            `json:"type,omitempty"`
 	URL     string            `json:"url,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
+	Env     map[string]any    `json:"env,omitempty"`
 	EnvFile string            `json:"envFile,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 }
@@ -81,6 +81,16 @@ var ValidClients = append(
 	},
 	ValidVSCodeClients...,
 )
+
+func MergeStringMaps(maps ...map[string]any) map[string]any {
+	result := make(map[string]any)
+	for _, m := range maps {
+		for k, v := range m {
+			result[k] = v // later maps overwrite earlier keys
+		}
+	}
+	return result
+}
 
 // ParseMCPClient parses and validates the MCP client string
 func ParseMCPClient(clientStr string) (MCPClient, error) {
@@ -211,20 +221,22 @@ func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error)
 }
 
 // getDefangMCPConfig returns the default MCP config for Defang
-func getDefangMCPConfig() (*MCPServerConfig, error) {
+
+// getDefangMCPConfigWithEnv returns the default MCP config for Defang, with optional env var map
+func getDefangMCPConfigWithEnv(env map[string]any) (*MCPServerConfig, error) {
 	currentPath, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
-
 	return &MCPServerConfig{
 		Command: currentPath,
 		Args:    []string{"mcp", "serve"},
+		Env:     env,
 	}, nil
 }
 
-// getVSCodeDefangMCPConfig returns the default MCP config for Defang in VSCode format
-func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
+// getVSCodeDefangMCPConfig returns the default VSCode MCP config for Defang, with optional env var map
+func getVSCodeDefangMCPConfig(client MCPClient) (*VSCodeMCPServerConfig, error) {
 	currentPath, err := os.Executable()
 	if err != nil {
 		return nil, err
@@ -233,19 +245,9 @@ func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
 		Type:    "stdio",
 		Command: currentPath,
 		Args:    []string{"mcp", "serve"},
-	}, nil
-}
-
-// getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() (*VSCodeMCPServerConfig, error) {
-	config, err := getVSCodeDefangMCPConfig()
-	if err != nil {
-		return nil, err
-	}
-	return &VSCodeMCPServerConfig{
-		Args:    config.Args,
-		Command: config.Command,
-		Type:    config.Type,
+		Env: map[string]any{
+			"development-client": string(client),
+		},
 	}, nil
 }
 
@@ -264,10 +266,10 @@ func parseExistingConfig(data []byte, existingData *map[string]any) error {
 }
 
 // handleVSCodeConfig handles the special case for VSCode mcp.json
-func handleVSCodeConfig(configPath string) error {
+func handleVSCodeConfig(configPath string, client MCPClient) error {
 	// Create or update the config file
 	var existingData map[string]any
-	config, err := getVSCodeServerConfig()
+	config, err := getVSCodeDefangMCPConfig(client)
 	if err != nil {
 		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
 	}
@@ -287,6 +289,15 @@ func handleVSCodeConfig(configPath string) error {
 		}
 
 		if mcpMap, ok := serversSection.(map[string]any); ok {
+			if defangRaw, ok := mcpMap["defang"]; ok {
+				if defangBytes, err := json.Marshal(defangRaw); err == nil {
+					var defangConfig VSCodeMCPServerConfig
+					if err := json.Unmarshal(defangBytes, &defangConfig); err == nil {
+						// Merge env if needed
+						config.Env = MergeStringMaps(defangConfig.Env, config.Env)
+					}
+				}
+			}
 			mcpMap["defang"] = config
 			existingData["servers"] = mcpMap
 		} else {
@@ -317,7 +328,12 @@ func handleVSCodeConfig(configPath string) error {
 	return nil
 }
 
-func handleStandardConfig(configPath string) error {
+// handleStandardConfig handles standard mcp.json, with optional env var map
+func handleStandardConfig(configPath string, client MCPClient) error {
+	// Example: inject env vars here (replace with function arg or config source as needed)
+	env := map[string]any{
+		"development-client": string(client),
+	}
 	// For all other clients, use the standard format
 	var existingData map[string]any
 	var config MCPConfig
@@ -351,10 +367,14 @@ func handleStandardConfig(configPath string) error {
 		config.MCPServers = make(map[string]MCPServerConfig)
 	}
 
-	defangConfig, err := getDefangMCPConfig()
+	defangConfig, err := getDefangMCPConfigWithEnv(env)
 	if err != nil {
 		return fmt.Errorf("failed to get Defang MCP config: %w", err)
 	}
+
+	// copy the existing env
+	defangConfig.Env = MergeStringMaps(defangConfig.Env, config.MCPServers["defang"].Env)
+
 	// Add or update the Defang MCP server config
 	config.MCPServers["defang"] = *defangConfig
 
@@ -403,11 +423,11 @@ func SetupClient(clientStr string) error {
 
 	// Handle VSCode mcp.json specially
 	if slices.Contains(ValidVSCodeClients, client) {
-		if err := handleVSCodeConfig(configPath); err != nil {
+		if err := handleVSCodeConfig(configPath, client); err != nil {
 			return err
 		}
 	} else {
-		if err := handleStandardConfig(configPath); err != nil {
+		if err := handleStandardConfig(configPath, client); err != nil {
 			return err
 		}
 	}

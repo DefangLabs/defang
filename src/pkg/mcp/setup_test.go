@@ -1,12 +1,13 @@
 package mcp
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
-
-	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func TestGetClientConfigPath(t *testing.T) {
@@ -269,167 +270,179 @@ func TestWriteConfig(t *testing.T) {
 			vscodeConfig: true,
 			existingData: "",
 			expectedData: `{
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": %s,
-      "type": "stdio"
-    }
-  }
-}`,
+				  "servers": {
+				    "defang": {
+				      "args": [
+				        "mcp",
+				        "serve"
+				      ],
+				      "command": %s,
+				      "type": "stdio",
+				      "env": {
+				        "development-client": "vscode"
+						}
+				    }
+				  }
+				}`,
 		},
 		{
 			name:         "vscode_other_mcp_server_without_defang",
 			fileExists:   true,
 			vscodeConfig: true,
 			existingData: `{
-	"servers": {
-		"notion": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@notionhq/notion-mcp-server"
-			],
-			"env": {
-				"OPENAPI_MCP_HEADERS": {
-					"Authorization": "Bearer ${input:NOTION_TOKEN}",
-					"Notion-Version": "2022-06-28"
-				}
-			},
-			"type": "stdio"
-		},
-		"github": {
-			"url": "https://api.githubcopilot.com/mcp/"
-		}
-	},
-	"inputs": [
-		{
-			"id": "NOTION_TOKEN",
-			"type": "promptString",
-			"description": "Notion API Token (https://www.notion.so/profile/integrations)",
-			"password": true
-		}
-	]
-}`,
+					"servers": {
+						"notion": {
+							"command": "npx",
+							"args": [
+								"-y",
+								"@notionhq/notion-mcp-server"
+							],
+							"env": {
+								"OPENAPI_MCP_HEADERS": {
+									"Authorization": "Bearer ${input:NOTION_TOKEN}",
+									"Notion-Version": "2022-06-28"
+								}
+							},
+							"type": "stdio"
+						},
+						"github": {
+							"url": "https://api.githubcopilot.com/mcp/"
+						}
+					},
+					"inputs": [
+						{
+							"id": "NOTION_TOKEN",
+							"type": "promptString",
+							"description": "Notion API Token (https://www.notion.so/profile/integrations)",
+							"password": true
+						}
+					]
+				}`,
 			expectedData: `{
-  "inputs": [
-    {
-      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
-      "id": "NOTION_TOKEN",
-      "password": true,
-      "type": "promptString"
-    }
-  ],
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": %s,
-      "type": "stdio"
-    },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/"
-    },
-    "notion": {
-      "args": [
-        "-y",
-        "@notionhq/notion-mcp-server"
-      ],
-      "command": "npx",
-      "env": {
-        "OPENAPI_MCP_HEADERS": {
-          "Authorization": "Bearer ${input:NOTION_TOKEN}",
-          "Notion-Version": "2022-06-28"
-        }
-      },
-      "type": "stdio"
-    }
-  }
-}`,
+				  "inputs": [
+				    {
+				      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+				      "id": "NOTION_TOKEN",
+				      "password": true,
+				      "type": "promptString"
+				    }
+				  ],
+				  "servers": {
+				    "defang": {
+				      "args": [
+				        "mcp",
+				        "serve"
+				      ],
+				      "command": %s,
+				      "type": "stdio",
+					  "env": {
+				        "development-client": "vscode"
+				      }
+				    },
+				    "github": {
+				      "url": "https://api.githubcopilot.com/mcp/"
+				    },
+				    "notion": {
+				      "args": [
+				        "-y",
+				        "@notionhq/notion-mcp-server"
+				      ],
+				      "command": "npx",
+				      "env": {
+				        "OPENAPI_MCP_HEADERS": {
+				          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+				          "Notion-Version": "2022-06-28"
+				        }
+				      },
+				      "type": "stdio"
+				    }
+				  }
+				}`,
 		},
 		{
 			name:         "vscode_other_mcp_server_with_defang",
 			fileExists:   true,
 			vscodeConfig: true,
 			existingData: `{
-  "inputs": [
-    {
-      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
-      "id": "NOTION_TOKEN",
-      "password": true,
-      "type": "promptString"
-    }
-  ],
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": "OLD_OUTDATED_DEFANG_LOCATION",
-      "type": "stdio"
-    },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/"
-    },
-    "notion": {
-      "args": [
-        "-y",
-        "@notionhq/notion-mcp-server"
-      ],
-      "command": "npx",
-      "env": {
-        "OPENAPI_MCP_HEADERS": {
-          "Authorization": "Bearer ${input:NOTION_TOKEN}",
-          "Notion-Version": "2022-06-28"
-        }
-      },
-      "type": "stdio"
-    }
-  }
-}`,
+				  "inputs": [
+				    {
+				      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+				      "id": "NOTION_TOKEN",
+				      "password": true,
+				      "type": "promptString"
+				    }
+				  ],
+				  "servers": {
+						"defang": {
+							"args": [
+								"mcp",
+								"serve"
+							],
+							"command": "OLD_OUTDATED_DEFANG_LOCATION",
+							"type": "stdio",
+							"env": {
+								"development-client": "vscode"
+							}
+						},
+				    "github": {
+				      "url": "https://api.githubcopilot.com/mcp/"
+				    },
+				    "notion": {
+				      "args": [
+				        "-y",
+				        "@notionhq/notion-mcp-server"
+				      ],
+				      "command": "npx",
+				      "env": {
+				        "OPENAPI_MCP_HEADERS": {
+				          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+				          "Notion-Version": "2022-06-28"
+				        }
+				      },
+				      "type": "stdio"
+				    }
+				  }
+				}`,
 			expectedData: `{
-  "inputs": [
-    {
-      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
-      "id": "NOTION_TOKEN",
-      "password": true,
-      "type": "promptString"
-    }
-  ],
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": %s,
-      "type": "stdio"
-    },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/"
-    },
-    "notion": {
-      "args": [
-        "-y",
-        "@notionhq/notion-mcp-server"
-      ],
-      "command": "npx",
-      "env": {
-        "OPENAPI_MCP_HEADERS": {
-          "Authorization": "Bearer ${input:NOTION_TOKEN}",
-          "Notion-Version": "2022-06-28"
-        }
-      },
-      "type": "stdio"
-    }
-  }
-}`,
+				  "inputs": [
+				    {
+				      "description": "Notion API Token (https://www.notion.so/profile/integrations)",
+				      "id": "NOTION_TOKEN",
+				      "password": true,
+				      "type": "promptString"
+				    }
+				  ],
+				  "servers": {
+						"defang": {
+							"args": [
+								"mcp",
+								"serve"
+							],
+							"command": %s,
+							"type": "stdio",
+							"env": {
+								"development-client": "vscode"
+							}
+				    },
+				    "github": {
+				      "url": "https://api.githubcopilot.com/mcp/"
+				    },
+				    "notion": {
+				      "args": [
+				        "-y",
+				        "@notionhq/notion-mcp-server"
+				      ],
+				      "command": "npx",
+				      "env": {
+				        "OPENAPI_MCP_HEADERS": {
+				          "Authorization": "Bearer ${input:NOTION_TOKEN}",
+				          "Notion-Version": "2022-06-28"
+				        }
+				      },
+				      "type": "stdio"
+				    }
+				  }
+				}`,
 		},
 		{
 			name:          "vscode_invalid_json_file",
@@ -450,17 +463,17 @@ func TestWriteConfig(t *testing.T) {
 			vscodeConfig: true,
 			existingData: "",
 			expectedData: `{
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": %s,
-      "type": "stdio"
-    }
-  }
-}`,
+		  "servers": {
+		    "defang": {
+		      "args": ["mcp", "serve"],
+		      "command": %s,
+		      "type": "stdio",
+		      "env": {
+		        "development-client": "vscode"
+		      }
+		    }
+		  }
+		}`,
 		},
 		{
 			name:         "vscode_config_new_file_with_whitespace",
@@ -468,154 +481,166 @@ func TestWriteConfig(t *testing.T) {
 			vscodeConfig: true,
 			existingData: "   \t  \n ",
 			expectedData: `{
-  "servers": {
-    "defang": {
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "command": %s,
-      "type": "stdio"
-    }
-  }
-}`,
+				  "servers": {
+				    "defang": {
+				      "args": [
+				        "mcp",
+				        "serve"
+				      ],
+				      "command": %s,
+				      "type": "stdio",
+					  "env": {
+						"development-client": "vscode"
+					  }
+				    }
+				  }
+				}`,
 		},
 		{
 			name:         "standard_config_new_file",
 			fileExists:   false,
 			existingData: "",
 			expectedData: `{
-  "mcpServers": {
-    "defang": {
-      "command": %s,
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+		      "env": {
+		        "development-client": "windsurf"
+		      }
+		    }
+		  }
+		}`,
 		},
 		{
 			name:       "standard_config_other_mcp_server_without_defang",
 			fileExists: true,
 			existingData: `{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
-      }
-    },
-    "stripe": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@stripe/mcp",
-        "--tools=all",
-        "--api-key="
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "github": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@modelcontextprotocol/server-github"
+		      ],
+		      "env": {
+		        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+		      }
+		    },
+		    "stripe": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@stripe/mcp",
+		        "--tools=all",
+		        "--api-key="
+		      ]
+		    }
+		  }
+		}`,
 			expectedData: `{
-  "mcpServers": {
-    "defang": {
-      "command": %s,
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    },
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
-      }
-    },
-    "stripe": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@stripe/mcp",
-        "--tools=all",
-        "--api-key="
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+		        "development-client": "windsurf"
+		      }
+		    },
+		    "github": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@modelcontextprotocol/server-github"
+		      ],
+		      "env": {
+		        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+		      }
+		    },
+		    "stripe": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@stripe/mcp",
+		        "--tools=all",
+		        "--api-key="
+		      ]
+		    }
+		  }
+		}`,
 		},
 		{
 			name:       "standard_config_other_mcp_server_with_defang",
 			fileExists: true,
 			existingData: `{
-  "mcpServers": {
-    "defang": {
-      "command": "OLD_OUTDATED_DEFANG_LOCATION",
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    },
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
-      }
-    },
-    "stripe": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@stripe/mcp",
-        "--tools=all",
-        "--api-key="
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": "OLD_OUTDATED_DEFANG_LOCATION",
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ]
+		    },
+		    "github": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@modelcontextprotocol/server-github"
+		      ],
+		      "env": {
+		        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+		      }
+		    },
+		    "stripe": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@stripe/mcp",
+		        "--tools=all",
+		        "--api-key="
+		      ]
+		    }
+		  }
+		}`,
 			expectedData: `{
-  "mcpServers": {
-    "defang": {
-      "command": %s,
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    },
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
-      }
-    },
-    "stripe": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@stripe/mcp",
-        "--tools=all",
-        "--api-key="
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+		        "development-client": "windsurf"
+		      }
+		    },
+		    "github": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@modelcontextprotocol/server-github"
+		      ],
+		      "env": {
+		        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+		      }
+		    },
+		    "stripe": {
+		      "command": "npx",
+		      "args": [
+		        "-y",
+		        "@stripe/mcp",
+		        "--tools=all",
+		        "--api-key="
+		      ]
+		    }
+		  }
+		}`,
 		},
 		{
 			name:          "standard_config_invalid_json_file",
@@ -634,32 +659,38 @@ func TestWriteConfig(t *testing.T) {
 			fileExists:   true,
 			existingData: "",
 			expectedData: `{
-  "mcpServers": {
-    "defang": {
-      "command": %s,
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+			  "env": {
+		        "development-client": "windsurf"
+		      }
+		    }
+		  }
+		}`,
 		},
 		{
 			name:         "standard_config_new_file_with_whitespace",
 			fileExists:   true,
 			existingData: "   \t  \n ",
 			expectedData: `{
-  "mcpServers": {
-    "defang": {
-      "command": %s,
-      "args": [
-        "mcp",
-        "serve"
-      ]
-    }
-  }
-}`,
+		  "mcpServers": {
+		    "defang": {
+		      "command": %s,
+		      "args": [
+		        "mcp",
+		        "serve"
+		      ],
+		      "env": {
+		        "development-client": "windsurf"
+		      }
+		    }
+		  }
+		}`,
 		},
 	}
 	for _, tt := range test {
@@ -687,10 +718,10 @@ func TestWriteConfig(t *testing.T) {
 
 			if tt.vscodeConfig {
 				typeOfConfig = "vscode mcp config"
-				err = handleVSCodeConfig(tempFilePath)
+				err = handleVSCodeConfig(tempFilePath, MCPClientVSCode)
 			} else {
 				typeOfConfig = "standard mcp config"
-				err = handleStandardConfig(tempFilePath)
+				err = handleStandardConfig(tempFilePath, MCPClientWindsurf)
 			}
 
 			if tt.expectedError {
@@ -715,8 +746,19 @@ func TestWriteConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pkg.Diff(string(actualContent), expectedData); err != nil {
-				t.Error(err)
+			if len(bytes.Clone(actualContent)) == 0 {
+				actualContent = []byte(`{}`)
+			}
+
+			var actualJSON, expectedJSON map[string]interface{}
+			if err := json.Unmarshal(actualContent, &actualJSON); err != nil {
+				t.Fatalf("Failed to unmarshal actual content: %v\nContent: %s", err, string(actualContent))
+			}
+			if err := json.Unmarshal([]byte(expectedData), &expectedJSON); err != nil {
+				t.Fatalf("Failed to unmarshal expected data: %v\nData: %s", err, expectedData)
+			}
+			if !reflect.DeepEqual(actualJSON, expectedJSON) {
+				t.Errorf("JSON output does not match expected.\nActual: %v\nExpected: %v", actualJSON, expectedJSON)
 			}
 		})
 	}
