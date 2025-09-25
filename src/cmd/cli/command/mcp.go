@@ -31,6 +31,7 @@ var mcpServerCmd = &cobra.Command{
 	Short: "Start defang MCP server",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		hideUpdate = true
 		authPort, _ := cmd.Flags().GetInt("auth-server")
 		term.SetDebug(true)
 
