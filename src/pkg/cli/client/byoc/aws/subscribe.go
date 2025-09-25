@@ -2,7 +2,6 @@ package aws
 
 import (
 	"slices"
-	"sync/atomic"
 
 	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
 	"github.com/DefangLabs/defang/src/pkg/types"
@@ -13,10 +12,10 @@ type byocSubscribeServerStream struct {
 	services []string
 	etag     types.ETag
 
-	ch     chan *defangv1.SubscribeResponse
-	resp   *defangv1.SubscribeResponse
-	err    error
-	closed atomic.Bool
+	ch   chan *defangv1.SubscribeResponse
+	resp *defangv1.SubscribeResponse
+	err  error
+	done chan struct{}
 }
 
 func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
@@ -26,26 +25,30 @@ func (s *byocSubscribeServerStream) HandleECSEvent(evt ecs.Event) {
 	if service := evt.Service(); len(s.services) > 0 && !slices.Contains(s.services, service) {
 		return
 	}
-	s.send(&defangv1.SubscribeResponse{
+	resp := defangv1.SubscribeResponse{
 		Name:   evt.Service(),
 		Status: evt.Status(),
 		State:  evt.State(),
-	})
+	}
+	select {
+	case s.ch <- &resp:
+	case <-s.done:
+	}
 }
 
 func (s *byocSubscribeServerStream) Close() error {
-	s.closed.Store(true)
-	close(s.ch)
+	close(s.done)
 	return nil
 }
 
 func (s *byocSubscribeServerStream) Receive() bool {
-	resp, ok := <-s.ch
-	if !ok || resp == nil {
+	select {
+	case resp := <-s.ch:
+		s.resp = resp
+		return true
+	case <-s.done:
 		return false
 	}
-	s.resp = resp
-	return true
 }
 
 func (s *byocSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
@@ -54,11 +57,4 @@ func (s *byocSubscribeServerStream) Msg() *defangv1.SubscribeResponse {
 
 func (s *byocSubscribeServerStream) Err() error {
 	return s.err
-}
-
-func (s *byocSubscribeServerStream) send(resp *defangv1.SubscribeResponse) {
-	if s.closed.Load() {
-		return
-	}
-	s.ch <- resp
 }
