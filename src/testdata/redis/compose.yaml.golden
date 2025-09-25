@@ -21,6 +21,16 @@ services:
     networks:
       default: null
     x-defang-redis: null
+  short-ports:
+    image: redis
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    x-defang-redis: null
   with-ext:
     image: redis
     networks:

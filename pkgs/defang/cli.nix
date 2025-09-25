@@ -1,13 +1,13 @@
 {
-  buildGoModule,
+  buildGo124Module,
   installShellFiles,
   lib,
 }:
-buildGoModule {
+buildGo124Module {
   pname = "defang-cli";
   version = "git";
-  src = ../../src;
-  vendorHash = "sha256-m8xBhpKS6Tvoik2WZbkWgM52/FkCEhbdFNRwByi30zw="; # TODO: use fetchFromGitHub
+  src = lib.cleanSource ../../src;
+  vendorHash = "sha256-VYJjG99g66S8V6GzqdZngnHESaVkQ4C6Tl2VsFMVCLA="; # TODO: use fetchFromGitHub
 
   subPackages = [ "cmd/cli" ];
 
@@ -33,5 +33,6 @@ buildGoModule {
     homepage = "https://defang.io/";
     license = licenses.mit;
     maintainers = with maintainers; [ lionello ];
+    mainProgram = "defang";
   };
 }

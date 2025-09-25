@@ -71,54 +71,57 @@ func (bs *byocServerStream) Receive() bool {
 }
 
 func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailResponse {
-	var response defangv1.TailResponse
 	if len(events) == 0 {
 		// The original gRPC/connect server stream would never send an empty response.
 		// We could loop around the select, but returning an empty response updates the spinner.
 		return nil
 	}
+	var response defangv1.TailResponse
 	parseFirelensRecords := false
 	parseECSEventRecords := false
-	// Get the Etag/Host/Service from the first event (should be the same for all events in this batch)
-	event := events[0]
-	if parts := strings.Split(*event.LogStreamName, "/"); len(parts) == 3 {
-		if strings.Contains(*event.LogGroupIdentifier, ":"+byoc.CdTaskPrefix) {
-			// These events are from the CD task: "crun/main/taskID" stream; we should detect stdout/stderr
-			response.Etag = bs.etag // pass the etag filter below, but we already filtered the tail by taskID
-			response.Host = "pulumi"
-			response.Service = "cd"
-		} else {
-			// These events are from an awslogs service task: "tenant/service_etag/taskID" stream
-			response.Host = parts[2] // TODO: figure out actual hostname/IP
-			parts = strings.Split(parts[1], "_")
-			if len(parts) != 2 || !pkg.IsValidRandomID(parts[1]) {
-				// skip, ignore sidecar logs (like route53-sidecar or fluentbit)
-				return nil
-			}
-			service, etag := parts[0], parts[1]
-			response.Etag = etag
-			response.Service = service
-		}
-	} else if strings.Contains(*event.LogStreamName, "-firelens-") {
-		// These events are from the Firelens sidecar; try to parse the JSON
+	// Get the Etag/Host/Service from the first entry (should be the same for all events in this batch)
+	first := events[0]
+	switch {
+	case strings.HasSuffix(*first.LogGroupIdentifier, "/ecs"):
+		// ECS lifecycle events. LogStreams: "f0b805a8-fa74-3212-b6ce-a981c011d337"
+		parseECSEventRecords = true
+	case strings.Contains(*first.LogGroupIdentifier, ":"+byoc.CdTaskPrefix):
+		// These events are from the CD task: "crun/main/<taskID>" stream; we should detect stdout/stderr
+		// LogStreams: "crun/main/0f2a8ccde0374239bdd04f5e07d8c523"
+		response.Host = "pulumi"
+		response.Service = "cd"
+	case strings.HasSuffix(*first.LogGroupIdentifier, "/builds") && strings.Contains(*first.LogStreamName, "-firelens-"):
+		// These events are from the Firelens sidecar "<service>/<kaniko>-firelens-<taskID>"; try to parse the JSON
+		// LogStreams: "app-image/kaniko-firelens-babe6cdb246b4c10b5b7093bb294e6c7"
 		var record logs.FirelensMessage
-		if err := json.Unmarshal([]byte(*event.Message), &record); err == nil {
+		if err := json.Unmarshal([]byte(*first.Message), &record); err == nil {
 			response.Etag = record.Etag
 			response.Host = record.Host
-			response.Service = record.ContainerName // TODO: could be service_etag
+			response.Service = record.ContainerName // TODO: ContainerName could be service_etag
 			parseFirelensRecords = true
+			break
 		}
-	} else if strings.HasSuffix(*event.LogGroupIdentifier, "/ecs") || strings.HasSuffix(*event.LogGroupIdentifier, "/ecs:*") {
-		parseECSEventRecords = true
-		response.Etag = bs.etag
-		response.Service = "ecs"
+		fallthrough
+	default:
+		if parts := strings.Split(*first.LogStreamName, "/"); len(parts) == 3 {
+			// These events are from an awslogs ECS task: "<tenant>/<service>_<etag>/<taskID>" stream
+			// LogStreams: "app/app_hg2xsgvsldqk/198f58c08c734bda924edc516f93b2d5"
+			response.Host = parts[2] // TODO: figure out actual hostname/IP for Task ID
+			underscore := strings.LastIndexByte(parts[1], '_')
+			if etag := parts[1][underscore+1:]; pkg.IsValidRandomID(etag) {
+				response.Service = parts[1][:underscore]
+				response.Etag = etag
+				break
+			}
+		}
+		term.Debugf("unrecognized log stream format: %s", *first.LogStreamName)
+		return nil // skip, ignore sidecar logs (like route53-sidecar or fluentbit)
 	}
 
-	// Client-side filtering
-	if bs.etag != "" && bs.etag != response.Etag {
+	// Client-side filtering on etag and service (if provided)
+	if response.Etag != "" && bs.etag != "" && bs.etag != response.Etag {
 		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}
-
 	if len(bs.services) > 0 && !slices.Contains(bs.services, response.GetService()) {
 		return nil // TODO: filter these out using the AWS StartLiveTail API
 	}

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -41,13 +43,13 @@ type VSCodeConfig struct {
 
 // VSCodeMCPServerConfig represents the configuration for a VSCode MCP server
 type VSCodeMCPServerConfig struct {
-	Type    string            `json:"type"`          // Required: "stdio" or "sse"
-	Command string            `json:"command"`       // Required for stdio
-	Args    []string          `json:"args"`          // Required for stdio
-	URL     string            `json:"url,omitempty"` // Required for sse
-	Env     map[string]string `json:"env,omitempty"`
+	Args    []string          `json:"args,omitempty"`    // Required for stdio
+	Command string            `json:"command,omitempty"` // Required for stdio
+	Env     map[string]any    `json:"env,omitempty"`
 	EnvFile string            `json:"envFile,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"` // For sse
+	Type    string            `json:"type,omitempty"`    // Required: "stdio" or "sse"
+	URL     string            `json:"url,omitempty"`     // Required for sse
 }
 
 // MCPClient represents the supported MCP clients as an enum
@@ -61,6 +63,7 @@ const (
 	MCPClientWindsurf       MCPClient = "windsurf"
 	MCPClientCursor         MCPClient = "cursor"
 	MCPClientKiro           MCPClient = "kiro"
+	MCPClientCodex          MCPClient = "codex"
 )
 
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
@@ -77,6 +80,7 @@ var ValidClients = append(
 		MCPClientWindsurf,
 		MCPClientCursor,
 		MCPClientKiro,
+		MCPClientCodex,
 	},
 	ValidVSCodeClients...,
 )
@@ -155,6 +159,11 @@ var kiroConfig = ClientInfo{
 	useHomeDir: true,
 }
 
+var codexConfig = ClientInfo{
+	configFile: ".codex/config.toml",
+	useHomeDir: true,
+}
+
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientWindsurf:       windsurfConfig,
@@ -164,6 +173,7 @@ var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientClaudeCode:     claudeCodeConfig,
 	MCPClientCursor:         cursorConfig,
 	MCPClientKiro:           kiroConfig,
+	MCPClientCodex:          codexConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS
@@ -195,6 +205,12 @@ func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error)
 	clientInfo, exists := clientRegistry[client]
 	if !exists {
 		return "", fmt.Errorf("unsupported client: %s", client)
+	}
+
+	if client == MCPClientCodex {
+		if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
+			return filepath.Join(codexHome, "config.toml"), nil
+		}
 	}
 
 	var basePath string
@@ -236,16 +252,30 @@ func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
 }
 
 // getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() (map[string]any, error) {
+func getVSCodeServerConfig() (*VSCodeMCPServerConfig, error) {
 	config, err := getVSCodeDefangMCPConfig()
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{
-		"type":    config.Type,
-		"command": config.Command,
-		"args":    config.Args,
+	return &VSCodeMCPServerConfig{
+		Args:    config.Args,
+		Command: config.Command,
+		Type:    config.Type,
 	}, nil
+}
+
+func parseExistingConfig(data []byte, existingData *map[string]any) error {
+	// Check if file is empty or only contains whitespace
+	if len(bytes.TrimSpace(data)) == 0 {
+		// File is empty, treat as new config
+		*existingData = make(map[string]any)
+	} else {
+		// Parse the JSON into a generic map to preserve all settings
+		if err := json.Unmarshal(data, &existingData); err != nil {
+			return fmt.Errorf("failed to unmarshal existing config: %w", err)
+		}
+	}
+	return nil
 }
 
 // handleVSCodeConfig handles the special case for VSCode mcp.json
@@ -259,9 +289,8 @@ func handleVSCodeConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// File exists, parse it
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
+		if err := parseExistingConfig(data, &existingData); err != nil {
+			return err
 		}
 
 		// Check if "servers" section exists
@@ -310,9 +339,8 @@ func handleStandardConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// Parse the JSON into a generic map to preserve all settings
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config: %w", err)
+		if err := parseExistingConfig(data, &existingData); err != nil {
+			return err
 		}
 
 		// Try to extract MCPServers from existing data
@@ -362,6 +390,56 @@ func handleStandardConfig(configPath string) error {
 	return nil
 }
 
+func handleCodexConfig(configPath string) error {
+	var existingData map[string]any
+
+	if data, err := os.ReadFile(configPath); err == nil {
+		if len(data) > 0 {
+			if err := toml.Unmarshal(data, &existingData); err != nil {
+				return fmt.Errorf("failed to unmarshal existing codex config: %w", err)
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	if existingData == nil {
+		existingData = make(map[string]any)
+	}
+
+	mcpServers, ok := existingData["mcp_servers"].(map[string]any)
+	if !ok {
+		if existingData["mcp_servers"] != nil {
+			return errors.New("failed to assert 'mcp_servers' section as map[string]any")
+		}
+		mcpServers = make(map[string]any)
+	}
+
+	defangConfig, err := getDefangMCPConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get Defang MCP config: %w", err)
+	}
+
+	mcpServers["defang"] = map[string]any{
+		"command": defangConfig.Command,
+		"args":    defangConfig.Args,
+	}
+
+	existingData["mcp_servers"] = mcpServers
+
+	data, err := toml.Marshal(existingData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal codex config: %w", err)
+	}
+
+	// #nosec G306 - config file does not contain sensitive data
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 func SetupClient(clientStr string) error {
 	client, err := ParseMCPClient(clientStr)
 	if err != nil {
@@ -388,18 +466,22 @@ func SetupClient(clientStr string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Handle VSCode mcp.json specially
-	if slices.Contains(ValidVSCodeClients, client) {
-		if err := handleVSCodeConfig(configPath); err != nil {
-			return err
-		}
-	} else {
-		if err := handleStandardConfig(configPath); err != nil {
-			return err
-		}
+	// Handle client-specific config formats
+	var handleErr error
+	switch {
+	case slices.Contains(ValidVSCodeClients, client):
+		handleErr = handleVSCodeConfig(configPath)
+	case client == MCPClientCodex:
+		handleErr = handleCodexConfig(configPath)
+	default:
+		handleErr = handleStandardConfig(configPath)
 	}
 
-	term.Infof("Restart %s for the changes to take effect.\n", client)
+	if handleErr != nil {
+		return handleErr
+	}
+
+	term.Infof("Ensure %s is upgraded to the latest version and restarted for mcp settings to take effect.\n", client)
 
 	return nil
 }
