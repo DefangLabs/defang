@@ -259,9 +259,11 @@ func handleVSCodeConfig(configPath string) error {
 
 	// Check if the file exists
 	if data, err := os.ReadFile(configPath); err == nil {
-		// File exists, parse it
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
+		if string(data) != "" {
+			// File exists and is not empty, try to parse it
+			if err := json.Unmarshal(data, &existingData); err != nil {
+				return fmt.Errorf("failed to unmarshal existing vscode config %w", err)
+			}
 		}
 
 		// Check if "servers" section exists
