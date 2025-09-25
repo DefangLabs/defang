@@ -71,9 +71,7 @@ func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, prov
 	}
 
 	configNames := make([]string, numConfigs)
-	for i, c := range config.Names {
-		configNames[i] = c
-	}
+	copy(configNames, config.Names)
 
 	return mcp.NewToolResultText(fmt.Sprintf("Here is the list of config variables for the project %q: %v", projectName, strings.Join(configNames, ", "))), nil
 }

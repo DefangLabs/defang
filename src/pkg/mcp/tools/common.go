@@ -16,6 +16,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// the name of the environment variable should match MCPClientDevelopmentKey in mcp package
 var MCPDevelopmentClients = pkg.Getenv("development-client", "unknown")
 
 var newProvider = cli.NewProvider

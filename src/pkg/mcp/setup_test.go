@@ -401,6 +401,7 @@ func TestWriteConfig(t *testing.T) {
 							"command": "OLD_OUTDATED_DEFANG_LOCATION",
 							"type": "stdio",
 							"env": {
+								"fake": "fake-data",
 								"development-client": "vscode"
 							}
 						},
@@ -441,6 +442,7 @@ func TestWriteConfig(t *testing.T) {
 							"command": %s,
 							"type": "stdio",
 							"env": {
+								"fake": "fake-data",
 								"development-client": "vscode"
 							}
 				    },
@@ -605,7 +607,10 @@ func TestWriteConfig(t *testing.T) {
 		      "args": [
 		        "mcp",
 		        "serve"
-		      ]
+		      ],
+			  "env": {
+		        "fake": "fake-data"
+		      }
 		    },
 		    "github": {
 		      "command": "npx",
@@ -637,7 +642,8 @@ func TestWriteConfig(t *testing.T) {
 		        "serve"
 		      ],
 			  "env": {
-		        "development-client": "windsurf"
+		        "development-client": "windsurf",
+				"fake": "fake-data"
 		      }
 		    },
 		    "github": {
