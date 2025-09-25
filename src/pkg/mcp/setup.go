@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
@@ -62,6 +63,7 @@ const (
 	MCPClientWindsurf       MCPClient = "windsurf"
 	MCPClientCursor         MCPClient = "cursor"
 	MCPClientKiro           MCPClient = "kiro"
+	MCPClientCodex          MCPClient = "codex"
 )
 
 // ValidVSCodeClients is a list of supported VSCode MCP clients with shorthand names
@@ -78,6 +80,7 @@ var ValidClients = append(
 		MCPClientWindsurf,
 		MCPClientCursor,
 		MCPClientKiro,
+		MCPClientCodex,
 	},
 	ValidVSCodeClients...,
 )
@@ -156,6 +159,11 @@ var kiroConfig = ClientInfo{
 	useHomeDir: true,
 }
 
+var codexConfig = ClientInfo{
+	configFile: ".codex/config.toml",
+	useHomeDir: true,
+}
+
 // clientRegistry maps client names to their configuration details
 var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientWindsurf:       windsurfConfig,
@@ -165,6 +173,7 @@ var clientRegistry = map[MCPClient]ClientInfo{
 	MCPClientClaudeCode:     claudeCodeConfig,
 	MCPClientCursor:         cursorConfig,
 	MCPClientKiro:           kiroConfig,
+	MCPClientCodex:          codexConfig,
 }
 
 // getSystemConfigDir returns the system configuration directory for the given OS
@@ -196,6 +205,12 @@ func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error)
 	clientInfo, exists := clientRegistry[client]
 	if !exists {
 		return "", fmt.Errorf("unsupported client: %s", client)
+	}
+
+	if client == MCPClientCodex {
+		if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
+			return filepath.Join(codexHome, "config.toml"), nil
+		}
 	}
 
 	var basePath string
@@ -375,6 +390,56 @@ func handleStandardConfig(configPath string) error {
 	return nil
 }
 
+func handleCodexConfig(configPath string) error {
+	var existingData map[string]any
+
+	if data, err := os.ReadFile(configPath); err == nil {
+		if len(data) > 0 {
+			if err := toml.Unmarshal(data, &existingData); err != nil {
+				return fmt.Errorf("failed to unmarshal existing codex config: %w", err)
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	if existingData == nil {
+		existingData = make(map[string]any)
+	}
+
+	mcpServers, ok := existingData["mcp_servers"].(map[string]any)
+	if !ok {
+		if existingData["mcp_servers"] != nil {
+			return errors.New("failed to assert 'mcp_servers' section as map[string]any")
+		}
+		mcpServers = make(map[string]any)
+	}
+
+	defangConfig, err := getDefangMCPConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get Defang MCP config: %w", err)
+	}
+
+	mcpServers["defang"] = map[string]any{
+		"command": defangConfig.Command,
+		"args":    defangConfig.Args,
+	}
+
+	existingData["mcp_servers"] = mcpServers
+
+	data, err := toml.Marshal(existingData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal codex config: %w", err)
+	}
+
+	// #nosec G306 - config file does not contain sensitive data
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
 func SetupClient(clientStr string) error {
 	client, err := ParseMCPClient(clientStr)
 	if err != nil {
@@ -401,15 +466,19 @@ func SetupClient(clientStr string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Handle VSCode mcp.json specially
-	if slices.Contains(ValidVSCodeClients, client) {
-		if err := handleVSCodeConfig(configPath); err != nil {
-			return err
-		}
-	} else {
-		if err := handleStandardConfig(configPath); err != nil {
-			return err
-		}
+	// Handle client-specific config formats
+	var handleErr error
+	switch {
+	case slices.Contains(ValidVSCodeClients, client):
+		handleErr = handleVSCodeConfig(configPath)
+	case client == MCPClientCodex:
+		handleErr = handleCodexConfig(configPath)
+	default:
+		handleErr = handleStandardConfig(configPath)
+	}
+
+	if handleErr != nil {
+		return handleErr
 	}
 
 	term.Infof("Ensure %s is upgraded to the latest version and restarted for mcp settings to take effect.\n", client)
