@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -14,6 +15,8 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+var MCPDevelopmentClients = pkg.Getenv("development-client", "unknown")
 
 var newProvider = cli.NewProvider
 

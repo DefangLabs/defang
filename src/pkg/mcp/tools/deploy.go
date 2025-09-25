@@ -81,7 +81,7 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 
 	// Get compose path
 	term.Debug("Compose up tool called - deploying services")
-	track.Evt("MCP Deploy Tool")
+	track.Evt("MCP Deploy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {

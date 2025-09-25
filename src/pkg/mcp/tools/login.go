@@ -34,7 +34,7 @@ func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster s
 	term.Debugf("mcp.CallToolRequest %+v", request)
 	// Test token
 	term.Debug("Function invoked: cli.Connect")
-	track.Evt("MCP Login Tool")
+	track.Evt("MCP Login Tool", track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
 
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {

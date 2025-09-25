@@ -42,16 +42,16 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClie
 	s.AddTool(setConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
 		adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-		return handleSetConfig(ctx, request, cluster, *providerId, adapter)
+		return handleSetConfig(ctx, request, cluster, providerId, adapter)
 	})
 }
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
+func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Set Config tool called")
-	track.Evt("MCP Set Config Tool")
+	track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
 
-	err := providerNotConfiguredError(providerId)
+	err := providerNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}
@@ -87,7 +87,7 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster s
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
-	provider, err := cli.NewProvider(ctx, providerId, client)
+	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
 		term.Error("Failed to get new provider", "error", err)
 		return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err

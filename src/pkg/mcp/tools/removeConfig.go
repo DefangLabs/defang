@@ -17,7 +17,7 @@ import (
 // handleRemoveConfigTool handles the remove config tool logic
 func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Remove Config tool called")
-	track.Evt("MCP Remove Config Tool")
+	track.Evt("MCP Remove Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
 
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {
