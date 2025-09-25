@@ -869,7 +869,7 @@ args = ["-y", "aux-server"]
 				}
 			}
 
-			err := handleCodexConfig(configPath)
+			err := handleCodexConfig(configPath, MCPClientCodex)
 			if tt.expectedError {
 				if err == nil {
 					t.Fatalf("expected error but got nil")
