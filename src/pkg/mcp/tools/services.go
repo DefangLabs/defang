@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // DefaultDeploymentInfo implements DeploymentInfoInterface using the actual deployment_info functions
@@ -38,26 +37,6 @@ func (c *DefaultCLI) NewProvider(ctx context.Context, providerId cliClient.Provi
 
 func (c *DefaultCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-// setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating services tool")
-	servicesTool := mcp.NewTool("services",
-		mcp.WithDescription("List information about services in Defang Playground"),
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("Services tool created")
-
-	// Add the services tool handler - make it non-blocking
-	term.Debug("Adding services tool handler")
-	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultCLI{}
-		deploymentInfo := &DefaultDeploymentInfo{}
-		return handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
-	})
 }
 
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {

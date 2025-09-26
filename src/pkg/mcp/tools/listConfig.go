@@ -12,7 +12,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // handleListConfigTool handles the list config tool logic
@@ -76,24 +75,4 @@ func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, prov
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("Here is the list of config variables for the project %q: %v", projectName, strings.Join(configNames, ", "))), nil
-}
-
-// setupSetConfigTool configures and adds the estimate tool to the MCP server
-func setupListConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating list config tool")
-	listConfigTool := mcp.NewTool("list_configs",
-		mcp.WithDescription("List all config variables for the defang project"),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("list config tool created")
-
-	// Add the Config tool handler
-	term.Debug("Adding List config tool handler")
-	cli := &DefaultToolCLI{}
-	s.AddTool(listConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
-	})
 }
