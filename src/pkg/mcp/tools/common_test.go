@@ -88,7 +88,7 @@ func TestCanIUseProvider(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		grpc := &mockGrpcClient{GrpcClient: &cliClient.GrpcClient{}}
 		prov := &mockGrpcClientProvider{}
-		err := CanIUseProvider(context.Background(), grpc, client.ProviderAWS, "proj", prov, 2)
+		err := CanIUseProvider(t.Context(), grpc, client.ProviderAWS, "proj", prov, 2)
 		assert.NoError(t, err)
 		// No way to check grpc.canIUseCalled since mockGrpcClient does not track it
 		// But we can check provider

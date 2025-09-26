@@ -55,7 +55,7 @@ func TestDomainMultipleProjectSupport(t *testing.T) {
 			b := &ByocAws{
 				driver: cfn.New(byoc.CdTaskPrefix, aws.Region("")), // default region
 			}
-			b.ByocBaseClient = byoc.NewByocBaseClient(context.Background(), tt.TenantName, b)
+			b.ByocBaseClient = byoc.NewByocBaseClient(t.Context(), tt.TenantName, b)
 
 			delegateDomain := "example.com"
 			projectLabel := dns.SafeLabel(tt.ProjectName)
@@ -118,7 +118,7 @@ func TestSubscribe(t *testing.T) {
 
 			byoc := &ByocAws{}
 
-			resp, err := byoc.Subscribe(context.Background(), &defangv1.SubscribeRequest{
+			resp, err := byoc.Subscribe(t.Context(), &defangv1.SubscribeRequest{
 				Etag:     etag,
 				Services: []string{"api", "web"},
 			})

@@ -132,7 +132,7 @@ func TestHandleLoginTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
+			result, err := handleLoginTool(t.Context(), request, tt.cluster, tt.authPort, mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

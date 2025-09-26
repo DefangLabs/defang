@@ -350,7 +350,7 @@ func TestInteractiveSetup(t *testing.T) {
 			mockHerokuClient.On("GetReleaseTasks", mock.Anything, mock.Anything).Return(tt.herokuReleaseTasks, nil)
 
 			// Execute the function under test
-			ctx := context.Background()
+			ctx := t.Context()
 			composeFileContents, err := InteractiveSetup(ctx, mockFabricClient, mockSurveyor, mockHerokuClient, tt.sourcePlatform)
 
 			// Assertions

@@ -203,7 +203,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleDestroyTool(context.Background(), request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleDestroyTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

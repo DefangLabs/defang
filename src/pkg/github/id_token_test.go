@@ -1,7 +1,6 @@
 package github
 
 import (
-	"context"
 	"os"
 	"testing"
 )
@@ -12,7 +11,7 @@ func TestGetIdToken(t *testing.T) {
 		t.Skip("ACTIONS_ID_TOKEN_REQUEST_URL not set")
 	}
 
-	jwt, err := GetIdToken(context.Background())
+	jwt, err := GetIdToken(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
