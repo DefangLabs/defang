@@ -14,7 +14,6 @@ var workingDirectoryOption = mcp.WithString("working_directory",
 	mcp.Description("Path to project's working directory"),
 )
 
-// SetupTools configures and adds all the MCP tools to the server
 func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
 	tools := []server.ServerTool{
 		{
