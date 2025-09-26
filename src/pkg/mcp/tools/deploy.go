@@ -138,7 +138,7 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		// Open the portal URL in the browser
 		term.Debugf("Opening portal URL in browser: %s", portalURL)
 		go func() {
-			err := OpenURLFunc(portalURL)
+			err := cli.OpenBrowser(portalURL)
 			if err != nil {
 				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
 			}
