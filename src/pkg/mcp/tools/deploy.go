@@ -60,7 +60,13 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 		mcp.WithDescription("Deploy services using defang"),
 
 		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
+			mcp.Description("Path to current working directory; required"),
+			mcp.Required(),
+		),
+
+		mcp.WithArray("compose_file_paths",
+			mcp.Description("Paths to docker-compose files; optional"),
+			mcp.Items(map[string]any{"type": "string"}),
 		),
 	)
 	term.Debug("Deployment tool created")
