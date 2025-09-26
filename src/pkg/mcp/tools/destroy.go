@@ -36,7 +36,7 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 
 func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Compose down tool called - removing services")
-	track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
+	track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
 
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {

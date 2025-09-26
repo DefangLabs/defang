@@ -62,7 +62,7 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClien
 
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Services tool called - fetching services from Defang")
-	track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
+	track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
 
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {

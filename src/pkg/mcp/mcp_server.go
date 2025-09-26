@@ -32,7 +32,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	tools.MCPDevelopmentClients = string(ideClient)
+	tools.MCPDevelopmentClient = string(ideClient)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,

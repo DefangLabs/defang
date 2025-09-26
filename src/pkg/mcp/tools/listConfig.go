@@ -18,7 +18,7 @@ import (
 // handleListConfigTool handles the list config tool logic
 func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("List Config tool called")
-	track.Evt("MCP List Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
+	track.Evt("MCP List Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
 
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {

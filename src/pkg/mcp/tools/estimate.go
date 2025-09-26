@@ -102,7 +102,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 
 func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Estimate tool called")
-	track.Evt("MCP Estimate Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClients))
+	track.Evt("MCP Estimate Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
