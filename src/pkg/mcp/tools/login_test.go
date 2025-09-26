@@ -133,7 +133,8 @@ func TestHandleLoginTool(t *testing.T) {
 
 			// Call the function
 			var err error
-			result := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
+			result, err := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
+			assert.NoError(t, err, "handleLoginTool returned unexpected error")
 
 			// Verify error expectations
 			if tt.expectError {

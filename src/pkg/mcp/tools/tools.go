@@ -23,10 +23,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				track.Evt("MCP Login Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
-				track.Evt("MCP Login Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
 			},
 		},
 		{
