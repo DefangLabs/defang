@@ -24,7 +24,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		email, err := gcp.GetCurrentAccountEmail(context.Background())
+		email, err := gcp.GetCurrentAccountEmail(t.Context())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -46,7 +46,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			}, nil
 		}
 		var gcp Gcp
-		email, err := gcp.GetCurrentAccountEmail(context.Background())
+		email, err := gcp.GetCurrentAccountEmail(t.Context())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

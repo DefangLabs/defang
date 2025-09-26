@@ -10,7 +10,7 @@ import (
 )
 
 func TestConfigDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	provider := MockConfigDeleteProvider{}
 
 	t.Run("expect no error", func(t *testing.T) {

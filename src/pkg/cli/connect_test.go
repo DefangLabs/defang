@@ -17,7 +17,7 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("unreachable", func(t *testing.T) {
 		t.Parallel()

@@ -39,7 +39,7 @@ func (g *mockActiveDeploymentsHandler) ListDeployments(ctx context.Context, req 
 }
 
 func TestActiveDeployments(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	fabricServer := &mockActiveDeploymentsHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)

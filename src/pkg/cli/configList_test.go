@@ -39,7 +39,7 @@ func (grpcListSecretsMockHandler) ListSecrets(ctx context.Context, req *connect.
 }
 
 func TestConfigList(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	fabricServer := &grpcListSecretsMockHandler{}
 	_, handler := defangv1connect.NewFabricControllerHandler(fabricServer)

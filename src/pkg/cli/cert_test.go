@@ -61,7 +61,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -78,7 +78,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -95,7 +95,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 503") {
@@ -113,7 +113,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -128,7 +128,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -145,7 +145,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 3)
+		err := getWithRetries(t.Context(), "http://example.com", 3)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		} else if !strings.Contains(err.Error(), "HTTP: 404") || !strings.Contains(err.Error(), "HTTP: 502") || !strings.Contains(err.Error(), "HTTP: 503") {
@@ -164,7 +164,7 @@ func TestGetWithRetries(t *testing.T) {
 		originalClient := httpClient
 		t.Cleanup(func() { httpClient = originalClient })
 		httpClient = tc
-		err := getWithRetries(context.Background(), "http://example.com", 1)
+		err := getWithRetries(t.Context(), "http://example.com", 1)
 		if err == nil {
 			t.Errorf("Expected error, got %v", err)
 		}

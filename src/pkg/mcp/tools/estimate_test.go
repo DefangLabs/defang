@@ -276,7 +276,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleEstimateTool(context.Background(), request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleEstimateTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

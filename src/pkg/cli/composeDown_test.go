@@ -40,7 +40,7 @@ func (m mockComposeDown) Delete(
 
 func TestComposeDown(t *testing.T) {
 	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
-	proj, err := loader.LoadProject(context.Background())
+	proj, err := loader.LoadProject(t.Context())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestComposeDown(t *testing.T) {
 
 	t.Run("Expect `Provider.Destroy` to be called when no specific services are specified",
 		func(t *testing.T) {
-			etag, err := ComposeDown(context.Background(), proj.Name, mockClient, mockProvider)
+			etag, err := ComposeDown(t.Context(), proj.Name, mockClient, mockProvider)
 			if err != nil {
 				t.Fatalf("ComposeDown() failed: %v", err)
 			}
@@ -89,7 +89,7 @@ func TestComposeDown(t *testing.T) {
 			for _, service := range proj.Services {
 				services = append(services, service.Name)
 			}
-			etag, err := ComposeDown(context.Background(), proj.Name, mockClient, mockProvider, services...)
+			etag, err := ComposeDown(t.Context(), proj.Name, mockClient, mockProvider, services...)
 
 			if err != nil {
 				t.Fatalf("ComposeDown() failed: %v", err)

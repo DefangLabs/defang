@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"context"
 	"strings"
 	"testing"
 )
@@ -30,7 +29,7 @@ func TestFindNSServer(t *testing.T) {
 			return nil
 		}
 
-		ns, err := FindNSServers(context.Background(), "a.b.c.d")
+		ns, err := FindNSServers(t.Context(), "a.b.c.d")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -65,7 +64,7 @@ func TestFindNSServer(t *testing.T) {
 			return nil
 		}
 
-		ns, err := FindNSServers(context.Background(), "a.b.c.d")
+		ns, err := FindNSServers(t.Context(), "a.b.c.d")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}

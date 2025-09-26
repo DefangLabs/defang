@@ -214,7 +214,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleRemoveConfigTool(context.Background(), request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleRemoveConfigTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

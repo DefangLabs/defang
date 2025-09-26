@@ -35,7 +35,7 @@ func TestRetrier(t *testing.T) {
 
 	fabricClient := defangv1connect.NewFabricControllerClient(server.Client(), server.URL, connect.WithGRPC(), connect.WithInterceptors(Retrier{}))
 
-	_, err := fabricClient.Deploy(context.Background(), connect.NewRequest(&defangv1.DeployRequest{}))
+	_, err := fabricClient.Deploy(t.Context(), connect.NewRequest(&defangv1.DeployRequest{}))
 	if err == nil {
 		t.Fatal("expected error")
 	}
