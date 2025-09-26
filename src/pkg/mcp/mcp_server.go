@@ -1,11 +1,14 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
+	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
 	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools, and prompts registered.
@@ -20,7 +23,23 @@ func prepareInstructions(defangTools []server.ServerTool) string {
 	return instructions
 }
 
-func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID) (*server.MCPServer, error) {
+type ToolTracker struct {
+	providerId string
+	cluster    string
+	client     string
+}
+
+func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		name := request.Params.Name
+		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", t.providerId))
+		resp, err := handler(ctx, request)
+		track.Evt("MCP Tool Done", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", t.providerId), track.P("error", err))
+		return resp, err
+	}
+}
+
+func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, client MCPClient) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
@@ -38,6 +57,15 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)
+
+	toolTracker := ToolTracker{
+		providerId: string(*providerID),
+		cluster:    cluster,
+		client:     tools.MCPDevelopmentClient,
+	}
+	for i := range defangTools {
+		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)
+	}
 
 	s.AddTools(defangTools...)
 	return s, nil

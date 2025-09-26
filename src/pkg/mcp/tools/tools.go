@@ -34,10 +34,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultCLI{}
 				deploymentInfo := &DefaultDeploymentInfo{}
-				track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
-				track.Evt("MCP Services Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
 			},
 		},
 		{
@@ -47,10 +44,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				track.Evt("MCP Deploy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleDeployTool(ctx, request, providerId, cluster, cli)
-				track.Evt("MCP Deploy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleDeployTool(ctx, request, providerId, cluster, cli)
 			},
 		},
 		{
@@ -61,9 +55,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
 				track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleDestroyTool(ctx, request, providerId, cluster, cli)
-				track.Evt("MCP Destroy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleDestroyTool(ctx, request, providerId, cluster, cli)
 			},
 		},
 		{
@@ -84,10 +76,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultEstimateCLI{}
-				track.Evt("MCP Estimate Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleEstimateTool(ctx, request, providerId, cluster, cli)
-				track.Evt("MCP Estimate Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleEstimateTool(ctx, request, providerId, cluster, cli)
 			},
 		},
 		{
@@ -104,10 +93,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-				track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleSetConfig(ctx, request, cluster, providerId, adapter)
-				track.Evt("MCP Set Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleSetConfig(ctx, request, cluster, providerId, adapter)
 			},
 		},
 		{
@@ -120,10 +106,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				track.Evt("MCP Remove Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
-				track.Evt("MCP Remove Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
 			},
 		},
 		{
@@ -133,10 +116,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				track.Evt("MCP List Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-				resp, err := handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
-				track.Evt("MCP List Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-				return resp, err
+				return handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
 			},
 		},
 	}
