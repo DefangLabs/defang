@@ -30,14 +30,15 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 	term.Debug("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
-		return handleDestroyTool(ctx, request, providerId, cluster, &DestroyCLIAdapter{DefaultToolCLI: cli})
+		track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("status", "started"))
+		resp, err := handleDestroyTool(ctx, request, providerId, cluster, &DestroyCLIAdapter{DefaultToolCLI: cli})
+		track.Evt("MCP Destroy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		return resp, err
 	})
 }
 
 func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Compose down tool called - removing services")
-	track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
-
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err

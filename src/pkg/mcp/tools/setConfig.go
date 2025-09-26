@@ -42,14 +42,16 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClie
 	s.AddTool(setConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
 		adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-		return handleSetConfig(ctx, request, cluster, providerId, adapter)
+		track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		resp, err := handleSetConfig(ctx, request, cluster, providerId, adapter)
+		track.Evt("MCP Set Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		return resp, err
 	})
 }
 
 // handleSetConfig handles the set config MCP tool request
 func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Set Config tool called")
-	track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_clients", MCPDevelopmentClient))
 
 	err := providerNotConfiguredError(*providerId)
 	if err != nil {

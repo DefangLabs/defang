@@ -33,8 +33,8 @@ var mcpServerCmd = &cobra.Command{
 
 		mcpClient, err := mcp.ParseMCPClient(ideClient)
 		if err != nil {
-			term.Warnf("Unable to parse MCP client - using VSCode as default: %v", err)
-			mcpClient = mcp.MCPClientVSCode
+			term.Warnf("Unable to parse MCP client: %v", err)
+			mcpClient = mcp.MCPClientUnspecified
 		}
 
 		term.Debug("Creating log file")

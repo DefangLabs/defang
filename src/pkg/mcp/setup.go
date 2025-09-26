@@ -56,6 +56,7 @@ type VSCodeMCPServerConfig struct {
 type MCPClient string
 
 const (
+	MCPClientUnspecified    MCPClient = ""
 	MCPClientVSCode         MCPClient = "vscode"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
 	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
