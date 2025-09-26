@@ -41,7 +41,7 @@ func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster s
 		term.Debug("Function invoked: cli.InteractiveLoginPrompt")
 		err = cli.InteractiveLoginMCP(ctx, client, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to login", err), err
+			return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
 		}
 	}
 
