@@ -56,6 +56,7 @@ type VSCodeMCPServerConfig struct {
 type MCPClient string
 
 const (
+	MCPClientUnspecified    MCPClient = ""
 	MCPClientVSCode         MCPClient = "vscode"
 	MCPClientVSCodeInsiders MCPClient = "vscode-insiders"
 	MCPClientClaudeDesktop  MCPClient = "claude-desktop"
@@ -226,7 +227,7 @@ func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error)
 }
 
 // getDefangMCPConfig returns the default MCP config for Defang
-func getDefangMCPConfig() (*MCPServerConfig, error) {
+func getDefangMCPConfig(client MCPClient) (*MCPServerConfig, error) {
 	currentPath, err := os.Executable()
 	if err != nil {
 		return nil, err
@@ -234,26 +235,27 @@ func getDefangMCPConfig() (*MCPServerConfig, error) {
 
 	return &MCPServerConfig{
 		Command: currentPath,
-		Args:    []string{"mcp", "serve"},
+		Args:    []string{"mcp", "serve", "--client", string(client)},
 	}, nil
 }
 
 // getVSCodeDefangMCPConfig returns the default MCP config for Defang in VSCode format
-func getVSCodeDefangMCPConfig() (*VSCodeMCPServerConfig, error) {
+func getVSCodeDefangMCPConfig(client MCPClient) (*VSCodeMCPServerConfig, error) {
 	currentPath, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
+
 	return &VSCodeMCPServerConfig{
 		Type:    "stdio",
 		Command: currentPath,
-		Args:    []string{"mcp", "serve"},
+		Args:    []string{"mcp", "serve", "--client", string(client)},
 	}, nil
 }
 
 // getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig() (*VSCodeMCPServerConfig, error) {
-	config, err := getVSCodeDefangMCPConfig()
+func getVSCodeServerConfig(client MCPClient) (*VSCodeMCPServerConfig, error) {
+	config, err := getVSCodeDefangMCPConfig(client)
 	if err != nil {
 		return nil, err
 	}
@@ -279,10 +281,10 @@ func parseExistingConfig(data []byte, existingData *map[string]any) error {
 }
 
 // handleVSCodeConfig handles the special case for VSCode mcp.json
-func handleVSCodeConfig(configPath string) error {
+func handleVSCodeConfig(configPath string, client MCPClient) error {
 	// Create or update the config file
 	var existingData map[string]any
-	config, err := getVSCodeServerConfig()
+	config, err := getVSCodeServerConfig(client)
 	if err != nil {
 		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
 	}
@@ -332,7 +334,7 @@ func handleVSCodeConfig(configPath string) error {
 	return nil
 }
 
-func handleStandardConfig(configPath string) error {
+func handleStandardConfig(configPath string, client MCPClient) error {
 	// For all other clients, use the standard format
 	var existingData map[string]any
 	var config MCPConfig
@@ -366,7 +368,7 @@ func handleStandardConfig(configPath string) error {
 		config.MCPServers = make(map[string]MCPServerConfig)
 	}
 
-	defangConfig, err := getDefangMCPConfig()
+	defangConfig, err := getDefangMCPConfig(client)
 	if err != nil {
 		return fmt.Errorf("failed to get Defang MCP config: %w", err)
 	}
@@ -415,7 +417,7 @@ func handleCodexConfig(configPath string) error {
 		mcpServers = make(map[string]any)
 	}
 
-	defangConfig, err := getDefangMCPConfig()
+	defangConfig, err := getDefangMCPConfig(MCPClientCodex)
 	if err != nil {
 		return fmt.Errorf("failed to get Defang MCP config: %w", err)
 	}
@@ -470,11 +472,11 @@ func SetupClient(clientStr string) error {
 	var handleErr error
 	switch {
 	case slices.Contains(ValidVSCodeClients, client):
-		handleErr = handleVSCodeConfig(configPath)
+		handleErr = handleVSCodeConfig(configPath, client)
 	case client == MCPClientCodex:
 		handleErr = handleCodexConfig(configPath)
 	default:
-		handleErr = handleStandardConfig(configPath)
+		handleErr = handleStandardConfig(configPath, client)
 	}
 
 	if handleErr != nil {
