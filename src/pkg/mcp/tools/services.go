@@ -12,10 +12,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // DefaultDeploymentInfo implements DeploymentInfoInterface using the actual deployment_info functions
@@ -38,29 +36,6 @@ func (c *DefaultCLI) NewProvider(ctx context.Context, providerId cliClient.Provi
 
 func (c *DefaultCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-// setupServicesTool configures and adds the services tool to the MCP server
-func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating services tool")
-	servicesTool := mcp.NewTool("services",
-		mcp.WithDescription("List information about services in Defang Playground"),
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("Services tool created")
-
-	// Add the services tool handler - make it non-blocking
-	term.Debug("Adding services tool handler")
-	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultCLI{}
-		deploymentInfo := &DefaultDeploymentInfo{}
-		track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-		resp, err := handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
-		track.Evt("MCP Services Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-		return resp, err
-	})
 }
 
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {

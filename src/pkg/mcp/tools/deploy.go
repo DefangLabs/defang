@@ -13,10 +13,8 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // OpenURLFunc allows browser.OpenURL to be overridden in tests
@@ -51,29 +49,6 @@ func (c *DefaultDeployCLI) ConfigureLoader(request mcp.CallToolRequest) cliClien
 
 func (c *DefaultDeployCLI) OpenBrowser(url string) error {
 	return browser.OpenURL(url)
-}
-
-// setupDeployTool configures and adds the deployment tool to the MCP server
-func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating deployment tool")
-	composeUpTool := mcp.NewTool("deploy",
-		mcp.WithDescription("Deploy services using defang"),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("Deployment tool created")
-
-	// Add the deployment tool handler - make it non-blocking
-	term.Debug("Adding deployment tool handler")
-	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultToolCLI{}
-		track.Evt("MCP Deploy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-		resp, err := handleDeployTool(ctx, request, providerId, cluster, cli)
-		track.Evt("MCP Deploy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-		return resp, err
-	})
 }
 
 func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (*mcp.CallToolResult, error) {
@@ -163,7 +138,7 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		// Open the portal URL in the browser
 		term.Debugf("Opening portal URL in browser: %s", portalURL)
 		go func() {
-			err := OpenURLFunc(portalURL)
+			err := cli.OpenBrowser(portalURL)
 			if err != nil {
 				term.Error("Failed to open URL in browser", "error", err, "url", portalURL)
 			}
