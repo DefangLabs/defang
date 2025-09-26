@@ -56,9 +56,9 @@ func setupServicesTool(s *server.MCPServer, cluster string, providerId *cliClien
 	s.AddTool(servicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultCLI{}
 		deploymentInfo := &DefaultDeploymentInfo{}
-		track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Services Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		resp, err := handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
-		track.Evt("MCP Services Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		track.Evt("MCP Services Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
 		return resp, err
 	})
 }

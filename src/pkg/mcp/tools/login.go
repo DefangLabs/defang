@@ -65,9 +65,9 @@ func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
 	term.Debug("Adding login tool handler")
 	cli := &DefaultToolCLI{}
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		track.Evt("MCP Login Tool", track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Login Tool", track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		resp := handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
-		track.Evt("MCP Login Tool Done", track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Login Tool Done", track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		return resp, nil
 	})
 }

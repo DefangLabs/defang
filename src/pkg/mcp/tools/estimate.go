@@ -96,9 +96,9 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 	term.Debug("Adding estimate tool handler")
 	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultEstimateCLI{}
-		track.Evt("MCP Estimate Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Estimate Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		resp, err := handleEstimateTool(ctx, request, providerId, cluster, cli)
-		track.Evt("MCP Estimate Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		track.Evt("MCP Estimate Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
 		return resp, err
 	})
 }

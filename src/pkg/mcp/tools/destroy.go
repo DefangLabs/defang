@@ -30,9 +30,9 @@ func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient
 	term.Debug("Adding destroy tool handler")
 	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
-		track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("status", "started"))
+		track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("status", "started"))
 		resp, err := handleDestroyTool(ctx, request, providerId, cluster, &DestroyCLIAdapter{DefaultToolCLI: cli})
-		track.Evt("MCP Destroy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		track.Evt("MCP Destroy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
 		return resp, err
 	})
 }

@@ -42,9 +42,9 @@ func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClie
 	s.AddTool(setConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
 		adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-		track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		resp, err := handleSetConfig(ctx, request, cluster, providerId, adapter)
-		track.Evt("MCP Set Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		track.Evt("MCP Set Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
 		return resp, err
 	})
 }

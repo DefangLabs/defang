@@ -69,9 +69,9 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 	term.Debug("Adding deployment tool handler")
 	s.AddTool(composeUpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cli := &DefaultToolCLI{}
-		track.Evt("MCP Deploy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient))
+		track.Evt("MCP Deploy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 		resp, err := handleDeployTool(ctx, request, providerId, cluster, cli)
-		track.Evt("MCP Deploy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("development_client", MCPDevelopmentClient), track.P("error", err))
+		track.Evt("MCP Deploy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
 		return resp, err
 	})
 }
