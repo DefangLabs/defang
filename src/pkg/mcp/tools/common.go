@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -16,8 +15,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// the name of the environment variable should match MCPClientDevelopmentKey in mcp package
-var MCPDevelopmentClients = pkg.Getenv("DEVELOPMENT_CLIENT", "unknown")
+var MCPDevelopmentClients = "vscode" // default is vscode
 
 var newProvider = cli.NewProvider
 

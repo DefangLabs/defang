@@ -28,7 +28,14 @@ var mcpServerCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		authPort, _ := cmd.Flags().GetInt("auth-server")
+		ideClient, _ := cmd.Flags().GetString("client")
 		term.SetDebug(true)
+
+		mcpClient, err := mcp.ParseMCPClient(ideClient)
+		if err != nil {
+			term.Warnf("Unable to parse MCP client - using VSCode as default: %v", err)
+			mcpClient = mcp.MCPClientVSCode
+		}
 
 		term.Debug("Creating log file")
 		logFile, err := os.OpenFile(filepath.Join(cliClient.StateDir, "defang-mcp.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
@@ -43,7 +50,7 @@ var mcpServerCmd = &cobra.Command{
 
 		// Create a new MCP server
 		term.Debug("Creating MCP server")
-		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, authPort, &providerID)
+		s, err := mcp.NewDefangMCPServer(RootCmd.Version, cluster, authPort, &providerID, mcpClient)
 		if err != nil {
 			return fmt.Errorf("failed to create MCP server: %w", err)
 		}

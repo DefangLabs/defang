@@ -13,7 +13,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID) (*server.MCPServer, error) {
+func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, ideClient MCPClient) (*server.MCPServer, error) {
 	instructions := `Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
 
 There are a number of available tools to help with deployment, configuration, and manage applications deployed with Defang.
@@ -32,6 +32,7 @@ set_config - This tool sets or updates configuration variables for a deployed ap
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
+	tools.MCPDevelopmentClients = string(ideClient)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
