@@ -15,6 +15,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+var MCPDevelopmentClient = ""
+
 var newProvider = cli.NewProvider
 
 func configureLoader(request mcp.CallToolRequest) *compose.Loader {

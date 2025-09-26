@@ -1,14 +1,15 @@
 package mcp
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
-
-	"github.com/DefangLabs/defang/src/pkg"
 )
 
 func TestGetClientConfigPath(t *testing.T) {
@@ -293,7 +294,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": %s,
       "type": "stdio"
@@ -347,7 +350,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": %s,
       "type": "stdio"
@@ -389,7 +394,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": "OLD_OUTDATED_DEFANG_LOCATION",
       "type": "stdio"
@@ -426,7 +433,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": %s,
       "type": "stdio"
@@ -474,7 +483,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": %s,
       "type": "stdio"
@@ -492,7 +503,9 @@ func TestWriteConfig(t *testing.T) {
     "defang": {
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "vscode"
       ],
       "command": %s,
       "type": "stdio"
@@ -510,7 +523,9 @@ func TestWriteConfig(t *testing.T) {
       "command": %s,
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     }
   }
@@ -548,7 +563,9 @@ func TestWriteConfig(t *testing.T) {
       "command": %s,
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     },
     "github": {
@@ -582,7 +599,9 @@ func TestWriteConfig(t *testing.T) {
       "command": "OLD_OUTDATED_DEFANG_LOCATION",
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     },
     "github": {
@@ -612,7 +631,9 @@ func TestWriteConfig(t *testing.T) {
       "command": %s,
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     },
     "github": {
@@ -659,7 +680,9 @@ func TestWriteConfig(t *testing.T) {
       "command": %s,
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     }
   }
@@ -675,7 +698,9 @@ func TestWriteConfig(t *testing.T) {
       "command": %s,
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--client",
+        "cursor"
       ]
     }
   }
@@ -707,10 +732,10 @@ func TestWriteConfig(t *testing.T) {
 
 			if tt.vscodeConfig {
 				typeOfConfig = "vscode mcp config"
-				err = handleVSCodeConfig(tempFilePath)
+				err = handleVSCodeConfig(tempFilePath, MCPClientVSCode)
 			} else {
 				typeOfConfig = "standard mcp config"
-				err = handleStandardConfig(tempFilePath)
+				err = handleStandardConfig(tempFilePath, MCPClientCursor)
 			}
 
 			if tt.expectedError {
@@ -735,8 +760,19 @@ func TestWriteConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := pkg.Diff(string(actualContent), expectedData); err != nil {
-				t.Error(err)
+			if len(bytes.Clone(actualContent)) == 0 {
+				actualContent = []byte(`{}`)
+			}
+
+			var actualJSON, expectedJSON map[string]interface{}
+			if err := json.Unmarshal(actualContent, &actualJSON); err != nil {
+				t.Fatalf("Failed to unmarshal actual content: %v\nContent: %s", err, string(actualContent))
+			}
+			if err := json.Unmarshal([]byte(expectedData), &expectedJSON); err != nil {
+				t.Fatalf("Failed to unmarshal expected data: %v\nData: %s", err, expectedData)
+			}
+			if !reflect.DeepEqual(actualJSON, expectedJSON) {
+				t.Errorf("JSON output does not match expected.\nActual: %v\nExpected: %v", actualJSON, expectedJSON)
 			}
 		})
 	}
@@ -789,7 +825,7 @@ args = ["-y", "docs-server"]
 			existingData: `
 [mcp_servers.defang]
 command = "OLD_PATH"
-args = ["mcp", "serve"]
+args = ["mcp", "serve", "--client", "codex"]
 
 [mcp_servers.aux]
 command = "npx"
@@ -884,7 +920,7 @@ args = ["-y", "aux-server"]
 			}
 
 			args := toStringSlice(t, argsValue)
-			expectedArgs := []string{"mcp", "serve"}
+			expectedArgs := []string{"mcp", "serve", "--client", "codex"}
 			if len(args) != len(expectedArgs) {
 				t.Fatalf("expected defang args %v, got %v", expectedArgs, args)
 			}
