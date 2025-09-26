@@ -11,7 +11,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // handleRemoveConfigTool handles the remove config tool logic
@@ -74,28 +73,4 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("Successfully remove the config variable %q from project %q", name, projectName)), nil
-}
-
-// setupRemoveConfigTool configures and adds the estimate tool to the MCP server
-func setupRemoveConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating remove config tool")
-	removeConfigTool := mcp.NewTool("remove_config",
-		mcp.WithDescription("Remove a config variable for the defang project"),
-		mcp.WithString("name",
-			mcp.Description("The name of the config variable"),
-			mcp.Required(),
-		),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("remove config tool created")
-
-	// Add the Config tool handler
-	term.Debug("Adding remove config tool handler")
-	cli := &DefaultToolCLI{}
-	s.AddTool(removeConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleRemoveConfigTool(ctx, request, providerId, cluster, &RemoveConfigCLIAdapter{DefaultToolCLI: cli})
-	})
 }

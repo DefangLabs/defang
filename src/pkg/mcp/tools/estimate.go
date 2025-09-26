@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/track"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // DefaultEstimateCLI implements EstimateCLIInterface using actual CLI functions
@@ -66,38 +65,6 @@ func (c *DefaultEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, est
 
 	term.DefaultTerm = oldTerm
 	return stdout.String()
-}
-
-// setupEstimateTool configures and adds the estimate tool to the MCP server
-func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating estimate tool")
-	estimateTool := mcp.NewTool("estimate",
-		mcp.WithDescription("Estimate the cost of a Defang project deployed to AWS"),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-
-		mcp.WithString("provider",
-			mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
-			mcp.DefaultString(strings.ToUpper(providerId.String())),
-			mcp.Enum("AWS", "GCP"),
-		),
-
-		mcp.WithString("deployment_mode",
-			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
-			mcp.DefaultString("AFFORDABLE"),
-			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH AVAILABILITY"),
-		),
-	)
-	term.Debug("Estimate tool created")
-
-	// Add the Estimate tool handler
-	term.Debug("Adding estimate tool handler")
-	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultEstimateCLI{}
-		return handleEstimateTool(ctx, request, providerId, cluster, cli)
-	})
 }
 
 func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (*mcp.CallToolResult, error) {

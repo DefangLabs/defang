@@ -10,7 +10,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
 
 // DefaultLoginCLI provides the default implementation
@@ -52,20 +51,4 @@ func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster s
 
 	term.Debug(output)
 	return mcp.NewToolResultText(output), nil
-}
-
-// setupLoginTool configures and adds the login tool to the MCP server
-func setupLoginTool(s *server.MCPServer, cluster string, authPort int) {
-	term.Debug("Creating login tool")
-	loginTool := mcp.NewTool("login",
-		mcp.WithDescription("Login to Defang"),
-	)
-	term.Debug("Login tool created")
-
-	// Add the login tool handler - make it non-blocking
-	term.Debug("Adding login tool handler")
-	cli := &DefaultToolCLI{}
-	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
-	})
 }
