@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,7 +12,7 @@ import (
 func TestLoader(t *testing.T) {
 	testRunCompose(t, func(t *testing.T, path string) {
 		loader := NewLoader(WithPath(path))
-		proj, err := loader.LoadProject(context.Background())
+		proj, err := loader.LoadProject(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

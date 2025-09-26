@@ -81,7 +81,7 @@ func (mockDeployProvider) PrepareDomainDelegation(ctx context.Context, req clien
 
 func TestComposeUp(t *testing.T) {
 	loader := compose.NewLoader(compose.WithPath("../../testdata/testproj/compose.yaml"))
-	proj, err := loader.LoadProject(context.Background())
+	proj, err := loader.LoadProject(t.Context())
 	if err != nil {
 		t.Fatalf("LoadProject() failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestComposeUp(t *testing.T) {
 
 	mc := client.MockFabricClient{DelegateDomain: "example.com"}
 	mp := &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}}
-	d, project, err := ComposeUp(context.Background(), proj, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
+	d, project, err := ComposeUp(t.Context(), proj, mc, mp, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		t.Fatalf("ComposeUp() failed: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestComposeUpStops(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
 			t.Cleanup(cancel)
 
 			provider := &mockDeployProvider{

@@ -195,7 +195,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleListConfigTool(context.Background(), request, &tt.providerID, "test-cluster", mockCLI)
+			result, err := handleListConfigTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectError {

@@ -239,7 +239,7 @@ func testPrepareDomainDelegationNew(t *testing.T, r53Client route53API) {
 func testPrepareDomainDelegationLegacy(t *testing.T, r53Client route53API) {
 	const projectDomain = "byoc-legacy.example.internal"
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// "Create" the legacy hosted zone
 	hz, err := r53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{

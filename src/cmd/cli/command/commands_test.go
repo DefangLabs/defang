@@ -259,7 +259,7 @@ func TestGetProvider(t *testing.T) {
 		return cmd
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("Nil loader auto provider non-interactive should load playground provider", func(t *testing.T) {
 		providerID = "auto"

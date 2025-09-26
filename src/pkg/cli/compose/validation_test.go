@@ -41,17 +41,17 @@ func TestValidationAndConvert(t *testing.T) {
 
 		options := LoaderOptions{ConfigPaths: []string{path}}
 		loader := Loader{options: options}
-		project, err := loader.LoadProject(context.Background())
+		project, err := loader.LoadProject(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := FixupServices(context.Background(), mockClient, project, UploadModeIgnore); err != nil {
+		if err := FixupServices(t.Context(), mockClient, project, UploadModeIgnore); err != nil {
 			t.Logf("Service conversion failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
 
-		if err := ValidateProjectConfig(context.Background(), project, listConfigNamesFunc); err != nil {
+		if err := ValidateProjectConfig(t.Context(), project, listConfigNamesFunc); err != nil {
 			t.Logf("Project config validation failed: %v", err)
 			logs.WriteString(err.Error() + "\n")
 		}
@@ -80,7 +80,7 @@ func makeListConfigNamesFunc(configs ...string) func(context.Context) ([]string,
 }
 
 func TestValidateConfig(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	testProject := composeTypes.Project{
 		Services: composeTypes.Services{},
