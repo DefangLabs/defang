@@ -15,7 +15,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var MCPDevelopmentClients = "vscode" // default is vscode
+var MCPDevelopmentClient = ""
 
 var newProvider = cli.NewProvider
 

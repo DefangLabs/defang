@@ -264,7 +264,7 @@ func startMockFabricServer(mockService *mockFabricService) *httptest.Server {
 func startInProcessMCPServer(ctx context.Context, fabric *httptest.Server) (*MCPClient, error) {
 	providerId := cliClient.ProviderDefang
 	cluster := strings.TrimPrefix(fabric.URL, "http://")
-	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, 0, &providerId, mcp.MCPClientVSCode)
+	srv, err := mcp.NewDefangMCPServer("0.0.1-test", cluster, 0, &providerId, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %v", err)
 	}
