@@ -9,45 +9,8 @@ import (
 	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
-
-// DefaultSetConfigCLI implements SetConfigCLIInterface using the actual CLI functions
-
-// setupSetConfigTool configures and adds the estimate tool to the MCP server
-func setupSetConfigTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating set config tool")
-	setConfigTool := mcp.NewTool("set_config",
-		mcp.WithDescription("Set a config variable for the defang project"),
-		mcp.WithString("name",
-			mcp.Description("The name of the config variable"),
-			mcp.Required(),
-		),
-
-		mcp.WithString("value",
-			mcp.Description("The value of the config variable"),
-			mcp.Required(),
-		),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("set config tool created")
-
-	// Add the Config tool handler
-	term.Debug("Adding set config tool handler")
-	s.AddTool(setConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultToolCLI{}
-		adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-		track.Evt("MCP Set Config Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
-		resp, err := handleSetConfig(ctx, request, cluster, providerId, adapter)
-		track.Evt("MCP Set Config Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-		return resp, err
-	})
-}
 
 // handleSetConfig handles the set config MCP tool request
 func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {

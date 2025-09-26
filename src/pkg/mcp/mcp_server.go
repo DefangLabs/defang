@@ -1,57 +1,72 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
-	"github.com/DefangLabs/defang/src/pkg/term"
+	"github.com/DefangLabs/defang/src/pkg/track"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
 	// NewDefangMCPServer returns a new MCPServer instance with all resources, tools, and prompts registered.
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 )
 
-func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, ideClient MCPClient) (*server.MCPServer, error) {
-	instructions := `Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file.
+func prepareInstructions(defangTools []server.ServerTool) string {
+	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
+	for _, tool := range defangTools {
+		instructions += "\n\n" + tool.Tool.Name + " - " + tool.Tool.Description
+	}
+	return instructions
+}
 
-There are a number of available tools to help with deployment, configuration, and manage applications deployed with Defang.
+type ToolTracker struct {
+	providerId string
+	cluster    string
+	client     string
+}
 
-deploy - This tool deploys a web application to the cloud using the compose.yaml file in the application's working directory.
-destroy - This tool spins down and removes a deployed project from the cloud, cleaning up all associated resources.
-estimate - This tool estimates the cost of running a deployed application based on its resource usage and cloud provider pricing.
-services - This tool lists all running services for a deployed application, providing status and resource usage information
-list_configs - This tool lists all configuration variables for a deployed application, allowing you to view current settings.
-remove_config - This tool removes a configuration variable for a deployed application, allowing you to clean up unused settings.
-set_config - This tool sets or updates configuration variables for a deployed application, allowing you to manage environment variables and secrets.`
+func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		name := request.Params.Name
+		track.Evt("MCP Tool Called", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", t.providerId))
+		resp, err := handler(ctx, request)
+		track.Evt("MCP Tool Done", track.P("tool", name), track.P("client", t.client), track.P("cluster", t.cluster), track.P("provider", t.providerId), track.P("error", err))
+		return resp, err
+	}
+}
 
+func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, client MCPClient) (*server.MCPServer, error) {
 	// Setup knowledge base
-	term.Debug("Setting up knowledge base")
 	if err := SetupKnowledgeBase(); err != nil {
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
-	tools.MCPDevelopmentClient = string(ideClient)
+	defangTools := tools.CollectTools(cluster, authPort, providerID)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
-		server.WithInstructions(instructions),
+		server.WithInstructions(prepareInstructions(defangTools)),
 	)
 
-	// Setup resources
-	term.Debug("Setting up resources")
 	resources.SetupResources(s)
-
-	//setup prompts
-	term.Debug("Setting up prompts")
 	prompts.SetupPrompts(s, cluster, providerID)
 
-	// Setup tools
-	term.Debug("Setting up tools")
-	tools.SetupTools(s, cluster, authPort, providerID)
+	toolTracker := ToolTracker{
+		providerId: string(*providerID),
+		cluster:    cluster,
+		client:     tools.MCPDevelopmentClient,
+	}
+	for i := range defangTools {
+		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)
+	}
+
+	s.AddTools(defangTools...)
 	return s, nil
 }

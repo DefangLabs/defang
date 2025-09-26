@@ -8,34 +8,9 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 )
-
-// setupDestroyTool configures and adds the destroy tool to the MCP server
-func setupDestroyTool(s *server.MCPServer, cluster string, providerId *cliClient.ProviderID) {
-	term.Debug("Creating destroy tool")
-	composeDownTool := mcp.NewTool("destroy",
-		mcp.WithDescription("Remove services using defang."),
-
-		mcp.WithString("working_directory",
-			mcp.Description("Path to current working directory"),
-		),
-	)
-	term.Debug("Destroy tool created")
-
-	// Add the destroy tool handler - make it non-blocking
-	term.Debug("Adding destroy tool handler")
-	s.AddTool(composeDownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cli := &DefaultToolCLI{}
-		track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("status", "started"))
-		resp, err := handleDestroyTool(ctx, request, providerId, cluster, &DestroyCLIAdapter{DefaultToolCLI: cli})
-		track.Evt("MCP Destroy Tool Done", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient), track.P("error", err))
-		return resp, err
-	})
-}
 
 func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Compose down tool called - removing services")
