@@ -86,6 +86,12 @@ func setupListConfigTool(s *server.MCPServer, cluster string, providerId *cliCli
 
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
+			mcp.Required(),
+		),
+
+		mcp.WithArray("compose_file_paths",
+			mcp.Description("Path(s) to docker-compose files; optional"),
+			mcp.Items(map[string]any{"type": "string"}),
 		),
 	)
 	term.Debug("list config tool created")

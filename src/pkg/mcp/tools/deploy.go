@@ -65,8 +65,8 @@ func setupDeployTool(s *server.MCPServer, cluster string, providerId *cliClient.
 		),
 
 		mcp.WithArray("compose_file_paths",
-			mcp.Description("Paths to docker-compose files; optional"),
-			mcp.Items(map[string]any{"type": "string"}),
+			mcp.Description("Path(s) to docker-compose files; optional"),
+			mcp.Items(map[string]string{"type": "string"}),
 		),
 	)
 	term.Debug("Deployment tool created")

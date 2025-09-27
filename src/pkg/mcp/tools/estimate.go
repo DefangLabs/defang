@@ -76,6 +76,7 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 
 		mcp.WithString("working_directory",
 			mcp.Description("Path to current working directory"),
+			mcp.Required(),
 		),
 
 		mcp.WithString("provider",
@@ -88,6 +89,11 @@ func setupEstimateTool(s *server.MCPServer, cluster string, providerId *cliClien
 			mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
 			mcp.DefaultString("AFFORDABLE"),
 			mcp.Enum("AFFORDABLE", "BALANCED", "HIGH AVAILABILITY"),
+		),
+
+		mcp.WithArray("compose_file_paths",
+			mcp.Description("Path(s) to docker-compose files; optional"),
+			mcp.Items(map[string]any{"type": "string"}),
 		),
 	)
 	term.Debug("Estimate tool created")
