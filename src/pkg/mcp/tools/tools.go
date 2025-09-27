@@ -12,6 +12,12 @@ import (
 
 var workingDirectoryOption = mcp.WithString("working_directory",
 	mcp.Description("Path to project's working directory"),
+	mcp.Required(),
+)
+
+var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
+	mcp.Description("Path(s) to docker-compose files"),
+	mcp.Items(map[string]string{"type": "string"}),
 )
 
 func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
@@ -29,6 +35,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("services",
 				mcp.WithDescription("List deployed services for the project in the current working directory"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultCLI{}
@@ -40,6 +47,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("deploy",
 				mcp.WithDescription("Deploy services using defang"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
@@ -50,6 +58,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("destroy",
 				mcp.WithDescription("Destroy deployed services for the project in the current working directory"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
@@ -61,6 +70,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("estimate",
 				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 				mcp.WithString("provider",
 					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
 					mcp.DefaultString(strings.ToUpper(providerId.String())),
@@ -82,6 +92,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("set_config",
 				mcp.WithDescription("Tail logs for a deployment."),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 				mcp.WithString("key",
 					mcp.Description("The config key to set"),
 				),
@@ -99,6 +110,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("remove_config",
 				mcp.WithDescription("Remove a config variable from the defang project"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 				mcp.WithString("key",
 					mcp.Description("The config key to remove"),
 				),
@@ -112,6 +124,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("list_configs",
 				mcp.WithDescription("List config variables for the defang project"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
