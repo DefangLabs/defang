@@ -246,6 +246,7 @@ message DeployRequest {
   string delegate_domain = 5;
   string delegation_set_id = 6;
   bool preview = 7 [ deprecated = true ];
+  Provider provider = 8;
 }
 
 message DeployResponse {
@@ -330,6 +331,33 @@ message ServiceInfo {
   string domainname = 16;  // domain name for the service
   string lb_dns_name = 17; // fully qualified domain name for the load-balancer
   bool allow_scaling = 18; // true if service is allowed to autoscale
+  ResourceType type = 21;
+}
+
+enum ResourceType {
+  RESOURCE_TYPE_UNSPECIFIED = 0;
+  RESOURCE_TYPE_SIDECAR = 1;
+
+  RESOURCE_TYPE_DEFANG_SERVICE = 100;
+
+  RESOURCE_TYPE_AWS_ECS_FARGATE = 200;
+  RESOURCE_TYPE_AWS_ECS_EC2 = 201;
+  RESOURCE_TYPE_AWS_RDS_POSTGRES = 210;
+  RESOURCE_TYPE_AWS_ELASTICACHE_REDIS = 220;
+  RESOURCE_TYPE_AWS_DOCUMENTDB = 230;
+  RESOURCE_TYPE_AWS_CLOUDFRONT_S3 = 240;
+  RESOURCE_TYPE_AWS_BEDROCK = 250;
+
+  RESOURCE_TYPE_DO_APP = 300;
+  RESOURCE_TYPE_DO_DB_POSTGRES = 310;
+  RESOURCE_TYPE_DO_DB_VALKEY = 311;
+
+  RESOURCE_TYPE_GCP_CLOUDRUN = 400;
+  RESOURCE_TYPE_GCP_COMPUTE_ENGINE = 410;
+  RESOURCE_TYPE_GCP_CLOUDSQL_POSTGRES = 420;
+  RESOURCE_TYPE_GCP_MEMORYSTORE = 430;
+  RESOURCE_TYPE_GCP_VERTEXAI = 440;
+  RESOURCE_TYPE_GCP_MONGODB = 450;
 }
 
 message Secrets {
