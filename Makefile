@@ -30,4 +30,3 @@ pkgs/npm/README.md src/README.md: README.md
 .PHONY: test-nix
 test-nix:
 	nix run .#defang-cli --extra-experimental-features flakes --extra-experimental-features nix-command
-
