@@ -4,20 +4,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-)
-
-// Patch points for testability
-var (
-	Connect                 = cli.Connect
-	CheckProviderConfigured = func(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-		return tools.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
-	}
 )
 
 func setupGcpByocPrompt(s *server.MCPServer, cluster string, providerId *client.ProviderID) {
@@ -43,12 +33,12 @@ func gcpByocPromptHandler(cluster string, providerId *client.ProviderID) func(ct
 			return nil, err
 		}
 
-		fabric, err := Connect(ctx, cluster)
+		fabric, err := common.Connect(ctx, cluster)
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", 0)
+		_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderGCP, "", 0)
 		if err != nil {
 			return nil, err
 		}

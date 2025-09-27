@@ -6,20 +6,21 @@ import (
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGcpByocPromptHandler_Success(t *testing.T) {
-	origConnect := Connect
-	origCheck := CheckProviderConfigured
-	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
-	CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
+	origConnect := common.Connect
+	origCheck := common.CheckProviderConfigured
+	common.Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
+	common.CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
 		return &MockProvider{}, nil
 	}
 	defer func() {
-		Connect = origConnect
-		CheckProviderConfigured = origCheck
+		common.Connect = origConnect
+		common.CheckProviderConfigured = origCheck
 	}()
 
 	providerId := client.ProviderID("")
@@ -46,9 +47,9 @@ func TestGcpByocPromptHandler_Success(t *testing.T) {
 }
 
 func TestGcpByocPromptHandler_ConnectError(t *testing.T) {
-	origConnect := Connect
-	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, os.ErrNotExist }
-	defer func() { Connect = origConnect }()
+	origConnect := common.Connect
+	common.Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, os.ErrNotExist }
+	defer func() { common.Connect = origConnect }()
 
 	providerId := client.ProviderID("")
 	handler := gcpByocPromptHandler("test-cluster", &providerId)
@@ -67,15 +68,15 @@ func TestGcpByocPromptHandler_ConnectError(t *testing.T) {
 }
 
 func TestGcpByocPromptHandler_CheckProviderConfiguredError(t *testing.T) {
-	origConnect := Connect
-	origCheck := CheckProviderConfigured
-	Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
-	CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
+	origConnect := common.Connect
+	origCheck := common.CheckProviderConfigured
+	common.Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, nil }
+	common.CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
 		return nil, os.ErrPermission
 	}
 	defer func() {
-		Connect = origConnect
-		CheckProviderConfigured = origCheck
+		common.Connect = origConnect
+		common.CheckProviderConfigured = origCheck
 	}()
 
 	providerId := client.ProviderID("")

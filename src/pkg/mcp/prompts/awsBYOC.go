@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -77,12 +78,12 @@ func awsByocPromptHandler(cluster string, providerId *client.ProviderID) func(ct
 			}
 		}
 
-		fabric, err := Connect(ctx, cluster)
+		fabric, err := common.Connect(ctx, cluster)
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", 0)
+		_, err = common.CheckProviderConfigured(ctx, fabric, client.ProviderAWS, "", 0)
 		if err != nil {
 			return nil, err
 		}
