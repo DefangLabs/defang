@@ -22,10 +22,6 @@ import (
 
 type DefaultToolCLI struct{}
 
-// --- DefaultToolCLI: Core tool passthrough methods ---
-// All methods for DefaultToolCLI are grouped here for clarity and maintainability.
-// These implement the various tool interfaces as passthroughs to the real CLI logic
-
 func (c *DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
 	// If there is a real implementation, call it; otherwise, return nil or a stub error
 	return nil
@@ -180,6 +176,7 @@ func (a *LoginCLIAdapter) InteractiveLoginMCP(ctx context.Context, client *cliCl
 	// Delegate to login.InteractiveLoginMCP from the login package
 	return login.InteractiveLoginMCP(ctx, client, cluster)
 }
+
 func (a *LoginCLIAdapter) GenerateAuthURL(authPort int) string {
 	// Use the same logic as the old DefaultLoginCLI
 	return "Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"

@@ -2,29 +2,10 @@ package tools
 
 import (
 	"context"
-	"strconv"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
-	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/login"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// DefaultLoginCLI provides the default implementation
-type DefaultLoginCLI struct{}
-
-func (c *DefaultLoginCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultLoginCLI) InteractiveLoginMCP(ctx context.Context, client *cliClient.GrpcClient, cluster string) error {
-	return login.InteractiveLoginMCP(ctx, client, cluster)
-}
-
-func (c *DefaultLoginCLI) GenerateAuthURL(authPort int) string {
-	return "Please open this URL in your browser: http://127.0.0.1:" + strconv.Itoa(authPort) + " to login"
-}
 
 // handleLoginTool handles the login tool logic
 func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster string, authPort int, cli LoginCLIInterface) (*mcp.CallToolResult, error) {

@@ -16,7 +16,6 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp"
-	defangtools "github.com/DefangLabs/defang/src/pkg/mcp/tools"
 	typepb "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/DefangLabs/defang/src/protos/io/defang/v1/defangv1connect"
@@ -527,13 +526,6 @@ func TestInProcessMCPServer(t *testing.T) {
 		const dummyToken = "Testing.Token.1234"
 		t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
 
-		// Mock openURLFunc
-		originalOpenURL := defangtools.OpenURLFunc
-		defangtools.OpenURLFunc = func(url string) error {
-			return nil
-		}
-		defer func() { defangtools.OpenURLFunc = originalOpenURL }()
-
 		result, err := mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{
 				Name: "deploy",
@@ -547,8 +539,6 @@ func TestInProcessMCPServer(t *testing.T) {
 		assertCalled(t, err == nil, "Deploy tool error")
 		assertCalled(t, !result.IsError, "Deploy tool IsError")
 		assertCalled(t, MockFabric.deployCalled, "deploy (Deploy)")
-		// openURLFunc is call within another thread which we do not wait for, so we cannot reliably check if it was called
-		//assertCalled(t, openURLFuncCalled, "openURLFunc should be called during deploy")
 
 		_, err = mcpClient.CallTool(t.Context(), m3mcp.CallToolRequest{
 			Params: m3mcp.CallToolParams{

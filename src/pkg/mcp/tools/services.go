@@ -24,18 +24,12 @@ func (d *DefaultDeploymentInfo) GetServices(ctx context.Context, projectName str
 }
 
 // DefaultCLI implements CLIInterface using the actual CLI functions
-type DefaultCLI struct{}
-
-func (c *DefaultCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return defangcli.Connect(ctx, cluster)
+type DefaultCLI struct {
+	DefaultToolCLI
 }
 
 func (c *DefaultCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
 	return defangcli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
 
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {
