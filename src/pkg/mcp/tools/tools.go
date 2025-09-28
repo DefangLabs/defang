@@ -74,7 +74,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultEstimateCLI{}
+				cli := &DefaultToolCLI{}
 				return handleEstimateTool(ctx, request, providerId, cluster, cli)
 			},
 		},

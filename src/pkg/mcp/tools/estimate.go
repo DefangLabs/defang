@@ -1,70 +1,17 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// DefaultEstimateCLI implements EstimateCLIInterface using actual CLI functions
-type DefaultEstimateCLI struct{}
-
-func (c *DefaultEstimateCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultEstimateCLI) LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error) {
-	return loader.LoadProject(ctx)
-}
-
-func (c *DefaultEstimateCLI) RunEstimate(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, providerId cliClient.ProviderID, region string, mode defangv1.DeploymentMode) (*defangv1.EstimateResponse, error) {
-	return cli.RunEstimate(ctx, project, client, provider, providerId, region, mode)
-}
-
-func (c *DefaultEstimateCLI) PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) {
-	cli.PrintEstimate(mode, estimate)
-}
-
-func (c *DefaultEstimateCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
-
-func (c *DefaultEstimateCLI) GetRegion(providerId cliClient.ProviderID) string {
-	return cliClient.GetRegion(providerId)
-}
-
-func (c *DefaultEstimateCLI) CreatePlaygroundProvider(client *cliClient.GrpcClient) cliClient.Provider {
-	return &cliClient.PlaygroundProvider{FabricClient: client}
-}
-
-func (c *DefaultEstimateCLI) SetProviderID(providerId *cliClient.ProviderID, providerString string) error {
-	return providerId.Set(providerString)
-}
-
-func (c *DefaultEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
-	oldTerm := term.DefaultTerm
-	stdout := new(bytes.Buffer)
-	term.DefaultTerm = term.NewTerm(
-		os.Stdin,
-		stdout,
-		new(bytes.Buffer),
-	)
-
-	cli.PrintEstimate(mode, estimate)
-
-	term.DefaultTerm = oldTerm
-	return stdout.String()
-}
 
 func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Estimate tool called")

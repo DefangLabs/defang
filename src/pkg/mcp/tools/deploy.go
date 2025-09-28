@@ -7,49 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/browser"
-
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// OpenURLFunc allows browser.OpenURL to be overridden in tests
-var OpenURLFunc = browser.OpenURL
-
-// DefaultDeployCLI implements DeployCLIInterface using actual CLI functions
-type DefaultDeployCLI struct{}
-
-func (c *DefaultDeployCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultDeployCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error) {
-	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultDeployCLI) ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error) {
-	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
-}
-
-func (c *DefaultDeployCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	return CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
-}
-
-func (c *DefaultDeployCLI) LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error) {
-	return loader.LoadProject(ctx)
-}
-
-func (c *DefaultDeployCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
-
-func (c *DefaultDeployCLI) OpenBrowser(url string) error {
-	return browser.OpenURL(url)
-}
 
 func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (*mcp.CallToolResult, error) {
 	err := providerNotConfiguredError(*providerId)
