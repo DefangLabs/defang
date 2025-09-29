@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -28,7 +29,7 @@ func setupPlaygroundPrompt(s *server.MCPServer, providerId *client.ProviderID) {
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleUser,
-					Content: mcp.NewTextContent(postPrompt),
+					Content: mcp.NewTextContent(common.PostPrompt),
 				},
 			},
 		}, nil

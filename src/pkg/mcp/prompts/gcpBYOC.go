@@ -56,7 +56,7 @@ func gcpByocPromptHandler(cluster string, providerId *client.ProviderID) func(ct
 			Messages: []mcp.PromptMessage{
 				{
 					Role:    mcp.RoleUser,
-					Content: mcp.NewTextContent(postPrompt),
+					Content: mcp.NewTextContent(common.PostPrompt),
 				},
 			},
 		}, nil
