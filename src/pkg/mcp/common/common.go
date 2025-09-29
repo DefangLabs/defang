@@ -19,7 +19,7 @@ var Connect = cli.Connect
 var CheckProviderConfigured = checkProviderConfigured
 var newProvider = cli.NewProvider
 
-const postPrompt = "Please deploy my application with Defang now."
+const PostPrompt = "Please deploy my application with Defang now."
 
 func GetStringArg(args map[string]string, key, defaultValue string) string {
 	if val, exists := args[key]; exists {
@@ -40,7 +40,6 @@ func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
 	if ok {
 		composeFilePaths, ok := composeFilePathsArgs.([]string)
 		if ok {
-			const postPrompt = "Please deploy my application with Defang now."
 			term.Debugf("Compose file paths provided: %s", composeFilePaths)
 			term.Debug("Function invoked: compose.NewLoader")
 			return compose.NewLoader(compose.WithPath(composeFilePaths...))
