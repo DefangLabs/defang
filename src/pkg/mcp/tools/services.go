@@ -10,18 +10,10 @@ import (
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// DefaultDeploymentInfo implements DeploymentInfoInterface using the actual deployment_info functions
-type DefaultDeploymentInfo struct{}
-
-func (d *DefaultDeploymentInfo) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
-	return deployment_info.GetServices(ctx, projectName, provider)
-}
 
 // DefaultCLI implements CLIInterface using the actual CLI functions
 type DefaultCLI struct {
