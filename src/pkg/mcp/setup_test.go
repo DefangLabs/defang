@@ -526,8 +526,7 @@ func TestWriteConfig(t *testing.T) {
         "serve",
         "--client",
         "cursor"
-      ],
-			"type": "stdio"
+      ]
     }
   }
 }`,
@@ -567,8 +566,7 @@ func TestWriteConfig(t *testing.T) {
         "serve",
         "--client",
         "cursor"
-      ],
-			"type": "stdio"
+      ]
     },
     "github": {
       "command": "npx",
@@ -636,8 +634,7 @@ func TestWriteConfig(t *testing.T) {
         "serve",
         "--client",
         "cursor"
-      ],
-			"type": "stdio"
+      ]
     },
     "github": {
       "command": "npx",
@@ -686,8 +683,7 @@ func TestWriteConfig(t *testing.T) {
         "serve",
         "--client",
         "cursor"
-      ],
-			"type": "stdio"
+      ]
     }
   }
 }`,
@@ -705,8 +701,7 @@ func TestWriteConfig(t *testing.T) {
         "serve",
         "--client",
         "cursor"
-      ],
-			"type": "stdio"
+      ]
     }
   }
 }`,
