@@ -296,12 +296,16 @@ func configureDefangMCPServer(configPath string, client MCPClient) error {
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
-	serverMap[name] = MCPServerConfig{
+	serverConfig := MCPServerConfig{
 		Command: command,
-		Type:    "stdio",
 		Args:    []string{"mcp", "serve", "--client", string(client)},
 	}
 
+	if client == MCPClientVSCode || client == MCPClientVSCodeInsiders {
+		serverConfig.Type = "stdio"
+	}
+
+	serverMap[name] = serverConfig
 	config[key] = serverMap
 	return writeConfigFile(configPath, config)
 }
