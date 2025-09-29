@@ -18,6 +18,7 @@ import (
 var Connect = cli.Connect
 var CheckProviderConfigured = checkProviderConfigured
 var newProvider = cli.NewProvider
+var ElicitationEnabled = true
 
 const PostPrompt = "Please deploy my application with Defang now."
 

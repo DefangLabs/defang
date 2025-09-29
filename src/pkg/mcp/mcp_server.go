@@ -2,11 +2,15 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -39,6 +43,22 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
+func OnRequestInitializationHandler(ctx context.Context, id any, message any) error {
+	initReq, ok := message.(*mcp.InitializeRequest)
+	if !ok {
+		return errors.New("Init Req: invalid message type")
+	}
+
+	common.ElicitationEnabled = initReq.Params.Capabilities.Elicitation != nil
+
+	// Pretty print capabilities
+	if data, err := json.MarshalIndent(initReq.Params.Capabilities, "", "  "); err == nil {
+		term.Debug("Client Capabilities:\n" + string(data))
+	}
+
+	return nil
+}
+
 func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, client MCPClient) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
@@ -49,11 +69,14 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 	s := server.NewMCPServer(
 		"Deploy with Defang",
 		version,
+		server.WithElicitation(),
 		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions(defangTools)),
 	)
+
+	hooks := &server.Hooks{}
+	hooks.AddOnRequestInitialization(OnRequestInitializationHandler)
 
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)
