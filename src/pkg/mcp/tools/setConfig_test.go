@@ -296,7 +296,7 @@ func TestHandleSetConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createCallToolRequest(tt.requestArgs)
-			result, err := handleSetConfig(testContext, request, tt.cluster, &tt.providerId, tt.mockCLI)
+			result, err := handleSetConfig(testContext, request, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.NotNil(t, result)

@@ -26,7 +26,7 @@ func setupGcpByocPrompt(s *server.MCPServer, cluster string, providerId *client.
 func gcpByocPromptHandler(cluster string, providerId *client.ProviderID) func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		projectID := req.Params.Arguments["GCP_PROJECT_ID"]
-		if err := actions.SetGCPByocProvider(ctx, cluster, projectID, providerId); err != nil {
+		if err := actions.SetGCPByocProvider(ctx, providerId, cluster, projectID); err != nil {
 			return nil, err
 		}
 

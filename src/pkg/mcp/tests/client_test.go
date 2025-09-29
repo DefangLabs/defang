@@ -253,6 +253,9 @@ var expectedToolsList = []string{
 	"set_config",
 	"remove_config",
 	"list_configs",
+	"set_aws_provider",
+	"set_gcp_provider",
+	"set_playground_provider",
 }
 
 func startMockFabricServer(mockService *mockFabricService) *httptest.Server {
