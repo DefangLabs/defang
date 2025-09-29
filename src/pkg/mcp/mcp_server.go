@@ -2,7 +2,10 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
@@ -39,6 +42,31 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 	}
 }
 
+func OnRequestInitializationHandler(ctx context.Context, id any, message any) error {
+	log.Print("OnRequestInitializationHandler is called:\n")
+
+	rawMsg, ok := message.(json.RawMessage)
+	if !ok {
+		return errors.New("Init Req: invalid message type")
+	}
+
+	var initReq mcp.InitializeRequest
+	if err := json.Unmarshal(rawMsg, &initReq); err != nil {
+		return errors.New("Init Req: failed to unmarshal message")
+	}
+
+	// Pretty print capabilities
+	if data, err := json.MarshalIndent(initReq.Params.Capabilities, "", "  "); err == nil {
+		log.Print("Client Capabilities:\n" + string(data))
+	}
+
+	log.Printf("server config - %v:", initReq)
+
+	log.Print("OnRequestInitializationHandler is done")
+
+	return nil
+}
+
 func NewDefangMCPServer(version string, cluster string, authPort int, providerID *cliClient.ProviderID, client MCPClient) (*server.MCPServer, error) {
 	// Setup knowledge base
 	if err := SetupKnowledgeBase(); err != nil {
@@ -50,7 +78,6 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 		"Deploy with Defang",
 		version,
 		server.WithResourceCapabilities(true, true),
-		server.WithPromptCapabilities(true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions(defangTools)),
 	)

@@ -13,11 +13,12 @@ import (
 // handleSetAWSProvider handles the set AWS provider MCP tool request
 func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (*mcp.CallToolResult, error) {
 	term.Debug("Set AWS Provider tool called")
-	awsId, err := request.RequireString("aws_access_key_id")
+
+	awsId, err := request.RequireString("aws_id")
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Invalid AWS access key", err), err
+		return mcp.NewToolResultErrorFromErr("Invalid AWS access key Id", err), err
 	}
-	awsSecretAccessKey, err := request.RequireString("aws_secret_access_key")
+	awsSecretAccessKey, err := request.RequireString("aws_secret")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid AWS secret access key", err), err
 	}
@@ -25,8 +26,7 @@ func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, prov
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid AWS region", err), err
 	}
-
-	if err := actions.SetAWSByocProvider(ctx, cluster, providerId, awsId, awsSecretAccessKey, awsRegion); err != nil {
+	if err := actions.SetAWSByocProvider(ctx, providerId, cluster, awsId, awsSecretAccessKey, awsRegion); err != nil {
 		return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
 	}
 

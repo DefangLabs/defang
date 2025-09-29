@@ -41,7 +41,7 @@ func IsValidAWSKey(key string) bool {
 	return true
 }
 
-func SetAWSByocProvider(ctx context.Context, cluster string, providerId *client.ProviderID, awsID string, awsSecret string, region string) error {
+func SetAWSByocProvider(ctx context.Context, providerId *client.ProviderID, cluster string, awsID string, awsSecret string, region string) error {
 	// Can never be nil or empty due to RequiredArgument
 	if IsValidAWSKey(awsID) {
 		err := os.Setenv("AWS_ACCESS_KEY_ID", awsID)
