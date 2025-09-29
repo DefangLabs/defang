@@ -45,7 +45,7 @@ func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.Gr
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client *client.GrpcClient) (client.Provider, error) {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil, m.NewProviderError
 }

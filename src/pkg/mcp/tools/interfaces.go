@@ -17,7 +17,7 @@ type Connecter interface {
 }
 
 type ProviderFactory interface {
-	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error)
+	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
 }
 
 type LoaderConfigurator interface {
