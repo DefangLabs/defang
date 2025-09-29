@@ -2,6 +2,8 @@ package prompts
 
 import (
 	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
 )
 
 func TestIsValidAWSKey_ValidKeys(t *testing.T) {
@@ -14,7 +16,7 @@ func TestIsValidAWSKey_ValidKeys(t *testing.T) {
 		"ASCA12345678901234",
 	}
 	for _, key := range validKeys {
-		if !isValidAWSKey(key) {
+		if !actions.IsValidAWSKey(key) {
 			t.Errorf("expected key %q to be valid", key)
 		}
 	}
@@ -30,7 +32,7 @@ func TestIsValidAWSKey_InvalidKeys(t *testing.T) {
 		"ZZZZ12345678901234", // invalid prefix
 	}
 	for _, key := range invalidKeys {
-		if isValidAWSKey(key) {
+		if actions.IsValidAWSKey(key) {
 			t.Errorf("expected key %q to be invalid", key)
 		}
 	}
