@@ -8,7 +8,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 )
 
-func SetGCPByocProvider(ctx context.Context, cluster string, projectID string, providerId *client.ProviderID) error {
+func SetGCPByocProvider(ctx context.Context, providerId *client.ProviderID, cluster string, projectID string) error {
 	err := os.Setenv("GCP_PROJECT_ID", projectID)
 	if err != nil {
 		return err
