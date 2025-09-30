@@ -728,29 +728,27 @@ func TestWriteConfig(t *testing.T) {
 				}
 			}
 
-			var typeOfConfig string
-
+			var client MCPClient
 			if tt.vscodeConfig {
-				typeOfConfig = "vscode mcp config"
-				err = handleVSCodeConfig(tempFilePath, MCPClientVSCode)
+				client = MCPClientVSCode
 			} else {
-				typeOfConfig = "standard mcp config"
-				err = handleStandardConfig(tempFilePath, MCPClientCursor)
+				client = MCPClientCursor
 			}
+			err = configureDefangMCPServer(tempFilePath, client)
 
 			if tt.expectedError {
 				if err == nil {
-					t.Errorf("Expected error for %s but got none", typeOfConfig)
+					t.Errorf("Expected error for %s but got none", client)
 				}
 				return // Don't continue with file comparison if we expected an error
 			} else {
 				if err != nil {
-					t.Fatalf("Unexpected error for %s: %v", typeOfConfig, err)
+					t.Fatalf("Unexpected error for %s: %v", client, err)
 				}
 			}
 
 			if err != nil {
-				t.Fatalf("Unexpected error for %s: %v", typeOfConfig, err)
+				t.Fatalf("Unexpected error for %s: %v", client, err)
 			}
 
 			expectedData := fmt.Sprintf(tt.expectedData, fmt.Sprintf(`"%s"`, executablePath))
@@ -779,11 +777,6 @@ func TestWriteConfig(t *testing.T) {
 }
 
 func TestHandleCodexConfig(t *testing.T) {
-	type expectedServer struct {
-		command string
-		args    []string
-	}
-
 	executablePath, err := os.Executable()
 	if err != nil {
 		t.Fatalf("failed to get executable: %v", err)
@@ -793,7 +786,7 @@ func TestHandleCodexConfig(t *testing.T) {
 		name                string
 		fileExists          bool
 		existingData        string
-		otherServers        map[string]expectedServer
+		otherServers        map[string]MCPServerConfig
 		expectProfileActive string
 		expectedError       bool
 	}{
@@ -811,10 +804,10 @@ active = "default"
 command = "npx"
 args = ["-y", "docs-server"]
 `,
-			otherServers: map[string]expectedServer{
+			otherServers: map[string]MCPServerConfig{
 				"docs": {
-					command: "npx",
-					args:    []string{"-y", "docs-server"},
+					Command: "npx",
+					Args:    []string{"-y", "docs-server"},
 				},
 			},
 			expectProfileActive: "default",
@@ -831,10 +824,10 @@ args = ["mcp", "serve", "--client", "codex"]
 command = "npx"
 args = ["-y", "aux-server"]
 `,
-			otherServers: map[string]expectedServer{
+			otherServers: map[string]MCPServerConfig{
 				"aux": {
-					command: "npx",
-					args:    []string{"-y", "aux-server"},
+					Command: "npx",
+					Args:    []string{"-y", "aux-server"},
 				},
 			},
 		},
@@ -863,7 +856,7 @@ args = ["-y", "aux-server"]
 				}
 			}
 
-			err := handleCodexConfig(configPath)
+			err := configureDefangMCPServer(configPath, MCPClientCodex)
 			if tt.expectedError {
 				if err == nil {
 					t.Fatalf("expected error but got nil")
@@ -946,17 +939,17 @@ args = ["-y", "aux-server"]
 					t.Fatalf("expected command for server %q to be string, got %T", serverName, serverMap["command"])
 				}
 
-				if cmd != expected.command {
-					t.Fatalf("expected command for server %q to be %q, got %q", serverName, expected.command, cmd)
+				if cmd != expected.Command {
+					t.Fatalf("expected command for server %q to be %q, got %q", serverName, expected.Command, cmd)
 				}
 
 				actualArgs := toStringSlice(t, serverMap["args"])
-				if len(actualArgs) != len(expected.args) {
-					t.Fatalf("expected args %v for server %q, got %v", expected.args, serverName, actualArgs)
+				if len(actualArgs) != len(expected.Args) {
+					t.Fatalf("expected args %v for server %q, got %v", expected.Args, serverName, actualArgs)
 				}
-				for i, arg := range expected.args {
+				for i, arg := range expected.Args {
 					if actualArgs[i] != arg {
-						t.Fatalf("expected args %v for server %q, got %v", expected.args, serverName, actualArgs)
+						t.Fatalf("expected args %v for server %q, got %v", expected.Args, serverName, actualArgs)
 					}
 				}
 			}

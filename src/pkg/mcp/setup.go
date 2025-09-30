@@ -1,9 +1,7 @@
 package mcp
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,36 +18,13 @@ import (
 
 // MCPServerConfig represents the configuration for an MCP server
 type MCPServerConfig struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Type    string            `json:"type,omitempty"`
-	URL     string            `json:"url,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
-	EnvFile string            `json:"envFile,omitempty"`
-	Headers map[string]string `json:"headers,omitempty"`
-}
-
-// MCPConfig represents the configuration file structure
-type MCPConfig struct {
-	MCPServers map[string]MCPServerConfig `json:"mcpServers"`
-}
-
-// VSCodeConfig represents the VSCode mcp.json structure
-type VSCodeConfig struct {
-	Servers map[string]VSCodeMCPServerConfig `json:"servers"`
-	// Other VSCode settings can be preserved with this field
-	Other map[string]any `json:"-"`
-}
-
-// VSCodeMCPServerConfig represents the configuration for a VSCode MCP server
-type VSCodeMCPServerConfig struct {
-	Args    []string          `json:"args,omitempty"`    // Required for stdio
-	Command string            `json:"command,omitempty"` // Required for stdio
-	Env     map[string]any    `json:"env,omitempty"`
-	EnvFile string            `json:"envFile,omitempty"`
-	Headers map[string]string `json:"headers,omitempty"` // For sse
-	Type    string            `json:"type,omitempty"`    // Required: "stdio" or "sse"
-	URL     string            `json:"url,omitempty"`     // Required for sse
+	Command string            `json:"command,omitempty" toml:"command,omitempty"`
+	Args    []string          `json:"args,omitempty" toml:"args,omitempty"`
+	Type    string            `json:"type,omitempty" toml:"type,omitempty"`
+	URL     string            `json:"url,omitempty" toml:"url,omitempty"`
+	Env     map[string]string `json:"env,omitempty" toml:"env,omitempty"`
+	EnvFile string            `json:"envFile,omitempty" toml:"envFile,omitempty"`
+	Headers map[string]string `json:"headers,omitempty" toml:"headers,omitempty"`
 }
 
 // MCPClient represents the supported MCP clients as an enum
@@ -226,220 +201,113 @@ func getClientConfigPath(homeDir, goos string, client MCPClient) (string, error)
 	return filepath.Join(basePath, clientInfo.configFile), nil
 }
 
-// getDefangMCPConfig returns the default MCP config for Defang
-func getDefangMCPConfig(client MCPClient) (*MCPServerConfig, error) {
-	currentPath, err := os.Executable()
+func readConfig(configPath string) (map[string]any, error) {
+	config := make(map[string]any)
+	configBytes, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return config, nil
+		}
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	return &MCPServerConfig{
-		Command: currentPath,
-		Args:    []string{"mcp", "serve", "--client", string(client)},
-	}, nil
+	if strings.TrimSpace(string(configBytes)) == "" {
+		return config, nil
+	}
+
+	if strings.HasSuffix(configPath, ".toml") {
+		err = toml.Unmarshal(configBytes, &config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		}
+		return config, nil
+	}
+
+	err = json.Unmarshal(configBytes, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	return config, nil
 }
 
-// getVSCodeDefangMCPConfig returns the default MCP config for Defang in VSCode format
-func getVSCodeDefangMCPConfig(client MCPClient) (*VSCodeMCPServerConfig, error) {
-	currentPath, err := os.Executable()
-	if err != nil {
-		return nil, err
+func extractServerMap(config map[string]any, key string) (map[string]any, error) {
+	if config == nil {
+		return make(map[string]any), nil
 	}
-
-	return &VSCodeMCPServerConfig{
-		Type:    "stdio",
-		Command: currentPath,
-		Args:    []string{"mcp", "serve", "--client", string(client)},
-	}, nil
-}
-
-// getVSCodeServerConfig returns a map with the VSCode-specific MCP server config
-func getVSCodeServerConfig(client MCPClient) (*VSCodeMCPServerConfig, error) {
-	config, err := getVSCodeDefangMCPConfig(client)
-	if err != nil {
-		return nil, err
+	if _, exists := config[key]; !exists {
+		return make(map[string]any), nil
 	}
-	return &VSCodeMCPServerConfig{
-		Args:    config.Args,
-		Command: config.Command,
-		Type:    config.Type,
-	}, nil
-}
-
-func parseExistingConfig(data []byte, existingData *map[string]any) error {
-	// Check if file is empty or only contains whitespace
-	if len(bytes.TrimSpace(data)) == 0 {
-		// File is empty, treat as new config
-		*existingData = make(map[string]any)
-	} else {
-		// Parse the JSON into a generic map to preserve all settings
-		if err := json.Unmarshal(data, &existingData); err != nil {
-			return fmt.Errorf("failed to unmarshal existing config: %w", err)
-		}
-	}
-	return nil
-}
-
-// handleVSCodeConfig handles the special case for VSCode mcp.json
-func handleVSCodeConfig(configPath string, client MCPClient) error {
-	// Create or update the config file
-	var existingData map[string]any
-	config, err := getVSCodeServerConfig(client)
-	if err != nil {
-		return fmt.Errorf("failed to get VSCode MCP config: %w", err)
-	}
-
-	// Check if the file exists
-	if data, err := os.ReadFile(configPath); err == nil {
-		if err := parseExistingConfig(data, &existingData); err != nil {
-			return err
-		}
-
-		// Check if "servers" section exists
-		serversSection, ok := existingData["servers"]
-		if !ok {
-			// Create new "servers" section
-			existingData["servers"] = map[string]any{}
-			serversSection = existingData["servers"]
-		}
-
-		if mcpMap, ok := serversSection.(map[string]any); ok {
-			mcpMap["defang"] = config
-			existingData["servers"] = mcpMap
-		} else {
-			return errors.New("failed to assert 'servers' section as map[string]any")
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read config file: %w", err)
-	} else {
-		// File doesn't exist, create a new config with minimal settings
-		existingData = map[string]any{
-			"servers": map[string]any{
-				"defang": config,
-			},
-		}
-	}
-
-	// Write the config to the file
-	data, err := json.MarshalIndent(existingData, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	// #nosec G306 - config file does not contain sensitive data
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
-}
-
-func handleStandardConfig(configPath string, client MCPClient) error {
-	// For all other clients, use the standard format
-	var existingData map[string]any
-	var config MCPConfig
-
-	// Check if the file exists
-	if data, err := os.ReadFile(configPath); err == nil {
-		if err := parseExistingConfig(data, &existingData); err != nil {
-			return err
-		}
-
-		// Try to extract MCPServers from existing data
-		if mcpServersData, ok := existingData["mcpServers"]; ok {
-			// Convert back to MCPConfig structure
-			mcpServersJSON, err := json.Marshal(map[string]any{"mcpServers": mcpServersData})
-			if err != nil {
-				return fmt.Errorf("failed to marshal mcpServers: %w", err)
-			}
-			err = json.Unmarshal(mcpServersJSON, &config)
-			if err != nil {
-				return fmt.Errorf("failed to unmarshal mcpServers: %w", err)
-			}
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read config file: %w", err)
-	} else {
-		// File doesn't exist, create a new config
-		existingData = make(map[string]any)
-	}
-
-	if config.MCPServers == nil {
-		config.MCPServers = make(map[string]MCPServerConfig)
-	}
-
-	defangConfig, err := getDefangMCPConfig(client)
-	if err != nil {
-		return fmt.Errorf("failed to get Defang MCP config: %w", err)
-	}
-	// Add or update the Defang MCP server config
-	config.MCPServers["defang"] = *defangConfig
-
-	// Update the existingData with the new MCPServers
-	existingData["mcpServers"] = config.MCPServers
-
-	// Write the config to the file
-	data, err := json.MarshalIndent(existingData, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	// #nosec G306 - config file does not contain sensitive data
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
-}
-
-func handleCodexConfig(configPath string) error {
-	var existingData map[string]any
-
-	if data, err := os.ReadFile(configPath); err == nil {
-		if len(data) > 0 {
-			if err := toml.Unmarshal(data, &existingData); err != nil {
-				return fmt.Errorf("failed to unmarshal existing codex config: %w", err)
-			}
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	if existingData == nil {
-		existingData = make(map[string]any)
-	}
-
-	mcpServers, ok := existingData["mcp_servers"].(map[string]any)
+	serverMap, ok := config[key].(map[string]any)
 	if !ok {
-		if existingData["mcp_servers"] != nil {
-			return errors.New("failed to assert 'mcp_servers' section as map[string]any")
+		return nil, fmt.Errorf("invalid \"%s\" config format", key)
+	}
+	return serverMap, nil
+}
+
+func writeConfigFile(configPath string, data any) error {
+	var configBytes []byte
+	var err error
+	if strings.HasSuffix(configPath, ".toml") {
+		configBytes, err = toml.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal config to TOML: %w", err)
 		}
-		mcpServers = make(map[string]any)
-	}
-
-	defangConfig, err := getDefangMCPConfig(MCPClientCodex)
-	if err != nil {
-		return fmt.Errorf("failed to get Defang MCP config: %w", err)
-	}
-
-	mcpServers["defang"] = map[string]any{
-		"command": defangConfig.Command,
-		"args":    defangConfig.Args,
-	}
-
-	existingData["mcp_servers"] = mcpServers
-
-	data, err := toml.Marshal(existingData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal codex config: %w", err)
+	} else {
+		configBytes, err = json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal config to JSON: %w", err)
+		}
 	}
 
 	// #nosec G306 - config file does not contain sensitive data
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil
+}
+
+func configureDefangMCPServer(configPath string, client MCPClient) error {
+	config, err := readConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read existing config file: %w", err)
+	}
+
+	var key string
+	switch client {
+	case MCPClientVSCode, MCPClientVSCodeInsiders:
+		key = "servers"
+	case MCPClientCodex:
+		// Codex uses TOML format and a different key
+		key = "mcp_servers"
+	default:
+		// Default to JSON format with standard key
+		key = "mcpServers"
+	}
+
+	serverMap, err := extractServerMap(config, key)
+	if err != nil {
+		return fmt.Errorf("failed to extract server map: %w", err)
+	}
+
+	name := "defang"
+	command, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+	serverConfig := MCPServerConfig{
+		Command: command,
+		Args:    []string{"mcp", "serve", "--client", string(client)},
+	}
+
+	if client == MCPClientVSCode || client == MCPClientVSCodeInsiders {
+		serverConfig.Type = "stdio"
+	}
+
+	serverMap[name] = serverConfig
+	config[key] = serverMap
+	return writeConfigFile(configPath, config)
 }
 
 func SetupClient(clientStr string) error {
@@ -468,19 +336,9 @@ func SetupClient(clientStr string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Handle client-specific config formats
-	var handleErr error
-	switch {
-	case slices.Contains(ValidVSCodeClients, client):
-		handleErr = handleVSCodeConfig(configPath, client)
-	case client == MCPClientCodex:
-		handleErr = handleCodexConfig(configPath)
-	default:
-		handleErr = handleStandardConfig(configPath, client)
-	}
-
-	if handleErr != nil {
-		return handleErr
+	err = configureDefangMCPServer(configPath, client)
+	if err != nil {
+		return fmt.Errorf("failed to update mcp config file for client %q: %w", client, err)
 	}
 
 	term.Infof("Ensure %s is upgraded to the latest version and restarted for mcp settings to take effect.\n", client)
