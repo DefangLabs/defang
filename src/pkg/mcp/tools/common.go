@@ -26,15 +26,12 @@ func configureLoader(request mcp.CallToolRequest) *compose.Loader {
 		term.Debug("Function invoked: compose.NewLoader")
 		return compose.NewLoader(compose.WithProjectName(projectName))
 	}
-	arguments := request.GetArguments()
-	composeFilePathsArgs, ok := arguments["compose_file_paths"]
-	if ok {
-		composeFilePaths, ok := composeFilePathsArgs.([]string)
-		if ok {
-			term.Debugf("Compose file paths provided: %s", composeFilePaths)
-			term.Debug("Function invoked: compose.NewLoader")
-			return compose.NewLoader(compose.WithPath(composeFilePaths...))
-		}
+
+	composeFilePathsArgs, err := request.RequireStringSlice("compose_file_paths")
+	if err == nil {
+		term.Debugf("Compose file paths provided: %s", composeFilePathsArgs)
+		term.Debug("Function invoked: compose.NewLoader")
+		return compose.NewLoader(compose.WithPath(composeFilePathsArgs...))
 	}
 
 	//TODO: Talk about using both project name and compose file paths
