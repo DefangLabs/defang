@@ -100,6 +100,8 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 		mode = defangv1.DeploymentMode_DEVELOPMENT
 	case "BALANCED":
 		mode = defangv1.DeploymentMode_STAGING
+	case "HIGH_AVAILABILITY":
+		mode = defangv1.DeploymentMode_PRODUCTION
 	case "HIGH AVAILABILITY":
 		mode = defangv1.DeploymentMode_PRODUCTION
 	default:
