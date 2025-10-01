@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"strconv"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/pkg/browser"
 )
 
 // DefaultToolCLI implements all tool interfaces as passthroughs to the real CLI logic
@@ -21,6 +23,8 @@ import (
 // Implements: DeployCLIInterface, DestroyCLIInterface, EstimateCLIInterface, ListConfigCLIInterface, LoginCLIInterface, RemoveConfigCLIInterface, SetConfigCLIInterface, CLIInterface, DeploymentInfoInterface
 
 type DefaultToolCLI struct{}
+
+var OpenBrowserFunc = browser.OpenURL
 
 func (DefaultToolCLI) CanIUseProvider(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, provider cliClient.Provider, serviceCount int) error {
 	// If there is a real implementation, call it; otherwise, return nil or a stub error
@@ -108,8 +112,11 @@ func (DefaultToolCLI) GetRegion(providerId cliClient.ProviderID) string {
 }
 
 func (DefaultToolCLI) OpenBrowser(url string) error {
-	// No-op stub implementation
-	return nil
+	if OpenBrowserFunc != nil {
+		return OpenBrowserFunc(url)
+	}
+
+	return errors.New("no browser function defined")
 }
 
 func (DefaultToolCLI) SetProviderID(providerId *cliClient.ProviderID, providerString string) error {
