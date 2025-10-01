@@ -132,7 +132,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedErrorContains: "no such file or directory",
 		},
 		{
-			name:             "unknown_deployment_mode_defaults",
+			name:             "unknown_deployment_mode_fails",
 			workingDirectory: ".",
 			deploymentMode:   "unknown-mode",
 			providerID:       client.ProviderAWS,
@@ -149,9 +149,9 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectError:          false,
+			expectError:          true,
 			expectTextResult:     true,
-			expectedTextContains: "Successfully estimated the cost of the project to AWS",
+			expectedTextContains: "Unknown deployment mode provided, please use one of AFFORDABLE, BALANCED or HIGH_AVAILABILITY",
 		},
 		{
 			name:             "load_project_error",
