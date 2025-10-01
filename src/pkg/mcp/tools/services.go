@@ -15,7 +15,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {
+func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Services tool called - fetching services from Defang")
 
 	err := providerNotConfiguredError(*providerId)
@@ -63,7 +63,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 	}
 
-	serviceResponse, err := deploymentInfo.GetServices(ctx, projectName, provider)
+	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {

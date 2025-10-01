@@ -97,13 +97,10 @@ type SetConfigCLIInterface interface {
 	ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error
 }
 
-type DeploymentInfoInterface interface {
-	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
-}
-
 type CLIInterface interface {
 	Connecter
 	// Unique methods
+	GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error)
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)
 	LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error)
 }
