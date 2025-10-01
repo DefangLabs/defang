@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -44,17 +44,27 @@ func (t *ToolTracker) TrackTool(name string, handler server.ToolHandlerFunc) ser
 }
 
 func OnRequestInitializationHandler(ctx context.Context, id any, message any) error {
-	initReq, ok := message.(*mcp.InitializeRequest)
+	log.Print("OnRequestInitializationHandler is called:\n")
+
+	rawMsg, ok := message.(json.RawMessage)
 	if !ok {
 		return errors.New("Init Req: invalid message type")
 	}
 
-	common.ElicitationEnabled = initReq.Params.Capabilities.Elicitation != nil
+	var initReq mcp.InitializeRequest
+	if err := json.Unmarshal(rawMsg, &initReq); err != nil {
+		return errors.New("Init Req: failed to unmarshal message")
+	}
 
 	// Pretty print capabilities
 	if data, err := json.MarshalIndent(initReq.Params.Capabilities, "", "  "); err == nil {
-		term.Debug("Client Capabilities:\n" + string(data))
+		log.Print("Client Capabilities:\n" + string(data))
 	}
+
+	common.ElicitationEnabled = initReq.Params.Capabilities.Elicitation != nil
+	log.Printf("server config - %v:", initReq)
+
+	log.Print("OnRequestInitializationHandler is done")
 
 	return nil
 }
@@ -65,6 +75,9 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 		return nil, fmt.Errorf("failed to setup knowledge base: %w", err)
 	}
 
+	hooks := &server.Hooks{}
+	hooks.AddOnRequestInitialization(OnRequestInitializationHandler)
+
 	defangTools := tools.CollectTools(cluster, authPort, providerID)
 	s := server.NewMCPServer(
 		"Deploy with Defang",
@@ -73,10 +86,8 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 		server.WithResourceCapabilities(true, true),
 		server.WithToolCapabilities(true),
 		server.WithInstructions(prepareInstructions(defangTools)),
+		server.WithHooks(hooks),
 	)
-
-	hooks := &server.Hooks{}
-	hooks.AddOnRequestInitialization(OnRequestInitializationHandler)
 
 	resources.SetupResources(s)
 	prompts.SetupPrompts(s, cluster, providerID)

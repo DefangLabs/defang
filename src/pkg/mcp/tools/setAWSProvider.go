@@ -79,11 +79,11 @@ func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, prov
 			return mcp.NewToolResultErrorFromErr("Invalid AWS Region format", errors.New("expected string for aws_region")), errors.New("invalid aws_region format")
 		}
 	} else {
-		awsId, err = request.RequireString("aws_access_key_id")
+		awsId, err = request.RequireString("aws_id")
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Invalid AWS access key", err), err
+			return mcp.NewToolResultErrorFromErr("Invalid AWS access key Id", err), err
 		}
-		awsSecretAccessKey, err = request.RequireString("aws_secret_access_key")
+		awsSecretAccessKey, err = request.RequireString("aws_secret")
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("Invalid AWS secret access key", err), err
 		}
@@ -93,7 +93,7 @@ func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, prov
 		}
 	}
 
-	if err := actions.SetAWSByocProvider(ctx, cluster, providerId, awsId, awsSecretAccessKey, awsRegion); err != nil {
+	if err := actions.SetAWSByocProvider(ctx, providerId, cluster, awsId, awsSecretAccessKey, awsRegion); err != nil {
 		return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
 	}
 

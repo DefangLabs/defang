@@ -37,7 +37,7 @@ func awsByocPromptHandler(cluster string, providerId *client.ProviderID) func(ct
 		awsID := req.Params.Arguments["AWS Credential"]
 		region := common.GetStringArg(req.Params.Arguments, "AWS_REGION", "")
 		awsSecret := common.GetStringArg(req.Params.Arguments, "AWS_SECRET_ACCESS_KEY", "")
-		if err := actions.SetAWSByocProvider(ctx, cluster, providerId, awsID, awsSecret, region); err != nil {
+		if err := actions.SetAWSByocProvider(ctx, providerId, cluster, awsID, awsSecret, region); err != nil {
 			return nil, err
 		}
 

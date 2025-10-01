@@ -135,6 +135,15 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("set_aws_provider",
 				mcp.WithDescription("Set the AWS provider for the defang project"),
 				workingDirectoryOption,
+				mcp.WithString("aws_id",
+					mcp.Description("Your AWS Access Key ID"),
+				),
+				mcp.WithString("aws_secret",
+					mcp.Description("Your AWS Secret Access Key"),
+				),
+				mcp.WithString("aws_region",
+					mcp.Description("Your AWS Region"),
+				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				return handleSetAWSProvider(ctx, request, providerId, cluster)
@@ -144,6 +153,9 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("set_gcp_provider",
 				mcp.WithDescription("Set the GCP provider for the defang project"),
 				workingDirectoryOption,
+				mcp.WithString("gcp_project_id",
+					mcp.Description("Your GCP Project ID"),
+				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				return handleSetGCPProvider(ctx, request, providerId, cluster)
