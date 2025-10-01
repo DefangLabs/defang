@@ -78,9 +78,9 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 
 				mcp.WithString("deployment_mode",
-					mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH AVAILABILITY."),
+					mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
 					mcp.DefaultString("AFFORDABLE"),
-					mcp.Enum("AFFORDABLE", "BALANCED", "HIGH AVAILABILITY"),
+					mcp.Enum("AFFORDABLE", "BALANCED", "HIGH_AVAILABILITY"),
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
