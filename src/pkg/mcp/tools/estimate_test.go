@@ -226,7 +226,7 @@ func TestHandleEstimateTool(t *testing.T) {
 		{
 			name:             "successful_estimate_high_availability_mode",
 			workingDirectory: ".",
-			deploymentMode:   "HIGH AVAILABILITY",
+			deploymentMode:   "HIGH_AVAILABILITY",
 			provider:         "GCP",
 			providerID:       client.ProviderGCP,
 			setupMock: func(m *MockEstimateCLI) {
