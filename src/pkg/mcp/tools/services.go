@@ -15,15 +15,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// DefaultCLI implements CLIInterface using the actual CLI functions
-type DefaultCLI struct {
-	DefaultToolCLI
-}
-
-func (c *DefaultCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
-	return defangcli.NewProvider(ctx, providerId, client)
-}
-
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Services tool called - fetching services from Defang")
 

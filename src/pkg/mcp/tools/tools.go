@@ -31,8 +31,8 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				workingDirectoryOption,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultCLI{}
-				deploymentInfo := &DefaultToolCLI{}
+				var cli CLIInterface = &DefaultToolCLI{}
+				var deploymentInfo DeploymentInfoInterface = &DefaultToolCLI{}
 				return handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
 			},
 		},
