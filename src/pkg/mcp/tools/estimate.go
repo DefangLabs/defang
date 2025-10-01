@@ -103,7 +103,7 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 	case "HIGH_AVAILABILITY":
 		mode = defangv1.DeploymentMode_PRODUCTION
 	default:
-		term.Warn("Unknown deployment mode provided, defaulting to AFFORDABLE")
+		term.Warnf("Unknown deployment mode provided - %q", modeString)
 		return mcp.NewToolResultError("Unknown deployment mode provided, please use one of AFFORDABLE, BALANCED or HIGH_AVAILABILITY"), fmt.Errorf("unknown deployment mode: %s", modeString)
 	}
 
