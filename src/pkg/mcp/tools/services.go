@@ -10,35 +10,12 @@ import (
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// DefaultDeploymentInfo implements DeploymentInfoInterface using the actual deployment_info functions
-type DefaultDeploymentInfo struct{}
-
-func (d *DefaultDeploymentInfo) GetServices(ctx context.Context, projectName string, provider cliClient.Provider) ([]deployment_info.Service, error) {
-	return deployment_info.GetServices(ctx, projectName, provider)
-}
-
-// DefaultCLI implements CLIInterface using the actual CLI functions
-type DefaultCLI struct{}
-
-func (c *DefaultCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return defangcli.Connect(ctx, cluster)
-}
-
-func (c *DefaultCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error) {
-	return defangcli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultCLI) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
-	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
-}
-
-func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface, deploymentInfo DeploymentInfoInterface) (*mcp.CallToolResult, error) {
+func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Services tool called - fetching services from Defang")
 
 	err := providerNotConfiguredError(*providerId)
@@ -86,7 +63,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
 	}
 
-	serviceResponse, err := deploymentInfo.GetServices(ctx, projectName, provider)
+	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {

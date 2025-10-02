@@ -32,7 +32,7 @@ func (m *MockDestroyCLI) Connect(ctx context.Context, cluster string) (*client.G
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient *client.GrpcClient) (client.Provider, error) {
+func (m *MockDestroyCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil, m.NewProviderError
 }

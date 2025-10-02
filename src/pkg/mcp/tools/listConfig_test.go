@@ -31,7 +31,7 @@ func (m *MockListConfigCLI) Connect(ctx context.Context, cluster string) (*clien
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, grpcClient *client.GrpcClient) (client.Provider, error) {
+func (m *MockListConfigCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	if m.NewProviderError != nil {
 		return nil, m.NewProviderError
