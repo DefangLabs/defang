@@ -45,7 +45,7 @@ func (m *MockDeployCLI) Connect(ctx context.Context, cluster string) (*client.Gr
 	return &client.GrpcClient{}, nil
 }
 
-func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client *client.GrpcClient) (client.Provider, error) {
+func (m *MockDeployCLI) NewProvider(ctx context.Context, providerId client.ProviderID, client client.FabricClient) (client.Provider, error) {
 	m.CallLog = append(m.CallLog, fmt.Sprintf("NewProvider(%s)", providerId))
 	return nil, m.NewProviderError
 }
@@ -219,13 +219,6 @@ func TestHandleDeployTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var originalOpenURLFunc = OpenURLFunc
-			OpenURLFunc = func(url string) error {
-				// Mock implementation that doesn't actually open a browser
-				return nil
-			}
-			defer func() { OpenURLFunc = originalOpenURLFunc }()
-
 			// Create mock and configure it
 			mockCLI := &MockDeployCLI{
 				CallLog: []string{},
