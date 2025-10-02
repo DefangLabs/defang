@@ -17,18 +17,18 @@ var envGcpVarNames = []string{
 
 var envGcpVars = map[string]string{}
 
-func saveGcpEnvVars() {
-	for _, key := range envGcpVarNames {
+func saveEnvVars(envVars map[string]string, envVarNames []string) {
+	for _, key := range envVarNames {
 		var val = os.Getenv(key)
-		if val == "" {
-			envGcpVars[key] = val
+		if val != "" {
+			envVars[key] = val
 		}
 	}
 }
 
-func restoreGcpEnvVars() {
-	for _, key := range envGcpVarNames {
-		if val, ok := envGcpVars[key]; !ok || val == "" {
+func restoreEnvVars(envVars map[string]string) {
+	for _, key := range envVars {
+		if val, ok := envVars[key]; !ok || val == "" {
 			os.Unsetenv(key)
 			continue
 		} else {
@@ -37,8 +37,8 @@ func restoreGcpEnvVars() {
 	}
 }
 
-func clearGcpEnvVars() {
-	for _, key := range envGcpVarNames {
+func clearEnvVars(envVars map[string]string) {
+	for key := range envVars {
 		os.Unsetenv(key)
 	}
 }
@@ -46,9 +46,9 @@ func clearGcpEnvVars() {
 func TestSetGCPBYOCProvider_ValidKeys(t *testing.T) {
 	origConnect := common.Connect
 	origCheck := common.CheckProviderConfigured
-	saveGcpEnvVars()
+	saveEnvVars(envGcpVars, envGcpVarNames)
 	defer func() {
-		restoreGcpEnvVars()
+		restoreEnvVars(envGcpVars)
 		common.Connect = origConnect
 		common.CheckProviderConfigured = origCheck
 	}()
@@ -90,7 +90,7 @@ func TestSetGCPBYOCProvider_ValidKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clearGcpEnvVars()
+			clearEnvVars(envGcpVars)
 			common.Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, tt.connectErr }
 			common.CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
 				return &client.MockProvider{}, tt.checkErr

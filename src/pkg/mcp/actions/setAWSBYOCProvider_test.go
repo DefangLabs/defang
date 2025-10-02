@@ -20,39 +20,13 @@ var awsEnvVarNames = []string{
 
 var awsEnvVars = map[string]string{}
 
-func saveAwsEnvVars() {
-	for _, key := range awsEnvVarNames {
-		var val = os.Getenv(key)
-		if val == "" {
-			awsEnvVars[key] = val
-		}
-	}
-}
-
-func restoreAwsEnvVars() {
-	for _, key := range awsEnvVarNames {
-		if val, ok := awsEnvVars[key]; !ok || val == "" {
-			os.Unsetenv(key)
-			continue
-		} else {
-			os.Setenv(key, val)
-		}
-	}
-}
-
-func clearAwsEnvVars() {
-	for _, key := range awsEnvVarNames {
-		os.Unsetenv(key)
-	}
-}
-
 func TestSetAWSBYOCProvider_ValidKeys(t *testing.T) {
 	validAwsID := "ABIA12345678901234"
 	origConnect := common.Connect
 	origCheck := common.CheckProviderConfigured
-	saveAwsEnvVars()
+	saveEnvVars(awsEnvVars, awsEnvVarNames)
 	defer func() {
-		restoreAwsEnvVars()
+		restoreEnvVars(awsEnvVars)
 		common.Connect = origConnect
 		common.CheckProviderConfigured = origCheck
 	}()
@@ -126,7 +100,7 @@ func TestSetAWSBYOCProvider_ValidKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clearAwsEnvVars()
+			clearEnvVars(awsEnvVars)
 			common.Connect = func(ctx context.Context, cluster string) (*client.GrpcClient, error) { return nil, tt.connectErr }
 			common.CheckProviderConfigured = func(ctx context.Context, fabric client.FabricClient, providerId client.ProviderID, s string, i int) (client.Provider, error) {
 				return &client.MockProvider{}, tt.checkErr
