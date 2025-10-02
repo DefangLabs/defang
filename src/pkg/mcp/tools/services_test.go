@@ -21,6 +21,12 @@ type MockCLI struct {
 	MockClient                       *client.GrpcClient
 	MockProvider                     client.Provider
 	MockProjectName                  string
+
+	GetServicesError    error
+	MockServices        []deployment_info.Service
+	GetServicesCalled   bool
+	GetServicesProject  string
+	GetServicesProvider client.Provider
 }
 
 func (m *MockCLI) Connect(ctx context.Context, cluster string) (*client.GrpcClient, error) {
@@ -47,16 +53,7 @@ func (m *MockCLI) LoadProjectNameWithFallback(ctx context.Context, loader client
 	return "default-project", nil
 }
 
-// MockDeploymentInfo implements DeploymentInfoInterface for testing
-type MockDeploymentInfo struct {
-	GetServicesError    error
-	MockServices        []deployment_info.Service
-	GetServicesCalled   bool
-	GetServicesProject  string
-	GetServicesProvider client.Provider
-}
-
-func (m *MockDeploymentInfo) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]deployment_info.Service, error) {
+func (m *MockCLI) GetServices(ctx context.Context, projectName string, provider client.Provider) ([]deployment_info.Service, error) {
 	m.GetServicesCalled = true
 	m.GetServicesProject = projectName
 	m.GetServicesProvider = provider
@@ -93,7 +90,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		providerId          client.ProviderID
 		requestArgs         map[string]interface{}
 		mockCLI             *MockCLI
-		mockDeploymentInfo  *MockDeploymentInfo
 		expectedError       bool
 		expectedResultError bool // whether result.IsError should be true
 		errorMessage        string
@@ -111,7 +107,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			mockCLI: &MockCLI{
 				ConnectError: errors.New("connection failed"),
 			},
-			mockDeploymentInfo:  &MockDeploymentInfo{},
+
 			expectedError:       true,
 			expectedResultError: true,
 			errorMessage:        "connection failed",
@@ -127,7 +123,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockClient:       &client.GrpcClient{},
 				NewProviderError: errors.New("provider creation failed"),
 			},
-			mockDeploymentInfo:  &MockDeploymentInfo{},
+
 			expectedError:       true,
 			expectedResultError: true,
 			errorMessage:        "provider creation failed",
@@ -142,7 +138,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			mockCLI: &MockCLI{
 				MockClient: &client.GrpcClient{},
 			},
-			mockDeploymentInfo:  &MockDeploymentInfo{},
+
 			expectedError:       true,
 			expectedResultError: true,
 			errorMessage:        "no provider is configured",
@@ -157,7 +153,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			mockCLI: &MockCLI{
 				MockClient: &client.GrpcClient{},
 			},
-			mockDeploymentInfo:  &MockDeploymentInfo{},
+
 			expectedError:       true,
 			expectedResultError: true,
 			errorMessage:        "no such file or directory",
@@ -174,7 +170,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProvider:                     &client.PlaygroundProvider{},
 				LoadProjectNameWithFallbackError: errors.New("failed to load project name"),
 			},
-			mockDeploymentInfo:  &MockDeploymentInfo{},
+
 			expectedError:       true,
 			expectedResultError: true,
 			errorMessage:        "failed to load project name",
@@ -189,11 +185,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				"working_directory": ".",
 			},
 			mockCLI: &MockCLI{
-				MockClient:      &client.GrpcClient{},
-				MockProvider:    &client.PlaygroundProvider{},
-				MockProjectName: "test-project",
-			},
-			mockDeploymentInfo: &MockDeploymentInfo{
+				MockClient:       &client.GrpcClient{},
+				MockProvider:     &client.PlaygroundProvider{},
+				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
 			expectedError:       true,  // Go error is returned
@@ -210,11 +204,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				"working_directory": ".",
 			},
 			mockCLI: &MockCLI{
-				MockClient:      &client.GrpcClient{},
-				MockProvider:    &client.PlaygroundProvider{},
-				MockProjectName: "test-project",
-			},
-			mockDeploymentInfo: &MockDeploymentInfo{
+				MockClient:       &client.GrpcClient{},
+				MockProvider:     &client.PlaygroundProvider{},
+				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
 			expectedError:       true,
@@ -231,11 +223,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				"working_directory": ".",
 			},
 			mockCLI: &MockCLI{
-				MockClient:      &client.GrpcClient{},
-				MockProvider:    &client.PlaygroundProvider{},
-				MockProjectName: "test-project",
-			},
-			mockDeploymentInfo: &MockDeploymentInfo{
+				MockClient:       &client.GrpcClient{},
+				MockProvider:     &client.PlaygroundProvider{},
+				MockProjectName:  "test-project",
 				GetServicesError: createConnectError(connect.CodeFailedPrecondition, "terms of service not accepted"),
 			},
 			expectedError:       true,
@@ -251,11 +241,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				"working_directory": ".",
 			},
 			mockCLI: &MockCLI{
-				MockClient:      &client.GrpcClient{},
-				MockProvider:    &client.PlaygroundProvider{},
-				MockProjectName: "test-project",
-			},
-			mockDeploymentInfo: &MockDeploymentInfo{
+				MockClient:       &client.GrpcClient{},
+				MockProvider:     &client.PlaygroundProvider{},
+				MockProjectName:  "test-project",
 				GetServicesError: errors.New("generic GetServices failure"),
 			},
 			expectedError:       false, // Returns text result, no Go error
@@ -276,8 +264,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockClient:      &client.GrpcClient{},
 				MockProvider:    &client.PlaygroundProvider{},
 				MockProjectName: "test-project",
-			},
-			mockDeploymentInfo: &MockDeploymentInfo{
 				MockServices: []deployment_info.Service{
 					{
 						Service:      "test-service",
@@ -298,7 +284,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createServicesCallToolRequest(tt.requestArgs)
-			result, err := handleServicesTool(ctx, request, &tt.providerId, testCluster, tt.mockCLI, tt.mockDeploymentInfo)
+			result, err := handleServicesTool(ctx, request, &tt.providerId, testCluster, tt.mockCLI)
 
 			// Check Go error expectation
 			if tt.expectedError {
@@ -322,11 +308,11 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			}
 
 			// Verify GetServices call expectations
-			assert.Equal(t, tt.expectedGetServices, tt.mockDeploymentInfo.GetServicesCalled, "GetServices call expectation")
+			assert.Equal(t, tt.expectedGetServices, tt.mockCLI.GetServicesCalled, "GetServices call expectation")
 
 			// Verify project name if GetServices was called
 			if tt.expectedGetServices && tt.expectedProjectName != "" {
-				assert.Equal(t, tt.expectedProjectName, tt.mockDeploymentInfo.GetServicesProject)
+				assert.Equal(t, tt.expectedProjectName, tt.mockCLI.GetServicesProject)
 			}
 		})
 	}

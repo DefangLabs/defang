@@ -38,9 +38,8 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultCLI{}
-				deploymentInfo := &DefaultDeploymentInfo{}
-				return handleServicesTool(ctx, request, providerId, cluster, cli, deploymentInfo)
+				var cli CLIInterface = &DefaultToolCLI{}
+				return handleServicesTool(ctx, request, providerId, cluster, cli)
 			},
 		},
 		{
@@ -84,7 +83,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				cli := &DefaultEstimateCLI{}
+				cli := &DefaultToolCLI{}
 				return handleEstimateTool(ctx, request, providerId, cluster, cli)
 			},
 		},
