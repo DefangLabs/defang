@@ -348,7 +348,12 @@ var RootCmd = &cobra.Command{
 
 		// Use "defer" to track any errors that occur during the command
 		defer func() {
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", err), P("non-interactive", nonInteractive), P("provider", providerID))
+			var errString = ""
+			if err != nil {
+				errString = err.Error()
+			}
+
+			track.Cmd(cmd, "Invoked", P("args", args), P("err", errString), P("non-interactive", nonInteractive), P("provider", providerID))
 		}()
 
 		// Do this first, since any errors will be printed to the console
