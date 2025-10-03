@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"net/http"
+	"regexp"
 	"strings"
 
 	"golang.org/x/oauth2/google"
@@ -19,45 +20,102 @@ func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	content := struct {
-		ClientEmail string `json:"client_email"`
-	}{}
 
-	json.Unmarshal(creds.JSON, &content)
-	if content.ClientEmail != "" {
-		return content.ClientEmail, nil
+	// Unmarshal creds.JSON into a struct that includes both possible fields
+	var key struct {
+		ClientEmail                    string `json:"client_email"`
+		Type                           string `json:"type"`
+		ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
+	}
+	err = json.Unmarshal(creds.JSON, &key)
+	if err == nil {
+		if key.Type == "external_account" {
+			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+		}
+		if key.Type == "impersonated_service_account" {
+			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+		}
+		if key.ClientEmail != "" {
+			return key.ClientEmail, nil
+		}
 	}
 
+	// Fallback: get token and try to extract email
 	token, err := creds.TokenSource.Token()
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve token: %w", err)
 	}
-	idToken, ok := token.Extra("id_token").(string)
-	if !ok {
-		return "", errors.New("failed to retrieve ID token")
+
+	// Try to extract email from id_token if present
+	if idToken, ok := token.Extra("id_token").(string); ok && idToken != "" {
+		if email, err := extractEmailFromIDToken(idToken); err == nil && email != "" {
+			return email, nil
+		}
 	}
 
-	// Split the ID token into its 3 parts: header, payload, and signature
+	// Last resort: query tokeninfo endpoint
+	return getEmailFromToken(ctx, token.AccessToken)
+}
+
+func extractEmailFromIDToken(idToken string) (string, error) {
+	// JWT format: header.payload.signature
 	parts := strings.Split(idToken, ".")
-	if len(parts) != 3 {
-		log.Fatalf("invalid ID token format")
+	if len(parts) < 2 {
+		return "", errors.New("invalid id_token format")
 	}
 
-	// Decode and Parse the payload
+	// Decode the payload (second part)
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		log.Fatalf("failed to decode payload: %v", err)
+		return "", fmt.Errorf("failed to decode id_token payload: %w", err)
 	}
-	claims := struct {
+
+	var claims struct {
 		Email string `json:"email"`
-	}{}
+	}
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		log.Fatalf("failed to unmarshal payload: %v", err)
+		return "", fmt.Errorf("failed to unmarshal id_token claims: %w", err)
 	}
 
-	if claims.Email != "" {
-		return claims.Email, nil
+	return claims.Email, nil
+}
+
+func parseServiceAccountFromURL(url string) (string, error) {
+	// URL format: https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/EMAIL:generateAccessToken
+	re := regexp.MustCompile(`serviceAccounts/([^:]+):`)
+	matches := re.FindStringSubmatch(url)
+	if len(matches) > 1 {
+		return matches[1], nil
+	}
+	return "", fmt.Errorf("unable to parse service account from URL: %s", url)
+}
+
+func getEmailFromToken(ctx context.Context, accessToken string) (string, error) {
+	url := "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" + accessToken
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
 	}
 
-	return "", nil // Should this be an error?
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var tokenInfo struct {
+		Email         string `json:"email"`
+		VerifiedEmail bool   `json:"verified_email"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tokenInfo); err != nil {
+		return "", err
+	}
+
+	if tokenInfo.Email == "" {
+		return "", errors.New("no email found in token info")
+	}
+
+	return tokenInfo.Email, nil
 }
