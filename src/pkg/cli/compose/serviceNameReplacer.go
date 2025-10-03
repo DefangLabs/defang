@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
@@ -17,13 +16,19 @@ const (
 	EnvironmentVars FixupTarget = "environment variable"
 )
 
+type ServiceDNSer interface {
+	ServicePrivateDNS(name string) string
+	ServicePublicDNS(name string, projectName string) string
+}
+
 type ServiceNameReplacer struct {
-	provider            client.Provider
+	provider            ServiceDNSer
+	projectName         string
 	privateServiceNames *regexp.Regexp
 	publicServiceNames  *regexp.Regexp
 }
 
-func NewServiceNameReplacer(provider client.Provider, project *composeTypes.Project) ServiceNameReplacer {
+func NewServiceNameReplacer(provider ServiceDNSer, project *composeTypes.Project) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var privateServiceNames []string // services with private "host" ports
 	var publicServiceNames []string  // services with "ingress" ports
@@ -38,23 +43,35 @@ func NewServiceNameReplacer(provider client.Provider, project *composeTypes.Proj
 
 	return ServiceNameReplacer{
 		provider:            provider,
+		projectName:         project.Name,
 		privateServiceNames: makeServiceNameRegex(privateServiceNames),
 		publicServiceNames:  makeServiceNameRegex(publicServiceNames),
 	}
 }
 
 func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
-	if s.privateServiceNames == nil {
-		return value
+	// First check for private services
+	if s.privateServiceNames != nil {
+		match := s.privateServiceNames.FindStringSubmatchIndex(value)
+		if match != nil {
+			// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
+			serviceStart := match[2]
+			serviceEnd := match[3]
+			return value[:serviceStart] + s.provider.ServicePrivateDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
+		}
 	}
-	match := s.privateServiceNames.FindStringSubmatchIndex(value)
-	if match == nil {
-		return value
+
+	// Then check for public services
+	if s.publicServiceNames != nil {
+		match := s.publicServiceNames.FindStringSubmatchIndex(value)
+		if match != nil {
+			serviceStart := match[2]
+			serviceEnd := match[3]
+			return value[:serviceStart] + s.provider.ServicePublicDNS(NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
+		}
 	}
-	// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
-	serviceStart := match[2]
-	serviceEnd := match[3]
-	return value[:serviceStart] + s.provider.ServiceDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
+
+	return value
 }
 
 func (s *ServiceNameReplacer) ReplaceServiceNameWithDNS(serviceName string, key, value string, fixupTarget FixupTarget) string {

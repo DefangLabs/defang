@@ -17,7 +17,7 @@ services:
   use-ingress-service:
     image: "service:latest"
     environment:
-      - "DB_URL=ingress-service:5432"
+      - "UI_URL=ingress-service:5432"
   env-in-config:
     image: "service:latest"
     environment:

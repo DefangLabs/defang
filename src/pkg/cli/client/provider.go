@@ -54,7 +54,8 @@ type Provider interface {
 	QueryForDebug(context.Context, *defangv1.DebugRequest) error
 	QueryLogs(context.Context, *defangv1.TailRequest) (ServerStream[defangv1.TailResponse], error)
 	RemoteProjectName(context.Context) (string, error)
-	ServiceDNS(string) string
+	ServicePrivateDNS(string) string
+	ServicePublicDNS(string, string) string
 	SetCanIUseConfig(*defangv1.CanIUseResponse)
 	Subscribe(context.Context, *defangv1.SubscribeRequest) (ServerStream[defangv1.SubscribeResponse], error)
 	TearDown(context.Context) error

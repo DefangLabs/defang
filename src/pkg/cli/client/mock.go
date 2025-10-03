@@ -21,7 +21,7 @@ func (m MockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsR
 	return &defangv1.Secrets{Names: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA", "VAR1"}}, nil
 }
 
-func (m MockProvider) ServiceDNS(service string) string {
+func (m MockProvider) ServicePrivateDNS(service string) string {
 	return "mock-" + service
 }
 

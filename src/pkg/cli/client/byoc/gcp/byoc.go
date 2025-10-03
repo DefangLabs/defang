@@ -939,3 +939,7 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 	pkg.Ensure(projectName != "", "ProjectName not set")
 	return fmt.Sprintf("%s_%s_%s_%s", byoc.DefangPrefix, projectName, b.PulumiStack, name)
 }
+
+func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
+	return name + "." + "beta" + "." + projectName + "." + b.TenantName + ".defang.app"
+}

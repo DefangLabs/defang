@@ -100,8 +100,13 @@ func (g *PlaygroundProvider) BootstrapList(context.Context) ([]string, error) {
 	return nil, errors.New("this command is not valid for the Defang playground; did you forget --provider?")
 }
 
-func (g PlaygroundProvider) ServiceDNS(name string) string {
+func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 	return string(g.GetTenantName()) + "-" + name
+}
+
+func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
+	// TODO: Move this to fabric since we do not know what shard was assigned, placeholder for now
+	return string(g.GetTenantName()) + "-" + name + "prod1b" + ".defang.dev"
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {

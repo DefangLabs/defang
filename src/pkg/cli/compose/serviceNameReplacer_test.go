@@ -3,16 +3,19 @@ package compose
 import (
 	"testing"
 
-	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
 type serviceNameReplacerMockProvider struct {
-	client.Provider
+	ServiceDNSer
 }
 
-func (m serviceNameReplacerMockProvider) ServiceDNS(name string) string {
+func (m serviceNameReplacerMockProvider) ServicePrivateDNS(name string) string {
 	return "override-" + name
+}
+
+func (m serviceNameReplacerMockProvider) ServicePublicDNS(name string, projectName string) string {
+	return name + "." + projectName + ".tenant2.defang.app"
 }
 
 func setup() ServiceNameReplacer {
@@ -115,7 +118,9 @@ func TestMakeServiceNameRegex(t *testing.T) {
 
 	s := ServiceNameReplacer{
 		provider:            serviceNameReplacerMockProvider{},
+		projectName:         "project1",
 		privateServiceNames: makeServiceNameRegex([]string{"redis", "postgres"}),
+		publicServiceNames:  makeServiceNameRegex([]string{"ingress-service"}),
 	}
 	tdt := []struct {
 		value    string
@@ -131,6 +136,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 		{"postgres://postgres", "postgres://override-postgres"},
 		{"pg://postgres:5432?u=postgres&p=password&d=nocodb", "pg://override-postgres:5432?u=postgres&p=password&d=nocodb"},
 		{"postgres://postgres:postgres@postgres:5432/postgres", "postgres://postgres:postgres@override-postgres:5432/postgres"},
+		{"ingress-service", "ingress-service.project1.tenant2.defang.app"},
 	}
 	for _, tt := range tdt {
 		if got := s.replaceServiceNameWithDNS(tt.value); got != tt.expected {

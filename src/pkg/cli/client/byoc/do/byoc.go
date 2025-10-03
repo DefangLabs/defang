@@ -790,6 +790,10 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 	return nil, fmt.Errorf("app not found: %s", appName)
 }
 
+func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
+	return name
+}
+
 func processServiceInfo(service *godo.AppServiceSpec, projectName string) *defangv1.ServiceInfo {
 	serviceInfo := &defangv1.ServiceInfo{
 		Project: projectName,
