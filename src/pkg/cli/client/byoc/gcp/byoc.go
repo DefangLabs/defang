@@ -737,10 +737,12 @@ func (b *ByocGcp) PutConfig(ctx context.Context, req *defangv1.PutConfigRequest)
 			}
 			_, err = b.driver.CreateSecret(ctx, secretId)
 		}
-		if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
-			term.Debugf("Secret %q already exists", secretId)
-		} else {
-			return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+		if err != nil {
+			if stat, ok := status.FromError(err); ok && stat.Code() == codes.AlreadyExists {
+				term.Debugf("Secret %q already exists", secretId)
+			} else {
+				return fmt.Errorf("failed to create secret %q: %w", secretId, err)
+			}
 		}
 	}
 	term.Debugf("Adding a new secret version for %q", secretId)
