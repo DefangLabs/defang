@@ -392,17 +392,7 @@ var RootCmd = &cobra.Command{
 	},
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if nonInteractive {
-			return nil
-		}
-
-		ctx := cmd.Context()
-		err := login.InteractiveRequireLoginAndToS(ctx, client, getCluster())
-		if err != nil {
-			return err
-		}
-
-		return agent.New(ctx, getCluster(), &providerID, agent.DefaultSystemPrompt).Start()
+		return agent.New(cmd.Context()).Start()
 	},
 }
 
