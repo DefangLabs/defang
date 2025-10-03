@@ -250,6 +250,7 @@ var expectedToolsList = []string{
 	"services",
 	"deploy",
 	"destroy",
+	"logs",
 	"estimate",
 	"set_config",
 	"remove_config",

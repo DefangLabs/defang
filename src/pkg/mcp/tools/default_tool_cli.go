@@ -55,6 +55,10 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, c
 	return cli.ComposeUp(ctx, project, client, provider, uploadMode, mode)
 }
 
+func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
+	return cli.Tail(ctx, provider, project.Name, options)
+}
+
 func (DefaultToolCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
 	return configureLoader(request)
 }
