@@ -619,8 +619,8 @@ func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
 			Name: "set_aws_provider",
 			Arguments: map[string]interface{}{
 				"working_directory": projectDir,
-				"access_key_id":     awsId,
-				"secret_access_key": awsSecret,
+				"accessKeyId":       awsId,
+				"secretAccessKey":   awsSecret,
 				"region":            region,
 			},
 		},
@@ -665,7 +665,7 @@ func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
 			Name: "set_gcp_provider",
 			Arguments: map[string]interface{}{
 				"working_directory": projectDir,
-				"gcp_project_id":    gcpProjectID,
+				"gcpProjectId":      gcpProjectID,
 			},
 		},
 	})

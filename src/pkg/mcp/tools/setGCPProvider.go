@@ -14,7 +14,7 @@ import (
 func handleSetGCPProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (*mcp.CallToolResult, error) {
 	term.Debug("Set GCP Provider tool called")
 
-	gcpProjectID, err := request.RequireString("gcp_project_id")
+	gcpProjectID, err := request.RequireString("gcpProjectId")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid GCP project ID", err), err
 	}
