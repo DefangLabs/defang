@@ -570,9 +570,7 @@ func TestInProcessMCPServer(t *testing.T) {
 	var cleanup func()
 	projectDir, cleanup = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
-	defer func() {
-		cleanup()
-	}()
+	t.Cleanup(cleanup)
 
 	// Test functions
 	tests := []struct {
@@ -599,20 +597,18 @@ func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
 	var cleanup func()
 	projectDir, cleanup = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
-	defer func() {
-		cleanup()
-	}()
-
 	var origCheck = common.CheckProviderConfigured
 	var origConnect = common.Connect
-	defer func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	}()
 	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
 	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
 		return &cliClient.MockProvider{}, nil
 	}
+	t.Cleanup(func() {
+		cleanup()
+		common.CheckProviderConfigured = origCheck
+		common.Connect = origConnect
+	})
+
 	const dummyToken = "Testing.Token.1234"
 	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)
 	awsId := "ABIA12345678901234"
@@ -623,9 +619,9 @@ func TestInProcessMCPServer_SetAWSBYOCProvider(t *testing.T) {
 			Name: "set_aws_provider",
 			Arguments: map[string]interface{}{
 				"working_directory": projectDir,
-				"aws_id":            awsId,
-				"aws_secret":        awsSecret,
-				"aws_region":        region,
+				"access_key_id":     awsId,
+				"secret_access_key": awsSecret,
+				"region":            region,
 			},
 		},
 	})
@@ -649,20 +645,17 @@ func TestInProcessMCPServer_SetGCPBYOCProvider(t *testing.T) {
 	var cleanup func()
 	projectDir, cleanup = createTestProjectDir(t)
 	mcpClient = setupTest(t, projectDir)
-	defer func() {
-		cleanup()
-	}()
-
 	var origCheck = common.CheckProviderConfigured
 	var origConnect = common.Connect
-	defer func() {
-		common.CheckProviderConfigured = origCheck
-		common.Connect = origConnect
-	}()
 	common.Connect = func(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) { return nil, nil }
 	common.CheckProviderConfigured = func(ctx context.Context, fabric cliClient.FabricClient, providerId cliClient.ProviderID, s string, i int) (cliClient.Provider, error) {
 		return &cliClient.MockProvider{}, nil
 	}
+	t.Cleanup(func() {
+		cleanup()
+		common.CheckProviderConfigured = origCheck
+		common.Connect = origConnect
+	})
 
 	const dummyToken = "Testing.Token.1234"
 	t.Setenv("DEFANG_ACCESS_TOKEN", dummyToken)

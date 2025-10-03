@@ -14,15 +14,15 @@ import (
 func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (*mcp.CallToolResult, error) {
 	term.Debug("Set AWS Provider tool called")
 
-	awsId, err := request.RequireString("aws_id")
+	awsId, err := request.RequireString("access_key_id")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid AWS access key Id", err), err
 	}
-	awsSecretAccessKey, err := request.RequireString("aws_secret")
+	awsSecretAccessKey, err := request.RequireString("secret_access_key")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid AWS secret access key", err), err
 	}
-	awsRegion, err := request.RequireString("aws_region")
+	awsRegion, err := request.RequireString("region")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("Invalid AWS region", err), err
 	}
