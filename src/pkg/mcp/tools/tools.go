@@ -102,7 +102,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
 				adapter := &SetConfigCLIAdapter{DefaultToolCLI: cli}
-				return handleSetConfig(ctx, request, cluster, providerId, adapter)
+				return handleSetConfig(ctx, request, providerId, cluster, adapter)
 			},
 		},
 		{
@@ -128,6 +128,45 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
 				return handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+			},
+		},
+		{
+			Tool: mcp.NewTool("set_aws_provider",
+				mcp.WithDescription("Set the AWS provider for the defang project"),
+				workingDirectoryOption,
+				mcp.WithString("accessKeyId",
+					mcp.Description("Your AWS Access Key ID"),
+				),
+				mcp.WithString("secretAccessKey",
+					mcp.Description("Your AWS Secret Access Key"),
+				),
+				mcp.WithString("region",
+					mcp.Description("Your AWS Region"),
+				),
+			),
+			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return handleSetAWSProvider(ctx, request, providerId, cluster)
+			},
+		},
+		{
+			Tool: mcp.NewTool("set_gcp_provider",
+				mcp.WithDescription("Set the GCP provider for the defang project"),
+				workingDirectoryOption,
+				mcp.WithString("gcpProjectId",
+					mcp.Description("Your GCP Project ID"),
+				),
+			),
+			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return handleSetGCPProvider(ctx, request, providerId, cluster)
+			},
+		},
+		{
+			Tool: mcp.NewTool("set_playground_provider",
+				mcp.WithDescription("Set the Playground provider for the defang project"),
+				workingDirectoryOption,
+			),
+			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return handleSetPlaygroundProvider(providerId)
 			},
 		},
 	}
