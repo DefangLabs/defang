@@ -13,7 +13,7 @@ import (
 )
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
+func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Set Config tool called")
 
 	err := providerNotConfiguredError(*providerId)
