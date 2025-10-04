@@ -3,6 +3,7 @@ package compose
 import (
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
@@ -15,7 +16,7 @@ func (m serviceNameReplacerMockProvider) ServicePrivateDNS(name string) string {
 }
 
 func (m serviceNameReplacerMockProvider) ServicePublicDNS(name string, projectName string) string {
-	return name + "." + projectName + ".tenant2.defang.app"
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
 func setup() ServiceNameReplacer {
@@ -49,6 +50,7 @@ func setup() ServiceNameReplacer {
 	}
 
 	project := &composeTypes.Project{
+		Name:     "project1",
 		Services: services,
 	}
 
@@ -66,26 +68,26 @@ func TestServiceNameReplacer(t *testing.T) {
 		// host - build args
 		{service: "host-serviceA", key: "BuildArg1", value: "value1", fixUpTarget: BuildArgs, expected: "value1"},
 		{service: "host-serviceA", key: "BuildArg2", value: "host-serviceB", fixUpTarget: BuildArgs, expected: "override-host-serviceb"},
-		{service: "host-serviceA", key: "BuildArg3", value: "ingress-serviceC", fixUpTarget: BuildArgs, expected: "ingress-serviceC"},
-		{service: "host-serviceA", key: "BuildArg4", value: "ingress-serviceD", fixUpTarget: BuildArgs, expected: "ingress-serviceD"},
+		{service: "host-serviceA", key: "BuildArg3", value: "ingress-serviceC", fixUpTarget: BuildArgs, expected: "ingress-servicec.project1.tenant2.defang.app"},
+		{service: "host-serviceA", key: "BuildArg4", value: "ingress-serviceD", fixUpTarget: BuildArgs, expected: "ingress-serviced.project1.tenant2.defang.app"},
 
 		// host - env args
 		{service: "host-serviceA", key: "env1", value: "value1", fixUpTarget: EnvironmentVars, expected: "value1"},
 		{service: "host-serviceA", key: "env2", value: "host-serviceB", fixUpTarget: EnvironmentVars, expected: "override-host-serviceb"},
-		{service: "host-serviceA", key: "env3", value: "ingress-serviceC", fixUpTarget: EnvironmentVars, expected: "ingress-serviceC"},
-		{service: "host-serviceA", key: "env4", value: "ingress-serviceD", fixUpTarget: EnvironmentVars, expected: "ingress-serviceD"},
+		{service: "host-serviceA", key: "env3", value: "ingress-serviceC", fixUpTarget: EnvironmentVars, expected: "ingress-servicec.project1.tenant2.defang.app"},
+		{service: "host-serviceA", key: "env4", value: "ingress-serviceD", fixUpTarget: EnvironmentVars, expected: "ingress-serviced.project1.tenant2.defang.app"},
 
 		// ingress - build args
 		{service: "ingress-serviceD", key: "BuildArg1", value: "value1", fixUpTarget: BuildArgs, expected: "value1"},
 		{service: "ingress-serviceD", key: "BuildArg2", value: "host-serviceA", fixUpTarget: BuildArgs, expected: "override-host-servicea"},
 		{service: "ingress-serviceD", key: "BuildArg3", value: "host-serviceB", fixUpTarget: BuildArgs, expected: "override-host-serviceb"},
-		{service: "ingress-serviceD", key: "BuildArg4", value: "ingress-serviceC", fixUpTarget: BuildArgs, expected: "ingress-serviceC"},
+		{service: "ingress-serviceD", key: "BuildArg4", value: "ingress-serviceC", fixUpTarget: BuildArgs, expected: "ingress-servicec.project1.tenant2.defang.app"},
 
 		// ingress - env args
 		{service: "ingress-serviceD", key: "env1", value: "value1", fixUpTarget: EnvironmentVars, expected: "value1"},
 		{service: "ingress-serviceD", key: "env2", value: "host-serviceA", fixUpTarget: EnvironmentVars, expected: "override-host-servicea"},
 		{service: "ingress-serviceD", key: "env3", value: "host-serviceB", fixUpTarget: EnvironmentVars, expected: "override-host-serviceb"},
-		{service: "ingress-serviceD", key: "env4", value: "ingress-serviceC", fixUpTarget: EnvironmentVars, expected: "ingress-serviceC"},
+		{service: "ingress-serviceD", key: "env4", value: "ingress-serviceC", fixUpTarget: EnvironmentVars, expected: "ingress-servicec.project1.tenant2.defang.app"},
 	}
 
 	// Create a service name replacer

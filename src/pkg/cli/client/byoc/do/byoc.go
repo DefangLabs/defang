@@ -791,6 +791,7 @@ func (b *ByocDo) getAppByName(ctx context.Context, name string) (*godo.App, erro
 }
 
 func (b *ByocDo) ServicePublicDNS(name string, projectName string) string {
+	//TODO: Add support for DO
 	return name
 }
 

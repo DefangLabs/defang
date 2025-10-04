@@ -908,5 +908,5 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 }
 
 func (b *ByocAws) ServicePublicDNS(name string, projectName string) string {
-	return name + "." + projectName + "." + b.TenantName + ".defang.app"
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }

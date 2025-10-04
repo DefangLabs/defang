@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,7 +27,7 @@ func (m MockProvider) ServicePrivateDNS(service string) string {
 }
 
 func (m MockProvider) ServicePublicDNS(service string, projectName string) string {
-	return service + "." + projectName + ".tenant2.defang.app"
+	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
 // MockServerStream mocks a ServerStream.

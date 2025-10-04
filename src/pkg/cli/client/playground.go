@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -106,7 +107,7 @@ func (g PlaygroundProvider) ServicePrivateDNS(name string) string {
 
 func (g PlaygroundProvider) ServicePublicDNS(name string, projectName string) string {
 	// TODO: Move this to fabric since we do not know what shard was assigned, placeholder for now
-	return string(g.GetTenantName()) + "-" + name + "prod1b" + ".defang.dev"
+	return string(g.GetTenantName()) + "-" + dns.SafeLabel(name) + "prod1b" + ".defang.dev"
 }
 
 func (g PlaygroundProvider) RemoteProjectName(ctx context.Context) (string, error) {
