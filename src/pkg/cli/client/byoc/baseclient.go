@@ -94,7 +94,7 @@ func (b *ByocBaseClient) SetCanIUseConfig(quotas *defangv1.CanIUseResponse) {
 	b.PulumiVersion = pkg.Getenv("DEFANG_PULUMI_VERSION", quotas.PulumiVersion)
 }
 
-func (b *ByocBaseClient) ServiceDNS(name string) string {
+func (b *ByocBaseClient) ServicePrivateDNS(name string) string {
 	return dns.SafeLabel(name) // TODO: consider merging this with getPrivateFqdn
 }
 
@@ -296,5 +296,5 @@ func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
 func (b ByocBaseClient) GetPrivateFqdn(projectName string, fqn string) string {
 	safeFqn := dns.SafeLabel(fqn)
-	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServiceDNS
+	return fmt.Sprintf("%s.%s", safeFqn, GetPrivateDomain(projectName)) // TODO: consider merging this with ServicePrivateDNS
 }
