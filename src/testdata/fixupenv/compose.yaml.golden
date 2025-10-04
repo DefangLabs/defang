@@ -24,9 +24,17 @@ services:
       - mode: ingress
         target: 5432
         protocol: tcp
-  refer-self:
+  refer-self-build-arg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CONFIG4: refer-self-env
+    networks:
+      default: null
+  refer-self-env:
     environment:
-      CONFIG3: refer-self
+      CONFIG3: refer-self-env
     image: service:latest
     networks:
       default: null

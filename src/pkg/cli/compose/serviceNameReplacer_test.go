@@ -8,7 +8,7 @@ import (
 )
 
 type serviceNameReplacerMockProvider struct {
-	ServiceDNSer
+	DNSResolver
 }
 
 func (m serviceNameReplacerMockProvider) ServicePrivateDNS(name string) string {
@@ -119,7 +119,7 @@ func TestMakeServiceNameRegex(t *testing.T) {
 	}
 
 	s := ServiceNameReplacer{
-		provider:            serviceNameReplacerMockProvider{},
+		dnsResolver:         serviceNameReplacerMockProvider{},
 		projectName:         "project1",
 		privateServiceNames: makeServiceNameRegex([]string{"redis", "postgres"}),
 		publicServiceNames:  makeServiceNameRegex([]string{"ingress-service"}),

@@ -16,19 +16,19 @@ const (
 	EnvironmentVars FixupTarget = "environment variable"
 )
 
-type ServiceDNSer interface {
+type DNSResolver interface {
 	ServicePrivateDNS(name string) string
 	ServicePublicDNS(name string, projectName string) string
 }
 
 type ServiceNameReplacer struct {
-	provider            ServiceDNSer
+	dnsResolver         DNSResolver
 	projectName         string
 	privateServiceNames *regexp.Regexp
 	publicServiceNames  *regexp.Regexp
 }
 
-func NewServiceNameReplacer(provider ServiceDNSer, project *composeTypes.Project) ServiceNameReplacer {
+func NewServiceNameReplacer(dnsResolver DNSResolver, project *composeTypes.Project) ServiceNameReplacer {
 	// Create a regexp to detect private service names in environment variable and build arg values
 	var privateServiceNames []string // services with private "host" ports
 	var publicServiceNames []string  // services with "ingress" ports
@@ -42,7 +42,7 @@ func NewServiceNameReplacer(provider ServiceDNSer, project *composeTypes.Project
 	}
 
 	return ServiceNameReplacer{
-		provider:            provider,
+		dnsResolver:         dnsResolver,
 		projectName:         project.Name,
 		privateServiceNames: makeServiceNameRegex(privateServiceNames),
 		publicServiceNames:  makeServiceNameRegex(publicServiceNames),
@@ -57,7 +57,7 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 			// [0] and [1] are the start and end of full match, resp. [2] and [3] are the start and end of the first submatch, etc.
 			serviceStart := match[2]
 			serviceEnd := match[3]
-			return value[:serviceStart] + s.provider.ServicePrivateDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
+			return value[:serviceStart] + s.dnsResolver.ServicePrivateDNS(NormalizeServiceName(value[serviceStart:serviceEnd])) + value[serviceEnd:]
 		}
 	}
 
@@ -67,7 +67,7 @@ func (s *ServiceNameReplacer) replaceServiceNameWithDNS(value string) string {
 		if match != nil {
 			serviceStart := match[2]
 			serviceEnd := match[3]
-			return value[:serviceStart] + s.provider.ServicePublicDNS(NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
+			return value[:serviceStart] + s.dnsResolver.ServicePublicDNS(NormalizeServiceName(value[serviceStart:serviceEnd]), s.projectName) + value[serviceEnd:]
 		}
 	}
 

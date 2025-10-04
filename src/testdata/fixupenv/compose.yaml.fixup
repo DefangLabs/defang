@@ -44,11 +44,25 @@
       }
     ]
   },
-  "refer-self": {
+  "refer-self-build-arg": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "CONFIG4": "refer-self-env.fixupenv.tenant2.defang.app"
+      }
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "refer-self-env": {
     "command": null,
     "entrypoint": null,
     "environment": {
-      "CONFIG3": "refer-self.fixupenv.tenant2.defang.app"
+      "CONFIG3": "refer-self-env.fixupenv.tenant2.defang.app"
     },
     "image": "service:latest",
     "networks": {

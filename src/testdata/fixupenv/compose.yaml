@@ -22,10 +22,14 @@ services:
     build:
       args:
         - "API_URL=http://Mistral:8000"
-  refer-self:
+  refer-self-env:
     image: "service:latest"
     environment:
-      - "CONFIG3=refer-self"
+      - "CONFIG3=refer-self-env"
     ports:
       - mode: ingress
         target: 5678
+  refer-self-build-arg:
+    build:
+      args:
+        - "CONFIG4=refer-self-env"
