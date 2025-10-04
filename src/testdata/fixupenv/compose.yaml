@@ -18,11 +18,14 @@ services:
     image: "service:latest"
     environment:
       - "UI_URL=ingress-service:5432"
-  env-in-config:
-    image: "service:latest"
-    environment:
-      - "CONFIG1=http://Mistral:8000"
   fixup-args:
     build:
       args:
         - "API_URL=http://Mistral:8000"
+  refer-self:
+    image: "service:latest"
+    environment:
+      - "CONFIG3=refer-self"
+    ports:
+      - mode: ingress
+        target: 5678

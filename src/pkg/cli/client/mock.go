@@ -25,6 +25,10 @@ func (m MockProvider) ServicePrivateDNS(service string) string {
 	return "mock-" + service
 }
 
+func (m MockProvider) ServicePublicDNS(service string, projectName string) string {
+	return service + "." + projectName + ".tenant2.defang.app"
+}
+
 // MockServerStream mocks a ServerStream.
 type MockServerStream[Msg any] struct {
 	index int
