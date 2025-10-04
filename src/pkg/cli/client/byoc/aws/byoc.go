@@ -906,3 +906,7 @@ func (b *ByocAws) AddEcsEventHandler(handler ECSEventHandler) {
 	defer b.handlersLock.Unlock()
 	b.ecsEventHandlers = append(b.ecsEventHandlers, handler)
 }
+
+func (b *ByocAws) ServicePublicDNS(name string, projectName string) string {
+	return dns.SafeLabel(name) + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
+}
