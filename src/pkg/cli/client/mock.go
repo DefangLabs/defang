@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	"github.com/DefangLabs/defang/src/pkg/dns"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -21,8 +22,12 @@ func (m MockProvider) ListConfig(ctx context.Context, req *defangv1.ListConfigsR
 	return &defangv1.Secrets{Names: []string{"CONFIG1", "CONFIG2", "dummy", "ENV1", "SENSITIVE_DATA", "VAR1"}}, nil
 }
 
-func (m MockProvider) ServiceDNS(service string) string {
+func (m MockProvider) ServicePrivateDNS(service string) string {
 	return "mock-" + service
+}
+
+func (m MockProvider) ServicePublicDNS(service string, projectName string) string {
+	return dns.SafeLabel(service) + "." + dns.SafeLabel(projectName) + ".tenant2.defang.app"
 }
 
 // MockServerStream mocks a ServerStream.

@@ -14,17 +14,6 @@
       }
     ]
   },
-  "env-in-config": {
-    "command": null,
-    "entrypoint": null,
-    "environment": {
-      "CONFIG1": null
-    },
-    "image": "service:latest",
-    "networks": {
-      "default": null
-    }
-  },
   "fixup-args": {
     "build": {
       "context": ".",
@@ -55,6 +44,39 @@
       }
     ]
   },
+  "refer-self-build-arg": {
+    "build": {
+      "context": ".",
+      "dockerfile": "Dockerfile",
+      "args": {
+        "CONFIG4": "refer-self-env.fixupenv.tenant2.defang.app"
+      }
+    },
+    "command": null,
+    "entrypoint": null,
+    "networks": {
+      "default": null
+    }
+  },
+  "refer-self-env": {
+    "command": null,
+    "entrypoint": null,
+    "environment": {
+      "CONFIG3": "refer-self-env.fixupenv.tenant2.defang.app"
+    },
+    "image": "service:latest",
+    "networks": {
+      "default": null
+    },
+    "ports": [
+      {
+        "mode": "ingress",
+        "target": 5678,
+        "protocol": "tcp",
+        "app_protocol": "http"
+      }
+    ]
+  },
   "ui": {
     "command": null,
     "entrypoint": null,
@@ -71,7 +93,7 @@
     "command": null,
     "entrypoint": null,
     "environment": {
-      "DB_URL": "ingress-service:5432"
+      "UI_URL": "ingress-service.fixupenv.tenant2.defang.app:5432"
     },
     "image": "service:latest",
     "networks": {
