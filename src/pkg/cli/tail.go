@@ -386,6 +386,20 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		return nil
 	}
 
+	if options.Verbose {
+		printLogEntry(e, options)
+	}
+
+	// Detect end logging event
+	if options.EndEventDetectFunc != nil {
+		if err := options.EndEventDetectFunc(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printLogEntry(e *defangv1.LogEntry, options *TailOptions) {
 	ts := e.Timestamp.AsTime()
 	tsString := ts.Local().Format(RFC3339Milli)
 	tsColor := termenv.ANSIBrightBlack
@@ -427,14 +441,6 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		buf.WriteRune('\n')
 	}
 	term.Print(buf.String())
-
-	// Detect end logging event
-	if options.EndEventDetectFunc != nil {
-		if err := options.EndEventDetectFunc(e); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func valueOrDefault(value, def string) string {
