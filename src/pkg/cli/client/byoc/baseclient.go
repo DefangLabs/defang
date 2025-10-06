@@ -285,7 +285,7 @@ func (b *ByocBaseClient) GetEndpoint(fqn string, projectName, delegateDomain str
 }
 
 // This function was copied from Fabric controller and slightly modified to work with BYOC
-func (b *ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) string {
+func (b ByocBaseClient) GetPublicFqdn(projectName, delegateDomain, fqn string) string {
 	if projectName == "" {
 		return "" //b.fqdn
 	}
