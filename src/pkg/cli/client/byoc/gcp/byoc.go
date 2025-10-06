@@ -943,5 +943,5 @@ func (b *ByocGcp) StackName(projectName, name string) string {
 }
 
 func (b *ByocGcp) ServicePublicDNS(name string, projectName string) string {
-	return dns.SafeLabel(name) + "." + "beta" + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
+	return dns.SafeLabel(name) + "." + b.PulumiStack + "." + dns.SafeLabel(projectName) + "." + dns.SafeLabel(b.TenantName) + ".defang.app"
 }
