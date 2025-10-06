@@ -155,7 +155,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 				entry.Host = evt.Host()
 				entry.Message = evt.Status()
 			}
-		} else if response.Service == "cd" && strings.HasPrefix(entry.Message, logs.ErrorPrefix) {
+		} else if response.Service == "cd" && (strings.HasPrefix(entry.Message, logs.ErrorPrefix) || strings.Contains(strings.ToLower(entry.Message), "error:")) {
 			entry.Stderr = true
 		}
 		if entry.Etag != "" && bs.etag != "" && entry.Etag != bs.etag {
@@ -164,6 +164,7 @@ func (bs *byocServerStream) parseEvents(events []ecs.LogEvent) *defangv1.TailRes
 		if entry.Service != "" && len(bs.services) > 0 && !slices.Contains(bs.services, entry.Service) {
 			continue
 		}
+
 		entries = append(entries, entry)
 	}
 	if len(entries) == 0 {
