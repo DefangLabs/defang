@@ -392,7 +392,8 @@ var RootCmd = &cobra.Command{
 	},
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return agent.New(cmd.Context()).Start()
+		authPort, _ := cmd.Flags().GetInt("auth-server")
+		return agent.New(cmd.Context(), cluster, authPort).Start()
 	},
 }
 
