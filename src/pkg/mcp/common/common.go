@@ -56,13 +56,11 @@ func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
 	return compose.NewLoader()
 }
 
-func FixupConfigError(err error) *mcp.CallToolResult {
+func FixupConfigError(err error) error {
 	if strings.Contains(err.Error(), "missing configs") {
-		mcpResult := mcp.NewToolResultErrorFromErr("The operation failed due to missing configs not being set. Please use the Defang tool called set_config to set the variable.", err)
-		term.Debugf("MCP output error: %v", mcpResult)
-		return mcpResult
+		return errors.New("The operation failed due to missing configs not being set. Please use the Defang tool called set_config to set the variable.")
 	}
-	return nil
+	return err
 }
 
 func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, providerId client.ProviderID, projectName string, provider client.Provider, serviceCount int) error {

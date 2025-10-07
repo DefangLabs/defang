@@ -70,11 +70,7 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		err = fmt.Errorf("failed to compose up services: %w", err)
 		term.Error("Failed to compose up services", "error", err)
 
-		result := common.HandleConfigError(err)
-		if result != nil {
-			return result, err
-		}
-
+		err = common.FixupConfigError(err)
 		return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), err
 	}
 
