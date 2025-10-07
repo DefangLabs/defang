@@ -1,4 +1,4 @@
-package ecs
+package cw
 
 import (
 	"context"
@@ -24,26 +24,6 @@ import (
 
 func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
-}
-
-func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
-	es := &eventStream{
-		cancel: cancel,
-		ch:     make(chan types.StartLiveTailResponseStream),
-	}
-
-	go func() {
-		defer close(es.ch)
-		for evt := range ch {
-			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-				Value: types.LiveTailSessionUpdate{
-					SessionResults: []types.LiveTailSessionLogEvent{evt},
-				},
-			}
-		}
-	}()
-
-	return es
 }
 
 func QueryAndTailLogGroups(ctx context.Context, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
@@ -159,6 +139,23 @@ func QueryLogGroup(ctx context.Context, input LogGroupInput, start, end time.Tim
 	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
 }
 
+func QueryLogGroupStream(ctx context.Context, input LogGroupInput, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
+	ctx, cancel := context.WithCancel(ctx)
+	es := newEventStream(cancel)
+
+	// TODO: this QueryLogGroup function doesn't return until all logs are fetched, so returning a stream is not very useful
+	if err := QueryLogGroup(ctx, input, start, end, limit, func(events []LogEvent) error {
+		es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+			Value: types.LiveTailSessionUpdate{SessionResults: events},
+		}
+		return nil
+	}); err != nil {
+		es.err = err
+	}
+
+	return es, nil
+}
+
 func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
@@ -171,6 +168,9 @@ func filterLogEvents(ctx context.Context, cw *cloudwatchlogs.Client, lgi LogGrou
 		FilterPattern:      pattern,
 	}
 
+	if limit != 0 {
+		params.Limit = &limit
+	}
 	if !start.IsZero() {
 		params.StartTime = ptr.Int64(start.UnixMilli())
 	}

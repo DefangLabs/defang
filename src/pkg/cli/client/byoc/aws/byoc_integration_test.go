@@ -19,17 +19,6 @@ func TestDeploy(t *testing.T) {
 
 		_, err := b.Deploy(context.Background(), &defangv1.DeployRequest{
 			Project: "byoc_integration_test",
-			Services: []*defangv1.Service{{
-				Name:  "test",
-				Image: "docker.io/library/nginx:latest",
-				Ports: []*defangv1.Port{{
-					Target: 80,
-					Mode:   defangv1.Mode_INGRESS,
-				}, {
-					Target: 443,
-					Mode:   defangv1.Mode_INGRESS,
-				}},
-			}},
 		})
 		if err == nil || !strings.Contains(err.Error(), "duplicate endpoint:") {
 			t.Error("expected error")
