@@ -244,7 +244,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			},
 			expectError:          false,
 			expectTextResult:     true,
-			expectedTextContains: "Successfully estimated the cost of the project to AWS",
+			expectedTextContains: "Successfully estimated the cost of the project to Google Cloud Platform",
 		},
 	}
 
