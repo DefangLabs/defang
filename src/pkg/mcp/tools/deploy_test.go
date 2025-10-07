@@ -88,8 +88,6 @@ func TestHandleDeployTool(t *testing.T) {
 		providerID            client.ProviderID
 		setupMock             func(*MockDeployCLI)
 		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
@@ -98,17 +96,15 @@ func TestHandleDeployTool(t *testing.T) {
 			workingDirectory:      "",
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockDeployCLI) {},
-			expectError:           false, // Function returns but with error result
-			expectErrorResult:     true,
-			expectedErrorContains: "working_directory is required",
+			expectError:           true,
+			expectedErrorContains: "invalid working directory",
 		},
 		{
 			name:                  "invalid_working_directory",
 			workingDirectory:      "/nonexistent/directory", // This will cause os.Chdir to fail in real execution
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockDeployCLI) {},
-			expectError:           true, // os.Chdir will return error and function will return it
-			expectErrorResult:     true,
+			expectError:           true,                        // os.Chdir will return error and function will return it
 			expectedErrorContains: "no such file or directory", // This is what os.Chdir returns
 		},
 		{
@@ -119,7 +115,6 @@ func TestHandleDeployTool(t *testing.T) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectError:          true, // LoadProject error returns Go error
-			expectTextResult:     true,
 			expectedTextContains: "Local deployment failed",
 		},
 		{
@@ -130,8 +125,7 @@ func TestHandleDeployTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true, // Connect error returns Go error
-			expectErrorResult:     true,
+			expectError:           true,                // Connect error returns Go error
 			expectedErrorContains: "connection failed", // This is the actual error message
 		},
 		{
@@ -143,7 +137,6 @@ func TestHandleDeployTool(t *testing.T) {
 				m.CheckProviderConfiguredError = errors.New("provider not configured")
 			},
 			expectError:           true, // CheckProviderConfigured error returns Go error
-			expectErrorResult:     true,
 			expectedErrorContains: "provider not configured",
 		},
 		{
@@ -155,7 +148,6 @@ func TestHandleDeployTool(t *testing.T) {
 				m.ComposeUpError = errors.New("compose up failed")
 			},
 			expectError:           true, // ComposeUp error returns Go error
-			expectErrorResult:     true,
 			expectedErrorContains: "compose up failed",
 		},
 		{
@@ -169,9 +161,8 @@ func TestHandleDeployTool(t *testing.T) {
 					Services: []*defangv1.ServiceInfo{}, // Empty services
 				}
 			},
-			expectError:          false,
-			expectTextResult:     true,
-			expectedTextContains: "Failed to deploy services",
+			expectError:           true,
+			expectedErrorContains: "no services deployed",
 		},
 		{
 			name:             "successful_deploy_defang_provider",
@@ -187,7 +178,6 @@ func TestHandleDeployTool(t *testing.T) {
 				}
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Please use the web portal url:",
 		},
 		{
@@ -204,7 +194,6 @@ func TestHandleDeployTool(t *testing.T) {
 				}
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Please use the aws console",
 		},
 		{
@@ -246,27 +235,8 @@ func TestHandleDeployTool(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 

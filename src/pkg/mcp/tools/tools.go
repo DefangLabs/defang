@@ -51,7 +51,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleDeployTool(ctx, request, providerId, cluster, cli)
+				output, err := handleDeployTool(ctx, request, providerId, cluster, cli)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
