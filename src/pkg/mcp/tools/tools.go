@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DefangLabs/defang/src/pkg/agent"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -19,7 +20,61 @@ var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
 	mcp.Items(map[string]string{"type": "string"}),
 )
 
+func translateSchema(schema map[string]any) mcp.ToolInputSchema {
+	if schema == nil {
+		return mcp.ToolInputSchema{
+			Type:       "object",
+			Properties: map[string]any{},
+			Required:   []string{},
+		}
+	}
+
+	schemaType, ok := schema["type"].(string)
+	if !ok {
+		schemaType = "object"
+	}
+	schemaProperties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		schemaProperties = map[string]any{}
+	}
+	schemaRequired, ok := schema["required"].([]string)
+	if !ok {
+		schemaRequired = []string{}
+	}
+
+	return mcp.ToolInputSchema{
+		Type:       schemaType,
+		Properties: schemaProperties,
+		Required:   schemaRequired,
+	}
+}
+
 func CollectTools(cluster string, authPort int, providerId *client.ProviderID) []server.ServerTool {
+	agentTools := agent.CollectTools(cluster, authPort)
+	var mappedTools []server.ServerTool
+	for _, t := range agentTools {
+		def := t.Definition()
+		inputSchema := translateSchema(def.InputSchema)
+		mappedTools = append(mappedTools, server.ServerTool{
+			Tool: mcp.Tool{
+				Name:        t.Name(),
+				Description: def.Description,
+				InputSchema: inputSchema,
+			},
+			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				result, err := t.RunRaw(ctx, request.GetArguments())
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Tool execution failed", err), nil
+				}
+				output, ok := result.(string)
+				if !ok {
+					return mcp.NewToolResultError("Tool returned unexpected result type"), nil
+				}
+				return mcp.NewToolResultText(output), nil
+			},
+		})
+	}
+
 	tools := []server.ServerTool{
 		{
 			Tool: mcp.NewTool("login",
