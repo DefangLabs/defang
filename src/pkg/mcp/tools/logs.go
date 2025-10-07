@@ -106,9 +106,9 @@ func handleLogsTool(ctx context.Context, request mcp.CallToolRequest, cluster st
 	})
 
 	if err != nil {
-		err = fmt.Errorf("failed to tail logs: %w", err)
-		term.Error("Failed to tail logs", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to tail logs", err), err
+		err = fmt.Errorf("failed to fetch logs: %w", err)
+		term.Error("Failed to fetch logs", "error", err)
+		return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 	}
 
 	return mcp.NewToolResultText("Done"), nil
