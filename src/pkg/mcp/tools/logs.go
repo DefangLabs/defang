@@ -7,41 +7,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// DefaultLogsCLI implements LogsCLIInterface using actual CLI functions
-type DefaultLogsCLI struct{}
-
-func (c *DefaultLogsCLI) Connect(ctx context.Context, cluster string) (*cliClient.GrpcClient, error) {
-	return cli.Connect(ctx, cluster)
-}
-
-func (c *DefaultLogsCLI) NewProvider(ctx context.Context, providerId cliClient.ProviderID, client *cliClient.GrpcClient) (cliClient.Provider, error) {
-	return cli.NewProvider(ctx, providerId, client)
-}
-
-func (c *DefaultLogsCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error {
-	return cli.Tail(ctx, provider, project.Name, options)
-}
-
-func (c *DefaultLogsCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	return CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
-}
-
-func (c *DefaultLogsCLI) LoadProject(ctx context.Context, loader cliClient.Loader) (*compose.Project, error) {
-	return loader.LoadProject(ctx)
-}
-
-func (c *DefaultLogsCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
-}
 
 func handleLogsTool(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Tail tool called - opening logs in browser")
