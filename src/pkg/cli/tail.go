@@ -386,9 +386,7 @@ func logEntryPrintHandler(e *defangv1.LogEntry, options *TailOptions) error {
 		return nil
 	}
 
-	if options.Verbose {
-		printLogEntry(e, options)
-	}
+	printLogEntry(e, options)
 
 	// Detect end logging event
 	if options.EndEventDetectFunc != nil {
@@ -409,6 +407,7 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions) {
 	if e.Stderr {
 		tsColor = termenv.ANSIBrightRed
 	}
+
 	var prefixLen int
 	trimmed := strings.TrimRight(e.Message, "\t\r\n ")
 	buf := term.NewMessageBuilder(term.StdoutCanColor())
@@ -440,7 +439,10 @@ func printLogEntry(e *defangv1.LogEntry, options *TailOptions) {
 		buf.WriteString(line)
 		buf.WriteRune('\n')
 	}
-	term.Print(buf.String())
+
+	if options.Verbose || e.Stderr {
+		term.Print(buf.String())
+	}
 }
 
 func valueOrDefault(value, def string) string {
