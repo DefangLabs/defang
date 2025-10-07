@@ -1,3 +1,5 @@
+SHELL := bash
+
 # VERSION is the version we should download and use.
 VERSION:=$(shell git describe --match=NeVeRmAtCh --always --dirty)
 
