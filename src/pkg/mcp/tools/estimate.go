@@ -96,5 +96,5 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 
 	estimateText := cli.CaptureTermOutput(mode, estimate)
 
-	return mcp.NewToolResultText("Successfully estimated the cost of the project to AWS:\n" + estimateText), nil
+	return mcp.NewToolResultText("Successfully estimated the cost of the project to " + providerID.Name() + ":\n" + estimateText), nil
 }
