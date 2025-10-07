@@ -12,6 +12,7 @@ import (
 
 var workingDirectoryOption = mcp.WithString("working_directory",
 	mcp.Description("Path to project's working directory"),
+	mcp.Required(),
 )
 
 var multipleComposeFilesOptions = mcp.WithArray("compose_file_paths",
@@ -45,6 +46,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("deploy",
 				mcp.WithDescription("Deploy services using defang"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
@@ -55,6 +57,7 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("destroy",
 				mcp.WithDescription("Destroy deployed services for the project in the current working directory"),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
@@ -86,12 +89,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			Tool: mcp.NewTool("estimate",
 				mcp.WithDescription("Estimate the cost of deployed a Defang project."),
 				workingDirectoryOption,
+				multipleComposeFilesOptions,
 				mcp.WithString("provider",
 					mcp.Description("The cloud provider to estimate costs for. Supported options are AWS or GCP"),
 					mcp.DefaultString(strings.ToUpper(providerId.String())),
 					mcp.Enum("AWS", "GCP"),
 				),
-
 				mcp.WithString("deployment_mode",
 					mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
 					mcp.DefaultString("AFFORDABLE"),
