@@ -54,10 +54,10 @@ func TestConfigureLoaderBranches(t *testing.T) {
 
 func TestHandleConfigError(t *testing.T) {
 	cfgErr := errors.New("missing configs: DB_PASSWORD")
-	res := HandleConfigError(cfgErr)
+	res := FixupConfigError(cfgErr)
 	assert.NotNil(t, res)
 	otherErr := errors.New("another error")
-	res2 := HandleConfigError(otherErr)
+	res2 := FixupConfigError(otherErr)
 	assert.Nil(t, res2)
 }
 
