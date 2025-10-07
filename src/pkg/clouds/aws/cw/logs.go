@@ -1,4 +1,4 @@
-package ecs
+package cw
 
 import (
 	"context"
@@ -25,32 +25,12 @@ func getLogGroupIdentifier(arnOrId string) string {
 	return strings.TrimSuffix(arnOrId, ":*")
 }
 
-func NewStaticLogStream(ch <-chan LogEvent, cancel func()) EventStream[types.StartLiveTailResponseStream] {
-	es := &eventStream{
-		cancel: cancel,
-		ch:     make(chan types.StartLiveTailResponseStream),
-	}
-
-	go func() {
-		defer close(es.ch)
-		for evt := range ch {
-			es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
-				Value: types.LiveTailSessionUpdate{
-					SessionResults: []types.LiveTailSessionLogEvent{evt},
-				},
-			}
-		}
-	}()
-
-	return es
-}
-
 type FiltererTailer interface {
-	LogFilterer
-	LogTailer
+	FilterLogEventsAPI
+	StartLiveTailAPI
 }
 
-func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
+func QueryAndTailLogGroups(ctx context.Context, cwClient FiltererTailer, start, end time.Time, logGroups ...LogGroupInput) (LiveTailStream, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	e := &eventStream{
@@ -63,7 +43,7 @@ func QueryAndTailLogGroups(ctx context.Context, cw FiltererTailer, start, end ti
 	var err error
 	for _, lgi := range logGroups {
 		var es LiveTailStream
-		es, err = QueryAndTailLogGroup(ctx, cw, lgi, start, end)
+		es, err = QueryAndTailLogGroup(ctx, cwClient, lgi, start, end)
 		if err != nil {
 			break // abort if there is any fatal error
 		}
@@ -97,11 +77,11 @@ type LogGroupInput struct {
 	LogEventFilterPattern string
 }
 
-type LogTailer interface {
+type StartLiveTailAPI interface {
 	StartLiveTail(ctx context.Context, params *cloudwatchlogs.StartLiveTailInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.StartLiveTailOutput, error)
 }
 
-func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveTailStream, error) {
+func TailLogGroup(ctx context.Context, cwClient StartLiveTailAPI, input LogGroupInput) (LiveTailStream, error) {
 	var pattern *string
 	if input.LogEventFilterPattern != "" {
 		pattern = &input.LogEventFilterPattern
@@ -118,7 +98,7 @@ func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveT
 		LogEventFilterPattern: pattern,
 	}
 
-	slto, err := cw.StartLiveTail(ctx, slti)
+	slto, err := cwClient.StartLiveTail(ctx, slti)
 	if err != nil {
 		return nil, err
 	}
@@ -126,11 +106,11 @@ func TailLogGroup(ctx context.Context, cw LogTailer, input LogGroupInput) (LiveT
 	return slto.GetStream(), nil
 }
 
-type LogFilterer interface {
+type FilterLogEventsAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
-func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
+func QueryLogGroups(ctx context.Context, cwClient FilterLogEventsAPI, start, end time.Time, limit int32, logGroups ...LogGroupInput) (<-chan LogEvent, <-chan error) {
 	var evtsChan chan LogEvent
 	errChan := make(chan error, len(logGroups))
 	var wg sync.WaitGroup
@@ -149,7 +129,7 @@ func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, l
 			// TODO: optimize this by simulating a descending query by doing
 			// multiple queries with time windows, starting from the end time
 			// and moving backwards until we have enough events.
-			err := QueryLogGroup(ctx, cw, lgi, start, end, 0, func(logEvents []LogEvent) error {
+			err := QueryLogGroup(ctx, cwClient, lgi, start, end, 0, func(logEvents []LogEvent) error {
 				for _, event := range logEvents {
 					lgEvtChan <- event
 				}
@@ -176,11 +156,28 @@ func QueryLogGroups(ctx context.Context, cw LogFilterer, start, end time.Time, l
 	return evtsChan, errChan
 }
 
-func QueryLogGroup(ctx context.Context, cw LogFilterer, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
-	return filterLogEvents(ctx, cw, input, start, end, limit, cb)
+func QueryLogGroup(ctx context.Context, cwClient FilterLogEventsAPI, input LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+	return filterLogEvents(ctx, cwClient, input, start, end, limit, cb)
 }
 
-func filterLogEvents(ctx context.Context, cw LogFilterer, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
+func QueryLogGroupStream(ctx context.Context, cwClient FilterLogEventsAPI, input LogGroupInput, start, end time.Time, limit int32) (EventStream[types.StartLiveTailResponseStream], error) {
+	ctx, cancel := context.WithCancel(ctx)
+	es := newEventStream(cancel)
+
+	// TODO: this QueryLogGroup function doesn't return until all logs are fetched, so returning a stream is not very useful
+	if err := QueryLogGroup(ctx, cwClient, input, start, end, limit, func(events []LogEvent) error {
+		es.ch <- &types.StartLiveTailResponseStreamMemberSessionUpdate{
+			Value: types.LiveTailSessionUpdate{SessionResults: events},
+		}
+		return nil
+	}); err != nil {
+		es.err = err
+	}
+
+	return es, nil
+}
+
+func filterLogEvents(ctx context.Context, cw FilterLogEventsAPI, lgi LogGroupInput, start, end time.Time, limit int32, cb func([]LogEvent) error) error {
 	var pattern *string
 	if lgi.LogEventFilterPattern != "" {
 		pattern = &lgi.LogEventFilterPattern
@@ -192,6 +189,9 @@ func filterLogEvents(ctx context.Context, cw LogFilterer, lgi LogGroupInput, sta
 		FilterPattern:      pattern,
 	}
 
+	if limit != 0 {
+		params.Limit = &limit
+	}
 	if !start.IsZero() {
 		params.StartTime = ptr.Int64(start.UnixMilli())
 	}

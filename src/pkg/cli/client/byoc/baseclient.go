@@ -217,14 +217,6 @@ func (b *ByocBaseClient) update(ctx context.Context, projectName, delegateDomain
 			hasIngress = hasIngress || port.Mode == compose.Mode_INGRESS
 			hasHost = hasHost || port.Mode == compose.Mode_HOST
 			si.Endpoints = append(si.Endpoints, b.GetEndpoint(fqn, projectName, delegateDomain, &port))
-			mode := defangv1.Mode_INGRESS
-			if port.Mode == compose.Mode_HOST {
-				mode = defangv1.Mode_HOST
-			}
-			si.Service.Ports = append(si.Service.Ports, &defangv1.Port{
-				Target: port.Target,
-				Mode:   mode,
-			})
 		}
 	} else {
 		si.PublicFqdn = b.GetPublicFqdn(projectName, delegateDomain, fqn)

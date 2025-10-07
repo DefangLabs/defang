@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DefangLabs/defang/src/pkg/clouds/aws/ecs"
+	"github.com/DefangLabs/defang/src/pkg/clouds/aws/cw"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,12 +22,12 @@ func ptrInt64(i int64) *int64 {
 func TestStreamToLogEvent(t *testing.T) {
 	var testEtag = "hg2xsgvsldqk"
 	var testdata = []struct {
-		event    *ecs.LogEvent
+		event    *cw.LogEvent
 		wantResp *defangv1.TailResponse
 	}{
 		{
 			// cd message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1761883448306),
 				LogGroupIdentifier: ptrString("532501343364:defang-cd-LogGroup-8id1W5WpeWRu"),
 				LogStreamName:      ptrString("crun/main/127bb61dd5f746918f578f32cc1d6d01"),
@@ -48,7 +48,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 		{
 			// error message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1761883448306),
 				LogGroupIdentifier: ptrString("532501343364:defang-cd-LogGroup-8id1W5WpeWRu"),
 				LogStreamName:      ptrString("crun/main/127bb61dd5f746918f578f32cc1d6d01"),
@@ -69,7 +69,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 		{
 			// service message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1761883448306),
 				LogGroupIdentifier: ptrString("532501343364:/Defang/django/beta/builds"),
 				LogStreamName:      ptrString("django-image/django_hg2xsgvsldqk/fb1d2a8e-9553-497e-85e4-91a57f8b6ba6"),
@@ -90,7 +90,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 		{
 			// ECS  message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1761883448306),
 				LogGroupIdentifier: ptrString("532501343364:/Defang/django/beta/ecs"),
 				LogStreamName:      ptrString("7127bdd6-6e73-3d4e-8c97-18c3071004af"),
@@ -101,7 +101,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 		{
 			// railpack message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1762148772888),
 				LogGroupIdentifier: ptrString("532501343364:defang-cd-LogGroup-8id1W5WpeWRu"),
 				LogStreamName:      ptrString("crun/main/a467a0afd56d44baab32bb5cceb10da0"),
@@ -122,7 +122,7 @@ func TestStreamToLogEvent(t *testing.T) {
 		},
 		{
 			// service message
-			event: &ecs.LogEvent{
+			event: &cw.LogEvent{
 				IngestionTime:      ptrInt64(1762144097682),
 				LogGroupIdentifier: ptrString("532501343364:/Defang/django6/beta/logs"),
 				LogStreamName:      ptrString("django/django_hg2xsgvsldqk/b89c0f0e35ad4357852f0d7cafd488eb"),
@@ -146,7 +146,7 @@ func TestStreamToLogEvent(t *testing.T) {
 	var byocServiceStream = newByocServerStream(nil, testEtag, []string{"cd", "app", "django"}, nil)
 
 	for _, td := range testdata {
-		tailResp := byocServiceStream.parseEvents([]ecs.LogEvent{*td.event})
+		tailResp := byocServiceStream.parseEvents([]cw.LogEvent{*td.event})
 		if (td.wantResp == nil) != (tailResp == nil) {
 			t.Errorf("nil mismatch: expected %v, got %v", td.wantResp, tailResp)
 			continue
