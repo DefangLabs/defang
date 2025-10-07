@@ -16,24 +16,24 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (*mcp.CallToolResult, error) {
+func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
 	term.Debug("Services tool called - fetching services from Defang")
 
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		return "", fmt.Errorf("no provider configured: %w", err)
 	}
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
 		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		return "", fmt.Errorf("invalid working directory: %w", errors.New("working_directory is required"))
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
 		term.Error("Failed to change working directory", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		return "", fmt.Errorf("failed to change working directory: %w", err)
 	}
 
 	loader := common.ConfigureLoader(request)
@@ -41,7 +41,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	// Create a Defang client
@@ -49,7 +49,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
 		term.Error("Failed to create provider", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to create provider", err), err
+		return "", fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
@@ -58,10 +58,10 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
 			term.Errorf("No projects found on Playground, error: %v", err)
-			return mcp.NewToolResultText("No projects found on Playground"), nil
+			return "", fmt.Errorf("no projects found on Playground: %w", err)
 		}
 		term.Errorf("Failed to load project name, error: %v", err)
-		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
+		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 
 	serviceResponse, err := cli.GetServices(ctx, projectName, provider)
@@ -69,15 +69,15 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {
 			term.Warnf("No services found for the specified project %s", projectName)
-			return mcp.NewToolResultText("No services found for the specified project " + projectName), err
+			return "", fmt.Errorf("no services found for the specified project %s: %w", projectName, err)
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
 			term.Warnf("Project %s is not deployed in Playground", projectName)
-			return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), err
+			return "", fmt.Errorf("project %s is not deployed in Playground: %w", projectName, err)
 		}
 
 		term.Error("Failed to get services", "error", err)
-		return mcp.NewToolResultText("Failed to get services"), nil
+		return "", fmt.Errorf("failed to get services: %w", err)
 	}
 
 	// Convert to JSON
@@ -85,9 +85,9 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	if jsonErr == nil {
 		term.Debugf("Successfully loaded services with count: %d", len(serviceResponse))
 		// Use NewToolResultText with JSON string
-		return mcp.NewToolResultText(string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects"), nil
+		return string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects", nil
 	}
 
 	// Return the data in a structured format
-	return mcp.NewToolResultText("Successfully loaded services, but failed to convert to JSON. Please check the logs for details."), nil
+	return "Successfully loaded services, but failed to convert to JSON. Please check the logs for details.", nil
 }
