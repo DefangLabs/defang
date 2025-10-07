@@ -3,7 +3,6 @@ package agent
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -19,63 +18,23 @@ type Agent struct {
 	tools []ai.ToolRef
 }
 
-func New(ctx context.Context) *Agent {
+func New(ctx context.Context, cluster string, authPort int) *Agent {
 	// Initialize Genkit with the Google AI plugin
 	g := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
 		genkit.WithDefaultModel("googleai/gemini-2.5-flash"),
 	)
-	// Define the weather tool
-	weatherTool := genkit.DefineTool(
-		g,
-		"getWeather",
-		"Gets the current weather for a location",
-		func(ctx *ai.ToolContext, input *WeatherInput) (string, error) {
-			// Simulated weather data
-			return fmt.Sprintf("The weather in %s is sunny and 72°F", input.Location), nil
-		},
-	)
 
-	// Define the calculator tool
-	calculatorTool := genkit.DefineTool(
-		g,
-		"calculator",
-		"Performs basic arithmetic operations (add, subtract, multiply, divide)",
-		func(ctx *ai.ToolContext, input *CalculatorInput) (float64, error) {
-			switch input.Operation {
-			case "add":
-				return input.A + input.B, nil
-			case "subtract":
-				return input.A - input.B, nil
-			case "multiply":
-				return input.A * input.B, nil
-			case "divide":
-				if input.B == 0 {
-					return 0, errors.New("division by zero")
-				}
-				return input.A / input.B, nil
-			default:
-				return 0, fmt.Errorf("invalid operation: %s", input.Operation)
-			}
-		},
-	)
-
+	tools := CollectTools(cluster, authPort)
+	toolRefs := make([]ai.ToolRef, len(tools))
+	for i, t := range tools {
+		toolRefs[i] = ai.ToolRef(t)
+	}
 	return &Agent{
 		ctx:   ctx,
 		g:     g,
-		tools: []ai.ToolRef{weatherTool, calculatorTool},
+		tools: toolRefs,
 	}
-}
-
-// Define input/output types for your tools
-type WeatherInput struct {
-	Location string `json:"location"`
-}
-
-type CalculatorInput struct {
-	Operation string  `json:"operation"`
-	A         float64 `json:"a"`
-	B         float64 `json:"b"`
 }
 
 func (a *Agent) Start() error {
