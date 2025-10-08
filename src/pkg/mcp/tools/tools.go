@@ -29,7 +29,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleLoginTool(ctx, request, cluster, authPort, &LoginCLIAdapter{DefaultToolCLI: cli})
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to login", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
