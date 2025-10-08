@@ -136,8 +136,18 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				wd, err := request.RequireString("working_directory")
+				if err != nil || wd == "" {
+					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
+				}
+				err = os.Chdir(wd)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("failed to change working directory", err), err
+				}
+
+				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
-				output, err := handleLogsTool(ctx, request, cluster, providerId, cli)
+				output, err := handleLogsTool(ctx, loader, request, cluster, providerId, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
 				}
