@@ -55,11 +55,11 @@ func TestConfigureLoaderBranches(t *testing.T) {
 func TestFixupConfigError(t *testing.T) {
 	cfgErr := errors.New("missing configs: DB_PASSWORD")
 	newErr := FixupConfigError(cfgErr)
-	assert.Equal(t, "The operation failed due to missing configs not being set. Please use the Defang tool called set_config to set the variable.", newErr.Error())
+	assert.EqualError(t, newErr, "The operation failed due to missing configs not being set, use the Defang tool called set_config to set the variable: missing configs: DB_PASSWORD")
 
 	otherErr := errors.New("another error")
 	res2 := FixupConfigError(otherErr)
-	assert.Equal(t, otherErr, res2)
+	assert.EqualError(t, res2, otherErr.Error())
 }
 
 func TestProviderNotConfiguredError(t *testing.T) {

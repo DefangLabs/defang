@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -24,7 +23,7 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
+		return "", fmt.Errorf("Invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
@@ -34,12 +33,12 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		return "", fmt.Errorf("Invalid config `name`: %w", errors.New("`name` is required"))
+		return "", fmt.Errorf("Invalid config `name`: %w", err)
 	}
 
 	value, err := request.RequireString("value")
 	if err != nil || value == "" {
-		return "", fmt.Errorf("Invalid config `value`: %w", errors.New("`value` is required"))
+		return "", fmt.Errorf("Invalid config `value`: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
@@ -64,7 +63,7 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 	term.Debug("Project name loaded:", projectName)
 
 	if !pkg.IsValidSecretName(name) {
-		return "", fmt.Errorf("Invalid secret name: secret name %q is not valid", name)
+		return "", fmt.Errorf("Invalid config name: secret name %q is not valid", name)
 	}
 
 	term.Debug("Function invoked: cli.ConfigSet")

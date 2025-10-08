@@ -26,7 +26,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		return "", fmt.Errorf("invalid working directory: %w", errors.New("working_directory is required"))
+		return "", fmt.Errorf("invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
@@ -76,7 +76,6 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	jsonData, jsonErr := json.Marshal(serviceResponse)
 	if jsonErr == nil {
 		term.Debugf("Successfully loaded services with count: %d", len(serviceResponse))
-		// Use NewToolResultText with JSON string
 		return string(jsonData) + "\nIf you would like to see more details about your deployed projects, please visit the Defang portal at https://portal.defang.io/projects", nil
 	}
 

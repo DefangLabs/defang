@@ -42,13 +42,12 @@ func (m *MockLoginCLI) GenerateAuthURL(authPort int) string {
 
 func TestHandleLoginTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		cluster               string
-		authPort              int
-		setupMock             func(*MockLoginCLI)
-		expectError           bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		cluster              string
+		authPort             int
+		setupMock            func(*MockLoginCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
 			name:     "successful_login_already_connected",
@@ -86,8 +85,7 @@ func TestHandleLoginTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed - not authenticated")
 				m.InteractiveLoginError = errors.New("login failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "login failed",
+			expectedError: "login failed",
 		},
 		{
 			name:     "custom_auth_url",
@@ -123,11 +121,8 @@ func TestHandleLoginTool(t *testing.T) {
 			// Call the function
 			var err error
 			result, err := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
-				}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {

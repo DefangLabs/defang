@@ -59,7 +59,7 @@ func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
 
 func FixupConfigError(err error) error {
 	if strings.Contains(err.Error(), "missing configs") {
-		return fmt.Errorf("The operation failed due to missing configs not being set, please use the Defang tool called set_config to set the variable: %w", err)
+		return fmt.Errorf("The operation failed due to missing configs not being set, use the Defang tool called set_config to set the variable: %w", err)
 	}
 	return err
 }

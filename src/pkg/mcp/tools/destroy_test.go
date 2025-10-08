@@ -65,29 +65,26 @@ func (m *MockDestroyCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loa
 
 func TestHandleDestroyTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		workingDirectory      string
-		providerID            client.ProviderID
-		setupMock             func(*MockDestroyCLI)
-		expectError           bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		workingDirectory     string
+		providerID           client.ProviderID
+		setupMock            func(*MockDestroyCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
-			name:                  "missing_working_directory",
-			workingDirectory:      "",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockDestroyCLI) {},
-			expectError:           true,
-			expectedErrorContains: "working_directory is required",
+			name:             "missing_working_directory",
+			workingDirectory: "",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockDestroyCLI) {},
+			expectedError:    "Invalid working directory: working_directory is required",
 		},
 		{
-			name:                  "invalid_working_directory",
-			workingDirectory:      "/nonexistent/directory",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockDestroyCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no such file or directory",
+			name:             "invalid_working_directory",
+			workingDirectory: "/nonexistent/directory",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockDestroyCLI) {},
+			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
 			name:             "connect_error",
@@ -96,8 +93,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			setupMock: func(m *MockDestroyCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "connection failed",
+			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:             "new_provider_error",
@@ -106,8 +102,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			setupMock: func(m *MockDestroyCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "provider creation failed",
+			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:             "load_project_name_error",
@@ -116,8 +111,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			setupMock: func(m *MockDestroyCLI) {
 				m.LoadProjectNameWithFallbackError = errors.New("failed to load project name")
 			},
-			expectError:           true,
-			expectedErrorContains: "failed to load project name",
+			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
 			name:             "can_i_use_provider_error",
@@ -127,8 +121,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.CanIUseProviderError = errors.New("provider not available")
 			},
-			expectError:           true,
-			expectedErrorContains: "provider not available",
+			expectedError: "Failed to use provider: provider not available",
 		},
 		{
 			name:             "compose_down_project_not_found",
@@ -138,8 +131,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = connect.NewError(connect.CodeNotFound, errors.New("project not found"))
 			},
-			expectError:          true,
-			expectedTextContains: "Project not found, nothing to destroy",
+			expectedError: "Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory.",
 		},
 		{
 			name:             "compose_down_generic_error",
@@ -149,8 +141,7 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ComposeDownError = errors.New("destroy failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "destroy failed",
+			expectedError: "Failed to send destroy request: destroy failed",
 		},
 		{
 			name:             "successful_destroy",
@@ -160,16 +151,14 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ComposeDownResult = "deployment-123"
 			},
-			expectError:          false,
 			expectedTextContains: "The project is in the process of being destroyed: test-project",
 		},
 		{
-			name:                  "provider_auto_not_configured",
-			workingDirectory:      ".",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockDestroyCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no provider is configured",
+			name:             "provider_auto_not_configured",
+			workingDirectory: ".",
+			providerID:       client.ProviderAuto,
+			setupMock:        func(m *MockDestroyCLI) {},
+			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 	}
 
@@ -195,11 +184,8 @@ func TestHandleDestroyTool(t *testing.T) {
 			result, err := handleDestroyTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
-				}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
@@ -208,7 +194,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if !tt.expectError && tt.workingDirectory != "" && tt.name == "successful_destroy" {
+			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_destroy" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",

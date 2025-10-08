@@ -34,7 +34,7 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		return "", fmt.Errorf("Invalid config `name`: %w", errors.New("`name` is required"))
+		return "", fmt.Errorf("Invalid config `name`: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")

@@ -134,7 +134,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid working directory",
+			errorMessage:  "Invalid working directory: required argument \"working_directory\" not found",
 		},
 		{
 			name:          "empty working directory",
@@ -143,7 +143,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": "", "name": testConfigName, "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "working_directory is required",
+			errorMessage:  "Invalid working directory: %!w(<nil>)",
 		},
 		{
 			name:          "invalid working directory",
@@ -152,7 +152,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": "/nonexistent/directory", "name": testConfigName, "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Failed to change working directory",
+			errorMessage:  "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
 			name:          "missing config name",
@@ -161,7 +161,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": tempDir, "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `name`",
+			errorMessage:  "Invalid config `name`: required argument \"name\" not found",
 		},
 		{
 			name:          "empty config name",
@@ -170,7 +170,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": "", "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "`name` is required",
+			errorMessage:  "Invalid config `name`: %!w(<nil>)",
 		},
 		{
 			name:          "missing config value",
@@ -179,7 +179,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": testConfigName},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "Invalid config `value`",
+			errorMessage:  "Invalid config `value`: required argument \"value\" not found",
 		},
 		{
 			name:          "empty config value",
@@ -188,7 +188,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": ""},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
-			errorMessage:  "`value` is required",
+			errorMessage:  "Invalid config `value`: %!w(<nil>)",
 		},
 
 		// CLI operation error tests
@@ -199,7 +199,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:          map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
 			expectedError:        true,
-			errorMessage:         "connection failed",
+			errorMessage:         "Could not connect: connection failed",
 			expectedConnectCalls: true,
 		},
 		{
@@ -209,7 +209,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:           map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
 			mockCLI:               &MockSetConfigCLI{NewProviderError: errors.New("provider initialization failed")},
 			expectedError:         true,
-			errorMessage:          "provider initialization failed",
+			errorMessage:          "Failed to get new provider: provider initialization failed",
 			expectedConnectCalls:  true,
 			expectedProviderCalls: true,
 		},
@@ -220,7 +220,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{LoadProjectNameError: errors.New("project loading failed")},
 			expectedError:            true,
-			errorMessage:             "project loading failed",
+			errorMessage:             "Failed to load project name: project loading failed",
 			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
@@ -232,7 +232,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{ConfigSetError: errors.New("config set failed")},
 			expectedError:            true,
-			errorMessage:             "config set failed",
+			errorMessage:             "Failed to set config: config set failed",
 			expectedConnectCalls:     true,
 			expectedProviderCalls:    true,
 			expectedProjectNameCalls: true,
@@ -249,7 +249,7 @@ func TestHandleSetConfig(t *testing.T) {
 				NewProviderError: errors.New("No provider configured. Use one of these setup tools:\n* /mcp.defang.AWS_Setup\n* /mcp.defang.GCP_Setup\n* /mcp.defang.Playground_Setup"),
 			},
 			expectedError:         true,
-			errorMessage:          "No provider configured",
+			errorMessage:          "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
 			expectedProviderCalls: false, // Early return in providerNotConfiguredError
 		},
@@ -287,7 +287,7 @@ func TestHandleSetConfig(t *testing.T) {
 			requestArgs:          map[string]interface{}{"working_directory": tempDir, "name": "test-key", "value": "test-value"},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("mock connection failure")},
 			expectedError:        true,
-			errorMessage:         "mock connection failure",
+			errorMessage:         "Could not connect: mock connection failure",
 			checkWorkingDir:      true,
 			expectedConnectCalls: true,
 		},
@@ -301,7 +301,7 @@ func TestHandleSetConfig(t *testing.T) {
 			if tt.expectedError {
 				assert.Error(t, err)
 				if tt.errorMessage != "" {
-					assert.Contains(t, err.Error(), tt.errorMessage)
+					assert.EqualError(t, err, tt.errorMessage)
 				}
 			} else {
 				assert.NoError(t, err)

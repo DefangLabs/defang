@@ -103,31 +103,28 @@ func (m *MockEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estima
 
 func TestHandleEstimateTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		workingDirectory      string
-		deploymentMode        string
-		provider              string
-		providerID            client.ProviderID
-		setupMock             func(*MockEstimateCLI)
-		expectError           bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		workingDirectory     string
+		deploymentMode       string
+		provider             string
+		providerID           client.ProviderID
+		setupMock            func(*MockEstimateCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
-			name:                  "missing_working_directory",
-			workingDirectory:      "",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectedErrorContains: "working_directory is required",
+			name:             "missing_working_directory",
+			workingDirectory: "",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockEstimateCLI) {},
+			expectedError:    "working_directory is required: %!w(<nil>)",
 		},
 		{
-			name:                  "invalid_working_directory",
-			workingDirectory:      "/nonexistent/directory",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no such file or directory",
+			name:             "invalid_working_directory",
+			workingDirectory: "/nonexistent/directory",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockEstimateCLI) {},
+			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
 			name:             "unknown_deployment_mode_fails",
@@ -147,8 +144,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
-			expectError:          true,
-			expectedTextContains: "Unknown deployment mode provided, please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
+			expectedError: "Unknown deployment mode \"UNKNOWN-MODE\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
 			name:             "load_project_error",
@@ -157,8 +153,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			setupMock: func(m *MockEstimateCLI) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
-			expectError:           true,
-			expectedErrorContains: "failed to parse compose file",
+			expectedError: "failed to parse compose file: failed to parse compose file: failed to parse compose file",
 		},
 		{
 			name:             "connect_error",
@@ -168,8 +163,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "connection failed",
+			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:             "set_provider_id_error",
@@ -180,8 +174,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.SetProviderIDError = errors.New("invalid provider")
 			},
-			expectError:           true,
-			expectedErrorContains: "invalid provider",
+			expectedError: "Invalid provider specified: invalid provider",
 		},
 		{
 			name:             "run_estimate_error",
@@ -192,8 +185,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Region = "us-west-2"
 				m.RunEstimateError = errors.New("estimate failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "estimate failed",
+			expectedError: "Failed to run estimate: estimate failed",
 		},
 		{
 			name:             "successful_estimate_default_mode",
@@ -212,7 +204,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $10.00/month"
 			},
-			expectError:          false,
 			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
@@ -234,7 +225,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 				m.CapturedOutput = "Estimated cost: $50.00/month"
 			},
-			expectError:          false,
 			expectedTextContains: "Successfully estimated the cost of the project to Google Cloud Platform",
 		},
 	}
@@ -270,11 +260,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			result, err := handleEstimateTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
-				}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
@@ -283,7 +270,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if !tt.expectError && tt.workingDirectory != "" && tt.name == "successful_estimate_default_mode" {
+			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_estimate_default_mode" {
 				expectedCalls := []string{
 					"ConfigureLoader",
 					"LoadProject",

@@ -62,37 +62,33 @@ func (m *MockListConfigCLI) ListConfig(ctx context.Context, provider client.Prov
 
 func TestHandleListConfigTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		workingDirectory      string
-		providerID            client.ProviderID
-		setupMock             func(*MockListConfigCLI)
-		expectError           bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		workingDirectory     string
+		providerID           client.ProviderID
+		setupMock            func(*MockListConfigCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
-			name:                  "missing_working_directory",
-			workingDirectory:      "",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockListConfigCLI) {},
-			expectError:           true,
-			expectedErrorContains: "working_directory is required",
+			name:             "missing_working_directory",
+			workingDirectory: "",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockListConfigCLI) {},
+			expectedError:    "Invalid working directory: %!w(<nil>)",
 		},
 		{
-			name:                  "invalid_working_directory",
-			workingDirectory:      "/nonexistent/directory",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockListConfigCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no such file or directory",
+			name:             "invalid_working_directory",
+			workingDirectory: "/nonexistent/directory",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockListConfigCLI) {},
+			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
-			name:                  "provider_auto_not_configured",
-			workingDirectory:      ".",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockListConfigCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no provider is configured",
+			name:             "provider_auto_not_configured",
+			workingDirectory: ".",
+			providerID:       client.ProviderAuto,
+			setupMock:        func(m *MockListConfigCLI) {},
+			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 		{
 			name:             "connect_error",
@@ -101,8 +97,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "connection failed",
+			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:             "new_provider_error",
@@ -111,8 +106,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
-			expectError:           true,
-			expectedErrorContains: "provider creation failed",
+			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:             "load_project_name_error",
@@ -121,8 +115,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			setupMock: func(m *MockListConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
-			expectError:           true,
-			expectedErrorContains: "failed to load project name",
+			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
 			name:             "list_config_error",
@@ -132,8 +125,7 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ListConfigError = errors.New("failed to list configs")
 			},
-			expectError:           true,
-			expectedErrorContains: "failed to list configs",
+			expectedError: "Failed to list config variables: failed to list configs",
 		},
 		{
 			name:             "no_config_variables_found",
@@ -145,7 +137,6 @@ func TestHandleListConfigTool(t *testing.T) {
 					Names: []string{},
 				}
 			},
-			expectError:          false,
 			expectedTextContains: "No config variables found for the project \"test-project\"",
 		},
 		{
@@ -158,7 +149,6 @@ func TestHandleListConfigTool(t *testing.T) {
 					Names: []string{"DATABASE_URL"},
 				}
 			},
-			expectError:          false,
 			expectedTextContains: "Here is the list of config variables for the project \"test-project\": DATABASE_URL",
 		},
 	}
@@ -187,11 +177,8 @@ func TestHandleListConfigTool(t *testing.T) {
 			result, err := handleListConfigTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
-				}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
@@ -200,7 +187,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if !tt.expectError && tt.workingDirectory != "" && tt.name == "successful_list_single_config" {
+			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_list_single_config" {
 				expectedCalls := []string{
 					"Connect(test-cluster)",
 					"NewProvider(aws)",

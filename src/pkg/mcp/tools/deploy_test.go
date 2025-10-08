@@ -83,39 +83,35 @@ func (m *MockDeployCLI) OpenBrowser(url string) error {
 
 func TestHandleDeployTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		workingDirectory      string
-		providerID            client.ProviderID
-		setupMock             func(*MockDeployCLI)
-		expectError           bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		workingDirectory     string
+		providerID           client.ProviderID
+		setupMock            func(*MockDeployCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
-			name:                  "missing_working_directory",
-			workingDirectory:      "",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockDeployCLI) {},
-			expectError:           true,
-			expectedErrorContains: "invalid working directory",
+			name:             "missing_working_directory",
+			workingDirectory: "",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockDeployCLI) {},
+			expectedError:    "invalid working directory: %!w(<nil>)",
 		},
 		{
-			name:                  "invalid_working_directory",
-			workingDirectory:      "/nonexistent/directory", // This will cause os.Chdir to fail in real execution
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockDeployCLI) {},
-			expectError:           true,                        // os.Chdir will return error and function will return it
-			expectedErrorContains: "no such file or directory", // This is what os.Chdir returns
+			name:             "invalid_working_directory",
+			workingDirectory: "/nonexistent/directory",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockDeployCLI) {},
+			expectedError:    "failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
 			name:             "load_project_error",
-			workingDirectory: ".", // Use current directory for tests that should proceed past chdir
+			workingDirectory: ".",
 			providerID:       client.ProviderAWS,
 			setupMock: func(m *MockDeployCLI) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
-			expectError:          true, // LoadProject error returns Go error
-			expectedTextContains: "Local deployment failed",
+			expectedError: "local deployment failed: failed to parse compose file: failed to parse compose file. Please provide a valid compose file path.",
 		},
 		{
 			name:             "connect_error",
@@ -125,8 +121,7 @@ func TestHandleDeployTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true,                // Connect error returns Go error
-			expectedErrorContains: "connection failed", // This is the actual error message
+			expectedError: "could not connect: connection failed",
 		},
 		{
 			name:             "check_provider_configured_error",
@@ -136,8 +131,7 @@ func TestHandleDeployTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.CheckProviderConfiguredError = errors.New("provider not configured")
 			},
-			expectError:           true, // CheckProviderConfigured error returns Go error
-			expectedErrorContains: "provider not configured",
+			expectedError: "provider not configured correctly: provider not configured",
 		},
 		{
 			name:             "compose_up_error",
@@ -147,8 +141,7 @@ func TestHandleDeployTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpError = errors.New("compose up failed")
 			},
-			expectError:           true, // ComposeUp error returns Go error
-			expectedErrorContains: "compose up failed",
+			expectedError: "failed to compose up services: compose up failed",
 		},
 		{
 			name:             "no_services_deployed",
@@ -158,15 +151,14 @@ func TestHandleDeployTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ComposeUpResponse = &defangv1.DeployResponse{
 					Etag:     "test-etag",
-					Services: []*defangv1.ServiceInfo{}, // Empty services
+					Services: []*defangv1.ServiceInfo{},
 				}
 			},
-			expectError:           true,
-			expectedErrorContains: "no services deployed",
+			expectedError: "no services deployed",
 		},
 		{
 			name:             "successful_deploy_defang_provider",
-			workingDirectory: ".", // Use current directory for successful tests
+			workingDirectory: ".",
 			providerID:       client.ProviderDefang,
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
@@ -177,12 +169,11 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectError:          false,
 			expectedTextContains: "Please use the web portal url:",
 		},
 		{
 			name:             "successful_deploy_aws_provider",
-			workingDirectory: ".", // Use current directory for successful tests
+			workingDirectory: ".",
 			providerID:       client.ProviderAWS,
 			setupMock: func(m *MockDeployCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
@@ -193,16 +184,14 @@ func TestHandleDeployTool(t *testing.T) {
 					},
 				}
 			},
-			expectError:          false,
 			expectedTextContains: "Please use the aws console",
 		},
 		{
-			name:                  "provider_auto_not_configured",
-			workingDirectory:      ".",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockDeployCLI) {},
-			expectError:           true,
-			expectedErrorContains: "no provider is configured",
+			name:             "provider_auto_not_configured",
+			workingDirectory: ".",
+			providerID:       client.ProviderAuto,
+			setupMock:        func(m *MockDeployCLI) {},
+			expectedError:    "no provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 	}
 
@@ -228,11 +217,8 @@ func TestHandleDeployTool(t *testing.T) {
 			result, err := handleDeployTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
-				}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedTextContains != "" && len(result) > 0 {
@@ -241,7 +227,7 @@ func TestHandleDeployTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if !tt.expectError && tt.workingDirectory != "" && tt.name == "successful_deploy_defang_provider" {
+			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_deploy_defang_provider" {
 				expectedCalls := []string{
 					"ConfigureLoader",
 					"LoadProject",

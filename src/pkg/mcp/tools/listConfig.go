@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -25,7 +24,7 @@ func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, prov
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
+		return "", fmt.Errorf("Invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
