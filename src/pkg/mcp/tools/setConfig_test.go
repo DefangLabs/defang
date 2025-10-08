@@ -299,28 +299,13 @@ func TestHandleSetConfig(t *testing.T) {
 			result, err := handleSetConfig(testContext, request, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
-				assert.NotNil(t, result)
-				// For validation errors, the function returns a result with IsError=true, not a Go error
-				if result != nil && result.IsError {
-					assert.True(t, result.IsError)
-					if tt.errorMessage != "" && len(result.Content) > 0 {
-						if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-							assert.Contains(t, textContent.Text, tt.errorMessage)
-						}
-					}
-				} else if err != nil {
-					// For system errors (like network), we get a Go error
-					assert.Error(t, err)
-					if tt.errorMessage != "" {
-						assert.Contains(t, err.Error(), tt.errorMessage)
-					}
-				} else {
-					t.Errorf("Expected error but got neither result.IsError=true nor Go error")
+				assert.Error(t, err)
+				if tt.errorMessage != "" {
+					assert.Contains(t, err.Error(), tt.errorMessage)
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, result)
-				assert.False(t, result.IsError)
+				assert.NotEmpty(t, result)
 			}
 
 			// Verify expected CLI method calls
