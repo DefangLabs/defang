@@ -62,11 +62,11 @@ func TestHandleConfigError(t *testing.T) {
 }
 
 func TestProviderNotConfiguredError(t *testing.T) {
-	err := providerNotConfiguredError(client.ProviderAuto)
+	err := ProviderNotConfiguredError(client.ProviderAuto)
 	assert.Error(t, err)
 	var pid client.ProviderID
 	_ = pid.Set("aws")
-	err2 := providerNotConfiguredError(pid)
+	err2 := ProviderNotConfiguredError(pid)
 	assert.NoError(t, err2)
 }
 

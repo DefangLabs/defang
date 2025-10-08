@@ -10,6 +10,7 @@ import (
 
 	defangcli "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -18,7 +19,7 @@ import (
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Services tool called - fetching services from Defang")
 
-	err := providerNotConfiguredError(*providerId)
+	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}
@@ -35,7 +36,7 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
 	}
 
-	loader := configureLoader(request)
+	loader := common.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
