@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -51,7 +52,7 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 		mode = defangv1.DeploymentMode_PRODUCTION
 	default:
 		term.Warnf("Unknown deployment mode provided - %q", modeString)
-		return mcp.NewToolResultError("Unknown deployment mode provided, please use one of AFFORDABLE, BALANCED or HIGH_AVAILABILITY"), fmt.Errorf("unknown deployment mode: %s", modeString)
+		return mcp.NewToolResultError("Unknown deployment mode provided, please use one of " + strings.Join(modes.AllDeploymentModes(), ", ")), fmt.Errorf("unknown deployment mode: %s", modeString)
 	}
 
 	term.Debugf("Deployment mode set to: %s", mode.String())

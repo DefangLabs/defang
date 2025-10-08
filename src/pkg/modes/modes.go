@@ -1,4 +1,4 @@
-package command
+package modes
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ func (b *Mode) Set(s string) error {
 		case "HA", "HIGH_AVAILABILITY", "HIGH-AVAILABILITY":
 			mode = int32(defangv1.DeploymentMode_PRODUCTION)
 		default:
-			return fmt.Errorf("invalid mode: %s, not one of %v", s, allModes())
+			return fmt.Errorf("invalid mode: %s, not one of %v", s, AllDeploymentModes())
 		}
 	}
 	*b = Mode(mode)
@@ -43,6 +43,6 @@ func (b Mode) Value() defangv1.DeploymentMode {
 	return defangv1.DeploymentMode(b)
 }
 
-func allModes() []string {
-	return []string{"affordable", "balanced", "high_availability"}
+func AllDeploymentModes() []string {
+	return []string{"AFFORDABLE", "BALANCED", "HIGH_AVAILABILITY"}
 }
