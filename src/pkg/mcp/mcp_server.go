@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/prompts"
 	"github.com/DefangLabs/defang/src/pkg/mcp/resources"
 	"github.com/DefangLabs/defang/src/pkg/mcp/tools"
@@ -61,7 +62,7 @@ func NewDefangMCPServer(version string, cluster string, authPort int, providerID
 	toolTracker := ToolTracker{
 		providerId: string(*providerID),
 		cluster:    cluster,
-		client:     tools.MCPDevelopmentClient,
+		client:     common.MCPDevelopmentClient,
 	}
 	for i := range defangTools {
 		defangTools[i].Handler = toolTracker.TrackTool(defangTools[i].Tool.Name, defangTools[i].Handler)

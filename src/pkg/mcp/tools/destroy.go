@@ -7,6 +7,7 @@ import (
 	"os"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -14,7 +15,7 @@ import (
 
 func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DestroyCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Compose down tool called - removing services")
-	err := providerNotConfiguredError(*providerId)
+	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}

@@ -9,13 +9,14 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (*mcp.CallToolResult, error) {
-	err := providerNotConfiguredError(*providerId)
+	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}
@@ -69,7 +70,7 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		err = fmt.Errorf("failed to compose up services: %w", err)
 		term.Error("Failed to compose up services", "error", err)
 
-		result := HandleConfigError(err)
+		result := common.HandleConfigError(err)
 		if result != nil {
 			return result, err
 		}

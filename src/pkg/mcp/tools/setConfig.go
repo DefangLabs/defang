@@ -8,6 +8,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -16,7 +17,7 @@ import (
 func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("Set Config tool called")
 
-	err := providerNotConfiguredError(*providerId)
+	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}
@@ -58,7 +59,7 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 		return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
 	}
 
-	loader := configureLoader(request)
+	loader := common.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)

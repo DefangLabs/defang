@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/term"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,7 +18,7 @@ import (
 func handleListConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli ListConfigCLIInterface) (*mcp.CallToolResult, error) {
 	term.Debug("List Config tool called")
 
-	err := providerNotConfiguredError(*providerId)
+	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
 	}
