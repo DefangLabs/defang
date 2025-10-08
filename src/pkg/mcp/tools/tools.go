@@ -101,7 +101,12 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleLogsTool(ctx, request, cluster, providerId, cli)
+				output, err := handleLogsTool(ctx, request, cluster, providerId, cli)
+				if err != nil {
+					term.Errorf("Logs tool failed: %v", err)
+					return mcp.NewToolResultErrorFromErr("Failed to fetch logs", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
