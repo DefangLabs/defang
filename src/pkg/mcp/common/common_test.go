@@ -8,7 +8,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/bufbuild/connect-go"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,15 +50,6 @@ func TestConfigureLoaderBranches(t *testing.T) {
 	assert.NotNil(t, loader2)
 	loader3 := ConfigureLoader(makeReq(map[string]any{}))
 	assert.NotNil(t, loader3)
-}
-
-func TestHandleTermsOfServiceError(t *testing.T) {
-	origErr := connect.NewError(connect.CodeFailedPrecondition, errors.New("terms of service not accepted"))
-	res := HandleTermsOfServiceError(origErr)
-	assert.NotNil(t, res)
-	otherErr := errors.New("some other error")
-	res2 := HandleTermsOfServiceError(otherErr)
-	assert.Nil(t, res2)
 }
 
 func TestHandleConfigError(t *testing.T) {

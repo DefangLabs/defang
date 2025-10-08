@@ -75,11 +75,6 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 			return mcp.NewToolResultText(fmt.Sprintf("Project %s is not deployed in Playground", projectName)), err
 		}
 
-		result := HandleTermsOfServiceError(err)
-		if result != nil {
-			return result, err
-		}
-
 		term.Error("Failed to get services", "error", err)
 		return mcp.NewToolResultText("Failed to get services"), nil
 	}
