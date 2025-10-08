@@ -68,8 +68,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 		providerID            client.ProviderID
 		setupMock             func(*MockRemoveConfigCLI)
 		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
@@ -80,7 +78,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:            client.ProviderAuto,
 			setupMock:             func(m *MockRemoveConfigCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no provider is configured",
 		},
 		{
@@ -89,8 +86,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			configName:            "DATABASE_URL",
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           false,
-			expectErrorResult:     true,
+			expectError:           true,
 			expectedErrorContains: "working_directory is required",
 		},
 		{
@@ -100,7 +96,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockRemoveConfigCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no such file or directory",
 		},
 		{
@@ -110,8 +105,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockRemoveConfigCLI) {},
 			expectError:           true,
-			expectErrorResult:     false,
-			expectedErrorContains: "required argument \"name\" not found",
+			expectedErrorContains: "`name` is required",
 		},
 		{
 			name:             "connect_error",
@@ -122,7 +116,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "connection failed",
 		},
 		{
@@ -134,7 +127,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "provider creation failed",
 		},
 		{
@@ -146,7 +138,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to load project name",
 		},
 		{
@@ -159,7 +150,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConfigDeleteNotFoundError = true
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Config variable \"NONEXISTENT_CONFIG\" not found in project \"test-project\"",
 		},
 		{
@@ -172,7 +162,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConfigDeleteError = errors.New("failed to delete config")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to delete config",
 		},
 		{
@@ -185,7 +174,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				// No errors, successful removal
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Successfully remove the config variable \"DATABASE_URL\" from project \"test-project\"",
 		},
 	}
@@ -224,27 +212,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 
