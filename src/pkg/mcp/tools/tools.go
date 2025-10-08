@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -98,9 +99,9 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					mcp.Enum("AWS", "GCP"),
 				),
 				mcp.WithString("deployment_mode",
-					mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
+					mcp.Description("The deployment mode for the estimate. Options are: "+strings.Join(modes.AllDeploymentModes(), ", ")),
 					mcp.DefaultString("AFFORDABLE"),
-					mcp.Enum("AFFORDABLE", "BALANCED", "HIGH_AVAILABILITY"),
+					mcp.Enum(modes.AllDeploymentModes()...),
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

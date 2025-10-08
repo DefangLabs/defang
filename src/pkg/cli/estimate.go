@@ -14,6 +14,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/logs"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/money"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -128,14 +129,14 @@ func PrintEstimate(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResp
 		term.Println("Estimate for Deployment Mode: HIGH_AVAILABILITY")
 		term.Println(highAvailabilityModeEstimateSummary)
 	default:
-		term.Printf("Estimate for %s Mode\n", mode.String())
+		panic("unexpected mode")
 	}
 
 	term.Table(tableItems, []string{"Cost", "Quantity", "Service", "Description"})
 	term.Printf("Estimated Monthly Cost: %s (+ usage)\n", subtotal.String())
 	term.Println("")
 	term.Printf("Estimate does not include taxes or Discount Programs.\n")
-	term.Println("To estimate other modes, use defang estimate --mode=affordable|balanced|high_availability")
+	term.Printf("To estimate other modes, use defang estimate --mode=%s\n", strings.Join(modes.AllDeploymentModes(), "|"))
 }
 
 type EstimateLineItemTableItem struct {

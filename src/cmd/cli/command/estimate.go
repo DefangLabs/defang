@@ -5,6 +5,7 @@ import (
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func makeEstimateCmd() *cobra.Command {
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if mode.Value() == defangv1.DeploymentMode_MODE_UNSPECIFIED {
-				mode = Mode(defangv1.DeploymentMode_DEVELOPMENT)
+				mode = modes.Mode(defangv1.DeploymentMode_DEVELOPMENT)
 			}
 			if region == "" {
 				region = cliClient.GetRegion(providerID) // This sets the default region based on the provider
@@ -58,7 +59,7 @@ func makeEstimateCmd() *cobra.Command {
 		},
 	}
 
-	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", allModes()))
+	estimateCmd.Flags().VarP(&mode, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringP("region", "r", "", "which cloud region to estimate")
 	return estimateCmd
 }
