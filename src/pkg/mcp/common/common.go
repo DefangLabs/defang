@@ -17,6 +17,7 @@ import (
 var Connect = cli.Connect
 var CheckProviderConfigured = checkProviderConfigured
 var newProvider = cli.NewProvider
+var MCPDevelopmentClient = ""
 
 const PostPrompt = "Please deploy my application with Defang now."
 
@@ -81,7 +82,7 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 	return nil
 }
 
-func providerNotConfiguredError(providerId client.ProviderID) error {
+func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
 		term.Error("No provider configured")
 		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")

@@ -11,6 +11,7 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	"github.com/DefangLabs/defang/src/pkg/login"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
@@ -60,7 +61,7 @@ func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, 
 }
 
 func (DefaultToolCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
+	return common.ConfigureLoader(request)
 }
 
 func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
@@ -80,7 +81,7 @@ func (DefaultToolCLI) GetServices(ctx context.Context, projectName string, provi
 }
 
 func (DefaultToolCLI) CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
-	return CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
+	return common.CheckProviderConfigured(ctx, client, providerId, projectName, serviceCount)
 }
 
 func (DefaultToolCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estimate *defangv1.EstimateResponse) string {
@@ -141,7 +142,7 @@ func (DestroyCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
 func (DestroyCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
+	return common.ConfigureLoader(request)
 }
 
 // --- SetConfigCLIInterface ---
@@ -157,7 +158,7 @@ func (a *SetConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliCl
 
 // --- RemoveConfigCLIInterface ---
 func (RemoveConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return configureLoader(request)
+	return common.ConfigureLoader(request)
 }
 func (RemoveConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
