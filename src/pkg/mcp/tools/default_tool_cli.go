@@ -141,9 +141,6 @@ type LoginCLIAdapter struct{ *DefaultToolCLI }
 func (DestroyCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
-func (DestroyCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
-}
 
 // --- SetConfigCLIInterface ---
 func (a *SetConfigCLIAdapter) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {

@@ -52,7 +52,6 @@ type LogsCLIInterface interface {
 type DestroyCLIInterface interface {
 	Connecter
 	ProviderFactory
-	LoaderConfigurator
 	ProjectNameLoader
 	// Unique methods
 	ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error)
