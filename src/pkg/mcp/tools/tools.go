@@ -199,7 +199,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return handleSetAWSProvider(ctx, request, providerId, cluster)
+				output, err := handleSetAWSProvider(ctx, request, providerId, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to set AWS provider", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
@@ -211,7 +215,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return handleSetGCPProvider(ctx, request, providerId, cluster)
+				output, err := handleSetGCPProvider(ctx, request, providerId, cluster)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to set GCP provider", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
@@ -220,7 +228,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				workingDirectoryOption,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return handleSetPlaygroundProvider(providerId)
+				output, err := handleSetPlaygroundProvider(providerId)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to set Playground provider", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 	}
