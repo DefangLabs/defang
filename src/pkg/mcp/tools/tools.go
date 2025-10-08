@@ -74,7 +74,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleDestroyTool(ctx, request, providerId, cluster, cli)
+				output, err := handleDestroyTool(ctx, request, providerId, cluster, cli)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to destroy services", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{

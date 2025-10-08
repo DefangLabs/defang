@@ -70,8 +70,6 @@ func TestHandleDestroyTool(t *testing.T) {
 		providerID            client.ProviderID
 		setupMock             func(*MockDestroyCLI)
 		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
@@ -80,8 +78,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			workingDirectory:      "",
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockDestroyCLI) {},
-			expectError:           false,
-			expectErrorResult:     true,
+			expectError:           true,
 			expectedErrorContains: "working_directory is required",
 		},
 		{
@@ -90,7 +87,6 @@ func TestHandleDestroyTool(t *testing.T) {
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockDestroyCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no such file or directory",
 		},
 		{
@@ -101,7 +97,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "connection failed",
 		},
 		{
@@ -112,7 +107,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "provider creation failed",
 		},
 		{
@@ -123,7 +117,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.LoadProjectNameWithFallbackError = errors.New("failed to load project name")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to load project name",
 		},
 		{
@@ -135,7 +128,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.CanIUseProviderError = errors.New("provider not available")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "provider not available",
 		},
 		{
@@ -147,7 +139,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ComposeDownError = connect.NewError(connect.CodeNotFound, errors.New("project not found"))
 			},
 			expectError:          true,
-			expectTextResult:     true,
 			expectedTextContains: "Project not found, nothing to destroy",
 		},
 		{
@@ -159,7 +150,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ComposeDownError = errors.New("destroy failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "destroy failed",
 		},
 		{
@@ -171,7 +161,6 @@ func TestHandleDestroyTool(t *testing.T) {
 				m.ComposeDownResult = "deployment-123"
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "The project is in the process of being destroyed: test-project",
 		},
 		{
@@ -213,27 +202,8 @@ func TestHandleDestroyTool(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 
