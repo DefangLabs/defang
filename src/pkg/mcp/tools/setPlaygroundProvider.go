@@ -6,15 +6,14 @@ import (
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // handleSetPlaygroundProvider handles the set Playground provider MCP tool request
-func handleSetPlaygroundProvider(providerId *cliClient.ProviderID) (*mcp.CallToolResult, error) {
+func handleSetPlaygroundProvider(providerId *cliClient.ProviderID) (string, error) {
 	term.Debug("Set Playground Provider tool called")
 	if err := actions.SetPlaygroundProvider(providerId); err != nil {
-		return mcp.NewToolResultErrorFromErr("Failed to set Playground provider", err), err
+		return "", fmt.Errorf("Failed to set Playground provider: %w", err)
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Successfully set the provider %q", *providerId)), nil
+	return fmt.Sprintf("Successfully set the provider %q", *providerId), nil
 }

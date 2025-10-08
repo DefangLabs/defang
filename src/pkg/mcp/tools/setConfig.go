@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -14,49 +13,44 @@ import (
 )
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (*mcp.CallToolResult, error) {
+func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
 	term.Debug("Set Config tool called")
 
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		return "", fmt.Errorf("Invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		term.Error("Invalid config `name`", "error", errors.New("`name` is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid config `name`", errors.New("`name` is required")), err
+		return "", fmt.Errorf("Invalid config `name`: %w", err)
 	}
 
 	value, err := request.RequireString("value")
 	if err != nil || value == "" {
-		term.Error("Invalid config `value`", "error", errors.New("`value` is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid config `value`", errors.New("`value` is required")), err
+		return "", fmt.Errorf("Invalid config `value`: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
-		term.Error("Failed to get new provider", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
+		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
 
 	loader := common.ConfigureLoader(request)
@@ -64,18 +58,18 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
+		return "", fmt.Errorf("Failed to load project name: %w", err)
 	}
 	term.Debug("Project name loaded:", projectName)
 
 	if !pkg.IsValidSecretName(name) {
-		return mcp.NewToolResultErrorFromErr("Invalid secret name", fmt.Errorf("secret name %q is not valid", name)), err
+		return "", fmt.Errorf("Invalid config name: secret name %q is not valid", name)
 	}
 
 	term.Debug("Function invoked: cli.ConfigSet")
 	if err := cli.ConfigSet(ctx, projectName, provider, name, value); err != nil {
-		return mcp.NewToolResultErrorFromErr("Failed to set config", err), err
+		return "", fmt.Errorf("Failed to set config: %w", err)
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Successfully set the config variable %q for project %q", name, projectName)), nil
+	return fmt.Sprintf("Successfully set the config variable %q for project %q", name, projectName), nil
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // handleLoginTool handles the login tool logic
-func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster string, authPort int, cli LoginCLIInterface) (*mcp.CallToolResult, error) {
+func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster string, authPort int, cli LoginCLIInterface) (string, error) {
 	term.Debug("Login tool called")
 	term.Debugf("mcp.CallToolRequest %+v", request)
 
@@ -17,17 +17,17 @@ func handleLoginTool(ctx context.Context, request mcp.CallToolRequest, cluster s
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
 		if authPort != 0 {
-			return mcp.NewToolResultText(cli.GenerateAuthURL(authPort)), nil
+			return cli.GenerateAuthURL(authPort), nil
 		}
 		term.Debug("Function invoked: cli.InteractiveLoginPrompt")
 		err = cli.InteractiveLoginMCP(ctx, client, cluster)
 		if err != nil {
-			return mcp.NewToolResultErrorFromErr("Failed to login", err), nil
+			return "", err
 		}
 	}
 
 	output := "Successfully logged in to Defang"
 
 	term.Debug(output)
-	return mcp.NewToolResultText(output), nil
+	return output, nil
 }

@@ -14,43 +14,39 @@ import (
 )
 
 // handleRemoveConfigTool handles the remove config tool logic
-func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (*mcp.CallToolResult, error) {
+func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli RemoveConfigCLIInterface) (string, error) {
 	term.Debug("Remove Config tool called")
 
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		return "", fmt.Errorf("No provider configured: %w", err)
 	}
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		term.Error("Invalid config `name`", "error", errors.New("`name` is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid config `name`", errors.New("`name` is required")), err
+		return "", fmt.Errorf("Invalid config `name`: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
-		term.Error("Failed to get new provider", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to get new provider", err), err
+		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
 
 	loader := cli.ConfigureLoader(request)
@@ -58,7 +54,7 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Failed to load project name", err), err
+		return "", fmt.Errorf("Failed to load project name: %w", err)
 	}
 	term.Debug("Project name loaded:", projectName)
 
@@ -66,10 +62,10 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 	if err := cli.ConfigDelete(ctx, projectName, provider, name); err != nil {
 		// Show a warning (not an error) if the config was not found
 		if connect.CodeOf(err) == connect.CodeNotFound {
-			return mcp.NewToolResultText(fmt.Sprintf("Config variable %q not found in project %q", name, projectName)), nil
+			return fmt.Sprintf("Config variable %q not found in project %q", name, projectName), nil
 		}
-		return mcp.NewToolResultErrorFromErr(fmt.Sprintf("Failed to remove config variable %q from project %q", name, projectName), err), err
+		return "", fmt.Errorf("Failed to remove config variable %q from project %q: %w", name, projectName, err)
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Successfully remove the config variable %q from project %q", name, projectName)), nil
+	return fmt.Sprintf("Successfully remove the config variable %q from project %q", name, projectName), nil
 }

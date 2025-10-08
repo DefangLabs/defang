@@ -42,14 +42,12 @@ func (m *MockLoginCLI) GenerateAuthURL(authPort int) string {
 
 func TestHandleLoginTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		cluster               string
-		authPort              int
-		setupMock             func(*MockLoginCLI)
-		expectTextResult      bool
-		expectErrorResult     bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		cluster              string
+		authPort             int
+		setupMock            func(*MockLoginCLI)
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
 			name:     "successful_login_already_connected",
@@ -58,7 +56,6 @@ func TestHandleLoginTool(t *testing.T) {
 			setupMock: func(m *MockLoginCLI) {
 				// No connect error means already logged in
 			},
-			expectTextResult:     true,
 			expectedTextContains: "Successfully logged in to Defang",
 		},
 		{
@@ -68,7 +65,6 @@ func TestHandleLoginTool(t *testing.T) {
 			setupMock: func(m *MockLoginCLI) {
 				m.ConnectError = errors.New("connection failed - not authenticated")
 			},
-			expectTextResult:     true,
 			expectedTextContains: "Please open this URL in your browser: http://127.0.0.1:3000 to login",
 		},
 		{
@@ -79,7 +75,6 @@ func TestHandleLoginTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed - not authenticated")
 				// InteractiveLoginError is nil, so login succeeds
 			},
-			expectTextResult:     true,
 			expectedTextContains: "Successfully logged in to Defang",
 		},
 		{
@@ -90,8 +85,7 @@ func TestHandleLoginTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed - not authenticated")
 				m.InteractiveLoginError = errors.New("login failed")
 			},
-			expectErrorResult:     true,
-			expectedErrorContains: "login failed",
+			expectedError: "login failed",
 		},
 		{
 			name:     "custom_auth_url",
@@ -101,7 +95,6 @@ func TestHandleLoginTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed - not authenticated")
 				m.AuthURL = "https://custom-auth.example.com/login"
 			},
-			expectTextResult:     true,
 			expectedTextContains: "https://custom-auth.example.com/login",
 		},
 		{
@@ -128,27 +121,12 @@ func TestHandleLoginTool(t *testing.T) {
 			// Call the function
 			var err error
 			result, err := handleLoginTool(context.Background(), request, tt.cluster, tt.authPort, mockCLI)
-			assert.NoError(t, err)
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 
