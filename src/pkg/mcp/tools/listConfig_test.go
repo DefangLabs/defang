@@ -67,8 +67,6 @@ func TestHandleListConfigTool(t *testing.T) {
 		providerID            client.ProviderID
 		setupMock             func(*MockListConfigCLI)
 		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
@@ -77,8 +75,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			workingDirectory:      "",
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockListConfigCLI) {},
-			expectError:           false,
-			expectErrorResult:     true,
+			expectError:           true,
 			expectedErrorContains: "working_directory is required",
 		},
 		{
@@ -87,7 +84,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockListConfigCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no such file or directory",
 		},
 		{
@@ -96,7 +92,6 @@ func TestHandleListConfigTool(t *testing.T) {
 			providerID:            client.ProviderAuto,
 			setupMock:             func(m *MockListConfigCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no provider is configured",
 		},
 		{
@@ -107,7 +102,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "connection failed",
 		},
 		{
@@ -118,7 +112,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "provider creation failed",
 		},
 		{
@@ -129,7 +122,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to load project name",
 		},
 		{
@@ -141,7 +133,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				m.ListConfigError = errors.New("failed to list configs")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to list configs",
 		},
 		{
@@ -155,7 +146,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				}
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "No config variables found for the project \"test-project\"",
 		},
 		{
@@ -169,7 +159,6 @@ func TestHandleListConfigTool(t *testing.T) {
 				}
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Here is the list of config variables for the project \"test-project\": DATABASE_URL",
 		},
 	}
@@ -205,27 +194,8 @@ func TestHandleListConfigTool(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 

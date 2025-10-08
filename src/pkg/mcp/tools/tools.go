@@ -177,7 +177,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				output, err := handleListConfigTool(ctx, request, providerId, cluster, &ListConfigCLIAdapter{DefaultToolCLI: cli})
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to list config", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{
