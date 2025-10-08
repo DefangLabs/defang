@@ -91,7 +91,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 		requestArgs         map[string]interface{}
 		mockCLI             *MockCLI
 		expectedError       bool
-		expectedResultError bool // whether result.IsError should be true
 		errorMessage        string
 		resultTextContains  string // expected text in result for non-error results
 		expectedGetServices bool
@@ -109,7 +108,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			expectedResultError: true,
 			errorMessage:        "connection failed",
 			expectedGetServices: false,
 		},
@@ -125,7 +123,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			expectedResultError: true,
 			errorMessage:        "provider creation failed",
 			expectedGetServices: false,
 		},
@@ -140,7 +137,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			expectedResultError: true,
 			errorMessage:        "no provider is configured",
 			expectedGetServices: false,
 		},
@@ -155,7 +151,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			expectedResultError: true,
 			errorMessage:        "no such file or directory",
 			expectedGetServices: false,
 		},
@@ -172,7 +167,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			expectedResultError: true,
 			errorMessage:        "failed to load project name",
 			expectedGetServices: false,
 		},
@@ -190,10 +184,8 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: defangcli.ErrNoServices{ProjectName: "test-project"},
 			},
-			expectedError:       true,  // Go error is returned
-			expectedResultError: false, // but result.IsError is false (text result)
+			expectedError:       true, // Go error is returned
 			errorMessage:        "no services found in project",
-			resultTextContains:  "No services found for the specified project test-project",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -210,9 +202,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				GetServicesError: createConnectError(connect.CodeNotFound, "project test-project is not deployed in Playground"),
 			},
 			expectedError:       true,
-			expectedResultError: false, // text result, not error result
 			errorMessage:        "is not deployed in Playground",
-			resultTextContains:  "Project test-project is not deployed in Playground",
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -228,9 +218,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				MockProjectName:  "test-project",
 				GetServicesError: errors.New("generic GetServices failure"),
 			},
-			expectedError:       false, // Returns text result, no Go error
-			expectedResultError: false,
-			resultTextContains:  "Failed to get services",
+			expectedError:       true, // Returns text result, no Go error
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -257,7 +245,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				},
 			},
 			expectedError:       false,
-			expectedResultError: false,
 			expectedGetServices: true,
 			expectedProjectName: "test-project",
 		},
@@ -276,16 +263,9 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Check result error expectation
-			assert.NotNil(t, result)
-			assert.Equal(t, tt.expectedResultError, result.IsError, "result.IsError expectation")
-
-			// Check result text content for non-error results
-			if !tt.expectedResultError && tt.resultTextContains != "" && len(result.Content) > 0 {
-				if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-					assert.Contains(t, textContent.Text, tt.resultTextContains)
+				// Check result text content for non-error results
+				if tt.resultTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.resultTextContains)
 				}
 			}
 

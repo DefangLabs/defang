@@ -14,19 +14,19 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (*mcp.CallToolResult, error) {
+func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli EstimateCLIInterface) (string, error) {
 	term.Debug("Estimate tool called")
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
 		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		return "", fmt.Errorf("working_directory is required: %w", err)
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
 		term.Error("Failed to change working directory", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	modeString, err := request.RequireString("deployment_mode")
@@ -52,7 +52,7 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 		mode = defangv1.DeploymentMode_PRODUCTION
 	default:
 		term.Warnf("Unknown deployment mode provided - %q", modeString)
-		return mcp.NewToolResultError("Unknown deployment mode provided, please use one of " + strings.Join(modes.AllDeploymentModes(), ", ")), fmt.Errorf("unknown deployment mode: %s", modeString)
+		return "", fmt.Errorf("Unknown deployment mode %q, please use one of %s", modeString, strings.Join(modes.AllDeploymentModes(), ", "))
 	}
 
 	term.Debugf("Deployment mode set to: %s", mode.String())
@@ -63,15 +63,13 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
-		term.Error("failed to parse compose file", "error", err)
-
-		return mcp.NewToolResultErrorFromErr("failed to parse compose file", err), err
+		return "", fmt.Errorf("failed to parse compose file: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+		return "", fmt.Errorf("Could not connect: %w", err)
 	}
 
 	defangProvider := cli.CreatePlaygroundProvider(client)
@@ -80,7 +78,7 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 	err = cli.SetProviderID(&providerID, providerString)
 	if err != nil {
 		term.Error("Invalid provider specified", "error", err)
-		return mcp.NewToolResultErrorFromErr("Invalid provider specified", err), err
+		return "", fmt.Errorf("Invalid provider specified: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.RunEstimate")
@@ -91,11 +89,11 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 
 	estimate, err := cli.RunEstimate(ctx, project, client, defangProvider, providerID, region, mode)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Failed to run estimate", err), err
+		return "", fmt.Errorf("Failed to run estimate: %w", err)
 	}
 	term.Debugf("Estimate: %+v", estimate)
 
 	estimateText := cli.CaptureTermOutput(mode, estimate)
 
-	return mcp.NewToolResultText("Successfully estimated the cost of the project to " + providerID.Name() + ":\n" + estimateText), nil
+	return "Successfully estimated the cost of the project to " + providerID.Name() + ":\n" + estimateText, nil
 }

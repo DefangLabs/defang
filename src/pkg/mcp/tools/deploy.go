@@ -15,10 +15,10 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (*mcp.CallToolResult, error) {
+func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli DeployCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("No provider configured", err), err
+		return "", fmt.Errorf("no provider configured: %w", err)
 	}
 
 	// Get compose path
@@ -26,14 +26,12 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
-		return mcp.NewToolResultErrorFromErr("Invalid working directory", errors.New("working_directory is required")), err
+		return "", fmt.Errorf("invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
-		return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+		return "", fmt.Errorf("failed to change working directory: %w", err)
 	}
 
 	loader := cli.ConfigureLoader(request)
@@ -42,22 +40,21 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
-		term.Error("Failed to deploy services", "error", err)
 
-		return mcp.NewToolResultText(fmt.Sprintf("Local deployment failed: %v. Please provide a valid compose file path.", err)), err
+		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
 
 	term.Debug("Function invoked: cli.Connect")
 	client, err := cli.Connect(ctx, cluster)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Could not connect", err), err
+		return "", fmt.Errorf("could not connect: %w", err)
 	}
 
 	term.Debug("Function invoked: cli.NewProvider")
 
 	provider, err := cli.CheckProviderConfigured(ctx, client, *providerId, project.Name, len(project.Services))
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("Provider not configured correctly", err), err
+		return "", fmt.Errorf("provider not configured correctly: %w", err)
 	}
 
 	// Deploy the services
@@ -68,19 +65,13 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
-		term.Error("Failed to compose up services", "error", err)
 
-		result := common.HandleConfigError(err)
-		if result != nil {
-			return result, err
-		}
-
-		return mcp.NewToolResultErrorFromErr("Failed to compose up services", err), err
+		err = common.FixupConfigError(err)
+		return "", err
 	}
 
 	if len(deployResp.Services) == 0 {
-		term.Error("Failed to deploy services", "error", errors.New("no services deployed"))
-		return mcp.NewToolResultText(fmt.Sprintf("Failed to deploy services: %v", errors.New("no services deployed"))), nil
+		return "", errors.New("no services deployed")
 	}
 
 	// Success case
@@ -128,5 +119,5 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 	}
 
 	// Return the etag data as text
-	return mcp.NewToolResultText(fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String())), nil
+	return fmt.Sprintf("%s to follow the deployment of %s, with the deployment ID of %s:\n%s", portal, project.Name, deployResp.Etag, urls.String()), nil
 }

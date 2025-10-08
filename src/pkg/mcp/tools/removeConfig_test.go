@@ -62,56 +62,50 @@ func (m *MockRemoveConfigCLI) ConfigDelete(ctx context.Context, projectName stri
 
 func TestHandleRemoveConfigTool(t *testing.T) {
 	tests := []struct {
-		name                  string
-		workingDirectory      string
-		configName            string
-		providerID            client.ProviderID
-		setupMock             func(*MockRemoveConfigCLI)
-		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
-		expectedTextContains  string
-		expectedErrorContains string
+		name                 string
+		workingDirectory     string
+		configName           string
+		providerID           client.ProviderID
+		setupMock            func(*MockRemoveConfigCLI)
+		expectError          bool
+		expectedTextContains string
+		expectedError        string
 	}{
 		{
-			name:                  "provider_auto_not_configured",
-			workingDirectory:      ".",
-			configName:            "DATABASE_URL",
-			providerID:            client.ProviderAuto,
-			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "no provider is configured",
+			name:             "provider_auto_not_configured",
+			workingDirectory: ".",
+			configName:       "DATABASE_URL",
+			providerID:       client.ProviderAuto,
+			setupMock:        func(m *MockRemoveConfigCLI) {},
+			expectError:      true,
+			expectedError:    "No provider configured: no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.",
 		},
 		{
-			name:                  "missing_working_directory",
-			workingDirectory:      "",
-			configName:            "DATABASE_URL",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           false,
-			expectErrorResult:     true,
-			expectedErrorContains: "working_directory is required",
+			name:             "missing_working_directory",
+			workingDirectory: "",
+			configName:       "DATABASE_URL",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockRemoveConfigCLI) {},
+			expectError:      true,
+			expectedError:    "Invalid working directory: working_directory is required",
 		},
 		{
-			name:                  "invalid_working_directory",
-			workingDirectory:      "/nonexistent/directory",
-			configName:            "DATABASE_URL",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "no such file or directory",
+			name:             "invalid_working_directory",
+			workingDirectory: "/nonexistent/directory",
+			configName:       "DATABASE_URL",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockRemoveConfigCLI) {},
+			expectError:      true,
+			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
 		},
 		{
-			name:                  "missing_config_name",
-			workingDirectory:      ".",
-			configName:            "",
-			providerID:            client.ProviderAWS,
-			setupMock:             func(m *MockRemoveConfigCLI) {},
-			expectError:           true,
-			expectErrorResult:     false,
-			expectedErrorContains: "required argument \"name\" not found",
+			name:             "missing_config_name",
+			workingDirectory: ".",
+			configName:       "",
+			providerID:       client.ProviderAWS,
+			setupMock:        func(m *MockRemoveConfigCLI) {},
+			expectError:      true,
+			expectedError:    "Invalid config `name`: required argument \"name\" not found",
 		},
 		{
 			name:             "connect_error",
@@ -121,9 +115,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.ConnectError = errors.New("connection failed")
 			},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "connection failed",
+			expectError:   true,
+			expectedError: "Could not connect: connection failed",
 		},
 		{
 			name:             "new_provider_error",
@@ -133,9 +126,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.NewProviderError = errors.New("provider creation failed")
 			},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "provider creation failed",
+			expectError:   true,
+			expectedError: "Failed to get new provider: provider creation failed",
 		},
 		{
 			name:             "load_project_name_error",
@@ -145,9 +137,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			setupMock: func(m *MockRemoveConfigCLI) {
 				m.LoadProjectNameError = errors.New("failed to load project name")
 			},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "failed to load project name",
+			expectError:   true,
+			expectedError: "Failed to load project name: failed to load project name",
 		},
 		{
 			name:             "config_not_found",
@@ -159,7 +150,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ConfigDeleteNotFoundError = true
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Config variable \"NONEXISTENT_CONFIG\" not found in project \"test-project\"",
 		},
 		{
@@ -171,9 +161,8 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				m.ProjectName = "test-project"
 				m.ConfigDeleteError = errors.New("failed to delete config")
 			},
-			expectError:           true,
-			expectErrorResult:     true,
-			expectedErrorContains: "failed to delete config",
+			expectError:   true,
+			expectedError: "Failed to remove config variable \"DATABASE_URL\" from project \"test-project\": failed to delete config",
 		},
 		{
 			name:             "successful_config_removal",
@@ -185,7 +174,6 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 				// No errors, successful removal
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Successfully remove the config variable \"DATABASE_URL\" from project \"test-project\"",
 		},
 	}
@@ -219,32 +207,13 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			// Verify error expectations
 			if tt.expectError {
 				assert.Error(t, err)
-				if tt.expectedErrorContains != "" {
-					assert.Contains(t, err.Error(), tt.expectedErrorContains)
+				if tt.expectedError != "" {
+					assert.EqualError(t, err, tt.expectedError) // Ensure err is not nil before checking its message
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 
