@@ -83,7 +83,6 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
-		term.Error("No provider configured")
 		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")
 	}
 	return nil
@@ -92,8 +91,7 @@ func ProviderNotConfiguredError(providerId client.ProviderID) error {
 func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error) {
 	provider, err := newProvider(ctx, providerId, client)
 	if err != nil {
-		term.Error("Failed to get new provider", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get new provider: %w", err)
 	}
 
 	_, err = provider.AccountInfo(ctx)
@@ -103,8 +101,7 @@ func checkProviderConfigured(ctx context.Context, client cliClient.FabricClient,
 
 	err = CanIUseProvider(ctx, client, providerId, projectName, provider, serviceCount)
 	if err != nil {
-		term.Error("Failed to use provider", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to use provider: %w", err)
 	}
 
 	return provider, nil

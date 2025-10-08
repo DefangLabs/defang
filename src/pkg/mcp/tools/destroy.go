@@ -29,19 +29,16 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
-		term.Error("Failed to get new provider", "error", err)
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
 		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
 		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
@@ -50,13 +47,11 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 	term.Debug("Function invoked: cliClient.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
 	if err != nil {
-		term.Error("Failed to load project name", "error", err)
 		return "", fmt.Errorf("Failed to load project name: %w", err)
 	}
 
 	err = cli.CanIUseProvider(ctx, client, *providerId, projectName, provider, 0)
 	if err != nil {
-		term.Error("Failed to use provider", "error", err)
 		return "", fmt.Errorf("Failed to use provider: %w", err)
 	}
 
@@ -65,7 +60,6 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 	if err != nil {
 		if connect.CodeOf(err) == connect.CodeNotFound {
 			// Show a warning (not an error) if the service was not found
-			term.Warn("Project not found", "error", err)
 			return "", errors.New("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory.")
 		}
 

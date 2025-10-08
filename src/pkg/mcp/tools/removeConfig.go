@@ -24,19 +24,16 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
 		return "", fmt.Errorf("Invalid working directory: %w", errors.New("working_directory is required"))
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
 		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	name, err := request.RequireString("name")
 	if err != nil || name == "" {
-		term.Error("Invalid config `name`", "error", errors.New("`name` is required"))
 		return "", fmt.Errorf("Invalid config `name`: %w", errors.New("`name` is required"))
 	}
 
@@ -49,7 +46,6 @@ func handleRemoveConfigTool(ctx context.Context, request mcp.CallToolRequest, pr
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
-		term.Error("Failed to get new provider", "error", err)
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
 

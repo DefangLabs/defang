@@ -26,13 +26,11 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
 		return "", fmt.Errorf("invalid working directory: %w", errors.New("working_directory is required"))
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
 		return "", fmt.Errorf("failed to change working directory: %w", err)
 	}
 
@@ -48,7 +46,6 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	term.Debug("Function invoked: cli.NewProvider")
 	provider, err := cli.NewProvider(ctx, *providerId, client)
 	if err != nil {
-		term.Error("Failed to create provider", "error", err)
 		return "", fmt.Errorf("failed to create provider: %w", err)
 	}
 
@@ -57,10 +54,8 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	term.Debugf("Project name loaded: %s", projectName)
 	if err != nil {
 		if strings.Contains(err.Error(), "no projects found") {
-			term.Errorf("No projects found on Playground, error: %v", err)
 			return "", fmt.Errorf("no projects found on Playground: %w", err)
 		}
-		term.Errorf("Failed to load project name, error: %v", err)
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 
@@ -68,15 +63,12 @@ func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, provid
 	if err != nil {
 		var noServicesErr defangcli.ErrNoServices
 		if errors.As(err, &noServicesErr) {
-			term.Warnf("No services found for the specified project %s", projectName)
 			return "", fmt.Errorf("no services found for the specified project %s: %w", projectName, err)
 		}
 		if connect.CodeOf(err) == connect.CodeNotFound && strings.Contains(err.Error(), "is not deployed in Playground") {
-			term.Warnf("Project %s is not deployed in Playground", projectName)
 			return "", fmt.Errorf("project %s is not deployed in Playground: %w", projectName, err)
 		}
 
-		term.Error("Failed to get services", "error", err)
 		return "", fmt.Errorf("failed to get services: %w", err)
 	}
 

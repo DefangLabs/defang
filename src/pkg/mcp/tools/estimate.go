@@ -63,8 +63,6 @@ func handleEstimateTool(ctx context.Context, request mcp.CallToolRequest, provid
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
-		term.Error("failed to parse compose file", "error", err)
-
 		return "", fmt.Errorf("failed to parse compose file: %w", err)
 	}
 

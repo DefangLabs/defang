@@ -26,13 +26,11 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
-		term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
 		return "", fmt.Errorf("invalid working directory: %w", err)
 	}
 
 	err = os.Chdir(wd)
 	if err != nil {
-		term.Error("Failed to change working directory", "error", err)
 		return "", fmt.Errorf("failed to change working directory: %w", err)
 	}
 
@@ -42,7 +40,6 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
 		err = fmt.Errorf("failed to parse compose file: %w", err)
-		term.Error("Failed to deploy services", "error", err)
 
 		return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 	}
@@ -68,14 +65,12 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 	deployResp, project, err := cli.ComposeUp(ctx, project, client, provider, compose.UploadModeDigest, defangv1.DeploymentMode_DEVELOPMENT)
 	if err != nil {
 		err = fmt.Errorf("failed to compose up services: %w", err)
-		term.Error("Failed to compose up services", "error", err)
 
 		err = common.FixupConfigError(err)
 		return "", err
 	}
 
 	if len(deployResp.Services) == 0 {
-		term.Error("Failed to deploy services", "error", errors.New("no services deployed"))
 		return "", errors.New("no services deployed")
 	}
 
