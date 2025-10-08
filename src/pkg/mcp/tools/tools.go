@@ -71,8 +71,19 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				wd, err := request.RequireString("working_directory")
+				if err != nil || wd == "" {
+					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
+				}
+
+				err = os.Chdir(wd)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+				}
+
+				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
-				output, err := handleDeployTool(ctx, request, providerId, cluster, cli)
+				output, err := handleDeployTool(ctx, loader, providerId, cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to deploy services", err), err
 				}

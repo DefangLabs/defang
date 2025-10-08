@@ -33,7 +33,6 @@ type ProjectNameLoader interface {
 type DeployCLIInterface interface {
 	Connecter
 	ProviderFactory
-	LoaderConfigurator
 	// Unique methods
 	ComposeUp(ctx context.Context, project *compose.Project, client *cliClient.GrpcClient, provider cliClient.Provider, uploadMode compose.UploadMode, mode defangv1.DeploymentMode) (*defangv1.DeployResponse, *compose.Project, error)
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
@@ -44,7 +43,6 @@ type DeployCLIInterface interface {
 type LogsCLIInterface interface {
 	Connecter
 	ProviderFactory
-	LoaderConfigurator
 	// Unique methods
 	Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cliTypes.TailOptions) error
 	CheckProviderConfigured(ctx context.Context, client *cliClient.GrpcClient, providerId cliClient.ProviderID, projectName string, serviceCount int) (cliClient.Provider, error)
