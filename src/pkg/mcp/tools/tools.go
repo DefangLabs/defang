@@ -122,7 +122,11 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				return handleEstimateTool(ctx, request, providerId, cluster, cli)
+				output, err := handleEstimateTool(ctx, request, providerId, cluster, cli)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
+				}
+				return mcp.NewToolResultText(output), nil
 			},
 		},
 		{

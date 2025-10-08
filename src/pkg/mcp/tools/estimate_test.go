@@ -110,8 +110,6 @@ func TestHandleEstimateTool(t *testing.T) {
 		providerID            client.ProviderID
 		setupMock             func(*MockEstimateCLI)
 		expectError           bool
-		expectTextResult      bool
-		expectErrorResult     bool
 		expectedTextContains  string
 		expectedErrorContains string
 	}{
@@ -120,8 +118,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			workingDirectory:      "",
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockEstimateCLI) {},
-			expectError:           false,
-			expectErrorResult:     true,
+			expectError:           true,
 			expectedErrorContains: "working_directory is required",
 		},
 		{
@@ -130,7 +127,6 @@ func TestHandleEstimateTool(t *testing.T) {
 			providerID:            client.ProviderAWS,
 			setupMock:             func(m *MockEstimateCLI) {},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "no such file or directory",
 		},
 		{
@@ -152,7 +148,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.CapturedOutput = "Estimated cost: $15.00/month"
 			},
 			expectError:          true,
-			expectTextResult:     true,
 			expectedTextContains: "Unknown deployment mode provided, please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
@@ -163,7 +158,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "failed to parse compose file",
 		},
 		{
@@ -175,7 +169,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.ConnectError = errors.New("connection failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "connection failed",
 		},
 		{
@@ -188,7 +181,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.SetProviderIDError = errors.New("invalid provider")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "invalid provider",
 		},
 		{
@@ -201,7 +193,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.RunEstimateError = errors.New("estimate failed")
 			},
 			expectError:           true,
-			expectErrorResult:     true,
 			expectedErrorContains: "estimate failed",
 		},
 		{
@@ -222,7 +213,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.CapturedOutput = "Estimated cost: $10.00/month"
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
@@ -245,7 +235,6 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.CapturedOutput = "Estimated cost: $50.00/month"
 			},
 			expectError:          false,
-			expectTextResult:     true,
 			expectedTextContains: "Successfully estimated the cost of the project to Google Cloud Platform",
 		},
 	}
@@ -288,27 +277,8 @@ func TestHandleEstimateTool(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-			}
-
-			// Verify result expectations
-			if tt.expectTextResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				if tt.expectedTextContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedTextContains)
-					}
-				}
-			}
-
-			if tt.expectErrorResult {
-				assert.NotNil(t, result)
-				assert.NotNil(t, result.Content)
-				assert.True(t, result.IsError)
-				if tt.expectedErrorContains != "" && len(result.Content) > 0 {
-					if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
-						assert.Contains(t, textContent.Text, tt.expectedErrorContains)
-					}
+				if tt.expectedTextContains != "" && len(result) > 0 {
+					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
 
