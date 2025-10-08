@@ -3,9 +3,9 @@ package tools
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -61,8 +61,30 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				cli := &DefaultToolCLI{}
-				track.Evt("MCP Destroy Tool", track.P("provider", *providerId), track.P("cluster", cluster), track.P("client", MCPDevelopmentClient))
 				return handleDestroyTool(ctx, request, providerId, cluster, cli)
+			},
+		},
+		{
+			Tool: mcp.NewTool("logs",
+				mcp.WithDescription("Fetch logs for a deployment."),
+				workingDirectoryOption,
+				mcp.WithString("deployment_id",
+					mcp.Description("The deployment ID for which to fetch logs"),
+				),
+				mcp.WithString("since",
+					mcp.Description("The start time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
+					mcp.Required(),
+					mcp.DefaultString(time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
+				),
+				mcp.WithString("until",
+					mcp.Description("The end time in RFC3339 format (e.g., 2006-01-02T15:04:05Z07:00)"),
+					mcp.Required(),
+					mcp.DefaultString(time.Now().Format(time.RFC3339)),
+				),
+			),
+			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				cli := &DefaultToolCLI{}
+				return handleLogsTool(ctx, request, cluster, providerId, cli)
 			},
 		},
 		{
@@ -75,7 +97,6 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 					mcp.DefaultString(strings.ToUpper(providerId.String())),
 					mcp.Enum("AWS", "GCP"),
 				),
-
 				mcp.WithString("deployment_mode",
 					mcp.Description("The deployment mode for the estimate. Options are AFFORDABLE, BALANCED or HIGH_AVAILABILITY."),
 					mcp.DefaultString("AFFORDABLE"),
