@@ -2,10 +2,12 @@ package tools
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -43,8 +45,19 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				multipleComposeFilesOptions,
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				wd, err := request.RequireString("working_directory")
+				if err != nil || wd == "" {
+					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
+				}
+
+				err = os.Chdir(wd)
+				if err != nil {
+					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+				}
+
+				loader := common.ConfigureLoader(request)
 				var cli CLIInterface = &DefaultToolCLI{}
-				output, err := handleServicesTool(ctx, request, providerId, cluster, cli)
+				output, err := handleServicesTool(ctx, loader, providerId, cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to list services", err), err
 				}
