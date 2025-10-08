@@ -68,11 +68,6 @@ func handleDestroyTool(ctx context.Context, request mcp.CallToolRequest, provide
 			return mcp.NewToolResultText("Project not found, nothing to destroy. Please use a valid project name, compose file path or project directory."), err
 		}
 
-		result := HandleTermsOfServiceError(err)
-		if result != nil {
-			return result, err
-		}
-
 		return mcp.NewToolResultErrorFromErr("Failed to send destroy request", err), err
 	}
 

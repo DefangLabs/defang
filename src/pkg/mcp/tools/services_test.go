@@ -217,24 +217,6 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			expectedProjectName: "test-project",
 		},
 		{
-			name:       "get_services_terms_of_service_error",
-			providerId: client.ProviderDefang,
-			requestArgs: map[string]interface{}{
-				"working_directory": ".",
-			},
-			mockCLI: &MockCLI{
-				MockClient:       &client.GrpcClient{},
-				MockProvider:     &client.PlaygroundProvider{},
-				MockProjectName:  "test-project",
-				GetServicesError: createConnectError(connect.CodeFailedPrecondition, "terms of service not accepted"),
-			},
-			expectedError:       true,
-			expectedResultError: true, // HandleTermsOfServiceError returns error result
-			errorMessage:        "terms of service not accepted",
-			expectedGetServices: true,
-			expectedProjectName: "test-project",
-		},
-		{
 			name:       "get_services_generic_error",
 			providerId: client.ProviderDefang,
 			requestArgs: map[string]interface{}{
