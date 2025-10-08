@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
@@ -58,7 +59,7 @@ func ConfigureLoader(request mcp.CallToolRequest) *compose.Loader {
 
 func FixupConfigError(err error) error {
 	if strings.Contains(err.Error(), "missing configs") {
-		return errors.New("The operation failed due to missing configs not being set. Please use the Defang tool called set_config to set the variable.")
+		return fmt.Errorf("The operation failed due to missing configs not being set, please use the Defang tool called set_config to set the variable: %w", err)
 	}
 	return err
 }
