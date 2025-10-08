@@ -9,13 +9,10 @@ import (
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/term"
-	"github.com/DefangLabs/defang/src/pkg/track"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func handleLogsTool(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
-	term.Debug("Tail tool called - opening logs in browser")
-	track.Evt("MCP Tail Tool")
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
 		return "", err

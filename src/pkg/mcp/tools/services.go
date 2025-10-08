@@ -17,8 +17,6 @@ import (
 )
 
 func handleServicesTool(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli CLIInterface) (string, error) {
-	term.Debug("Services tool called - fetching services from Defang")
-
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("no provider configured: %w", err)

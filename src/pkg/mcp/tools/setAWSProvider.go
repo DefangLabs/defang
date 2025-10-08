@@ -6,14 +6,11 @@ import (
 
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/actions"
-	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // handleSetAWSProvider handles the set AWS provider MCP tool request
 func handleSetAWSProvider(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string) (string, error) {
-	term.Debug("Set AWS Provider tool called")
-
 	awsId, err := request.RequireString("accessKeyId")
 	if err != nil {
 		return "", fmt.Errorf("Invalid AWS access key Id: %w", err)

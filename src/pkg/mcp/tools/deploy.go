@@ -21,9 +21,6 @@ func handleDeployTool(ctx context.Context, request mcp.CallToolRequest, provider
 		return "", fmt.Errorf("no provider configured: %w", err)
 	}
 
-	// Get compose path
-	term.Debug("Compose up tool called - deploying services")
-
 	wd, err := request.RequireString("working_directory")
 	if err != nil || wd == "" {
 		return "", fmt.Errorf("invalid working directory: %w", err)
