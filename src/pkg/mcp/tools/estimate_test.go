@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
+	"github.com/DefangLabs/defang/src/pkg/modes"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -151,7 +153,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			},
 			expectError:          true,
 			expectTextResult:     true,
-			expectedTextContains: "Unknown deployment mode provided, please use one of AFFORDABLE, BALANCED or HIGH_AVAILABILITY",
+			expectedTextContains: "Unknown deployment mode provided, please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
 			name:             "load_project_error",
