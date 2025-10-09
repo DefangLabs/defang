@@ -83,7 +83,7 @@ func CanIUseProvider(ctx context.Context, grpcClient client.FabricClient, provid
 
 func ProviderNotConfiguredError(providerId client.ProviderID) error {
 	if providerId == client.ProviderAuto {
-		return errors.New("no provider is configured; please type in the chat /defang.AWS_Setup for AWS, /defang.GCP_Setup for GCP, or /defang.Playground_Setup for Playground.")
+		return errors.New("No cloud provider is configured. To continue, please set up a provider:\n- For AWS: /defang.AWS_Setup or set_aws_provider\n- For GCP: /defang.GCP_Setup or set_gcp_provider\n- For Playground: /defang.Playground_Setup or set_playground_provider\nIf your IDE supports prompts, you can use the commands above directly in chat.")
 	}
 	return nil
 }
