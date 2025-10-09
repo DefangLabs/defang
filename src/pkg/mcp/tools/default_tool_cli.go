@@ -15,7 +15,6 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/mcp/deployment_info"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/browser"
 )
 
@@ -58,10 +57,6 @@ func (DefaultToolCLI) ComposeUp(ctx context.Context, project *compose.Project, c
 
 func (c *DefaultToolCLI) Tail(ctx context.Context, provider cliClient.Provider, project *compose.Project, options cli.TailOptions) error {
 	return cli.Tail(ctx, provider, project.Name, options)
-}
-
-func (DefaultToolCLI) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
 }
 
 func (DefaultToolCLI) ComposeDown(ctx context.Context, projectName string, client *cliClient.GrpcClient, provider cliClient.Provider) (string, error) {
@@ -141,9 +136,6 @@ type LoginCLIAdapter struct{ *DefaultToolCLI }
 func (DestroyCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
-func (DestroyCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
-}
 
 // --- SetConfigCLIInterface ---
 func (a *SetConfigCLIAdapter) ConfigSet(ctx context.Context, projectName string, provider cliClient.Provider, name, value string) error {
@@ -152,14 +144,8 @@ func (a *SetConfigCLIAdapter) ConfigSet(ctx context.Context, projectName string,
 func (a *SetConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
-func (a *SetConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return a.DefaultToolCLI.ConfigureLoader(request)
-}
 
 // --- RemoveConfigCLIInterface ---
-func (RemoveConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return common.ConfigureLoader(request)
-}
 func (RemoveConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }

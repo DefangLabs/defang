@@ -3,8 +3,6 @@ package tools
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -85,11 +83,6 @@ func (m *MockSetConfigCLI) ConfigSet(ctx context.Context, projectName string, pr
 	return m.ConfigSetError
 }
 
-func (m *MockSetConfigCLI) ConfigureLoader(request mcp.CallToolRequest) client.Loader {
-	// Return nil or a simple mock loader as needed for your tests
-	return nil
-}
-
 func createCallToolRequest(args map[string]interface{}) mcp.CallToolRequest {
 	return mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -100,9 +93,6 @@ func createCallToolRequest(args map[string]interface{}) mcp.CallToolRequest {
 }
 
 func TestHandleSetConfig(t *testing.T) {
-	// Create temporary directory for testing
-	tempDir := t.TempDir()
-
 	// Common test data
 	const (
 		testCluster    = "test-cluster"
@@ -119,7 +109,6 @@ func TestHandleSetConfig(t *testing.T) {
 		mockCLI                  *MockSetConfigCLI
 		expectedError            bool
 		errorMessage             string
-		checkWorkingDir          bool
 		expectedProjectName      string
 		expectedConnectCalls     bool
 		expectedProviderCalls    bool
@@ -128,37 +117,10 @@ func TestHandleSetConfig(t *testing.T) {
 	}{
 		// Input validation tests
 		{
-			name:          "missing working directory",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"name": testConfigName, "value": testValue},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "Invalid working directory: required argument \"working_directory\" not found",
-		},
-		{
-			name:          "empty working directory",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": "", "name": testConfigName, "value": testValue},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "Invalid working directory: %!w(<nil>)",
-		},
-		{
-			name:          "invalid working directory",
-			cluster:       testCluster,
-			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": "/nonexistent/directory", "name": testConfigName, "value": testValue},
-			mockCLI:       &MockSetConfigCLI{},
-			expectedError: true,
-			errorMessage:  "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
-		},
-		{
 			name:          "missing config name",
 			cluster:       testCluster,
 			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": tempDir, "value": testValue},
+			requestArgs:   map[string]interface{}{"value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
 			errorMessage:  "Invalid config `name`: required argument \"name\" not found",
@@ -167,7 +129,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:          "empty config name",
 			cluster:       testCluster,
 			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": "", "value": testValue},
+			requestArgs:   map[string]interface{}{"name": "", "value": testValue},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
 			errorMessage:  "Invalid config `name`: %!w(<nil>)",
@@ -176,7 +138,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:          "missing config value",
 			cluster:       testCluster,
 			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": testConfigName},
+			requestArgs:   map[string]interface{}{"name": testConfigName},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
 			errorMessage:  "Invalid config `value`: required argument \"value\" not found",
@@ -185,7 +147,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:          "empty config value",
 			cluster:       testCluster,
 			providerId:    client.ProviderID(""),
-			requestArgs:   map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": ""},
+			requestArgs:   map[string]interface{}{"name": testConfigName, "value": ""},
 			mockCLI:       &MockSetConfigCLI{},
 			expectedError: true,
 			errorMessage:  "Invalid config `value`: %!w(<nil>)",
@@ -196,7 +158,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                 "connect error",
 			cluster:              testCluster,
 			providerId:           client.ProviderID(""),
-			requestArgs:          map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
+			requestArgs:          map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("connection failed")},
 			expectedError:        true,
 			errorMessage:         "Could not connect: connection failed",
@@ -206,7 +168,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                  "provider error",
 			cluster:               testCluster,
 			providerId:            client.ProviderID(""),
-			requestArgs:           map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
+			requestArgs:           map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:               &MockSetConfigCLI{NewProviderError: errors.New("provider initialization failed")},
 			expectedError:         true,
 			errorMessage:          "Failed to get new provider: provider initialization failed",
@@ -217,7 +179,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                     "load project name error",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
-			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
+			requestArgs:              map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{LoadProjectNameError: errors.New("project loading failed")},
 			expectedError:            true,
 			errorMessage:             "Failed to load project name: project loading failed",
@@ -229,7 +191,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                     "config set error",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
-			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": "valid_config_name", "value": testValue},
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{ConfigSetError: errors.New("config set failed")},
 			expectedError:            true,
 			errorMessage:             "Failed to set config: config set failed",
@@ -244,7 +206,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:        "provider auto not configured",
 			cluster:     testCluster,
 			providerId:  client.ProviderAuto,
-			requestArgs: map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
+			requestArgs: map[string]interface{}{"name": testConfigName, "value": testValue},
 			mockCLI: &MockSetConfigCLI{
 				NewProviderError: errors.New("No provider configured. Use one of these setup tools:\n* /mcp.defang.AWS_Setup\n* /mcp.defang.GCP_Setup\n* /mcp.defang.Playground_Setup"),
 			},
@@ -259,7 +221,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                     "successful config set",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
-			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": "valid_config_name", "value": testValue},
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue},
 			mockCLI:                  &MockSetConfigCLI{},
 			expectedError:            false,
 			expectedConnectCalls:     true,
@@ -271,7 +233,7 @@ func TestHandleSetConfig(t *testing.T) {
 			name:                     "successful config set with project name",
 			cluster:                  testCluster,
 			providerId:               client.ProviderID(""),
-			requestArgs:              map[string]interface{}{"working_directory": tempDir, "name": "valid_config_name", "value": testValue, "project_name": "test-project"},
+			requestArgs:              map[string]interface{}{"name": "valid_config_name", "value": testValue, "project_name": "test-project"},
 			mockCLI:                  &MockSetConfigCLI{ReturnedProjectName: "test-project"},
 			expectedError:            false,
 			expectedProjectName:      "test-project",
@@ -280,23 +242,13 @@ func TestHandleSetConfig(t *testing.T) {
 			expectedProjectNameCalls: true,
 			expectedConfigSetCalls:   true,
 		},
-		{
-			name:                 "working directory change validation",
-			cluster:              testCluster,
-			providerId:           client.ProviderID(""),
-			requestArgs:          map[string]interface{}{"working_directory": tempDir, "name": "test-key", "value": "test-value"},
-			mockCLI:              &MockSetConfigCLI{ConnectError: errors.New("mock connection failure")},
-			expectedError:        true,
-			errorMessage:         "Could not connect: mock connection failure",
-			checkWorkingDir:      true,
-			expectedConnectCalls: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := createCallToolRequest(tt.requestArgs)
-			result, err := handleSetConfig(testContext, request, &tt.providerId, tt.cluster, tt.mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleSetConfig(testContext, loader, request, &tt.providerId, tt.cluster, tt.mockCLI)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -313,14 +265,6 @@ func TestHandleSetConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedProviderCalls, tt.mockCLI.NewProviderCalled, "NewProvider call expectation")
 			assert.Equal(t, tt.expectedProjectNameCalls, tt.mockCLI.LoadProjectNameCalled, "LoadProjectName call expectation")
 			assert.Equal(t, tt.expectedConfigSetCalls, tt.mockCLI.ConfigSetCalled, "ConfigSet call expectation")
-
-			// Check working directory change if required
-			if tt.checkWorkingDir {
-				currentDir, _ := os.Getwd()
-				expectedDir, _ := filepath.EvalSymlinks(tempDir)
-				actualDir, _ := filepath.EvalSymlinks(currentDir)
-				assert.Equal(t, expectedDir, actualDir)
-			}
 
 			// Check project name if specified
 			if tt.expectedProjectName != "" {

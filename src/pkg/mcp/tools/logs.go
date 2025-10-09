@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	cliTypes "github.com/DefangLabs/defang/src/pkg/cli"
@@ -12,11 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleLogsTool(ctx context.Context, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", err
-	}
+func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	deploymentId, err := request.RequireString("deployment_id")
 	if err != nil || deploymentId == "" {
 		return "", err
@@ -31,13 +26,6 @@ func handleLogsTool(ctx context.Context, request mcp.CallToolRequest, cluster st
 	if err != nil {
 		return "", fmt.Errorf("Invalid parameter 'until', must be in RFC3339 format: %w", err)
 	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("failed to change working directory: %w", err)
-	}
-
-	loader := cli.ConfigureLoader(request)
 
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
