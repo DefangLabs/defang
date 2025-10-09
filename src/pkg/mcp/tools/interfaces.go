@@ -73,7 +73,6 @@ type EstimateCLIInterface interface {
 type ListConfigCLIInterface interface {
 	Connecter
 	ProviderFactory
-	LoaderConfigurator
 	ProjectNameLoader
 	// Unique methods
 	ListConfig(ctx context.Context, provider cliClient.Provider, projectName string) (*defangv1.Secrets, error)
