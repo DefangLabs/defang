@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/mcp/common"
 	"github.com/DefangLabs/defang/src/pkg/modes"
+	"github.com/DefangLabs/defang/src/pkg/term"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -171,8 +173,20 @@ func CollectTools(cluster string, authPort int, providerId *client.ProviderID) [
 				),
 			),
 			Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				wd, err := request.RequireString("working_directory")
+				if err != nil || wd == "" {
+					term.Error("Invalid working directory", "error", errors.New("working_directory is required"))
+					return mcp.NewToolResultErrorFromErr("invalid working directory", err), err
+				}
+
+				err = os.Chdir(wd)
+				if err != nil {
+					term.Error("Failed to change working directory", "error", err)
+					return mcp.NewToolResultErrorFromErr("Failed to change working directory", err), err
+				}
+				loader := common.ConfigureLoader(request)
 				cli := &DefaultToolCLI{}
-				output, err := handleEstimateTool(ctx, request, providerId, cluster, cli)
+				output, err := handleEstimateTool(ctx, loader, request, providerId, cluster, cli)
 				if err != nil {
 					return mcp.NewToolResultErrorFromErr("Failed to estimate costs", err), err
 				}

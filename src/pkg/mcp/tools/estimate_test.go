@@ -104,7 +104,6 @@ func (m *MockEstimateCLI) CaptureTermOutput(mode defangv1.DeploymentMode, estima
 func TestHandleEstimateTool(t *testing.T) {
 	tests := []struct {
 		name                 string
-		workingDirectory     string
 		deploymentMode       string
 		provider             string
 		providerID           client.ProviderID
@@ -113,24 +112,9 @@ func TestHandleEstimateTool(t *testing.T) {
 		expectedError        string
 	}{
 		{
-			name:             "missing_working_directory",
-			workingDirectory: "",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockEstimateCLI) {},
-			expectedError:    "working_directory is required: %!w(<nil>)",
-		},
-		{
-			name:             "invalid_working_directory",
-			workingDirectory: "/nonexistent/directory",
-			providerID:       client.ProviderAWS,
-			setupMock:        func(m *MockEstimateCLI) {},
-			expectedError:    "Failed to change working directory: chdir /nonexistent/directory: no such file or directory",
-		},
-		{
-			name:             "unknown_deployment_mode_fails",
-			workingDirectory: ".",
-			deploymentMode:   "unknown-mode",
-			providerID:       client.ProviderAWS,
+			name:           "unknown_deployment_mode_fails",
+			deploymentMode: "unknown-mode",
+			providerID:     client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.Region = "us-west-2"
@@ -147,18 +131,16 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedError: "Unknown deployment mode \"UNKNOWN-MODE\", please use one of " + strings.Join(modes.AllDeploymentModes(), ", "),
 		},
 		{
-			name:             "load_project_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "load_project_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.LoadProjectError = errors.New("failed to parse compose file")
 			},
 			expectedError: "failed to parse compose file: failed to parse compose file: failed to parse compose file",
 		},
 		{
-			name:             "connect_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "connect_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.ConnectError = errors.New("connection failed")
@@ -166,10 +148,9 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedError: "Could not connect: connection failed",
 		},
 		{
-			name:             "set_provider_id_error",
-			workingDirectory: ".",
-			provider:         "invalid-provider",
-			providerID:       client.ProviderAWS,
+			name:       "set_provider_id_error",
+			provider:   "invalid-provider",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.SetProviderIDError = errors.New("invalid provider")
@@ -177,9 +158,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedError: "Invalid provider specified: invalid provider",
 		},
 		{
-			name:             "run_estimate_error",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "run_estimate_error",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.Region = "us-west-2"
@@ -188,9 +168,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedError: "Failed to run estimate: estimate failed",
 		},
 		{
-			name:             "successful_estimate_default_mode",
-			workingDirectory: ".",
-			providerID:       client.ProviderAWS,
+			name:       "successful_estimate_default_mode",
+			providerID: client.ProviderAWS,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.Region = "us-west-2"
@@ -207,11 +186,10 @@ func TestHandleEstimateTool(t *testing.T) {
 			expectedTextContains: "Successfully estimated the cost of the project to AWS",
 		},
 		{
-			name:             "successful_estimate_high_availability_mode",
-			workingDirectory: ".",
-			deploymentMode:   "HIGH_AVAILABILITY",
-			provider:         "GCP",
-			providerID:       client.ProviderGCP,
+			name:           "successful_estimate_high_availability_mode",
+			deploymentMode: "HIGH_AVAILABILITY",
+			provider:       "GCP",
+			providerID:     client.ProviderGCP,
 			setupMock: func(m *MockEstimateCLI) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.Region = "us-central1"
@@ -239,9 +217,7 @@ func TestHandleEstimateTool(t *testing.T) {
 			tt.setupMock(mockCLI)
 
 			// Create request
-			args := map[string]interface{}{
-				"working_directory": tt.workingDirectory,
-			}
+			args := map[string]interface{}{}
 			if tt.deploymentMode != "" {
 				args["deployment_mode"] = tt.deploymentMode
 			}
@@ -257,7 +233,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := handleEstimateTool(t.Context(), request, &tt.providerID, "test-cluster", mockCLI)
+			loader := &client.MockLoader{}
+			result, err := handleEstimateTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -270,9 +247,8 @@ func TestHandleEstimateTool(t *testing.T) {
 			}
 
 			// For successful cases, verify CLI methods were called in order
-			if tt.expectedError == "" && tt.workingDirectory != "" && tt.name == "successful_estimate_default_mode" {
+			if tt.expectedError == "" && tt.name == "successful_estimate_default_mode" {
 				expectedCalls := []string{
-					"ConfigureLoader",
 					"LoadProject",
 					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
