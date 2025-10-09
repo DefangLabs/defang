@@ -25,12 +25,13 @@ func (gcp Gcp) GetCurrentAccountEmail(ctx context.Context) (string, error) {
 	var key struct {
 		ClientEmail                    string `json:"client_email"`
 		Type                           string `json:"type"`
+		Audience                       string `json:"audience"`
 		ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
 	}
 	err = json.Unmarshal(creds.JSON, &key)
 	if err == nil {
 		if key.Type == "external_account" {
-			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)
+			return "principalSet:" + key.Audience, nil
 		}
 		if key.Type == "impersonated_service_account" {
 			return parseServiceAccountFromURL(key.ServiceAccountImpersonationURL)

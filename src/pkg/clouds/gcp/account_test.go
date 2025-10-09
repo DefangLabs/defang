@@ -64,7 +64,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 			return &google.Credentials{
 				JSON: []byte(`{
 				"type": "external_account",
-				"service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/1234567890/serviceAccounts/test@project.iam.gserviceaccount.com:generateAccessToken"
+				"audience": "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider",
 			}`),
 			}, nil
 		}
@@ -73,7 +73,7 @@ func TestGetCurrentAccountEmail(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		expected := "test@project.iam.gserviceaccount.com"
+		expected := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/github/providers/defang-github-provider"
 		if email != expected {
 			t.Errorf("expected email to be %s, got %s", expected, email)
 		}
