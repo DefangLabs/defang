@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,22 +12,42 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
+type LogsParams struct {
+	DeploymentID string    `json:"deployment_id"`
+	Since        time.Time `json:"since"`
+	Until        time.Time `json:"until"`
+}
+
+func ParseLogsParams(request mcp.CallToolRequest) (LogsParams, error) {
 	deploymentId, err := request.RequireString("deployment_id")
-	if err != nil || deploymentId == "" {
-		return "", err
-	}
-	since := request.GetString("since", "")
-	until := request.GetString("until", "")
-	sinceTime, err := time.Parse(time.RFC3339, since)
 	if err != nil {
-		return "", fmt.Errorf("Invalid parameter 'since', must be in RFC3339 format: %w", err)
+		return LogsParams{}, errors.New("missing required parameter: deployment_id")
 	}
-	untilTime, err := time.Parse(time.RFC3339, until)
-	if err != nil {
-		return "", fmt.Errorf("Invalid parameter 'until', must be in RFC3339 format: %w", err)
+	sinceStr := request.GetString("since", "")
+	var since time.Time
+	if sinceStr != "" {
+		since, err = time.Parse(time.RFC3339, sinceStr)
+		if err != nil {
+			return LogsParams{}, fmt.Errorf("invalid parameter 'since', must be in RFC3339 format: %w", err)
+		}
+	}
+	untilStr := request.GetString("until", "")
+	var until time.Time
+	if untilStr != "" {
+		until, err = time.Parse(time.RFC3339, untilStr)
+		if err != nil {
+			return LogsParams{}, fmt.Errorf("invalid parameter 'until', must be in RFC3339 format: %w", err)
+		}
 	}
 
+	return LogsParams{
+		DeploymentID: deploymentId,
+		Since:        since,
+		Until:        until,
+	}, nil
+}
+
+func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, params LogsParams, cluster string, providerId *cliClient.ProviderID, cli LogsCLIInterface) (string, error) {
 	term.Debug("Function invoked: loader.LoadProject")
 	project, err := cli.LoadProject(ctx, loader)
 	if err != nil {
@@ -50,9 +71,9 @@ func handleLogsTool(ctx context.Context, loader cliClient.ProjectLoader, request
 	}
 
 	err = cli.Tail(ctx, provider, project, cliTypes.TailOptions{
-		Deployment: deploymentId,
-		Since:      sinceTime,
-		Until:      untilTime,
+		Deployment: params.DeploymentID,
+		Since:      params.Since,
+		Until:      params.Until,
 	})
 
 	if err != nil {

@@ -155,7 +155,7 @@ func TestHandleEstimateTool(t *testing.T) {
 				m.Project = &compose.Project{Name: "test-project"}
 				m.SetProviderIDError = errors.New("invalid provider")
 			},
-			expectedError: "Invalid provider specified: invalid provider",
+			expectedError: "Invalid provider specified: provider not one of [auto defang aws digitalocean gcp]",
 		},
 		{
 			name:       "run_estimate_error",
@@ -234,7 +234,15 @@ func TestHandleEstimateTool(t *testing.T) {
 
 			// Call the function
 			loader := &client.MockLoader{}
-			result, err := handleEstimateTool(t.Context(), loader, request, &tt.providerID, "test-cluster", mockCLI)
+			params, err := ParseEstimateParams(request, &tt.providerID)
+			if err != nil {
+				if tt.expectedError != "" {
+					assert.EqualError(t, err, tt.expectedError)
+					return
+				}
+				assert.NoError(t, err)
+			}
+			result, err := handleEstimateTool(t.Context(), loader, params, "test-cluster", mockCLI)
 
 			// Verify error expectations
 			if tt.expectedError != "" {
@@ -252,7 +260,6 @@ func TestHandleEstimateTool(t *testing.T) {
 					"LoadProject",
 					"Connect(test-cluster)",
 					"CreatePlaygroundProvider",
-					"SetProviderID(aws)",
 					"GetRegion(aws)",
 					"RunEstimate(test-project, aws, DEVELOPMENT)",
 					"CaptureTermOutput(DEVELOPMENT)",
