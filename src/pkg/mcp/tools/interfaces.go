@@ -97,7 +97,6 @@ type RemoveConfigCLIInterface interface {
 
 type SetConfigCLIInterface interface {
 	Connecter
-	LoaderConfigurator
 	ProjectNameLoader
 	// Unique methods
 	NewProvider(ctx context.Context, providerId cliClient.ProviderID, client cliClient.FabricClient) (cliClient.Provider, error)

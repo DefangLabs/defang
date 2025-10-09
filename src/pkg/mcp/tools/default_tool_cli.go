@@ -149,9 +149,6 @@ func (a *SetConfigCLIAdapter) ConfigSet(ctx context.Context, projectName string,
 func (a *SetConfigCLIAdapter) LoadProjectNameWithFallback(ctx context.Context, loader cliClient.Loader, provider cliClient.Provider) (string, error) {
 	return cliClient.LoadProjectNameWithFallback(ctx, loader, provider)
 }
-func (a *SetConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {
-	return a.DefaultToolCLI.ConfigureLoader(request)
-}
 
 // --- RemoveConfigCLIInterface ---
 func (RemoveConfigCLIAdapter) ConfigureLoader(request mcp.CallToolRequest) cliClient.Loader {

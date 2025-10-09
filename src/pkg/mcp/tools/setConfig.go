@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	cliClient "github.com/DefangLabs/defang/src/pkg/cli/client"
@@ -13,20 +12,10 @@ import (
 )
 
 // handleSetConfig handles the set config MCP tool request
-func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
+func handleSetConfig(ctx context.Context, loader cliClient.ProjectLoader, request mcp.CallToolRequest, providerId *cliClient.ProviderID, cluster string, cli SetConfigCLIInterface) (string, error) {
 	err := common.ProviderNotConfiguredError(*providerId)
 	if err != nil {
 		return "", fmt.Errorf("No provider configured: %w", err)
-	}
-
-	wd, err := request.RequireString("working_directory")
-	if err != nil || wd == "" {
-		return "", fmt.Errorf("Invalid working directory: %w", err)
-	}
-
-	err = os.Chdir(wd)
-	if err != nil {
-		return "", fmt.Errorf("Failed to change working directory: %w", err)
 	}
 
 	name, err := request.RequireString("name")
@@ -50,8 +39,6 @@ func handleSetConfig(ctx context.Context, request mcp.CallToolRequest, providerI
 	if err != nil {
 		return "", fmt.Errorf("Failed to get new provider: %w", err)
 	}
-
-	loader := common.ConfigureLoader(request)
 
 	term.Debug("Function invoked: cli.LoadProjectNameWithFallback")
 	projectName, err := cli.LoadProjectNameWithFallback(ctx, loader, provider)
