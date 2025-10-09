@@ -89,7 +89,7 @@ func TestHandleListConfigTool(t *testing.T) {
 			workingDirectory: ".",
 			providerID:       client.ProviderAuto,
 			setupMock:        func(m *MockListConfigCLI) {},
-			expectedError:    common.PromptError.Error(),
+			expectedError:    common.ErrNoProviderSet.Error(),
 		},
 		{
 			name:             "connect_error",

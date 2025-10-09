@@ -192,7 +192,7 @@ func TestHandleDeployTool(t *testing.T) {
 			workingDirectory: ".",
 			providerID:       client.ProviderAuto,
 			setupMock:        func(m *MockDeployCLI) {},
-			expectedError:    common.PromptError.Error(),
+			expectedError:    common.ErrNoProviderSet.Error(),
 		},
 	}
 

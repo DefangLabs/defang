@@ -159,7 +159,7 @@ func TestHandleDestroyTool(t *testing.T) {
 			workingDirectory: ".",
 			providerID:       client.ProviderAuto,
 			setupMock:        func(m *MockDestroyCLI) {},
-			expectedError:    common.PromptError.Error(),
+			expectedError:    common.ErrNoProviderSet.Error(),
 		},
 	}
 

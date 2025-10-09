@@ -138,7 +138,7 @@ func TestHandleServicesToolWithMockCLI(t *testing.T) {
 			},
 
 			expectedError:       true,
-			errorMessage:        common.PromptError.Error(),
+			errorMessage:        common.ErrNoProviderSet.Error(),
 			expectedGetServices: false,
 		},
 		{

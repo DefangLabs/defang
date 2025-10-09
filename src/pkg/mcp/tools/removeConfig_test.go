@@ -79,7 +79,7 @@ func TestHandleRemoveConfigTool(t *testing.T) {
 			providerID:       client.ProviderAuto,
 			setupMock:        func(m *MockRemoveConfigCLI) {},
 			expectError:      true,
-			expectedError:    common.PromptError.Error(),
+			expectedError:    common.ErrNoProviderSet.Error(),
 		},
 		{
 			name:             "missing_working_directory",

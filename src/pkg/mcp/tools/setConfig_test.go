@@ -247,10 +247,10 @@ func TestHandleSetConfig(t *testing.T) {
 			providerId:  client.ProviderAuto,
 			requestArgs: map[string]interface{}{"working_directory": tempDir, "name": testConfigName, "value": testValue},
 			mockCLI: &MockSetConfigCLI{
-				NewProviderError: common.PromptError,
+				NewProviderError: common.ErrNoProviderSet,
 			},
 			expectedError:         true,
-			errorMessage:          common.PromptError.Error(),
+			errorMessage:          common.ErrNoProviderSet.Error(),
 			expectedConnectCalls:  false, // Early return in providerNotConfiguredError
 			expectedProviderCalls: false, // Early return in providerNotConfiguredError
 		},
