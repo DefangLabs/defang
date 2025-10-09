@@ -244,8 +244,10 @@ func (gcp Gcp) EnsureUserHasServiceAccountRoles(ctx context.Context, user, servi
 
 	resource := fmt.Sprintf("projects/%s/serviceAccounts/%s", gcp.ProjectId, serviceAccount)
 	member := "user:" + user
-	if strings.HasSuffix(serviceAccount, ".iam.gserviceaccount.com") {
-		member = "serviceAccount:" + serviceAccount
+	if strings.HasSuffix(user, ".gserviceaccount.com") {
+		member = "serviceAccount:" + user
+	} else if strings.HasPrefix(user, "principalSet://") {
+		member = user
 	}
 
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
@@ -299,11 +301,11 @@ type resourceWithIAMPolicyClient interface {
 }
 
 func ensureAccountHasRolesWithResource(ctx context.Context, client resourceWithIAMPolicyClient, resource, account string, roles []string) error {
-	var member string
+	member := "user:" + account
 	if strings.HasSuffix(account, ".gserviceaccount.com") {
 		member = "serviceAccount:" + account
-	} else {
-		member = "user:" + account
+	} else if strings.HasPrefix(account, "principalSet://") {
+		member = account
 	}
 	policy, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Resource: resource})
 	if err != nil {
